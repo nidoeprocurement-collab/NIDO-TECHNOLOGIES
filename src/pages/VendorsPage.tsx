@@ -167,36 +167,39 @@ export default function VendorsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <p className="text-xs text-gray-500">Configuration / Vendor Management</p>
             <h1 className="text-2xl font-bold">Vendor Management</h1>
           </div>
-          <div className="flex gap-3">
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
-              <FileDown size={18} />
-              Export CSV
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
+              <FileDown size={16} />
+              <span className="hidden md:inline">Export CSV</span>
+              <span className="md:hidden">Export</span>
             </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
-              <FileUp size={18} />
-              Template
+            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
+              <FileUp size={16} />
+              <span className="hidden md:inline">Template</span>
+              <span className="md:hidden">TPL</span>
             </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
-              <Upload size={18} />
-              Bulk Import
+            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
+              <Upload size={16} />
+              <span className="hidden md:inline">Bulk Import</span>
+              <span className="md:hidden">Import</span>
             </button>
-            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
-              <LogIn size={18} />
-              Onboard
+            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
+              <LogIn size={16} />
+              <span className="hidden md:inline">Onboard</span>
             </button>
             <button
               onClick={() => {
                 resetForm();
                 setShowCreate(true);
               }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium whitespace-nowrap"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               Add Vendor
             </button>
           </div>
@@ -205,21 +208,21 @@ export default function VendorsPage() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Search and Filter */}
-        <div className="mb-6 flex gap-4">
+        <div className="mb-6 flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
             <input
               type="text"
               placeholder="Search vendors..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
           >
             <option value="all">All</option>
             <option value="active">Active</option>
@@ -234,31 +237,25 @@ export default function VendorsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600">
                     VENDOR ID
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600">
                     VENDOR
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden sm:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600">
                     CATEGORY
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden lg:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600">
                     CONTACT
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden lg:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600">
                     RATING
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    ORDERS
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    TOTAL SPEND
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600">
                     STATUS
                   </th>
-                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-6 py-4 text-center text-xs font-semibold text-gray-600">
                     ACTIONS
                   </th>
                 </tr>
@@ -266,51 +263,49 @@ export default function VendorsPage() {
               <tbody>
                 {filteredVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-3 sm:px-6 py-8 text-center text-gray-500">
                       No vendors found
                     </td>
                   </tr>
                 ) : (
                   filteredVendors.map((vendor) => (
                     <tr key={vendor.id} className="border-b hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-blue-600">
+                      <td className="px-3 sm:px-6 py-4 text-sm font-medium text-blue-600">
                         {vendor.vendor_code}
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium">
+                      <td className="px-3 sm:px-6 py-4 text-sm font-medium">
                         {vendor.company_name}
                       </td>
-                      <td className="px-6 py-4 text-sm">{vendor.category}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="hidden sm:table-cell px-6 py-4 text-sm">{vendor.category}</td>
+                      <td className="hidden lg:table-cell px-6 py-4 text-sm text-gray-600">
                         {vendor.email}
                       </td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="hidden lg:table-cell px-6 py-4 text-sm">
                         <span className="text-yellow-500">★</span> {vendor.rating}
                       </td>
-                      <td className="px-6 py-4 text-sm">0</td>
-                      <td className="px-6 py-4 text-sm">$0</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-3 sm:px-6 py-4 text-sm">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+                          className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
                             vendor.status
                           )}`}
                         >
                           {vendor.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-3 sm:px-6 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
                           <button className="p-2 hover:bg-gray-200 rounded">
-                            <Eye size={16} />
+                            <Eye size={14} className="sm:w-4 sm:h-4" />
                           </button>
                           <button 
                             onClick={() => handleEditOpen(vendor)}
                             className="p-2 hover:bg-gray-200 rounded">
-                            <Edit2 size={16} />
+                            <Edit2 size={14} className="sm:w-4 sm:h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(vendor.id)}
                             className="p-2 hover:bg-gray-200 rounded text-red-600">
-                            <Trash2 size={16} />
+                            <Trash2 size={14} className="sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       </td>
