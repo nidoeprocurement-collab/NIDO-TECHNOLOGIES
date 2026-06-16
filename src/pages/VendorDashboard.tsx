@@ -23,18 +23,18 @@ export default function VendorDashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {DASHBOARD_STATS.map((stat) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.label} className="bg-white p-6 rounded-lg border hover:shadow-lg transition-shadow">
+              <div key={stat.label} className="bg-white p-4 sm:p-6 rounded-lg border hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-gray-600 text-xs font-semibold">{stat.label}</p>
-                    <p className="text-3xl font-bold mt-2">{stat.value}</p>
+                    <p className="text-2xl sm:text-3xl font-bold mt-2">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-lg ${stat.color}`}>
-                    <Icon size={24} />
+                  <div className={`p-2 rounded-lg ${stat.color}`}>
+                    <Icon size={20} className="sm:w-6 sm:h-6" />
                   </div>
                 </div>
               </div>
@@ -43,23 +43,23 @@ export default function VendorDashboard() {
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           {/* Spend by Category */}
-          <div className="bg-white p-6 rounded-lg border">
-            <h3 className="font-semibold mb-4">Spend by Category</h3>
+          <div className="bg-white p-4 sm:p-6 rounded-lg border">
+            <h3 className="font-semibold mb-4 text-sm sm:text-base">Spend by Category</h3>
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">No data available</p>
+              <p className="text-xs sm:text-sm text-gray-500">No data available</p>
             </div>
           </div>
 
           {/* Top Vendors by Spend */}
-          <div className="bg-white p-6 rounded-lg border">
-            <h3 className="font-semibold mb-4">Top Vendors by Spend ($K)</h3>
+          <div className="bg-white p-4 sm:p-6 rounded-lg border">
+            <h3 className="font-semibold mb-4 text-sm sm:text-base">Top Vendors by Spend ($K)</h3>
             <div className="space-y-3">
               {["SGH.JSBMDF", "raj furnitures"].map((vendor) => (
                 <div key={vendor} className="flex items-center gap-3">
-                  <span className="w-32 text-sm truncate">{vendor}</span>
-                  <div className="flex-1 bg-gray-100 h-6 rounded" style={{width: Math.random() * 100 + "%"}}></div>
+                  <span className="w-24 sm:w-32 text-xs sm:text-sm truncate">{vendor}</span>
+                  <div className="flex-1 bg-gray-100 h-5 rounded" style={{width: Math.random() * 100 + "%"}}></div>
                 </div>
               ))}
             </div>
@@ -67,30 +67,30 @@ export default function VendorDashboard() {
         </div>
 
         {/* Vendor Profiles Table */}
-        <div className="bg-white p-6 rounded-lg border">
-          <h3 className="font-semibold mb-4">Vendor Profiles</h3>
+        <div className="bg-white p-4 sm:p-6 rounded-lg border">
+          <h3 className="font-semibold mb-4 text-sm sm:text-base">Vendor Profiles</h3>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">VENDOR</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">CATEGORY</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">RATING</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">ORDERS</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">TOTAL SPEND</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">STATUS</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">VENDOR</th>
+                  <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">CATEGORY</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">RATING</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">ORDERS</th>
+                  <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">TOTAL SPEND</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">STATUS</th>
                 </tr>
               </thead>
               <tbody>
                 {MOCK_VENDOR_PROFILES.map((vendor) => (
                   <tr key={vendor.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium">{vendor.vendor}</td>
-                    <td className="px-4 py-3 text-sm">{vendor.category}</td>
-                    <td className="px-4 py-3 text-sm"><span className="text-yellow-500">★</span> {vendor.rating}</td>
-                    <td className="px-4 py-3 text-sm">{vendor.orders}</td>
-                    <td className="px-4 py-3 text-sm">{vendor.spend}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">{vendor.vendor}</td>
+                    <td className="hidden sm:table-cell px-4 py-3 text-xs sm:text-sm">{vendor.category}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm"><span className="text-yellow-500">★</span> {vendor.rating}</td>
+                    <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">{vendor.orders}</td>
+                    <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm">{vendor.spend}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                         {vendor.status}
                       </span>
                     </td>

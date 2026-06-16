@@ -7,7 +7,6 @@ import {
   Download,
   Upload,
   MoreVertical,
-  Users,
   Archive,
 } from "lucide-react";
 
@@ -78,6 +77,8 @@ export default function ClientsPage() {
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"All" | "Premium" | "Active" | "Pending" | "Inactive">("All");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [showMenu, setShowMenu] = useState(false);
 
   useEffect(() => {
     const initializeClients = async () => {
@@ -324,40 +325,74 @@ export default function ClientsPage() {
             <h1 className="text-2xl font-bold">Clients</h1>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigate("/clients/add")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          <div className="relative">
+            <button 
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="More options"
             >
-              <Plus size={18} />
-              Add Client
+              <MoreVertical size={20} className="text-gray-600" />
             </button>
-            <div className="relative group">
-              <button className="px-3 py-2 rounded-lg hover:bg-gray-100">
-                <MoreVertical size={20} />
-              </button>
-              <div className="hidden group-hover:flex absolute right-0 mt-0 bg-white border rounded-lg shadow-lg flex-col">
-                <button onClick={exportCSV} className="px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2">
-                  <Download size={16} />
-                  Export
+            
+            {showMenu && (
+              <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52 z-50">
+                <button 
+                  onClick={() => {
+                    navigate("/clients/add");
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Plus size={16} />
+                  Add Client
                 </button>
-                <button onClick={() => setShowBulkImport(true)} className="px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    exportCSV();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Download size={16} />
+                  Export Clients
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowBulkImport(true);
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
                   <Upload size={16} />
-                  Import
+                  Bulk Import
                 </button>
-                <button onClick={downloadTemplate} className="px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    downloadTemplate();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
                   <Download size={16} />
-                  Template
+                  Download Template
+                </button>
+                <div className="border-t border-gray-200 my-1"></div>
+                <button 
+                  onClick={() => setShowMenu(false)}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Archive size={16} />
+                  Archive Clients
                 </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Premium Clients", value: stats.premium, color: "blue", filter: "Premium" },
             { label: "Active Clients", value: stats.active, color: "green", filter: "Active" },
@@ -367,14 +402,14 @@ export default function ClientsPage() {
             <button
               key={stat.label}
               onClick={() => setActiveFilter(stat.filter as any)}
-              className={`text-left p-6 bg-white rounded-lg border-2 transition-all ${
+              className={`text-left p-4 bg-white rounded-lg border-2 transition-all ${
                 activeFilter === stat.filter
                   ? `border-${stat.color}-500 shadow-lg`
                   : "border-gray-200 hover:shadow-md"
               }`}
             >
-              <p className="text-gray-600 text-sm">{stat.label}</p>
-              <p className={`text-3xl font-bold mt-2 text-${stat.color}-600`}>
+              <p className="text-gray-600 text-xs sm:text-sm">{stat.label}</p>
+              <p className={`text-2xl sm:text-3xl font-bold mt-2 text-${stat.color}-600`}>
                 {stat.value}
               </p>
             </button>
@@ -382,15 +417,15 @@ export default function ClientsPage() {
         </div>
 
         {/* Search Bar */}
-        <div className="mb-6 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
             <input
               type="text"
               placeholder="Search by name, email, or ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
             />
           </div>
         </div>
@@ -401,25 +436,25 @@ export default function ClientsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     <input type="checkbox" className="rounded" />
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Client ID
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Client Name
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Representative
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Email
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-4 py-3 text-center text-xs font-semibold text-gray-600">
                     Actions
                   </th>
                 </tr>
@@ -427,78 +462,53 @@ export default function ClientsPage() {
               <tbody>
                 {filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-3 sm:px-4 py-8 text-center text-gray-500 text-sm">
                       No clients found
                     </td>
                   </tr>
                 ) : (
                   filteredClients.map((client) => (
                     <tr key={client.id} className="border-b hover:bg-gray-50">
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-4 py-3">
                         <input type="checkbox" className="rounded" />
                       </td>
                       <td
-                        className="px-6 py-4 text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                        className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium text-blue-600 cursor-pointer hover:underline"
                         onClick={() => navigate(`/clients/${client.id}`)}
                       >
                         {client.client_id}
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium">
+                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">
                         {client.company_name}
                       </td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">
                         {client.contact_person}
                       </td>
-                      <td className="px-6 py-4 text-sm">{client.email}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(client.status)}`}>
+                      <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm">
+                        {client.email}
+                      </td>
+                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(
+                            client.status
+                          )}`}
+                        >
                           {client.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="relative group">
-                          <button className="p-2 hover:bg-gray-200 rounded">
-                            <MoreVertical size={16} />
-                          </button>
-                          <div className="hidden group-hover:flex absolute right-0 mt-0 bg-white border rounded-lg shadow-lg flex-col z-10">
-                            <button
-                              onClick={() => navigate(`/clients/${client.id}`)}
-                              className="px-4 py-2 text-left text-sm hover:bg-gray-100"
-                            >
-                              View Details
-                            </button>
-                            <button
-                              onClick={() => handleEditClient(client.id)}
-                              className="px-4 py-2 text-left text-sm hover:bg-gray-100"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeleteClient(client.id, client.company_name)
-                              }
-                              className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600"
-                            >
-                              Archive
-                            </button>
-                          </div>
-                        </div>
+                      <td className="px-3 sm:px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleEditClient(client.id)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="px-6 py-4 border-t flex items-center justify-between text-sm text-gray-600">
-            <span>{filteredClients.length}-{filteredClients.length} of {clients.filter(c => !c.is_archived).length} clients</span>
-            <div className="flex gap-2">
-              <button className="p-2 hover:bg-gray-100 rounded">←</button>
-              <button className="px-3 py-1 rounded border">1</button>
-              <button className="p-2 hover:bg-gray-100 rounded">→</button>
-            </div>
           </div>
         </div>
       </div>
