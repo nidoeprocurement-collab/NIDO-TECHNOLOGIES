@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, MoreVertical, Download, Upload, Eye, Trash2, Edit2, FileDown, FileUp, LogIn } from "lucide-react";
+import { Plus, Search, MoreVertical, Download, Upload, Eye, Trash2, Edit2, FileDown, FileUp, LogIn, Archive } from "lucide-react";
 
 const MOCK_VENDORS = [
   {
@@ -49,6 +49,7 @@ export default function VendorsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
@@ -163,45 +164,127 @@ export default function VendorsPage() {
     }
   };
 
+  const exportCSV = () => {
+    if (vendors.length === 0) {
+      console.log("[v0] No vendors to export");
+      return;
+    }
+    const headers = ["Vendor Code", "Company Name", "Category", "Contact Person", "Email", "Phone", "Status"];
+    const csv = [
+      headers.join(","),
+      ...vendors.map((v) =>
+        [v.vendor_code, v.company_name, v.category, v.contact_person, v.email, v.phone, v.status].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "vendors.csv";
+    a.click();
+    console.log("[v0] Vendors exported successfully");
+  };
+
+  const downloadTemplate = () => {
+    const headers = ["Vendor Code", "Company Name", "Category", "Contact Person", "Email", "Phone", "Status"];
+    const sampleRow = ["VND-001", "Sample Company", "IT Hardware", "John Doe", "john@sample.com", "+1-555-0000", "pending"];
+    const csv = [headers.join(","), sampleRow.join(",")].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "vendors_template.csv";
+    a.click();
+    console.log("[v0] Template downloaded successfully");
+  };
+
+  const handleArchiveVendors = () => {
+    const activeVendors = vendors.filter((v) => v.status === "active");
+    if (activeVendors.length === 0) {
+      console.log("[v0] No active vendors to archive");
+      return;
+    }
+    if (window.confirm(`Archive ${activeVendors.length} active vendor(s)?`)) {
+      setVendors(vendors.map((v) => (v.status === "active" ? { ...v, status: "inactive" } : v)));
+      console.log("[v0] Vendors archived successfully");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Configuration / Vendor Management</p>
             <h1 className="text-2xl font-bold">Vendor Management</h1>
           </div>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <FileDown size={16} />
-              <span className="hidden md:inline">Export CSV</span>
-              <span className="md:hidden">Export</span>
-            </button>
-            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <FileUp size={16} />
-              <span className="hidden md:inline">Template</span>
-              <span className="md:hidden">TPL</span>
-            </button>
-            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <Upload size={16} />
-              <span className="hidden md:inline">Bulk Import</span>
-              <span className="md:hidden">Import</span>
-            </button>
-            <button className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium whitespace-nowrap">
-              <LogIn size={16} />
-              <span className="hidden md:inline">Onboard</span>
-            </button>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowCreate(true);
-              }}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium whitespace-nowrap"
+
+          <div className="relative">
+            <button 
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="More options"
             >
-              <Plus size={16} />
-              Add Vendor
+              <MoreVertical size={20} className="text-gray-600" />
             </button>
+            
+            {showMenu && (
+              <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-52 z-50">
+                <button 
+                  onClick={() => {
+                    navigate("/vendors/onboarding");
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <LogIn size={16} />
+                  Vendor Onboard
+                </button>
+                <button 
+                  onClick={() => {
+                    exportCSV();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Download size={16} />
+                  Export CSV
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Upload size={16} />
+                  Bulk Import
+                </button>
+                <button 
+                  onClick={() => {
+                    downloadTemplate();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Download size={16} />
+                  Download Template
+                </button>
+                <div className="border-t border-gray-200 my-1"></div>
+                <button 
+                  onClick={() => {
+                    handleArchiveVendors();
+                    setShowMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                >
+                  <Archive size={16} />
+                  Archive Vendors
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
