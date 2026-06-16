@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { toast } from "sonner";
-import { Check, ChevronRight } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Upload, User, Briefcase, FileText, MapPin, Files } from "lucide-react";
 
 const ONBOARDING_STEPS = [
-  { id: 1, label: "Basic Information", completed: true },
-  { id: 2, label: "Business Details", completed: true },
-  { id: 3, label: "Banking Information", completed: false },
-  { id: 4, label: "Documents", completed: false },
-  { id: 5, label: "Review", completed: false },
+  { id: 1, label: "Basic Info", icon: User },
+  { id: 2, label: "Business", icon: Briefcase },
+  { id: 3, label: "Financial", icon: FileText },
+  { id: 4, label: "Address", icon: MapPin },
+  { id: 5, label: "Documents", icon: Files },
 ];
 
 export default function VendorOnboardingPage() {
@@ -33,9 +32,9 @@ export default function VendorOnboardingPage() {
   const handleNext = () => {
     if (currentStep < ONBOARDING_STEPS.length) {
       setCurrentStep(currentStep + 1);
-      toast.success(`Completed Step ${currentStep}`);
+      console.log("[v0] Completed Step " + currentStep);
     } else {
-      toast.success("Onboarding Complete!");
+      console.log("[v0] Onboarding Complete!");
     }
   };
 
@@ -161,39 +160,57 @@ export default function VendorOnboardingPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div>
-            <p className="text-xs text-gray-500">Vendor Portal / Onboarding</p>
-            <h1 className="text-2xl font-bold">Vendor Onboarding</h1>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button className="p-2 hover:bg-gray-100 rounded">
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold">Vendor Onboarding</h1>
+              <p className="text-xs text-gray-500">Complete all 5 steps to register a new vendor</p>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Progress Steps */}
-        <div className="mb-8">
+        {/* Progress Steps with Icons */}
+        <div className="mb-8 bg-white p-8 rounded-lg border">
           <div className="flex items-center justify-between">
-            {ONBOARDING_STEPS.map((step, idx) => (
-              <div key={step.id} className="flex items-center flex-1">
-                <div
-                  className={`flex items-center justify-center w-10 h-10 rounded-full font-semibold ${
-                    step.id <= currentStep
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  {step.id < currentStep ? <Check size={20} /> : step.id}
+            {ONBOARDING_STEPS.map((step, idx) => {
+              const Icon = step.icon;
+              const isActive = step.id === currentStep;
+              const isCompleted = step.id < currentStep;
+              
+              return (
+                <div key={step.id} className="flex flex-col items-center flex-1">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full mb-2 relative" 
+                    style={{
+                      backgroundColor: isActive || isCompleted ? '#3B82F6' : '#E5E7EB',
+                      color: isActive || isCompleted ? 'white' : '#6B7280'
+                    }}>
+                    {isCompleted ? <Check size={24} /> : <Icon size={24} />}
+                  </div>
+                  <p className={`text-sm font-medium ${isActive ? 'text-blue-600' : 'text-gray-600'}`}>{step.label}</p>
+                  {idx < ONBOARDING_STEPS.length - 1 && (
+                    <div className="absolute top-8 left-[calc(50%+40px)] w-[calc(100%-80px)] h-1"
+                      style={{backgroundColor: isCompleted ? '#3B82F6' : '#E5E7EB'}}></div>
+                  )}
                 </div>
-                <div className="ml-3">
-                  <p className="font-medium">{step.label}</p>
-                </div>
-                {idx < ONBOARDING_STEPS.length - 1 && (
-                  <div className={`flex-1 h-1 mx-4 ${step.id < currentStep ? "bg-blue-600" : "bg-gray-200"}`}></div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
+
+        {/* Magic Upload */}
+        {currentStep === 1 && (
+          <div className="mb-6 border-2 border-dashed border-blue-400 p-8 rounded-lg bg-blue-50">
+            <div className="flex items-center justify-center gap-2">
+              <Upload size={20} className="text-blue-600" />
+              <span className="text-sm font-medium text-blue-600 cursor-pointer">Magic Upload</span>
+            </div>
+          </div>
+        )}
 
         {/* Form Content */}
         <div className="bg-white p-8 rounded-lg border mb-8">
@@ -205,13 +222,14 @@ export default function VendorOnboardingPage() {
           <button
             onClick={handlePrevious}
             disabled={currentStep === 1}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 flex items-center gap-2"
           >
-            Previous
+            <ArrowLeft size={18} />
+            Cancel
           </button>
           <button
             onClick={handleNext}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
           >
             {currentStep === ONBOARDING_STEPS.length ? "Complete" : "Next"}
             <ChevronRight size={18} />

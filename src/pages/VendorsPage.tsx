@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { Plus, Search, MoreVertical, Download, Upload, Eye, Trash2, Edit2 } from "lucide-react";
+import { Plus, Search, MoreVertical, Download, Upload, Eye, Trash2, Edit2, FileDown, FileUp, LogIn } from "lucide-react";
 
 const MOCK_VENDORS = [
   {
@@ -76,7 +75,7 @@ export default function VendorsPage() {
 
   const handleCreate = () => {
     if (!form.name || !form.contactEmail) {
-      toast.error("Please fill in required fields");
+      console.log("[v0] Please fill in required fields");
       return;
     }
     const newVendor = {
@@ -92,14 +91,14 @@ export default function VendorsPage() {
       created_at: new Date().toISOString().split("T")[0],
     };
     setVendors([...vendors, newVendor]);
-    toast.success("Vendor created successfully");
+    console.log("[v0] Vendor created successfully");
     setShowCreate(false);
     resetForm();
   };
 
   const handleSaveEdit = () => {
     if (!editingId || !form.name || !form.contactEmail) {
-      toast.error("Please fill in required fields");
+      console.log("[v0] Please fill in required fields");
       return;
     }
     setVendors(
@@ -116,7 +115,7 @@ export default function VendorsPage() {
           : v
       )
     );
-    toast.success("Vendor updated successfully");
+    console.log("[v0] Vendor updated successfully");
     setShowEdit(false);
     setEditingId(null);
     resetForm();
@@ -125,7 +124,7 @@ export default function VendorsPage() {
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to delete this vendor?")) {
       setVendors(vendors.filter((v) => v.id !== id));
-      toast.success("Vendor deleted successfully");
+      console.log("[v0] Vendor deleted successfully");
     }
   };
 
@@ -170,49 +169,48 @@ export default function VendorsPage() {
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-500">Procurement / Vendors</p>
-            <h1 className="text-2xl font-bold">Vendors</h1>
+            <p className="text-xs text-gray-500">Configuration / Vendor Management</p>
+            <h1 className="text-2xl font-bold">Vendor Management</h1>
           </div>
-          <button
-            onClick={() => {
-              resetForm();
-              setShowCreate(true);
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Add Vendor
-          </button>
+          <div className="flex gap-3">
+            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
+              <FileDown size={18} />
+              Export CSV
+            </button>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
+              <FileUp size={18} />
+              Template
+            </button>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
+              <Upload size={18} />
+              Bulk Import
+            </button>
+            <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2 text-sm font-medium">
+              <LogIn size={18} />
+              Onboard
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowCreate(true);
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm font-medium"
+            >
+              <Plus size={18} />
+              Add Vendor
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
-          {[
-            { label: "Total Vendors", value: stats.total, color: "blue" },
-            { label: "Active", value: stats.active, color: "green" },
-            { label: "Pending", value: stats.pending, color: "yellow" },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="p-6 bg-white rounded-lg border-2 border-gray-200"
-            >
-              <p className="text-gray-600 text-sm">{stat.label}</p>
-              <p className={`text-3xl font-bold mt-2 text-${stat.color}-600`}>
-                {stat.value}
-              </p>
-            </div>
-          ))}
-        </div>
-
         {/* Search and Filter */}
         <div className="mb-6 flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3 text-gray-400" size={20} />
             <input
               type="text"
-              placeholder="Search by vendor name or email..."
+              placeholder="Search vendors..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
@@ -223,7 +221,7 @@ export default function VendorsPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg"
           >
-            <option value="all">All Status</option>
+            <option value="all">All</option>
             <option value="active">Active</option>
             <option value="pending">Pending</option>
             <option value="inactive">Inactive</option>
@@ -237,32 +235,38 @@ export default function VendorsPage() {
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    Vendor Code
+                    VENDOR ID
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    Company Name
+                    VENDOR
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    Category
+                    CATEGORY
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    Contact
+                    CONTACT
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    Email
+                    RATING
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
-                    Status
+                    ORDERS
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                    TOTAL SPEND
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                    STATUS
                   </th>
                   <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600">
-                    Actions
+                    ACTIONS
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                       No vendors found
                     </td>
                   </tr>
@@ -277,9 +281,13 @@ export default function VendorsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm">{vendor.category}</td>
                       <td className="px-6 py-4 text-sm">
-                        {vendor.contact_person}
+                        {vendor.email}
                       </td>
-                      <td className="px-6 py-4 text-sm">{vendor.email}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className="text-yellow-500">★</span> {vendor.rating}
+                      </td>
+                      <td className="px-6 py-4 text-sm">0</td>
+                      <td className="px-6 py-4 text-sm">$0</td>
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
@@ -290,24 +298,20 @@ export default function VendorsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className="relative group">
+                        <div className="flex items-center justify-center gap-2">
                           <button className="p-2 hover:bg-gray-200 rounded">
-                            <MoreVertical size={16} />
+                            <Eye size={16} />
                           </button>
-                          <div className="hidden group-hover:flex absolute right-0 mt-0 bg-white border rounded-lg shadow-lg flex-col z-10">
-                            <button
-                              onClick={() => handleEditOpen(vendor)}
-                              className="px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-                            >
-                              <Edit2 size={14} /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDelete(vendor.id)}
-                              className="px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600 flex items-center gap-2"
-                            >
-                              <Trash2 size={14} /> Delete
-                            </button>
-                          </div>
+                          <button 
+                            onClick={() => handleEditOpen(vendor)}
+                            className="p-2 hover:bg-gray-200 rounded">
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(vendor.id)}
+                            className="p-2 hover:bg-gray-200 rounded text-red-600">
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </td>
                     </tr>

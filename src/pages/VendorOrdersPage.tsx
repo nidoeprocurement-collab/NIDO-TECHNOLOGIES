@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
-import { Search, Filter, Eye, Download } from "lucide-react";
+import { Search, Filter, Eye, Download, AlertCircle, Shield, Clock } from "lucide-react";
 
 const MOCK_VENDOR_ORDERS = [
   {
@@ -70,96 +69,108 @@ export default function VendorOrdersPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div>
-            <p className="text-xs text-gray-500">Vendor Portal / Orders</p>
-            <h1 className="text-2xl font-bold">My Orders</h1>
-          </div>
+          <p className="text-xs text-gray-500">Procurement / Vendor Orders</p>
+          <h1 className="text-2xl font-bold">Vendor Orders</h1>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-5 gap-4 mb-8">
+        {/* Stats Cards - Updated Icons */}
+        <div className="grid grid-cols-4 gap-6 mb-8">
           {[
-            { label: "Total", value: stats.total, color: "blue" },
-            { label: "Pending", value: stats.pending, color: "yellow" },
-            { label: "Processing", value: stats.processing, color: "blue" },
-            { label: "Delivered", value: stats.delivered, color: "green" },
-            { label: "Revenue", value: "$" + (stats.totalValue / 1000).toFixed(1) + "k", color: "purple" },
-          ].map((stat) => (
-            <div key={stat.label} className="p-4 bg-white rounded-lg border">
-              <p className="text-sm text-gray-600">{stat.label}</p>
-              <p className={`text-2xl font-bold mt-2 text-${stat.color}-600`}>
-                {stat.value}
-              </p>
+            { label: "VENDOR ASSIGNMENTS", value: 0, icon: AlertCircle, color: "bg-blue-100 text-blue-600" },
+            { label: "AT RISK SLA", value: 0, icon: Shield, color: "bg-yellow-100 text-yellow-600" },
+            { label: "SLA BREACHES", value: 0, icon: AlertCircle, color: "bg-red-100 text-red-600" },
+            { label: "DUE REMINDERS", value: 0, icon: Clock, color: "bg-purple-100 text-purple-600" },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.label} className="p-6 bg-white rounded-lg border">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 font-semibold">{stat.label}</p>
+                    <p className="text-3xl font-bold mt-2">{stat.value}</p>
+                  </div>
+                  <div className={`p-2 rounded ${stat.color}`}>
+                    <Icon size={20} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Vendor Order Control Tower */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Vendor Order Control Tower</h2>
+          
+          {/* Filters */}
+          <div className="mb-6 flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search by order number, vendor, or organization"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+              />
             </div>
-          ))}
-        </div>
-
-        {/* Filters */}
-        <div className="mb-6 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search orders..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-            />
+            <select className="px-4 py-2 border border-gray-300 rounded-lg">
+              <option>All Vendors</option>
+            </select>
+            <select className="px-4 py-2 border border-gray-300 rounded-lg">
+              <option>All SLA</option>
+            </select>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
-          >
-            <option value="all">All Orders</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="delivered">Delivered</option>
-          </select>
-          <button className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 flex items-center gap-2">
-            <Download size={18} />
-            Export
-          </button>
-        </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="px-6 py-4 text-left text-xs font-semibold">Order #</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Client</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Items</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Amount</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Status</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((o) => (
-                <tr key={o.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-blue-600">{o.order_number}</td>
-                  <td className="px-6 py-4 text-sm">{o.client}</td>
-                  <td className="px-6 py-4 text-sm">{o.items}</td>
-                  <td className="px-6 py-4 text-sm font-medium">${o.amount.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm">{o.date}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(o.status)}`}>
-                      {o.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button className="text-blue-600 hover:text-blue-700">
-                      <Eye size={18} />
-                    </button>
+          {/* Table */}
+          <div className="bg-white rounded-lg border overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">ORDER</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">VENDOR</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">ASSIGNED SCOPE</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">SLA ELAPSED</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">SLA</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">REMINDERS</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">AMOUNT</th>
+                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600">ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                    <div className="text-center">
+                      <p className="font-medium">No vendor orders found</p>
+                      <p className="text-sm">Assign vendors in procure order details and they will appear here.</p>
+                    </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* SLA Overview */}
+        <div>
+          <h2 className="text-lg font-semibold mb-4">SLA Overview</h2>
+          <p className="text-sm text-gray-600 mb-4">Live vendor SLA status with quick actions for procurement.</p>
+          
+          <div className="grid grid-cols-4 gap-4">
+            {[
+              { label: "WITHIN SLA", value: 0, color: "bg-green-100 text-green-600" },
+              { label: "AT RISK", value: 0, color: "bg-yellow-100 text-yellow-600" },
+              { label: "BREACHED", value: 0, color: "bg-red-100 text-red-600" },
+              { label: "DUE REMINDERS", value: 0, color: "bg-gray-100 text-gray-600" },
+            ].map((stat) => (
+              <div key={stat.label} className={`p-6 rounded-lg ${stat.color}`}>
+                <p className="text-xs font-semibold mb-2">{stat.label}</p>
+                <p className="text-3xl font-bold">{stat.value}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
