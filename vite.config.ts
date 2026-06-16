@@ -9,7 +9,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["sb-2l7x0xwy8q58.vercel.run"],
+    allowedHosts: [
+      "sb-2l7x0xwy8q58.vercel.run",
+      "sb-4wkjcuxlyqu0.vercel.run",
+      "localhost",
+      "127.0.0.1",
+      ".vercel.run",
+    ],
     hmr: {
       overlay: false,
     },
