@@ -11,7 +11,7 @@ export default function SLAOverview() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
           <div>
             <p className="text-xs text-gray-500">Operations / SLA</p>
             <h1 className="text-2xl font-bold">SLA Overview</h1>
@@ -19,9 +19,9 @@ export default function SLAOverview() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Key Metrics */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
           {SLA_METRICS.map((metric) => {
             const Icon = metric.icon;
             return (
@@ -46,7 +46,7 @@ export default function SLAOverview() {
         </div>
 
         {/* SLA Breaches */}
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
           <div className="bg-white p-6 rounded-lg border">
             <h3 className="font-semibold mb-4">Current SLA Status</h3>
             <div className="space-y-3">
@@ -95,7 +95,7 @@ export default function SLAOverview() {
         {/* Detailed SLA Table */}
         <div className="bg-white p-6 rounded-lg border">
           <h3 className="font-semibold mb-4">SLA Details by Vendor</h3>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-w-0">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50">
@@ -113,11 +113,11 @@ export default function SLAOverview() {
                   { name: "Equipment Rentals", response: "2.5 hrs", resolution: "22 hrs", compliance: "96%", status: "On Track" },
                 ].map((vendor) => (
                   <tr key={vendor.name} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-2 font-medium">{vendor.name}</td>
-                    <td className="px-4 py-2">{vendor.response}</td>
-                    <td className="px-4 py-2">{vendor.resolution}</td>
-                    <td className="px-4 py-2">{vendor.compliance}</td>
-                    <td className="px-4 py-2">
+                    <td className="px- truncate4 py-2 font-medium">{vendor.name}</td>
+                    <td className="px- truncate4 py-2">{vendor.response}</td>
+                    <td className="px- truncate4 py-2">{vendor.resolution}</td>
+                    <td className="px- truncate4 py-2">{vendor.compliance}</td>
+                    <td className="px- truncate4 py-2">
                       <span className={`px-3 py-1 rounded text-xs font-semibold ${
                         vendor.status === "On Track" 
                           ? "bg-green-100 text-green-800" 

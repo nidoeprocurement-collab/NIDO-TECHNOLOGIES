@@ -216,7 +216,7 @@ export default function VendorsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Configuration / Vendor Management</p>
             <h1 className="text-2xl font-bold">Vendor Management</h1>
@@ -289,7 +289,7 @@ export default function VendorsPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Search and Filter */}
         <div className="mb-6 flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
@@ -316,29 +316,29 @@ export default function VendorsPage() {
 
         {/* Table */}
         <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto min-w-0">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     VENDOR ID
                   </th>
-                  <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     VENDOR
                   </th>
-                  <th className="hidden sm:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden sm:table-cell px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     CATEGORY
                   </th>
-                  <th className="hidden lg:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden lg:table-cell px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     CONTACT
                   </th>
-                  <th className="hidden lg:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="hidden lg:table-cell px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     RATING
                   </th>
-                  <th className="px-3 sm:px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     STATUS
                   </th>
-                  <th className="px-3 sm:px-6 py-4 text-center text-xs font-semibold text-gray-600">
+                  <th className="px-3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center text-xs font-semibold text-gray-600">
                     ACTIONS
                   </th>
                 </tr>
@@ -346,27 +346,27 @@ export default function VendorsPage() {
               <tbody>
                 {filteredVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 sm:px-6 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-3 sm:px-4 md:px-6 py-8 text-center text-gray-500">
                       No vendors found
                     </td>
                   </tr>
                 ) : (
                   filteredVendors.map((vendor) => (
                     <tr key={vendor.id} className="border-b hover:bg-gray-50">
-                      <td className="px-3 sm:px-6 py-4 text-sm font-medium text-blue-600">
+                      <td className="px- truncate3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600">
                         {vendor.vendor_code}
                       </td>
-                      <td className="px-3 sm:px-6 py-4 text-sm font-medium">
+                      <td className="px- truncate3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium">
                         {vendor.company_name}
                       </td>
-                      <td className="hidden sm:table-cell px-6 py-4 text-sm">{vendor.category}</td>
-                      <td className="hidden lg:table-cell px-6 py-4 text-sm text-gray-600">
+                      <td className="hidden sm:table-cell px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{vendor.category}</td>
+                      <td className="hidden lg:table-cell px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600">
                         {vendor.email}
                       </td>
-                      <td className="hidden lg:table-cell px-6 py-4 text-sm">
+                      <td className="hidden lg:table-cell px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                         <span className="text-yellow-500">★</span> {vendor.rating}
                       </td>
-                      <td className="px-3 sm:px-6 py-4 text-sm">
+                      <td className="px- truncate3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                         <span
                           className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
                             vendor.status
@@ -375,7 +375,7 @@ export default function VendorsPage() {
                           {vendor.status}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-6 py-4 text-center">
+                      <td className="px- truncate3 sm:px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button className="p-2 hover:bg-gray-200 rounded">
                             <Eye size={14} className="sm:w-4 sm:h-4" />

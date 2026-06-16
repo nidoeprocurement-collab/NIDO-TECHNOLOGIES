@@ -68,7 +68,7 @@ export default function DeliveryChallansPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Logistics / Delivery Challans</p>
             <h1 className="text-2xl font-bold">Delivery Challans</h1>
@@ -80,7 +80,7 @@ export default function DeliveryChallansPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         <div className="mb-6 flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3 text-gray-400" size={20} />
@@ -105,30 +105,30 @@ export default function DeliveryChallansPage() {
         </div>
 
         <div className="bg-white rounded-lg border overflow-hidden">
-          <table className="w-full">
+          <table className="w-full table-auto">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="px-6 py-4 text-left text-xs font-semibold">Challan #</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Client</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Items</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Status</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold">Actions</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Challan #</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Client</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Items</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Date</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Status</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center text-xs font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
                 <tr key={c.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-blue-600">{c.number}</td>
-                  <td className="px-6 py-4 text-sm">{c.client_name}</td>
-                  <td className="px-6 py-4 text-sm">{c.items_count}</td>
-                  <td className="px-6 py-4 text-sm">{c.created_date}</td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600">{c.number}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{c.client_name}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{c.items_count}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{c.created_date}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                     <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(c.status)}`}>
                       {c.status.replace("_", " ")}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center">
                     <button
                       onClick={() => handleDelete(c.id)}
                       className="text-red-600 hover:text-red-700"

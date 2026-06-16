@@ -16,14 +16,14 @@ export default function VendorDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
           <h1 className="text-2xl font-bold">Vendor Analytics</h1>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {DASHBOARD_STATS.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -69,8 +69,8 @@ export default function VendorDashboard() {
         {/* Vendor Profiles Table */}
         <div className="bg-white p-4 sm:p-6 rounded-lg border">
           <h3 className="font-semibold mb-4 text-sm sm:text-base">Vendor Profiles</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto min-w-0">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">VENDOR</th>
@@ -84,12 +84,12 @@ export default function VendorDashboard() {
               <tbody>
                 {MOCK_VENDOR_PROFILES.map((vendor) => (
                   <tr key={vendor.id} className="border-b hover:bg-gray-50">
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">{vendor.vendor}</td>
+                    <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm font-medium">{vendor.vendor}</td>
                     <td className="hidden sm:table-cell px-4 py-3 text-xs sm:text-sm">{vendor.category}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm"><span className="text-yellow-500">★</span> {vendor.rating}</td>
+                    <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm"><span className="text-yellow-500">★</span> {vendor.rating}</td>
                     <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">{vendor.orders}</td>
                     <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm">{vendor.spend}</td>
-                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                    <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm">
                       <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                         {vendor.status}
                       </span>

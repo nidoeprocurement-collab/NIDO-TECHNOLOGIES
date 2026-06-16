@@ -103,7 +103,7 @@ export default function OrdersPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Procurement / Orders</p>
             <h1 className="text-2xl font-bold">Purchase Orders</h1>
@@ -118,9 +118,9 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Total Orders", value: stats.total, color: "blue" },
             { label: "Pending", value: stats.pending, color: "yellow" },
@@ -166,32 +166,32 @@ export default function OrdersPage() {
 
         {/* Table */}
         <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto min-w-0">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Order #
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Client
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Vendor
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Items
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Amount
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Date
                   </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">
                     Status
                   </th>
-                  <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600">
+                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center text-xs font-semibold text-gray-600">
                     Actions
                   </th>
                 </tr>
@@ -199,26 +199,26 @@ export default function OrdersPage() {
               <tbody>
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 md:px-6 py-8 text-center text-gray-500">
                       No orders found
                     </td>
                   </tr>
                 ) : (
                   filteredOrders.map((order) => (
                     <tr key={order.id} className="border-b hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-blue-600 cursor-pointer hover:underline">
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600 cursor-pointer hover:underline">
                         {order.order_number}
                       </td>
-                      <td className="px-6 py-4 text-sm">{order.client_name}</td>
-                      <td className="px-6 py-4 text-sm">{order.vendor_name}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{order.client_name}</td>
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{order.vendor_name}</td>
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                         {order.items_count} items
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium">
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium">
                         ${order.total_amount.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 text-sm">{order.order_date}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{order.order_date}</td>
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
                             order.status
@@ -227,7 +227,7 @@ export default function OrdersPage() {
                           {order.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center">
                         <div className="relative group">
                           <button className="p-2 hover:bg-gray-200 rounded">
                             <MoreVertical size={16} />

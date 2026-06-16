@@ -319,7 +319,7 @@ export default function ClientsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Clients / Client List</p>
             <h1 className="text-2xl font-bold">Clients</h1>
@@ -390,9 +390,9 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Premium Clients", value: stats.premium, color: "blue", filter: "Premium" },
             { label: "Active Clients", value: stats.active, color: "green", filter: "Active" },
@@ -432,8 +432,8 @@ export default function ClientsPage() {
 
         {/* Table */}
         <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto min-w-0">
+            <table className="w-full table-auto">
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
@@ -469,7 +469,7 @@ export default function ClientsPage() {
                 ) : (
                   filteredClients.map((client) => (
                     <tr key={client.id} className="border-b hover:bg-gray-50">
-                      <td className="px-3 sm:px-4 py-3">
+                      <td className="px- truncate3 sm:px-4 py-3">
                         <input type="checkbox" className="rounded" />
                       </td>
                       <td
@@ -478,7 +478,7 @@ export default function ClientsPage() {
                       >
                         {client.client_id}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">
+                      <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm font-medium">
                         {client.company_name}
                       </td>
                       <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">
@@ -487,7 +487,7 @@ export default function ClientsPage() {
                       <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm">
                         {client.email}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                      <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm">
                         <span
                           className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(
                             client.status
@@ -496,7 +496,7 @@ export default function ClientsPage() {
                           {client.status}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-4 py-3 text-center">
+                      <td className="px- truncate3 sm:px-4 py-3 text-center">
                         <button
                           onClick={() => handleEditClient(client.id)}
                           className="text-blue-600 hover:text-blue-800 text-sm font-medium"

@@ -492,7 +492,7 @@ export default function AddClient() {
 
         {/* Step Content */}
         <Card className="bg-white">
-          <CardContent className="p-8">
+          <CardContent className="p-4 md:p-6 lg:p-8">
             {/* Step 1: Basic Info */}
             {step === 0 && (
               <div className="space-y-6">
@@ -500,7 +500,7 @@ export default function AddClient() {
                   <h2 className="text-xl font-bold mb-1">Step 1: Basic Info</h2>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Client ID
@@ -527,7 +527,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Category *
@@ -617,7 +617,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Client Logo (PNG)
@@ -655,7 +655,7 @@ export default function AddClient() {
                   <div></div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Contact Person *
@@ -683,7 +683,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Phone
@@ -723,7 +723,7 @@ export default function AddClient() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Contract Start Date *
@@ -759,7 +759,7 @@ export default function AddClient() {
                   <h2 className="text-xl font-bold mb-1">Step 2: Business</h2>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       GST Treatment *
@@ -796,7 +796,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       GSTIN *
@@ -823,7 +823,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Currency
@@ -870,7 +870,7 @@ export default function AddClient() {
                   <h2 className="text-xl font-bold mb-1">Step 3: Financial</h2>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Payment Terms *
@@ -908,7 +908,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Bank Name *
@@ -935,7 +935,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       IFSC Code
@@ -1013,7 +1013,7 @@ export default function AddClient() {
                   </label>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Billing City *
@@ -1041,7 +1041,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Billing State *
@@ -1089,7 +1089,7 @@ export default function AddClient() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       Billing Pincode *

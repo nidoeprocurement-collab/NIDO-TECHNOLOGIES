@@ -49,7 +49,7 @@ export default function ServicesPage() {
   return (
     <div className="space-y-8 p-6">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[32px] border border-blue-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden rounded-[32px] border border-blue-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-4 md:p-6 lg:p-8 text-white shadow-2xl">
         <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-500/25 blur-3xl" />
         <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-cyan-400/15 blur-3xl" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -138,7 +138,7 @@ export default function ServicesPage() {
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
               Mandatory fields enforced
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-600">
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-600">
               <div className="rounded-2xl bg-white p-3 shadow-sm">
                 Company dropdown
               </div>
