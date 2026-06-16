@@ -1,73 +1,87 @@
-# React + TypeScript + Vite
+# NIDO Procurement Platform - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, professional procurement management application built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Dashboard & Analytics** - Main dashboard with SLA overview and metrics
+- **Vendor Management** - Vendor list, orders, categories, and onboarding
+- **Client Management** - Client list, add clients, and contract management
+- **Procurement** - Orders, requests, and approval workflows
+- **Reports** - Analytics and audit trails
+- **Transactions** - Sales (quotes, orders, invoices) and purchases (expenses, POs, bills)
+- **User Management** - User roles, departments, invitations, and audit logs
+- **Shop** - Product catalog and e-commerce
+- **Dark Theme UI** - Professional dark-themed interface with responsive design
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19.2
+- TypeScript
+- Vite
+- React Router
+- Tailwind CSS
+- Lucide React (icons)
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Installation
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+# or
+pnpm install
+# or
+yarn install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev
 ```
+
+The app will be available at `http://localhost:5173`
+
+### Build
+
+```bash
+npm run build
+# or
+pnpm build
+# or
+yarn build
+```
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── layout/          # Navigation, sidebar, top bar
+│   ├── ui/              # Reusable UI components
+│   └── shared/          # Shared utilities
+├── pages/               # Page components for each route
+├── contexts/            # React contexts for state management
+├── store/               # Global state management
+└── App.tsx              # Main app component with routing
+```
+
+## Navigation Structure
+
+- Dashboard (Main Dashboard, SLA Overview)
+- Shop
+- Services & New AMC
+- Support
+- Clients (List, Add, Contracts)
+- Vendors (List, Orders, Dashboard, Categories, Onboarding)
+- Procure (Orders, Requests, Approvals)
+- Reports (Analytics, Audit Trail)
+- Transactions - Sales (Quotes, Orders, Invoices, Recurring, Delivery, Receipts, Credits, e-Way Bills)
+- Transactions - Purchases (Expenses, Recurring, POs, Bills, Payments, Credits)
+- User Management (Users, Roles, Departments, Invitations, Audit Trail)
+- Configuration
