@@ -14,7 +14,7 @@ export default function AppLayout() {
         <TopBar />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto pt-16 lg:pt-16">
+        <main className="flex-1 overflow-y-auto pt-24 lg:pt-24">
           <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             <Outlet />
           </div>
