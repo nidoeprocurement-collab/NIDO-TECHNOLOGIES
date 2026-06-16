@@ -4,7 +4,7 @@ import TopBar from './TopBar';
 
 export default function AppLayout() {
   return (
-    <div className="flex h-screen bg-gray-950">
+    <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <Sidebar />
 
@@ -15,7 +15,7 @@ export default function AppLayout() {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto pt-16 lg:pt-16">
-          <div className="p-4 md:p-6 lg:p-8">
+          <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             <Outlet />
           </div>
         </main>
