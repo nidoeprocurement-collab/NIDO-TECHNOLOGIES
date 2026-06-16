@@ -242,6 +242,17 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
+          <Route 
+            path="clients" 
+            element={
+              <PageErrorBoundary
+                title="Clients failed to load"
+                resetKey={location.pathname}
+              >
+                <ClientsPage />
+              </PageErrorBoundary>
+            }
+          />
           <Route path="clients/contracts" element={<ClientsPage />} />
           <Route path="permissions" element={<PermissionsPage />} />
           <Route
@@ -361,7 +372,6 @@ function AppRoutes() {
             element={<AddMasterCatalogueItemWrapper />}
           />
           <Route path="integrations" element={<IntegrationsPage />} />
-          <Route path="reports" element={<MainDashboard />} />
           <Route path="reports/audit" element={<AuditTrailPage />} />
           <Route
             path="shop"
@@ -654,6 +664,27 @@ function AppRoutes() {
           <Route path="procure/approvals" element={<ApprovalWorkflowsPage />} />
           <Route path="organizations" element={<OrganizationsPage />} />
           <Route path="archive" element={<ArchivePage />} />
+          
+          {/* Simplified sidebar routes */}
+          <Route path="sla-overview" element={<SLAOverview />} />
+          <Route path="vendors/dashboard" element={<VendorDashboard />} />
+          <Route path="roles" element={<RoleTemplatesPage />} />
+          <Route path="departments" element={<DepartmentsPage />} />
+          <Route path="user-invitations" element={<UserInvitationPage />} />
+          <Route path="audit-logs" element={<AuditLogPage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="recurring-expenses" element={<RecurringExpensesPage />} />
+          <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+          <Route path="bills" element={<BillsPage />} />
+          <Route path="payments-made" element={<PaymentsMadePage />} />
+          <Route path="vendor-credits" element={<VendorCreditsPage />} />
+          <Route path="recurring-invoices" element={<RecurringInvoicesPage />} />
+          <Route path="delivery-challans" element={<DeliveryChallansPage />} />
+          <Route path="payment-receipts" element={<PaymentReceiptsPage />} />
+          <Route path="credit-notes" element={<CreditNotesPage />} />
+          <Route path="eway-bills" element={<EWayBillsPage />} />
+          <Route path="invoices" element={<InvoicePage />} />
+          <Route path="reports" element={<AuditTrailPage />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

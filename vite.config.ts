@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    allowedHosts: [
+      "localhost",
+      "127.0.0.1",
+      ".vercel.run", // Allow all .vercel.run subdomains
+      ".vercel.app",  // Allow all .vercel.app subdomains
+    ],
     hmr: {
       overlay: false,
     },
@@ -51,7 +57,7 @@ export default defineConfig(({ mode }) => ({
             "sonner",
           ],
           charts: ["recharts"],
-          pdf: ["jspdf", "jspdf-autotable", "html2canvas"],
+          pdf: ["jspdf", "jspdf-autotable"],
         },
       },
     },

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  Zap,
 } from 'lucide-react';
 
 interface NavItem {
@@ -27,10 +28,7 @@ const navigationItems: NavItem[] = [
   {
     label: 'Dashboard',
     icon: <LayoutDashboard size={20} />,
-    children: [
-      { label: 'Main Dashboard', path: '/dashboard' },
-      { label: 'SLA Overview', path: '/dashboard/sla' },
-    ],
+    path: '/dashboard',
   },
   {
     label: 'Shop',
@@ -38,12 +36,9 @@ const navigationItems: NavItem[] = [
     path: '/shop',
   },
   {
-    label: 'Services & AMC',
+    label: 'Services',
     icon: <Wrench size={20} />,
-    children: [
-      { label: 'Services', path: '/services' },
-      { label: 'New AMC', path: '/services/amc/new' },
-    ],
+    path: '/services',
   },
   {
     label: 'Support',
@@ -53,39 +48,32 @@ const navigationItems: NavItem[] = [
   {
     label: 'Clients',
     icon: <Users size={20} />,
-    children: [
-      { label: 'Client List', path: '/clients' },
-      { label: 'Add Client', path: '/clients/add' },
-      { label: 'Contracts', path: '/clients/contracts' },
-    ],
+    path: '/clients',
   },
   {
     label: 'Vendors',
-    icon: <TrendingUp size={20} />,
+    icon: <Package size={20} />,
     children: [
       { label: 'Vendor List', path: '/vendors' },
       { label: 'Vendor Orders', path: '/vendors/orders' },
-      { label: 'Vendor Dashboard', path: '/dashboard/vendor' },
+      { label: 'Vendor Dashboard', path: '/vendors/dashboard' },
       { label: 'Categories', path: '/vendors/categories' },
       { label: 'Onboarding', path: '/vendors/onboarding' },
     ],
   },
   {
-    label: 'Procure',
-    icon: <Package size={20} />,
+    label: 'MY Requests',
+    icon: <TrendingUp size={20} />,
     children: [
-      { label: 'Orders', path: '/orders' },
-      { label: 'Requests', path: '/procure/requests' },
-      { label: 'Approvals', path: '/configuration/workflows' },
+      { label: 'My Orders', path: '/orders' },
+      { label: 'My Services', path: '/services' },
+      { label: 'SLA Overview', path: '/sla-overview' },
     ],
   },
   {
     label: 'Reports',
     icon: <TrendingUp size={20} />,
-    children: [
-      { label: 'Analytics', path: '/reports' },
-      { label: 'Audit Trail', path: '/reports/audit' },
-    ],
+    path: '/reports',
   },
   {
     label: 'Transactions',
@@ -95,24 +83,24 @@ const navigationItems: NavItem[] = [
         label: 'Sales',
         children: [
           { label: 'Quotes', path: '/sales/quotes' },
-          { label: 'Orders', path: '/sales/orders' },
-          { label: 'Invoices', path: '/sales/invoices' },
-          { label: 'Recurring', path: '/sales/recurring-invoices' },
-          { label: 'Delivery', path: '/sales/delivery-challans' },
-          { label: 'Receipts', path: '/sales/payment-receipts' },
-          { label: 'Credits', path: '/sales/credit-notes' },
-          { label: 'e-Way Bills', path: '/sales/eway-bills' },
+          { label: 'Sales Orders', path: '/sales/orders' },
+          { label: 'Invoices', path: '/invoices' },
+          { label: 'Recurring Invoices', path: '/recurring-invoices' },
+          { label: 'Delivery Challans', path: '/delivery-challans' },
+          { label: 'Payment Receipts', path: '/payment-receipts' },
+          { label: 'Credit Notes', path: '/credit-notes' },
+          { label: 'e-Way Bills', path: '/eway-bills' },
         ],
       },
       {
         label: 'Purchases',
         children: [
-          { label: 'Expenses', path: '/transactions/purchase/expenses' },
-          { label: 'Recurring', path: '/transactions/purchase/recurring-expenses' },
-          { label: 'Purchase Orders', path: '/transactions/purchase/purchase-orders' },
-          { label: 'Bills', path: '/transactions/purchase/bills' },
-          { label: 'Payments', path: '/transactions/purchase/payments-made' },
-          { label: 'Credits', path: '/transactions/purchase/vendor-credits' },
+          { label: 'Expenses', path: '/expenses' },
+          { label: 'Recurring Expenses', path: '/recurring-expenses' },
+          { label: 'Purchase Orders', path: '/purchase-orders' },
+          { label: 'Bills', path: '/bills' },
+          { label: 'Payments Made', path: '/payments-made' },
+          { label: 'Vendor Credits', path: '/vendor-credits' },
         ],
       },
     ],
@@ -122,10 +110,10 @@ const navigationItems: NavItem[] = [
     icon: <Users size={20} />,
     children: [
       { label: 'Users', path: '/users/management' },
-      { label: 'Roles', path: '/users/roles' },
-      { label: 'Departments', path: '/users/departments' },
-      { label: 'Invitations', path: '/users/invitations' },
-      { label: 'Audit Trail', path: '/users/audit-trail' },
+      { label: 'Roles', path: '/roles' },
+      { label: 'Departments', path: '/departments' },
+      { label: 'Invitations', path: '/user-invitations' },
+      { label: 'Audit Trail', path: '/audit-logs' },
     ],
   },
   {
@@ -138,22 +126,35 @@ const navigationItems: NavItem[] = [
 interface NavItemProps {
   item: NavItem;
   level?: number;
+  isActive?: boolean;
 }
 
 function NavItemComponent({ item, level = 0 }: NavItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
   const hasChildren = item.children && item.children.length > 0;
   const isTopLevel = level === 0;
+
+  // Check if current path matches
+  const isActive = item.path && location.pathname.startsWith(item.path);
+  
+  // Check if any child is active
+  const hasActiveChild = hasChildren && item.children.some(child => {
+    if (child.children) {
+      return child.children.some(subchild => subchild.path && location.pathname.startsWith(subchild.path));
+    }
+    return child.path && location.pathname.startsWith(child.path);
+  });
 
   if (hasChildren) {
     return (
       <div className="space-y-1">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-            isTopLevel
-              ? 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            isOpen || hasActiveChild
+              ? 'text-blue-600 bg-blue-50'
+              : 'text-gray-700 hover:bg-gray-100'
           }`}
         >
           <span className="flex items-center gap-3">
@@ -163,7 +164,7 @@ function NavItemComponent({ item, level = 0 }: NavItemProps) {
           {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
         {isOpen && (
-          <div className={`space-y-1 ${isTopLevel ? 'pl-2' : 'pl-4'}`}>
+          <div className={`space-y-0.5 ${isTopLevel ? 'pl-2' : 'pl-4'}`}>
             {item.children.map((child, idx) => (
               <NavItemComponent key={idx} item={child} level={level + 1} />
             ))}
@@ -176,10 +177,10 @@ function NavItemComponent({ item, level = 0 }: NavItemProps) {
   return (
     <Link
       to={item.path || '#'}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-        isTopLevel
-          ? 'text-gray-300 hover:bg-gray-800 hover:text-white'
-          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-300'
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+        isActive
+          ? 'text-blue-600 bg-blue-50'
+          : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
       {item.icon}
@@ -196,21 +197,28 @@ export default function Sidebar() {
       {/* Mobile Toggle */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="fixed top-4 left-4 z-40 lg:hidden p-2 rounded-md bg-gray-800 text-gray-300 hover:bg-gray-700"
+        className="fixed top-4 left-4 z-40 lg:hidden p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 shadow-sm"
       >
         {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-full bg-gray-900 border-r border-gray-800 w-64 overflow-y-auto transition-transform duration-300 z-30 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 w-64 overflow-y-auto transition-transform duration-300 z-30 lg:translate-x-0 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 z-10">
-          <h1 className="text-xl font-bold text-white">NIDO</h1>
-          <p className="text-xs text-gray-500">Procurement Platform</p>
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+              <Zap size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900">NIDO</h1>
+              <p className="text-xs text-gray-500">Procurement</p>
+            </div>
+          </div>
         </div>
 
         {/* Navigation Items */}
@@ -219,6 +227,22 @@ export default function Sidebar() {
             <NavItemComponent key={idx} item={item} />
           ))}
         </nav>
+
+        {/* Bottom Section */}
+        <div className="border-t border-gray-200 p-4 mt-4">
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-xs font-bold text-blue-600">N</span>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-900">Nido Owner</p>
+              <p className="text-xs text-gray-500">Owner</p>
+            </div>
+          </div>
+          <button className="w-full mt-3 px-3 py-2 text-xs text-gray-600 hover:text-red-600 text-left rounded-lg hover:bg-red-50 transition-all">
+            Sign Out
+          </button>
+        </div>
       </aside>
 
       {/* Mobile Overlay */}
