@@ -28,10 +28,7 @@ const navigationItems: NavItem[] = [
   {
     label: 'Dashboard',
     icon: <LayoutDashboard size={20} />,
-    children: [
-      { label: 'Main Dashboard', path: '/dashboard' },
-      { label: 'SLA Overview', path: '/dashboard/sla' },
-    ],
+    path: '/dashboard',
   },
   {
     label: 'Shop',
@@ -41,10 +38,7 @@ const navigationItems: NavItem[] = [
   {
     label: 'Services',
     icon: <Wrench size={20} />,
-    children: [
-      { label: 'Services', path: '/services' },
-      { label: 'New AMC', path: '/services/amc/new' },
-    ],
+    path: '/services',
   },
   {
     label: 'Support',
@@ -54,11 +48,7 @@ const navigationItems: NavItem[] = [
   {
     label: 'Clients',
     icon: <Users size={20} />,
-    children: [
-      { label: 'Client List', path: '/clients' },
-      { label: 'Add Client', path: '/clients/add' },
-      { label: 'Contracts', path: '/clients/contracts' },
-    ],
+    path: '/clients',
   },
   {
     label: 'Vendors',
@@ -66,7 +56,7 @@ const navigationItems: NavItem[] = [
     children: [
       { label: 'Vendor List', path: '/vendors' },
       { label: 'Vendor Orders', path: '/vendors/orders' },
-      { label: 'Vendor Dashboard', path: '/dashboard/vendor' },
+      { label: 'Vendor Dashboard', path: '/vendors/dashboard' },
       { label: 'Categories', path: '/vendors/categories' },
       { label: 'Onboarding', path: '/vendors/onboarding' },
     ],
@@ -77,16 +67,13 @@ const navigationItems: NavItem[] = [
     children: [
       { label: 'My Orders', path: '/orders' },
       { label: 'My Services', path: '/services' },
-      { label: 'SLA Overview', path: '/dashboard/sla' },
+      { label: 'SLA Overview', path: '/sla-overview' },
     ],
   },
   {
     label: 'Reports',
     icon: <TrendingUp size={20} />,
-    children: [
-      { label: 'Analytics', path: '/reports' },
-      { label: 'Audit Trail', path: '/reports/audit' },
-    ],
+    path: '/reports',
   },
   {
     label: 'Transactions',
@@ -97,23 +84,23 @@ const navigationItems: NavItem[] = [
         children: [
           { label: 'Quotes', path: '/sales/quotes' },
           { label: 'Sales Orders', path: '/sales/orders' },
-          { label: 'Invoices', path: '/sales/invoices' },
-          { label: 'Recurring', path: '/sales/recurring-invoices' },
-          { label: 'Delivery Challans', path: '/sales/delivery-challans' },
-          { label: 'Payment Receipt', path: '/sales/payment-receipts' },
-          { label: 'Credit Notes', path: '/sales/credit-notes' },
-          { label: 'e-Way Bills', path: '/sales/eway-bills' },
+          { label: 'Invoices', path: '/invoices' },
+          { label: 'Recurring Invoices', path: '/recurring-invoices' },
+          { label: 'Delivery Challans', path: '/delivery-challans' },
+          { label: 'Payment Receipts', path: '/payment-receipts' },
+          { label: 'Credit Notes', path: '/credit-notes' },
+          { label: 'e-Way Bills', path: '/eway-bills' },
         ],
       },
       {
         label: 'Purchases',
         children: [
-          { label: 'Expenses', path: '/transactions/purchase/expenses' },
-          { label: 'Recurring Expenses', path: '/transactions/purchase/recurring-expenses' },
-          { label: 'Purchase Orders', path: '/transactions/purchase/purchase-orders' },
-          { label: 'Bills', path: '/transactions/purchase/bills' },
-          { label: 'Payments Made', path: '/transactions/purchase/payments-made' },
-          { label: 'Vendor Credits', path: '/transactions/purchase/vendor-credits' },
+          { label: 'Expenses', path: '/expenses' },
+          { label: 'Recurring Expenses', path: '/recurring-expenses' },
+          { label: 'Purchase Orders', path: '/purchase-orders' },
+          { label: 'Bills', path: '/bills' },
+          { label: 'Payments Made', path: '/payments-made' },
+          { label: 'Vendor Credits', path: '/vendor-credits' },
         ],
       },
     ],
@@ -123,10 +110,10 @@ const navigationItems: NavItem[] = [
     icon: <Users size={20} />,
     children: [
       { label: 'Users', path: '/users/management' },
-      { label: 'Roles', path: '/users/roles' },
-      { label: 'Departments', path: '/users/departments' },
-      { label: 'Invitations', path: '/users/invitations' },
-      { label: 'Audit Trail', path: '/users/audit-trail' },
+      { label: 'Roles', path: '/roles' },
+      { label: 'Departments', path: '/departments' },
+      { label: 'Invitations', path: '/user-invitations' },
+      { label: 'Audit Trail', path: '/audit-logs' },
     ],
   },
   {
