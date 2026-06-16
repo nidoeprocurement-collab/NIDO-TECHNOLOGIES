@@ -20,4 +20,18 @@ const CardContent = React.forwardRef<HTMLDivElement, CardProps>(
 );
 CardContent.displayName = "CardContent";
 
-export { Card, CardContent };
+const CardHeader = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={`pb-4 ${className || ""}`} {...props} />
+  )
+);
+CardHeader.displayName = "CardHeader";
+
+const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h2 ref={ref} className={`text-lg font-semibold leading-tight ${className || ""}`} {...props} />
+  )
+);
+CardTitle.displayName = "CardTitle";
+
+export { Card, CardContent, CardHeader, CardTitle };

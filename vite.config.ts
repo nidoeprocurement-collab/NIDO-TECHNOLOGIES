@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => ({
             "sonner",
           ],
           charts: ["recharts"],
-          pdf: ["jspdf", "jspdf-autotable", "html2canvas"],
+          pdf: ["jspdf", "jspdf-autotable"],
         },
       },
     },
