@@ -62,35 +62,35 @@ const MetricCard = ({ title, value, icon: Icon, bgColor, href }) => (
 
 const RecentOrdersTable = () => (
   <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-    <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+    <div className="p-4 md:p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Orders</h3>
       <a href="/orders" className="text-blue-600 hover:text-blue-700 text-sm font-medium">View all orders →</a>
     </div>
-    <div className="overflow-x-auto">
-      <table className="w-full">
+    <div className="overflow-x-auto min-w-0">
+      <table className="w-full table-auto">
         <thead className="bg-gray-50 dark:bg-gray-700/50">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Order ID</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Client</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Vendor</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Amount</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Status</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Date</th>
+            <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Order ID</th>
+            <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Client</th>
+            <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Vendor</th>
+            <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Amount</th>
+            <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Status</th>
+            <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Date</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {[1, 2, 3].map((i) => (
             <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-              <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">ORD-2024-{1340 + i}</td>
-              <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">Client {i}</td>
-              <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">Vendor {i}</td>
-              <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">₹{(5000 * i).toLocaleString()}</td>
-              <td className="px-6 py-4 text-sm">
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-gray-900 dark:text-white">ORD-2024-{1340 + i}</td>
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600 dark:text-gray-400">Client {i}</td>
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600 dark:text-gray-400">Vendor {i}</td>
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-gray-900 dark:text-white">₹{(5000 * i).toLocaleString()}</td>
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                   Completed
                 </span>
               </td>
-              <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">2024-05-{25 + i}</td>
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600 dark:text-gray-400">2024-05-{25 + i}</td>
             </tr>
           ))}
         </tbody>
@@ -172,7 +172,7 @@ export default function MainDashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-6 lg:p-8">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Welcome back, System Owner! 👋</h1>
@@ -275,7 +275,7 @@ export default function MainDashboard() {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard title="Pending Approvals" value="156" icon={AlertCircle} bgColor="bg-yellow-500" href="/approvals" />
         <MetricCard title="Active Contracts" value="86" icon={CheckCircle} bgColor="bg-green-500" href="/contracts" />
         <MetricCard title="Open Invoices" value="231" icon={DollarSign} bgColor="bg-blue-500" href="/invoices" />

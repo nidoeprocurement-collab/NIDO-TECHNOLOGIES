@@ -116,7 +116,7 @@ export default function SupportPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Support / Tickets</p>
             <h1 className="text-2xl font-bold">Support Center</h1>
@@ -131,9 +131,9 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
           {[
             { label: "Open", value: stats.open, color: "yellow", icon: AlertCircle },
             { label: "In Progress", value: stats.in_progress, color: "blue", icon: Clock },
@@ -182,30 +182,30 @@ export default function SupportPage() {
 
         {/* Tickets Table */}
         <div className="bg-white rounded-lg border overflow-hidden">
-          <table className="w-full">
+          <table className="w-full table-auto">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="px-6 py-4 text-left text-xs font-semibold">Ticket</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Subject</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Priority</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Created</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Status</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Ticket</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Subject</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Priority</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Created</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Status</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((ticket) => (
                 <tr key={ticket.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-blue-600">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600">
                     {ticket.number}
                   </td>
-                  <td className="px-6 py-4 text-sm">{ticket.subject}</td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{ticket.subject}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                     <span className={`px-3 py-1 rounded text-xs font-semibold ${getPriorityColor(ticket.priority)}`}>
                       {ticket.priority}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm">{ticket.created}</td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{ticket.created}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(ticket.status)}
                       <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(ticket.status)}`}>

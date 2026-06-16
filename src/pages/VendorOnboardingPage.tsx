@@ -494,7 +494,7 @@ export default function VendorOnboardingPage() {
 
             {/* Step Content */}
             <Card className="bg-white">
-              <CardContent className="p-8">
+              <CardContent className="p-4 md:p-6 lg:p-8">
                 {/* Step 1: Basic Info */}
                 {step === 0 && (
                   <div className="space-y-6">
@@ -502,7 +502,7 @@ export default function VendorOnboardingPage() {
                       <h2 className="text-xl font-bold mb-1">Step 1: Basic Info</h2>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Vendor ID
@@ -529,7 +529,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Category *
@@ -619,7 +619,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Vendor Logo (PNG)
@@ -657,7 +657,7 @@ export default function VendorOnboardingPage() {
                       <div></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Contact Person *
@@ -685,7 +685,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Phone
@@ -712,7 +712,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Website
@@ -728,7 +728,7 @@ export default function VendorOnboardingPage() {
                       <div></div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Contract Start Date *
@@ -764,7 +764,7 @@ export default function VendorOnboardingPage() {
                       <h2 className="text-xl font-bold mb-1">Step 2: Business Details</h2>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           GST Treatment *
@@ -801,7 +801,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Source of Supply
@@ -838,7 +838,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Currency
@@ -885,7 +885,7 @@ export default function VendorOnboardingPage() {
                       <h2 className="text-xl font-bold mb-1">Step 3: Financial Information</h2>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Payment Terms *
@@ -923,7 +923,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Bank Name *
@@ -950,7 +950,7 @@ export default function VendorOnboardingPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           IFSC Code
@@ -989,7 +989,7 @@ export default function VendorOnboardingPage() {
                     <div className="space-y-4">
                       <div>
                         <h3 className="font-semibold text-base mb-4">Billing Address</h3>
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <label className="block text-sm font-medium mb-2">
                               Address *
@@ -1015,7 +1015,7 @@ export default function VendorOnboardingPage() {
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-6 mt-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                           <div>
                             <label className="block text-sm font-medium mb-2">
                               State *
@@ -1071,7 +1071,7 @@ export default function VendorOnboardingPage() {
                       {!formData.same_address && (
                         <div>
                           <h3 className="font-semibold text-base mb-4">Shipping Address</h3>
-                          <div className="grid grid-cols-2 gap-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                               <label className="block text-sm font-medium mb-2">
                                 Address
@@ -1097,7 +1097,7 @@ export default function VendorOnboardingPage() {
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-6 mt-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                             <div>
                               <label className="block text-sm font-medium mb-2">
                                 State
@@ -1146,7 +1146,7 @@ export default function VendorOnboardingPage() {
                       <h2 className="text-xl font-bold mb-1">Step 5: Documents</h2>
                     </div>
 
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-6 lg:p-8 text-center">
                       <Upload className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-600">Upload GST Certificate, PAN Card, and Bank Documents</p>
                       <input
@@ -1192,7 +1192,7 @@ export default function VendorOnboardingPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                       <div>
                         <p className="text-gray-600">Company Name</p>
                         <p className="font-semibold">{formData.company_name}</p>

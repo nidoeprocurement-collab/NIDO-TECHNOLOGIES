@@ -445,7 +445,7 @@ export default function ClientDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
         {/* LEFT SIDEBAR - CLIENT CARD - ONLY SHOW ON OVERVIEW TAB */}
         {activeTab === "overview" && (
         <div className="col-span-3">
@@ -529,7 +529,7 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Client Info Footer */}
-              <div className="grid grid-cols-2 gap-4 py-4 border-t border-[#E8ECF1]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4 border-t border-[#E8ECF1]">
                 <div>
                   <p className="text-xs text-[#5C6370]">Client Since</p>
                   <p className="text-sm font-medium text-[#1A1D26]">
@@ -560,7 +560,7 @@ export default function ClientDetailPage() {
         <div className={activeTab === "overview" ? "col-span-9 space-y-6" : "col-span-12 space-y-6"}>
           {/* STATS ROW */}
           {activeTab === "overview" && (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <Card className="border-[#E8ECF1]">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
@@ -627,7 +627,7 @@ export default function ClientDetailPage() {
             </TabsList>
 
             <TabsContent value="overview" className="mt-6">
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Company Details */}
                 <Card className="border-[#E8ECF1]">
                   <CardContent className="p-5">
@@ -735,7 +735,7 @@ export default function ClientDetailPage() {
               </div>
 
               {/* BOTTOM ROW - SUMMARY CARDS */}
-              <div className="grid grid-cols-3 gap-6 mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
                 {/* User Summary */}
                 <Card className="border-[#E8ECF1]">
                   <CardContent className="p-5">
@@ -952,7 +952,7 @@ export default function ClientDetailPage() {
                 <Card className="border-[#E8ECF1]">
                   <CardContent className="p-6">
                     <h4 className="font-semibold text-[#1A1D26] mb-4">Permission Matrix</h4>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto min-w-0">
                       <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
@@ -1074,7 +1074,7 @@ export default function ClientDetailPage() {
                   <Card className="border-[#E8ECF1] mb-6">
                     <CardContent className="p-6">
                       <h4 className="font-semibold text-[#1A1D26] mb-4">Detailed Role Comparison</h4>
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto min-w-0">
                         <Table>
                           <TableHeader>
                             <TableRow className="hover:bg-transparent">
@@ -1157,7 +1157,7 @@ export default function ClientDetailPage() {
       
                   </div>
                   
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto min-w-0">
                     <table className="w-full text-sm">
                       <thead className="border-b border-[#E8ECF1] bg-[#F9FAFB]">
                         <tr>
@@ -1238,7 +1238,7 @@ export default function ClientDetailPage() {
                     </select>
                   </div>
                   
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto min-w-0">
                     <table className="w-full text-sm">
                       <thead className="border-b border-[#E8ECF1] bg-[#F9FAFB]">
                         <tr>
@@ -1296,7 +1296,7 @@ export default function ClientDetailPage() {
             <TabsContent value="catalog" className="mt-6">
               <div className="space-y-6">
                 {/* Stat Cards */}
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card className="border-[#E8ECF1]">
                     <CardContent className="p-4">
                       <p className="text-sm text-gray-600">Total Items</p>
@@ -1366,7 +1366,7 @@ export default function ClientDetailPage() {
                     </div>
 
                     {/* Table */}
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto min-w-0">
                       <table className="w-full text-sm">
                         <thead className="border-b border-[#E8ECF1] bg-[#F9FAFB]">
                           <tr>
@@ -1588,7 +1588,7 @@ export default function ClientDetailPage() {
                     Role Information
                   </h3>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label className="text-xs font-semibold text-[#1A1D26]">Role Name *</Label>
                         <Input 
@@ -1709,7 +1709,7 @@ export default function ClientDetailPage() {
                   )}
 
                   {/* Modules Table */}
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto min-w-0">
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
@@ -1741,7 +1741,7 @@ export default function ClientDetailPage() {
               </div>
 
               {/* Data Access & Approval */}
-              <div className="grid grid-cols-2 gap-4 pb-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
                 <div className="bg-gradient-to-br from-[#F9FAFB] to-white p-4 rounded-lg border border-[#E8ECF1]">
                   <h3 className="text-sm font-semibold text-[#1A1D26] mb-4 flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-[#4A6CF7]" />

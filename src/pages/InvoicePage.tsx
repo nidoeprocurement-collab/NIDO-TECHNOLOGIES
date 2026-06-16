@@ -78,7 +78,7 @@ export default function InvoicePage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Finance / Invoices</p>
             <h1 className="text-2xl font-bold">Invoices</h1>
@@ -93,9 +93,9 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Total", value: stats.total, color: "blue" },
             { label: "Paid", value: stats.paid, color: "green" },
@@ -140,34 +140,34 @@ export default function InvoicePage() {
 
         {/* Table */}
         <div className="bg-white rounded-lg border">
-          <table className="w-full">
+          <table className="w-full table-auto">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="px-6 py-4 text-left text-xs font-semibold">Invoice #</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Client</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Amount</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Date</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Due</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold">Status</th>
-                <th className="px-6 py-4 text-center text-xs font-semibold">Actions</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Invoice #</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Client</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Amount</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Date</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Due</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Status</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center text-xs font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredInvoices.map((inv) => (
                 <tr key={inv.id} className="border-b hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-blue-600">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600">
                     {inv.invoice_number}
                   </td>
-                  <td className="px-6 py-4 text-sm">{inv.client_name}</td>
-                  <td className="px-6 py-4 text-sm">${inv.amount.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm">{inv.invoice_date}</td>
-                  <td className="px-6 py-4 text-sm">{inv.due_date}</td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{inv.client_name}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">${inv.amount.toLocaleString()}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{inv.invoice_date}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{inv.due_date}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
                     <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(inv.status)}`}>
                       {inv.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center">
                     <button
                       onClick={() => handleDelete(inv.id)}
                       className="text-red-600 hover:text-red-700"

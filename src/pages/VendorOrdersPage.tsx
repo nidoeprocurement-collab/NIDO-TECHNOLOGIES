@@ -68,15 +68,15 @@ export default function VendorOrdersPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
           <p className="text-xs text-gray-500">Procurement / Vendor Orders</p>
           <h1 className="text-2xl font-bold">Vendor Orders</h1>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
         {/* Stats Cards - Updated Icons */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {[
               { label: "VENDOR ASSIGNMENTS", value: 0, icon: AlertCircle, color: "bg-blue-100 text-blue-600" },
               { label: "AT RISK SLA", value: 0, icon: Shield, color: "bg-yellow-100 text-yellow-600" },
@@ -126,8 +126,8 @@ export default function VendorOrdersPage() {
 
           {/* Table */}
           <div className="bg-white rounded-lg border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="overflow-x-auto min-w-0">
+              <table className="w-full table-auto">
                 <thead>
                   <tr className="border-b bg-gray-50">
                     <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">ORDER</th>
@@ -160,7 +160,7 @@ export default function VendorOrdersPage() {
           <h2 className="text-lg font-semibold mb-4">SLA Overview</h2>
           <p className="text-sm text-gray-600 mb-4">Live vendor SLA status with quick actions for procurement.</p>
           
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: "WITHIN SLA", value: 0, color: "bg-green-100 text-green-600" },
               { label: "AT RISK", value: 0, color: "bg-yellow-100 text-yellow-600" },
