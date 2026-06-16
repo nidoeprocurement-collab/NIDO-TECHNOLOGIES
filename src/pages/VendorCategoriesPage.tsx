@@ -77,17 +77,17 @@ export default function VendorCategoriesPage() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Filters */}
-        <div className="mb-6 flex gap-4">
-          <select className="px-4 py-2 border border-gray-300 rounded-lg">
+        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+          <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option>All Vendors</option>
           </select>
-          <select className="px-4 py-2 border border-gray-300 rounded-lg">
+          <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option>All Workflows</option>
           </select>
-          <select className="px-4 py-2 border border-gray-300 rounded-lg">
+          <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option>All SLA Templates</option>
           </select>
-          <input type="text" placeholder="Search" className="flex-1 px-4 py-2 border border-gray-300 rounded-lg" />
+          <input type="text" placeholder="Search" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" />
         </div>
 
         {/* Table */}
@@ -96,8 +96,8 @@ export default function VendorCategoriesPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">CATEGORY NAME</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">VENDOR CODE</th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">CATEGORY NAME</th>
+                  <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">VENDOR CODE</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">DESCRIPTION</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">APPROVAL WORKFLOW</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600">DEFAULT SLA TEMPLATE</th>
@@ -109,24 +109,24 @@ export default function VendorCategoriesPage() {
               <tbody>
                 {MOCK_CATEGORIES.map((cat) => (
                   <tr key={cat.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium">{cat.name}</td>
-                    <td className="px-6 py-4 text-sm">{cat.code}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{cat.description}</td>
-                    <td className="px-6 py-4 text-sm">{cat.workflow}</td>
-                    <td className="px-6 py-4 text-sm">{cat.template}</td>
-                    <td className="px-6 py-4 text-sm text-center">{cat.vendors}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">{cat.name}</td>
+                    <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">{cat.code}</td>
+                    <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm text-gray-600">{cat.description}</td>
+                    <td className="hidden xl:table-cell px-4 py-3 text-xs sm:text-sm">{cat.workflow}</td>
+                    <td className="hidden xl:table-cell px-4 py-3 text-xs sm:text-sm">{cat.template}</td>
+                    <td className="hidden sm:table-cell px-4 py-3 text-xs sm:text-sm text-center">{cat.vendors}</td>
+                    <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                         {cat.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button className="p-2 hover:bg-gray-200 rounded">
-                          <Edit2 size={16} />
+                    <td className="px-3 sm:px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button className="p-1 hover:bg-gray-200 rounded">
+                          <Edit2 size={14} />
                         </button>
-                        <button className="p-2 hover:bg-gray-200 rounded text-red-600">
-                          <Trash2 size={16} />
+                        <button className="p-1 hover:bg-gray-200 rounded text-red-600">
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -135,7 +135,7 @@ export default function VendorCategoriesPage() {
               </tbody>
             </table>
           </div>
-          <div className="px-6 py-4 border-t text-sm text-gray-600">
+          <div className="px-3 sm:px-4 py-3 border-t text-xs sm:text-sm text-gray-600">
             1 — 5 of 5
           </div>
         </div>
@@ -143,34 +143,34 @@ export default function VendorCategoriesPage() {
         {/* Category Settings */}
         <div>
           <h2 className="text-lg font-semibold mb-4">Category Settings</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
               <div className="flex items-center gap-3 mb-2">
-                <Settings size={20} className="text-blue-600" />
-                <h3 className="font-semibold">Manage Approval Paths</h3>
+                <Settings size={18} className="text-blue-600" />
+                <h3 className="font-semibold text-sm sm:text-base">Manage Approval Paths</h3>
               </div>
-              <p className="text-sm text-gray-600">Configure category-specific approval workflows.</p>
+              <p className="text-xs sm:text-sm text-gray-600">Configure category-specific approval workflows.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
               <div className="flex items-center gap-3 mb-2">
-                <Lock size={20} className="text-green-600" />
-                <h3 className="font-semibold">Role Hierarchy & Permissions</h3>
+                <Lock size={18} className="text-green-600" />
+                <h3 className="font-semibold text-sm sm:text-base">Role Hierarchy & Permissions</h3>
               </div>
-              <p className="text-sm text-gray-600">Set roles and permissions for vendor categories.</p>
+              <p className="text-xs sm:text-sm text-gray-600">Set roles and permissions for vendor categories.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
               <div className="flex items-center gap-3 mb-2">
-                <ZapOff size={20} className="text-purple-600" />
-                <h3 className="font-semibold">Auto Assignment Logic</h3>
+                <ZapOff size={18} className="text-purple-600" />
+                <h3 className="font-semibold text-sm sm:text-base">Auto Assignment Logic</h3>
               </div>
-              <p className="text-sm text-gray-600">Define auto vendor assignment rules.</p>
+              <p className="text-xs sm:text-sm text-gray-600">Define auto vendor assignment rules.</p>
             </div>
-            <div className="bg-white p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="bg-white p-4 sm:p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
               <div className="flex items-center gap-3 mb-2">
-                <Layers size={20} className="text-orange-600" />
-                <h3 className="font-semibold">Category Settings</h3>
+                <Layers size={18} className="text-orange-600" />
+                <h3 className="font-semibold text-sm sm:text-base">Category Settings</h3>
               </div>
-              <p className="text-sm text-gray-600">Edit/manage products by vendors.</p>
+              <p className="text-xs sm:text-sm text-gray-600">Edit/manage products by vendors.</p>
             </div>
           </div>
         </div>
