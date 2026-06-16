@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { listDocuments, updateDocument, COLLECTIONS } from "@/lib/appwrite";
-import { Query } from "appwrite";
+import { mockDataService } from "@/lib/mockData";
 import {
   ROLE_TEMPLATES,
   AVAILABLE_MODULES,
@@ -29,7 +28,6 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientUsersTable } from "@/components/ClientUsersTable";
 import { downloadUsersJSON, downloadUsersCSV } from "@/lib/export-users";
-import { ensureClientUsersExist } from "@/lib/seed-users";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -171,46 +169,24 @@ export default function ClientDetailPage() {
   const fetchClient = async () => {
     setLoading(true);
     try {
-      const documents = await listDocuments(COLLECTIONS.CLIENTS, [
-        Query.equal("$id", id),
-      ]);
+      const data = mockDataService.getClientById(id);
 
-      if (!documents || documents.length === 0) {
+      if (!data) {
         toast.error("Client not found");
         setLoading(false);
         return;
       }
 
-      const data = documents[0];
       setClient(data);
       
-      // Ensure users exist for this client (seed if empty)
-      await ensureClientUsersExist(id, data?.company_name);
-
-      // Fetch users from Appwrite
-      await fetchClientUsers(id);
+      // Load users from mock data
+      const users = mockDataService.getClientUsers(id);
+      setClientUsers(users);
     } catch (error) {
       console.error("[v0] Error fetching client:", error);
       toast.error("Failed to load client");
     } finally {
       setLoading(false);
-    }
-  };
-
-  /* ------------------ FETCH CLIENT USERS FROM APPWRITE ------------------ */
-  const fetchClientUsers = async (clientId: string) => {
-    try {
-      const documents = await listDocuments(COLLECTIONS.CLIENT_USERS, [
-        Query.equal("client_id", clientId),
-        Query.orderDesc("$createdAt"),
-      ]);
-
-      if (documents && documents.length > 0) {
-        setClientUsers(documents);
-        console.log("[v0] Client users loaded:", documents.length);
-      }
-    } catch (err) {
-      console.error("[v0] Error fetching users:", err);
     }
   };
 

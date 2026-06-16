@@ -1255,5 +1255,3 @@ export default function AddClient() {
     </div>
   );
 }
-
-export default AddClient;

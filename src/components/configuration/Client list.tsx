@@ -2,28 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { mockDataService } from "@/lib/mockData";
 
 export default function ClientListPage() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 Fetch clients from Supabase
+  // Load clients from mock data
   useEffect(() => {
     const fetchClients = async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching clients:", error);
-      } else {
+      try {
+        const data = mockDataService.getClients();
         setClients(data || []);
+      } catch (error) {
+        console.error("[v0] Error fetching clients:", error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchClients();
