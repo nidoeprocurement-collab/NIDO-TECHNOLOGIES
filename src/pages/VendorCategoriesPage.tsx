@@ -57,7 +57,7 @@ export default function VendorCategoriesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Configuration / Vendor Categories</p>
             <h1 className="text-2xl font-bold">Vendor Categories</h1>
@@ -75,7 +75,7 @@ export default function VendorCategoriesPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="px-4 md:px-6 py-8">
         {/* Filters */}
         <div className="mb-6 flex flex-col sm:flex-row gap-3">
           <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -98,12 +98,12 @@ export default function VendorCategoriesPage() {
                 <tr className="border-b bg-gray-50">
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">CATEGORY NAME</th>
                   <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">VENDOR CODE</th>
-                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">DESCRIPTION</th>
-                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">APPROVAL WORKFLOW</th>
-                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">DEFAULT SLA TEMPLATE</th>
-                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">ACTIVE VENDORS</th>
-                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">STATUS</th>
-                  <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center text-xs font-semibold text-gray-600">ACTIONS</th>
+                  <th className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">DESCRIPTION</th>
+                  <th className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">APPROVAL WORKFLOW</th>
+                  <th className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">DEFAULT SLA TEMPLATE</th>
+                  <th className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">ACTIVE VENDORS</th>
+                  <th className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 text-left text-xs font-semibold text-gray-600">STATUS</th>
+                  <th className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 text-center text-xs font-semibold text-gray-600">ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -143,7 +143,7 @@ export default function VendorCategoriesPage() {
         {/* Category Settings */}
         <div>
           <h2 className="text-lg font-semibold mb-4">Category Settings</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
             <div className="bg-white p-4 sm:p-6 rounded-lg border hover:shadow-lg transition-shadow cursor-pointer">
               <div className="flex items-center gap-3 mb-2">
                 <Settings size={18} className="text-blue-600" />
