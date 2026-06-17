@@ -29,20 +29,20 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
 const CATEGORY_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#6b7280'];
 
 const KPICard = ({ title, value, change, changeType, icon: Icon, bgColor }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-    <div className="flex items-start justify-between">
-      <div className="flex-1">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{title}</p>
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h3>
-        <p className={`text-xs mt-2 flex items-center gap-1 ${changeType === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
-          {changeType === 'positive' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-          {change} vs last month
-        </p>
+  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow duration-200 h-full flex flex-col justify-between">
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex-1 min-w-0">
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1 sm:mb-2 truncate">{title}</p>
+        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white break-words">{value}</h3>
       </div>
-      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${bgColor}`}>
-        <Icon size={24} className="text-white" />
+      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${bgColor}`}>
+        <Icon size={20} className="sm:w-6 sm:h-6 text-white" />
       </div>
     </div>
+    <p className={`text-xs mt-2 sm:mt-3 flex items-center gap-1 ${changeType === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
+      {changeType === 'positive' ? <ArrowUp size={12} className="sm:w-3.5 sm:h-3.5" /> : <ArrowDown size={12} className="sm:w-3.5 sm:h-3.5" />}
+      <span className="truncate">{change} vs last month</span>
+    </p>
   </div>
 );
 
@@ -182,7 +182,7 @@ export default function MainDashboard() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-4 lg:gap-3 mb-6">
         <KPICard title="Total Clients" value="15" change="12.5%" changeType="positive" icon={Eye} bgColor="bg-blue-600" />
         <KPICard title="Total Vendors" value="2" change="8.3%" changeType="positive" icon={Package} bgColor="bg-green-600" />
         <KPICard title="Total Orders" value="0" change="16.7%" changeType="positive" icon={ShoppingCart} bgColor="bg-purple-600" />
@@ -192,7 +192,7 @@ export default function MainDashboard() {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
         {/* Expenses Overview */}
         <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Expenses Overview</h3>
@@ -275,7 +275,7 @@ export default function MainDashboard() {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-4 mt-6 md:mt-8">
         <MetricCard title="Pending Approvals" value="156" icon={AlertCircle} bgColor="bg-yellow-500" href="/approvals" />
         <MetricCard title="Active Contracts" value="86" icon={CheckCircle} bgColor="bg-green-500" href="/contracts" />
         <MetricCard title="Open Invoices" value="231" icon={DollarSign} bgColor="bg-blue-500" href="/invoices" />
@@ -286,7 +286,7 @@ export default function MainDashboard() {
       <RecentOrdersTable />
 
       {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
         {/* Top Vendors */}
         <div className="lg:col-span-1">
           <TopVendors />

@@ -116,7 +116,7 @@ export default function SupportPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Support / Tickets</p>
             <h1 className="text-2xl font-bold">Support Center</h1>
@@ -131,7 +131,7 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="w-full px-4 md:px-6 py-8">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
           {[

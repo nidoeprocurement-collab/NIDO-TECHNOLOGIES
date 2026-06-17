@@ -16,14 +16,14 @@ export default function VendorDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4">
           <h1 className="text-2xl font-bold">Vendor Analytics</h1>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="px-4 md:px-6 py-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
           {DASHBOARD_STATS.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -43,7 +43,7 @@ export default function VendorDashboard() {
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mb-8">
           {/* Spend by Category */}
           <div className="bg-white p-4 sm:p-6 rounded-lg border">
             <h3 className="font-semibold mb-4 text-sm sm:text-base">Spend by Category</h3>
