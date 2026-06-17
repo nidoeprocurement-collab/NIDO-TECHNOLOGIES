@@ -53,8 +53,41 @@ export default function SalesQuoteDetailPage() {
       bankDetails: 'BANK NAME: IDFC\nA/c Payee Name: Nido Technologies\nBank A/C No.: 00281864611'
     },
     termsConditions: 'Payment of 50% post approval of quote, 30% against trial component and 20% before delivery.',
-    bankDetails: 'BANK NAME: IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDF0080154'
+    bankDetails: 'BANK NAME: IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDF0080154',
+    activities: [
+      {
+        id: 1,
+        type: 'CREATED',
+        description: `Quote ${this?.quoteNumber || 'EST-000126'} created`,
+        timestamp: '3/30/2026, 2:30:00 PM',
+        user: 'System Owner'
+      },
+      {
+        id: 2,
+        type: 'CONVERTED',
+        description: `Quote ${this?.quoteNumber || 'EST-000126'} converted to Sales Order SO-00001`,
+        timestamp: '3/30/2026, 4:30:00 PM',
+        user: 'System Owner'
+      }
+    ]
   };
+
+  const activities = [
+    {
+      id: 1,
+      type: 'CREATED',
+      description: `Quote ${quote.quoteNumber} created`,
+      timestamp: '3/30/2026, 2:30:00 PM',
+      user: 'System Owner'
+    },
+    {
+      id: 2,
+      type: 'CONVERTED',
+      description: `Quote ${quote.quoteNumber} converted to Sales Order SO-00001`,
+      timestamp: '3/30/2026, 4:30:00 PM',
+      user: 'System Owner'
+    }
+  ];
 
   return (
     <div className="space-y-6 pb-6">
@@ -283,8 +316,14 @@ export default function SalesQuoteDetailPage() {
       )}
 
       {activeTab === 'activity' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <p className="text-gray-600 dark:text-gray-400">Activity logs will appear here</p>
+        <div className="space-y-4">
+          {activities.map((activity) => (
+            <div key={activity.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+              <p className="text-xs uppercase font-semibold text-gray-700 dark:text-gray-300 tracking-wide mb-2">{activity.type}</p>
+              <p className="text-sm sm:text-base text-gray-900 dark:text-white font-medium mb-2">{activity.description}</p>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{activity.timestamp} by {activity.user}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
