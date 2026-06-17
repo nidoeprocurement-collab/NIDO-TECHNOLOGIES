@@ -50,7 +50,6 @@ export default function LoginPage() {
           {/* Left Section - Features */}
           <div className="hidden lg:block bg-black" style={{ marginLeft: '20px' }}>
             <p className="text-xs font-semibold text-white uppercase tracking-wider mb-8">
-              CORPESSENTIALS
             </p>
             
             <h1 className="text-4xl font-bold text-white mb-6">
