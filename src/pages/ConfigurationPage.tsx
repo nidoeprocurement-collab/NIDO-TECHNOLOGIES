@@ -1,4 +1,5 @@
-import {
+export default function ConfigurationPage() {
+  import {
   Settings,
   Users,
   GitBranch,
