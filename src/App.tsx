@@ -54,7 +54,6 @@ const VendorOnboardingPage = lazy(() => import("@/pages/VendorOnboardingPage"));
 const AddVendorPage = lazy(() => import("@/pages/AddVendorPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
-const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
 const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
@@ -231,28 +230,6 @@ function AppRoutes() {
             }
           />
           <Route path="clients/add" element={<AddClient />} />
-          <Route
-            path="clients/:id"
-            element={
-              <PageErrorBoundary
-                title="Client profile failed to load"
-                resetKey={location.pathname}
-              >
-                <ClientDetailPage />
-              </PageErrorBoundary>
-            }
-          />
-          <Route
-            path="clients/:id/users/:userId"
-            element={
-              <PageErrorBoundary
-                title="User profile failed to load"
-                resetKey={location.pathname}
-              >
-                <UserProfilePage />
-              </PageErrorBoundary>
-            }
-          />
           <Route 
             path="clients" 
             element={
