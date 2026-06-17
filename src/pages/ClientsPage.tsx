@@ -14,60 +14,45 @@ import {
 // Mock client data
 const MOCK_CLIENTS = [
   {
-    id: "cli_001",
+    id: "CLI-001",
     client_id: "CLI-00024",
-    company_name: "raj",
+    company_name: "Acme Corporation",
     category: "Technology",
     client_tier: "Premium Clients",
-    contact_person: "raj",
-    email: "raj@info.com",
-    phone: "+1-555-0100",
-    mobile: "+1-555-0101",
+    contact_person: "John Smith",
+    email: "john.smith@acme.com",
+    phone: "+1-555-0101",
+    mobile: "+1-555-0102",
     status: "active",
     client_logo_url: null,
     is_archived: false,
     total_spend: 0,
   },
   {
-    id: "cli_002",
+    id: "CLI-002",
     client_id: "CLI-00023",
-    company_name: "veera industries",
-    category: "Import/Export",
+    company_name: "TechVision Solutions",
+    category: "IT Services",
     client_tier: "Premium Clients",
-    contact_person: "Veeru",
-    email: "Veeru@indu.com",
-    phone: "+1-555-0200",
-    mobile: "+1-555-0201",
+    contact_person: "Sarah Johnson",
+    email: "sarah@techvision.com",
+    phone: "+1-555-0201",
+    mobile: "+1-555-0202",
     status: "active",
     client_logo_url: null,
     is_archived: false,
     total_spend: 0,
   },
   {
-    id: "cli_003",
+    id: "CLI-003",
     client_id: "CLI-00020",
-    company_name: "Nitin Supplies",
-    category: "Services",
+    company_name: "Global Enterprises",
+    category: "Manufacturing",
     client_tier: "Standard Clients",
-    contact_person: "Nitin Shetty",
-    email: "nitin.shetty@gmail.com",
-    phone: "+1-555-0300",
-    mobile: "+1-555-0301",
-    status: "active",
-    client_logo_url: null,
-    is_archived: false,
-    total_spend: 0,
-  },
-  {
-    id: "cli_004",
-    client_id: "CLI-00021",
-    company_name: "Mohan Textiles",
-    category: "Financial Services",
-    client_tier: "Standard Clients",
-    contact_person: "Mohan Bhat",
-    email: "mohan.bhat@gmail.com",
-    phone: "+1-555-0400",
-    mobile: "+1-555-0401",
+    contact_person: "Michael Brown",
+    email: "michael@globalent.com",
+    phone: "+1-555-0301",
+    mobile: "+1-555-0302",
     status: "active",
     client_logo_url: null,
     is_archived: false,
@@ -248,9 +233,17 @@ export default function ClientsPage() {
             continue;
           }
 
+          const maxId = Math.max(0, ...clients.map(c => {
+            const num = parseInt(c.id.replace("CLI-", ""));
+            return isNaN(num) ? 0 : num;
+          }), ...clientsToInsert.map(c => {
+            const num = parseInt(c.id.replace("CLI-", ""));
+            return isNaN(num) ? 0 : num;
+          }));
+
           const clientData: any = {
-            id: `cli_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            client_id: `CLI-${String(clients.length + clientsToInsert.length + 1).padStart(3, "0")}`,
+            id: `CLI-${String(maxId + 1).padStart(3, "0")}`,
+            client_id: `CLI-${String(clients.length + clientsToInsert.length + 1).padStart(5, "0")}`,
             company_name: companyName,
             category: values[headers.indexOf("category")] || "Miscellaneous",
             client_tier: values[headers.indexOf("client tier")] || "Standard Clients",
