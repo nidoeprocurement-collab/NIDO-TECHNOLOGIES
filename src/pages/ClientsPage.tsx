@@ -81,6 +81,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"All" | "Premium" | "Active" | "Pending" | "Inactive">("All");
+  const [showArchived, setShowArchived] = useState(false);
 
   const [showMenu, setShowMenu] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
@@ -376,11 +377,14 @@ export default function ClientsPage() {
                 </button>
                 <div className="border-t border-gray-200 my-1"></div>
                 <button 
-                  onClick={() => setShowMenu(false)}
+                  onClick={() => {
+                    setShowArchived(true);
+                    setShowMenu(false);
+                  }}
                   className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
                 >
                   <Archive size={16} />
-                  Archive Clients
+                  Archived Clients
                 </button>
               </div>
             )}
@@ -538,6 +542,95 @@ export default function ClientsPage() {
       </div>
 
       {/* Bulk Import Modal */}
+      {showArchived && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
+            <div className="sticky top-0 bg-white border-b p-4 sm:p-6 flex items-center justify-between">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">Archived Clients</h2>
+              <button
+                onClick={() => setShowArchived(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-6">
+              {(() => {
+                const archivedClients = clients.filter(c => c.is_archived);
+                
+                if (archivedClients.length === 0) {
+                  return (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No archived clients yet</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-auto">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                            Client ID
+                          </th>
+                          <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                            Client Name
+                          </th>
+                          <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                            Representative
+                          </th>
+                          <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                            Email
+                          </th>
+                          <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                            Total Spend (INR)
+                          </th>
+                          <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {archivedClients.map((client) => (
+                          <tr key={client.id} className="border-b hover:bg-gray-50">
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium text-blue-600">
+                              {client.client_id}
+                            </td>
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">
+                              {client.company_name}
+                            </td>
+                            <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">
+                              {client.contact_person}
+                            </td>
+                            <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm">
+                              {client.email}
+                            </td>
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                              ₹{client.total_spend || 0}
+                            </td>
+                            <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                              <span
+                                className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(
+                                  client.status
+                                )}`}
+                              >
+                                {client.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showBulkImport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
