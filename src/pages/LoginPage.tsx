@@ -46,9 +46,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center font-bold shadow-2xl rounded-2xl" style={{ fontFamily: 'Roboto, Lato, system-ui, sans-serif' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center" style={{ fontFamily: 'Roboto, Lato, system-ui, sans-serif', fontWeight: '800', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', borderRadius: '15px' }}>
           {/* Left Section - Features */}
-          <div className="hidden lg:block bg-black ml-5">
+          <div className="hidden lg:block bg-black" style={{ marginLeft: '20px' }}>
             <p className="text-xs font-semibold text-white uppercase tracking-wider mb-8">
               CORPESSENTIALS
             </p>
@@ -88,7 +88,7 @@ export default function LoginPage() {
           </div>
 
           {/* Right Section - Login Form */}
-          <div className="w-full max-w-sm ml-12 mr--12">
+          <div className="w-full max-w-sm" style={{ marginLeft: '50px', marginRight: '-50px' }}>
             <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
               {/* Header */}
               <div className="mb-8">
