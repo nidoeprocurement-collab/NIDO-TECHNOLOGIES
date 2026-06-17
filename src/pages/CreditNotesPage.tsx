@@ -8,7 +8,7 @@ import {
 
 export default function CreditNotesDashboard() {
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl space-y-6">
 
         {/* Header */}
