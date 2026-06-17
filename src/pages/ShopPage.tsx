@@ -79,7 +79,7 @@ export default function ShopPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Shop / Products</p>
             <h1 className="text-2xl font-bold">Product Shop</h1>
@@ -93,7 +93,7 @@ export default function ShopPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="w-full px-4 md:px-6 py-8">
         {/* Search and Filters */}
         <div className="mb-8">
           <div className="mb-6 relative">

@@ -11,7 +11,7 @@ export default function SLAOverview() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
+        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
           <div>
             <p className="text-xs text-gray-500">Operations / SLA</p>
             <h1 className="text-2xl font-bold">SLA Overview</h1>
@@ -19,7 +19,7 @@ export default function SLAOverview() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="w-full px-4 md:px-6 py-8">
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
           {SLA_METRICS.map((metric) => {

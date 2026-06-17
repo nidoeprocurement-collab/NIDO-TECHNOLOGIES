@@ -68,7 +68,7 @@ export default function DeliveryChallansPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Logistics / Delivery Challans</p>
             <h1 className="text-2xl font-bold">Delivery Challans</h1>
@@ -80,7 +80,7 @@ export default function DeliveryChallansPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
+      <div className="w-full px-4 md:px-6 py-8">
         <div className="mb-6 flex gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3 text-gray-400" size={20} />
