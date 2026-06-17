@@ -44,52 +44,52 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center text-gray-100 border border-black">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center font-bold shadow-2xl rounded-2xl" style={{ fontFamily: 'Roboto, Lato, system-ui, sans-serif' }}>
           {/* Left Section - Features */}
-          <div className="hidden lg:block">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-8">
+          <div className="hidden lg:block bg-black ml-5">
+            <p className="text-xs font-semibold text-white uppercase tracking-wider mb-8">
               CORPESSENTIALS
             </p>
             
-            <h1 className="text-4xl font-bold text-gray-900 mb-6">
+            <h1 className="text-4xl font-bold text-white mb-6">
               Real-time spend insights
             </h1>
             
             <div className="space-y-6">
-              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+              <p className="text-sm font-semibold text-white uppercase tracking-wider">
                 Enterprise Features
               </p>
               
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-gray-700">Automated purchase orders</p>
+                  <p className="text-white">Automated purchase orders</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-gray-700">Multi-location support</p>
+                  <p className="text-gray-100">Multi-location support</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-gray-700">Role-based access control</p>
+                  <p className="text-white">Role-based access control</p>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-gray-700">Enterprise-grade security</p>
+                  <p className="text-white">Enterprise-grade security</p>
                 </div>
               </div>
             </div>
 
-            <p className="text-xs text-gray-500 mt-12">
+            <p className="text-xs text-white mt-12">
               © 2024 Nido Tech CorpEssentials
             </p>
           </div>
 
           {/* Right Section - Login Form */}
-          <div className="w-full max-w-sm">
-            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
+          <div className="w-full max-w-sm ml-12 mr--12">
+            <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
               {/* Header */}
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
