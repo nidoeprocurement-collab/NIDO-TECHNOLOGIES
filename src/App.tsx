@@ -120,8 +120,17 @@ const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
 const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <Suspense
       fallback={
@@ -135,7 +144,7 @@ function AppRoutes() {
           path="/login"
           element={
             isAuthenticated ? (
-              <Navigate to="/home" replace />
+              <Navigate to="/dashboard" replace />
             ) : (
               <PageErrorBoundary
                 title="Login failed to load"
@@ -158,12 +167,14 @@ function AppRoutes() {
         <Route
           path="/"
           element={
-            <ProtectedRoute>
+            isAuthenticated ? (
               <AppLayout />
-            </ProtectedRoute>
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         >
-          <Route index element={<Navigate to="/home" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="home" element={<HomePage />} />
           <Route path="categories" element={<Navigate to="/shop" replace />} />
           <Route path="dashboard" element={<MainDashboard />} />
