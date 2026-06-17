@@ -46,7 +46,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4">
       <div className="w-full max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center text-gray-100 border border-black">
           {/* Left Section - Features */}
           <div className="hidden lg:block">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-8">
