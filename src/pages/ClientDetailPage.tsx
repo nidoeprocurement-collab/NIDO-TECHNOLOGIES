@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Download, Mail, Phone, MapPin, Globe, Users, ShoppingCart, Calendar, BarChart3 } from 'lucide-react';
+import { ChevronLeft, Download, Mail, Phone, MapPin, Globe, Users, ShoppingCart, Calendar, BarChart3, Edit } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -414,8 +414,256 @@ export default function ClientDetailPage() {
               </div>
             )}
 
+            {/* Roles Tab */}
+            {activeTab === 'roles' && (
+              <div className="space-y-6">
+                {/* Roles Management Section */}
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Roles Management</h3>
+                  <p className="text-sm text-gray-600 mb-6">Roles determine what users in the client can access and do for the system. Each role comes with a set of permissions across modules. Users can only perform actions that their assigned roles allow.</p>
+                  
+                  {/* Roles Grid */}
+                  <div className="grid grid-cols-3 gap-6 mb-8">
+                    {/* System Owner */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
+                          <h4 className="text-sm font-bold text-gray-900">System Owner</h4>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">Unrestricted access with all permissions</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Data Visibility</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Can Approver</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Approval Limit</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Administrator */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
+                          <h4 className="text-sm font-bold text-gray-900">Administrator</h4>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">Full access to internal organizations</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Data Visibility</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Can Approver</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Approval Limit</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Procurement Specialist */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
+                          <h4 className="text-sm font-bold text-gray-900">Procurement Specialist</h4>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">Manage purchase orders and create purchase orders</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Data Visibility</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Can Approver</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Approval Limit</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-600 font-medium">PKG 100</p>
+                    </div>
+
+                    {/* Employee */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
+                          <h4 className="text-sm font-bold text-gray-900">Employee</h4>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">Basic access to dashboard and shop</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Data Visibility</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Can Approver</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Approval Limit</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-600 font-medium">Department Only</p>
+                    </div>
+
+                    {/* Vendor Administrator */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
+                          <h4 className="text-sm font-bold text-gray-900">Vendor Administrator</h4>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">Vendor account setup with full access</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Data Visibility</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Can Approver</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Approval Limit</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-600 font-medium">You Only</p>
+                    </div>
+
+                    {/* Accounts Payable Officer */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
+                          <h4 className="text-sm font-bold text-gray-900">Accounts Payable Officer</h4>
+                        </div>
+                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">Manage bills, invoices, and vendor credits</p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Data Visibility</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Can Approver</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" disabled className="w-4 h-4" />
+                          <span className="text-xs text-gray-700">Approval Limit</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-600 font-medium">PKG 100000</p>
+                    </div>
+                  </div>
+
+                  {/* Permission Matrix Section */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-5 mb-8">
+                    <h4 className="text-sm font-bold text-gray-900 mb-4">Permission Matrix</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-semibold text-gray-700">Module</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">View</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Create</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Edit</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Delete</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Report</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Approve</th>
+                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Export</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {['INVOICE', 'Purchase Orders', 'Shop', 'VENDORS', 'CLIENTS', 'Inventory', 'Transaction', 'Approvals', 'Reports & Analytics', 'Configuration', 'Audit Trail', 'Notifications', 'User Management'].map((module, idx) => (
+                            <tr key={idx} className="border-b hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">{module}</td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Permission Summary Section */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-5">
+                    <h4 className="text-sm font-bold text-gray-900 mb-4">Permission Summary</h4>
+                    <div className="grid grid-cols-3 gap-6">
+                      {/* Dashboard */}
+                      <div className="border border-gray-200 rounded p-4">
+                        <p className="text-xs font-semibold text-gray-900 mb-3">Dashboard</p>
+                        <div className="flex gap-2">
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Create</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Delete</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Print</button>
+                        </div>
+                      </div>
+
+                      {/* Purchase Orders */}
+                      <div className="border border-gray-200 rounded p-4">
+                        <p className="text-xs font-semibold text-gray-900 mb-3">Purchase Orders</p>
+                        <div className="flex gap-2">
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Approve</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Create</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Delete</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
+                        </div>
+                      </div>
+
+                      {/* Shop */}
+                      <div className="border border-gray-200 rounded p-4">
+                        <p className="text-xs font-semibold text-gray-900 mb-3">Shop</p>
+                        <div className="flex gap-2">
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Configurable</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Create</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Delete</button>
+                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Other Tabs - Placeholder */}
-            {activeTab !== 'overview' && (
+            {activeTab !== 'overview' && activeTab !== 'roles' && (
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <p className="text-gray-600">
                   {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Management - Coming Soon
