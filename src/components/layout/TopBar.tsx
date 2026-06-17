@@ -1,5 +1,7 @@
-import { Bell, Search, User, LogOut, ArrowLeft, ChevronRight, Home } from 'lucide-react';
+import { useState } from 'react';
+import { Bell, Search, LogOut, ArrowLeft, ChevronRight, Home, User } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Route to label mapping for breadcrumbs
 const routeLabels: Record<string, string> = {
@@ -68,7 +70,15 @@ function generateBreadcrumbs(pathname: string) {
 export default function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const breadcrumbs = generateBreadcrumbs(location.pathname);
+
+  const handleLogout = () => {
+    console.log('[v0] User logging out');
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-20 lg:ml-64">
@@ -101,14 +111,52 @@ export default function TopBar() {
           </button>
 
           {/* User Menu */}
-          <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+          <div className="relative flex items-center gap-3 pl-4 border-l border-gray-200">
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-gray-900">System Owner</p>
-              <p className="text-xs text-gray-500">Administrator</p>
+              <p className="text-sm font-medium text-gray-900">{user?.name || 'System Owner'}</p>
+              <p className="text-xs text-gray-500">{user?.role || 'Administrator'}</p>
             </div>
-            <button className="w-9 h-9 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm hover:bg-blue-700 transition-colors">
-              A
+            <button 
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-9 h-9 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm hover:bg-blue-700 transition-colors"
+              title={user?.email}
+            >
+              {user?.name?.charAt(0) || 'A'}
             </button>
+
+            {/* User Dropdown Menu */}
+            {showUserMenu && (
+              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-2 w-48 z-50">
+                <div className="px-4 py-2 border-b border-gray-200">
+                  <p className="text-sm font-semibold text-gray-900">{user?.name || 'System Owner'}</p>
+                  <p className="text-xs text-gray-500">{user?.email}</p>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    // Profile navigation can be added here
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <User size={16} />
+                  Profile
+                </button>
+
+                <div className="border-t border-gray-200 my-1"></div>
+
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    handleLogout();
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

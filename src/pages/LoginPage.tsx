@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [email, setEmail] = useState('owner@nidotec.com');
+  const [email, setEmail] = useState('owner@nidotech.com');
   const [password, setPassword] = useState('Owner@123');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +22,12 @@ export default function LoginPage() {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Validate credentials
-      if (email === 'owner@nidotec.com' && password === 'Owner@123') {
+      if (email === 'owner@nidotech.com' && password === 'Owner@123') {
         console.log('[v0] Login successful with credentials:', email);
         login({
           id: 'owner-1',
           email: email,
-          name: 'Owner User',
+          name: 'System Owner',
           role: 'admin',
         });
         navigate('/dashboard', { replace: true });
@@ -44,127 +44,157 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <div className="inline-block bg-white rounded-lg p-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">N</span>
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">NIDO Procurement</h1>
-          <p className="text-blue-100">Intelligent Procurement Management</p>
-        </div>
-
-        {/* Login Card */}
-        <div className="bg-white rounded-xl shadow-2xl p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Welcome Back</h2>
-
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 text-gray-400" size={18} />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
-                  placeholder="owner@nidotec.com"
-                  disabled={isLoading}
-                />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-7xl">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+          {/* Left Section - Features */}
+          <div className="hidden lg:block">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-8">
+              CORPESSENTIALS
+            </p>
+            
+            <h1 className="text-4xl font-bold text-gray-900 mb-6">
+              Real-time spend insights
+            </h1>
+            
+            <div className="space-y-6">
+              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                Enterprise Features
+              </p>
+              
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="text-gray-400 mt-1">✓</div>
+                  <p className="text-gray-700">Automated purchase orders</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="text-gray-400 mt-1">✓</div>
+                  <p className="text-gray-700">Multi-location support</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="text-gray-400 mt-1">✓</div>
+                  <p className="text-gray-700">Role-based access control</p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="text-gray-400 mt-1">✓</div>
+                  <p className="text-gray-700">Enterprise-grade security</p>
+                </div>
               </div>
             </div>
 
-            {/* Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 text-gray-400" size={18} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all"
-                  placeholder="Enter your password"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                  disabled={isLoading}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            <p className="text-xs text-gray-500 mt-12">
+              © 2024 Nido Tech CorpEssentials
+            </p>
+          </div>
+
+          {/* Right Section - Login Form */}
+          <div className="w-full max-w-sm">
+            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
+              {/* Header */}
+              <div className="mb-8">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
+                    <Zap size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Nido Tech</h2>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">CORPESSENTIALS</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="mb-6 border-b border-gray-200">
+                <button className="pb-3 px-4 text-gray-900 font-medium border-b-2 border-gray-900">
+                  Sign In
                 </button>
               </div>
-            </div>
 
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center text-gray-700">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 mr-2"
-                  disabled={isLoading}
-                />
-                Remember me
-              </label>
-              <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
-                Forgot password?
-              </a>
-            </div>
+              {/* Welcome Message */}
+              <div className="mb-8">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  Welcome back
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  Sign in to your account to continue
+                </p>
+              </div>
 
-            {/* Login Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-2.5 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Logging in...
-                </>
-              ) : (
-                'Login'
+              {/* Error Message */}
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Divider */}
-          <div className="my-6 flex items-center gap-4">
-            <div className="flex-1 bg-gray-200 h-px"></div>
-            <span className="text-gray-500 text-sm">Demo Credentials</span>
-            <div className="flex-1 bg-gray-200 h-px"></div>
+              {/* Login Form */}
+              <form onSubmit={handleLogin} className="space-y-5">
+                {/* Email Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                    placeholder="owner@nidotech.com"
+                    disabled={isLoading}
+                  />
+                </div>
+
+                {/* Password Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                      placeholder="••••••••••"
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      disabled={isLoading}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sign In Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      Sign In
+                      <span>→</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Footer Note */}
+              <p className="text-xs text-gray-600 mt-6 pt-6 border-t border-gray-200">
+                <span className="font-medium">User creation is owner-only.</span> Log in with the owner account to create client admin and client user accounts.
+              </p>
+            </div>
           </div>
-
-          {/* Demo Info */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <p className="text-xs text-gray-600 mb-2">
-              <span className="font-semibold">Email:</span> owner@nidotec.com
-            </p>
-            <p className="text-xs text-gray-600">
-              <span className="font-semibold">Password:</span> Owner@123
-            </p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 text-center text-blue-100 text-sm">
-          <p>© 2024 NIDO Technologies. All rights reserved.</p>
         </div>
       </div>
     </div>
