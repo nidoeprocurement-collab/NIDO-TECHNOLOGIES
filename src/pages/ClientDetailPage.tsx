@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import {
   ChevronLeft,
   MoreVertical,
@@ -26,6 +28,7 @@ const ClientDetailPage = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [showRolesMenu, setShowRolesMenu] = useState(false);
   const [userFilter, setUserFilter] = useState("all");
+  const pdfRef = useRef(null);
 
   const client = {
     id: "CLI-001",
@@ -124,8 +127,46 @@ const ClientDetailPage = () => {
     { id: 3, type: "contract", title: "Contract updated", description: "Contract period extended to Dec 2025", date: "2024-05-20 11:00 AM" },
   ];
 
-  const downloadProfile = () => {
-    alert("Download Profile PDF - Feature implementation");
+  const downloadProfile = async () => {
+    if (pdfRef.current) {
+      try {
+        const canvas = await html2canvas(pdfRef.current, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+        });
+
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4",
+        });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const imgWidth = pageWidth - 20;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        let heightLeft = imgHeight;
+        let position = 10;
+
+        const imgData = canvas.toDataURL("image/png");
+
+        while (heightLeft >= 0) {
+          pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight - 20;
+          position = heightLeft > 0 ? heightLeft - imgHeight + 20 : 0;
+          if (heightLeft > 0) {
+            pdf.addPage();
+          }
+        }
+
+        pdf.save(`${client.name}-profile.pdf`);
+      } catch (error) {
+        console.error("PDF generation error:", error);
+        alert("Failed to generate PDF. Please try again.");
+      }
+    }
   };
 
   return (
@@ -194,7 +235,7 @@ const ClientDetailPage = () => {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div ref={pdfRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 h-fit">
               <div className="text-center mb-6">
                 <div className="w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
