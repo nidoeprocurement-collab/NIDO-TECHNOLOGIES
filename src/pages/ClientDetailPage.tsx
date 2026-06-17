@@ -585,7 +585,7 @@ export default function ClientDetailPage() {
                     </div>
                   </div>
 
-                  {/* Permission Matrix Section */}
+                  {/* Permission Matrix Section - Read Only */}
                   <div className="bg-white rounded-lg border border-gray-200 p-5 mb-8">
                     <h4 className="text-sm font-bold text-gray-900 mb-4">Permission Matrix</h4>
                     <div className="overflow-x-auto">
@@ -603,16 +603,30 @@ export default function ClientDetailPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {['INVOICE', 'Purchase Orders', 'Shop', 'VENDORS', 'CLIENTS', 'Inventory', 'Transaction', 'Approvals', 'Reports & Analytics', 'Configuration', 'Audit Trail', 'Notifications', 'User Management'].map((module, idx) => (
+                          {[
+                            { module: 'INVOICE', perms: [true, true, true, true, true, false, true] },
+                            { module: 'Purchase Orders', perms: [true, true, true, true, false, true, false] },
+                            { module: 'Shop', perms: [true, false, false, false, false, false, false] },
+                            { module: 'VENDORS', perms: [true, true, true, false, true, false, true] },
+                            { module: 'CLIENTS', perms: [true, false, false, false, true, false, false] },
+                            { module: 'Inventory', perms: [true, true, true, true, false, false, true] },
+                            { module: 'Transaction', perms: [true, false, false, false, false, false, false] },
+                            { module: 'Approvals', perms: [true, false, false, false, false, true, false] },
+                            { module: 'Reports & Analytics', perms: [true, false, false, false, true, false, true] },
+                            { module: 'Configuration', perms: [false, false, false, false, false, false, false] },
+                            { module: 'Audit Trail', perms: [true, false, false, false, false, false, false] },
+                            { module: 'Notifications', perms: [true, false, false, false, false, false, false] },
+                            { module: 'User Management', perms: [true, true, false, false, false, false, true] }
+                          ].map((item, idx) => (
                             <tr key={idx} className="border-b hover:bg-gray-50">
-                              <td className="px-4 py-3 font-medium text-gray-900">{module}</td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
-                              <td className="px-4 py-3 text-center"><input type="checkbox" className="w-4 h-4" /></td>
+                              <td className="px-4 py-3 font-medium text-gray-900">{item.module}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[0] ? '✓' : '-'}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[1] ? '✓' : '-'}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[2] ? '✓' : '-'}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[3] ? '✓' : '-'}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[4] ? '✓' : '-'}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[5] ? '✓' : '-'}</td>
+                              <td className="px-4 py-3 text-center text-green-600">{item.perms[6] ? '✓' : '-'}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -656,6 +670,51 @@ export default function ClientDetailPage() {
                           <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Role Comparison Section */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-5 mt-8">
+                    <h4 className="text-sm font-bold text-gray-900 mb-4">Role Comparison</h4>
+                    <p className="text-xs text-gray-600 mb-4">Compare permissions, restrictions, and capabilities across different roles to see the right access level to assign to user teams members.</p>
+                    
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 border-b">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">ATTRIBUTE</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">SYSTEM OWNER</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">ADMINISTRATOR</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">PROCUREMENT MANAGER</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">PROCUREMENT SPECIALIST</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">SECONDARY MANAGER</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">FINANCE MANAGER</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">EMPLOYEE</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">CLIENT ADMINISTRATOR</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">CLIENT USER</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">VENDOR ADMINISTRATOR</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">VENDOR USER</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { attr: 'USER', data: [true, true, true, true, true, true, false, true, false, false, false] },
+                            { attr: 'Data Visibility', data: [true, true, true, true, true, true, false, true, false, false, false] },
+                            { attr: 'Can Approver', data: [true, true, false, false, false, true, false, false, false, false, false] },
+                            { attr: 'Approval Limit', data: [true, true, false, false, false, true, false, false, false, false, false] },
+                            { attr: 'Module Access', data: [true, true, true, true, true, true, false, true, false, true, false] }
+                          ].map((row, idx) => (
+                            <tr key={idx} className="border-b hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">{row.attr}</td>
+                              {row.data.map((value, colIdx) => (
+                                <td key={colIdx} className="px-4 py-3 text-center text-green-600">
+                                  {value ? '✓' : '-'}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 </div>
