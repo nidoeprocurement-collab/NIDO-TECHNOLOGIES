@@ -8,65 +8,71 @@ import {
   Upload,
   MoreVertical,
   Archive,
+  Edit,
+  Eye,
 } from "lucide-react";
 
 // Mock client data
 const MOCK_CLIENTS = [
   {
     id: "cli_001",
-    client_id: "CLI-001",
-    company_name: "Tech Solutions Inc",
+    client_id: "CLI-00024",
+    company_name: "raj",
     category: "Technology",
     client_tier: "Premium Clients",
-    contact_person: "John Smith",
-    email: "john@techsolutions.com",
+    contact_person: "raj",
+    email: "raj@info.com",
     phone: "+1-555-0100",
     mobile: "+1-555-0101",
     status: "active",
     client_logo_url: null,
     is_archived: false,
+    total_spend: 0,
   },
   {
     id: "cli_002",
-    client_id: "CLI-002",
-    company_name: "Global Trading Ltd",
+    client_id: "CLI-00023",
+    company_name: "veera industries",
     category: "Import/Export",
     client_tier: "Premium Clients",
-    contact_person: "Sarah Johnson",
-    email: "sarah@globaltrading.com",
+    contact_person: "Veeru",
+    email: "Veeru@indu.com",
     phone: "+1-555-0200",
     mobile: "+1-555-0201",
     status: "active",
     client_logo_url: null,
     is_archived: false,
+    total_spend: 0,
   },
   {
     id: "cli_003",
-    client_id: "CLI-003",
-    company_name: "Marketing Pro Agency",
+    client_id: "CLI-00020",
+    company_name: "Nitin Supplies",
     category: "Services",
     client_tier: "Standard Clients",
-    contact_person: "Mike Davis",
-    email: "mike@marketingpro.com",
+    contact_person: "Nitin Shetty",
+    email: "nitin.shetty@gmail.com",
     phone: "+1-555-0300",
     mobile: "+1-555-0301",
-    status: "pending",
+    status: "active",
     client_logo_url: null,
     is_archived: false,
+    total_spend: 0,
   },
   {
     id: "cli_004",
-    client_id: "CLI-004",
-    company_name: "Finance Corp",
+    client_id: "CLI-00021",
+    company_name: "Mohan Textiles",
     category: "Financial Services",
     client_tier: "Standard Clients",
-    contact_person: "Emily Wilson",
-    email: "emily@financecorp.com",
+    contact_person: "Mohan Bhat",
+    email: "mohan.bhat@gmail.com",
     phone: "+1-555-0400",
     mobile: "+1-555-0401",
-    status: "inactive",
+    status: "active",
     client_logo_url: null,
     is_archived: false,
+    total_spend: 0,
   },
 ];
 
@@ -79,6 +85,7 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [showMenu, setShowMenu] = useState(false);
+  const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
 
   useEffect(() => {
     const initializeClients = async () => {
@@ -452,6 +459,9 @@ export default function ClientsPage() {
                     Email
                   </th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                    Total Spend (USD)
+                  </th>
+                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Status
                   </th>
                   <th className="px-3 sm:px-4 py-3 text-center text-xs font-semibold text-gray-600">
@@ -462,14 +472,14 @@ export default function ClientsPage() {
               <tbody>
                 {filteredClients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 sm:px-4 py-8 text-center text-gray-500 text-sm">
+                    <td colSpan={8} className="px-3 sm:px-4 py-8 text-center text-gray-500 text-sm">
                       No clients found
                     </td>
                   </tr>
                 ) : (
                   filteredClients.map((client) => (
                     <tr key={client.id} className="border-b hover:bg-gray-50">
-                      <td className="px- truncate3 sm:px-4 py-3">
+                      <td className="px-3 sm:px-4 py-3">
                         <input type="checkbox" className="rounded" />
                       </td>
                       <td
@@ -478,7 +488,7 @@ export default function ClientsPage() {
                       >
                         {client.client_id}
                       </td>
-                      <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm font-medium">
+                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm font-medium">
                         {client.company_name}
                       </td>
                       <td className="hidden md:table-cell px-4 py-3 text-xs sm:text-sm">
@@ -487,7 +497,10 @@ export default function ClientsPage() {
                       <td className="hidden lg:table-cell px-4 py-3 text-xs sm:text-sm">
                         {client.email}
                       </td>
-                      <td className="px- truncate3 sm:px-4 py-3 text-xs sm:text-sm">
+                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
+                        ${client.total_spend || 0}
+                      </td>
+                      <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
                         <span
                           className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(
                             client.status
@@ -496,13 +509,50 @@ export default function ClientsPage() {
                           {client.status}
                         </span>
                       </td>
-                      <td className="px- truncate3 sm:px-4 py-3 text-center">
+                      <td className="px-3 sm:px-4 py-3 text-center relative">
                         <button
-                          onClick={() => handleEditClient(client.id)}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          onClick={() => setRowMenuOpen(rowMenuOpen === client.id ? null : client.id)}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors inline-block"
+                          title="Actions"
                         >
-                          Edit
+                          <MoreVertical size={18} className="text-gray-600" />
                         </button>
+                        
+                        {rowMenuOpen === client.id && (
+                          <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-40 z-50">
+                            <button
+                              onClick={() => {
+                                navigate(`/clients/${client.id}`);
+                                setRowMenuOpen(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                            >
+                              <Eye size={16} />
+                              View Details
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleEditClient(client.id);
+                                setRowMenuOpen(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                            >
+                              <Edit size={16} />
+                              Edit
+                            </button>
+                            <div className="border-t border-gray-200 my-1"></div>
+                            <button
+                              onClick={() => {
+                                handleDeleteClient(client.id, client.company_name);
+                                setRowMenuOpen(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
+                            >
+                              <Archive size={16} />
+                              Archive
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
