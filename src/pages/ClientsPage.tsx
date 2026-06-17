@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
-  Search,
   Plus,
   Download,
   Upload,
@@ -82,7 +81,6 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"All" | "Premium" | "Active" | "Pending" | "Inactive">("All");
-  const [searchTerm, setSearchTerm] = useState("");
 
   const [showMenu, setShowMenu] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
@@ -111,13 +109,6 @@ export default function ClientsPage() {
 
   const filteredClients = clients.filter((c) => {
     if (c.is_archived) return false;
-    
-    const matchesSearch = 
-      c.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.client_id.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (!matchesSearch) return false;
 
     if (activeFilter === "All") {
       return true;
@@ -140,7 +131,7 @@ export default function ClientsPage() {
       "Representative",
       "Email",
       "Phone",
-      "Total Spend (USD)",
+      "Total Spend (INR)",
       "Status",
     ];
 
@@ -150,7 +141,7 @@ export default function ClientsPage() {
       client.contact_person,
       client.email,
       client.phone,
-      "$0",
+      "₹0",
       client.status,
     ]);
 
@@ -397,44 +388,27 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <div className="w-full px-4 md:px-6 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           {[
-            { label: "Premium Clients", value: stats.premium, color: "blue", filter: "Premium" },
-            { label: "Active Clients", value: stats.active, color: "green", filter: "Active" },
-            { label: "Pending", value: stats.pending, color: "orange", filter: "Pending" },
-            { label: "Inactive", value: stats.inactive, color: "red", filter: "Inactive" },
-          ].map((stat) => (
+            { label: "Premium Clients", value: "Premium", count: stats.premium },
+            { label: "Active Clients", value: "Active", count: stats.active },
+            { label: "Pending", value: "Pending", count: stats.pending },
+            { label: "Inactive", value: "Inactive", count: stats.inactive },
+          ].map((tab) => (
             <button
-              key={stat.label}
-              onClick={() => setActiveFilter(stat.filter as any)}
-              className={`text-left p-4 bg-white rounded-lg border-2 transition-all ${
-                activeFilter === stat.filter
-                  ? `border-${stat.color}-500 shadow-lg`
-                  : "border-gray-200 hover:shadow-md"
+              key={tab.value}
+              onClick={() => setActiveFilter(tab.value as any)}
+              className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap rounded-lg transition-all ${
+                activeFilter === tab.value
+                  ? "bg-blue-600 text-white shadow-md"
+                  : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
               }`}
             >
-              <p className="text-gray-600 text-xs sm:text-sm">{stat.label}</p>
-              <p className={`text-2xl sm:text-3xl font-bold mt-2 text-${stat.color}-600`}>
-                {stat.value}
-              </p>
+              {tab.label} ({tab.count})
             </button>
           ))}
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Search by name, email, or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
-            />
-          </div>
         </div>
 
         {/* Table */}
@@ -459,7 +433,7 @@ export default function ClientsPage() {
                     Email
                   </th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                    Total Spend (USD)
+                    Total Spend (INR)
                   </th>
                   <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Status
@@ -498,7 +472,7 @@ export default function ClientsPage() {
                         {client.email}
                       </td>
                       <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
-                        ${client.total_spend || 0}
+                        ₹{client.total_spend || 0}
                       </td>
                       <td className="px-3 sm:px-4 py-3 text-xs sm:text-sm">
                         <span
