@@ -82,36 +82,35 @@ export default function Configuration() {
           Configuration
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+  {menuItems.map((item) => {
+    const Icon = item.icon;
 
-            return (
-              <div
-                key={item.title}
-                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
-              >
-                <div className="flex justify-center mb-5">
-                  <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Icon className="w-7 h-7 text-blue-600" />
-                  </div>
-                </div>
+    return (
+      <Link
+        key={item.title}
+        href={item.href}
+        className="block"
+      >
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-300 cursor-pointer h-full">
+          <div className="flex justify-center mb-5">
+            <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center">
+              <Icon className="w-7 h-7 text-blue-600" />
+            </div>
+          </div>
 
-                <div className="text-center">
-                  <h3 className="font-semibold text-slate-800 text-lg flex items-center justify-center gap-1">
-                    {item.title}
-                    <span className="text-slate-400">›</span>
-                  </h3>
+          <div className="text-center">
+            <h3 className="font-semibold text-slate-800 text-lg flex items-center justify-center gap-1">
+              {item.title}
+              <span className="text-slate-400">›</span>
+            </h3>
 
-                  <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+            <p className="mt-2 text-sm text-slate-500 leading-relaxed">
+              {item.description}
+            </p>
+          </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </Link>
+    );
+  })}
+</div>
