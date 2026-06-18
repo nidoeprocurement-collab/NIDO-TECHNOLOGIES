@@ -571,18 +571,18 @@ export default function CatalogUpdatesTab() {
 
       {/* Add/Edit Item Dialog - Full Screen */}
       {addDialogOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-50">
-          <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+          <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between flex-shrink-0">
             <h2 className="text-2xl font-bold">{editingItem ? 'Edit Item' : 'Add New Item'}</h2>
-            <button onClick={() => setAddDialogOpen(false)} className="text-slate-500 hover:text-slate-700">
+            <button onClick={() => setAddDialogOpen(false)} className="text-slate-500 hover:text-slate-700 flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
-          <div className="w-full overflow-auto pb-28">
-            <div className="max-w-6xl mx-auto px-6 pt-6">
-              <div className="space-y-6 pb-4">
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-6xl mx-auto px-6 py-6">
+              <div className="space-y-6 pb-32">
               {/* General Details + Category */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
@@ -864,7 +864,7 @@ export default function CatalogUpdatesTab() {
               </div>
             </div>
           </div>
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-end gap-2">
+          <div className="bg-white border-t p-4 flex justify-end gap-2 flex-shrink-0">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveItem}>Save Item</Button>
           </div>
