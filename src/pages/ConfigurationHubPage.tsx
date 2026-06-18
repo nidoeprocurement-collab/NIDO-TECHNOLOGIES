@@ -16,51 +16,61 @@ const menuItems = [
     title: "General Settings",
     description: "Organization, localization & defaults",
     icon: Settings,
+    href: "/configuration/general-settings",
   },
   {
     title: "Nido-Users",
     description: "Manage roles and user assignments",
     icon: Users,
+    href: "/configuration/nido-users",
   },
   {
     title: "Approval Workflows",
     description: "Define multi-level approval chains",
     icon: GitBranch,
+    href: "/configuration/approval-workflows",
   },
   {
     title: "Order Statuses",
     description: "Customize order lifecycle stages",
     icon: ClipboardList,
+    href: "/configuration/order-statuses",
   },
   {
     title: "Notifications",
     description: "Email, SMS & in-app alert rules",
     icon: Bell,
+    href: "/configuration/notifications",
   },
   {
     title: "Master Catalogue",
     description: "Manage and register the global product/service catalogue",
     icon: BookOpen,
+    href: "/configuration/master-catalogue",
   },
   {
     title: "Integrations",
     description: "Manage connectors and API integrations",
     icon: Plug,
+    href: "/configuration/integrations",
   },
   {
     title: "System Logs",
     description: "Activity & system event logs",
     icon: FileText,
+    href: "/configuration/system-logs",
   },
   {
     title: "Auto Assignment",
     description: "Smart analyst auto-routing rules",
     icon: Zap,
+    href: "/configuration/auto-assignment",
   },
   {
     title: "Price Engine",
     description: "Configure pricing rules and calculations",
     icon: DollarSign,
+    href: "/configuration/price-engine",
   },
 ];
 
