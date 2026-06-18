@@ -866,7 +866,7 @@ export default function CatalogUpdatesTab() {
           </div>
           <div className="bg-white border-t p-4 flex justify-end gap-2 flex-shrink-0">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveItem}>Save Item</Button>
+            <Button onClick={handleAddItem}>Save Item</Button>
           </div>
         </div>
       )}
