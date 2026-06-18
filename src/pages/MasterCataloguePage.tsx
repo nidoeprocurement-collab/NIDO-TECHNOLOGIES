@@ -580,9 +580,9 @@ export default function CatalogUpdatesTab() {
               </svg>
             </button>
           </div>
-          <div className="w-full px-6 pt-6 pb-20">
-          <ScrollArea className="px-6 pb-2" style={{ maxHeight: 'calc(90vh - 130px)' }}>
-            <div className="space-y-6 pb-4">
+          <div className="w-full overflow-auto pb-28">
+            <div className="max-w-6xl mx-auto px-6 pt-6">
+              <div className="space-y-6 pb-4">
               {/* General Details + Category */}
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
@@ -861,12 +861,12 @@ export default function CatalogUpdatesTab() {
                   </div>
                 </div>
               </div>
+              </div>
             </div>
-          </ScrollArea>
+          </div>
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveItem}>Save Item</Button>
-          </div>
           </div>
         </div>
       )}
