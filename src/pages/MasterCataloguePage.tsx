@@ -569,12 +569,18 @@ export default function CatalogUpdatesTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Item Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] p-0">
-          <DialogHeader className="px-6 pt-6 pb-2">
-            <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
-          </DialogHeader>
+      {/* Add/Edit Item Dialog - Full Screen */}
+      {addDialogOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-50">
+          <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">{editingItem ? 'Edit Item' : 'Add New Item'}</h2>
+            <button onClick={() => setAddDialogOpen(false)} className="text-slate-500 hover:text-slate-700">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="w-full px-6 pt-6 pb-20">
           <ScrollArea className="px-6 pb-2" style={{ maxHeight: 'calc(90vh - 130px)' }}>
             <div className="space-y-6 pb-4">
               {/* General Details + Category */}
@@ -857,12 +863,13 @@ export default function CatalogUpdatesTab() {
               </div>
             </div>
           </ScrollArea>
-          <DialogFooter className="px-6 pb-4">
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 flex justify-end gap-2">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddItem}>{editingItem ? 'Update Item' : 'Add Item'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button onClick={handleSaveItem}>Save Item</Button>
+          </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
