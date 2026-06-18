@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
-import { Upload, Download, Plus, Search, FileText, FileSpreadsheet } from "lucide-react";
+import { Upload, Download, Plus, Search, FileText, FileSpreadsheet, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import CatalogUpdatesTab from "@/components/configuration/CatalogUpdatesTab";
 
 const COLORS = ["Black","White","Red","Blue","Green","Yellow","Orange","Purple","Pink","Brown","Gray","Silver","Gold","Beige","Maroon","Navy","Teal","Olive","Cyan","Magenta"];
 
@@ -130,6 +132,16 @@ export default function MasterCataloguePage() {
           </div>
         </div>
       </div>
+
+      {/* Add New Item Dialog */}
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Catalog Item</DialogTitle>
+          </DialogHeader>
+          <CatalogUpdatesTab />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
