@@ -242,17 +242,6 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
-          <Route
-            path="clients/:id/users/:userId"
-            element={
-              <PageErrorBoundary
-                title="User profile failed to load"
-                resetKey={location.pathname}
-              >
-                <UserProfilePage />
-              </PageErrorBoundary>
-            }
-          />
           <Route 
             path="clients" 
             element={

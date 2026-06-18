@@ -23,7 +23,7 @@ const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
         {React.Children.map(children, (child) =>
           React.isValidElement(child)
             ? React.cloneElement(child as React.ReactElement<any>, {
-                value: currentValue,
+                currentValue,
                 onValueChange: handleValueChange,
               })
             : child
@@ -37,16 +37,25 @@ Tabs.displayName = "Tabs"
 interface TabsListProps {
   children: React.ReactNode
   className?: string
+  currentValue?: string
+  onValueChange?: (value: string) => void
 }
 
 const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
-  ({ children, className }, ref) => (
+  ({ children, className, currentValue, onValueChange }, ref) => (
     <div
       ref={ref}
       className={`inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground ${className || ""}`}
       role="tablist"
     >
-      {children}
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child)
+          ? React.cloneElement(child as React.ReactElement<any>, {
+              currentValue,
+              onValueChange,
+            })
+          : child
+      )}
     </div>
   )
 )

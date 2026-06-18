@@ -1,308 +1,392 @@
-import React, { useState } from 'react';
-import { useData } from '@/contexts/DataContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { toast } from '@/hooks/use-toast';
-import { Plus, Search, Copy } from 'lucide-react';
-import type { UserRole, ModulePermission } from '@/types';
-import { MODULES } from '@/types';
+"use client"
 
-const defaultModulePermissions = (): ModulePermission[] =>
-  MODULES.map(m => ({ module: m, enabled: true, view: true, create: false, edit: false, delete: false, export: false }));
+import { useState } from "react"
+import {
+  Search,
+  Plus,
+  Download,
+  Pencil,
+  Trash2,
+} from "lucide-react"
 
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 
-export default function NidoRolesPanel() {
-  const { userRoles, addUserRole, updateUserRole, deleteUserRole } = useData();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [form, setForm] = useState<Omit<UserRole, 'id'>>({
-    name: '', description: '', roleType: 'Internal User', roleCode: '', status: 'Active',
-    isDefault: false, assignedUsers: 0, modulePermissions: defaultModulePermissions(),
-    dataVisibility: 'All', locationAccess: 'All', canApproveOrders: false, approvalLimit: 0,
-  });
+const roles = [
+  {
+    name: "System Owner",
+    description: "Full system access with all permissions",
+    status: "Active",
+    users: 1,
+  },
+  {
+    name: "Procurement Manager",
+    description: "Manages purchase orders and procurement",
+    status: "Active",
+    users: 2,
+  },
+  {
+    name: "Accounts Payable",
+    description: "Manages invoices and payments",
+    status: "Active",
+    users: 1,
+  },
+  {
+    name: "Vendor Admin",
+    description: "Manages vendor information",
+    status: "Active",
+    users: 1,
+  },
+]
 
-  const filtered = userRoles.filter(r =>
-    !search || r.name.toLowerCase().includes(search.toLowerCase())
-  );
+const users = [
+  {
+    name: "System Owner",
+    email: "owner@nidotech.com",
+    role: "System Owner",
+    jobTitle: "CEO",
+    department: "Management",
+    status: "Active",
+  },
+  {
+    name: "Mark Adams",
+    email: "admin@nidotech.com",
+    role: "System Admin",
+    jobTitle: "System Admin",
+    department: "IT",
+    status: "Active",
+  },
+  {
+    name: "Jane Smith",
+    email: "procurement@nidotech.com",
+    role: "Procurement Manager",
+    jobTitle: "Procurement Manager",
+    department: "Procurement",
+    status: "Active",
+  },
+  {
+    name: "David Chen",
+    email: "ap@nidotech.com",
+    role: "Accounts Payable",
+    jobTitle: "Accounts Payable",
+    department: "Finance",
+    status: "Active",
+  },
+]
 
-  const openCreate = () => {
-    setEditingId(null);
-    setForm({
-      name: '', description: '', roleType: 'Internal User', roleCode: '', status: 'Active',
-      isDefault: false, assignedUsers: 0, modulePermissions: defaultModulePermissions(),
-      dataVisibility: 'All', locationAccess: 'All', canApproveOrders: false, approvalLimit: 0,
-    });
-    setDialogOpen(true);
-  };
+export default function NidoUsersPage() {
+  const [activeTab, setActiveTab] = useState("roles")
+  const [searchRole, setSearchRole] = useState("")
+  const [searchUser, setSearchUser] = useState("")
 
-  const openEdit = (id: string) => {
-    const r = userRoles.find(r => r.id === id);
-    if (!r) return;
-    setEditingId(id);
-    const { id: _, ...rest } = r;
-    setForm({ ...rest, modulePermissions: rest.modulePermissions.length ? rest.modulePermissions : defaultModulePermissions() });
-    setDialogOpen(true);
-  };
+  const filteredRoles = roles.filter((role) =>
+    role.name.toLowerCase().includes(searchRole.toLowerCase())
+  )
 
-  const cloneRole = (id: string) => {
-    const r = userRoles.find(r => r.id === id);
-    if (!r) return;
-    setEditingId(null);
-    const { id: _, ...rest } = r;
-    setForm({ ...rest, name: `${rest.name} (Copy)`, modulePermissions: rest.modulePermissions.length ? rest.modulePermissions : defaultModulePermissions() });
-    setDialogOpen(true);
-  };
-
-  const handleSave = () => {
-    if (!form.name.trim()) { toast({ title: 'Error', description: 'Role name required', variant: 'destructive' }); return; }
-    if (editingId) {
-      updateUserRole(editingId, form);
-      toast({ title: 'Updated', description: `Role "${form.name}" updated` });
-    } else {
-      addUserRole(form);
-      toast({ title: 'Created', description: `Role "${form.name}" created` });
-    }
-    setDialogOpen(false);
-  };
-
-  const togglePerm = (modIdx: number, field: keyof ModulePermission) => {
-    setForm(prev => {
-      const perms = [...prev.modulePermissions];
-      perms[modIdx] = { ...perms[modIdx], [field]: !perms[modIdx][field] };
-      return { ...prev, modulePermissions: perms };
-    });
-  };
-
-  const toggleSelectAll = (modIdx: number) => {
-    setForm(prev => {
-      const perms = [...prev.modulePermissions];
-      const p = perms[modIdx];
-      const allChecked = p.view && p.create && p.edit && p.delete && p.export;
-      perms[modIdx] = { ...p, view: !allChecked, create: !allChecked, edit: !allChecked, delete: !allChecked, export: !allChecked };
-      return { ...prev, modulePermissions: perms };
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-success text-success-foreground';
-      case 'Inactive': return 'bg-warning text-warning-foreground';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
+  const filteredUsers = users.filter(
+    (user) =>
+      user.name.toLowerCase().includes(searchUser.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchUser.toLowerCase())
+  )
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Define roles and their permissions.</p>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">Export CSV</Button>
-          <Button variant="outline" size="sm">Export PDF</Button>
-          <Button onClick={openCreate} className="gap-1.5"><Plus size={14} /> Add Role</Button>
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Nido-Users
+          </h1>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage roles and platform users
+          </p>
         </div>
-      </div>
 
-      <div className="relative w-64">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-        <Input className="pl-8 h-8 text-sm" placeholder="Search roles..." value={search} onChange={e => setSearch(e.target.value)} />
-      </div>
+        {/* Tabs */}
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="h-12 bg-white border rounded-lg p-1">
+            <TabsTrigger
+              value="roles"
+              className="px-6 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600"
+            >
+              User Roles
+            </TabsTrigger>
 
-      <Card>
-        <CardContent className="pt-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Role Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned Users</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map(role => (
-                <TableRow key={role.id}>
-                  <TableCell className="font-medium text-primary cursor-pointer hover:underline" onClick={() => openEdit(role.id)}>{role.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{role.description}</TableCell>
-                  <TableCell><Badge className={`${getStatusColor(role.status)} border-none`}>{role.status}</Badge></TableCell>
-                  <TableCell>
-                    <span>{role.assignedUsers} Users</span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => openEdit(role.id)}>Edit</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          <p className="text-xs text-muted-foreground mt-3">Showing 1 to {filtered.length} of {filtered.length} entries</p>
-        </CardContent>
-      </Card>
+            <TabsTrigger
+              value="users"
+              className="px-6 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600"
+            >
+              Add / Manage Users
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-      {/* Add/Edit Role Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{editingId ? 'Edit Role' : '+ Add Role'}</span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button size="sm" onClick={handleSave}>Save Role</Button>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-
-          {/* Role Information */}
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-foreground border-b border-border pb-1">Role Information</h3>
-            <div className="space-y-3 pt-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs">Role Name</Label>
-                  <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g., Procurement Manager" />
-                </div>
-                <div>
-                  <Label className="text-xs">Role Code</Label>
-                  <Input value={form.roleCode} onChange={e => setForm(p => ({ ...p, roleCode: e.target.value }))} placeholder="e.g., PM" />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">Role Type</Label>
-                <Select value={form.roleType} onValueChange={v => setForm(p => ({ ...p, roleType: v as any }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Internal User">Internal User</SelectItem>
-                    <SelectItem value="Client User">Client User</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">Description</Label>
-                <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} />
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.status === 'Active'} onCheckedChange={v => setForm(p => ({ ...p, status: v ? 'Active' : 'Inactive' }))} />
-                  <Label className="text-xs">Active</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={form.isDefault} onCheckedChange={v => setForm(p => ({ ...p, isDefault: !!v }))} />
-                  <Label className="text-xs">Set as Default Role</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">Status</Label>
-                  <Switch checked={form.status === 'Active'} onCheckedChange={v => setForm(p => ({ ...p, status: v ? 'Active' : 'Inactive' }))} />
-                </div>
-                <div className="ml-auto">
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs text-primary" onClick={() => { if (editingId) cloneRole(editingId); }}>
-                    <Copy size={12} /> Clone Existing Role
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Module Permissions */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between border-b border-border pb-1">
-              <h3 className="text-sm font-semibold text-foreground">Module Permissions</h3>
-              <div className="relative w-48">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={12} />
-                <Input className="pl-7 h-7 text-xs" placeholder="Search Modules" />
-              </div>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
-                  <TableHead>Module</TableHead>
-                  <TableHead className="w-16 text-center">View</TableHead>
-                  <TableHead className="w-16 text-center">Create</TableHead>
-                  <TableHead className="w-16 text-center">Edit</TableHead>
-                  <TableHead className="w-16 text-center">Delete</TableHead>
-                  <TableHead className="w-16 text-center">Export</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {form.modulePermissions.map((perm, idx) => (
-                  <TableRow key={perm.module}>
-                    <TableCell>
-                      <Checkbox checked={perm.enabled} onCheckedChange={() => togglePerm(idx, 'enabled')} />
-                    </TableCell>
-                    <TableCell className="font-medium text-sm">
-                      <div className="flex items-center gap-2">
-                        {perm.module}
-                        <button className="text-xs text-primary" onClick={() => toggleSelectAll(idx)}>Select All</button>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center"><Checkbox checked={perm.view} onCheckedChange={() => togglePerm(idx, 'view')} /></TableCell>
-                    <TableCell className="text-center"><Checkbox checked={perm.create} onCheckedChange={() => togglePerm(idx, 'create')} /></TableCell>
-                    <TableCell className="text-center"><Checkbox checked={perm.edit} onCheckedChange={() => togglePerm(idx, 'edit')} /></TableCell>
-                    <TableCell className="text-center"><Checkbox checked={perm.delete} onCheckedChange={() => togglePerm(idx, 'delete')} /></TableCell>
-                    <TableCell className="text-center"><Checkbox checked={perm.export} onCheckedChange={() => togglePerm(idx, 'export')} /></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Data Access & Approval */}
-          <div className="grid grid-cols-2 gap-4">
+        {/* USER ROLES TAB */}
+        {activeTab === "roles" && (
+          <>
             <Card>
-              <CardContent className="pt-4 space-y-3">
-                <h3 className="text-sm font-semibold">Data Access Control</h3>
-                <div>
-                  <Label className="text-xs">Data Visibility</Label>
-                  <Select value={form.dataVisibility} onValueChange={v => setForm(p => ({ ...p, dataVisibility: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All</SelectItem>
-                      <SelectItem value="Department Only">Department Only</SelectItem>
-                      <SelectItem value="Own Only">Own Only</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs">Location Access</Label>
-                  <Select value={form.locationAccess} onValueChange={v => setForm(p => ({ ...p, locationAccess: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All</SelectItem>
-                      <SelectItem value="Selected Locations">Selected Locations</SelectItem>
-                      <SelectItem value="Assigned Location">Assigned Location</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4 space-y-3">
-                <h3 className="text-sm font-semibold">Approval Permissions</h3>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={form.canApproveOrders} onCheckedChange={v => setForm(p => ({ ...p, canApproveOrders: !!v }))} />
-                  <Label className="text-xs">Can Approve Orders</Label>
-                </div>
-                {form.canApproveOrders && (
-                  <div>
-                    <Label className="text-xs">Approval Limit (₹)</Label>
-                    <Input type="number" value={form.approvalLimit} onChange={e => setForm(p => ({ ...p, approvalLimit: Number(e.target.value) }))} />
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="relative w-full max-w-md">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                    <Input
+                      placeholder="Search roles..."
+                      className="pl-10"
+                      value={searchRole}
+                      onChange={(e) =>
+                        setSearchRole(e.target.value)
+                      }
+                    />
                   </div>
-                )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Export CSV
+                    </Button>
+
+                    <Button variant="outline">
+                      <Download className="mr-2 h-4 w-4" />
+                      Export PDF
+                    </Button>
+
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Role
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          </div>
-        </DialogContent>
-      </Dialog>
+
+            <div>
+              <h2 className="text-lg font-semibold">
+                User Roles
+              </h2>
+
+              <p className="text-sm text-muted-foreground">
+                Define roles and their permissions.
+              </p>
+            </div>
+
+            <Card>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-slate-100">
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Role Name
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Description
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Status
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Assigned Users
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredRoles.map((role) => (
+                      <tr
+                        key={role.name}
+                        className="border-b hover:bg-slate-50"
+                      >
+                        <td className="px-6 py-4">
+                          <button className="font-medium text-blue-600">
+                            {role.name}
+                          </button>
+                        </td>
+
+                        <td className="px-6 py-4 text-sm">
+                          {role.description}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <Badge className="bg-green-100 text-green-700">
+                            {role.status}
+                          </Badge>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          {role.users} Users
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                          >
+                            Edit
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="border-t px-6 py-4 text-sm text-muted-foreground">
+                  Showing 1 to {filteredRoles.length} of{" "}
+                  {roles.length} entries
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* MANAGE USERS TAB */}
+        {activeTab === "users" && (
+          <>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Add / Manage Users
+                </h2>
+
+                <p className="text-sm text-muted-foreground">
+                  Add and manage client or vendor users.
+                </p>
+              </div>
+
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add User
+              </Button>
+            </div>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="relative w-full max-w-md">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                  <Input
+                    placeholder="Search users..."
+                    className="pl-10"
+                    value={searchUser}
+                    onChange={(e) =>
+                      setSearchUser(e.target.value)
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-slate-100">
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Name
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Email
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Role
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Job Title
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Department
+                      </th>
+
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                        Status
+                      </th>
+
+                      <th className="px-6 py-4 text-center text-xs font-semibold uppercase">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr
+                        key={user.email}
+                        className="border-b hover:bg-slate-50"
+                      >
+                        <td className="px-6 py-4">
+                          {user.name}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          {user.email}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          {user.role}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          {user.jobTitle}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          {user.department}
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <Badge className="bg-green-100 text-green-700">
+                            {user.status}
+                          </Badge>
+                        </td>
+
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
     </div>
-  );
+  )
 }

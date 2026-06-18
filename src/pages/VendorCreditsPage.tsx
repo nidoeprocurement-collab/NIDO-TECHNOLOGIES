@@ -1,10 +1,75 @@
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Plus, MoreHorizontal } from "lucide-react"
+
 export default function VendorCreditsPage() {
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">VendorCreditsPage</h1>
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <p className="text-gray-600 dark:text-gray-400">Content coming soon...</p>
-      </div>
+    <div className="min-h-screen bg-[#f6f7fb] p-3">
+      {/* Header */}
+      <Card className="rounded-xl border border-gray-200 bg-white shadow-none">
+        <div className="flex items-center justify-between px-4 py-4">
+          <h1 className="text-[20px] font-bold text-slate-900">
+            All Vendor Credits
+          </h1>
+
+          <div className="flex items-center gap-2">
+            <Button className="h-9 rounded-lg bg-blue-600 px-4 hover:bg-blue-700">
+              <Plus className="mr-2 h-4 w-4" />
+              New
+            </Button>
+
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-lg border-gray-200"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Table Section */}
+      <Card className="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-none">
+        {/* Header Row */}
+        <div className="grid h-12 grid-cols-[40px_1fr_1.8fr_2fr_2fr_1.5fr_1fr_1fr] items-center rounded-lg border border-gray-200 bg-white px-2">
+          <div className="flex justify-center">
+            <Checkbox />
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            DATE
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            CREDIT NOTE#
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            REFERENCE NUMBER
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            VENDOR NAME
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            STATUS
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            AMOUNT
+          </div>
+
+          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+            BALANCE
+          </div>
+        </div>
+
+        {/* Empty Table Body */}
+        <div className="min-h-[320px]" />
+      </Card>
     </div>
-  );
+  )
 }

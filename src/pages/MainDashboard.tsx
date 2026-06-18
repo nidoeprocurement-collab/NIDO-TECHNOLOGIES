@@ -188,7 +188,7 @@ export default function MainDashboard() {
         <KPICard title="Total Orders" value="0" change="16.7%" changeType="positive" icon={ShoppingCart} bgColor="bg-purple-600" />
         <KPICard title="Total Expenses" value="₹0" change="5.8%" changeType="negative" icon={DollarSign} bgColor="bg-red-600" />
         <KPICard title="Avg Order Value" value="₹0" change="19.4%" changeType="positive" icon={TrendingUp} bgColor="bg-indigo-600" />
-        <KPICard title="Savings (This Month)" value="₹0" change="22.4%" changeType="positive" icon={CheckCircle} bgColor="bg-teal-600" />
+        <KPICard title="Savings" value="₹0" change="22.4%" changeType="positive" icon={CheckCircle} bgColor="bg-teal-600" />
       </div>
 
       {/* Charts Section */}
