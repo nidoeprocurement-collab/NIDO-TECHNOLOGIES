@@ -1,148 +1,158 @@
-// MasterCataloguePage_Full.tsx
 "use client";
 
-import { Upload, Download, Plus, FileSpreadsheet } from "lucide-react";
+import React, { useMemo, useRef, useState } from "react";
+import { Upload, Download, Plus, Search, FileText, FileSpreadsheet } from "lucide-react";
+
+const COLORS = ["Black","White","Red","Blue","Green","Yellow","Orange","Purple","Pink","Brown","Gray","Silver","Gold","Beige","Maroon","Navy","Teal","Olive","Cyan","Magenta"];
+
+type Status = "published" | "draft" | "archived";
 
 export default function MasterCataloguePage() {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("upload");
+  const [showAdd, setShowAdd] = useState(false);
+
+  const [products, setProducts] = useState([
+    {id:1,name:"Office Chair",sku:"OC001",category:"Furniture",brand:"IKEA",color:"Black",status:"published" as Status},
+    {id:2,name:"Standing Desk",sku:"SD002",category:"Furniture",brand:"Steelcase",color:"White",status:"draft" as Status},
+    {id:3,name:"Laptop",sku:"LP003",category:"Electronics",brand:"Dell",color:"Silver",status:"archived" as Status},
+  ]);
+
+  const [form,setForm] = useState({
+    name:"",sku:"",category:"",brand:"",color:"Black",status:"published"
+  });
+
+  const filtered = useMemo(()=>products.filter(p=>{
+    const f = filter==="all" || p.status===filter;
+    const s = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
+    return f && s;
+  }),[products,filter,search]);
+
+  const exportCSV=()=>{
+    const rows = [
+      "Name,SKU,Category,Brand,Color,Status",
+      ...filtered.map(p=>`${p.name},${p.sku},${p.category},${p.brand},${p.color},${p.status}`)
+    ];
+    const blob=new Blob([rows.join("\n")],{type:"text/csv"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="catalog.csv";
+    a.click();
+  };
+
+  const addProduct=()=>{
+    setProducts([...products,{id:Date.now(),...form,status:form.status as Status}]);
+    setShowAdd(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-6">
-      <div className="mx-auto max-w-7xl space-y-5">
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         <div>
-          <h1 className="text-xl font-semibold text-slate-800">
-            Master Catalogue
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Manage and review all products/services available for client contracts
-            and downstream client specific mappings.
-          </p>
+          <h1 className="text-2xl font-bold">Master Catalogue</h1>
+          <p className="text-slate-500">Manage products and catalog operations</p>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
-          <div className="rounded-md bg-blue-600 text-white px-4 py-3 text-sm font-medium">
-            12 Total
-          </div>
-          <div className="rounded-md bg-green-100 text-green-700 px-4 py-3 text-sm font-medium">
-            9 Published
-          </div>
-          <div className="rounded-md bg-amber-100 text-amber-700 px-4 py-3 text-sm font-medium">
-            0 Drafts
-          </div>
-          <div className="rounded-md bg-red-100 text-red-600 px-4 py-3 text-sm font-medium">
-            0 Archived
-          </div>
+        <div className="grid md:grid-cols-4 gap-4">
+          {[
+            ["all","Total",products.length,"bg-blue-600 text-white"],
+            ["published","Published",products.filter(x=>x.status==="published").length,"bg-green-100"],
+            ["draft","Drafts",products.filter(x=>x.status==="draft").length,"bg-amber-100"],
+            ["archived","Archived",products.filter(x=>x.status==="archived").length,"bg-red-100"]
+          ].map(([key,label,count,cls])=>(
+            <button key={String(key)} onClick={()=>setFilter(String(key))} className={`rounded-xl p-4 text-left border ${cls}`}>
+              <div className="text-sm">{label}</div>
+              <div className="text-3xl font-bold">{count}</div>
+            </button>
+          ))}
         </div>
 
-        <div className="rounded-lg border bg-white p-4">
-          <div className="flex justify-end gap-2 mb-4">
-            <button className="h-8 px-3 text-xs border rounded-md flex items-center gap-1 bg-white">
-              <Download size={14} />
-              Export CSV
-            </button>
-
-            <button className="h-8 px-3 text-xs border rounded-md bg-white">
-              Bulk Import
-            </button>
-
-            <button className="h-8 px-3 text-xs rounded-md bg-blue-600 text-white flex items-center gap-1">
-              <Plus size={14} />
-              Add New Item
-            </button>
+        <div className="bg-white rounded-xl border p-4">
+          <div className="flex flex-wrap gap-2 justify-between mb-4">
+            <div className="relative w-80">
+              <Search className="absolute left-3 top-3 h-4 w-4"/>
+              <input className="border rounded-lg pl-10 p-2 w-full" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={exportCSV} className="border rounded-lg px-3 py-2 flex gap-2"><Download size={16}/>Export CSV</button>
+              <button onClick={()=>fileRef.current?.click()} className="border rounded-lg px-3 py-2">Bulk Import</button>
+              <button onClick={()=>setShowAdd(true)} className="bg-blue-600 text-white rounded-lg px-3 py-2 flex gap-2"><Plus size={16}/>Add New Item</button>
+            </div>
           </div>
 
-          <div className="overflow-hidden rounded-md border">
-            <table className="w-full text-xs">
-              <thead className="bg-slate-50">
-                <tr className="text-slate-500">
-                  <th className="p-3 text-left">ITEM NAME</th>
-                  <th className="p-3 text-left">SKU</th>
-                  <th className="p-3 text-left">CATEGORY</th>
-                  <th className="p-3 text-left">BRAND</th>
-                  <th className="p-3 text-left">STATUS</th>
-                  <th className="p-3 text-left">ACTIONS</th>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-100">
+              <tr>
+                <th className="p-3 text-left">Name</th><th>SKU</th><th>Category</th><th>Brand</th><th>Color</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p=>(
+                <tr key={p.id} className="border-b">
+                  <td className="p-3">{p.name}</td><td>{p.sku}</td><td>{p.category}</td><td>{p.brand}</td><td>{p.color}</td><td>{p.status}</td>
                 </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center py-8 text-slate-400"
-                  >
-                    No items match the selected filters. Adjust search,
-                    category, or status to view catalog entries.
-                  </td>
-                </tr>
-              </tbody>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl border">
+            <div className="p-4 border-b font-semibold">Import / Export Products</div>
+            <div className="flex gap-4 px-4 pt-4">
+              <button onClick={()=>setTab("upload")}>Bulk Upload Items</button>
+              <button onClick={()=>setTab("excel")}>Export Excel</button>
+              <button onClick={()=>setTab("pdf")}>Export PDF</button>
+            </div>
+            <div className="p-4">
+              {tab==="upload" && <div className="border-2 border-dashed rounded-xl p-12 text-center">
+                <Upload className="mx-auto mb-3"/>
+                <button onClick={()=>fileRef.current?.click()} className="bg-blue-600 text-white px-4 py-2 rounded">Upload</button>
+                <input ref={fileRef} hidden type="file" accept=".csv,.xlsx"/>
+              </div>}
+              {tab==="excel" && <div className="p-8"><FileSpreadsheet/> Excel export ready.</div>}
+              {tab==="pdf" && <div className="p-8"><FileText/> PDF export ready.</div>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border p-4">
+            <div className="flex justify-between">
+              <h3 className="font-semibold">Approval & Audit Logs</h3>
+              <button onClick={()=>alert("Export logs")} className="border px-3 py-1 rounded">Export</button>
+            </div>
+            <table className="w-full mt-4 text-sm">
+              <thead><tr><th>User</th><th>Action</th><th>Date</th></tr></thead>
+              <tbody><tr><td>Admin</td><td>Created Product</td><td>2025-06-01</td></tr></tbody>
             </table>
           </div>
-
-          <div className="text-[10px] text-slate-400 mt-2">
-            Showing 0 of 0 entries
-          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border bg-white">
-            <div className="border-b p-3">
-              <h2 className="text-sm font-medium">Import / Export Products</h2>
-            </div>
-
-            <div className="px-3 pt-3 flex gap-4 text-xs">
-              <button className="font-medium border-b-2 border-blue-600 pb-2">
-                Bulk Upload Items
-              </button>
-              <button className="text-slate-500">
-                Export Catalog (Excel)
-              </button>
-              <button className="text-slate-500">
-                Export Catalog (PDF)
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="border-2 border-dashed rounded-lg py-10 text-center">
-                <Upload className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                <div className="text-xs text-slate-500">
-                  Bulk upload your product catalog using CSV template.
-                </div>
-
-                <button className="mt-4 px-4 py-2 text-xs rounded-md bg-blue-600 text-white">
-                  Upload
-                </button>
+        {showAdd && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+            <div className="bg-white rounded-xl p-6 w-[500px] space-y-3">
+              <h3 className="font-bold">Add Product</h3>
+              <input className="border p-2 w-full" placeholder="Name" onChange={e=>setForm({...form,name:e.target.value})}/>
+              <input className="border p-2 w-full" placeholder="SKU" onChange={e=>setForm({...form,sku:e.target.value})}/>
+              <input className="border p-2 w-full" placeholder="Category" onChange={e=>setForm({...form,category:e.target.value})}/>
+              <input className="border p-2 w-full" placeholder="Brand" onChange={e=>setForm({...form,brand:e.target.value})}/>
+              <select className="border p-2 w-full" onChange={e=>setForm({...form,color:e.target.value})}>
+                {COLORS.map(c=><option key={c}>{c}</option>)}
+              </select>
+              <select className="border p-2 w-full" onChange={e=>setForm({...form,status:e.target.value})}>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+              </select>
+              <div className="flex justify-end gap-2">
+                <button onClick={()=>setShowAdd(false)} className="border px-3 py-2 rounded">Cancel</button>
+                <button onClick={addProduct} className="bg-blue-600 text-white px-3 py-2 rounded">Save</button>
               </div>
             </div>
           </div>
-
-          <div className="rounded-lg border bg-white">
-            <div className="flex items-center justify-between border-b p-3">
-              <h2 className="text-sm font-medium">Approval & Audit Logs</h2>
-
-              <button className="text-xs border rounded-md px-3 py-1 flex items-center gap-1">
-                <FileSpreadsheet size={14} />
-                Export
-              </button>
-            </div>
-
-            <div className="p-3">
-              <div className="overflow-hidden rounded-md border">
-                <table className="w-full text-xs">
-                  <thead className="bg-slate-50">
-                    <tr className="text-slate-500">
-                      <th className="p-3 text-left">EVENT</th>
-                      <th className="p-3 text-left">USER</th>
-                      <th className="p-3 text-left">DATE</th>
-                      <th className="p-3 text-left">STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan={4} className="h-32"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
