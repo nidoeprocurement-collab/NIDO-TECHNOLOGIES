@@ -23,7 +23,7 @@ const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(
         {React.Children.map(children, (child) =>
           React.isValidElement(child)
             ? React.cloneElement(child as React.ReactElement<any>, {
-                value: currentValue,
+                currentValue,
                 onValueChange: handleValueChange,
               })
             : child

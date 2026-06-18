@@ -18,6 +18,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import ManageUsersPanel from "./ManageUsersPanel"
 
 const roles = [
   {
@@ -259,132 +260,7 @@ export default function NidoUsersPage() {
 
         {/* MANAGE USERS TAB */}
         {activeTab === "users" && (
-          <>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  Add / Manage Users
-                </h2>
-
-                <p className="text-sm text-muted-foreground">
-                  Add and manage client or vendor users.
-                </p>
-              </div>
-
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add User
-              </Button>
-            </div>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="relative w-full max-w-md">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-
-                  <Input
-                    placeholder="Search users..."
-                    className="pl-10"
-                    value={searchUser}
-                    onChange={(e) =>
-                      setSearchUser(e.target.value)
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-0 overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-slate-100">
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
-                        Name
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
-                        Email
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
-                        Role
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
-                        Job Title
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
-                        Department
-                      </th>
-
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
-                        Status
-                      </th>
-
-                      <th className="px-6 py-4 text-center text-xs font-semibold uppercase">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filteredUsers.map((user) => (
-                      <tr
-                        key={user.email}
-                        className="border-b hover:bg-slate-50"
-                      >
-                        <td className="px-6 py-4">
-                          {user.name}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          {user.email}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          {user.role}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          {user.jobTitle}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          {user.department}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <Badge className="bg-green-100 text-green-700">
-                            {user.status}
-                          </Badge>
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <div className="flex justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </>
+          <ManageUsersPanel />
         )}
       </div>
     </div>
