@@ -49,6 +49,24 @@ export default function MasterCataloguePage() {
     setShowAdd(false);
   };
 
+  if (activeTab === "add") {
+    return (
+      <div className="min-h-screen w-full bg-slate-50">
+        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Add Master Catalogue Item</h1>
+          <button onClick={()=>setActiveTab("products")} className="text-slate-500 hover:text-slate-700">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="w-full">
+          <CatalogUpdatesTab />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -63,7 +81,6 @@ export default function MasterCataloguePage() {
           </div>
         </div>
 
-        {activeTab === "products" ? (
         <>
         <div className="grid md:grid-cols-4 gap-4">
           {[
@@ -139,9 +156,6 @@ export default function MasterCataloguePage() {
           </div>
         </div>
         </>
-        ) : (
-          <CatalogUpdatesTab />
-        )}
       </div>
     </div>
   );
