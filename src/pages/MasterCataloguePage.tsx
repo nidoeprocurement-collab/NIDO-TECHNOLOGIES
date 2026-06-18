@@ -160,3 +160,7 @@ export default function MasterCataloguePage() {
     </div>
   );
 }
+function setShowAdd(arg0: boolean) {
+  throw new Error("Function not implemented.");
+}
+
