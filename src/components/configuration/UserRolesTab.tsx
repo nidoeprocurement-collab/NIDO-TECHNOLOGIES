@@ -14,8 +14,10 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  TabsContent,
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import ManageUsersPanel from "./ManageUsersPanel"
 
 const roles = [
   {
@@ -49,10 +51,6 @@ export default function NidoUsersPage() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
-
-    if (value === "users") {
-      window.location.href = "/nido-users/manage-users"
-    }
   }
 
   return (
@@ -89,9 +87,9 @@ export default function NidoUsersPage() {
               Add / Manage Users
             </TabsTrigger>
           </TabsList>
-        </Tabs>
 
-        {/* Toolbar */}
+          {/* User Roles Tab Content */}
+          <TabsContent value="roles" className="space-y-6 mt-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -210,6 +208,13 @@ export default function NidoUsersPage() {
             </div>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          {/* Add/Manage Users Tab Content */}
+          <TabsContent value="users" className="space-y-6 mt-6">
+            <ManageUsersPanel />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
