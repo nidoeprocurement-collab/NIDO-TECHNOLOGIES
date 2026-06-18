@@ -90,7 +90,7 @@ const emptyItem: Omit<CatalogItem, 'id'> = {
   trackPerformance: false, performanceRating: 4,
 };
 
-export default function CatalogUpdatesTab() {
+function CatalogUpdatesTabContent() {
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -863,6 +863,54 @@ export default function CatalogUpdatesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+export default function MasterCataloguePage() {
+  const [activeTab, setActiveTab] = useState('products');
+
+  if (activeTab === 'add') {
+    return (
+      <div className="min-h-screen w-full bg-slate-50">
+        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between z-50">
+          <h1 className="text-2xl font-bold">Add Master Catalogue Item</h1>
+          <button onClick={() => setActiveTab('products')} className="text-slate-500 hover:text-slate-700 p-2">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="w-full overflow-auto">
+          <CatalogUpdatesTabContent />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Master Catalogue</h1>
+            <p className="text-slate-500">Manage and view all catalog items</p>
+          </div>
+          <button onClick={() => setActiveTab('add')} className="bg-blue-600 text-white rounded-lg px-4 py-2 flex gap-2 items-center">
+            <Plus size={16} />
+            Add New Item
+          </button>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Catalog Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-slate-600 text-center py-8">
+              View and manage your catalog items here. Click "Add New Item" to create a new catalog entry.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
