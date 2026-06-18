@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
-import { Upload, Download, Plus, Search, FileText, FileSpreadsheet, X } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Upload, Download, Plus, Search, FileText, FileSpreadsheet } from "lucide-react";
 import CatalogUpdatesTab from "@/components/configuration/CatalogUpdatesTab";
 
 const COLORS = ["Black","White","Red","Blue","Green","Yellow","Orange","Purple","Pink","Brown","Gray","Silver","Gold","Beige","Maroon","Navy","Teal","Olive","Cyan","Magenta"];
@@ -15,7 +14,7 @@ export default function MasterCataloguePage() {
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("upload");
-  const [showAdd, setShowAdd] = useState(false);
+  const [activeTab, setActiveTab] = useState("products");
 
   const [products, setProducts] = useState([
     {id:1,name:"Office Chair",sku:"OC001",category:"Furniture",brand:"IKEA",color:"Black",status:"published" as Status},
@@ -53,11 +52,19 @@ export default function MasterCataloguePage() {
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Master Catalogue</h1>
-          <p className="text-slate-500">Manage products and catalog operations</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Master Catalogue</h1>
+            <p className="text-slate-500">Manage products and catalog operations</p>
+          </div>
+          <div className="flex gap-2 border-b">
+            <button onClick={()=>setActiveTab("products")} className={`px-4 py-2 border-b-2 transition ${activeTab==="products" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-600"}`}>Products</button>
+            <button onClick={()=>setActiveTab("add")} className={`px-4 py-2 border-b-2 transition ${activeTab==="add" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-600"}`}>Add Master Catalogue</button>
+          </div>
         </div>
 
+        {activeTab === "products" ? (
+        <>
         <div className="grid md:grid-cols-4 gap-4">
           {[
             ["all","Total",products.length,"bg-blue-600 text-white"],
@@ -81,7 +88,7 @@ export default function MasterCataloguePage() {
             <div className="flex gap-2">
               <button onClick={exportCSV} className="border rounded-lg px-3 py-2 flex gap-2"><Download size={16}/>Export CSV</button>
               <button onClick={()=>fileRef.current?.click()} className="border rounded-lg px-3 py-2">Bulk Import</button>
-              <button onClick={()=>setShowAdd(true)} className="bg-blue-600 text-white rounded-lg px-3 py-2 flex gap-2"><Plus size={16}/>Add New Item</button>
+              <button onClick={()=>setActiveTab("add")} className="bg-blue-600 text-white rounded-lg px-3 py-2 flex gap-2"><Plus size={16}/>Add New Item</button>
             </div>
           </div>
 
@@ -131,17 +138,11 @@ export default function MasterCataloguePage() {
             </table>
           </div>
         </div>
-      </div>
-
-      {/* Add New Item Dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Catalog Item</DialogTitle>
-          </DialogHeader>
+        </>
+        ) : (
           <CatalogUpdatesTab />
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
     </div>
   );
 }
