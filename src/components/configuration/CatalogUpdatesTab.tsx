@@ -807,7 +807,7 @@ export default function CatalogUpdatesTab() {
                     <Label>Vendor SKU (optional)</Label>
                     <Input placeholder="V-HP-MB-M3" value={form.vendorSku || ''} onChange={e => updateForm({ vendorSku: e.target.value })} />
                   </div>
-                  <div>
+                  <div>0
                     <Label>Estimated Lead Time</Label>
                     <Select value={form.leadTime || '10 Days'} onValueChange={v => updateForm({ leadTime: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
