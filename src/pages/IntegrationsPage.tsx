@@ -288,7 +288,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Integrations Marketplace</h1>
