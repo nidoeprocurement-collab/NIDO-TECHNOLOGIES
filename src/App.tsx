@@ -242,17 +242,6 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
-          <Route 
-            path="clients" 
-            element={
-              <PageErrorBoundary
-                title="Clients failed to load"
-                resetKey={location.pathname}
-              >
-                <ClientsPage />
-              </PageErrorBoundary>
-            }
-          />
           <Route path="clients/contracts" element={<ClientsPage />} />
           <Route path="permissions" element={<PermissionsPage />} />
           <Route
