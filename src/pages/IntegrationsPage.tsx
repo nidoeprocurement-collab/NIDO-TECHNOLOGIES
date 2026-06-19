@@ -179,6 +179,7 @@ export default function IntegrationsPage() {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showConfig, setShowConfig] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState("Popular");
   const [newIntegration, setNewIntegration] = useState({
     name: "",
     category: "",
@@ -186,8 +187,16 @@ export default function IntegrationsPage() {
     webhookUrl: "",
   });
 
-  const popular = integrations.filter((i) => i.popular);
-  const allFiltered = integrations.filter(
+  // Get unique categories
+  const categories = ["Popular", ...new Set(integrations.map((i) => i.category))];
+  
+  // Filter integrations by category
+  const getIntegrationsByCategory = (category: string) => {
+    if (category === "Popular") return integrations.filter((i) => i.popular);
+    return integrations.filter((i) => i.category === category);
+  };
+
+  const displayedIntegrations = getIntegrationsByCategory(activeCategory).filter(
     (i) =>
       i.name.toLowerCase().includes(search.toLowerCase()) ||
       i.category.toLowerCase().includes(search.toLowerCase()),
@@ -278,130 +287,98 @@ export default function IntegrationsPage() {
   const configIntegration = integrations.find((i) => i.id === showConfig);
 
   return (
-    <div>
-            <div className="p-6 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-bold">Integrations</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Connect and manage third-party applications to automate workflows
-              and sync data. Integrate with ERPs, accounting, payment gateways,
-              e-invoicing, cloud storage, communication APIs.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Settings className="h-4 w-4" /> API Settings
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <RefreshCw className="h-4 w-4" /> Sync History
-            </Button>
-          </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">Integrations Marketplace</h1>
+          <p className="text-slate-600">Connect with 50+ business tools and services</p>
         </div>
 
-        {/* Popular Integrations */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Popular Integrations</h2>
-            <Button
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowAdd(true)}
-            >
-              <Plus className="h-4 w-4" /> New Items
-            </Button>
+        {/* Search & Add Button */}
+        <div className="mb-8 flex gap-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-3 h-5 w-5 text-slate-400" />
+            <Input
+              placeholder="Search integrations..."
+              className="pl-12 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {popular.map((integration) => (
-              <Card
-                key={integration.id}
-                className="hover:shadow-md transition-shadow"
+          <Button
+            onClick={() => setShowAdd(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-lg"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Integration
+          </Button>
+        </div>
+
+        {/* Category Tabs */}
+        <div className="mb-8 border-b border-slate-200">
+          <div className="flex gap-1 overflow-x-auto pb-2">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`px-5 py-2.5 rounded-t-lg font-medium transition-all whitespace-nowrap ${
+                  activeCategory === category
+                    ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                }`}
               >
-                <CardContent className="p-4 text-center space-y-2">
-                  <div className="text-3xl">{integration.icon}</div>
-                  <p className="font-semibold text-sm">{integration.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {integration.category}
-                  </p>
-                  {getStatusButton(integration)}
-                </CardContent>
-              </Card>
+                {category}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* All Integrations */}
+        {/* Integrations Grid */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">All Integrations</h2>
-            <div className="flex gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search integrations..."
-                  className="pl-9 w-60"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAdd(true)}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {displayedIntegrations.map((integration) => (
+              <Card
+                key={integration.id}
+                className="hover:shadow-lg transition-all duration-200 border border-slate-200 rounded-xl overflow-hidden"
               >
-                <Plus className="h-4 w-4 mr-2" /> Add Integration
-              </Button>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {allFiltered
-              .filter((i) => !i.popular)
-              .map((integration) => (
-                <Card
-                  key={integration.id}
-                  className="hover:shadow-md transition-shadow"
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="text-2xl">{integration.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">
-                          {integration.name}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {getStatusButton(integration)}
-                          {integration.lastSync && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {integration.lastSync}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {integration.status === "connected" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setShowConfig(integration.id)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      )}
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-4xl">{integration.icon}</div>
+                      {getStatusButton(integration)}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            {/* Add Integration Card */}
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{integration.name}</h3>
+                      <p className="text-xs text-slate-500 mt-1">{integration.category}</p>
+                    </div>
+                    {integration.lastSync && (
+                      <p className="text-xs text-slate-400">Last sync: {integration.lastSync}</p>
+                    )}
+                    {integration.status === "connected" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2"
+                        onClick={() => setShowConfig(integration.id)}
+                      >
+                        <Settings className="h-3 w-3 mr-2" />
+                        Configure
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+            {/* Add Card */}
             <Card
-              className="border-dashed cursor-pointer hover:border-primary/50 transition-colors"
+              className="border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all duration-200"
               onClick={() => setShowAdd(true)}
             >
-              <CardContent className="p-4 flex items-center justify-center h-full min-h-[80px]">
+              <CardContent className="p-6 flex items-center justify-center h-full min-h-[200px]">
                 <div className="text-center">
-                  <Plus className="h-8 w-8 text-muted-foreground mx-auto" />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Add Integration
-                  </p>
+                  <Plus className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600 font-medium">Add Integration</p>
                 </div>
               </CardContent>
             </Card>
