@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -51,7 +52,27 @@ const spendCategories = [
 const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Catalog", "Activity", "Configuration"];
 
 export default function App() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Overview");
+
+  const handleTabClick = (tab: string) => {
+    setActiveTab(tab);
+    
+    // Navigate to respective pages based on tab
+    const tabRoutes: { [key: string]: string } = {
+      "Roles": "/client-roles",
+      "Users": "/users",
+      "Orders": "/orders",
+      "Services": "/services",
+      "Catalog": "/master-catalogue",
+      "Activity": "/client-activity",
+      "Configuration": "/configuration",
+    };
+
+    if (tabRoutes[tab]) {
+      navigate(tabRoutes[tab]);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -193,7 +214,7 @@ export default function App() {
               {tabs.map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => handleTabClick(tab)}
                   className={`px-4 py-3 text-sm font-medium transition-colors relative ${
                     activeTab === tab
                       ? "text-blue-600"

@@ -55,6 +55,8 @@ const AddVendorPage = lazy(() => import("@/pages/AddVendorPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
 const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
+const ClientRolesPage = lazy(() => import("@/pages/ClientRolesPage"));
+const ClientActivityPage = lazy(() => import("@/pages/ClientActivityPage"));
 const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
@@ -243,6 +245,8 @@ function AppRoutes() {
             }
           />
           <Route path="clients/contracts" element={<ClientsPage />} />
+          <Route path="client-roles" element={<ClientRolesPage />} />
+          <Route path="client-activity" element={<ClientActivityPage />} />
           <Route path="permissions" element={<PermissionsPage />} />
           <Route
             path="users"
