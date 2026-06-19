@@ -62,6 +62,7 @@ export default function ClientsPageUI() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
+       <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="bg-white border-b sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between">
