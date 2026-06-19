@@ -1,815 +1,181 @@
-import React, { useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Download, Mail, Phone, MapPin, Globe, Users, ShoppingCart, Calendar, BarChart3, Edit } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+"use client"
 
-interface MockClient {
-  id: string;
-  name: string;
-  category: string;
-  email: string;
-  phone: string;
-  address: string;
-  website: string;
-  employees: string;
-  joinedDate: string;
-  billingEmail: string;
-  totalUsers: number;
-  activeUsers: number;
-  pendingUsers: number;
-  totalSpends: number;
-  lastPayment: number;
-  lastPaymentDate: string;
-  openOrders: number;
-  ordersValue: number;
-  activeServices: number;
-  daysUntilRenewal: number;
-  inactiveUsers: number;
-}
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 
-const mockClients: Record<string, MockClient> = {
-  'CLI-001': {
-    id: 'CI-00023',
-    name: 'veera industries',
-    category: 'Technology',
-    email: 'Veeru@indu.com',
-    phone: '9784515647',
-    address: 'No address',
-    website: 'www.veeraindustries.com',
-    employees: '51-200 employees',
-    joinedDate: 'Jun 2026',
-    billingEmail: 'Veeru@indu.com',
-    totalUsers: 24,
-    activeUsers: 12,
-    pendingUsers: 3,
-    inactiveUsers: 9,
-    totalSpends: 101000,
-    lastPayment: 25000,
-    lastPaymentDate: 'Jan 11, 2026',
-    openOrders: 3,
-    ordersValue: 32500,
-    activeServices: 2,
-    daysUntilRenewal: 0,
-  },
-  'CLI-00023': {
-    id: 'CLI-00023',
-    name: 'TechVision Solutions',
-    category: 'Technology',
-    email: 'contact@techvision.com',
-    phone: '9876543210',
-    address: 'Tech Park, Bangalore',
-    website: 'www.techvision.com',
-    employees: '200-500 employees',
-    joinedDate: 'Mar 2025',
-    billingEmail: 'billing@techvision.com',
-    totalUsers: 35,
-    activeUsers: 28,
-    pendingUsers: 5,
-    inactiveUsers: 2,
-    totalSpends: 150000,
-    lastPayment: 40000,
-    lastPaymentDate: 'Dec 15, 2025',
-    openOrders: 5,
-    ordersValue: 75000,
-    activeServices: 3,
-    daysUntilRenewal: 45,
-  },
-};
-
-export default function ClientDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  const client = mockClients[id || 'CLI-001'];
-
-  if (!client) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Client Not Found</h2>
-          <button
-            onClick={() => navigate('/clients')}
-            className="text-blue-600 hover:text-blue-700"
-          >
-            Back to Clients
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const downloadPDF = async () => {
-    if (!contentRef.current) return;
-
-    try {
-      const canvas = await html2canvas(contentRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-      });
-
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageData = canvas.toDataURL('image/png');
-      let heightLeft = imgHeight;
-
-      pdf.addImage(pageData, 'PNG', 0, 0, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        const position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(pageData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`${client.name.replace(/\s+/g, '_')}-profile.pdf`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-    }
-  };
-
-  const initials = client.name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase();
-
+export default function CompanyDashboard() {
   return (
-    <div className="min-h-screen bg-white" ref={contentRef}>
-      {/* Page Title */}
-      <div className="px-6 pt-6 pb-2">
-        <h1 className="text-2xl font-bold text-gray-900">{client.name}</h1>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      {/* HEADER */}
+      <h1 className="text-2xl font-semibold mb-4">veera industries</h1>
+
+      {/* TOP CARDS */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <StatCard title="Total Users" value="24" sub="12 Active • 3 Pending invites" />
+        <StatCard title="Total Spends" value="$101,000" sub="Last Payment: $25,000" />
+        <StatCard title="Open Orders" value="3" sub="$32,500 value" />
+        <StatCard title="Contracts" value="3" sub="Active contracts" />
       </div>
 
-      {/* Main Container */}
-      <div className="px-6 pb-8">
-        <div className="flex gap-8">
-          {/* Left Sidebar - 25% width */}
-          <div className="w-1/4 flex-shrink-0">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              {/* Avatar */}
-              <div className="flex justify-center mb-4">
-                <div className="w-28 h-28 bg-blue-50 rounded-full flex items-center justify-center border-2 border-blue-400 shadow-sm">
-                  <span className="text-4xl font-bold text-blue-600">{initials}</span>
-                </div>
+      {/* MAIN GRID */}
+      <div className="grid grid-cols-4 gap-6">
+        
+        {/* LEFT PROFILE */}
+        <Card className="col-span-1">
+          <CardContent className="p-4 space-y-4">
+            <div className="flex flex-col items-center">
+              <div className="h-16 w-16 rounded-full border-2 flex items-center justify-center text-blue-600 font-bold">
+                VI
               </div>
-
-              {/* Client Name */}
-              <h2 className="text-center text-base font-bold text-gray-900 mb-1">{client.name}</h2>
-              <p className="text-center text-sm text-gray-600 mb-4">Premium Client • Since {client.joinedDate}</p>
-
-              {/* Contact Info */}
-              <div className="space-y-2 mb-4 pb-4 border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                  <Mail size={16} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700 break-all">{client.email}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone size={16} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">{client.phone}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">{client.address}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Globe size={16} className="text-gray-400 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">{client.website}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2 mb-4">
-                <button className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2">
-                  <Mail size={16} />
-                  Email
-                </button>
-                <button className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2">
-                  <Phone size={16} />
-                  Call
-                </button>
-              </div>
-
-              {/* Contract Progress */}
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs font-semibold text-gray-700">Contract Progress</span>
-                  <span className="text-xs font-semibold text-blue-600">{client.daysUntilRenewal} days left</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '100%' }} />
-                </div>
-              </div>
-
-              {/* Client Details */}
-              <div className="grid grid-cols-2 gap-3 mb-4 pb-4 border-b border-gray-200 text-xs">
-                <div>
-                  <p className="text-gray-500">Client Since</p>
-                  <p className="font-semibold text-gray-900">{client.joinedDate}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Client ID</p>
-                  <p className="font-semibold text-gray-900">{client.id}</p>
-                </div>
-              </div>
-
-              {/* Download Profile Button */}
-              <button
-                onClick={downloadPDF}
-                className="w-full px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 flex items-center justify-center gap-2 border border-blue-200"
-              >
-                <Download size={16} />
-                Download Profile
-              </button>
+              <h2 className="mt-2 font-semibold">veera industries</h2>
+              <p className="text-sm text-gray-500">Premium Client • Since 2026</p>
             </div>
+
+            <div className="text-sm space-y-2">
+              <p>📧 Veeru@indu.com</p>
+              <p>📞 9784515647</p>
+              <p>📍 No address</p>
+              <p>🌐 N/A</p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button className="w-full">Email</Button>
+              <Button variant="outline" className="w-full">Call</Button>
+            </div>
+
+            <div>
+              <p className="text-sm mb-1">Contract Progress</p>
+              <Progress value={100} />
+              <p className="text-xs text-gray-500 mt-1">0 days left</p>
+            </div>
+
+            <div className="text-sm flex justify-between">
+              <span>Client Since</span>
+              <span>Jun 2026</span>
+            </div>
+
+            <div className="text-sm flex justify-between">
+              <span>Client ID</span>
+              <span>CI-00023</span>
+            </div>
+
+            <Button className="w-full mt-2">Download Profile</Button>
+          </CardContent>
+        </Card>
+
+        {/* RIGHT SIDE */}
+        <div className="col-span-3 space-y-6">
+
+          {/* TABS */}
+          <div className="flex gap-6 border-b pb-2 text-sm">
+            <span className="text-blue-600 border-b-2 border-blue-600 pb-1">Overview</span>
+            <span>Roles</span>
+            <span>Users</span>
+            <span>Orders</span>
+            <span>Services</span>
+            <span>Catalog</span>
+            <span>Activity</span>
+            <span>Configuration</span>
           </div>
 
-          {/* Right Main Area - 75% width */}
-          <div className="flex-1">
-            {/* Top 3 Stat Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              {/* Total Users */}
-              <div className="bg-white rounded-lg border border-gray-200 p-5">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="text-xs text-gray-600 font-medium flex items-center gap-1">
-                      <Users size={14} className="text-blue-600" /> Total Users
-                    </p>
-                  </div>
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900 mb-1">{client.totalUsers}</h3>
-                <div className="space-y-0.5">
-                  <p className="text-xs text-gray-600">{client.activeUsers} Active</p>
-                  <p className="text-xs text-gray-600">{client.pendingUsers} Pending Invites</p>
-                </div>
-              </div>
+          {/* GRID */}
+          <div className="grid grid-cols-3 gap-4">
 
-              {/* Total Spends */}
-              <div className="bg-white rounded-lg border border-gray-200 p-5">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="text-xs text-gray-600 font-medium flex items-center gap-1">
-                      <BarChart3 size={14} className="text-green-600" /> Total Spends
-                    </p>
-                  </div>
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900 mb-1">${(client.totalSpends / 1000).toFixed(0)}k</h3>
-                <div className="space-y-0.5">
-                  <p className="text-xs text-gray-600">Year to date</p>
-                  <p className="text-xs text-gray-600">Last Payment: ${(client.lastPayment / 1000).toFixed(0)}k</p>
-                  <p className="text-xs text-gray-600">{client.lastPaymentDate}</p>
-                </div>
-              </div>
+            {/* COMPANY DETAILS */}
+            <Card>
+              <CardContent className="p-4 space-y-2 text-sm">
+                <h3 className="font-semibold">Company Details</h3>
+                <p>🏢 veera industries</p>
+                <p>💻 Technology</p>
+                <p>👥 51-200 employees</p>
+                <p>🌐 www.veeraindustries.com</p>
+                <p>📞 9784515647</p>
+                <p>📧 Veeru@indu.com</p>
+              </CardContent>
+            </Card>
 
-              {/* Open Orders */}
-              <div className="bg-white rounded-lg border border-gray-200 p-5">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <p className="text-xs text-gray-600 font-medium flex items-center gap-1">
-                      <ShoppingCart size={14} className="text-orange-600" /> Open Orders
-                    </p>
-                  </div>
-                </div>
-                <h3 className="text-3xl font-bold text-gray-900 mb-1">{client.openOrders}</h3>
-                <div className="space-y-0.5">
-                  <p className="text-xs text-gray-600">${(client.ordersValue / 1000).toFixed(1)}k value</p>
-                  <p className="text-xs text-gray-600">Contracts</p>
-                </div>
-              </div>
-            </div>
+            {/* SPENDING OVERVIEW */}
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold mb-2">Spending Overview</h3>
+                <p className="text-xl font-bold">$101,000</p>
+                <p className="text-green-500 text-sm">+12.5% vs last year</p>
 
-            {/* Tabs */}
-            <div className="flex gap-8 border-b border-gray-200 mb-6">
-              {['overview', 'roles', 'users', 'orders', 'services', 'catalog', 'activity', 'configuration'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-3 px-1 text-sm font-medium transition-colors ${
-                    activeTab === tab
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
-            </div>
+                {/* Fake chart bars */}
+                <div className="mt-4 flex items-end gap-2 h-24">
+                  {[10, 20, 30, 25, 35, 40, 45, 30, 50].map((h, i) => (
+                    <div key={i} className="bg-blue-500 w-3" style={{ height: `${h}%` }} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-            {/* Content Area */}
-            {activeTab === 'overview' && (
-              <div className="grid grid-cols-3 gap-6">
-                {/* Left Column - Company Details */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Globe size={16} className="text-blue-600" /> Company Details
-                  </h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Company</p>
-                      <p className="text-sm font-medium text-gray-900">{client.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Category</p>
-                      <p className="text-sm font-medium text-gray-900">{client.category}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Employees</p>
-                      <p className="text-sm font-medium text-gray-900">{client.employees}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Website</p>
-                      <p className="text-sm font-medium text-blue-600">{client.website}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Phone</p>
-                      <p className="text-sm font-medium text-gray-900">{client.phone}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1">Billing Email</p>
-                      <p className="text-sm font-medium text-gray-900">{client.billingEmail}</p>
-                    </div>
-                  </div>
+            {/* CATEGORY PIE */}
+            <Card>
+              <CardContent className="p-4 space-y-2">
+                <h3 className="font-semibold">Top Spend Categories</h3>
+
+                <div className="flex items-center justify-center h-32">
+                  <div className="h-24 w-24 rounded-full border-8 border-blue-500 border-t-green-500 border-r-yellow-500 border-b-purple-500"></div>
                 </div>
 
-                {/* Middle Column - Spending Overview */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-sm font-bold text-gray-900 mb-4">Spending Overview</h3>
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="text-2xl font-bold text-gray-900">${(client.totalSpends / 1000).toFixed(0)}k</div>
-                    <button className="text-xs px-2 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50">This Year</button>
-                  </div>
-                  <p className="text-xs text-gray-600 mb-1">Total Spend</p>
-                  <p className="text-xs text-green-600 font-medium mb-4">+12.5% vs last year</p>
-                  {/* Simplified Bar Chart */}
-                  <div className="flex items-end justify-between gap-1 h-20">
-                    {Array.from({ length: 12 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 bg-blue-500 rounded-t"
-                        style={{ height: `${Math.random() * 100}%`, minHeight: '4px' }}
-                      />
-                    ))}
-                  </div>
-                  <div className="text-xs text-gray-500 text-center mt-2">Jan - Dec</div>
+                <div className="text-sm space-y-1">
+                  <p>🔵 Hardware 45%</p>
+                  <p>🟢 Software 30%</p>
+                  <p>🟡 Service 15%</p>
+                  <p>🟣 Other 10%</p>
                 </div>
+              </CardContent>
+            </Card>
 
-                {/* Right Column - Top Spend Categories */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-sm font-bold text-gray-900 mb-4">Top Spend Categories</h3>
-                  <div className="flex items-center justify-between">
-                    {/* Pie Chart Placeholder */}
-                    <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 via-green-400 to-purple-400 flex items-center justify-center text-white text-xs font-bold">
-                      Chart
-                    </div>
-                    <div className="space-y-2 flex-1 ml-4">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                          <span>Hardware</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">45%</span>
-                          <span className="text-gray-500">$200,250</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          <span>Software</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">30%</span>
-                          <span className="text-gray-500">$30,300</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                          <span>Service</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">15%</span>
-                          <span className="text-gray-500">$15,300</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                          <span>Other</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">10%</span>
-                          <span className="text-gray-500">$10,500</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+            {/* USER SUMMARY */}
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold">User Summary</h3>
+                <p className="text-xl font-bold">24</p>
+                <div className="flex gap-4 text-sm mt-2">
+                  <span className="text-green-600">12 Active</span>
+                  <span className="text-red-500">4 Inactive</span>
                 </div>
-              </div>
-            )}
+              </CardContent>
+            </Card>
 
-            {/* Roles Tab */}
-            {activeTab === 'roles' && (
-              <div className="space-y-6">
-                {/* Roles Management Section */}
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Roles Management</h3>
-                  <p className="text-sm text-gray-600 mb-6">Roles determine what users in the client can access and do for the system. Each role comes with a set of permissions across modules. Users can only perform actions that their assigned roles allow.</p>
-                  
-                  {/* Roles Grid */}
-                  <div className="grid grid-cols-3 gap-6 mb-8">
-                    {/* System Owner */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
-                          <h4 className="text-sm font-bold text-gray-900">System Owner</h4>
-                        </div>
-                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-4">Unrestricted access with all permissions</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Data Visibility</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Can Approver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Approval Limit</span>
-                        </div>
-                      </div>
-                    </div>
+            {/* RECENT ORDERS */}
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold">Recent Orders</h3>
+                <p className="text-xl font-bold">$32,500</p>
+                <p className="text-sm">3 Open Orders</p>
+              </CardContent>
+            </Card>
 
-                    {/* Administrator */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
-                          <h4 className="text-sm font-bold text-gray-900">Administrator</h4>
-                        </div>
-                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-4">Full access to internal organizations</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Data Visibility</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Can Approver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Approval Limit</span>
-                        </div>
-                      </div>
-                    </div>
+            {/* ACTIVE SERVICES */}
+            <Card>
+              <CardContent className="p-4">
+                <h3 className="font-semibold">Active Services</h3>
+                <p className="text-xl font-bold text-blue-600">0 days</p>
+                <p className="text-sm">Until Renewal</p>
+                <p className="text-sm mt-1">2 Active Contracts</p>
+              </CardContent>
+            </Card>
 
-                    {/* Procurement Specialist */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
-                          <h4 className="text-sm font-bold text-gray-900">Procurement Specialist</h4>
-                        </div>
-                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-4">Manage purchase orders and create purchase orders</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Data Visibility</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Can Approver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Approval Limit</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-blue-600 font-medium">PKG 100</p>
-                    </div>
-
-                    {/* Employee */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
-                          <h4 className="text-sm font-bold text-gray-900">Employee</h4>
-                        </div>
-                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-4">Basic access to dashboard and shop</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Data Visibility</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Can Approver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Approval Limit</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-blue-600 font-medium">Department Only</p>
-                    </div>
-
-                    {/* Vendor Administrator */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
-                          <h4 className="text-sm font-bold text-gray-900">Vendor Administrator</h4>
-                        </div>
-                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-4">Vendor account setup with full access</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Data Visibility</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Can Approver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Approval Limit</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-blue-600 font-medium">You Only</p>
-                    </div>
-
-                    {/* Accounts Payable Officer */}
-                    <div className="bg-white rounded-lg border border-gray-200 p-5">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded mb-2">ALLOWED</span>
-                          <h4 className="text-sm font-bold text-gray-900">Accounts Payable Officer</h4>
-                        </div>
-                        <button className="text-gray-400 hover:text-gray-600"><Edit size={16} /></button>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-4">Manage bills, invoices, and vendor credits</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Data Visibility</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Can Approver</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" disabled className="w-4 h-4" />
-                          <span className="text-xs text-gray-700">Approval Limit</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-blue-600 font-medium">PKG 100000</p>
-                    </div>
-                  </div>
-
-                  {/* Permission Matrix Section - Read Only */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-5 mb-8">
-                    <h4 className="text-sm font-bold text-gray-900 mb-4">Permission Matrix</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 border-b">
-                          <tr>
-                            <th className="px-4 py-2 text-left font-semibold text-gray-700">Module</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">View</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Create</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Edit</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Delete</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Report</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Approve</th>
-                            <th className="px-4 py-2 text-center font-semibold text-gray-700">Export</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[
-                            { module: 'INVOICE', perms: [true, true, true, true, true, false, true] },
-                            { module: 'Purchase Orders', perms: [true, true, true, true, false, true, false] },
-                            { module: 'Shop', perms: [true, false, false, false, false, false, false] },
-                            { module: 'VENDORS', perms: [true, true, true, false, true, false, true] },
-                            { module: 'CLIENTS', perms: [true, false, false, false, true, false, false] },
-                            { module: 'Inventory', perms: [true, true, true, true, false, false, true] },
-                            { module: 'Transaction', perms: [true, false, false, false, false, false, false] },
-                            { module: 'Approvals', perms: [true, false, false, false, false, true, false] },
-                            { module: 'Reports & Analytics', perms: [true, false, false, false, true, false, true] },
-                            { module: 'Configuration', perms: [false, false, false, false, false, false, false] },
-                            { module: 'Audit Trail', perms: [true, false, false, false, false, false, false] },
-                            { module: 'Notifications', perms: [true, false, false, false, false, false, false] },
-                            { module: 'User Management', perms: [true, true, false, false, false, false, true] }
-                          ].map((item, idx) => (
-                            <tr key={idx} className="border-b hover:bg-gray-50">
-                              <td className="px-4 py-3 font-medium text-gray-900">{item.module}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[0] ? '✓' : '-'}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[1] ? '✓' : '-'}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[2] ? '✓' : '-'}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[3] ? '✓' : '-'}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[4] ? '✓' : '-'}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[5] ? '✓' : '-'}</td>
-                              <td className="px-4 py-3 text-center text-green-600">{item.perms[6] ? '✓' : '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Permission Summary Section */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-5">
-                    <h4 className="text-sm font-bold text-gray-900 mb-4">Permission Summary</h4>
-                    <div className="grid grid-cols-3 gap-6">
-                      {/* Dashboard */}
-                      <div className="border border-gray-200 rounded p-4">
-                        <p className="text-xs font-semibold text-gray-900 mb-3">Dashboard</p>
-                        <div className="flex gap-2">
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Create</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Delete</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Print</button>
-                        </div>
-                      </div>
-
-                      {/* Purchase Orders */}
-                      <div className="border border-gray-200 rounded p-4">
-                        <p className="text-xs font-semibold text-gray-900 mb-3">Purchase Orders</p>
-                        <div className="flex gap-2">
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Approve</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Create</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Delete</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
-                        </div>
-                      </div>
-
-                      {/* Shop */}
-                      <div className="border border-gray-200 rounded p-4">
-                        <p className="text-xs font-semibold text-gray-900 mb-3">Shop</p>
-                        <div className="flex gap-2">
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Configurable</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Create</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">Delete</button>
-                          <button className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Role Comparison Section */}
-                  <div className="bg-white rounded-lg border border-gray-200 p-5 mt-8">
-                    <h4 className="text-sm font-bold text-gray-900 mb-4">Role Comparison</h4>
-                    <p className="text-xs text-gray-600 mb-4">Compare permissions, restrictions, and capabilities across different roles to see the right access level to assign to user teams members.</p>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 border-b">
-                          <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">ATTRIBUTE</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">SYSTEM OWNER</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">ADMINISTRATOR</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">PROCUREMENT MANAGER</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">PROCUREMENT SPECIALIST</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">SECONDARY MANAGER</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">FINANCE MANAGER</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">EMPLOYEE</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">CLIENT ADMINISTRATOR</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">CLIENT USER</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">VENDOR ADMINISTRATOR</th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">VENDOR USER</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[
-                            { attr: 'USER', data: [true, true, true, true, true, true, false, true, false, false, false] },
-                            { attr: 'Data Visibility', data: [true, true, true, true, true, true, false, true, false, false, false] },
-                            { attr: 'Can Approver', data: [true, true, false, false, false, true, false, false, false, false, false] },
-                            { attr: 'Approval Limit', data: [true, true, false, false, false, true, false, false, false, false, false] },
-                            { attr: 'Module Access', data: [true, true, true, true, true, true, false, true, false, true, false] }
-                          ].map((row, idx) => (
-                            <tr key={idx} className="border-b hover:bg-gray-50">
-                              <td className="px-4 py-3 font-medium text-gray-900">{row.attr}</td>
-                              {row.data.map((value, colIdx) => (
-                                <td key={colIdx} className="px-4 py-3 text-center text-green-600">
-                                  {value ? '✓' : '-'}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Other Tabs - Placeholder */}
-            {activeTab !== 'overview' && activeTab !== 'roles' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <p className="text-gray-600">
-                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Management - Coming Soon
-                </p>
-              </div>
-            )}
-
-            {/* Bottom Summary Cards */}
-            {activeTab === 'overview' && (
-              <div className="grid grid-cols-3 gap-6 mt-6">
-                {/* User Summary */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <Users size={16} className="text-blue-600" /> User Summary
-                      </h3>
-                      <div className="space-y-2">
-                        <div className="flex items-end gap-4">
-                          <div>
-                            <p className="text-2xl font-bold text-gray-900">{client.totalUsers}</p>
-                            <p className="text-xs text-gray-600">Total Users</p>
-                          </div>
-                          <div className="flex gap-3 text-xs">
-                            <div className="text-center">
-                              <p className="text-lg font-bold text-green-600">{client.activeUsers}</p>
-                              <p className="text-gray-600">Active</p>
-                            </div>
-                            <div className="text-center">
-                              <p className="text-lg font-bold text-orange-600">{client.inactiveUsers}</p>
-                              <p className="text-gray-600">Inactive</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <ChevronLeft size={20} className="rotate-180" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Recent Orders */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <ShoppingCart size={16} className="text-orange-600" /> Recent Orders
-                      </h3>
-                      <div className="space-y-1">
-                        <p className="text-2xl font-bold text-gray-900">${(client.ordersValue / 1000).toFixed(1)}k</p>
-                        <p className="text-xs text-gray-600">Total Value</p>
-                        <p className="text-xs text-gray-600 mt-2">{client.openOrders}</p>
-                        <p className="text-xs text-gray-600">Open Orders</p>
-                      </div>
-                    </div>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <ChevronLeft size={20} className="rotate-180" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Active Services */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <Calendar size={16} className="text-blue-600" /> Active Services
-                      </h3>
-                      <div className="space-y-1">
-                        <p className="text-2xl font-bold text-blue-600">{client.daysUntilRenewal}</p>
-                        <p className="text-xs text-gray-600">days</p>
-                        <p className="text-xs text-gray-600">Until Renewal</p>
-                        <p className="text-xs text-gray-600 mt-2">{client.activeServices}</p>
-                        <p className="text-xs text-gray-600">Active Contracts</p>
-                      </div>
-                    </div>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <ChevronLeft size={20} className="rotate-180" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
     </div>
-  );
+  )
+}
+
+/* REUSABLE STAT CARD */
+function StatCard({ title, value, sub }: any) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-sm text-gray-500">{title}</p>
+        <p className="text-xl font-bold">{value}</p>
+        <p className="text-xs text-gray-400">{sub}</p>
+      </CardContent>
+    </Card>
+  )
 }
