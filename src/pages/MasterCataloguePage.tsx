@@ -1,159 +1,876 @@
-"use client";
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
+import {
+  Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Trash2,
+  Settings, ShoppingCart, X, Star, Image as ImageIcon, Download
+} from 'lucide-react';
 
-import React, { useMemo, useRef, useState } from "react";
-import { Upload, Download, Plus, Search, FileText, FileSpreadsheet } from "lucide-react";
+interface CatalogItem {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  subCategory: string;
+  brand: string;
+  price: number;
+  discountPrice?: number;
+  status: 'In Stock' | 'Low Stock' | 'Out of Stock';
+  image?: string;
+  description?: string;
+  tags: string[];
+  initialStock: number;
+  minStockThreshold: number;
+  specification?: string;
+  warranty?: string;
+  hsnCode?: string;
+  dimensionL?: string;
+  dimensionW?: string;
+  dimensionH?: string;
+  dimUnit?: string;
+  weight?: string;
+  weightUnit?: string;
+  customsDeclaration?: string;
+  primaryVendor?: string;
+  vendorSku?: string;
+  leadTime?: string;
+  vendorContact?: string;
+  vendorEmail?: string;
+  vendorPhone?: string;
+  vendorPhone2?: string;
+  trackPerformance?: boolean;
+  performanceRating?: number;
+}
 
-const COLORS = ["Black","White","Red","Blue","Green","Yellow","Orange","Purple","Pink","Brown","Gray","Silver","Gold","Beige","Maroon","Navy","Teal","Olive","Cyan","Magenta"];
+const defaultCategories: Record<string, string[]> = {
+  'IT Hardware': ['Laptops', 'Desktops', 'Monitors', 'Peripherals', 'Storage', 'Networking'],
+  'Stationery': ['Paper', 'Writing', 'Filing', 'Desk Accessories'],
+  'Office Supplies': ['Furniture', 'Cleaning', 'Pantry', 'Safety'],
+};
 
-type Status = "published" | "draft" | "archived";
+const defaultBrands = ['HP', 'Sandisk', 'Logitech', 'Apple', 'Epson', 'Dell', 'Lenovo', 'Samsung'];
+const defaultVendors = ['HP Direct', 'Sandisk Global', 'Epson Hub', 'Apple Store B2B', 'Dell Enterprise'];
+const leadTimeOptions = ['10 Days', '1 Month', 'On Backorder', 'TBD'];
+const customsOptions = ['Exempt', 'Taxable', 'Restricted'];
+const defaultTags = ['CoreEssentials', 'New Arrival', 'High-End', 'Budget', 'Eco-Friendly'];
 
-export default function MasterCataloguePage() {
-  const fileRef = useRef<HTMLInputElement>(null);
+const initialItems: CatalogItem[] = [
+  { id: '1', name: 'HP Envy Laptop', sku: 'LAP-1001', category: 'IT Hardware', subCategory: 'Laptops', brand: 'HP', price: 80000, status: 'In Stock', tags: ['CoreEssentials'], initialStock: 50, minStockThreshold: 5 },
+  { id: '2', name: 'Sandisk 1TB SSD', sku: 'SSD-2025', category: 'IT Hardware', subCategory: 'Storage', brand: 'Sandisk', price: 12000, status: 'Low Stock', tags: ['High-End'], initialStock: 12, minStockThreshold: 5 },
+  { id: '3', name: 'Logitech Wireless Mouse', sku: 'MOU-3301', category: 'IT Hardware', subCategory: 'Peripherals', brand: 'Logitech', price: 1000, status: 'In Stock', tags: [], initialStock: 200, minStockThreshold: 20 },
+  { id: '4', name: 'Apple iPad Air', sku: 'TAB-1110', category: 'IT Hardware', subCategory: 'Laptops', brand: 'Apple', price: 450, status: 'Low Stock', tags: ['New Arrival'], initialStock: 8, minStockThreshold: 3 },
+  { id: '5', name: 'Epson Workforce Printer', sku: 'PRN-3215', category: 'Stationery', subCategory: 'Paper', brand: 'Epson', price: 62000, status: 'Out of Stock', tags: [], initialStock: 0, minStockThreshold: 2 },
+];
 
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState("upload");
-  const [showAdd, setShowAdd] = useState(false);
+const auditLogs = [
+  { event: 'New Item Added', detail: 'Apple MacBook Air M3', user: 'Annit Kumar', date: '26 Mar 2024 11:55 PM', status: 'Approved' },
+  { event: 'Price Changed', detail: 'Sandisk 1TB SSD', user: 'Sakelti Gupta', date: '25 Mar 2024 2:50 PM', status: 'Approved' },
+  { event: 'Deleted Item', detail: 'Formation Uptop', user: 'Rehul Verma', date: '16 Mar 2023 3:35 PM', status: 'Approved' },
+  { event: 'Bulk Update', detail: 'CSV Catalog Accounts', user: 'Sakelti Gupta', date: '07 Mar 2023 2:50 PM', status: 'Approved' },
+];
 
-  const [products, setProducts] = useState([
-    {id:1,name:"Office Chair",sku:"OC001",category:"Furniture",brand:"IKEA",color:"Black",status:"published" as Status},
-    {id:2,name:"Standing Desk",sku:"SD002",category:"Furniture",brand:"Steelcase",color:"White",status:"draft" as Status},
-    {id:3,name:"Laptop",sku:"LP003",category:"Electronics",brand:"Dell",color:"Silver",status:"archived" as Status},
-  ]);
+const emptyItem: Omit<CatalogItem, 'id'> = {
+  name: '', sku: '', category: '', subCategory: '', brand: '', price: 0, status: 'In Stock',
+  tags: [], initialStock: 50, minStockThreshold: 5, description: '', specification: '', warranty: '',
+  hsnCode: '', dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
+  customsDeclaration: 'Exempt', primaryVendor: '', vendorSku: '', leadTime: '10 Days',
+  vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
+  trackPerformance: false, performanceRating: 4,
+};
 
-  const [form,setForm] = useState({
-    name:"",sku:"",category:"",brand:"",color:"Black",status:"published"
+export default function CatalogUpdatesTab() {
+  const navigate = useNavigate();
+  const [items, setItems] = useState<CatalogItem[]>(initialItems);
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [brandFilter, setBrandFilter] = useState('all');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Dialogs
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [viewItem, setViewItem] = useState<CatalogItem | null>(null);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+
+  // Form state
+  const [form, setForm] = useState<Omit<CatalogItem, 'id'>>(emptyItem);
+  const [autoSku, setAutoSku] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+  const [categories, setCategories] = useState<Record<string, string[]>>(defaultCategories);
+  const [brands, setBrands] = useState<string[]>(defaultBrands);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [newSubCategoryInput, setNewSubCategoryInput] = useState('');
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [addingSubCategory, setAddingSubCategory] = useState(false);
+  const [productImages, setProductImages] = useState<string[]>([]);
+
+  const bulkFileRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'In Stock': return 'bg-success text-success-foreground';
+      case 'Low Stock': return 'bg-warning text-warning-foreground';
+      case 'Out of Stock': return 'bg-destructive text-destructive-foreground';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const filtered = items.filter(i => {
+    if (search && !i.name.toLowerCase().includes(search.toLowerCase()) && !i.sku.toLowerCase().includes(search.toLowerCase())) return false;
+    if (categoryFilter !== 'all' && i.category !== categoryFilter) return false;
+    if (statusFilter !== 'all' && i.status !== statusFilter) return false;
+    if (brandFilter !== 'all' && i.brand !== brandFilter) return false;
+    return true;
   });
 
-  const filtered = useMemo(()=>products.filter(p=>{
-    const f = filter==="all" || p.status===filter;
-    const s = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
-    return f && s;
-  }),[products,filter,search]);
-
-  const exportCSV=()=>{
-    const rows = [
-      "Name,SKU,Category,Brand,Color,Status",
-      ...filtered.map(p=>`${p.name},${p.sku},${p.category},${p.brand},${p.color},${p.status}`)
-    ];
-    const blob=new Blob([rows.join("\n")],{type:"text/csv"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(blob);
-    a.download="catalog.csv";
-    a.click();
+  const stats = {
+    total: items.length,
+    inStock: items.filter(i => i.status === 'In Stock').length,
+    lowStock: items.filter(i => i.status === 'Low Stock').length,
+    outOfStock: items.filter(i => i.status === 'Out of Stock').length,
   };
 
-  const addProduct=()=>{
-    setProducts([...products,{id:Date.now(),...form,status:form.status as Status}]);
-    setShowAdd(false);
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
+  const toggleAll = () => {
+    setSelectedIds(prev => prev.length === filtered.length ? [] : filtered.map(i => i.id));
+  };
+
+  const updateForm = (patch: Partial<Omit<CatalogItem, 'id'>>) => setForm(f => ({ ...f, ...patch }));
+
+  const generateSku = () => {
+    const prefix = form.category === 'IT Hardware' ? 'ITH' : form.category === 'Stationery' ? 'STN' : 'OFS';
+    return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+  };
+
+  const openAddDialog = () => {
+    setForm(emptyItem);
+    setEditingItem(null);
+    setProductImages([]);
+    setAutoSku(false);
+    setAddDialogOpen(true);
+  };
+
+  const openEditDialog = (item: CatalogItem) => {
+    setForm({ ...item });
+    setEditingItem(item);
+    setProductImages(item.image ? [item.image] : []);
+    setAddDialogOpen(true);
+  };
+
+  const openViewDialog = (item: CatalogItem) => {
+    setViewItem(item);
+    setViewDialogOpen(true);
+  };
+
+  const handleAddItem = () => {
+    if (!form.name.trim()) { toast.error('Item Name is required'); return; }
+    const sku = autoSku ? generateSku() : form.sku;
+    if (!sku.trim()) { toast.error('SKU is required'); return; }
+
+    const newItem: CatalogItem = {
+      ...form,
+      id: editingItem ? editingItem.id : Date.now().toString(),
+      sku,
+      image: productImages[0] || undefined,
+    };
+
+    if (editingItem) {
+      setItems(prev => prev.map(i => i.id === editingItem.id ? newItem : i));
+      toast.success('Item updated successfully');
+    } else {
+      setItems(prev => [...prev, newItem]);
+      toast.success('Item added successfully');
+    }
+    setAddDialogOpen(false);
+  };
+
+  const deleteItem = (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+    toast.success('Item deleted');
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          setProductImages(prev => [...prev, ev.target!.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        let added = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim());
+          const nameIdx = headers.indexOf('item name');
+          const skuIdx = headers.indexOf('sku');
+          const catIdx = headers.indexOf('category');
+          const brandIdx = headers.indexOf('brand');
+          const priceIdx = headers.indexOf('price');
+          const statusIdx = headers.indexOf('status');
+          if (nameIdx === -1 || skuIdx === -1) continue;
+          const newItem: CatalogItem = {
+            id: Date.now().toString() + i,
+            name: cols[nameIdx] || '',
+            sku: cols[skuIdx] || '',
+            category: cols[catIdx] || 'IT Hardware',
+            subCategory: '',
+            brand: cols[brandIdx] || '',
+            price: parseFloat(cols[priceIdx]) || 0,
+            status: (cols[statusIdx] as any) || 'In Stock',
+            tags: [],
+            initialStock: 50,
+            minStockThreshold: 5,
+          };
+          if (newItem.name && newItem.sku) {
+            setItems(prev => [...prev, newItem]);
+            added++;
+          }
+        }
+        toast.success(`${added} item(s) imported successfully`);
+        setBulkImportOpen(false);
+      } catch {
+        toast.error('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const exportToCSV = (data: any[], filename: string) => {
+    if (!data.length) { toast.error('No data to export'); return; }
+    const headers = Object.keys(data[0]);
+    const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${row[h] ?? ''}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filename} downloaded`);
+  };
+
+  const exportCatalogExcel = () => {
+    exportToCSV(items.map(i => ({
+      'Item Name': i.name, SKU: i.sku, Category: i.category, Brand: i.brand,
+      Price: i.price, Status: i.status, 'Initial Stock': i.initialStock,
+    })), 'master-catalogue.csv');
+  };
+
+  const exportCatalogPDF = () => {
+    // Generate a simple printable HTML and open in new window for PDF save
+    const rows = items.map(i => `<tr><td>${i.name}</td><td>${i.sku}</td><td>${i.category}</td><td>${i.brand}</td><td>₹${i.price.toLocaleString()}</td><td>${i.status}</td></tr>`).join('');
+    const html = `<html><head><title>Master Catalogue</title><style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f5f5f5;font-weight:bold}h1{color:#333}</style></head><body><h1>Master Catalogue</h1><p>Exported on ${new Date().toLocaleDateString()}</p><table><thead><tr><th>Item Name</th><th>SKU</th><th>Category</th><th>Brand</th><th>Price</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); win.print(); }
+    toast.success('PDF export opened for printing');
+  };
+
+  const exportAuditLogs = () => {
+    exportToCSV(auditLogs.map(l => ({
+      Event: l.event, Detail: l.detail, User: l.user, Date: l.date, Status: l.status,
+    })), 'audit-logs.csv');
+  };
+
+  const addTag = () => {
+    if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
+      updateForm({ tags: [...form.tags, tagInput.trim()] });
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tag: string) => updateForm({ tags: form.tags.filter(t => t !== tag) });
+
+  const addNewCategory = () => {
+    if (newCategoryInput.trim() && !categories[newCategoryInput.trim()]) {
+      setCategories(prev => ({ ...prev, [newCategoryInput.trim()]: [] }));
+      updateForm({ category: newCategoryInput.trim(), subCategory: '' });
+      setNewCategoryInput('');
+      setAddingCategory(false);
+      toast.success('Category added');
+    }
+  };
+
+  const addNewSubCategory = () => {
+    if (newSubCategoryInput.trim() && form.category) {
+      setCategories(prev => ({
+        ...prev,
+        [form.category]: [...(prev[form.category] || []), newSubCategoryInput.trim()],
+      }));
+      updateForm({ subCategory: newSubCategoryInput.trim() });
+      setNewSubCategoryInput('');
+      setAddingSubCategory(false);
+      toast.success('Sub-category added');
+    }
+  };
+
+  const renderStars = (rating: number, onChange?: (r: number) => void) => (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(s => (
+        <Star
+          key={s}
+          size={16}
+          className={`${s <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'} ${onChange ? 'cursor-pointer' : ''}`}
+          onClick={() => onChange?.(s)}
+        />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Master Catalogue</h1>
-          <p className="text-slate-500">Manage products and catalog operations</p>
-        </div>
+    <div className="space-y-6 bg-gray-50 p-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-semibold text-gray-900">Master Catalogue</h2>
+        <p className="text-sm text-gray-600 mt-1">Manage and register all products/services available for client contracts and downstream client-specific mapping.</p>
+        <p className="text-xs text-gray-500 mt-1">Loading catalog from backend...</p>
+      </div>
 
-        <div className="grid md:grid-cols-4 gap-4">
-          {[
-            ["all","Total",products.length,"bg-blue-600 text-white"],
-            ["published","Published",products.filter(x=>x.status==="published").length,"bg-green-100"],
-            ["draft","Drafts",products.filter(x=>x.status==="draft").length,"bg-amber-100"],
-            ["archived","Archived",products.filter(x=>x.status==="archived").length,"bg-red-100"]
-          ].map(([key,label,count,cls])=>(
-            <button key={String(key)} onClick={()=>setFilter(String(key))} className={`rounded-xl p-4 text-left border ${cls}`}>
-              <div className="text-sm">{label}</div>
-              <div className="text-3xl font-bold">{count}</div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-3">
+        <Card className="border-0 cursor-pointer">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]" style={{ backgroundColor: '#1a6fac' }}>
+            <ShoppingCart size={18} className="text-white" />
+            <span className="font-medium text-sm text-white">{stats.total} Total</span>
+          </CardContent>
+        </Card>
+        <Card className="border-0 cursor-pointer">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-white" style={{ backgroundColor: 'rgba(225, 86, 99, 0.98)' }}>
+            <ShoppingCart size={18} />
+            <span className="font-medium text-sm">{filtered.length} Published</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-yellow-100 text-yellow-700 border-0 cursor-pointer hover:bg-yellow-200">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]">
+            <ShoppingCart size={18} />
+            <span className="font-medium text-sm">0 Drafts</span>
+          </CardContent>
+        </Card>
+        <Card className="border-0 cursor-pointer">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-red-700" style={{ backgroundColor: 'rgba(0, 0, 0, 0.22)' }}>
+            <ShoppingCart size={18} />
+            <span className="font-medium text-sm">0 Archived</span>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Actions Bar */}
+      <div className="flex items-center justify-end gap-3">
+        <Button variant="outline" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100">
+          <FileDown size={16} />
+          Export CSV
+        </Button>
+        <Button variant="outline" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={() => setBulkImportOpen(true)}>
+          <Upload size={16} />
+          Bulk Import
+        </Button>
+        <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => navigate('/configuration/master-catalogue/add')}>
+          <Plus size={16} />
+          Add New Item
+        </Button>
+      </div>
+
+      {/* Table */}
+      <Card className="border-gray-200">
+        <CardContent className="pt-6">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-gray-200 bg-gray-50">
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-600">
+                    No items match the selected filters. Adjust search, category, or status to view catalog entries.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map(item => (
+                  <TableRow key={item.id} className="border-gray-200 hover:bg-gray-50">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
+                          ) : (
+                            <ImageIcon size={14} className="text-gray-500" />
+                          )}
+                        </div>
+                        <span className="font-medium text-sm">{item.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
+                    <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
+                    <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
+                    <TableCell><Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => openEditDialog(item)}><Pencil size={14} className="text-gray-600" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => openViewDialog(item)}><Eye size={14} className="text-gray-600" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => deleteItem(item.id)}><Trash2 size={14} className="text-gray-600" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
+            <span>Showing 0 of {items.length} entries</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Import/Export + Audit Logs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-gray-200">
+          <CardHeader className="border-b border-gray-200">
+            <CardTitle className="text-base font-semibold pl-3">   Import / Export Products</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <Tabs defaultValue="upload" className="w-full">
+              <TabsList className="bg-gray-100 grid w-full grid-cols-3 mb-4">
+                <TabsTrigger value="upload" className="text-xs">Bulk Upload Items</TabsTrigger>
+                <TabsTrigger value="excel" className="text-xs">Export Catalog (Excel)</TabsTrigger>
+                <TabsTrigger value="pdf" className="text-xs">Export Catalog (PDF)</TabsTrigger>
+              </TabsList>
+              <TabsContent value="upload" className="mt-4">
+                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <Upload size={32} className="mx-auto text-blue-500 mb-3" />
+                  <p className="text-sm font-medium text-gray-800">Upload</p>
+                  <p className="text-xs text-gray-600 mt-1">Bulk upload new products or catalog using CSV template.</p>
+                  <input ref={bulkFileRef} type="file" accept=".csv" className="hidden" onChange={handleBulkImport} />
+                  <Button className="mt-4 bg-blue-600 hover:bg-blue-700" size="sm" onClick={() => bulkFileRef.current?.click()}>Upload</Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="excel" className="mt-4">
+                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <FileDown size={32} className="mx-auto text-green-500 mb-3" />
+                  <p className="text-sm font-medium text-gray-800">Export</p>
+                  <p className="text-xs text-gray-600 mt-1">Export the entire product catalog as Excel file.</p>
+                  <Button variant="outline" className="mt-4 border-gray-300" size="sm" onClick={exportCatalogExcel}>Export Excel</Button>
+                </div>
+              </TabsContent>
+              <TabsContent value="pdf" className="mt-4">
+                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <FileText size={32} className="mx-auto text-red-500 mb-3" />
+                  <p className="text-sm font-medium text-gray-800">Export Catalog</p>
+                  <p className="text-xs text-gray-600 mt-1">Export as PDF file.</p>
+                  <Button variant="outline" className="mt-4 border-gray-300" size="sm" onClick={exportCatalogPDF}>Export PDF</Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <Card className="border-gray-200">
+          <CardHeader className="border-b border-gray-200 flex items-center justify-between">
+            <CardTitle className="text-base font-semibold pl-3">   Approval & Audit Logs</CardTitle>
+            <Button variant="outline" size="sm" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={exportAuditLogs}><Download size={14} /> Export</Button>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-gray-200 bg-gray-50">
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Event</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">User</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Date</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {auditLogs.map((log, i) => (
+                  <TableRow key={i} className="border-gray-200 hover:bg-gray-50">
+                    <TableCell>
+                      <p className="text-sm font-medium">{log.event}</p>
+                      <p className="text-xs text-muted-foreground">{log.detail}</p>
+                    </TableCell>
+                    <TableCell className="text-sm">{log.user}</TableCell>
+                    <TableCell className="text-xs">{log.date}</TableCell>
+                    <TableCell><Badge className="bg-success text-success-foreground border-none">{log.status}</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Bulk Import Items</DialogTitle></DialogHeader>
+          <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
+            <Upload size={32} className="mx-auto text-primary mb-3" />
+            <p className="text-sm font-medium mb-1">Upload CSV File</p>
+            <p className="text-xs text-muted-foreground mb-3">CSV must have headers: Item Name, SKU, Category, Brand, Price, Status</p>
+            <input ref={bulkFileRef} type="file" accept=".csv" className="hidden" onChange={handleBulkImport} />
+            <Button onClick={() => bulkFileRef.current?.click()}>Select CSV File</Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkImportOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Item Dialog */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Item Details</DialogTitle></DialogHeader>
+          {viewItem && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div><Label className="text-muted-foreground">Name</Label><p className="font-medium">{viewItem.name}</p></div>
+                <div><Label className="text-muted-foreground">SKU</Label><p>{viewItem.sku}</p></div>
+                <div><Label className="text-muted-foreground">Category</Label><p>{viewItem.category}</p></div>
+                <div><Label className="text-muted-foreground">Brand</Label><p>{viewItem.brand}</p></div>
+                <div><Label className="text-muted-foreground">Price</Label><p>₹{viewItem.price.toLocaleString()}</p></div>
+                <div><Label className="text-muted-foreground">Status</Label><Badge className={`${getStatusColor(viewItem.status)} border-none`}>{viewItem.status}</Badge></div>
+              </div>
+            </div>
+          )}
+          <DialogFooter><Button variant="outline" onClick={() => setViewDialogOpen(false)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Item Dialog - Full Screen */}
+      {addDialogOpen && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+          <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between flex-shrink-0">
+            <h2 className="text-2xl font-bold">{editingItem ? 'Edit Item' : 'Add New Item'}</h2>
+            <button onClick={() => setAddDialogOpen(false)} className="text-slate-500 hover:text-slate-700 flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-xl border p-4">
-          <div className="flex flex-wrap gap-2 justify-between mb-4">
-            <div className="relative w-80">
-              <Search className="absolute left-3 top-3 h-4 w-4"/>
-              <input className="border rounded-lg pl-10 p-2 w-full" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)}/>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={exportCSV} className="border rounded-lg px-3 py-2 flex gap-2"><Download size={16}/>Export CSV</button>
-              <button onClick={()=>fileRef.current?.click()} className="border rounded-lg px-3 py-2">Bulk Import</button>
-              <button onClick={()=>setShowAdd(true)} className="bg-blue-600 text-white rounded-lg px-3 py-2 flex gap-2"><Plus size={16}/>Add New Item</button>
-            </div>
           </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-6xl mx-auto px-6 py-6">
+              <div className="space-y-6 pb-32">
+              {/* General Details + Category */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm border-b pb-1">General Details</h3>
+                  <div>
+                    <Label>Item Name <span className="text-destructive">*</span></Label>
+                    <Input placeholder="e.g., Apple MacBook Air M3" value={form.name} onChange={e => updateForm({ name: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Brand</Label>
+                    <Select value={form.brand} onValueChange={v => updateForm({ brand: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select Brand" /></SelectTrigger>
+                      <SelectContent>
+                        {brands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Label>SKU <span className="text-destructive">*</span></Label>
+                      <div className="flex items-center gap-1 ml-auto">
+                        <Checkbox checked={autoSku} onCheckedChange={v => setAutoSku(!!v)} id="autoSku" />
+                        <Label htmlFor="autoSku" className="text-xs">Auto-Generate</Label>
+                      </div>
+                    </div>
+                    <Input placeholder="e.g., LAP-1002" value={autoSku ? '(auto)' : form.sku} disabled={autoSku} onChange={e => updateForm({ sku: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Short Description</Label>
+                    <Textarea placeholder="Brief product description" value={form.description || ''} onChange={e => updateForm({ description: e.target.value })} className="min-h-[60px]" />
+                  </div>
+                </div>
 
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="p-3 text-left">Name</th><th>SKU</th><th>Category</th><th>Brand</th><th>Color</th><th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(p=>(
-                <tr key={p.id} className="border-b">
-                  <td className="p-3">{p.name}</td><td>{p.sku}</td><td>{p.category}</td><td>{p.brand}</td><td>{p.color}</td><td>{p.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-sm border-b pb-1">Category & Classification</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Category</Label>
+                      {addingCategory ? (
+                        <div className="flex gap-1">
+                          <Input value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)} placeholder="New category" className="h-9" />
+                          <Button size="sm" onClick={addNewCategory}>Add</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setAddingCategory(false)}>✕</Button>
+                        </div>
+                      ) : (
+                        <Select value={form.category} onValueChange={v => { if (v === '__add__') { setAddingCategory(true); } else { updateForm({ category: v, subCategory: '' }); } }}>
+                          <SelectTrigger><SelectValue placeholder="Select Category" /></SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(categories).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            <SelectItem value="__add__"><span className="text-primary">+ Add Category</span></SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    <div>
+                      <Label>Sub-category</Label>
+                      {addingSubCategory ? (
+                        <div className="flex gap-1">
+                          <Input value={newSubCategoryInput} onChange={e => setNewSubCategoryInput(e.target.value)} placeholder="New sub-cat" className="h-9" />
+                          <Button size="sm" onClick={addNewSubCategory}>Add</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setAddingSubCategory(false)}>✕</Button>
+                        </div>
+                      ) : (
+                        <Select value={form.subCategory} onValueChange={v => { if (v === '__add__') { setAddingSubCategory(true); } else { updateForm({ subCategory: v }); } }}>
+                          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                          <SelectContent>
+                            {(categories[form.category] || []).map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            <SelectItem value="__add__"><span className="text-primary">+ Add Sub-category</span></SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Tags</Label>
+                    <div className="flex flex-wrap gap-1 mb-1">
+                      {form.tags.map(t => (
+                        <Badge key={t} variant="secondary" className="gap-1">{t}<X size={10} className="cursor-pointer" onClick={() => removeTag(t)} /></Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      <Input placeholder="Tags..." value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())} className="h-8" />
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {defaultTags.filter(t => !form.tags.includes(t)).map(t => (
+                        <Badge key={t} variant="outline" className="cursor-pointer text-xs" onClick={() => updateForm({ tags: [...form.tags, t] })}>{t}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border">
-            <div className="p-4 border-b font-semibold">Import / Export Products</div>
-            <div className="flex gap-4 px-4 pt-4">
-              <button onClick={()=>setTab("upload")}>Bulk Upload Items</button>
-              <button onClick={()=>setTab("excel")}>Export Excel</button>
-              <button onClick={()=>setTab("pdf")}>Export PDF</button>
-            </div>
-            <div className="p-4">
-              {tab==="upload" && <div className="border-2 border-dashed rounded-xl p-12 text-center">
-                <Upload className="mx-auto mb-3"/>
-                <button onClick={()=>fileRef.current?.click()} className="bg-blue-600 text-white px-4 py-2 rounded">Upload</button>
-                <input ref={fileRef} hidden type="file" accept=".csv,.xlsx"/>
-              </div>}
-              {tab==="excel" && <div className="p-8"><FileSpreadsheet/> Excel export ready.</div>}
-              {tab==="pdf" && <div className="p-8"><FileText/> PDF export ready.</div>}
-            </div>
-          </div>
+              {/* Pricing & Inventory */}
+              <div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Pricing & Inventory</h3>
+                <div className="grid grid-cols-5 gap-3">
+                  <div>
+                    <Label>Regular Price</Label>
+                    <div className="flex items-center">
+                      <span className="text-xs mr-1">₹</span>
+                      <Input type="number" value={form.price} onChange={e => updateForm({ price: parseFloat(e.target.value) || 0 })} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Discount Price</Label>
+                    <div className="flex items-center">
+                      <span className="text-xs mr-1">₹</span>
+                      <Input type="number" placeholder="(optional)" value={form.discountPrice || ''} onChange={e => updateForm({ discountPrice: parseFloat(e.target.value) || undefined })} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Inventory Status</Label>
+                    <Select value={form.status} onValueChange={v => updateForm({ status: v as any })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="In Stock">In Stock</SelectItem>
+                        <SelectItem value="Low Stock">Low Stock</SelectItem>
+                        <SelectItem value="Out of Stock">Out of Stock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Initial Stock Quantity</Label>
+                    <Input type="number" value={form.initialStock} onChange={e => updateForm({ initialStock: parseInt(e.target.value) || 0 })} />
+                  </div>
+                  <div>
+                    <Label>Minimum Stock Threshold</Label>
+                    <Input type="number" value={form.minStockThreshold} onChange={e => updateForm({ minStockThreshold: parseInt(e.target.value) || 0 })} />
+                  </div>
+                </div>
+              </div>
 
-          <div className="bg-white rounded-xl border p-4">
-            <div className="flex justify-between">
-              <h3 className="font-semibold">Approval & Audit Logs</h3>
-              <button onClick={()=>alert("Export logs")} className="border px-3 py-1 rounded">Export</button>
-            </div>
-            <table className="w-full mt-4 text-sm">
-              <thead><tr><th>User</th><th>Action</th><th>Date</th></tr></thead>
-              <tbody><tr><td>Admin</td><td>Created Product</td><td>2025-06-01</td></tr></tbody>
-            </table>
-          </div>
-        </div>
+              {/* Product Specifics & Media */}
+              <div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Product Specifics & Media</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Detailed Specification</Label>
+                      <Textarea placeholder="Rich Text Editor or long-text area" value={form.specification || ''} onChange={e => updateForm({ specification: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Warranty Information (for internal use)</Label>
+                      <Textarea placeholder="Enter private notes or additional detail..." value={form.warranty || ''} onChange={e => updateForm({ warranty: e.target.value })} className="min-h-[60px]" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Add Image</Label>
+                    <div
+                      className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      <ImageIcon size={24} className="mx-auto text-muted-foreground mb-2" />
+                      <p className="text-sm">Click to Upload or Drag Images</p>
+                    </div>
+                    <input ref={imageInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                    {productImages.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {productImages.map((img, i) => (
+                          <div key={i} className="relative w-16 h-16 rounded overflow-hidden border">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <button className="absolute top-0 right-0 bg-destructive text-destructive-foreground rounded-bl p-0.5" onClick={() => setProductImages(prev => prev.filter((_, idx) => idx !== i))}>
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="w-16 h-16 border-2 border-dashed border-border rounded flex items-center justify-center cursor-pointer hover:bg-muted/50" onClick={() => imageInputRef.current?.click()}>
+                          <Plus size={16} className="text-muted-foreground" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-        {showAdd && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-            <div className="bg-white rounded-xl p-6 w-[500px] space-y-3">
-              <h3 className="font-bold">Add Product</h3>
-              <input className="border p-2 w-full" placeholder="Name" onChange={e=>setForm({...form,name:e.target.value})}/>
-              <input className="border p-2 w-full" placeholder="SKU" onChange={e=>setForm({...form,sku:e.target.value})}/>
-              <input className="border p-2 w-full" placeholder="Category" onChange={e=>setForm({...form,category:e.target.value})}/>
-              <input className="border p-2 w-full" placeholder="Brand" onChange={e=>setForm({...form,brand:e.target.value})}/>
-              <select className="border p-2 w-full" onChange={e=>setForm({...form,color:e.target.value})}>
-                {COLORS.map(c=><option key={c}>{c}</option>)}
-              </select>
-              <select className="border p-2 w-full" onChange={e=>setForm({...form,status:e.target.value})}>
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-                <option value="archived">Archived</option>
-              </select>
-              <div className="flex justify-end gap-2">
-                <button onClick={()=>setShowAdd(false)} className="border px-3 py-2 rounded">Cancel</button>
-                <button onClick={addProduct} className="bg-blue-600 text-white px-3 py-2 rounded">Save</button>
+              {/* Logistics & Customs */}
+              <div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Logistics & Customs</h3>
+                <div className="grid grid-cols-4 gap-3">
+                  <div>
+                    <Label>HSN/SAC Code</Label>
+                    <Input placeholder="84713010" value={form.hsnCode || ''} onChange={e => updateForm({ hsnCode: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Dimensions</Label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs">L</span><Input className="w-12 h-8" value={form.dimensionL || ''} onChange={e => updateForm({ dimensionL: e.target.value })} />
+                      <span className="text-xs">W</span><Input className="w-12 h-8" value={form.dimensionW || ''} onChange={e => updateForm({ dimensionW: e.target.value })} />
+                      <span className="text-xs">H</span><Input className="w-12 h-8" value={form.dimensionH || ''} onChange={e => updateForm({ dimensionH: e.target.value })} />
+                      <Select value={form.dimUnit || 'cm'} onValueChange={v => updateForm({ dimUnit: v })}>
+                        <SelectTrigger className="w-16 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="cm">cm</SelectItem><SelectItem value="in">in</SelectItem><SelectItem value="mm">mm</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Shipping Weight</Label>
+                    <div className="flex items-center gap-1">
+                      <Input value={form.weight || ''} onChange={e => updateForm({ weight: e.target.value })} className="h-8" />
+                      <Select value={form.weightUnit || 'kg'} onValueChange={v => updateForm({ weightUnit: v })}>
+                        <SelectTrigger className="w-16 h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="kg">kg</SelectItem><SelectItem value="lb">lb</SelectItem><SelectItem value="g">g</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Customs Declaration</Label>
+                    <Select value={form.customsDeclaration || 'Exempt'} onValueChange={v => updateForm({ customsDeclaration: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{customsOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vendor & Sourcing */}
+              <div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Vendor & Sourcing</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Primary Vendor</Label>
+                    <Select value={form.primaryVendor || ''} onValueChange={v => updateForm({ primaryVendor: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select Vendor" /></SelectTrigger>
+                      <SelectContent>{defaultVendors.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Vendor SKU (optional)</Label>
+                    <Input placeholder="V-HP-MB-M3" value={form.vendorSku || ''} onChange={e => updateForm({ vendorSku: e.target.value })} />
+                  </div>
+                  <div>0
+                    <Label>Estimated Lead Time</Label>
+                    <Select value={form.leadTime || '10 Days'} onValueChange={v => updateForm({ leadTime: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{leadTimeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vendor Contact */}
+              <div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Vendor Contact</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Vendor Contact Person</Label>
+                    <Input placeholder="Annit Kumar" value={form.vendorContact || ''} onChange={e => updateForm({ vendorContact: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Vendor Email</Label>
+                    <Input placeholder="a.kumar@hpd.com" value={form.vendorEmail || ''} onChange={e => updateForm({ vendorEmail: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Vendor Phone</Label>
+                    <Input placeholder="+91 98765 43210" value={form.vendorPhone || ''} onChange={e => updateForm({ vendorPhone: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label>Vendor Phone</Label>
+                    <Input placeholder="+91 98765 43210" value={form.vendorPhone2 || ''} onChange={e => updateForm({ vendorPhone2: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Track Vendor Performance */}
+              <div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Track Vendor Performance</h3>
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Label>Track Performance</Label>
+                    <Switch checked={form.trackPerformance || false} onCheckedChange={v => updateForm({ trackPerformance: v })} />
+                    <span className="text-xs">{form.trackPerformance ? 'ON' : 'OFF'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label>Performance Rating (1-5 stars)</Label>
+                    {renderStars(form.performanceRating || 4, r => updateForm({ performanceRating: r }))}
+                  </div>
+                </div>
+              </div>
               </div>
             </div>
           </div>
-        )}
-      </div>
+          <div className="bg-white border-t p-4 flex justify-end gap-2 flex-shrink-0">
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddItem}>Save Item</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
