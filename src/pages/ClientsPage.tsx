@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { MoreVertical, Users } from "lucide-react"
+import { MoreVertical, Users, Plus, Download, Upload, FileDown, Archive } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -83,11 +83,26 @@ export default function ClientsPageUI() {
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>View Details</DropdownMenuItem>
-              <DropdownMenuItem>Edit</DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600">
-                Archive
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem className="cursor-pointer">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Client
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <Download className="h-4 w-4 mr-2" />
+                Export Clients
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Import
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <FileDown className="h-4 w-4 mr-2" />
+                Download Template
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <Archive className="h-4 w-4 mr-2" />
+                Archived Clients
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
