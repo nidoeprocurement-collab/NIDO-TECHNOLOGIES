@@ -22,7 +22,6 @@ import {
   Pencil,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useEffect } from "react";
 
 interface Integration {
@@ -176,9 +175,6 @@ const DEFAULT_INTEGRATIONS: Integration[] = [
 ];
 
 export default function IntegrationsPage() {
-  const { setMeta } = usePageMeta();
-  useEffect(() => { setMeta({ title: "Integrations" }); }, []);
-
   const [integrations, setIntegrations] = useState(DEFAULT_INTEGRATIONS);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
