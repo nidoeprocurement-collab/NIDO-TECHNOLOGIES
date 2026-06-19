@@ -3,9 +3,10 @@ import {
   ChevronLeft, ChevronRight, Mail, Phone, MapPin, Globe, FileText,
   Users, ShoppingCart, Zap, Download, TrendingUp
 } from 'lucide-react';
-import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { ClientUsers } from './ClientUsers';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ClientUsersTable } from '@/components/ClientUsersTable';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -413,7 +414,7 @@ export function ClientDetail({ client, onBack }: ClientDetailProps) {
         </TabsContent>
 
         <TabsContent value="users" className="mt-0">
-          <ClientUsers clientId={client.id} clientName={client.name} />
+          <ClientUsersTable clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-0">
