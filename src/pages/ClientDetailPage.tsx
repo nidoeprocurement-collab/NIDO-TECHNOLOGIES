@@ -9,27 +9,14 @@ export default function ApexDashboard() {
   const [showProfile, setShowProfile] = useState(true)
   const [activeTab, setActiveTab] = useState("Overview")
 
-  // DOWNLOAD FUNCTION
   const downloadProfile = () => {
-    const content = `
-Client: Apex Tech Solutions
-Email: support@apex.com
-Phone: +1-555-1000
-Address: 123 Corp Ave, San Diego, CA
-Client ID: CLT-1024
-Since: Jan 2024
-Contract: 2025-01-01 to 2026-12-31
-    `
-
+    const content = `Apex Tech Solutions Profile`
     const blob = new Blob([content], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
-
     const a = document.createElement("a")
     a.href = url
-    a.download = "client-profile.txt"
+    a.download = "profile.txt"
     a.click()
-
-    URL.revokeObjectURL(url)
   }
 
   return (
@@ -38,22 +25,26 @@ Contract: 2025-01-01 to 2026-12-31
         Apex Tech Solutions
       </h1>
 
-      <div className="flex gap-6">
+      {/* GRID LAYOUT (IMPORTANT FIX) */}
+      <div
+        className={`grid gap-6 transition-all duration-300 ${
+          showProfile ? "grid-cols-4" : "grid-cols-1"
+        }`}
+      >
 
         {/* SIDEBAR */}
         {showProfile && (
-          <div className="w-80 transition-all duration-300">
-            <Card className="overflow-hidden relative">
+          <div className="col-span-1">
+            <Card className="relative overflow-hidden">
 
-              {/* TOGGLE BUTTON (RIGHT SIDE) */}
+              {/* HIDE BUTTON */}
               <button
                 onClick={() => setShowProfile(false)}
-                className="absolute top-2 right-2 p-1 bg-white rounded shadow"
+                className="absolute top-2 right-2 bg-white p-1 rounded shadow"
               >
                 <EyeOff size={16} />
               </button>
 
-              {/* TOP */}
               <div className="bg-gradient-to-r from-blue-600 to-blue-400 h-28 flex items-center justify-center">
                 <div className="h-20 w-20 rounded-full bg-white flex items-center justify-center font-bold text-blue-600">
                   ATS
@@ -61,29 +52,17 @@ Contract: 2025-01-01 to 2026-12-31
               </div>
 
               <CardContent className="p-4 space-y-4">
-                <div className="text-center">
-                  <h2 className="font-semibold text-lg">
-                    Apex Tech Solutions
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    Premium Client • Since 2024
-                  </p>
-                </div>
+                <h2 className="text-center font-semibold">
+                  Apex Tech Solutions
+                </h2>
 
-                <div className="text-sm space-y-2">
+                <div className="text-sm space-y-1">
                   <p>📧 support@apex.com</p>
                   <p>📞 +1-555-1000</p>
-                  <p>📍 San Diego, CA</p>
+                  <p>📍 San Diego</p>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button className="w-full">Email</Button>
-                  <Button variant="outline" className="w-full">
-                    Call
-                  </Button>
-                </div>
-
-                {/* PROGRESS (CUSTOM FIX - NO IMPORT ERROR) */}
+                {/* PROGRESS */}
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>Contract</span>
@@ -94,11 +73,7 @@ Contract: 2025-01-01 to 2026-12-31
                   </div>
                 </div>
 
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={downloadProfile}
-                >
+                <Button onClick={downloadProfile} className="w-full">
                   Download Profile
                 </Button>
               </CardContent>
@@ -106,21 +81,21 @@ Contract: 2025-01-01 to 2026-12-31
           </div>
         )}
 
-        {/* SHOW BUTTON WHEN HIDDEN */}
-        {!showProfile && (
-          <button
-            onClick={() => setShowProfile(true)}
-            className="h-10 px-3 bg-white shadow rounded"
-          >
-            <Eye size={16} />
-          </button>
-        )}
+        {/* MAIN */}
+        <div className={`${showProfile ? "col-span-3" : "col-span-1"}`}>
 
-        {/* MAIN CONTENT (AUTO EXPANDS) */}
-        <div className="flex-1 transition-all duration-300">
+          {/* SHOW BUTTON */}
+          {!showProfile && (
+            <button
+              onClick={() => setShowProfile(true)}
+              className="mb-4 bg-white p-2 rounded shadow"
+            >
+              <Eye size={16} />
+            </button>
+          )}
 
           {/* TABS */}
-          <div className="flex gap-6 border-b pb-2 mb-4">
+          <div className="flex gap-6 border-b pb-2 mb-6">
             {[
               "Overview",
               "Users",
@@ -144,71 +119,89 @@ Contract: 2025-01-01 to 2026-12-31
             ))}
           </div>
 
-          {/* TAB CONTENT */}
-          {activeTab === "Overview" && <Overview />}
-          {activeTab === "Users" && <Page title="Users Page" />}
-          {activeTab === "Orders" && <Page title="Orders Page" />}
-          {activeTab === "Services" && <Page title="Services Page" />}
-          {activeTab === "Catalog" && <Page title="Catalog Page" />}
-          {activeTab === "Activity" && <Page title="Activity Page" />}
-          {activeTab === "Notes" && <Page title="Notes Page" />}
+          {/* OVERVIEW PAGE */}
+          {activeTab === "Overview" && (
+            <>
+              {/* TOP STATS */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <StatCard title="Total Users" value="24" />
+                <StatCard title="Total Spends" value="$101K" />
+                <StatCard title="Open Orders" value="3" />
+              </div>
+
+              {/* ANALYTICS (EXACT MATCH) */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-3 gap-4">
+
+                    {/* COMPANY */}
+                    <Card>
+                      <CardContent className="p-4 text-sm space-y-1">
+                        <h3 className="font-semibold">
+                          Company Details
+                        </h3>
+                        <p>Apex Tech</p>
+                        <p>Technology</p>
+                        <p>51-200 employees</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* BAR CHART */}
+                    <Card>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold mb-2">
+                          Spending
+                        </h3>
+
+                        <div className="flex items-end gap-2 h-24">
+                          {[20,30,40,50,60,80,100].map((h,i)=>(
+                            <div
+                              key={i}
+                              className="bg-blue-500 w-3"
+                              style={{height:`${h}%`}}
+                            />
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* PIE */}
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <h3 className="font-semibold mb-2">
+                          Categories
+                        </h3>
+                        <div className="h-24 w-24 mx-auto rounded-full border-[10px] border-blue-500 border-t-cyan-400 border-r-purple-400 border-b-gray-300"></div>
+                      </CardContent>
+                    </Card>
+
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* OTHER PAGES */}
+          {activeTab !== "Overview" && (
+            <Card>
+              <CardContent className="p-6 text-center">
+                {activeTab} Page
+              </CardContent>
+            </Card>
+          )}
+
         </div>
       </div>
     </div>
   )
 }
 
-/* OVERVIEW PAGE */
-function Overview() {
-  return (
-    <div className="space-y-6">
-
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard title="Users" value="24" sub="12 Active" />
-        <StatCard title="Spends" value="$101K" sub="+12%" />
-        <StatCard title="Orders" value="3" sub="Open" />
-      </div>
-
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="font-semibold mb-2">
-            Spending Overview
-          </h3>
-
-          <div className="flex items-end gap-2 h-24">
-            {[20,30,40,50,60,80,100].map((h,i)=>(
-              <div
-                key={i}
-                className="bg-blue-500 w-3"
-                style={{height:`${h}%`}}
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-/* SIMPLE PAGE */
-function Page({ title }: any) {
-  return (
-    <Card>
-      <CardContent className="p-6 text-center text-lg">
-        {title}
-      </CardContent>
-    </Card>
-  )
-}
-
-/* STAT CARD */
-function StatCard({ title, value, sub }: any) {
+function StatCard({ title, value }: any) {
   return (
     <Card>
       <CardContent className="p-4">
         <p className="text-sm text-gray-500">{title}</p>
         <p className="text-xl font-bold">{value}</p>
-        <p className="text-xs text-gray-400">{sub}</p>
       </CardContent>
     </Card>
   )
