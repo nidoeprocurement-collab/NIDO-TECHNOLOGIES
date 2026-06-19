@@ -22,7 +22,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
 
 import {
   Users,
@@ -195,11 +195,9 @@ export default function ClientUsersPage() {
 
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>
-                            {user.avatar}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-semibold text-blue-600">
+                          {user.avatar}
+                        </div>
 
                         <div>
                           <p className="font-medium">

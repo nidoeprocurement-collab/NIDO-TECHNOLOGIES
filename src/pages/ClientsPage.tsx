@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { MoreVertical, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export default function ClientsPageUI() {
+  const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState("All")
 
   const stats = {
@@ -177,7 +179,10 @@ export default function ClientsPageUI() {
                       <input type="checkbox" />
                     </td>
 
-                    <td className="px-6 py-4 text-blue-600 font-medium cursor-pointer">
+                    <td 
+                      className="px-6 py-4 text-blue-600 font-medium cursor-pointer hover:underline"
+                      onClick={() => navigate(`/clients/${c.id}`)}
+                    >
                       {c.id}
                     </td>
 

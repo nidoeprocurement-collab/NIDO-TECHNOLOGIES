@@ -2,7 +2,6 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 
 export default function CompanyDashboard() {
   return (
@@ -45,8 +44,8 @@ export default function CompanyDashboard() {
             </div>
 
             <div>
-              <p className="text-sm mb-1">Contract Progress</p>
-              <Progress value={100} />
+              <p className="text-sm mb-1">Contract Status</p>
+              <p className="text-sm font-semibold">Active</p>
               <p className="text-xs text-gray-500 mt-1">0 days left</p>
             </div>
 
