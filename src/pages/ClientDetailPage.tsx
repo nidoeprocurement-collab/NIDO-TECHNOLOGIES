@@ -26,6 +26,10 @@ import {
   FileText,
   Clock,
 } from "lucide-react";
+import { ClientRolesTab } from "@/components/ClientRolesTab";
+import { ClientActivityTab } from "@/components/ClientActivityTab";
+import { ClientServicesTab } from "@/components/ClientServicesTab";
+import { ClientConfigurationTab } from "@/components/ClientConfigurationTab";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
@@ -230,188 +234,23 @@ export default function App() {
             </div>
           </div>
 
-          {/* Overview panels */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* Company Details */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 text-sm mb-4">Company Details</h3>
-              <div className="flex flex-col gap-3 text-xs text-gray-700">
-                <div className="flex items-center gap-2">
-                  <Building2 size={14} className="text-gray-400 shrink-0" />
-                  <span>Nitin Supplies</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FileText size={14} className="text-gray-400 shrink-0" />
-                  <span>Technology</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users size={14} className="text-gray-400 shrink-0" />
-                  <span>51-200 employees</span>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-gray-400">Website</span>
-                  <div className="flex items-center gap-2">
-                    <Globe size={14} className="text-gray-400 shrink-0" />
-                    <a href="#" className="text-blue-500 hover:underline">www.nitinsupplies.com</a>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-gray-400">Phone</span>
-                  <div className="flex items-center gap-2">
-                    <Phone size={14} className="text-gray-400 shrink-0" />
-                    <span>080-4000017</span>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-gray-400">Billing Email</span>
-                  <div className="flex items-center gap-2">
-                    <Mail size={14} className="text-gray-400 shrink-0" />
-                    <a href="#" className="text-blue-500 hover:underline">nitinshetty@gmail.com</a>
-                  </div>
-                </div>
+          {/* Tab Content */}
+          <div className="mt-6">
+            {activeTab === "Roles" && <ClientRolesTab />}
+            {activeTab === "Users" && <ClientUsersTable clientId="client-123" />}
+            {activeTab === "Orders" && (
+              <div className="bg-white rounded-lg border border-gray-200 p-6 text-center py-12">
+                <p className="text-gray-600">Orders management coming soon</p>
               </div>
-            </div>
-
-            {/* Spending Overview */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="font-semibold text-gray-900 text-sm">Spending Overview</h3>
-                <span className="text-xs border border-gray-200 rounded-md px-2 py-0.5 text-gray-500">This Year</span>
+            )}
+            {activeTab === "Services" && <ClientServicesTab />}
+            {activeTab === "Catalog" && (
+              <div className="bg-white rounded-lg border border-gray-200 p-6 text-center py-12">
+                <p className="text-gray-600">Catalog management coming soon</p>
               </div>
-              <p className="text-2xl font-bold text-gray-900">$101,000</p>
-              <p className="text-xs text-gray-400 mb-1">Total Spend</p>
-              <p className="text-xs text-green-500 font-medium mb-3">+12.5% vs last year</p>
-              <ResponsiveContainer width="100%" height={130}>
-                <BarChart data={monthlySpend} barSize={10} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}K`} />
-                  <Tooltip
-                    formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
-                    contentStyle={{ fontSize: 11, borderRadius: 6, border: "1px solid #e5e7eb" }}
-                  />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Top Spend Categories */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-gray-900 text-sm mb-4">Top Spend Categories</h3>
-              <div className="flex items-center gap-4">
-                <div className="shrink-0">
-                  <PieChart width={100} height={100}>
-                    <Pie
-                      data={spendCategories}
-                      cx={45}
-                      cy={45}
-                      innerRadius={28}
-                      outerRadius={45}
-                      dataKey="value"
-                      strokeWidth={1}
-                    >
-                      {spendCategories.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </div>
-                <div className="flex flex-col gap-2 flex-1">
-                  {spendCategories.map((cat) => (
-                    <div key={cat.name} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        <span className="text-gray-600">{cat.name} {cat.value}%</span>
-                      </div>
-                      <span className="text-gray-800 font-medium">{cat.amount}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom row */}
-          <div className="grid grid-cols-3 gap-4">
-            {/* User Summary */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Users size={15} className="text-gray-400" />
-                  <h3 className="font-semibold text-gray-900 text-sm">User Summary</h3>
-                </div>
-                <ChevronRight size={15} className="text-gray-400" />
-              </div>
-              <div className="flex items-end gap-6">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Users size={22} className="text-gray-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">24</p>
-                  <p className="text-xs text-gray-400">Total Users</p>
-                </div>
-                <div className="flex gap-4 pb-1">
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-green-500">12</p>
-                    <p className="text-xs text-gray-400">Active</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-orange-400">4</p>
-                    <p className="text-xs text-gray-400">Inactive</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Orders */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart size={15} className="text-gray-400" />
-                  <h3 className="font-semibold text-gray-900 text-sm">Recent Orders</h3>
-                </div>
-                <ChevronRight size={15} className="text-gray-400" />
-              </div>
-              <div className="flex items-end gap-6">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <ShoppingCart size={22} className="text-gray-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">3</p>
-                  <p className="text-xs text-gray-400">Open Orders</p>
-                </div>
-                <div className="pb-1">
-                  <p className="text-xl font-bold text-gray-900">$32,500</p>
-                  <p className="text-xs text-gray-400">Total Value</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Active Services */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Clock size={15} className="text-gray-400" />
-                  <h3 className="font-semibold text-gray-900 text-sm">Active Services</h3>
-                </div>
-                <ChevronRight size={15} className="text-gray-400" />
-              </div>
-              <div className="flex items-end gap-6">
-                <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <FileText size={22} className="text-gray-300" />
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">2</p>
-                  <p className="text-xs text-gray-400">Active Contracts</p>
-                </div>
-                <div className="pb-1">
-                  <p className="text-xl font-bold text-blue-500">0 days</p>
-                  <p className="text-xs text-gray-400">Until Renewal</p>
-                </div>
-              </div>
-            </div>
+            )}
+            {activeTab === "Activity" && <ClientActivityTab />}
+            {activeTab === "Configuration" && <ClientConfigurationTab />}
           </div>
         </div>
       </div>
