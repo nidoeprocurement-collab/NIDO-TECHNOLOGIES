@@ -1,208 +1,164 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Eye, EyeOff } from "lucide-react"
 
-export default function ApexDashboard() {
-  const [showProfile, setShowProfile] = useState(true)
+export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("Overview")
+  const [hideSidebar, setHideSidebar] = useState(false)
+
+  const tabs = ["Overview", "Users", "Orders", "Services", "Catalog", "Activity", "Notes"]
 
   const downloadProfile = () => {
-    const content = `Apex Tech Solutions Profile`
+    const content = `
+Client: Apex Tech Solutions
+Email: support@apex.com
+Phone: +1-555-1000
+Employees: 51-200
+Website: www.apex.com
+`
     const blob = new Blob([content], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = "profile.txt"
+    a.download = "client-profile.txt"
     a.click()
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <h1 className="text-2xl font-semibold mb-6">
-        Apex Tech Solutions
-      </h1>
+    <div className="flex bg-gray-100 min-h-screen p-6 gap-6">
 
-      {/* GRID LAYOUT (IMPORTANT FIX) */}
-      <div
-        className={`grid gap-6 transition-all duration-300 ${
-          showProfile ? "grid-cols-4" : "grid-cols-1"
-        }`}
-      >
+      {/* SIDEBAR */}
+      {!hideSidebar && (
+        <div className="w-[300px] bg-white rounded-2xl shadow-md p-5 relative">
 
-        {/* SIDEBAR */}
-        {showProfile && (
-          <div className="col-span-1">
-            <Card className="relative overflow-hidden">
+          {/* Hide Button */}
+          <button
+            onClick={() => setHideSidebar(true)}
+            className="absolute -right-3 top-6 bg-white shadow px-2 py-1 rounded-full"
+          >
+            ◀
+          </button>
 
-              {/* HIDE BUTTON */}
-              <button
-                onClick={() => setShowProfile(false)}
-                className="absolute top-2 right-2 bg-white p-1 rounded shadow"
-              >
-                <EyeOff size={16} />
-              </button>
-
-              <div className="bg-gradient-to-r from-blue-600 to-blue-400 h-28 flex items-center justify-center">
-                <div className="h-20 w-20 rounded-full bg-white flex items-center justify-center font-bold text-blue-600">
-                  ATS
-                </div>
-              </div>
-
-              <CardContent className="p-4 space-y-4">
-                <h2 className="text-center font-semibold">
-                  Apex Tech Solutions
-                </h2>
-
-                <div className="text-sm space-y-1">
-                  <p>📧 support@apex.com</p>
-                  <p>📞 +1-555-1000</p>
-                  <p>📍 San Diego</p>
-                </div>
-
-                {/* PROGRESS */}
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Contract</span>
-                    <span>70%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 h-2 rounded">
-                    <div className="bg-blue-500 h-2 rounded w-[70%]" />
-                  </div>
-                </div>
-
-                <Button onClick={downloadProfile} className="w-full">
-                  Download Profile
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="bg-gradient-to-r from-blue-600 to-blue-400 h-32 rounded-xl flex items-center justify-center text-white text-3xl font-bold">
+            ATS
           </div>
+
+          <h2 className="text-lg font-semibold mt-4">Apex Tech Solutions</h2>
+          <p className="text-sm text-gray-500">Premium Client • Since 2024</p>
+
+          <div className="mt-4 space-y-2 text-sm text-gray-600">
+            <p>📧 support@apex.com</p>
+            <p>📞 +1-555-1000</p>
+            <p>📍 San Diego, CA</p>
+            <p>📅 2025-2026</p>
+          </div>
+
+          <div className="flex gap-2 mt-4">
+            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg w-full">Email</button>
+            <button className="border px-4 py-2 rounded-lg w-full">Call</button>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-sm text-gray-500">Contract Progress</p>
+            <div className="h-2 bg-gray-200 rounded-full mt-1">
+              <div className="h-2 bg-blue-600 rounded-full w-[70%]"></div>
+            </div>
+          </div>
+
+          <button
+            onClick={downloadProfile}
+            className="mt-4 w-full border rounded-lg py-2 text-sm"
+          >
+            ⬇ Download Profile
+          </button>
+        </div>
+      )}
+
+      {/* MAIN */}
+      <div className="flex-1">
+
+        {/* Show Button */}
+        {hideSidebar && (
+          <button
+            onClick={() => setHideSidebar(false)}
+            className="mb-3 bg-white shadow px-3 py-1 rounded"
+          >
+            ▶ Show Profile
+          </button>
         )}
 
-        {/* MAIN */}
-        <div className={`${showProfile ? "col-span-3" : "col-span-1"}`}>
+        <h1 className="text-2xl font-semibold mb-4">Apex Tech Solutions</h1>
 
-          {/* SHOW BUTTON */}
-          {!showProfile && (
+        {/* TABS */}
+        <div className="flex gap-6 border-b mb-6">
+          {tabs.map(tab => (
             <button
-              onClick={() => setShowProfile(true)}
-              className="mb-4 bg-white p-2 rounded shadow"
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`pb-2 ${
+                activeTab === tab
+                  ? "border-b-2 border-black font-semibold"
+                  : "text-gray-500"
+              }`}
             >
-              <Eye size={16} />
+              {tab}
             </button>
-          )}
-
-          {/* TABS */}
-          <div className="flex gap-6 border-b pb-2 mb-6">
-            {[
-              "Overview",
-              "Users",
-              "Orders",
-              "Services",
-              "Catalog",
-              "Activity",
-              "Notes",
-            ].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-1 ${
-                  activeTab === tab
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* OVERVIEW PAGE */}
-          {activeTab === "Overview" && (
-            <>
-              {/* TOP STATS */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <StatCard title="Total Users" value="24" />
-                <StatCard title="Total Spends" value="$101K" />
-                <StatCard title="Open Orders" value="3" />
-              </div>
-
-              {/* ANALYTICS (EXACT MATCH) */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-3 gap-4">
-
-                    {/* COMPANY */}
-                    <Card>
-                      <CardContent className="p-4 text-sm space-y-1">
-                        <h3 className="font-semibold">
-                          Company Details
-                        </h3>
-                        <p>Apex Tech</p>
-                        <p>Technology</p>
-                        <p>51-200 employees</p>
-                      </CardContent>
-                    </Card>
-
-                    {/* BAR CHART */}
-                    <Card>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold mb-2">
-                          Spending
-                        </h3>
-
-                        <div className="flex items-end gap-2 h-24">
-                          {[20,30,40,50,60,80,100].map((h,i)=>(
-                            <div
-                              key={i}
-                              className="bg-blue-500 w-3"
-                              style={{height:`${h}%`}}
-                            />
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* PIE */}
-                    <Card>
-                      <CardContent className="p-4 text-center">
-                        <h3 className="font-semibold mb-2">
-                          Categories
-                        </h3>
-                        <div className="h-24 w-24 mx-auto rounded-full border-[10px] border-blue-500 border-t-cyan-400 border-r-purple-400 border-b-gray-300"></div>
-                      </CardContent>
-                    </Card>
-
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-
-          {/* OTHER PAGES */}
-          {activeTab !== "Overview" && (
-            <Card>
-              <CardContent className="p-6 text-center">
-                {activeTab} Page
-              </CardContent>
-            </Card>
-          )}
-
+          ))}
         </div>
+
+        {/* TAB CONTENT */}
+        {activeTab === "Overview" && (
+          <>
+            {/* TOP CARDS */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <Card title="Total Users" value="24" sub="12 Active" />
+              <Card title="Total Spends" value="$101,000" sub="Year to date" />
+              <Card title="Open Orders" value="3" sub="$32,500 value" />
+            </div>
+
+            {/* MIDDLE */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <Box title="Company Details" />
+              <Box title="Spending Overview" />
+              <Box title="Top Spend Categories" />
+            </div>
+
+            {/* BOTTOM */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card title="User Summary" value="24" sub="Total Users" />
+              <Card title="Recent Orders" value="3" sub="$32,500" />
+              <Card title="Active Services" value="2" sub="272 days" />
+            </div>
+          </>
+        )}
+
+        {/* OTHER TABS */}
+        {activeTab !== "Overview" && (
+          <div className="bg-white p-10 rounded-xl shadow text-center text-gray-500">
+            {activeTab} Page Content
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function StatCard({ title, value }: any) {
+/* COMPONENTS */
+
+function Card({ title, value, sub }: any) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-sm text-gray-500">{title}</p>
-        <p className="text-xl font-bold">{value}</p>
-      </CardContent>
-    </Card>
+    <div className="bg-white p-5 rounded-xl shadow">
+      <p className="text-sm text-gray-500">{title}</p>
+      <h2 className="text-2xl font-semibold mt-1">{value}</h2>
+      <p className="text-sm text-gray-400 mt-1">{sub}</p>
+    </div>
+  )
+}
+
+function Box({ title }: any) {
+  return (
+    <div className="bg-white p-5 rounded-xl shadow h-[200px]">
+      <p className="font-semibold">{title}</p>
+    </div>
   )
 }
