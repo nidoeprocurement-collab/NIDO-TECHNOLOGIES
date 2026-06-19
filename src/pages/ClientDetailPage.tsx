@@ -1,74 +1,66 @@
 "use client"
-
 import { useState } from "react"
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("Overview")
   const [hideSidebar, setHideSidebar] = useState(false)
 
-  const tabs = ["Overview", "Users", "Orders", "Services", "Catalog", "Activity", "Notes"]
-
-  const downloadProfile = () => {
-    const content = `
-Client: Apex Tech Solutions
-Email: support@apex.com
-Phone: +1-555-1000
-Employees: 51-200
-Website: www.apex.com
-`
-    const blob = new Blob([content], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "client-profile.txt"
-    a.click()
-  }
-
   return (
-    <div className="flex bg-gray-100 min-h-screen p-6 gap-6">
+    <div className="flex min-h-screen bg-[#f6f8fb] p-6 gap-6">
 
       {/* SIDEBAR */}
       {!hideSidebar && (
-        <div className="w-[300px] bg-white rounded-2xl shadow-md p-5 relative">
+        <div className="w-[280px] bg-white rounded-2xl border border-gray-200 shadow-sm p-5 relative">
 
           {/* Hide Button */}
           <button
             onClick={() => setHideSidebar(true)}
-            className="absolute -right-3 top-6 bg-white shadow px-2 py-1 rounded-full"
+            className="absolute -right-3 top-6 bg-white border shadow-sm rounded-full px-2 py-1"
           >
             ◀
           </button>
 
-          <div className="bg-gradient-to-r from-blue-600 to-blue-400 h-32 rounded-xl flex items-center justify-center text-white text-3xl font-bold">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-[#2f6fed] to-[#6ea8fe] h-28 rounded-xl flex items-center justify-center text-white text-2xl font-semibold">
             ATS
           </div>
 
-          <h2 className="text-lg font-semibold mt-4">Apex Tech Solutions</h2>
-          <p className="text-sm text-gray-500">Premium Client • Since 2024</p>
+          <h2 className="mt-4 text-[16px] font-semibold text-gray-800">
+            Apex Tech Solutions
+          </h2>
+          <p className="text-sm text-gray-400">
+            Premium Client • Since 2024
+          </p>
 
-          <div className="mt-4 space-y-2 text-sm text-gray-600">
+          {/* Info */}
+          <div className="mt-4 space-y-3 text-sm text-gray-600">
             <p>📧 support@apex.com</p>
             <p>📞 +1-555-1000</p>
             <p>📍 San Diego, CA</p>
-            <p>📅 2025-2026</p>
+            <p>📅 2025–2026</p>
           </div>
 
+          {/* Buttons */}
           <div className="flex gap-2 mt-4">
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg w-full">Email</button>
-            <button className="border px-4 py-2 rounded-lg w-full">Call</button>
+            <button className="bg-[#2f6fed] text-white px-4 py-2 rounded-lg w-full">
+              Email
+            </button>
+            <button className="border px-4 py-2 rounded-lg w-full">
+              Call
+            </button>
           </div>
 
-          <div className="mt-4">
-            <p className="text-sm text-gray-500">Contract Progress</p>
-            <div className="h-2 bg-gray-200 rounded-full mt-1">
-              <div className="h-2 bg-blue-600 rounded-full w-[70%]"></div>
+          {/* Progress */}
+          <div className="mt-5">
+            <p className="text-sm text-gray-500 mb-1">
+              Contract Progress
+            </p>
+            <div className="h-2 bg-gray-200 rounded-full">
+              <div className="h-2 bg-[#2f6fed] w-[70%] rounded-full"></div>
             </div>
           </div>
 
-          <button
-            onClick={downloadProfile}
-            className="mt-4 w-full border rounded-lg py-2 text-sm"
-          >
+          {/* Download */}
+          <button className="mt-5 w-full border rounded-lg py-2 text-sm">
             ⬇ Download Profile
           </button>
         </div>
@@ -77,88 +69,90 @@ Website: www.apex.com
       {/* MAIN */}
       <div className="flex-1">
 
-        {/* Show Button */}
         {hideSidebar && (
           <button
             onClick={() => setHideSidebar(false)}
-            className="mb-3 bg-white shadow px-3 py-1 rounded"
+            className="mb-4 bg-white border px-3 py-1 rounded"
           >
-            ▶ Show Profile
+            ▶
           </button>
         )}
 
-        <h1 className="text-2xl font-semibold mb-4">Apex Tech Solutions</h1>
+        <h1 className="text-[24px] font-semibold text-gray-800 mb-4">
+          Apex Tech Solutions
+        </h1>
 
         {/* TABS */}
-        <div className="flex gap-6 border-b mb-6">
-          {tabs.map(tab => (
-            <button
+        <div className="flex gap-6 border-b mb-6 text-sm">
+          {["Overview","Users","Orders","Services","Catalog","Activity","Notes"].map(tab => (
+            <span
               key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`pb-2 ${
-                activeTab === tab
-                  ? "border-b-2 border-black font-semibold"
-                  : "text-gray-500"
+              className={`pb-2 cursor-pointer ${
+                tab === "Overview"
+                  ? "border-b-2 border-gray-900 text-gray-900 font-medium"
+                  : "text-gray-400"
               }`}
             >
               {tab}
-            </button>
+            </span>
           ))}
         </div>
 
-        {/* TAB CONTENT */}
-        {activeTab === "Overview" && (
-          <>
-            {/* TOP CARDS */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <Card title="Total Users" value="24" sub="12 Active" />
-              <Card title="Total Spends" value="$101,000" sub="Year to date" />
-              <Card title="Open Orders" value="3" sub="$32,500 value" />
-            </div>
+        {/* TOP CARDS */}
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          <Card title="Total Users" value="24" sub="12 Active" />
+          <Card title="Total Spends" value="$101,000" sub="Year to date" />
+          <Card title="Open Orders" value="3" sub="$32,500 value" />
+        </div>
 
-            {/* MIDDLE */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <Box title="Company Details" />
-              <Box title="Spending Overview" />
-              <Box title="Top Spend Categories" />
-            </div>
-
-            {/* BOTTOM */}
-            <div className="grid grid-cols-3 gap-4">
-              <Card title="User Summary" value="24" sub="Total Users" />
-              <Card title="Recent Orders" value="3" sub="$32,500" />
-              <Card title="Active Services" value="2" sub="272 days" />
-            </div>
-          </>
-        )}
-
-        {/* OTHER TABS */}
-        {activeTab !== "Overview" && (
-          <div className="bg-white p-10 rounded-xl shadow text-center text-gray-500">
-            {activeTab} Page Content
+        {/* MIDDLE */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-6">
+          <div className="grid grid-cols-3 gap-6">
+            <Box title="Company Details" />
+            <Box title="Spending Overview" chart="line" />
+            <Box title="Top Spend Categories" chart="pie" />
           </div>
-        )}
+        </div>
+
+        {/* BOTTOM */}
+        <div className="grid grid-cols-3 gap-6">
+          <Card title="User Summary" value="24" sub="Total Users" />
+          <Card title="Recent Orders" value="3" sub="$32,500" />
+          <Card title="Active Services" value="2" sub="272 days" />
+        </div>
       </div>
     </div>
   )
 }
 
-/* COMPONENTS */
-
 function Card({ title, value, sub }: any) {
   return (
-    <div className="bg-white p-5 rounded-xl shadow">
+    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
       <p className="text-sm text-gray-500">{title}</p>
-      <h2 className="text-2xl font-semibold mt-1">{value}</h2>
+      <h2 className="text-2xl font-semibold text-gray-800 mt-1">
+        {value}
+      </h2>
       <p className="text-sm text-gray-400 mt-1">{sub}</p>
     </div>
   )
 }
 
-function Box({ title }: any) {
+function Box({ title, chart }: any) {
   return (
-    <div className="bg-white p-5 rounded-xl shadow h-[200px]">
-      <p className="font-semibold">{title}</p>
+    <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm h-[220px]">
+      <p className="font-medium text-gray-700 mb-2">{title}</p>
+
+      {chart === "line" && (
+        <>
+          
+        </>
+      )}
+
+      {chart === "pie" && (
+        <>
+          
+        </>
+      )}
     </div>
   )
 }
