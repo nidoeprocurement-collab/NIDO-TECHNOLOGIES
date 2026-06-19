@@ -386,7 +386,7 @@ export default function AddMasterCatalogueItemWrapper() {
                             </div>
                           </td>
                           <td className="p-2"><Input value={spec.value} className="text-xs h-8" readOnly /></td>
-                          <td className="p-2"><Select><SelectTrigger className="h-8 text-xs"><SelectValue value="-" /></SelectTrigger><SelectContent>{unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></td>
+                          <td className="p-2"><Select><SelectTrigger className="h-8 text-xs"><SelectValue  placeholder="-" /></SelectTrigger><SelectContent>{unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></td>
                           <td className="p-2"><button className="text-red-500 hover:text-red-700"><X size={16} /></button></td>
                         </tr>
                       ))}
