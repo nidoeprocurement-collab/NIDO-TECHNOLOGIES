@@ -98,8 +98,8 @@ export default function NidoUsersPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+   <div className="min-h-screen bg-gray-50">
+      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
