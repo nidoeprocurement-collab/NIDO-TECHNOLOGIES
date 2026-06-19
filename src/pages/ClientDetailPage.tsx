@@ -26,10 +26,6 @@ import {
   FileText,
   Clock,
 } from "lucide-react";
-import { ClientRolesTab } from "@/components/ClientRolesTab";
-import { ClientActivityTab } from "@/components/ClientActivityTab";
-import { ClientServicesTab } from "@/components/ClientServicesTab";
-import { ClientConfigurationTab } from "@/components/ClientConfigurationTab";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
