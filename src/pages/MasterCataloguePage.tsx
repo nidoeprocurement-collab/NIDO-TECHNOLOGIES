@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -91,6 +92,7 @@ const emptyItem: Omit<CatalogItem, 'id'> = {
 };
 
 export default function CatalogUpdatesTab() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<CatalogItem[]>(initialItems);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -346,177 +348,176 @@ export default function CatalogUpdatesTab() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-gray-50 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">Master Catalogue</h2>
-          <p className="text-sm text-muted-foreground">Manage and update the product and service catalog. Add new items, bulk upload or update listings, and set pricing. Keep your catalog current and accurate.</p>
-        </div>
-        <Button className="gap-1.5" onClick={() => setBulkImportOpen(true)}><Plus size={14} /> Bulk Import</Button>
+      <div>
+        <h2 className="text-2xl font-semibold text-gray-900">Master Catalogue</h2>
+        <p className="text-sm text-gray-600 mt-1">Manage and register all products/services available for client contracts and downstream client-specific mapping.</p>
+        <p className="text-xs text-gray-500 mt-1">Loading catalog from backend...</p>
       </div>
 
-      {/* Stats */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: `${stats.total} Items`, icon: ShoppingCart, color: 'bg-primary text-primary-foreground' },
-          { label: `${stats.inStock} in Stock`, icon: ShoppingCart, color: 'bg-success/20 text-success' },
-          { label: `${stats.lowStock} Low Stock`, icon: ShoppingCart, color: 'bg-warning/20 text-warning' },
-          { label: `${stats.outOfStock} Out of Stock`, icon: ShoppingCart, color: 'bg-destructive/20 text-destructive' },
-        ].map(stat => (
-          <Card key={stat.label} className={`${stat.color} cursor-pointer`}>
-            <CardContent className="pt-3 pb-3 flex items-center gap-2">
-              <stat.icon size={16} />
-              <span className="font-medium text-sm">{stat.label}</span>
-            </CardContent>
-          </Card>
-        ))}
+        <Card className="border-0 cursor-pointer">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]" style={{ backgroundColor: '#1a6fac' }}>
+            <ShoppingCart size={18} className="text-white" />
+            <span className="font-medium text-sm text-white">{stats.total} Total</span>
+          </CardContent>
+        </Card>
+        <Card className="border-0 cursor-pointer">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-white" style={{ backgroundColor: 'rgba(225, 86, 99, 0.98)' }}>
+            <ShoppingCart size={18} />
+            <span className="font-medium text-sm">{filtered.length} Published</span>
+          </CardContent>
+        </Card>
+        <Card className="bg-yellow-100 text-yellow-700 border-0 cursor-pointer hover:bg-yellow-200">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]">
+            <ShoppingCart size={18} />
+            <span className="font-medium text-sm">0 Drafts</span>
+          </CardContent>
+        </Card>
+        <Card className="border-0 cursor-pointer">
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-red-700" style={{ backgroundColor: 'rgba(0, 0, 0, 0.22)' }}>
+            <ShoppingCart size={18} />
+            <span className="font-medium text-sm">0 Archived</span>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="All Categories" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {Object.keys(categories).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={brandFilter} onValueChange={setBrandFilter}>
-          <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="All Brands" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Brands</SelectItem>
-            {brands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-28 h-8 text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="In Stock">In Stock</SelectItem>
-            <SelectItem value="Low Stock">Low Stock</SelectItem>
-            <SelectItem value="Out of Stock">Out of Stock</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" size={12} />
-          <Input className="pl-7 h-8 w-36 text-xs" placeholder="Search Item" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setBulkImportOpen(true)}><Upload size={12} /> Bulk Import</Button>
-          <Button size="sm" className="gap-1.5" onClick={openAddDialog}><Plus size={12} /> Add New Item</Button>
-        </div>
+      {/* Actions Bar */}
+      <div className="flex items-center justify-end gap-3">
+        <Button variant="outline" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100">
+          <FileDown size={16} />
+          Export CSV
+        </Button>
+        <Button variant="outline" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={() => setBulkImportOpen(true)}>
+          <Upload size={16} />
+          Bulk Import
+        </Button>
+        <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => navigate('/configuration/master-catalogue/add')}>
+          <Plus size={16} />
+          Add New Item
+        </Button>
       </div>
 
       {/* Table */}
-      <Card>
-        <CardContent className="pt-4">
+      <Card className="border-gray-200">
+        <CardContent className="pt-6">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-8"><Checkbox checked={selectedIds.length === filtered.length && filtered.length > 0} onCheckedChange={toggleAll} /></TableHead>
-                <TableHead>Item Name</TableHead>
-                <TableHead>SKU</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Brand</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+              <TableRow className="border-gray-200 bg-gray-50">
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(item => (
-                <TableRow key={item.id}>
-                  <TableCell><Checkbox checked={selectedIds.includes(item.id)} onCheckedChange={() => toggleSelect(item.id)} /></TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {item.image ? (
-                          <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
-                        ) : (
-                          <ImageIcon size={14} className="text-muted-foreground" />
-                        )}
-                      </div>
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{item.sku}</TableCell>
-                  <TableCell className="text-sm">{item.category}</TableCell>
-                  <TableCell className="text-sm text-primary">{item.brand}</TableCell>
-                  <TableCell>₹{item.price.toLocaleString()}</TableCell>
-                  <TableCell><Badge className={`${getStatusColor(item.status)} border-none`}>{item.status}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditDialog(item)}><Pencil size={12} /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openViewDialog(item)}><Eye size={12} /></Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteItem(item.id)}><Trash2 size={12} /></Button>
-                    </div>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-600">
+                    No items match the selected filters. Adjust search, category, or status to view catalog entries.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                filtered.map(item => (
+                  <TableRow key={item.id} className="border-gray-200 hover:bg-gray-50">
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
+                          ) : (
+                            <ImageIcon size={14} className="text-gray-500" />
+                          )}
+                        </div>
+                        <span className="font-medium text-sm">{item.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
+                    <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
+                    <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
+                    <TableCell><Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => openEditDialog(item)}><Pencil size={14} className="text-gray-600" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => openViewDialog(item)}><Eye size={14} className="text-gray-600" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => deleteItem(item.id)}><Trash2 size={14} className="text-gray-600" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
-          <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-            <span>Showing 1 - {filtered.length} of {items.length} entries</span>
+          <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
+            <span>Showing 0 of {items.length} entries</span>
           </div>
         </CardContent>
       </Card>
 
       {/* Import/Export + Audit Logs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Import / Export Products</CardTitle></CardHeader>
-          <CardContent>
-            <Tabs defaultValue="upload">
-              <TabsList className="bg-muted">
-                <TabsTrigger value="upload">Bulk Upload Items</TabsTrigger>
-                <TabsTrigger value="excel">Export Catalog (Excel)</TabsTrigger>
-                <TabsTrigger value="pdf">Export Catalog (PDF)</TabsTrigger>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-gray-200">
+          <CardHeader className="border-b border-gray-200">
+            <CardTitle className="text-base font-semibold pl-3">   Import / Export Products</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <Tabs defaultValue="upload" className="w-full">
+              <TabsList className="bg-gray-100 grid w-full grid-cols-3 mb-4">
+                <TabsTrigger value="upload" className="text-xs">Bulk Upload Items</TabsTrigger>
+                <TabsTrigger value="excel" className="text-xs">Export Catalog (Excel)</TabsTrigger>
+                <TabsTrigger value="pdf" className="text-xs">Export Catalog (PDF)</TabsTrigger>
               </TabsList>
-              <TabsContent value="upload" className="mt-3">
-                <div className="text-center p-6 border-2 border-dashed border-border rounded-lg">
-                  <Upload size={24} className="mx-auto text-primary mb-2" />
-                  <p className="text-sm font-medium">Upload</p>
-                  <p className="text-xs text-muted-foreground">Bulk upload new products or catalog using CSV template.</p>
+              <TabsContent value="upload" className="mt-4">
+                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <Upload size={32} className="mx-auto text-blue-500 mb-3" />
+                  <p className="text-sm font-medium text-gray-800">Upload</p>
+                  <p className="text-xs text-gray-600 mt-1">Bulk upload new products or catalog using CSV template.</p>
                   <input ref={bulkFileRef} type="file" accept=".csv" className="hidden" onChange={handleBulkImport} />
-                  <Button className="mt-2" size="sm" onClick={() => bulkFileRef.current?.click()}>Upload</Button>
+                  <Button className="mt-4 bg-blue-600 hover:bg-blue-700" size="sm" onClick={() => bulkFileRef.current?.click()}>Upload</Button>
                 </div>
               </TabsContent>
-              <TabsContent value="excel" className="mt-3">
-                <div className="text-center p-6 border-2 border-dashed border-border rounded-lg">
-                  <FileDown size={24} className="mx-auto text-success mb-2" />
-                  <p className="text-sm font-medium">Export</p>
-                  <p className="text-xs text-muted-foreground">Export the entire product catalog as Excel file.</p>
-                  <Button variant="outline" className="mt-2" size="sm" onClick={exportCatalogExcel}>Export Excel</Button>
+              <TabsContent value="excel" className="mt-4">
+                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <FileDown size={32} className="mx-auto text-green-500 mb-3" />
+                  <p className="text-sm font-medium text-gray-800">Export</p>
+                  <p className="text-xs text-gray-600 mt-1">Export the entire product catalog as Excel file.</p>
+                  <Button variant="outline" className="mt-4 border-gray-300" size="sm" onClick={exportCatalogExcel}>Export Excel</Button>
                 </div>
               </TabsContent>
-              <TabsContent value="pdf" className="mt-3">
-                <div className="text-center p-6 border-2 border-dashed border-border rounded-lg">
-                  <FileText size={24} className="mx-auto text-destructive mb-2" />
-                  <p className="text-sm font-medium">Export Catalog</p>
-                  <p className="text-xs text-muted-foreground">Export as PDF file.</p>
-                  <Button variant="outline" className="mt-2" size="sm" onClick={exportCatalogPDF}>Export PDF</Button>
+              <TabsContent value="pdf" className="mt-4">
+                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <FileText size={32} className="mx-auto text-red-500 mb-3" />
+                  <p className="text-sm font-medium text-gray-800">Export Catalog</p>
+                  <p className="text-xs text-gray-600 mt-1">Export as PDF file.</p>
+                  <Button variant="outline" className="mt-4 border-gray-300" size="sm" onClick={exportCatalogPDF}>Export PDF</Button>
                 </div>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Approval & Audit Logs</CardTitle>
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={exportAuditLogs}><Download size={12} /> Export</Button>
-            </div>
+        <Card className="border-gray-200">
+          <CardHeader className="border-b border-gray-200 flex items-center justify-between">
+            <CardTitle className="text-base font-semibold pl-3">   Approval & Audit Logs</CardTitle>
+            <Button variant="outline" size="sm" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={exportAuditLogs}><Download size={14} /> Export</Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <Table>
-              <TableHeader><TableRow>
-                <TableHead>Event</TableHead><TableHead>User</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead>
-              </TableRow></TableHeader>
+              <TableHeader>
+                <TableRow className="border-gray-200 bg-gray-50">
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Event</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">User</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Date</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {auditLogs.map((log, i) => (
-                  <TableRow key={i}>
+                  <TableRow key={i} className="border-gray-200 hover:bg-gray-50">
                     <TableCell>
                       <p className="text-sm font-medium">{log.event}</p>
                       <p className="text-xs text-muted-foreground">{log.detail}</p>
