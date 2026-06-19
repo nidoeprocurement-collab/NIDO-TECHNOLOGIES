@@ -395,7 +395,7 @@ export default function AddMasterCatalogueItemWrapper() {
                 </div>
 
                 {/* Add Specification Panel */}
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
                   <div className="mb-3">
                     <Label className="text-xs sm:text-sm font-medium text-gray-700">Add Specification Category</Label>
                     <div className="flex gap-2 mt-2">
@@ -407,51 +407,30 @@ export default function AddMasterCatalogueItemWrapper() {
                     </div>
                   </div>
 
-                  <div className="w-full border border-gray-200 rounded-lg p-4 mt-4">
-                    <h4 className="text-base font-semibold text-gray-800 mb-4">Add Row</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-xs sm:text-sm font-medium text-gray-700">Specification</Label>
-                        <div className="flex gap-2 mt-1">
-                          <Select>
-                            <SelectTrigger className="text-sm flex-1">
-                              <SelectValue placeholder="Select specification..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {specificationsList.map(spec => <SelectItem key={spec} value={spec}>{spec}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <Button variant="outline" size="sm" className="px-2" onClick={() => openAddDialog('specification')} title="Add new Specification">
-                            <Plus size={16} />
-                          </Button>
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs sm:text-sm font-medium text-gray-700">Value</Label>
-                        <Input placeholder="e.g., 1200 x 1200" className="text-sm" />
-                      </div>
-                      <div>
-                        <Label className="text-xs sm:text-sm font-medium text-gray-700">Unit</Label>
-                        <div className="flex gap-2">
-                          <Select>
-                            <SelectTrigger className="text-sm flex-1">
-                              <SelectValue placeholder="Select unit..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <Button variant="outline" size="sm" className="px-2" onClick={() => openAddDialog('unit')} title="Add new Unit">
-                            <Plus size={16} />
-                          </Button>
-                        </div>
-                      </div>
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                        <Plus size={16} className="mr-2" />
-                        Add Specification Row
+                  <div>
+                    <Label className="text-xs sm:text-sm font-medium text-gray-700">Value</Label>
+                    <Input placeholder="e.g., 1200 x 1200" className="text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs sm:text-sm font-medium text-gray-700">Unit</Label>
+                    <div className="flex gap-2">
+                      <Select>
+                        <SelectTrigger className="text-sm flex-1">
+                          <SelectValue placeholder="Select unit..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="outline" size="sm" className="px-2" onClick={() => openAddDialog('unit')} title="Add new Unit">
+                        <Plus size={16} />
                       </Button>
                     </div>
                   </div>
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                    <Plus size={16} className="mr-2" />
+                    Add Specification Row
+                  </Button>
                 </div>
               </div>
             </div>
@@ -550,7 +529,7 @@ export default function AddMasterCatalogueItemWrapper() {
               
               {/* Product Summary */}
               <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4">
+                <CardContent className="pt-4 pb-4" style={{ marginLeft: '10px', marginRight: '-10px' }}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
                       <PackageIcon size={20} className="text-gray-600" />
@@ -569,7 +548,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
               {/* Product Identifiers */}
               <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4">
+                <CardContent className="pt-4 pb-4" style={{ paddingLeft: '10px', paddingRight: '-10px', marginRight: '10px' }}>
                   <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide">Product Identifiers</h3>
                   <p className="text-xs text-gray-600 mt-1">Unique codes for tracking</p>
                   <div className="mt-3 space-y-2">
@@ -587,7 +566,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
               {/* Inventory Management */}
               <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4">
+                <CardContent className="pt-4 pb-4" style={{ marginLeft: '10px', marginRight: '-10px' }}>
                   <h3 className="text-xs font-bold text-green-600 uppercase tracking-wide">Inventory Management</h3>
                   <p className="text-xs text-gray-600 mt-1">Multi-vendor stock allocation</p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
@@ -604,7 +583,7 @@ export default function AddMasterCatalogueItemWrapper() {
                   <p className="text-xs text-blue-600 mt-2">Add vendor contributions to track multi-source inventory</p>
 
                   {/* Add Vendor Stock Panel */}
-                  <div className="mt-3 border-t border-gray-300 pt-3">
+                  <div className="mt-3 border-t border-gray-300 pt-3" style={{ marginRight: '20px' }}>
                     <button 
                       onClick={() => setExpandVendorPanel(!expandVendorPanel)}
                       className="flex items-center justify-between w-full text-xs font-semibold text-gray-700 hover:text-gray-900"
@@ -663,7 +642,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
               {/* Quick Actions */}
               <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4 space-y-2">
+                <CardContent className="pt-4 pb-4 space-y-2" style={{ marginRight: '10px', marginLeft: '10px' }}>
                   <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">Quick Actions</h3>
                   <Button variant="outline" className="w-full text-sm h-10 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handlePreview}>
                     Preview Product
