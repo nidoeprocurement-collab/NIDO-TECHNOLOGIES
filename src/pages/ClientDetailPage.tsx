@@ -414,7 +414,7 @@ export function ClientDetail({ client, onBack }: ClientDetailProps) {
         </TabsContent>
 
         <TabsContent value="users" className="mt-0">
-          <ClientUsersTable users={usersData} />
+          <ClientUsersTable clientId={client.id} />
         </TabsContent>
 
         <TabsContent value="orders" className="mt-0">
