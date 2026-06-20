@@ -16,8 +16,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import {
   Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Trash2,
-  Settings, ShoppingCart, X, Star, Image as ImageIcon, Download
+  Settings, ShoppingCart, X, Star, Image as ImageIcon, Download, MoreVertical
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CatalogItem {
   id: string;
@@ -441,11 +447,31 @@ export default function CatalogUpdatesTab() {
                     <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
                     <TableCell><Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge></TableCell>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => openEditDialog(item)}><Pencil size={14} className="text-gray-600" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => openViewDialog(item)}><Eye size={14} className="text-gray-600" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200" onClick={() => deleteItem(item.id)}><Trash2 size={14} className="text-gray-600" /></Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200">
+                            <MoreVertical size={16} className="text-gray-600" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => openEditDialog(item)} className="cursor-pointer">
+                            <Pencil size={14} className="mr-2" />
+                            Edit Product
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openViewDialog(item)} className="cursor-pointer">
+                            <Eye size={14} className="mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/configuration/master-catalogue/roles/${item.id}`)} className="cursor-pointer">
+                            <Settings size={14} className="mr-2" />
+                            Edit Roles & Preferences
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => deleteItem(item.id)} className="cursor-pointer text-red-600">
+                            <Trash2 size={14} className="mr-2" />
+                            Delete Product
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

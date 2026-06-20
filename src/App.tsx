@@ -68,6 +68,7 @@ const UserRolesTab = lazy(
 const IntegrationsPage = lazy(() => import("@/pages/IntegrationsPage"));
 const SupportPage = lazy(() => import("@/pages/SupportPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
+const EditProductRolesPage = lazy(() => import("@/pages/EditProductRolesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
 const InvoicePage = lazy(() => import("@/pages/InvoicePage"));
 const InvoiceDetails = lazy(() => import("@/pages/InvoiceDetails"));
@@ -359,6 +360,10 @@ function AppRoutes() {
           <Route
             path="configuration/master-catalogue/edit/:itemId"
             element={<AddMasterCatalogueItemWrapper />}
+          />
+          <Route
+            path="configuration/master-catalogue/roles/:productId"
+            element={<EditProductRolesPage />}
           />
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="reports/audit" element={<AuditTrailPage />} />
