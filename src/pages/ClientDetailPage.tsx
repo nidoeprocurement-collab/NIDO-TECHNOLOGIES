@@ -929,7 +929,24 @@ const addUserDeviceOptions = [
   { sku: "DELL-U2722D", name: "Dell UltraSharp 27\" Monitor", category: "Display", img: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=60&h=60&fit=crop&auto=format" },
   { sku: "LG-MX-KEYS-ADV", name: "Logitech MX Keys Keyboard", category: "Peripheral", img: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=60&h=60&fit=crop&auto=format" },
   { sku: "SONY-WH1000XM5", name: "Sony WH-1000XM5 Headphones", category: "Audio", img: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=60&h=60&fit=crop&auto=format" },
+  { sku: "IPAD-PRO-12-M4", name: "Apple iPad Pro 12.9\" (M4)", category: "Tablet", img: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=60&h=60&fit=crop&auto=format" },
+  { sku: "HP-ELITEBOOK-840", name: "HP EliteBook 840 G11", category: "Laptop", img: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=60&h=60&fit=crop&auto=format" },
+  { sku: "SAM-GALAXY-S25", name: "Samsung Galaxy S25 Ultra", category: "Mobile", img: "https://images.unsplash.com/photo-1610945264803-c22b62d2a7b3?w=60&h=60&fit=crop&auto=format" },
+  { sku: "WEBCAM-LOGITECH-C920", name: "Logitech C920 HD Webcam", category: "Peripheral", img: "https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?w=60&h=60&fit=crop&auto=format" },
+  { sku: "DOCK-THUNDERBOLT-4", name: "CalDigit Thunderbolt 4 Dock", category: "Peripheral", img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=60&h=60&fit=crop&auto=format" },
 ];
+
+type AssignedDeviceEntry = {
+  sku: string;
+  name: string;
+  category: string;
+  img: string;
+  serialNo: string;
+  modelNo: string;
+  referenceNo: string;
+  assignedOn: string;
+  status: "Active" | "In Repair";
+};
 
 function AddUserModal({ onClose }: { onClose: () => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -2202,9 +2219,9 @@ const userActivityLog = [
   { action: "Password changed", date: "2026-05-10 11:00 AM", icon: "lock" },
 ];
 
-function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate }: { user: UserRecord; onBack: () => void; onEdit?: () => void; onResetPassword?: () => void; onDeactivate?: () => void }) {
+function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, assignedDevices = [], onOpenAssignPage }: { user: UserRecord; onBack: () => void; onEdit?: () => void; onResetPassword?: () => void; onDeactivate?: () => void; assignedDevices?: AssignedDeviceEntry[]; onOpenAssignPage?: () => void }) {
   const [detailTab, setDetailTab] = useState("Overview");
-  const detailTabs = ["Overview", "Activity", "Orders", "Expenses", "Assigned Devices"];
+  const detailTabs = ["Overview", "Activity", "Orders", "Services", "Expenses", "Assigned Devices"];
   const [dotMenuOpen, setDotMenuOpen] = useState(false);
 
   const formattedDate = new Date(user.lastActive).toLocaleDateString("en-US", {
@@ -2250,6 +2267,13 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate }:
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Edit User
+                </button>
+                <button
+                  onClick={() => { setDotMenuOpen(false); onOpenAssignPage?.(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  Assign Device
                 </button>
                 <div className="my-1 border-t border-gray-100" />
                 <button
@@ -2492,6 +2516,37 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate }:
           </div>
         )}
 
+        {detailTab === "Services" && (
+          <div className="p-5">
+            <p className="text-xs font-semibold text-gray-700 mb-3">Services by this user</p>
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {["Service ID", "Requested Date", "Service Name", "Requested By", "Amount", "Status"].map(h => (
+                      <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {servicesData.map((svc, i) => (
+                    <tr key={svc.id} className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
+                      <td className="px-4 py-2.5 text-blue-500 font-medium">{svc.id}</td>
+                      <td className="px-4 py-2.5 text-gray-600">{svc.startDate}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-800">{svc.name}</td>
+                      <td className="px-4 py-2.5 text-blue-500">{svc.provider}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">{svc.amount}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">Active</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {detailTab === "Expenses" && (
           <div className="p-5 flex flex-col gap-5">
             {/* Summary cards */}
@@ -2573,132 +2628,112 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate }:
               </div>
             </div>
 
-            {/* Expense log table */}
-            <div>
-              <p className="text-xs font-semibold text-gray-700 mb-3">Expense Log</p>
-              <div className="border border-gray-100 rounded-xl overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      {["Expense ID", "Date", "Category", "Description", "Amount", "Status"].map(h => (
-                        <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { id: "EXP-001", date: "2026-06-10", category: "Hardware", desc: "MacBook Pro 14\"", amount: "$4,200", status: "Approved" },
-                      { id: "EXP-002", date: "2026-05-22", category: "Software", desc: "Adobe Creative Suite", amount: "$2,800", status: "Approved" },
-                      { id: "EXP-003", date: "2026-05-15", category: "Travel", desc: "Bangalore offsite", amount: "$1,950", status: "Approved" },
-                      { id: "EXP-004", date: "2026-04-30", category: "Furniture", desc: "Ergonomic Chair", amount: "$1,740", status: "Approved" },
-                      { id: "EXP-005", date: "2026-06-18", category: "Hardware", desc: "iPhone 15 Pro", amount: "$1,320", status: "Pending" },
-                      { id: "EXP-006", date: "2026-06-20", category: "Software", desc: "Zoom annual license", amount: "$480", status: "Pending" },
-                    ].map((row, i) => (
-                      <tr key={row.id} className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
-                        <td className="px-4 py-2.5 text-blue-500 font-medium">{row.id}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{row.date}</td>
-                        <td className="px-4 py-2.5">
-                          <span className="inline-block text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{row.category}</span>
-                        </td>
-                        <td className="px-4 py-2.5 text-gray-700">{row.desc}</td>
-                        <td className="px-4 py-2.5 font-semibold text-gray-900">{row.amount}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full border ${
-                            row.status === "Approved"
+          </div>
+        )}
+
+        {detailTab === "Assigned Devices" && (() => {
+          const staticDevices: AssignedDeviceEntry[] = [
+            { name: "Apple MacBook Pro (2023)", sku: "MBP-14-M3-512", category: "Laptop", assignedOn: "2023-09-01", status: "Active", img: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=80&h=80&fit=crop&auto=format", serialNo: "C02XL0UKJHD5", modelNo: "A2779", referenceNo: "REF-2023-0091" },
+            { name: "Apple iPhone 15 Pro", sku: "IP15PRO-128-BLK", category: "Mobile", assignedOn: "2023-10-15", status: "Active", img: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=80&h=80&fit=crop&auto=format", serialNo: "F7RTXK9BPQM", modelNo: "A3290", referenceNo: "REF-2023-0122" },
+            { name: "Dell UltraSharp 27\" Monitor", sku: "DELL-U2722D", category: "Display", assignedOn: "2023-09-01", status: "Active", img: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=80&h=80&fit=crop&auto=format", serialNo: "CN-0GHVMX-47122", modelNo: "U2722D", referenceNo: "REF-2023-0089" },
+            { name: "Logitech MX Keys Keyboard", sku: "LG-MX-KEYS-ADV", category: "Peripheral", assignedOn: "2024-01-10", status: "In Repair", img: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=80&h=80&fit=crop&auto=format", serialNo: "2210LZ19D310", modelNo: "920-009295", referenceNo: "REF-2024-0011" },
+          ];
+          const allDevices = [...assignedDevices, ...staticDevices];
+          const activeCount = allDevices.filter((d) => d.status === "Active").length;
+          const repairCount = allDevices.filter((d) => d.status === "In Repair").length;
+          return (
+            <div className="p-5 flex flex-col gap-5">
+              {/* Summary + action row */}
+              <div className="flex items-center justify-between">
+                <div className="grid grid-cols-3 gap-3 flex-1">
+                  {[
+                    { label: "Total Devices", value: String(allDevices.length), sub: "Assigned to user" },
+                    { label: "Active", value: String(activeCount), sub: "In use", color: "text-green-600" },
+                    { label: "In Repair", value: String(repairCount), sub: repairCount > 0 ? "Est. return Jun 28" : "None", color: "text-orange-500" },
+                  ].map((card) => (
+                    <div key={card.label} className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
+                      <p className="text-[10px] text-gray-400 mb-1">{card.label}</p>
+                      <p className={`text-xl font-bold ${card.color ?? "text-gray-900"}`}>{card.value}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => onOpenAssignPage?.()}
+                  className="ml-4 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors shrink-0"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                  Assign Device
+                </button>
+              </div>
+
+              {/* Newly assigned devices (from AssignDevicePage) */}
+              {assignedDevices.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">Recently Assigned</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {assignedDevices.map((device) => (
+                      <div key={device.sku + device.assignedOn} className="border border-blue-200 bg-blue-50/30 rounded-xl p-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
+                        <div className="w-16 h-16 rounded-lg bg-white border border-blue-100 overflow-hidden shrink-0">
+                          <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-semibold text-gray-900 leading-snug">{device.name}</p>
+                            <span className="shrink-0 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">
+                              {device.status}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{device.sku}</p>
+                          <div className="flex flex-wrap gap-2 mt-2 text-[10px] text-gray-500">
+                            <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{device.category}</span>
+                            {device.serialNo && <span className="font-mono">S/N: {device.serialNo}</span>}
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-1 text-[10px] text-gray-400">
+                            {device.modelNo && <span>Model: {device.modelNo}</span>}
+                            {device.referenceNo && <span>Ref: {device.referenceNo}</span>}
+                          </div>
+                          <p className="text-[10px] text-blue-500 mt-1">Assigned {new Date(device.assignedOn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Static existing device cards */}
+              <div>
+                {assignedDevices.length > 0 && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Previously Assigned</p>}
+                <div className="grid grid-cols-2 gap-4">
+                  {staticDevices.map((device) => (
+                    <div key={device.sku} className="border border-gray-200 rounded-xl p-4 flex items-start gap-4 hover:shadow-sm transition-shadow bg-white">
+                      <div className="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                        <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-semibold text-gray-900 leading-snug">{device.name}</p>
+                          <span className={`shrink-0 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
+                            device.status === "Active"
                               ? "bg-green-50 text-green-700 border-green-200"
                               : "bg-orange-50 text-orange-600 border-orange-200"
                           }`}>
-                            {row.status}
+                            {device.status}
                           </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{device.sku}</p>
+                        <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
+                          <span className="inline-block bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full text-[10px]">{device.category}</span>
+                          <span>Assigned {new Date(device.assignedOn).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {detailTab === "Assigned Devices" && (
-          <div className="p-5 flex flex-col gap-5">
-            {/* Summary */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Total Devices", value: "4", sub: "Assigned to you" },
-                { label: "Active", value: "3", sub: "In use", color: "text-green-600" },
-                { label: "In Repair", value: "1", sub: "Est. return Jun 28", color: "text-orange-500" },
-              ].map((card) => (
-                <div key={card.label} className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
-                  <p className="text-[10px] text-gray-400 mb-1">{card.label}</p>
-                  <p className={`text-xl font-bold ${card.color ?? "text-gray-900"}`}>{card.value}</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Device cards grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                {
-                  name: "Apple MacBook Pro (2023)",
-                  sku: "MBP-14-M3-512",
-                  category: "Laptop",
-                  assignedOn: "2023-09-01",
-                  status: "Active",
-                  img: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=80&h=80&fit=crop&auto=format",
-                },
-                {
-                  name: "Apple iPhone 15 Pro",
-                  sku: "IP15PRO-128-BLK",
-                  category: "Mobile",
-                  assignedOn: "2023-10-15",
-                  status: "Active",
-                  img: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=80&h=80&fit=crop&auto=format",
-                },
-                {
-                  name: "Dell UltraSharp 27\" Monitor",
-                  sku: "DELL-U2722D",
-                  category: "Display",
-                  assignedOn: "2023-09-01",
-                  status: "Active",
-                  img: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=80&h=80&fit=crop&auto=format",
-                },
-                {
-                  name: "Logitech MX Keys Keyboard",
-                  sku: "LG-MX-KEYS-ADV",
-                  category: "Peripheral",
-                  assignedOn: "2024-01-10",
-                  status: "In Repair",
-                  img: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=80&h=80&fit=crop&auto=format",
-                },
-              ].map((device) => (
-                <div key={device.sku} className="border border-gray-200 rounded-xl p-4 flex items-start gap-4 hover:shadow-sm transition-shadow bg-white">
-                  <div className="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden shrink-0">
-                    <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-semibold text-gray-900 leading-snug">{device.name}</p>
-                      <span className={`shrink-0 inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${
-                        device.status === "Active"
-                          ? "bg-green-50 text-green-700 border-green-200"
-                          : "bg-orange-50 text-orange-600 border-orange-200"
-                      }`}>
-                        {device.status}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{device.sku}</p>
-                    <div className="flex items-center gap-3 mt-2 text-[11px] text-gray-500">
-                      <span className="inline-block bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full text-[10px]">{device.category}</span>
-                      <span>Assigned {new Date(device.assignedOn).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
@@ -2760,6 +2795,227 @@ function ArchiveConfirmModal({ user, onConfirm, onCancel }: { user: { name: stri
   );
 }
 
+function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; onBack: () => void; onAssign: (device: AssignedDeviceEntry) => void }) {
+  const [search, setSearch] = useState("");
+  const [showDrop, setShowDrop] = useState(false);
+  const [selected, setSelected] = useState<typeof addUserDeviceOptions[0] | null>(null);
+  const [serialNo, setSerialNo] = useState("");
+  const [modelNo, setModelNo] = useState("");
+  const [referenceNo, setReferenceNo] = useState("");
+  const [activeField, setActiveField] = useState<"serial" | "model" | "reference">("serial");
+
+  const filtered = addUserDeviceOptions.filter(
+    (d) => d.name.toLowerCase().includes(search.toLowerCase()) || d.sku.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleAssign = () => {
+    if (!selected) return;
+    onAssign({
+      sku: selected.sku,
+      name: selected.name,
+      category: selected.category,
+      img: selected.img,
+      serialNo,
+      modelNo,
+      referenceNo,
+      assignedOn: new Date().toISOString().slice(0, 10),
+      status: "Active",
+    });
+    onBack();
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Back breadcrumb */}
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <span className="text-gray-300 text-xs">/</span>
+        <span className="text-xs text-gray-500">{userName}</span>
+        <span className="text-gray-300 text-xs">/</span>
+        <span className="text-xs font-semibold text-gray-800">Assign Device</span>
+      </div>
+
+      {/* Main card */}
+      <div className="bg-white rounded-xl border border-gray-200 flex flex-col" style={{ minHeight: "560px" }}>
+        {/* Card header */}
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">Assign Device</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Search the master catalog and assign a device to{" "}
+            <span className="font-medium text-gray-700">{userName}</span>.
+          </p>
+        </div>
+
+        {/* Card body */}
+        <div className="px-6 py-5 flex flex-col gap-6 flex-1">
+
+          {/* Search bar */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-2">
+              Search Master Catalog <span className="text-red-400">*</span>
+            </label>
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setShowDrop(true); }}
+                onFocus={() => setShowDrop(true)}
+                placeholder="Search by device name or SKU..."
+                className="w-full pl-8 pr-4 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-400"
+              />
+              {showDrop && search.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto">
+                  {filtered.length === 0 ? (
+                    <p className="px-4 py-3 text-xs text-gray-400">No devices found</p>
+                  ) : (
+                    filtered.map((d) => (
+                      <button
+                        key={d.sku}
+                        onClick={() => { setSelected(d); setSearch(""); setShowDrop(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left group"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0">
+                          <img src={d.img} alt={d.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 group-hover:text-blue-700">{d.name}</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{d.sku} · {d.category}</p>
+                        </div>
+                        <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">{d.category}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Selected product card */}
+          {selected && (
+            <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-white border border-blue-100 overflow-hidden shrink-0 shadow-sm">
+                <img src={selected.img} alt={selected.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">{selected.name}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{selected.sku}</p>
+                <span className="inline-block mt-1.5 bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full text-[10px] font-medium">
+                  {selected.category}
+                </span>
+              </div>
+              <button
+                onClick={() => { setSelected(null); setSerialNo(""); setModelNo(""); setReferenceNo(""); }}
+                className="text-gray-300 hover:text-gray-500 transition-colors shrink-0 p-1"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* 3-tab entry fields */}
+          {selected && (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              {/* Tab strip */}
+              <div className="flex border-b border-gray-200 bg-gray-50">
+                {(["serial", "model", "reference"] as const).map((field, idx) => {
+                  const labels = { serial: "Serial No", model: "Model No", reference: "Reference No" };
+                  const values = { serial: serialNo, model: modelNo, reference: referenceNo };
+                  return (
+                    <button
+                      key={field}
+                      onClick={() => setActiveField(field)}
+                      className={`flex-1 px-4 py-3 text-xs font-medium transition-colors relative border-r last:border-r-0 border-gray-200 ${
+                        activeField === field
+                          ? "text-blue-600 bg-white"
+                          : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/60"
+                      }`}
+                    >
+                      <span className="block">{labels[field]}</span>
+                      {values[field] && (
+                        <span className="block text-[9px] text-blue-400 mt-0.5 font-mono truncate max-w-[80px] mx-auto">{values[field]}</span>
+                      )}
+                      {activeField === field && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Tab input */}
+              <div className="p-5">
+                {activeField === "serial" && (
+                  <div>
+                    <label className="block text-[11px] text-blue-600 mb-1.5">Serial Number</label>
+                    <input
+                      type="text"
+                      value={serialNo}
+                      onChange={(e) => setSerialNo(e.target.value)}
+                      placeholder="e.g. C02XL0UKJHD5"
+                      autoFocus
+                      className="w-full px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Located on the device label or packaging</p>
+                  </div>
+                )}
+                {activeField === "model" && (
+                  <div>
+                    <label className="block text-[11px] text-blue-600 mb-1.5">Model Number</label>
+                    <input
+                      type="text"
+                      value={modelNo}
+                      onChange={(e) => setModelNo(e.target.value)}
+                      placeholder="e.g. A2779"
+                      autoFocus
+                      className="w-full px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Model identifier from the manufacturer</p>
+                  </div>
+                )}
+                {activeField === "reference" && (
+                  <div>
+                    <label className="block text-[11px] text-blue-600 mb-1.5">Reference Number</label>
+                    <input
+                      type="text"
+                      value={referenceNo}
+                      onChange={(e) => setReferenceNo(e.target.value)}
+                      placeholder="e.g. REF-2024-00198"
+                      autoFocus
+                      className="w-full px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Internal reference or asset tag number</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer — Assign Device button at bottom right */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button
+            onClick={onBack}
+            className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAssign}
+            disabled={!selected}
+            className="px-5 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Assign Device
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UsersPage() {
   const [users, setUsers] = useState<UserRecord[]>([...usersData]);
   const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
@@ -2773,6 +3029,8 @@ function UsersPage() {
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<UserRecord | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<UserRecord | null>(null);
+  const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
+  const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
 
   const archiveUser = (id: string) => {
     const u = users.find((u) => u.id === id);
@@ -2799,6 +3057,19 @@ function UsersPage() {
 
   if (showArchivedUsers) return <ArchivedUsersPage onBack={() => setShowArchivedUsers(false)} archivedUsers={archived} />;
   if (editingUser) return <EditUserPage user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
+  if (assigningDeviceFor) return (
+    <AssignDevicePage
+      userName={assigningDeviceFor.name}
+      onBack={() => setAssigningDeviceFor(null)}
+      onAssign={(device) => {
+        setUserDevices((prev) => ({
+          ...prev,
+          [assigningDeviceFor.id]: [...(prev[assigningDeviceFor.id] ?? []), device],
+        }));
+        setAssigningDeviceFor(null);
+      }}
+    />
+  );
   if (liveSelectedUser) return (
     <UserDetailPage
       user={liveSelectedUser}
@@ -2806,6 +3077,8 @@ function UsersPage() {
       onEdit={() => setEditingUser(liveSelectedUser)}
       onResetPassword={() => setResetPasswordUser(liveSelectedUser)}
       onDeactivate={() => deactivateUser(liveSelectedUser.id)}
+      assignedDevices={userDevices[liveSelectedUser.id] ?? []}
+      onOpenAssignPage={() => setAssigningDeviceFor(liveSelectedUser)}
     />
   );
 
@@ -3391,13 +3664,11 @@ function ServicesPage() {
           <thead>
             <tr className="border-b border-gray-200 bg-white">
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service ID</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested Date</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service Name</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Provider</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Start Date</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">End Date</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested By</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -3406,40 +3677,22 @@ function ServicesPage() {
                 <td className="px-4 py-3">
                   <span className="text-blue-500 hover:underline cursor-pointer font-medium">{svc.id}</span>
                 </td>
+                <td className="px-4 py-3 text-gray-700">{svc.startDate}</td>
                 <td className="px-4 py-3 font-medium text-gray-800">{svc.name}</td>
                 <td className="px-4 py-3">
                   <span className="text-blue-500 hover:underline cursor-pointer">{svc.provider}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-700">{svc.startDate}</td>
-                <td className="px-4 py-3 text-gray-700">{svc.endDate}</td>
                 <td className="px-4 py-3 font-semibold text-gray-900">{svc.amount}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
                     Active
                   </span>
                 </td>
-                <td className="px-4 py-3 relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === svc.id ? null : svc.id); }}
-                    className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
-                  >
-                    <MoreVertical size={13} />
-                  </button>
-                  {rowMenu === svc.id && (
-                    <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-36" onClick={(e) => e.stopPropagation()}>
-                      {["View Details", "Edit Service", "Renew Service", "Cancel Service"].map((action) => (
-                        <button key={action} onClick={() => setRowMenu(null)} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${action === "Cancel Service" ? "text-red-500" : "text-gray-700"}`}>
-                          {action}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-xs text-gray-400">No services found for this category.</td>
+                <td colSpan={6} className="px-4 py-10 text-center text-xs text-gray-400">No services found for this category.</td>
               </tr>
             )}
           </tbody>
@@ -3831,8 +4084,8 @@ function CatalogPage() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Product Code</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-24">SKU</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Product ID</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-24">SKU Code</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles</th>
@@ -4021,14 +4274,37 @@ function ConfigurationPage() {
 
   // Invite Users state
   const [inviteSearch, setInviteSearch] = useState("");
+  const [inviteRoleFilter, setInviteRoleFilter] = useState("All Roles");
+  const [inviteRoleOpen, setInviteRoleOpen] = useState(false);
   const [selectedInvites, setSelectedInvites] = useState<Set<string>>(new Set());
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const [showInviteConfirm, setShowInviteConfirm] = useState(false);
 
-  const inviteFiltered = usersData.filter((u) =>
-    u.name.toLowerCase().includes(inviteSearch.toLowerCase()) ||
-    u.email.toLowerCase().includes(inviteSearch.toLowerCase()) ||
-    u.role.toLowerCase().includes(inviteSearch.toLowerCase())
-  );
+  const uniqueRoles = ["All Roles", ...Array.from(new Set(usersData.map((u) => u.role)))];
+
+  const inviteFiltered = usersData.filter((u) => {
+    const matchSearch =
+      u.name.toLowerCase().includes(inviteSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(inviteSearch.toLowerCase()) ||
+      u.role.toLowerCase().includes(inviteSearch.toLowerCase());
+    const matchRole = inviteRoleFilter === "All Roles" || u.role === inviteRoleFilter;
+    return matchSearch && matchRole;
+  });
+
+  const allSelectableIds = inviteFiltered.filter((u) => !invitedIds.has(u.id)).map((u) => u.id);
+  const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedInvites.has(id));
+
+  const toggleSelectAll = () => {
+    setSelectedInvites((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        allSelectableIds.forEach((id) => next.delete(id));
+      } else {
+        allSelectableIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
 
   const toggleInvite = (id: string) => {
     setSelectedInvites((prev) => {
@@ -4038,9 +4314,10 @@ function ConfigurationPage() {
     });
   };
 
-  const sendInvites = () => {
+  const confirmAndSendInvites = () => {
     setInvitedIds((prev) => new Set([...prev, ...selectedInvites]));
     setSelectedInvites(new Set());
+    setShowInviteConfirm(false);
   };
 
   return (
@@ -4107,7 +4384,46 @@ function ConfigurationPage() {
       )}
 
       {configTab === "Invite Users" && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4" onClick={() => setInviteRoleOpen(false)}>
+          {/* Invite confirmation popup */}
+          {showInviteConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowInviteConfirm(false)}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+                <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-gray-100">
+                  <h2 className="text-sm font-semibold text-gray-900">Confirm Invitation</h2>
+                  <button onClick={() => setShowInviteConfirm(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={15} />
+                  </button>
+                </div>
+                <div className="px-6 py-5 flex flex-col gap-4">
+                  <p className="text-xs text-gray-500">
+                    You are about to send invitations to <span className="font-semibold text-gray-800">{selectedInvites.size} user{selectedInvites.size > 1 ? "s" : ""}</span>. They will receive an email with access instructions.
+                  </p>
+                  <div className="border border-gray-100 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                    {usersData.filter((u) => selectedInvites.has(u.id)).map((user, i) => (
+                      <div key={user.id} className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}>
+                        <div className={`w-6 h-6 rounded-full ${user.color} flex items-center justify-center text-white text-[9px] font-bold shrink-0`}>{user.initials}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{user.name}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
+                        </div>
+                        <span className="text-[10px] text-gray-500 shrink-0">{user.role}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                  <button onClick={() => setShowInviteConfirm(false)} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={confirmAndSendInvites} className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-1.5">
+                    <UserPlus size={12} /> Send Invitation{selectedInvites.size > 1 ? "s" : ""}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <p className="text-xs text-gray-500">Search and select users to invite to this client. Invited users will receive an email with access instructions.</p>
           </div>
@@ -4126,6 +4442,31 @@ function ConfigurationPage() {
             />
           </div>
 
+          {/* Role filter */}
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setInviteRoleOpen((v) => !v)}
+              className="flex items-center gap-2 px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+              Filter by Role: <span className="text-blue-600 font-medium">{inviteRoleFilter}</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {inviteRoleOpen && (
+              <div className="absolute left-0 top-9 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 min-w-[160px]">
+                {uniqueRoles.map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => { setInviteRoleFilter(role); setInviteRoleOpen(false); }}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${inviteRoleFilter === role ? "text-blue-600 font-medium" : "text-gray-700"}`}
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* User list */}
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             {inviteFiltered.length === 0 ? (
@@ -4134,7 +4475,15 @@ function ConfigurationPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="w-10 px-3 py-2.5" />
+                    <th className="w-10 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        className="rounded border-gray-300 accent-blue-600 cursor-pointer"
+                        title="Select all"
+                      />
+                    </th>
                     <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User</th>
                     <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
                     <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Role</th>
@@ -4183,7 +4532,7 @@ function ConfigurationPage() {
               {selectedInvites.size > 0 ? `${selectedInvites.size} user${selectedInvites.size > 1 ? "s" : ""} selected` : "Select users above to invite"}
             </p>
             <button
-              onClick={sendInvites}
+              onClick={() => selectedInvites.size > 0 && setShowInviteConfirm(true)}
               disabled={selectedInvites.size === 0}
               className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center gap-1.5"
             >
