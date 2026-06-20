@@ -4019,11 +4019,10 @@ function CatalogPage() {
   const [products, setProducts] = useState(catalogProducts.map((p) => ({ ...p, roles: [...p.roles] })));
   const [editingProductSku, setEditingProductSku] = useState<string | null>(null);
   const [editingRoles, setEditingRoles] = useState<string[]>([]);
-  const [editingPreferences, setEditingPreferences] = useState({
-    discountApplicable: true,
-    bulkOrdersAllowed: true,
-    customizationAllowed: false,
-  });
+  const [editingPreference, setEditingPreference] = useState("");
+  const [prefDropdownOpen, setPrefDropdownOpen] = useState(false);
+  const [editingAddingPref, setEditingAddingPref] = useState(false);
+  const [editingNewPrefName, setEditingNewPrefName] = useState("");
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -4045,11 +4044,10 @@ function CatalogPage() {
   const openEditRolesDialog = (product: any) => {
     setEditingProductSku(product.sku);
     setEditingRoles([...product.roles]);
-    setEditingPreferences({
-      discountApplicable: true,
-      bulkOrdersAllowed: true,
-      customizationAllowed: false,
-    });
+    setEditingPreference("");
+    setPrefDropdownOpen(false);
+    setEditingAddingPref(false);
+    setEditingNewPrefName("");
   };
 
   const saveRolesAndPreferences = () => {
@@ -4066,6 +4064,15 @@ function CatalogPage() {
     setEditingRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
+  };
+
+  const addNewEditingPreference = () => {
+    if (editingNewPrefName.trim()) {
+      setEditingPreference(editingNewPrefName);
+      setEditingNewPrefName("");
+      setEditingAddingPref(false);
+      setPrefDropdownOpen(false);
+    }
   };
 
   return (
@@ -4274,47 +4281,47 @@ function CatalogPage() {
                   </div>
 
                   {/* Preferences */}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 mb-3">Preferences <span className="text-red-400">*</span></p>
-                    <p className="text-xs text-blue-500 mb-3">Configure additional product options for this client.</p>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={editingPreferences.discountApplicable}
-                          onChange={(e) => setEditingPreferences({ ...editingPreferences, discountApplicable: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-gray-700">Allow Discounts</p>
-                          <p className="text-[10px] text-gray-500">Enable discount codes for this product</p>
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Preferences <span className="text-red-400">*</span></label>
+                    <button
+                      type="button"
+                      onClick={() => { setPrefDropdownOpen((v) => !v); setEditingAddingPref(false); }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white text-left"
+                    >
+                      <span className={editingPreference ? "text-gray-700" : "text-gray-400"}>{editingPreference || "Select preference"}</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    {prefDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1">
+                        {preferences.map((p) => (
+                          <button key={p} onClick={() => { setEditingPreference(p); setPrefDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors ${editingPreference === p ? "text-blue-600 font-medium" : "text-gray-700"}`}>
+                            {p}
+                          </button>
+                        ))}
+                        <div className="border-t border-gray-100 mt-1 pt-1">
+                          {editingAddingPref ? (
+                            <div className="px-3 py-2 flex items-center gap-2">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingNewPrefName}
+                                onChange={(e) => setEditingNewPrefName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && addNewEditingPreference()}
+                                placeholder="Preference name..."
+                                className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                              />
+                              <button onClick={addNewEditingPreference} className="px-2 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Add</button>
+                              <button onClick={() => { setEditingAddingPref(false); setEditingNewPrefName(""); }} className="px-2 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setEditingAddingPref(true)} className="w-full text-left px-4 py-2 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1.5">
+                              <span className="text-sm leading-none">+</span> Add new preference
+                            </button>
+                          )}
                         </div>
-                      </label>
-                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={editingPreferences.bulkOrdersAllowed}
-                          onChange={(e) => setEditingPreferences({ ...editingPreferences, bulkOrdersAllowed: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-gray-700">Allow Bulk Orders</p>
-                          <p className="text-[10px] text-gray-500">Enable bulk purchasing for this product</p>
-                        </div>
-                      </label>
-                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={editingPreferences.customizationAllowed}
-                          onChange={(e) => setEditingPreferences({ ...editingPreferences, customizationAllowed: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <p className="text-xs font-medium text-gray-700">Allow Customization</p>
-                          <p className="text-[10px] text-gray-500">Allow customization options for this product</p>
-                        </div>
-                      </label>
-                    </div>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-blue-500 mt-1">Choose a preference for this product.</p>
                   </div>
                 </>
               )}
