@@ -4017,6 +4017,13 @@ function CatalogPage() {
   const [page, setPage] = useState(1);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [products, setProducts] = useState(catalogProducts.map((p) => ({ ...p, roles: [...p.roles] })));
+  const [editingProductSku, setEditingProductSku] = useState<string | null>(null);
+  const [editingRoles, setEditingRoles] = useState<string[]>([]);
+  const [editingPreference, setEditingPreference] = useState("");
+  const [editingPreferences, setEditingPreferences] = useState(["Preference 1", "Preference 2"]);
+  const [prefDropdownOpen, setPrefDropdownOpen] = useState(false);
+  const [editingAddingPref, setEditingAddingPref] = useState(false);
+  const [editingNewPrefName, setEditingNewPrefName] = useState("");
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -4033,6 +4040,41 @@ function CatalogPage() {
     setProducts((prev) =>
       prev.map((p) => p.sku === sku ? { ...p, roles: p.roles.filter((r) => r !== role) } : p)
     );
+  };
+
+  const openEditRolesDialog = (product: any) => {
+    setEditingProductSku(product.sku);
+    setEditingRoles([...product.roles]);
+    setEditingPreference("");
+    setPrefDropdownOpen(false);
+    setEditingAddingPref(false);
+    setEditingNewPrefName("");
+  };
+
+  const saveRolesAndPreferences = () => {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.sku === editingProductSku ? { ...p, roles: editingRoles } : p
+      )
+    );
+    setEditingProductSku(null);
+    setRowMenu(null);
+  };
+
+  const toggleEditingRole = (role: string) => {
+    setEditingRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
+    );
+  };
+
+  const addNewEditingPreference = () => {
+    const name = editingNewPrefName.trim();
+    if (!name || editingPreferences.includes(name)) return;
+    setEditingPreferences((prev) => [...prev, name]);
+    setEditingPreference(name);
+    setEditingNewPrefName("");
+    setEditingAddingPref(false);
+    setPrefDropdownOpen(false);
   };
 
   return (
@@ -4110,7 +4152,7 @@ function CatalogPage() {
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
               </tr>
@@ -4157,7 +4199,7 @@ function CatalogPage() {
                     {rowMenu === product.sku && (
                       <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-44" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => setRowMenu(null)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">View Product</button>
-                        <button onClick={() => setRowMenu(null)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit Roles & Preferences</button>
+                        <button onClick={() => { openEditRolesDialog(product); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit Roles & Preferences</button>
                         <div className="my-1 border-t border-gray-100" />
                         <button onClick={() => { setProducts((prev) => prev.filter((p) => p.sku !== product.sku)); setRowMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500">Remove Product</button>
                       </div>
@@ -4184,6 +4226,127 @@ function CatalogPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Roles & Preferences Dialog */}
+      {editingProductSku && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setEditingProductSku(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditingProductSku(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h2 className="text-sm font-semibold text-gray-900">Edit Roles & Preferences</h2>
+              </div>
+              <button onClick={() => setEditingProductSku(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={16} /></button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-6">
+              {products.find((p) => p.sku === editingProductSku) && (
+                <>
+                  {/* Product Info */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-3">Product Information</p>
+                    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Product Name</p>
+                          <p className="text-sm font-medium text-gray-900">{products.find((p) => p.sku === editingProductSku)?.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">SKU</p>
+                          <p className="text-sm text-gray-600">{editingProductSku}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assign Roles */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-3">Assign Roles <span className="text-red-400">*</span></p>
+                    <p className="text-xs text-blue-500 mb-3">Select which roles can access this product.</p>
+                    <div className="space-y-2">
+                      {catalogRoleOptions.map((role) => (
+                        <label key={role} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={editingRoles.includes(role)}
+                            onChange={() => toggleEditingRole(role)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-gray-700">{role}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preferences */}
+                  <div className="relative" onClick={(e) => e.stopPropagation()}>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Preferences <span className="text-red-400">*</span></label>
+                    <button
+                      type="button"
+                      onClick={() => { setPrefDropdownOpen((v) => !v); setEditingAddingPref(false); }}
+                      className="w-full flex items-center justify-between px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white text-left"
+                    >
+                      <span className={editingPreference ? "text-gray-700" : "text-gray-400"}>{editingPreference || "Select preference"}</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400 shrink-0"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    {prefDropdownOpen && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1">
+                        {editingPreferences.map((p) => (
+                          <button key={p} onClick={() => { setEditingPreference(p); setPrefDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors ${editingPreference === p ? "text-blue-600 font-medium" : "text-gray-700"}`}>
+                            {p}
+                          </button>
+                        ))}
+                        <div className="border-t border-gray-100 mt-1 pt-1">
+                          {editingAddingPref ? (
+                            <div className="px-3 py-2 flex items-center gap-2">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingNewPrefName}
+                                onChange={(e) => setEditingNewPrefName(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && addNewEditingPreference()}
+                                placeholder="Preference name..."
+                                className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400"
+                              />
+                              <button onClick={addNewEditingPreference} className="px-2 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">Add</button>
+                              <button onClick={() => { setEditingAddingPref(false); setEditingNewPrefName(""); }} className="px-2 py-1 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setEditingAddingPref(true)} className="w-full text-left px-4 py-2 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1.5">
+                              <span className="text-sm leading-none">+</span> Add new preference
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-blue-500 mt-1">Choose a preference for this product.</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setEditingProductSku(null)}
+                className="px-4 py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveRolesAndPreferences}
+                className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4583,6 +4746,12 @@ function PlaceholderPage({ tab }: { tab: string }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    status: "",
+    dateRange: "",
+    sortBy: "",
+  });
 
   const isOverview = activeTab === "Overview";
 
@@ -4741,26 +4910,96 @@ export default function App() {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="bg-white rounded-xl border border-gray-200 px-4">
-            <div className="flex border-b border-gray-100">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === tab
-                      ? "text-blue-600"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {tab}
-                  {activeTab === tab && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
-                  )}
-                </button>
-              ))}
+          {/* Tabs with Filter */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4">
+              <div className="flex border-b border-gray-100">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                      activeTab === tab
+                        ? "text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === tab && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 text-sm font-medium transition-colors ${
+                  showFilters
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Filter size={18} />
+              </button>
             </div>
+            
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="border-b border-gray-100 p-4 bg-gray-50">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2 font-medium">Status</label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2 font-medium">Date Range</label>
+                    <select
+                      value={filters.dateRange}
+                      onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                      <option value="year">This Year</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2 font-medium">Sort By</label>
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Default</option>
+                      <option value="name">Name</option>
+                      <option value="date">Date</option>
+                      <option value="recent">Most Recent</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => {
+                      setFilters({ status: "", dateRange: "", sortBy: "" });
+                    }}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Non-overview tab content */}
