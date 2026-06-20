@@ -4017,6 +4017,13 @@ function CatalogPage() {
   const [page, setPage] = useState(1);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [products, setProducts] = useState(catalogProducts.map((p) => ({ ...p, roles: [...p.roles] })));
+  const [editingProductSku, setEditingProductSku] = useState<string | null>(null);
+  const [editingRoles, setEditingRoles] = useState<string[]>([]);
+  const [editingPreferences, setEditingPreferences] = useState({
+    discountApplicable: true,
+    bulkOrdersAllowed: true,
+    customizationAllowed: false,
+  });
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -4032,6 +4039,32 @@ function CatalogPage() {
   const removeRole = (sku: string, role: string) => {
     setProducts((prev) =>
       prev.map((p) => p.sku === sku ? { ...p, roles: p.roles.filter((r) => r !== role) } : p)
+    );
+  };
+
+  const openEditRolesDialog = (product: any) => {
+    setEditingProductSku(product.sku);
+    setEditingRoles([...product.roles]);
+    setEditingPreferences({
+      discountApplicable: true,
+      bulkOrdersAllowed: true,
+      customizationAllowed: false,
+    });
+  };
+
+  const saveRolesAndPreferences = () => {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.sku === editingProductSku ? { ...p, roles: editingRoles } : p
+      )
+    );
+    setEditingProductSku(null);
+    setRowMenu(null);
+  };
+
+  const toggleEditingRole = (role: string) => {
+    setEditingRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
     );
   };
 
@@ -4157,7 +4190,7 @@ function CatalogPage() {
                     {rowMenu === product.sku && (
                       <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-44" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => setRowMenu(null)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">View Product</button>
-                        <button onClick={() => setRowMenu(null)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit Roles & Preferences</button>
+                        <button onClick={() => { openEditRolesDialog(product); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit Roles & Preferences</button>
                         <div className="my-1 border-t border-gray-100" />
                         <button onClick={() => { setProducts((prev) => prev.filter((p) => p.sku !== product.sku)); setRowMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500">Remove Product</button>
                       </div>
@@ -4184,6 +4217,97 @@ function CatalogPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Roles & Preferences Dialog */}
+      {editingProductSku && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Roles & Preferences</h3>
+              <button
+                onClick={() => setEditingProductSku(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {products.find((p) => p.sku === editingProductSku) && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Product</p>
+                  <p className="text-sm text-gray-600">{products.find((p) => p.sku === editingProductSku)?.name}</p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-3">Assign Roles</p>
+                  <div className="space-y-2">
+                    {catalogRoleOptions.map((role) => (
+                      <label key={role} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                        <input
+                          type="checkbox"
+                          checked={editingRoles.includes(role)}
+                          onChange={() => toggleEditingRole(role)}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                        />
+                        <span className="text-sm text-gray-700">{role}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Preferences</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={editingPreferences.discountApplicable}
+                        onChange={(e) => setEditingPreferences({ ...editingPreferences, discountApplicable: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">Allow Discounts</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={editingPreferences.bulkOrdersAllowed}
+                        onChange={(e) => setEditingPreferences({ ...editingPreferences, bulkOrdersAllowed: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">Allow Bulk Orders</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={editingPreferences.customizationAllowed}
+                        onChange={(e) => setEditingPreferences({ ...editingPreferences, customizationAllowed: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">Allow Customization</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setEditingProductSku(null)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveRolesAndPreferences}
+                    className="flex-1 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
