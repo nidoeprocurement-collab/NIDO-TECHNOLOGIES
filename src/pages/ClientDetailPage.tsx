@@ -28,6 +28,7 @@ import {
   X,
   CheckCircle,
   Timer,
+  Filter,
 } from "lucide-react";
 
 const monthlySpend = [
@@ -962,7 +963,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
     reportingManager: "",
     gender: "",
     joiningDate: "",
-    role: "",
+    role:"",
     orgAccess: "",
     dataVisibility: "All Data",
     locationAccess: "All Locations",
@@ -2021,11 +2022,11 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Archived On</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Reason</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Archived On <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Reason <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
           </thead>
@@ -2223,6 +2224,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
   const [detailTab, setDetailTab] = useState("Overview");
   const detailTabs = ["Overview", "Activity", "Orders", "Services", "Expenses", "Assigned Devices"];
   const [dotMenuOpen, setDotMenuOpen] = useState(false);
+  const [expMonth, setExpMonth] = useState("2026-06");
 
   const formattedDate = new Date(user.lastActive).toLocaleDateString("en-US", {
     year: "numeric", month: "short", day: "numeric",
@@ -2268,14 +2270,6 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Edit User
                 </button>
-                <button
-                  onClick={() => { setDotMenuOpen(false); onOpenAssignPage?.(); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                  Assign Device
-                </button>
-                <div className="my-1 border-t border-gray-100" />
                 <button
                   onClick={() => { setDotMenuOpen(false); onDeactivate?.(); }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-orange-600 hover:bg-orange-50 transition-colors text-left"
@@ -2378,15 +2372,15 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   </div>
                   <p className="text-sm font-bold text-green-600">{user.status}</p>
                 </div>
-                {/* Role */}
+                {/* Cost Center */}
                 <div className="px-4 py-3 flex flex-col gap-1.5 border-r border-gray-100">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      <Building2 size={11} className="text-indigo-600" />
                     </div>
-                    <span className="text-[10px] text-gray-500">Role</span>
+                    <span className="text-[10px] text-gray-500">Cost Center</span>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">{user.role}</p>
+                  <p className="text-sm font-bold text-gray-900">IT Operations</p>
                 </div>
                 {/* Total Orders */}
                 <div className="px-4 py-3 flex flex-col gap-1.5 border-r border-gray-100">
@@ -2453,7 +2447,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                       { label: "Department", value: "Operations" },
                       { label: "Reporting Manager", value: "Sophia Martinez" },
                       { label: "Joining Date", value: "2022-04-18" },
-                      { label: "Role", value: user.role },
+                      { label: "Account Info", value: "Postpaid" },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex flex-col gap-0.5">
                         <p className="text-[10px] text-gray-400">{label}</p>
@@ -2497,7 +2491,9 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
               <thead>
                 <tr className="border-b border-gray-100">
                   {["Order ID", "Date", "Items", "Amount", "Status"].map(h => (
-                    <th key={h} className="text-left py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide pr-4">{h}</th>
+                    <th key={h} className="text-left py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide pr-4">
+                      {h}{(h === "Status") && <Filter size={9} className="inline ml-0.5 text-gray-300" />}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -2524,7 +2520,9 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {["Service ID", "Requested Date", "Service Name", "Requested By", "Amount", "Status"].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide">{h}</th>
+                      <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide">
+                        {h}{(h === "Status" || h === "Requested Date") && <Filter size={9} className="inline ml-0.5 text-gray-300" />}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -2551,17 +2549,40 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
           <div className="p-5 flex flex-col gap-5">
             {/* Summary cards */}
             <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Total Expenses", value: "$15,450", sub: "Year to date", color: "text-gray-900" },
-                { label: "This Month", value: "$3,200", sub: "Jun 2026", color: "text-blue-600" },
-                { label: "Pending Approval", value: "$1,800", sub: "2 requests", color: "text-orange-500" },
-              ].map((card) => (
-                <div key={card.label} className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
-                  <p className="text-[10px] text-gray-400 mb-1">{card.label}</p>
-                  <p className={`text-xl font-bold ${card.color}`}>{card.value}</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
+              <div className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
+                <p className="text-[10px] text-gray-400 mb-1">Total Expenses</p>
+                <p className="text-xl font-bold text-gray-900">$15,450</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Year to date</p>
+              </div>
+              <div className="border border-blue-100 rounded-xl px-4 py-3 bg-blue-50/40">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] text-gray-400">This Month</p>
+                  <select
+                    value={expMonth}
+                    onChange={(e) => setExpMonth(e.target.value)}
+                    className="text-[10px] text-blue-600 border border-blue-200 rounded-md px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 cursor-pointer"
+                  >
+                    <option value="2026-01">Jan 2026</option>
+                    <option value="2026-02">Feb 2026</option>
+                    <option value="2026-03">Mar 2026</option>
+                    <option value="2026-04">Apr 2026</option>
+                    <option value="2026-05">May 2026</option>
+                    <option value="2026-06">Jun 2026</option>
+                    <option value="2025-12">Dec 2025</option>
+                    <option value="2025-11">Nov 2025</option>
+                    <option value="2025-10">Oct 2025</option>
+                  </select>
                 </div>
-              ))}
+                <p className="text-xl font-bold text-blue-600">$3,200</p>
+                <p className="text-[11px] text-blue-400 mt-0.5">
+                  {new Date(expMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <div className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
+                <p className="text-[10px] text-gray-400 mb-1">Pending Approval</p>
+                <p className="text-xl font-bold text-orange-500">$1,800</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">2 requests</p>
+              </div>
             </div>
 
             {/* Chart + Top 5 */}
@@ -3181,11 +3202,11 @@ function UsersPage() {
                 <input type="checkbox" checked={allChecked} onChange={toggleAll} className="rounded border-gray-300 text-blue-500 cursor-pointer" />
               </th>
               <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User ID</th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role</th>
+              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
               <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Last Active</th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
+              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Last Active <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="w-10 px-3 py-3" />
             </tr>
           </thead>
@@ -3399,11 +3420,11 @@ function OrdersPage() {
           <thead>
             <tr className="border-b border-gray-200 bg-white">
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Order ID</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Date</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Items</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Vendor</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Vendor <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
           </thead>
@@ -3664,11 +3685,11 @@ function ServicesPage() {
           <thead>
             <tr className="border-b border-gray-200 bg-white">
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service ID</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested Date</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service Name</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service Name <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested By</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
             </tr>
           </thead>
           <tbody>
@@ -4087,10 +4108,10 @@ function CatalogPage() {
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Product ID</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-24">SKU Code</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR)</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability</th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
               </tr>
             </thead>
@@ -4486,8 +4507,8 @@ function ConfigurationPage() {
                     </th>
                     <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User</th>
                     <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Role</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status</th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                   </tr>
                 </thead>
                 <tbody>
