@@ -4020,6 +4020,7 @@ function CatalogPage() {
   const [editingProductSku, setEditingProductSku] = useState<string | null>(null);
   const [editingRoles, setEditingRoles] = useState<string[]>([]);
   const [editingPreference, setEditingPreference] = useState("");
+  const [editingPreferences, setEditingPreferences] = useState(["Preference 1", "Preference 2"]);
   const [prefDropdownOpen, setPrefDropdownOpen] = useState(false);
   const [editingAddingPref, setEditingAddingPref] = useState(false);
   const [editingNewPrefName, setEditingNewPrefName] = useState("");
@@ -4067,12 +4068,13 @@ function CatalogPage() {
   };
 
   const addNewEditingPreference = () => {
-    if (editingNewPrefName.trim()) {
-      setEditingPreference(editingNewPrefName);
-      setEditingNewPrefName("");
-      setEditingAddingPref(false);
-      setPrefDropdownOpen(false);
-    }
+    const name = editingNewPrefName.trim();
+    if (!name || editingPreferences.includes(name)) return;
+    setEditingPreferences((prev) => [...prev, name]);
+    setEditingPreference(name);
+    setEditingNewPrefName("");
+    setEditingAddingPref(false);
+    setPrefDropdownOpen(false);
   };
 
   return (
@@ -4293,7 +4295,7 @@ function CatalogPage() {
                     </button>
                     {prefDropdownOpen && (
                       <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1">
-                        {preferences.map((p) => (
+                        {editingPreferences.map((p) => (
                           <button key={p} onClick={() => { setEditingPreference(p); setPrefDropdownOpen(false); }} className={`w-full text-left px-4 py-2 text-xs hover:bg-gray-50 transition-colors ${editingPreference === p ? "text-blue-600 font-medium" : "text-gray-700"}`}>
                             {p}
                           </button>
