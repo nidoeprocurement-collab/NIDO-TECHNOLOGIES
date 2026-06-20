@@ -4220,91 +4220,121 @@ function CatalogPage() {
 
       {/* Edit Roles & Preferences Dialog */}
       {editingProductSku && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Edit Roles & Preferences</h3>
-              <button
-                onClick={() => setEditingProductSku(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X size={20} />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setEditingProductSku(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditingProductSku(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h2 className="text-sm font-semibold text-gray-900">Edit Roles & Preferences</h2>
+              </div>
+              <button onClick={() => setEditingProductSku(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={16} /></button>
             </div>
 
-            {products.find((p) => p.sku === editingProductSku) && (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-2">Product</p>
-                  <p className="text-sm text-gray-600">{products.find((p) => p.sku === editingProductSku)?.name}</p>
-                </div>
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-6">
+              {products.find((p) => p.sku === editingProductSku) && (
+                <>
+                  {/* Product Info */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-3">Product Information</p>
+                    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Product Name</p>
+                          <p className="text-sm font-medium text-gray-900">{products.find((p) => p.sku === editingProductSku)?.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">SKU</p>
+                          <p className="text-sm text-gray-600">{editingProductSku}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                <div>
-                  <p className="text-sm font-medium text-gray-700 mb-3">Assign Roles</p>
-                  <div className="space-y-2">
-                    {catalogRoleOptions.map((role) => (
-                      <label key={role} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
+                  {/* Assign Roles */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-3">Assign Roles <span className="text-red-400">*</span></p>
+                    <p className="text-xs text-blue-500 mb-3">Select which roles can access this product.</p>
+                    <div className="space-y-2">
+                      {catalogRoleOptions.map((role) => (
+                        <label key={role} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={editingRoles.includes(role)}
+                            onChange={() => toggleEditingRole(role)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                          />
+                          <span className="text-xs font-medium text-gray-700">{role}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preferences */}
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-3">Preferences <span className="text-red-400">*</span></p>
+                    <p className="text-xs text-blue-500 mb-3">Configure additional product options for this client.</p>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                         <input
                           type="checkbox"
-                          checked={editingRoles.includes(role)}
-                          onChange={() => toggleEditingRole(role)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                          checked={editingPreferences.discountApplicable}
+                          onChange={(e) => setEditingPreferences({ ...editingPreferences, discountApplicable: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
                         />
-                        <span className="text-sm text-gray-700">{role}</span>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-700">Allow Discounts</p>
+                          <p className="text-[10px] text-gray-500">Enable discount codes for this product</p>
+                        </div>
                       </label>
-                    ))}
+                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editingPreferences.bulkOrdersAllowed}
+                          onChange={(e) => setEditingPreferences({ ...editingPreferences, bulkOrdersAllowed: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-700">Allow Bulk Orders</p>
+                          <p className="text-[10px] text-gray-500">Enable bulk purchasing for this product</p>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={editingPreferences.customizationAllowed}
+                          onChange={(e) => setEditingPreferences({ ...editingPreferences, customizationAllowed: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-700">Allow Customization</p>
+                          <p className="text-[10px] text-gray-500">Allow customization options for this product</p>
+                        </div>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                </>
+              )}
+            </div>
 
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Preferences</p>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={editingPreferences.discountApplicable}
-                        onChange={(e) => setEditingPreferences({ ...editingPreferences, discountApplicable: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">Allow Discounts</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={editingPreferences.bulkOrdersAllowed}
-                        onChange={(e) => setEditingPreferences({ ...editingPreferences, bulkOrdersAllowed: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">Allow Bulk Orders</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
-                      <input
-                        type="checkbox"
-                        checked={editingPreferences.customizationAllowed}
-                        onChange={(e) => setEditingPreferences({ ...editingPreferences, customizationAllowed: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">Allow Customization</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={() => setEditingProductSku(null)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={saveRolesAndPreferences}
-                    className="flex-1 px-4 py-2 bg-blue-600 rounded-lg text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={() => setEditingProductSku(null)}
+                className="px-4 py-2 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveRolesAndPreferences}
+                className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
