@@ -4583,6 +4583,12 @@ function PlaceholderPage({ tab }: { tab: string }) {
 export default function App() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    status: "",
+    dateRange: "",
+    sortBy: "",
+  });
 
   const isOverview = activeTab === "Overview";
 
@@ -4741,26 +4747,96 @@ export default function App() {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="bg-white rounded-xl border border-gray-200 px-4">
-            <div className="flex border-b border-gray-100">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-3 text-sm font-medium transition-colors relative ${
-                    activeTab === tab
-                      ? "text-blue-600"
-                      : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {tab}
-                  {activeTab === tab && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
-                  )}
-                </button>
-              ))}
+          {/* Tabs with Filter */}
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4">
+              <div className="flex border-b border-gray-100">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                      activeTab === tab
+                        ? "text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {tab}
+                    {activeTab === tab && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 text-sm font-medium transition-colors ${
+                  showFilters
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Filter size={18} />
+              </button>
             </div>
+            
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="border-b border-gray-100 p-4 bg-gray-50">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2 font-medium">Status</label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="pending">Pending</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2 font-medium">Date Range</label>
+                    <select
+                      value={filters.dateRange}
+                      onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">All Dates</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                      <option value="year">This Year</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-2 font-medium">Sort By</label>
+                    <select
+                      value={filters.sortBy}
+                      onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Default</option>
+                      <option value="name">Name</option>
+                      <option value="date">Date</option>
+                      <option value="recent">Most Recent</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => {
+                      setFilters({ status: "", dateRange: "", sortBy: "" });
+                    }}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Non-overview tab content */}
