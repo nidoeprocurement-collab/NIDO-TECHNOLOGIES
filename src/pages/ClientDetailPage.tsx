@@ -24,12 +24,12 @@ import {
   Clock,
 } from "lucide-react";
 import RolesPage from "./ClientRolesPage";
-import UsersPage from "./ClienUsersPage";
-import OrdersPage from "./ClienOrdersPage";
-import ServicesPage from "./ClienServicesPage";
-import CatalogPage from "./ClienCatalogPage";
-import ActivityPage from "./ClienActivityPage";
-import ConfigurationPage from "./ClienConfigurationPage";
+import UsersPage from "./ClientUsersPage";
+import OrdersPage from "./ClientOrdersPage";
+import ServicesPage from "./ClientServicesPage";
+import CatalogPage from "./ClientCatalogPage";
+import ActivityPage from "./ClientActivityPage";
+import ConfigurationPage from "./ClientConfigurationPage";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
