@@ -265,7 +265,7 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function CatalogPage() {
+export default function ClientCatalogPage() {
   const [search, setSearch] = useState("");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
