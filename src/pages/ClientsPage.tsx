@@ -16,8 +16,8 @@ import {
 export default function ClientsPageUI() {
   const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState("All")
-  const [showAddClient, setShowAddClient] = useState(false)
   const [showArchivedClients, setShowArchivedClients] = useState(false)
+  const [selectedArchivedClient, setSelectedArchivedClient] = useState<any>(null)
 
   const stats = {
     premium: 0,
@@ -32,16 +32,34 @@ export default function ClientsPageUI() {
       name: "Archived Client 1",
       rep: "Rep Name",
       email: "archived@example.com",
+      phone: "+91 98765 43210",
+      mobile: "+91 99876 54321",
+      website: "www.archivedclient1.com",
+      category: "IT Hardware",
       status: "archived",
       archivedOn: "2025-11-01",
+      contractEndDate: "2025-11-01",
+      billingAddress: "123 Business Street",
+      billingCity: "Mumbai",
+      billingState: "Maharashtra",
+      billingPincode: "400001",
     },
     {
       id: "CI-00098",
       name: "Archived Client 2",
       rep: "Rep Name",
       email: "archived2@example.com",
+      phone: "+91 99876 54321",
+      mobile: "+91 98765 43210",
+      website: "www.archivedclient2.com",
+      category: "Cloud Servers",
       status: "archived",
       archivedOn: "2025-10-15",
+      contractEndDate: "2025-10-15",
+      billingAddress: "456 Corporate Plaza",
+      billingCity: "Bangalore",
+      billingState: "Karnataka",
+      billingPincode: "560001",
     },
   ]
 
@@ -121,7 +139,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowAddClient(true)}>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/add-client')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Client
               </DropdownMenuItem>
@@ -297,63 +315,6 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
         </Card>
       </div>
 
-      {/* Add Client Modal */}
-      {showAddClient && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
-              <h2 className="text-lg font-semibold">Add New Client</h2>
-              <button onClick={() => setShowAddClient(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Company Name</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter company name" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
-                <select className="w-full px-3 py-2 border rounded-lg">
-                  <option>IT Hardware</option>
-                  <option>Cloud Servers</option>
-                  <option>Office Supplies</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Contact Person</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter contact name" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
-                  <input type="email" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter email" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Phone</label>
-                  <input type="tel" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter phone" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contract Start Date</label>
-                  <input type="date" className="w-full px-3 py-2 border rounded-lg" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Contract End Date</label>
-                  <input type="date" className="w-full px-3 py-2 border rounded-lg" />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 p-6 border-t">
-              <button onClick={() => setShowAddClient(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={() => {
-                setShowAddClient(false)
-                navigate('/add-client')
-              }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Continue to Full Form</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Archived Clients Modal */}
       {showArchivedClients && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -377,7 +338,12 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                   <tbody>
                     {archivedClients.map((client) => (
                       <tr key={client.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 text-sm">{client.id}</td>
+                        <td 
+                          className="py-3 px-4 text-sm text-blue-600 font-medium cursor-pointer hover:underline"
+                          onClick={() => setSelectedArchivedClient(client)}
+                        >
+                          {client.id}
+                        </td>
                         <td className="py-3 px-4 text-sm font-medium">{client.name}</td>
                         <td className="py-3 px-4 text-sm">{client.rep}</td>
                         <td className="py-3 px-4 text-sm">{client.email}</td>
@@ -393,6 +359,122 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             </div>
             <div className="flex justify-end gap-2 p-6 border-t">
               <button onClick={() => setShowArchivedClients(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archived Client Detail Modal */}
+      {selectedArchivedClient && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
+              <h2 className="text-lg font-semibold">Client Details - {selectedArchivedClient.id}</h2>
+              <button 
+                onClick={() => setSelectedArchivedClient(null)} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Basic Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Client ID</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Company Name</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Category</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.category}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Contact Person</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.rep}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Contact Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Email</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Phone</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Mobile</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.mobile}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Website</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.website}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing Address */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Billing Address</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500 font-medium mb-1">Address</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingAddress}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">City</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingCity}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">State</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingState}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Pincode</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingPincode}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Archive Information */}
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Archive Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Archived On</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.archivedOn}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 font-medium mb-1">Contract End Date</p>
+                    <p className="text-sm text-gray-900">{selectedArchivedClient.contractEndDate}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-xs text-gray-500 font-medium mb-2">Status</p>
+                <Badge className="bg-red-100 text-red-800 capitalize">{selectedArchivedClient.status}</Badge>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-6 border-t">
+              <button 
+                onClick={() => setSelectedArchivedClient(null)} 
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
