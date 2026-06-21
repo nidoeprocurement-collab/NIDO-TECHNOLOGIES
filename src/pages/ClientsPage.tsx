@@ -144,7 +144,16 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                 Add Client
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                const csv = clients.map(c => `${c.id},${c.name},${c.rep},${c.email},${c.status}`).join('\n')
+                const clientsData = [
+                  { id: "CI-00019", name: "Raj Manufacturing", rep: "Rajesh Kumar", email: "rajesh@gmail.com", status: "active" },
+                  { id: "CI-00018", name: "Tech Solutions Ltd", rep: "Amit Singh", email: "amit@gmail.com", status: "active" },
+                  { id: "CI-00017", name: "Global Exports", rep: "Priya Sharma", email: "priya@gmail.com", status: "pending" },
+                  { id: "CI-00016", name: "Express IT Services", rep: "Vikram Patel", email: "vikram@gmail.com", status: "active" },
+                  { id: "CI-00015", name: "Digital Innovations", rep: "Anita Desai", email: "anita@gmail.com", status: "active" },
+                  { id: "CI-00021", name: "Mohan Textiles", rep: "Mohan Bhat", email: "mohanbhat@gmail.com", status: "active" },
+                  { id: "CI-00008", name: "Naveen Solutions", rep: "Naveen Kumar", email: "naveenkumar@gmail.com", status: "active" },
+                ]
+                const csv = clientsData.map(c => `${c.id},${c.name},${c.rep},${c.email},${c.status}`).join('\n')
                 const headers = 'Client ID,Name,Representative,Email,Status\n'
                 const blob = new Blob([headers + csv], { type: 'text/csv' })
                 const url = URL.createObjectURL(blob)
