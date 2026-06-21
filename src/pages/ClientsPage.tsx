@@ -18,6 +18,8 @@ export default function ClientsPageUI() {
   const [activeFilter, setActiveFilter] = useState("All")
   const [showArchivedClients, setShowArchivedClients] = useState(false)
   const [selectedArchivedClient, setSelectedArchivedClient] = useState<any>(null)
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [importedClients, setImportedClients] = useState<any[]>([])
 
   const stats = {
     premium: 0,
@@ -77,6 +79,84 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  const handleBulkImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const csv = e.target?.result as string
+        const lines = csv.split('\n')
+        const headers = lines[0].split(',').map(h => h.trim())
+        
+        // Get the highest existing client ID to auto-generate new ones
+        const maxId = clients.length > 0 
+          ? Math.max(...clients.map(c => parseInt(c.id.replace('CI-', '')))) 
+          : 24
+
+        const newClients = lines.slice(1)
+          .filter(line => line.trim())
+          .map((line, index) => {
+            const values = line.split(',').map(v => v.trim())
+            const clientData: any = {}
+            
+            headers.forEach((header, idx) => {
+              const value = values[idx] || '' // Keep blank fields as empty strings
+              clientData[header] = value
+            })
+
+            // Auto-generate client ID if not provided
+            if (!clientData['Client ID'] || clientData['Client ID'] === '') {
+              clientData['Client ID'] = `CI-${String(maxId + index + 1).padStart(5, '0')}`
+            }
+
+            return {
+              id: clientData['Client ID'],
+              name: clientData['Company Name'] || '',
+              category: clientData['Category'] || '',
+              tier: clientData['Client Tier'] || '',
+              rep: clientData['Contact Person'] || '',
+              email: clientData['Email'] || '',
+              phone: clientData['Phone'] || '',
+              mobile: clientData['Mobile'] || '',
+              website: clientData['Website'] || '',
+              contractStartDate: clientData['Contract Start Date'] || '',
+              contractEndDate: clientData['Contract End Date'] || '',
+              gstTreatment: clientData['GST Treatment'] || '',
+              gstin: clientData['GSTIN'] || '',
+              sourceOfSupply: clientData['Source of Supply'] || '',
+              pan: clientData['PAN Number'] || '',
+              currency: clientData['Currency'] || '',
+              openingBalance: clientData['Opening Balance'] || '',
+              paymentTerms: clientData['Payment Terms'] || '',
+              tdsRate: clientData['TDS Rate'] || '',
+              bankName: clientData['Bank Name'] || '',
+              accountNumber: clientData['Account Number'] || '',
+              ifscCode: clientData['IFSC Code'] || '',
+              branch: clientData['Branch'] || '',
+              billingAddress: clientData['Billing Address'] || '',
+              billingCity: clientData['Billing City'] || '',
+              billingState: clientData['Billing State'] || '',
+              billingPincode: clientData['Billing Pincode'] || '',
+              shippingAddress: clientData['Shipping Address'] || '',
+              shippingCity: clientData['Shipping City'] || '',
+              shippingState: clientData['Shipping State'] || '',
+              shippingPincode: clientData['Shipping Pincode'] || '',
+              status: 'active'
+            }
+          })
+
+        setImportedClients(newClients)
+        setShowBulkImport(false)
+      } catch (error) {
+        console.error('Error parsing CSV:', error)
+        alert('Error parsing CSV file. Please check the format.')
+      }
+    }
+    reader.readAsText(file)
   }
 
   const clients = [
@@ -167,7 +247,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                 <Download className="h-4 w-4 mr-2" />
                 Export Clients
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowBulkImport(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 Bulk Import
               </DropdownMenuItem>
@@ -260,7 +340,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
               </thead>
 
               <tbody>
-                {clients.map((c, i) => (
+                {[...clients, ...importedClients].map((c, i) => (
                   <tr
                     key={i}
                     className="border-b hover:bg-gray-50"
@@ -484,6 +564,42 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      {showBulkImport && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-lg font-semibold">Bulk Import Clients</h2>
+              <button onClick={() => setShowBulkImport(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Upload CSV File</label>
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-gray-400 transition-colors">
+                  <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                  <span className="text-sm text-gray-600">Click to upload or drag and drop</span>
+                  <span className="text-xs text-gray-500 mt-1">CSV file</span>
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    onChange={handleBulkImport}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>Note:</strong> Use the template downloaded from "Download Template" option. Client IDs will be auto-generated if not provided. Blank fields will be kept as empty.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-6 border-t">
+              <button onClick={() => setShowBulkImport(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
             </div>
           </div>
         </div>
