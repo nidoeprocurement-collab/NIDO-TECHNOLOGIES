@@ -2452,7 +2452,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
   );
 }
 
-export default function UsersPage() {
+export default function ClientUsersPage() {
   const [users, setUsers] = useState<UserRecord[]>([...usersData]);
   const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
