@@ -591,7 +591,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
   );
 }
 
-export default function RolesPage() {
+export default function ClientRolesPage() {
   const [rolesState, setRolesState] = useState(roles);
   const [showNewRole, setShowNewRole] = useState(false);
   const [editingRole, setEditingRole] = useState<typeof roles[0] | null>(null);
