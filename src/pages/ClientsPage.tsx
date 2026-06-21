@@ -16,12 +16,49 @@ import {
 export default function ClientsPageUI() {
   const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState("All")
+  const [showAddClient, setShowAddClient] = useState(false)
+  const [showArchivedClients, setShowArchivedClients] = useState(false)
 
   const stats = {
     premium: 0,
     active: 14,
     pending: 0,
     inactive: 0,
+  }
+
+  const archivedClients = [
+    {
+      id: "CI-00099",
+      name: "Archived Client 1",
+      rep: "Rep Name",
+      email: "archived@example.com",
+      status: "archived",
+      archivedOn: "2025-11-01",
+    },
+    {
+      id: "CI-00098",
+      name: "Archived Client 2",
+      rep: "Rep Name",
+      email: "archived2@example.com",
+      status: "archived",
+      archivedOn: "2025-10-15",
+    },
+  ]
+
+  const handleDownloadTemplate = () => {
+    // Create a CSV template with client onboarding details
+    const template = `Client ID,Company Name,Category,Client Tier,Contact Person,Email,Phone,Mobile,Website,Contract Start Date,Contract End Date,GST Treatment,GSTIN,Source of Supply,PAN Number,Currency,Opening Balance,Payment Terms,TDS Rate,Bank Name,Account Number,IFSC Code,Branch,Billing Address,Billing City,Billing State,Billing Pincode,Shipping Address,Shipping City,Shipping State,Shipping Pincode
+CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 98765 43210,+91 99876 54321,www.company.com,2024-01-01,2025-01-01,Registered Business,27AABCT1234A1Z5,Maharashtra,AAAAA0000A,INR,50000,Net 30,1.0,ICIC Bank,9876543210,ICIC0001234,Mumbai,123 Business Street,Mumbai,Maharashtra,400001,123 Business Street,Mumbai,Maharashtra,400001`
+
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'client-template.csv')
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const clients = [
@@ -84,11 +121,22 @@ export default function ClientsPageUI() {
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowAddClient(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Client
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                const csv = clients.map(c => `${c.id},${c.name},${c.rep},${c.email},${c.status}`).join('\n')
+                const headers = 'Client ID,Name,Representative,Email,Status\n'
+                const blob = new Blob([headers + csv], { type: 'text/csv' })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = 'clients-export.csv'
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+              }}>
                 <Download className="h-4 w-4 mr-2" />
                 Export Clients
               </DropdownMenuItem>
@@ -96,11 +144,11 @@ export default function ClientsPageUI() {
                 <Upload className="h-4 w-4 mr-2" />
                 Bulk Import
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={handleDownloadTemplate}>
                 <FileDown className="h-4 w-4 mr-2" />
                 Download Template
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchivedClients(true)}>
                 <Archive className="h-4 w-4 mr-2" />
                 Archived Clients
               </DropdownMenuItem>
@@ -248,6 +296,107 @@ export default function ClientsPageUI() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Client Modal */}
+      {showAddClient && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
+              <h2 className="text-lg font-semibold">Add New Client</h2>
+              <button onClick={() => setShowAddClient(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Company Name</label>
+                <input type="text" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter company name" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Category</label>
+                <select className="w-full px-3 py-2 border rounded-lg">
+                  <option>IT Hardware</option>
+                  <option>Cloud Servers</option>
+                  <option>Office Supplies</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Contact Person</label>
+                <input type="text" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter contact name" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email</label>
+                  <input type="email" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter email" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Phone</label>
+                  <input type="tel" className="w-full px-3 py-2 border rounded-lg" placeholder="Enter phone" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Contract Start Date</label>
+                  <input type="date" className="w-full px-3 py-2 border rounded-lg" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Contract End Date</label>
+                  <input type="date" className="w-full px-3 py-2 border rounded-lg" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-6 border-t">
+              <button onClick={() => setShowAddClient(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+              <button onClick={() => {
+                setShowAddClient(false)
+                navigate('/add-client')
+              }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Continue to Full Form</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archived Clients Modal */}
+      {showArchivedClients && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
+              <h2 className="text-lg font-semibold">Archived Clients</h2>
+              <button onClick={() => setShowArchivedClients(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="p-6">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4 font-semibold text-sm">Client ID</th>
+                      <th className="text-left py-3 px-4 font-semibold text-sm">Company Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-sm">Representative</th>
+                      <th className="text-left py-3 px-4 font-semibold text-sm">Email</th>
+                      <th className="text-left py-3 px-4 font-semibold text-sm">Archived On</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archivedClients.map((client) => (
+                      <tr key={client.id} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4 text-sm">{client.id}</td>
+                        <td className="py-3 px-4 text-sm font-medium">{client.name}</td>
+                        <td className="py-3 px-4 text-sm">{client.rep}</td>
+                        <td className="py-3 px-4 text-sm">{client.email}</td>
+                        <td className="py-3 px-4 text-sm">{client.archivedOn}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {archivedClients.length === 0 && (
+                <div className="text-center py-8 text-gray-500">No archived clients found</div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 p-6 border-t">
+              <button onClick={() => setShowArchivedClients(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
