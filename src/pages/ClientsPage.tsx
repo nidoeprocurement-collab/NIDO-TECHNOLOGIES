@@ -139,7 +139,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('clients/add')}>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/clients/add')}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Client
               </DropdownMenuItem>
