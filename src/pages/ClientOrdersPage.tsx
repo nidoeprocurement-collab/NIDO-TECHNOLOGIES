@@ -115,7 +115,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function OrdersPage() {
+export default function ClientOrdersPage() {
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
