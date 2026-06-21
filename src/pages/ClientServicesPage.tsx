@@ -137,7 +137,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function ServicesPage() {
+export default function ClientServicesPage() {
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Category");
