@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
 import { StatusBadge, usersData } from "./ClientUsersPage";
 
-export default function ConfigurationPage() {
+export default function ClientConfigurationPage() {
   const [configTab, setConfigTab] = useState("General");
   const configTabs = ["General", "Invite Users"];
 
