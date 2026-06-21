@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
-import { usersData } from "./ClientUsersPage";
+import { StatusBadge, usersData } from "./ClientUsersPage";
 
 export default function ConfigurationPage() {
   const [configTab, setConfigTab] = useState("General");

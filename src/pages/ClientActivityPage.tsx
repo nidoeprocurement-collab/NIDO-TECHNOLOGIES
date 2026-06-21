@@ -31,7 +31,7 @@ const activityItems = [
   },
 ];
 
-export default function ActivityPage() {
+export default function ClientActivityPage() {
   const [page, setPage] = useState(1);
 
   return (
