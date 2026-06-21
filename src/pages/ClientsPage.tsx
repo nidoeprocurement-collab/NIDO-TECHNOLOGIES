@@ -20,6 +20,18 @@ export default function ClientsPageUI() {
   const [selectedArchivedClient, setSelectedArchivedClient] = useState<any>(null)
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [importedClients, setImportedClients] = useState<any[]>([])
+  const [editingClient, setEditingClient] = useState<any>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [allClients, setAllClients] = useState<any[]>([
+    { id: "CI-00019", name: "Raj Manufacturing", category: "IT Hardware", tier: "Premium", rep: "Rajesh Kumar", email: "rajesh@gmail.com", phone: "+91 98765 43210", mobile: "+91 99876 54321", website: "www.rajmfg.com", contractStartDate: "2024-01-01", contractEndDate: "2025-01-01", status: "active", billingAddress: "123 Tech Street", billingCity: "Mumbai", billingState: "Maharashtra", billingPincode: "400001" },
+    { id: "CI-00018", name: "Tech Solutions Ltd", category: "Cloud Servers", tier: "Standard", rep: "Amit Singh", email: "amit@gmail.com", phone: "+91 87654 32109", mobile: "+91 88765 43210", website: "www.techsol.com", contractStartDate: "2024-02-01", contractEndDate: "2025-02-01", status: "active", billingAddress: "456 IT Park", billingCity: "Bangalore", billingState: "Karnataka", billingPincode: "560001" },
+    { id: "CI-00017", name: "Global Exports", category: "Office Supplies", tier: "Basic", rep: "Priya Sharma", email: "priya@gmail.com", phone: "+91 76543 21098", mobile: "+91 77654 32109", website: "www.globalexp.com", contractStartDate: "2024-03-01", contractEndDate: "2025-03-01", status: "pending", billingAddress: "789 Export Plaza", billingCity: "Delhi", billingState: "Delhi", billingPincode: "110001" },
+    { id: "CI-00016", name: "Express IT Services", category: "IT Hardware", tier: "Premium", rep: "Vikram Patel", email: "vikram@gmail.com", phone: "+91 65432 10987", mobile: "+91 66543 21098", website: "www.expressit.com", contractStartDate: "2024-04-01", contractEndDate: "2025-04-01", status: "active", billingAddress: "321 Tech Hub", billingCity: "Hyderabad", billingState: "Telangana", billingPincode: "500001" },
+    { id: "CI-00015", name: "Digital Innovations", category: "Cloud Servers", tier: "Standard", rep: "Anita Desai", email: "anita@gmail.com", phone: "+91 54321 09876", mobile: "+91 55432 10987", website: "www.diginnovate.com", contractStartDate: "2024-05-01", contractEndDate: "2025-05-01", status: "active", billingAddress: "654 Innovation Drive", billingCity: "Pune", billingState: "Maharashtra", billingPincode: "411001" },
+    { id: "CI-00021", name: "Mohan Textiles", category: "Office Supplies", tier: "Basic", rep: "Mohan Bhat", email: "mohanbhat@gmail.com", phone: "+91 43210 98765", mobile: "+91 44321 09876", website: "www.mohantex.com", contractStartDate: "2024-06-01", contractEndDate: "2025-06-01", status: "active", billingAddress: "987 Textile Park", billingCity: "Surat", billingState: "Gujarat", billingPincode: "395001" },
+    { id: "CI-00008", name: "Naveen Solutions", category: "IT Hardware", tier: "Standard", rep: "Naveen Kumar", email: "naveenkumar@gmail.com", phone: "+91 32109 87654", mobile: "+91 33210 98765", website: "www.naveensol.com", contractStartDate: "2024-07-01", contractEndDate: "2025-07-01", status: "active", billingAddress: "147 Business Plaza", billingCity: "Ahmedabad", billingState: "Gujarat", billingPincode: "380001" },
+  ])
+  const [archivedClientsList, setArchivedClientsList] = useState<any[]>(archivedClients)
 
   const stats = {
     premium: 0,
@@ -340,7 +352,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
               </thead>
 
               <tbody>
-                {[...clients, ...importedClients].map((c, i) => (
+                {[...allClients, ...importedClients].map((c, i) => (
                   <tr
                     key={i}
                     className="border-b hover:bg-gray-50"
@@ -376,11 +388,19 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                         </DropdownMenuTrigger>
 
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            View Details
+                          <DropdownMenuItem onClick={() => {
+                            setEditingClient(c)
+                            setShowEditModal(true)
+                          }}>
+                            Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem 
+                            className="text-red-600 cursor-pointer"
+                            onClick={() => {
+                              setAllClients(allClients.filter(client => client.id !== c.id))
+                              setArchivedClientsList([...archivedClientsList, { ...c, status: 'archived', archivedOn: new Date().toISOString().split('T')[0] }])
+                            }}
+                          >
                             Archive
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -425,7 +445,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                     </tr>
                   </thead>
                   <tbody>
-                    {archivedClients.map((client) => (
+                    {archivedClientsList.map((client) => (
                       <tr key={client.id} className="border-b hover:bg-gray-50">
                         <td 
                           className="py-3 px-4 text-sm text-blue-600 font-medium cursor-pointer hover:underline"
@@ -442,7 +462,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                   </tbody>
                 </table>
               </div>
-              {archivedClients.length === 0 && (
+              {archivedClientsList.length === 0 && (
                 <div className="text-center py-8 text-gray-500">No archived clients found</div>
               )}
             </div>
@@ -600,6 +620,204 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             </div>
             <div className="flex justify-end gap-2 p-6 border-t">
               <button onClick={() => setShowBulkImport(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Modal */}
+      {showEditModal && editingClient && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
+              <h2 className="text-lg font-semibold">Edit Client - {editingClient.id}</h2>
+              <button 
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingClient(null)
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Basic Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Company Name</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.name}
+                      onChange={(e) => setEditingClient({ ...editingClient, name: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.category}
+                      onChange={(e) => setEditingClient({ ...editingClient, category: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Client Tier</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.tier}
+                      onChange={(e) => setEditingClient({ ...editingClient, tier: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Contact Person</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.rep}
+                      onChange={(e) => setEditingClient({ ...editingClient, rep: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Contact Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                    <input 
+                      type="email" 
+                      defaultValue={editingClient.email}
+                      onChange={(e) => setEditingClient({ ...editingClient, email: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                    <input 
+                      type="tel" 
+                      defaultValue={editingClient.phone}
+                      onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Mobile</label>
+                    <input 
+                      type="tel" 
+                      defaultValue={editingClient.mobile}
+                      onChange={(e) => setEditingClient({ ...editingClient, mobile: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Website</label>
+                    <input 
+                      type="url" 
+                      defaultValue={editingClient.website}
+                      onChange={(e) => setEditingClient({ ...editingClient, website: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Contract Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Contract Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Contract Start Date</label>
+                    <input 
+                      type="date" 
+                      defaultValue={editingClient.contractStartDate}
+                      onChange={(e) => setEditingClient({ ...editingClient, contractStartDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Contract End Date</label>
+                    <input 
+                      type="date" 
+                      defaultValue={editingClient.contractEndDate}
+                      onChange={(e) => setEditingClient({ ...editingClient, contractEndDate: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing Address */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Billing Address</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.billingAddress}
+                      onChange={(e) => setEditingClient({ ...editingClient, billingAddress: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.billingCity}
+                      onChange={(e) => setEditingClient({ ...editingClient, billingCity: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">State</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.billingState}
+                      onChange={(e) => setEditingClient({ ...editingClient, billingState: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Pincode</label>
+                    <input 
+                      type="text" 
+                      defaultValue={editingClient.billingPincode}
+                      onChange={(e) => setEditingClient({ ...editingClient, billingPincode: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-6 border-t">
+              <button 
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingClient(null)
+                }}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setAllClients(allClients.map(client => 
+                    client.id === editingClient.id ? editingClient : client
+                  ))
+                  setShowEditModal(false)
+                  setEditingClient(null)
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
         </div>
