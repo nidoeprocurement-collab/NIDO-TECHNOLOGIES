@@ -23,13 +23,13 @@ import {
   FileText,
   Clock,
 } from "lucide-react";
-import RolesPage from "./RolesPage";
-import UsersPage from "./UsersPage";
-import OrdersPage from "./OrdersPage";
-import ServicesPage from "./ServicesPage";
-import CatalogPage from "./CatalogPage";
-import ActivityPage from "./ActivityPage";
-import ConfigurationPage from "./ConfigurationPage";
+import RolesPage from "./ClientRolesPage";
+import UsersPage from "./ClienUsersPage";
+import OrdersPage from "./ClienOrdersPage";
+import ServicesPage from "./ClienServicesPage";
+import CatalogPage from "./ClienCatalogPage";
+import ActivityPage from "./ClienActivityPage";
+import ConfigurationPage from "./ClienConfigurationPage";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
