@@ -25,6 +25,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { servicesData } from "./ClientServicesPage";
+import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
+import { CircleCheck } from "./ClientRolesPage";
 
 
 export const usersData = [
