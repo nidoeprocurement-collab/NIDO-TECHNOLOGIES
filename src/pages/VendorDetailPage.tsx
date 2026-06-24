@@ -38,7 +38,7 @@ const VendorDetailPage = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header Section */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           {/* Vendor Info Row */}
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-start gap-4">
@@ -81,8 +81,8 @@ const VendorDetailPage = () => {
             </div>
 
             {/* Primary Contact */}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-6 w-72 flex-shrink-0">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">Primary Contact</h3>
+            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 w-72 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Primary Contact</h3>
               
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
@@ -114,7 +114,7 @@ const VendorDetailPage = () => {
           </div>
 
           {/* Metrics Cards */}
-          <div className="grid grid-cols-6 gap-4 pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-6 gap-3 pt-3 border-t border-gray-200">
             {/* Rating */}
             <div className="pt-4">
               <div className="flex items-center gap-2 mb-2">
@@ -201,12 +201,12 @@ const VendorDetailPage = () => {
 
       {/* Overview Tab Content */}
       {activeTab === 'overview' && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid grid-cols-3 gap-8">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="grid grid-cols-3 gap-4">
             {/* Left Column - Vendor Information */}
             <div>
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   Vendor Information
                   <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
                 </h2>
@@ -261,7 +261,7 @@ const VendorDetailPage = () => {
             </div>
 
             {/* Middle Column - Address & Categories */}
-            <div className="space-y-8">
+            <div className="space-y-4">
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                   Address Information
@@ -327,7 +327,7 @@ const VendorDetailPage = () => {
             </div>
 
             {/* Right Column - Payment Details & Performance */}
-            <div className="space-y-8">
+            <div className="space-y-4">
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                   Business & Payment Details
