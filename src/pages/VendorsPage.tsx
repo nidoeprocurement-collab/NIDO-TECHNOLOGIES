@@ -373,24 +373,24 @@ export default function App() {
 
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif] p-4 gap-3">
+    <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif] p-3 gap-2">
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-shrink-0">
+      <div className="flex items-center justify-between flex-shrink-0 py-1">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 leading-tight">Vendors List</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Manage and monitor all your vendor relationships in one place</p>
+          <h1 className="text-lg font-bold text-gray-900 leading-tight">Vendors List</h1>
+          <p className="text-xs text-gray-400 mt-0">Manage and monitor all your vendor relationships</p>
         </div>
         <TopMenu onArchived={() => setShowArchived(true)} onOnboarding={() => navigate('/vendors/onboarding')} />
       </div>
 
       {/* Stats tiles */}
-      <div className="grid grid-cols-6 gap-3 flex-shrink-0">
+      <div className="grid grid-cols-4 gap-2 flex-shrink-0">
         {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>{s.icon}</div>
+          <div key={s.label} className="bg-white rounded-lg border border-gray-100 shadow-sm p-2 flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>{s.icon}</div>
             <div className="min-w-0">
-              <p className="text-base font-bold text-gray-900 leading-tight">{s.value}</p>
+              <p className="text-sm font-bold text-gray-900 leading-tight">{s.value}</p>
               <p className="text-xs text-gray-500 leading-tight truncate">{s.label}</p>
             </div>
           </div>
