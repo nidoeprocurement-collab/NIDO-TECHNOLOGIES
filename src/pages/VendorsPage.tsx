@@ -385,10 +385,10 @@ export default function App() {
       </div>
 
       {/* Stats tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 flex-shrink-0">
+      <div className="grid grid-cols-6 gap-1.5 flex-shrink-0">
         {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-md border border-gray-100 shadow-sm p-2 flex items-center gap-2">
-            <div className={`w-6 h-6 rounded-md ${s.bg} flex items-center justify-center flex-shrink-0 text-xs`}>{s.icon}</div>
+          <div key={s.label} className="bg-white rounded-md border border-gray-100 shadow-sm p-3 py-4 flex flex-col items-center justify-center gap-1 text-center">
+            <div className={`w-5 h-5 rounded-md ${s.bg} flex items-center justify-center flex-shrink-0 text-xs`}>{s.icon}</div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-gray-900 leading-tight">{s.value}</p>
               <p className="text-xs text-gray-500 leading-tight truncate">{s.label}</p>
@@ -416,15 +416,15 @@ export default function App() {
         <div className="flex-1 min-h-0 overflow-hidden">
           <table className="w-full h-full table-fixed text-xs border-collapse">
             <colgroup>
-              <col style={{ width: "7%" }} />
-              <col style={{ width: "13%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "19%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "16%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "11%" }} />
-              <col style={{ width: "5%" }} />
-              <col style={{ width: "5%" }} />
-              <col style={{ width: "6%" }} />
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "9%" }} />
+              <col style={{ width: "10%" }} />
               <col style={{ width: "7%" }} />
-              <col style={{ width: "5%" }} />
             </colgroup>
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
