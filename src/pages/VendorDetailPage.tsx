@@ -202,9 +202,9 @@ const VendorDetailPage = () => {
       {/* Overview Tab Content */}
       {activeTab === 'overview' && (
         <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-12 gap-3">
             {/* Left Column - Vendor Information */}
-            <div>
+            <div className="col-span-3">
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                   Vendor Information
@@ -261,35 +261,35 @@ const VendorDetailPage = () => {
             </div>
 
             {/* Middle Column - Address & Categories */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="col-span-3 space-y-3">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
                   Address Information
                   <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
                 </h2>
 
-                <div className="space-y-6">
+                <div className="space-y-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Registered Address</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Registered Address</h3>
                     <p className="text-sm text-gray-600">Divyasree Greens, #12/1, Challaghatta Village, Varthur Hobli, Bangalore – 560071, Karnataka, India</p>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Billing Address</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Billing Address</h3>
                     <p className="text-sm text-gray-600">DLF Cyber City, Tower C, 8th Floor, Gurugram – 122002, Haryana, India</p>
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Shipping Address</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Shipping Address</h3>
                     <p className="text-sm text-gray-600">Same as Billing Address</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6">Categories & Products</h2>
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-3">Categories & Products</h2>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
                     <p className="text-xs text-gray-500 font-medium mb-3">Primary Categories</p>
                     <div className="flex flex-wrap gap-2">
@@ -300,8 +300,8 @@ const VendorDetailPage = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-100">
-                    <div className="grid grid-cols-4 gap-3">
+                  <div className="pt-2 border-t border-gray-100">
+                    <div className="grid grid-cols-4 gap-2">
                       <div>
                         <p className="text-xs text-gray-500 font-medium">Total Products</p>
                         <p className="text-lg font-bold text-gray-900">128</p>
@@ -321,20 +321,20 @@ const VendorDetailPage = () => {
                     </div>
                   </div>
 
-                  <button className="text-blue-600 text-sm font-medium hover:underline mt-4">View All Products →</button>
+                  <button className="text-blue-600 text-sm font-medium hover:underline mt-2">View All Products →</button>
                 </div>
               </div>
             </div>
 
             {/* Right Column - Payment Details & Performance */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="col-span-3 space-y-3">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
                   Business & Payment Details
                   <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
                 </h2>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
                     <p className="text-xs text-gray-500 font-medium">Payment Terms</p>
                     <p className="text-sm text-gray-900 font-medium">Net 30</p>
@@ -355,7 +355,7 @@ const VendorDetailPage = () => {
                     <p className="text-xs text-gray-500 font-medium">Available Credit</p>
                     <p className="text-sm text-green-600 font-medium">₹2,75,00,000</p>
                   </div>
-                  <div className="pt-4 border-t border-gray-100">
+                  <div className="pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500 font-medium">Bank Name</p>
                     <p className="text-sm text-gray-900 font-medium">HDFC Bank</p>
                   </div>
