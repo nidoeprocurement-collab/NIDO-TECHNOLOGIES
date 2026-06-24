@@ -373,7 +373,7 @@ export default function App() {
 
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif] p-3 gap-2">
+    <div className="w-full h-screen overflow-hidden flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif] px-4 py-3 gap-2 mx-auto max-w-6xl">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0 py-1">
@@ -385,12 +385,12 @@ export default function App() {
       </div>
 
       {/* Stats tiles */}
-      <div className="grid grid-cols-4 gap-2 flex-shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 flex-shrink-0">
         {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-lg border border-gray-100 shadow-sm p-2 flex items-center gap-2">
-            <div className={`w-7 h-7 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>{s.icon}</div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900 leading-tight">{s.value}</p>
+          <div key={s.label} className="bg-white rounded-md border border-gray-100 shadow-sm p-2 flex items-center gap-2">
+            <div className={`w-6 h-6 rounded-md ${s.bg} flex items-center justify-center flex-shrink-0 text-xs`}>{s.icon}</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-gray-900 leading-tight">{s.value}</p>
               <p className="text-xs text-gray-500 leading-tight truncate">{s.label}</p>
             </div>
           </div>
