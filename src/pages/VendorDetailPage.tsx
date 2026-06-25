@@ -348,5 +348,3 @@ function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode 
     </div>
   );
 }
-
-
