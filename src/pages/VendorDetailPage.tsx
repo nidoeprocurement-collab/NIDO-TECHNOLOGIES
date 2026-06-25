@@ -349,6 +349,66 @@ function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode 
   );
 }
 
+// Products Tab - Shows vendor products
+function ProductsTab() {
+  const sampleProducts = [
+    { id: 1, name: "Enterprise Server Rack", sku: "SRV-001", category: "Hardware", price: "₹2,50,000", stock: 45, status: "Active" },
+    { id: 2, name: "Network Switch 48P", sku: "NSW-048", category: "Networking", price: "₹1,75,000", stock: 12, status: "Active" },
+    { id: 3, name: "Database License Pack", sku: "DBL-100", category: "Software", price: "₹5,00,000", stock: 0, status: "Out of Stock" },
+    { id: 4, name: "Cloud Storage 1TB", sku: "CLD-001", category: "Services", price: "₹12,000/mo", stock: "Unlimited", status: "Active" },
+    { id: 5, name: "IT Support Contract", sku: "SUP-YR1", category: "Services", price: "₹8,50,000", stock: "Available", status: "Active" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Products & Services</h2>
+          <p className="text-sm text-gray-600 mt-1">Manage and view all products offered by this vendor</p>
+        </div>
+        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Add Product</button>
+      </div>
+
+      {/* Products Table */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Product Name</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">SKU</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Category</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Price</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Stock</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Status</th>
+              <th className="px-6 py-3 text-center font-semibold text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {sampleProducts.map((product) => (
+              <tr key={product.id} className="hover:bg-gray-50">
+                <td className="px-6 py-3 font-medium text-gray-900">{product.name}</td>
+                <td className="px-6 py-3 text-gray-600">{product.sku}</td>
+                <td className="px-6 py-3 text-gray-600">{product.category}</td>
+                <td className="px-6 py-3 text-gray-900 font-semibold">{product.price}</td>
+                <td className="px-6 py-3 text-gray-600">{product.stock}</td>
+                <td className="px-6 py-3">
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${product.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}>
+                    {product.status}
+                  </span>
+                </td>
+                <td className="px-6 py-3 text-center">
+                  <button className="text-blue-600 hover:text-blue-700 text-xs font-medium">View</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── main page ─────────────────────────────────────────────────────────────────
 const TABS = [
   { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
@@ -482,7 +542,7 @@ export default function VendorDetail() {
       {/* ── Page body ────────────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-5">
         {activeTab === "overview" && <OverviewTab />}
-        {activeTab === "products" && <PlaceholderTab label="Products" icon={<Package className="w-6 h-6" />} />}
+        {activeTab === "products" && <ProductsTab />}
         {activeTab === "orders" && <PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} />}
         {activeTab === "performance" && <PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} />}
         {activeTab === "contracts" && <PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} />}
