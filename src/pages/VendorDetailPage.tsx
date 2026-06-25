@@ -29,7 +29,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
