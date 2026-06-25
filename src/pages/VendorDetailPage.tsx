@@ -32,6 +32,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import VendorProductsPage from "./VendorProductsPage";
 import VendorOrdersPage from "./VendorOrdersPage";
+import VendorContractsPage from "./VendorContractsPage";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -486,7 +487,7 @@ export default function VendorDetail() {
         {activeTab === "products" && <VendorProductsPage />}
         {activeTab === "orders" && <VendorOrdersPage />}
         {activeTab === "performance" && <div className="px-6 py-5"><PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} /></div>}
-        {activeTab === "contracts" && <div className="px-6 py-5"><PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} /></div>}
+        {activeTab === "contracts" && <VendorContractsPage />}
         {activeTab === "documents" && <div className="px-6 py-5"><PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} /></div>}
         {activeTab === "payments" && <div className="px-6 py-5"><PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} /></div>}
         {activeTab === "news" && <div className="px-6 py-5"><PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} /></div>}
