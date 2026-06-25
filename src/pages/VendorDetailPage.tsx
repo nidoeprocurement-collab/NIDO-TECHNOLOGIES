@@ -1,535 +1,499 @@
-'use client';
+import { useState } from "react";
+import {
+  Star,
+  Phone,
+  Mail,
+  MessageSquare,
+  ChevronLeft,
+  Building2,
+  MapPin,
+  CreditCard,
+  FileText,
+  Package,
+  ShoppingCart,
+  TrendingUp,
+  ClipboardList,
+  Newspaper,
+  DollarSign,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  ArrowUpRight,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+import { useNavigate } from "react-router";
 
-import React, { useState } from 'react';
-import { Star, TrendingUp, ShoppingCart, CheckCircle, Award, FileText, CreditCard, MessageSquare, Phone, Mail, MapPin, Edit2, BarChart3, Eye } from 'lucide-react';
+// ── helpers ──────────────────────────────────────────────────────────────────
+function fmt(n: number) {
+  return "₹" + n.toLocaleString("en-IN");
+}
 
-const VendorDetailPage = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'products', label: 'Products (128)' },
-    { id: 'orders', label: 'Orders (156)' },
-    { id: 'performance', label: 'Performance' },
-    { id: 'contracts', label: 'Contracts (3)' },
-    { id: 'documents', label: 'Documents (24)' },
-    { id: 'payments', label: 'Payments' },
-    { id: 'notes', label: 'Notes & Activity' },
-  ];
-
-  const spendData = [
-    { month: 'Jan', value: 180 },
-    { month: 'Feb', value: 220 },
-    { month: 'Mar', value: 190 },
-    { month: 'Apr', value: 250 },
-    { month: 'May', value: 150 },
-    { month: 'Jun', value: 170 },
-    { month: 'Jul', value: 240 },
-    { month: 'Aug', value: 200 },
-    { month: 'Sep', value: 210 },
-    { month: 'Oct', value: 180 },
-    { month: 'Nov', value: 190 },
-    { month: 'Dec', value: 160 },
-  ];
-
-  const maxSpend = Math.max(...spendData.map(d => d.value));
-
+function ProgressBar({ value, color = "bg-blue-500" }: { value: number; color?: string }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Section */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          {/* Vendor Info Row */}
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex items-start gap-4">
-              {/* Logo */}
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">
-                D
-              </div>
-              
-              {/* Company Info */}
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-gray-900">Dell India Pvt. Ltd.</h1>
-                  <span className="inline-block bg-green-50 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">Active</span>
-                </div>
-                
-                {/* Metadata */}
-                <div className="grid grid-cols-5 gap-8 mt-4 text-sm">
-                  <div>
-                    <p className="text-gray-500 font-medium">Vendor ID</p>
-                    <p className="text-gray-900 font-semibold">VEN-1001</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 font-medium">Vendor Code</p>
-                    <p className="text-gray-900 font-semibold">DELL-IND-001</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 font-medium">Category</p>
-                    <p className="text-gray-900 font-semibold">IT Hardware</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 font-medium">Vendor Type</p>
-                    <p className="text-gray-900 font-semibold">Supplier</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 font-medium">Onboarded On</p>
-                    <p className="text-gray-900 font-semibold">Feb 10, 2024</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <div className="flex items-center gap-3 w-full">
+      <div className="flex-1 bg-gray-100 rounded-full h-2">
+        <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${value}%` }} />
+      </div>
+      <span className="text-xs font-semibold text-gray-700 w-10 text-right">{value}%</span>
+    </div>
+  );
+}
 
-            {/* Primary Contact */}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 w-72 flex-shrink-0">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Primary Contact</h3>
-              
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    R
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900 text-sm">Rahul Sharma</p>
-                    <p className="text-xs text-gray-600">Manager – Sales</p>
-                  </div>
-                </div>
+// ── spend data ───────────────────────────────────────────────────────────────
+const spendData = [
+  { month: "Jan", spend: 32 },
+  { month: "Feb", spend: 45 },
+  { month: "Mar", spend: 28 },
+  { month: "Apr", spend: 58 },
+  { month: "May", spend: 41 },
+  { month: "Jun", spend: 67 },
+  { month: "Jul", spend: 52 },
+  { month: "Aug", spend: 73 },
+  { month: "Sep", spend: 61 },
+  { month: "Oct", spend: 48 },
+  { month: "Nov", spend: 55 },
+  { month: "Dec", spend: 70 },
+];
 
-                <div className="flex items-center gap-3 text-sm">
-                  <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <p className="text-blue-600">rahul.sharma@dell.com</p>
-                </div>
+const activities = [
+  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Invoice #INV-2024-0892 approved for ₹12,50,000", time: "2 hours ago", color: "bg-emerald-50" },
+  { icon: <ShoppingCart className="w-4 h-4 text-blue-500" />, text: "New PO #PO-2024-0334 raised for IT Hardware", time: "Yesterday", color: "bg-blue-50" },
+  { icon: <AlertCircle className="w-4 h-4 text-amber-500" />, text: "Compliance document renewal due in 15 days", time: "2 days ago", color: "bg-amber-50" },
+  { icon: <Clock className="w-4 h-4 text-purple-500" />, text: "Contract #CNT-005 extended for 6 months", time: "1 week ago", color: "bg-purple-50" },
+  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Annual vendor review completed — Score: 85.8%", time: "2 weeks ago", color: "bg-emerald-50" },
+];
 
-                <div className="flex items-center gap-3 text-sm">
-                  <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <p className="text-gray-900">+91 98765 43210</p>
-                </div>
+const contracts = [
+  { name: "Hardware Supply Agreement", value: "₹1,80,00,000", progress: 20, status: "Active", end: "Mar 2026" },
+  { name: "Enterprise Support Contract", value: "₹95,00,000", progress: 45, status: "Active", end: "Dec 2025" },
+  { name: "Cloud Infrastructure Deal", value: "₹1,70,00,500", progress: 74, status: "Active", end: "Aug 2025" },
+];
 
-                <button className="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  Message Vendor
-                </button>
-              </div>
-            </div>
+// ── tab content ───────────────────────────────────────────────────────────────
+function OverviewTab() {
+  return (
+    <div className="flex flex-col gap-5">
+
+      {/* Top 3-column info */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Vendor Information */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Building2 className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Vendor Information</h3>
           </div>
-
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-6 gap-3 pt-3 border-t border-gray-200">
-            {/* Rating */}
-            <div className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-                <span className="text-xs text-gray-600">Rating</span>
+          <div className="flex flex-col gap-2.5">
+            {[
+              { label: "Address", value: "14th Floor, DLF Cyber City" },
+              { label: "City", value: "New Delhi" },
+              { label: "State / Province", value: "Delhi" },
+              { label: "Zip / Postal Code", value: "110001" },
+              { label: "Country", value: "India" },
+              { label: "Website", value: "www.dell.com/in" },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between items-start gap-2">
+                <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
+                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">4.8 / 5</p>
-              <p className="text-xs text-green-600 font-medium">Top Performer</p>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            {/* This Month Spend */}
-            <div className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <ShoppingCart className="w-5 h-5 text-blue-500" />
-                <span className="text-xs text-gray-600">This Month Spend</span>
+        {/* Additional Information */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Additional Information</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {[
+              { label: "Registration No.", value: "DL-2015-123456" },
+              { label: "Tax ID / GST", value: "29AADCD1234F1Z5" },
+              { label: "PAN Number", value: "AADCD1234F" },
+              { label: "Founded", value: "1984 (India ops: 2015)" },
+              { label: "Employees", value: "500+" },
+              { label: "Annual Revenue", value: "₹50 Cr+" },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between items-start gap-2">
+                <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
+                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">₹2,45,00,000</p>
-              <p className="text-xs text-green-600 font-medium">↑ 12.6% vs last month</p>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            {/* Total Orders */}
-            <div className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <ShoppingCart className="w-5 h-5 text-blue-500" />
-                <span className="text-xs text-gray-600">Total Orders</span>
+        {/* Payment & Bank Details */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <CreditCard className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Payment & Bank Details</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {[
+              { label: "Payment Mode", value: "NEFT / RTGS" },
+              { label: "Payment Terms", value: "NET 30" },
+              { label: "Bank Account", value: "XXXX-XXXX-1234" },
+              { label: "IFSC Code", value: "HDFC0001234" },
+              { label: "Bank Name", value: "HDFC Bank Ltd." },
+              { label: "Branch", value: "Connaught Place, Delhi" },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between items-start gap-2">
+                <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
+                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">156</p>
-              <p className="text-xs text-gray-600">All Time</p>
-            </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-            {/* On-time Delivery */}
-            <div className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                <span className="text-xs text-gray-600">On-time Delivery</span>
+      {/* Billing / Shipping + Performance */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Billing Address */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Billing Address</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {[
+              { label: "Address Line 1", value: "14th Floor, DLF Cyber City" },
+              { label: "Address Line 2", value: "Sector 25, Phase II" },
+              { label: "City", value: "New Delhi" },
+              { label: "State", value: "Delhi" },
+              { label: "Zip Code", value: "110001" },
+              { label: "Country", value: "India" },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between items-start gap-2">
+                <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
+                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">94.2%</p>
-              <p className="text-xs text-gray-600">SLA Adherence</p>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            {/* Quality Score */}
-            <div className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Award className="w-5 h-5 text-purple-500" />
-                <span className="text-xs text-gray-600">Quality Score</span>
+        {/* Shipping Address */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="w-4 h-4 text-purple-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Shipping Address</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {[
+              { label: "Address Line 1", value: "Plot 12, Sector 18" },
+              { label: "Address Line 2", value: "NSEZ, Noida" },
+              { label: "City", value: "Noida" },
+              { label: "State", value: "Uttar Pradesh" },
+              { label: "Zip Code", value: "201301" },
+              { label: "Country", value: "India" },
+            ].map(r => (
+              <div key={r.label} className="flex justify-between items-start gap-2">
+                <span className="text-xs text-gray-400 flex-shrink-0">{r.label}</span>
+                <span className="text-xs font-medium text-gray-700 text-right">{r.value}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-900">4.6 / 5</p>
-              <p className="text-xs text-green-600 font-medium">Excellent</p>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            {/* Contract Status */}
-            <div className="pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="w-5 h-5 text-blue-500" />
-                <span className="text-xs text-gray-600">Contract Status</span>
+        {/* Vendor Performance */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Vendor Performance</h3>
+          </div>
+          <div className="flex flex-col gap-3.5">
+            {[
+              { label: "Quality", value: 82, color: "bg-blue-500" },
+              { label: "Delivery", value: 88, color: "bg-emerald-500" },
+              { label: "Responsiveness", value: 79, color: "bg-purple-500" },
+              { label: "Compliance", value: 91, color: "bg-indigo-500" },
+            ].map(m => (
+              <div key={m.label}>
+                <div className="flex justify-between mb-1.5">
+                  <span className="text-xs text-gray-500">{m.label}</span>
+                </div>
+                <ProgressBar value={m.value} color={m.color} />
               </div>
-              <p className="text-2xl font-bold text-gray-900">Active</p>
-              <p className="text-xs text-gray-600">Valid till Dec 31, 2026</p>
+            ))}
+            <div className="mt-2 pt-3 border-t border-gray-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-600">Grand Score</span>
+              <span className="text-sm font-bold text-blue-600">83.8%</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-8 overflow-x-auto">
-            {tabs.map((tab) => (
+      {/* Active Contracts + Report Activity */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Active Contracts */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-blue-500" />
+              <h3 className="text-sm font-semibold text-gray-800">Active Contracts</h3>
+            </div>
+            <span className="text-xs bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full">3 Active</span>
+          </div>
+          <div className="flex flex-col gap-4">
+            {contracts.map((c, i) => (
+              <div key={i} className="flex flex-col gap-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-800">{c.name}</p>
+                    <p className="text-xs text-gray-400">{c.value} · Ends {c.end}</p>
+                  </div>
+                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{c.status}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${c.progress}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-400 w-8 text-right">{c.progress}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Report Activity */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Newspaper className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Report Activity</h3>
+          </div>
+          <div className="flex flex-col gap-0">
+            {activities.map((a, i) => (
+              <div key={i} className="flex gap-3 relative pb-4 last:pb-0">
+                {i < activities.length - 1 && (
+                  <div className="absolute left-4 top-7 bottom-0 w-px bg-gray-100" />
+                )}
+                <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center flex-shrink-0 z-10`}>
+                  {a.icon}
+                </div>
+                <div className="pt-1 min-w-0">
+                  <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{a.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Spend Summary + Spend Metrics */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Spend Summary chart */}
+        <div className="col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-blue-500" />
+              <h3 className="text-sm font-semibold text-gray-800">Spend Summary</h3>
+            </div>
+            <span className="text-xs text-gray-400">Last 12 months</span>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={spendData} barSize={18} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={v => `${v}L`} />
+              <Tooltip
+                formatter={(v: number) => [`₹${v} L`, "Spend"]}
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.08)" }}
+              />
+              <Bar dataKey="spend" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Spend Metrics */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <ArrowUpRight className="w-4 h-4 text-blue-500" />
+            <h3 className="text-sm font-semibold text-gray-800">Spend Metrics</h3>
+          </div>
+          <div className="flex flex-col gap-4">
+            {[
+              { label: "Total Spend", value: "₹4,09,00,500", highlight: true },
+              { label: "Total Orders", value: "156", highlight: false },
+              { label: "Avg Order Value", value: "₹5,53,190", highlight: false },
+              { label: "Last Order Date", value: "April 2024", highlight: false },
+              { label: "Avg Payment Cycle", value: "May 2024", highlight: false },
+            ].map(m => (
+              <div key={m.label} className="flex flex-col gap-0.5">
+                <p className="text-xs text-gray-400">{m.label}</p>
+                <p className={`text-sm font-bold ${m.highlight ? "text-blue-600" : "text-gray-800"}`}>{m.value}</p>
+                {m.label !== "Avg Payment Cycle" && <div className="h-px bg-gray-50 mt-1" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-24 gap-3 text-gray-300">
+      <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center">{icon}</div>
+      <p className="text-sm font-medium text-gray-400">{label} content coming soon</p>
+    </div>
+  );
+}
+
+// ── main page ─────────────────────────────────────────────────────────────────
+const TABS = [
+  { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
+  { key: "products", label: "Products", count: 28, icon: <Package className="w-3.5 h-3.5" /> },
+  { key: "orders", label: "Orders", count: 78, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
+  { key: "performance", label: "Performance", icon: <TrendingUp className="w-3.5 h-3.5" /> },
+  { key: "contracts", label: "Contracts", count: 5, icon: <ClipboardList className="w-3.5 h-3.5" /> },
+  { key: "documents", label: "Documents", count: 34, icon: <FileText className="w-3.5 h-3.5" /> },
+  { key: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5" /> },
+  { key: "news", label: "News & Activity", icon: <Newspaper className="w-3.5 h-3.5" /> },
+];
+
+export default function VendorDetail() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const navigate = useNavigate();
+
+  const stats = [
+    { label: "Rating", value: "4.6/5", sub: "★★★★★", accent: "text-amber-500" },
+    { label: "Total Contract Value", value: "₹4,45,00,500", sub: "+12% YoY", accent: "text-blue-600" },
+    { label: "Total Orders", value: "156", sub: "All time", accent: "text-gray-800" },
+    { label: "On-Time Delivery", value: "99.8%", sub: "Last 12 months", accent: "text-emerald-600" },
+    { label: "Quality Score", value: "85.8%", sub: "Avg last 3 reviews", accent: "text-indigo-600" },
+    { label: "Active Contracts", value: "3", sub: "Running", accent: "text-purple-600" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#f5f6fa] font-[Inter,sans-serif] flex flex-col">
+
+      {/* ── Sticky Header ───────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
+
+        {/* Vendor identity row */}
+        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {/* Back button + avatar */}
+            <button
+              onClick={() => navigate("/")}
+              className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+              D
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-lg font-bold text-gray-900">Dell India Pvt. Ltd.</h1>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active
+                </span>
+              </div>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                {[
+                  { label: "VDA-1001" },
+                  { label: "Dell_IND-001" },
+                  { label: "IT Hardware" },
+                  { label: "Supplier: IT Hardware" },
+                  { label: "Onboard: Feb 15, 2024" },
+                ].map((item, i) => (
+                  <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
+                    {i > 0 && <span className="text-gray-300">·</span>}
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Primary contact + action */}
+          <div className="flex items-start gap-6 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Primary Contact</p>
+              <p className="text-sm font-semibold text-gray-800">Rahul Sharma</p>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Phone className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">+91 98765 43210</span>
+              </div>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Mail className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">rahul@dell.com</span>
+              </div>
+            </div>
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-1">
+              <MessageSquare className="w-3.5 h-3.5" />
+              Message Vendor
+            </button>
+          </div>
+        </div>
+
+        {/* Stats strip */}
+        <div className="px-6 pb-3">
+          <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+            {stats.map((s, i) => (
+              <div key={i} className="flex flex-col items-center py-3 px-2 text-center">
+                <p className={`text-base font-bold ${s.accent}`}>{s.value}</p>
+                <p className="text-xs text-gray-500 font-medium leading-tight mt-0.5">{s.label}</p>
+                <p className="text-xs text-gray-400 leading-tight">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Horizontal scrollable tabs */}
+        <div className="relative">
+          <div className="flex items-center px-6 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
+            {TABS.map(tab => (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-4 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
                 }`}
               >
+                <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
                 {tab.label}
+                {tab.count !== undefined && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    activeTab === tab.key ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Overview Tab Content */}
-      {activeTab === 'overview' && (
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="grid grid-cols-3 gap-4">
-            {/* Left Column - Vendor Information */}
-            <div>
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  Vendor Information
-                  <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
-                </h2>
-                
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Company Name</p>
-                    <p className="text-sm text-gray-900 font-medium">Dell India Pvt. Ltd.</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Registered Name</p>
-                    <p className="text-sm text-gray-900 font-medium">Dell India Private Limited</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">GSTIN</p>
-                    <p className="text-sm text-gray-900 font-medium">29AABCD1234E1Z5</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">PAN</p>
-                    <p className="text-sm text-gray-900 font-medium">AABCD1234E</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">CIN</p>
-                    <p className="text-sm text-gray-900 font-medium">U7220DKA1PTC0545577</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Legal Entity Type</p>
-                    <p className="text-sm text-gray-900 font-medium">Private Limited</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Year of Establishment</p>
-                    <p className="text-sm text-gray-900 font-medium">2010</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Website</p>
-                    <p className="text-sm text-blue-600 font-medium cursor-pointer hover:underline">www.dell.com</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Vendor Status</p>
-                    <p className="text-sm font-medium"><span className="bg-green-50 text-green-700 px-2 py-1 rounded text-xs">Active</span></p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Preferred Vendor</p>
-                    <p className="text-sm text-gray-900 font-medium">Yes</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Vendor Tier</p>
-                    <p className="text-sm text-gray-900 font-medium">Tier 1</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* ── Page body ────────────────────────────────────────────────────── */}
+      <div className="flex-1 px-6 py-5">
+        {activeTab === "overview" && <OverviewTab />}
+        {activeTab === "products" && <PlaceholderTab label="Products" icon={<Package className="w-6 h-6" />} />}
+        {activeTab === "orders" && <PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} />}
+        {activeTab === "performance" && <PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} />}
+        {activeTab === "contracts" && <PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} />}
+        {activeTab === "documents" && <PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} />}
+        {activeTab === "payments" && <PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} />}
+        {activeTab === "news" && <PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} />}
+      </div>
 
-            {/* Middle Column - Address & Categories */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  Address Information
-                  <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
-                </h2>
-
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Registered Address</h3>
-                    <p className="text-sm text-gray-600">Divyasree Greens, #12/1, Challaghatta Village, Varthur Hobli, Bangalore – 560071, Karnataka, India</p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Billing Address</h3>
-                    <p className="text-sm text-gray-600">DLF Cyber City, Tower C, 8th Floor, Gurugram – 122002, Haryana, India</p>
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Shipping Address</h3>
-                    <p className="text-sm text-gray-600">Same as Billing Address</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6">Categories & Products</h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-3">Primary Categories</p>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="bg-blue-50 text-blue-700 text-xs px-3 py-1 rounded-full font-medium">IT Hardware</span>
-                      <span className="bg-purple-50 text-purple-700 text-xs px-3 py-1 rounded-full font-medium">Laptops</span>
-                      <span className="bg-orange-50 text-orange-700 text-xs px-3 py-1 rounded-full font-medium">Desktops</span>
-                      <span className="bg-pink-50 text-pink-700 text-xs px-3 py-1 rounded-full font-medium">Accessories</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-gray-100">
-                    <div className="grid grid-cols-4 gap-3">
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium">Total Products</p>
-                        <p className="text-lg font-bold text-gray-900">128</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium">Active Products</p>
-                        <p className="text-lg font-bold text-green-600">120</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium">Out of Stock</p>
-                        <p className="text-lg font-bold text-orange-600">5</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 font-medium">Inactive</p>
-                        <p className="text-lg font-bold text-red-600">3</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button className="text-blue-600 text-sm font-medium hover:underline mt-4">View All Products →</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column - Payment Details & Performance */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  Business & Payment Details
-                  <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
-                </h2>
-
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Payment Terms</p>
-                    <p className="text-sm text-gray-900 font-medium">Net 30</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Payment Method</p>
-                    <p className="text-sm text-gray-900 font-medium">Bank Transfer</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Currency</p>
-                    <p className="text-sm text-gray-900 font-medium">INR</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Credit Limit</p>
-                    <p className="text-sm text-gray-900 font-medium">₹5,00,00,000</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Available Credit</p>
-                    <p className="text-sm text-green-600 font-medium">₹2,75,00,000</p>
-                  </div>
-                  <div className="pt-4 border-t border-gray-100">
-                    <p className="text-xs text-gray-500 font-medium">Bank Name</p>
-                    <p className="text-sm text-gray-900 font-medium">HDFC Bank</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Bank Account No.</p>
-                    <p className="text-sm text-gray-900 font-medium">50200012345678</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">IFSC Code</p>
-                    <p className="text-sm text-gray-900 font-medium">HDFC0001234</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-gray-900">Vendor Performance (Last 6 Months)</h2>
-                  <Eye className="w-4 h-4 text-gray-400 cursor-pointer" />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900">Overall Score</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-lg font-bold text-gray-900">4.8 / 5</p>
-                      <span className="bg-green-50 text-green-700 text-xs px-2 py-1 rounded font-medium">Top Performer</span>
-                    </div>
-                  </div>
-
-                  {[
-                    { label: 'Quality', value: 4.6 },
-                    { label: 'Delivery', value: 4.7 },
-                    { label: 'Response Time', value: 4.8 },
-                    { label: 'Pricing', value: 4.5 },
-                    { label: 'Service', value: 4.6 },
-                  ].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between">
-                      <p className="text-xs text-gray-600 font-medium">{item.label}</p>
-                      <div className="flex items-center gap-2 flex-1 ml-4">
-                        <div className="h-2 bg-blue-200 rounded-full flex-1 overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(item.value / 5) * 100}%` }}></div>
-                        </div>
-                        <p className="text-xs font-semibold text-gray-900 w-10 text-right">{item.value} / 5</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-gray-900">Active Contracts</h2>
-                  <a href="#" className="text-blue-600 text-xs font-medium hover:underline">View All</a>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Total Contracts</p>
-                    <p className="text-2xl font-bold text-gray-900">3</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Active Contracts</p>
-                    <p className="text-2xl font-bold text-green-600">2</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Expiring in 30 Days</p>
-                    <p className="text-2xl font-bold text-orange-600">0</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium">Expiring in 60 Days</p>
-                    <p className="text-2xl font-bold text-red-600">1</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-gray-900">Recent Activities</h2>
-                  <a href="#" className="text-blue-600 text-xs font-medium hover:underline">View All</a>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <ShoppingCart className="w-4 h-4 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Purchase Order PO-10034 created</p>
-                      <p className="text-xs text-gray-500">Apr 16, 2026 01:20 PM</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Edit2 className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Price updated for 5 products</p>
-                      <p className="text-xs text-gray-500">Apr 15, 2026 11:10 AM</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">Contract renewed (CT-2025-001)</p>
-                      <p className="text-xs text-gray-500">Mar 28, 2026 04:30 PM</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Spend Summary Section */}
-          <div className="grid grid-cols-2 gap-8 mt-8">
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-gray-900">Spend Summary</h2>
-                <div className="flex items-center gap-2">
-                  <select className="text-xs text-gray-600 bg-transparent border border-gray-200 rounded px-2 py-1">
-                    <option>This Year</option>
-                  </select>
-                  <Edit2 className="w-4 h-4 text-gray-400 cursor-pointer" />
-                </div>
-              </div>
-
-              <div className="flex items-end gap-2 h-64 justify-center">
-                {spendData.map((item, index) => (
-                  <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                    <div className="w-full bg-blue-100 rounded-t hover:bg-blue-200 transition" style={{ height: `${(item.value / maxSpend) * 200}px` }}></div>
-                    <p className="text-xs text-gray-600 font-medium">{item.month}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6">Spend Metrics</h2>
-
-              <div className="space-y-6">
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-2">Total Spend</p>
-                  <p className="text-3xl font-bold text-gray-900">₹12,45,00,000</p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-2">Orders</p>
-                  <p className="text-3xl font-bold text-gray-900">156</p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-500 font-medium mb-2">Avg. Order Value</p>
-                  <p className="text-3xl font-bold text-gray-900">₹7,98,717</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Other Tabs Content */}
-      {activeTab !== 'overview' && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <p className="text-gray-600 font-medium">Content for {tabs.find(t => t.id === activeTab)?.label} tab</p>
-            <p className="text-gray-500 text-sm mt-2">This tab is active and ready for content</p>
-          </div>
-        </div>
-      )}
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
-};
-
-export default VendorDetailPage;
+}
