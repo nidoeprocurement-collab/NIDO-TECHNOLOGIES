@@ -350,211 +350,611 @@ function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode 
 }
 
 // Products Tab - Shows vendor products
-function ProductsTab() {
-  const sampleProducts = [
-    { id: 1, name: "Enterprise Server Rack", sku: "SRV-001", category: "Hardware", price: "₹2,50,000", stock: 45, status: "Active" },
-    { id: 2, name: "Network Switch 48P", sku: "NSW-048", category: "Networking", price: "₹1,75,000", stock: 12, status: "Active" },
-    { id: 3, name: "Database License Pack", sku: "DBL-100", category: "Software", price: "₹5,00,000", stock: 0, status: "Out of Stock" },
-    { id: 4, name: "Cloud Storage 1TB", sku: "CLD-001", category: "Services", price: "₹12,000/mo", stock: "Unlimited", status: "Active" },
-    { id: 5, name: "IT Support Contract", sku: "SUP-YR1", category: "Services", price: "₹8,50,000", stock: "Available", status: "Active" },
-  ];
+"import { useMemo, useState } from \"react\";
+import {
+  Users,
+  CheckSquare,
+  AlertTriangle,
+  Tag,
+  Clock,
+  Star,
+  MoreVertical,
+  ChevronUp,
+  ChevronDown,
+  Eye,
+  Pencil,
+  Trash2,
+  Search,
+  ArrowUpDown,
+  Plus,
+  TrendingUp,
+  Upload,
+  Download,
+  RefreshCw,
+  Image as ImageIcon,
+} from \"lucide-react\";
 
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Products & Services</h2>
-          <p className="text-sm text-gray-600 mt-1">Manage and view all products offered by this vendor</p>
-        </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Add Product</button>
-      </div>
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from \"@/components/ui/select\";
+import { Button } from \"@/components/ui/button\";
+import { Input } from \"@/components/ui/input\";
+import { Badge } from \"@/components/ui/badge\";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from \"@/components/ui/dropdown-menu\";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from \"@/components/ui/alert-dialog\";
+import { toast } from \"sonner\";
 
-      {/* Products Table */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Product Name</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">SKU</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Category</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Price</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Stock</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Status</th>
-              <th className="px-6 py-3 text-center font-semibold text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sampleProducts.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50">
-                <td className="px-6 py-3 font-medium text-gray-900">{product.name}</td>
-                <td className="px-6 py-3 text-gray-600">{product.sku}</td>
-                <td className="px-6 py-3 text-gray-600">{product.category}</td>
-                <td className="px-6 py-3 text-gray-900 font-semibold">{product.price}</td>
-                <td className="px-6 py-3 text-gray-600">{product.stock}</td>
-                <td className="px-6 py-3">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${product.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}>
-                    {product.status}
-                  </span>
-                </td>
-                <td className="px-6 py-3 text-center">
-                  <button className="text-blue-600 hover:text-blue-700 text-xs font-medium">View</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+import { MOCK_PRODUCTS, CATEGORIES, BRANDS } from \"@/data/mockProducts\";
+import { formatINR, formatDateShort, stockBucket } from \"@/lib/format\";
+import {
+  ProductFormDialog,
+  ViewProductDialog,
+  BulkPriceDialog,
+  ImportProductsDialog,
+  ExportCatalogDialog,
+  SyncFeedDialog,
+} from \"@/components/catalog/ProductModals\";
 
-// ── main page ─────────────────────────────────────────────────────────────────
-const TABS = [
-  { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
-  { key: "products", label: "Products", count: 28, icon: <Package className="w-3.5 h-3.5" /> },
-  { key: "orders", label: "Orders", count: 78, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
-  { key: "performance", label: "Performance", icon: <TrendingUp className="w-3.5 h-3.5" /> },
-  { key: "contracts", label: "Contracts", count: 5, icon: <ClipboardList className="w-3.5 h-3.5" /> },
-  { key: "documents", label: "Documents", count: 34, icon: <FileText className="w-3.5 h-3.5" /> },
-  { key: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5" /> },
-  { key: "news", label: "News & Activity", icon: <Newspaper className="w-3.5 h-3.5" /> },
+const STAT_DEF = [
+  { key: \"total\", label: \"Total Products\", sub: \"All Products\", icon: Users, color: \"bg-blue-50 text-blue-600\" },
+  { key: \"active\", label: \"Active Products\", subFn: (p, t) => `${((p / t) * 100).toFixed(2)}% of total`, icon: CheckSquare, color: \"bg-emerald-50 text-emerald-600\" },
+  { key: \"outOfStock\", label: \"Out of Stock\", subFn: (p, t) => `${((p / t) * 100).toFixed(2)}% of total`, icon: AlertTriangle, color: \"bg-orange-50 text-orange-600\" },
+  { key: \"priceUpdates\", label: \"Price Updates\", sub: \"This Month\", icon: Tag, color: \"bg-emerald-50 text-emerald-600\" },
+  { key: \"avgLead\", label: \"Avg. Lead Time\", sub: \"Across all products\", suffix: \" Days\", icon: Clock, color: \"bg-blue-50 text-blue-600\" },
+  { key: \"preferred\", label: \"Preferred Products\", subFn: (p, t) => `${((p / t) * 100).toFixed(2)}% of total`, icon: Star, color: \"bg-rose-50 text-rose-600\" },
 ];
 
-export default function VendorDetail() {
-  const [activeTab, setActiveTab] = useState("overview");
-  const navigate = useNavigate();
+const PRICE_OPTIONS = [
+  { value: \"all\", label: \"All\" },
+  { value: \"7d\", label: \"Updated in last 7 days\" },
+  { value: \"30d\", label: \"Updated in last 30 days\" },
+  { value: \"stale\", label: \"Not updated in 60+ days\" },
+];
 
-  const stats = [
-    { label: "Rating", value: "4.6/5", sub: "★★★★★", accent: "text-amber-500" },
-    { label: "Total Contract Value", value: "₹4,45,00,500", sub: "+12% YoY", accent: "text-blue-600" },
-    { label: "Total Orders", value: "156", sub: "All time", accent: "text-gray-800" },
-    { label: "On-Time Delivery", value: "99.8%", sub: "Last 12 months", accent: "text-emerald-600" },
-    { label: "Quality Score", value: "85.8%", sub: "Avg last 3 reviews", accent: "text-indigo-600" },
-    { label: "Active Contracts", value: "3", sub: "Running", accent: "text-purple-600" },
-  ];
+const STOCK_OPTIONS = [
+  { value: \"all\", label: \"All\" },
+  { value: \"in\", label: \"In Stock\" },
+  { value: \"low\", label: \"Low Stock\" },
+  { value: \"out\", label: \"Out of Stock\" },
+];
+
+export default function VendorCatalog() {
+  const [products, setProducts] = useState(MOCK_PRODUCTS);
+  const [filters, setFilters] = useState({ category: \"all\", brand: \"all\", stock: \"all\", price: \"all\", search: \"\" });
+  const [sort, setSort] = useState({ key: \"lastUpdated\", dir: \"desc\" });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // dialogs
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [viewing, setViewing] = useState(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+
+  // ---- derived
+  const filtered = useMemo(() => {
+    const now = Date.now();
+    return products.filter((p) => {
+      if (filters.category !== \"all\" && p.category !== filters.category) return false;
+      if (filters.brand !== \"all\" && p.brand !== filters.brand) return false;
+      if (filters.stock !== \"all\" && stockBucket(p.stock) !== filters.stock) return false;
+      if (filters.price !== \"all\") {
+        const days = (now - new Date(p.lastUpdated).getTime()) / (1000 * 60 * 60 * 24);
+        if (filters.price === \"7d\" && days > 7) return false;
+        if (filters.price === \"30d\" && days > 30) return false;
+        if (filters.price === \"stale\" && days < 60) return false;
+      }
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        if (!(p.name.toLowerCase().includes(q) || p.vendorSku.toLowerCase().includes(q) || (p.masterSku || \"\").toLowerCase().includes(q))) return false;
+      }
+      return true;
+    });
+  }, [products, filters]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const av = a[sort.key]; const bv = b[sort.key];
+      if (av == null) return 1; if (bv == null) return -1;
+      if (typeof av === \"number\" && typeof bv === \"number\") return sort.dir === \"asc\" ? av - bv : bv - av;
+      const as = String(av).toLowerCase(); const bs = String(bv).toLowerCase();
+      if (as < bs) return sort.dir === \"asc\" ? -1 : 1;
+      if (as > bs) return sort.dir === \"asc\" ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [filtered, sort]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const stats = useMemo(() => {
+    const t = products.length;
+    const a = products.filter((p) => p.status === \"Active\").length;
+    const o = products.filter((p) => p.stock <= 0).length;
+    const pr = products.filter((p) => p.preferred).length;
+    const monthAgo = Date.now() - 30 * 86400000;
+    const pu = products.filter((p) => new Date(p.lastUpdated).getTime() >= monthAgo).length;
+    const avg = Math.round(products.reduce((s, p) => s + p.leadTime, 0) / Math.max(1, products.length));
+    return { total: t, active: a, outOfStock: o, preferred: pr, priceUpdates: pu, avgLead: avg };
+  }, [products]);
+
+  // ---- handlers
+  const handleSort = (key) => {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === \"asc\" ? \"desc\" : \"asc\" } : { key, dir: \"asc\" }));
+  };
+
+  const saveProduct = (p) => {
+    setProducts((prev) => {
+      const idx = prev.findIndex((x) => x.id === p.id);
+      if (idx >= 0) {
+        const copy = [...prev]; copy[idx] = p; return copy;
+      }
+      return [p, ...prev];
+    });
+  };
+
+  const removeProduct = (id) => {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    toast.success(\"Product deleted\");
+    setDeleteId(null);
+  };
+
+  const applyBulk = ({ mode, direction, value, scope }) => {
+    const targetIds = new Set((scope === \"filtered\" ? filtered : products).map((p) => p.id));
+    setProducts((prev) => prev.map((p) => {
+      if (!targetIds.has(p.id)) return p;
+      let np = p.purchasePrice;
+      const delta = mode === \"percent\" ? (np * value) / 100 : value;
+      np = direction === \"increase\" ? np + delta : Math.max(0, np - delta);
+      const trend = ((np - p.purchasePrice) / p.purchasePrice) * 100;
+      return { ...p, purchasePrice: Math.round(np), priceTrend: Number(trend.toFixed(2)), lastUpdated: new Date().toISOString() };
+    }));
+  };
+
+  const importProducts = (count) => {
+    const next = Array.from({ length: count }, (_, i) => {
+      const idx = products.length + i + 1;
+      return {
+        id: `p_imp_${Date.now()}_${i}`,
+        vendorSku: `IMP-${String(idx).padStart(4, \"0\")}`,
+        name: `Imported Product ${idx}`,
+        description: \"Imported via CSV\",
+        masterSku: `M-${5000 + idx}`,
+        category: CATEGORIES[idx % CATEGORIES.length],
+        brand: BRANDS[idx % BRANDS.length],
+        purchasePrice: 500 + (idx % 50) * 100,
+        priceTrend: 0,
+        moq: 5,
+        leadTime: 2,
+        stock: 50 + (idx % 30),
+        lastUpdated: new Date().toISOString(),
+        status: \"Active\",
+        preferred: false,
+      };
+    });
+    setProducts((prev) => [...next, ...prev]);
+  };
+
+  const refreshFromFeed = () => {
+    setProducts((prev) => prev.map((p, i) => {
+      if (i % 11 !== 0) return p;
+      const trend = (Math.random() * 6 - 3); // -3 to +3
+      const np = Math.max(100, Math.round(p.purchasePrice * (1 + trend / 100)));
+      return { ...p, purchasePrice: np, priceTrend: Number(trend.toFixed(2)), lastUpdated: new Date().toISOString() };
+    }));
+  };
+
+  const resetFilters = () => setFilters({ category: \"all\", brand: \"all\", stock: \"all\", price: \"all\", search: \"\" });
 
   return (
-    <div className="min-h-screen bg-[#f5f6fa] font-[Inter,sans-serif] flex flex-col">
+    <div className=\"min-h-screen bg-slate-50 font-sans\" data-testid=\"vendor-catalog-page\">
+      <div className=\"max-w-[1400px] mx-auto px-6 py-8\">
+        {/* Header */}
+        <div className=\"mb-6 flex items-center justify-between\">
+          <div>
+            <h1 className=\"text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900\">Vendor Product Catalog</h1>
+            <p className=\"text-sm text-slate-500 mt-1\">Manage products, prices, and stock from your vendor feed.</p>
+          </div>
+        </div>
 
-      {/* ── Sticky Header ───────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
-
-        {/* Vendor identity row */}
-        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            {/* Back button + avatar */}
-            <button
-              onClick={() => navigate("/")}
-              className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
-              D
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-lg font-bold text-gray-900">Dell India Pvt. Ltd.</h1>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active
-                </span>
+        {/* Stats */}
+        <div className=\"grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-8\" data-testid=\"stats-grid\">
+          {STAT_DEF.map((s) => {
+            const Icon = s.icon;
+            const value = stats[s.key];
+            const sub = s.subFn ? s.subFn(value, stats.total) : s.sub;
+            return (
+              <div key={s.key} className=\"bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition\" data-testid={`stat-${s.key}`}>
+                <div className=\"flex items-start gap-3\">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${s.color}`}>
+                    <Icon className=\"w-5 h-5\" />
+                  </div>
+                  <div className=\"min-w-0\">
+                    <p className=\"text-xs font-medium text-slate-500 truncate\">{s.label}</p>
+                    <p className=\"text-2xl font-semibold text-slate-900 mt-0.5\">
+                      {value}{s.suffix || \"\"}
+                    </p>
+                    <p className=\"text-[11px] text-slate-400 mt-0.5\">{sub}</p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
-                {[
-                  { label: "VDA-1001" },
-                  { label: "Dell_IND-001" },
-                  { label: "IT Hardware" },
-                  { label: "Supplier: IT Hardware" },
-                  { label: "Onboard: Feb 15, 2024" },
-                ].map((item, i) => (
-                  <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
-                    {i > 0 && <span className="text-gray-300">·</span>}
-                    {item.label}
-                  </span>
+            );
+          })}
+        </div>
+
+        {/* Filters */}
+        <div className=\"flex flex-wrap items-center justify-center gap-3 mb-6\" data-testid=\"filters\">
+          <FilterSelect
+            testid=\"filter-category\"
+            label=\"Category\"
+            value={filters.category}
+            onChange={(v) => { setFilters({ ...filters, category: v }); setPage(1); }}
+            options={[{ value: \"all\", label: \"All Categories\" }, ...CATEGORIES.map((c) => ({ value: c, label: c }))]}
+          />
+          <FilterSelect
+            testid=\"filter-brand\"
+            label=\"Brand\"
+            value={filters.brand}
+            onChange={(v) => { setFilters({ ...filters, brand: v }); setPage(1); }}
+            options={[{ value: \"all\", label: \"All Brands\" }, ...BRANDS.map((b) => ({ value: b, label: b }))]}
+          />
+          <FilterSelect
+            testid=\"filter-stock\"
+            label=\"Stock Status\"
+            value={filters.stock}
+            onChange={(v) => { setFilters({ ...filters, stock: v }); setPage(1); }}
+            options={STOCK_OPTIONS}
+          />
+          <FilterSelect
+            testid=\"filter-price\"
+            label=\"Price Updated\"
+            value={filters.price}
+            onChange={(v) => { setFilters({ ...filters, price: v }); setPage(1); }}
+            options={PRICE_OPTIONS}
+          />
+        </div>
+
+        {/* Action bar */}
+        <div className=\"flex items-center justify-between gap-3 mb-4\">
+          <div className=\"relative w-full max-w-sm\">
+            <Search className=\"w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400\" />
+            <Input
+              data-testid=\"search-input\"
+              placeholder=\"Search by name, vendor SKU, master SKU...\"
+              value={filters.search}
+              onChange={(e) => { setFilters({ ...filters, search: e.target.value }); setPage(1); }}
+              className=\"pl-9 bg-white\"
+            />
+          </div>
+
+          <div className=\"flex items-center gap-2\">
+            {(filters.category !== \"all\" || filters.brand !== \"all\" || filters.stock !== \"all\" || filters.price !== \"all\" || filters.search) && (
+              <Button variant=\"ghost\" size=\"sm\" onClick={resetFilters} data-testid=\"reset-filters\" className=\"text-slate-600\">
+                Clear filters
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant=\"outline\" size=\"icon\" data-testid=\"actions-trigger\" className=\"h-10 w-10 rounded-lg border-slate-200\">
+                  <MoreVertical className=\"w-4 h-4\" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align=\"end\" className=\"w-56\">
+                <DropdownMenuLabel>Catalog actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem data-testid=\"menu-add-product\" onClick={() => { setEditing(null); setFormOpen(true); }}>
+                  <Plus className=\"w-4 h-4 mr-2 text-blue-600\" /> Add Product
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid=\"menu-bulk-price\" onClick={() => setBulkOpen(true)}>
+                  <TrendingUp className=\"w-4 h-4 mr-2 text-blue-600\" /> Bulk Price Update
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid=\"menu-import\" onClick={() => setImportOpen(true)}>
+                  <Upload className=\"w-4 h-4 mr-2 text-blue-600\" /> Import Products
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid=\"menu-export\" onClick={() => setExportOpen(true)}>
+                  <Download className=\"w-4 h-4 mr-2 text-blue-600\" /> Export Catalog
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid=\"menu-sync\" onClick={() => setSyncOpen(true)}>
+                  <RefreshCw className=\"w-4 h-4 mr-2 text-blue-600\" /> Sync Vendor Feed
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className=\"bg-white border border-slate-200 rounded-xl overflow-hidden\" data-testid=\"products-table\">
+          <div className=\"overflow-x-auto\">
+            <table className=\"w-full text-sm\">
+              <thead className=\"bg-slate-50/70 border-b border-slate-200\">
+                <tr className=\"text-left text-slate-500\">
+                  <Th onClick={() => handleSort(\"vendorSku\")} sorted={sort.key === \"vendorSku\" ? sort.dir : null}>Vendor SKU</Th>
+                  <Th onClick={() => handleSort(\"name\")} sorted={sort.key === \"name\" ? sort.dir : null}>Product Name</Th>
+                  <Th>Master SKU</Th>
+                  <Th>Category</Th>
+                  <Th onClick={() => handleSort(\"purchasePrice\")} sorted={sort.key === \"purchasePrice\" ? sort.dir : null}>Purchase Price</Th>
+                  <Th>MOQ</Th>
+                  <Th onClick={() => handleSort(\"leadTime\")} sorted={sort.key === \"leadTime\" ? sort.dir : null}>Lead Time</Th>
+                  <Th onClick={() => handleSort(\"stock\")} sorted={sort.key === \"stock\" ? sort.dir : null}>Stock</Th>
+                  <Th onClick={() => handleSort(\"lastUpdated\")} sorted={sort.key === \"lastUpdated\" ? sort.dir : null}>Last Updated</Th>
+                  <Th onClick={() => handleSort(\"status\")} sorted={sort.key === \"status\" ? sort.dir : null}>Status</Th>
+                  <Th>Actions</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className=\"py-16 text-center text-slate-400\" data-testid=\"empty-state\">
+                      No products match your filters.
+                    </td>
+                  </tr>
+                ) : paged.map((p) => (
+                  <tr key={p.id} className=\"border-b border-slate-100 hover:bg-slate-50/60\" data-testid={`row-${p.id}`}>
+                    <td className=\"px-4 py-3\">
+                      <div className=\"flex items-center gap-3\">
+                        <div className=\"w-9 h-9 rounded-md bg-slate-100 flex items-center justify-center shrink-0\">
+                          <ImageIcon className=\"w-4 h-4 text-slate-400\" />
+                        </div>
+                        <span className=\"font-medium text-blue-600\">{p.vendorSku}</span>
+                      </div>
+                    </td>
+                    <td className=\"px-4 py-3\">
+                      <div className=\"text-slate-900 font-medium\">{p.name}</div>
+                      <div className=\"text-xs text-slate-400 mt-0.5 line-clamp-1\">{p.description}</div>
+                    </td>
+                    <td className=\"px-4 py-3 text-slate-600\">{p.masterSku || \"—\"}</td>
+                    <td className=\"px-4 py-3 text-slate-600\">{p.category}</td>
+                    <td className=\"px-4 py-3\">
+                      <div className=\"font-semibold text-slate-900\">{formatINR(p.purchasePrice)}</div>
+                      <PriceTrend trend={p.priceTrend} />
+                    </td>
+                    <td className=\"px-4 py-3 text-slate-700\">{p.moq}</td>
+                    <td className=\"px-4 py-3 text-slate-700\">{p.leadTime} {p.leadTime > 1 ? \"Days\" : \"Day\"}</td>
+                    <td className=\"px-4 py-3\">
+                      <div className=\"font-semibold text-slate-900\">{p.stock}</div>
+                      <StockTag stock={p.stock} />
+                    </td>
+                    <td className=\"px-4 py-3 text-slate-600\">{formatDateShort(p.lastUpdated)}</td>
+                    <td className=\"px-4 py-3\">
+                      <Badge className={p.status === \"Active\"
+                        ? \"bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-50\"
+                        : \"bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-100\"}>
+                        {p.status}
+                      </Badge>
+                    </td>
+                    <td className=\"px-4 py-3\">
+                      <div className=\"flex items-center gap-1\">
+                        <Button
+                          variant=\"ghost\"
+                          size=\"icon\"
+                          data-testid={`view-${p.id}`}
+                          onClick={() => { setViewing(p); setViewOpen(true); }}
+                          className=\"h-8 w-8 text-slate-500 hover:text-blue-600\"
+                        >
+                          <Eye className=\"w-4 h-4\" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant=\"ghost\" size=\"icon\" data-testid={`row-menu-${p.id}`} className=\"h-8 w-8 text-slate-500\">
+                              <MoreVertical className=\"w-4 h-4\" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align=\"end\">
+                            <DropdownMenuItem onClick={() => { setEditing(p); setFormOpen(true); }} data-testid={`edit-${p.id}`}>
+                              <Pencil className=\"w-4 h-4 mr-2\" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setViewing(p); setViewOpen(true); }}>
+                              <Eye className=\"w-4 h-4 mr-2\" /> View details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setDeleteId(p.id)} className=\"text-red-600 focus:text-red-700\" data-testid={`delete-${p.id}`}>
+                              <Trash2 className=\"w-4 h-4 mr-2\" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </div>
+              </tbody>
+            </table>
           </div>
 
-          {/* Primary contact + action */}
-          <div className="flex items-start gap-6 flex-shrink-0">
-            <div className="text-right">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Primary Contact</p>
-              <p className="text-sm font-semibold text-gray-800">Rahul Sharma</p>
-              <div className="flex items-center justify-end gap-1 mt-0.5">
-                <Phone className="w-3 h-3 text-gray-400" />
-                <span className="text-xs text-gray-500">+91 98765 43210</span>
-              </div>
-              <div className="flex items-center justify-end gap-1 mt-0.5">
-                <Mail className="w-3 h-3 text-gray-400" />
-                <span className="text-xs text-gray-500">rahul@dell.com</span>
-              </div>
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-1">
-              <MessageSquare className="w-3.5 h-3.5" />
-              Message Vendor
-            </button>
-          </div>
-        </div>
-
-        {/* Stats strip */}
-        <div className="px-6 pb-3">
-          <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-            {stats.map((s, i) => (
-              <div key={i} className="flex flex-col items-center py-3 px-2 text-center">
-                <p className={`text-base font-bold ${s.accent}`}>{s.value}</p>
-                <p className="text-xs text-gray-500 font-medium leading-tight mt-0.5">{s.label}</p>
-                <p className="text-xs text-gray-400 leading-tight">{s.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Horizontal scrollable tabs */}
-        <div className="relative">
-          <div className="flex items-center px-6 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
-            {TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
-                  activeTab === tab.key
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
-                }`}
-              >
-                <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
-                {tab.label}
-                {tab.count !== undefined && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                    activeTab === tab.key ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
-                  }`}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
+          {/* Pagination footer */}
+          <div className=\"flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 bg-white\">
+            <p className=\"text-xs text-slate-500\" data-testid=\"pagination-info\">
+              Showing {sorted.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, sorted.length)} of {sorted.length} products
+            </p>
+            <Pager
+              page={currentPage}
+              totalPages={totalPages}
+              onChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={(v) => { setPageSize(Number(v)); setPage(1); }}
+            />
           </div>
         </div>
       </div>
 
-      {/* ── Page body ────────────────────────────────────────────────────── */}
-      <div className="flex-1 px-6 py-5">
-        {activeTab === "overview" && <OverviewTab />}
-        {activeTab === "products" && <ProductsTab />}
-        {activeTab === "orders" && <PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} />}
-        {activeTab === "performance" && <PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} />}
-        {activeTab === "contracts" && <PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} />}
-        {activeTab === "documents" && <PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} />}
-        {activeTab === "payments" && <PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} />}
-        {activeTab === "news" && <PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} />}
-      </div>
+      {/* Dialogs */}
+      <ProductFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        product={editing}
+        onSave={saveProduct}
+      />
+      <ViewProductDialog open={viewOpen} onOpenChange={setViewOpen} product={viewing} />
+      <BulkPriceDialog open={bulkOpen} onOpenChange={setBulkOpen} onApply={applyBulk} totalCount={products.length} />
+      <ImportProductsDialog open={importOpen} onOpenChange={setImportOpen} onImport={importProducts} />
+      <ExportCatalogDialog open={exportOpen} onOpenChange={setExportOpen} products={products} />
+      <SyncFeedDialog open={syncOpen} onOpenChange={setSyncOpen} onSync={refreshFromFeed} />
 
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent data-testid=\"delete-confirm-dialog\">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this product?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the product from your vendor catalog. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid=\"delete-confirm\"
+              onClick={() => deleteId && removeProduct(deleteId)}
+              className=\"bg-red-600 hover:bg-red-700\"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
+/* ----- helpers ----- */
+
+const FilterSelect = ({ label, value, onChange, options, testid }) => (
+  <div className=\"bg-white border border-slate-200 rounded-xl px-3 py-2 min-w-[180px]\">
+    <p className=\"text-[11px] font-medium text-slate-500\">{label}</p>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger data-testid={testid} className=\"border-0 shadow-none p-0 h-7 font-semibold text-slate-900 focus:ring-0\">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+);
+
+const Th = ({ children, onClick, sorted }) => (
+  <th
+    onClick={onClick}
+    className={`px-4 py-3 font-medium text-xs uppercase tracking-wider whitespace-nowrap ${onClick ? \"cursor-pointer hover:text-slate-700 select-none\" : \"\"}`}
+  >
+    <span className=\"inline-flex items-center gap-1\">
+      {children}
+      {onClick && (
+        sorted === \"asc\" ? <ChevronUp className=\"w-3 h-3\" /> :
+        sorted === \"desc\" ? <ChevronDown className=\"w-3 h-3\" /> :
+        <ArrowUpDown className=\"w-3 h-3 opacity-40\" />
+      )}
+    </span>
+  </th>
+);
+
+const PriceTrend = ({ trend }) => {
+  if (!trend || trend === 0) {
+    return <div className=\"text-xs text-slate-400 mt-0.5 flex items-center gap-1\">→ 0.00%</div>;
+  }
+  const up = trend > 0;
+  return (
+    <div className={`text-xs mt-0.5 flex items-center gap-1 ${up ? \"text-red-500\" : \"text-emerald-600\"}`}>
+      <span>{up ? \"↑\" : \"↓\"}</span>
+      <span>{Math.abs(trend).toFixed(2)}%</span>
+    </div>
+  );
+};
+
+const StockTag = ({ stock }) => {
+  const b = stockBucket(stock);
+  if (b === \"in\") return <span className=\"inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700\">In Stock</span>;
+  if (b === \"low\") return <span className=\"inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700\">Low Stock</span>;
+  return <span className=\"inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-700\">Out of Stock</span>;
+};
+
+const Pager = ({ page, totalPages, onChange, pageSize, onPageSizeChange }) => {
+  const range = () => {
+    const out = [];
+    const push = (v) => out.push(v);
+    push(1);
+    if (page > 3) push(\"...\");
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) push(i);
+    if (page < totalPages - 2) push(\"...\");
+    if (totalPages > 1) push(totalPages);
+    return out;
+  };
+
+  return (
+    <div className=\"flex items-center gap-2\">
+      <Button
+        variant=\"outline\"
+        size=\"icon\"
+        className=\"h-8 w-8\"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        data-testid=\"page-prev\"
+      >
+        <ChevronUp className=\"w-4 h-4 -rotate-90\" />
+      </Button>
+      {range().map((it, idx) =>
+        it === \"...\" ? (
+          <span key={`e-${idx}`} className=\"px-2 text-slate-400\">…</span>
+        ) : (
+          <Button
+            key={it}
+            variant={it === page ? \"default\" : \"outline\"}
+            className={`h-8 min-w-8 px-2 ${it === page ? \"bg-blue-600 hover:bg-blue-700\" : \"\"}`}
+            onClick={() => onChange(it)}
+            data-testid={`page-${it}`}
+          >
+            {it}
+          </Button>
+        )
+      )}
+      <Button
+        variant=\"outline\"
+        size=\"icon\"
+        className=\"h-8 w-8\"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= totalPages}
+        data-testid=\"page-next\"
+      >
+        <ChevronDown className=\"w-4 h-4 -rotate-90\" />
+      </Button>
+      <Select value={String(pageSize)} onValueChange={onPageSizeChange}>
+        <SelectTrigger className=\"h-8 w-[110px]\" data-testid=\"page-size\">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value=\"10\">10 / page</SelectItem>
+          <SelectItem value=\"20\">20 / page</SelectItem>
+          <SelectItem value=\"50\">50 / page</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+};
+"
