@@ -65,11 +65,11 @@ const spendData = [
 ];
 
 const activities = [
-  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Invoice #INV-2024-0892 approved for ₹12,50,000", time: "2 hours ago", color: "bg-emerald-50" },
-  { icon: <ShoppingCart className="w-4 h-4 text-blue-500" />, text: "New PO #PO-2024-0334 raised for IT Hardware", time: "Yesterday", color: "bg-blue-50" },
-  { icon: <AlertCircle className="w-4 h-4 text-amber-500" />, text: "Compliance document renewal due in 15 days", time: "2 days ago", color: "bg-amber-50" },
-  { icon: <Clock className="w-4 h-4 text-purple-500" />, text: "Contract #CNT-005 extended for 6 months", time: "1 week ago", color: "bg-purple-50" },
-  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Annual vendor review completed — Score: 85.8%", time: "2 weeks ago", color: "bg-emerald-50" },
+  { iconType: "check", text: "Invoice #INV-2024-0892 approved for ₹12,50,000", time: "2 hours ago", color: "bg-emerald-50" },
+  { iconType: "cart", text: "New PO #PO-2024-0334 raised for IT Hardware", time: "Yesterday", color: "bg-blue-50" },
+  { iconType: "alert", text: "Compliance document renewal due in 15 days", time: "2 days ago", color: "bg-amber-50" },
+  { iconType: "clock", text: "Contract #CNT-005 extended for 6 months", time: "1 week ago", color: "bg-purple-50" },
+  { iconType: "check", text: "Annual vendor review completed — Score: 85.8%", time: "2 weeks ago", color: "bg-emerald-50" },
 ];
 
 const contracts = [
@@ -270,20 +270,29 @@ function OverviewTab() {
             <h3 className="text-sm font-semibold text-gray-800">Report Activity</h3>
           </div>
           <div className="flex flex-col gap-0">
-            {activities.map((a, i) => (
-              <div key={i} className="flex gap-3 relative pb-4 last:pb-0">
-                {i < activities.length - 1 && (
-                  <div className="absolute left-4 top-7 bottom-0 w-px bg-gray-100" />
-                )}
-                <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center flex-shrink-0 z-10`}>
-                  {a.icon}
+            {activities.map((a, i) => {
+              const iconConfig: Record<string, { icon: React.ReactNode; color: string }> = {
+                check: { icon: <CheckCircle2 className="w-4 h-4" />, color: "text-emerald-500" },
+                cart: { icon: <ShoppingCart className="w-4 h-4" />, color: "text-blue-500" },
+                alert: { icon: <AlertCircle className="w-4 h-4" />, color: "text-amber-500" },
+                clock: { icon: <Clock className="w-4 h-4" />, color: "text-purple-500" },
+              };
+              const config = iconConfig[a.iconType] || iconConfig.check;
+              return (
+                <div key={i} className="flex gap-3 relative pb-4 last:pb-0">
+                  {i < activities.length - 1 && (
+                    <div className="absolute left-4 top-7 bottom-0 w-px bg-gray-100" />
+                  )}
+                  <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center flex-shrink-0 z-10 ${config.color}`}>
+                    {config.icon}
+                  </div>
+                  <div className="pt-1 min-w-0">
+                    <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{a.time}</p>
+                  </div>
                 </div>
-                <div className="pt-1 min-w-0">
-                  <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{a.time}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
