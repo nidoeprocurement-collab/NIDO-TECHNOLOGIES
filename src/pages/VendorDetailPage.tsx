@@ -31,6 +31,7 @@ import {
 } from "recharts";
 import { useNavigate } from "react-router-dom";
 import VendorProductsPage from "./VendorProductsPage";
+import VendorOrdersPage from "./VendorOrdersPage";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -483,7 +484,7 @@ export default function VendorDetail() {
       <div className="flex-1 px-0 py-0 overflow-auto">
         {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab /></div>}
         {activeTab === "products" && <VendorProductsPage />}
-        {activeTab === "orders" && <div className="px-6 py-5"><PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} /></div>}
+        {activeTab === "orders" && <VendorOrdersPage />}
         {activeTab === "performance" && <div className="px-6 py-5"><PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} /></div>}
         {activeTab === "contracts" && <div className="px-6 py-5"><PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} /></div>}
         {activeTab === "documents" && <div className="px-6 py-5"><PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} /></div>}
