@@ -30,6 +30,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
+import VendorProductsPage from "./VendorProductsPage";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -479,15 +480,15 @@ export default function VendorDetail() {
       </div>
 
       {/* ── Page body ────────────────────────────────────────────────────── */}
-      <div className="flex-1 px-6 py-5">
-        {activeTab === "overview" && <OverviewTab />}
-        {activeTab === "products" && <PlaceholderTab label="Products" icon={<Package className="w-6 h-6" />} />}
-        {activeTab === "orders" && <PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} />}
-        {activeTab === "performance" && <PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} />}
-        {activeTab === "contracts" && <PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} />}
-        {activeTab === "documents" && <PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} />}
-        {activeTab === "payments" && <PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} />}
-        {activeTab === "news" && <PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} />}
+      <div className="flex-1 px-0 py-0 overflow-auto">
+        {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab /></div>}
+        {activeTab === "products" && <VendorProductsPage />}
+        {activeTab === "orders" && <div className="px-6 py-5"><PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} /></div>}
+        {activeTab === "performance" && <div className="px-6 py-5"><PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} /></div>}
+        {activeTab === "contracts" && <div className="px-6 py-5"><PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} /></div>}
+        {activeTab === "documents" && <div className="px-6 py-5"><PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} /></div>}
+        {activeTab === "payments" && <div className="px-6 py-5"><PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} /></div>}
+        {activeTab === "news" && <div className="px-6 py-5"><PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} /></div>}
       </div>
 
       <style>{`
