@@ -1,1275 +1,958 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Check, ChevronRight, Upload, Loader2 } from "lucide-react";
+'use client';
 
-// Mock toast notification system
-const toast = {
-  success: (msg: string) => console.log("[v0] Success:", msg),
-  error: (msg: string) => console.error("[v0] Error:", msg),
-};
+import React, { useState } from 'react';
+import { Cloud, Plus, Trash2, Star } from 'lucide-react';
 
-const STEPS = [
-  { label: "Basic Info", icon: "A" },
-  { label: "Business", icon: "B" },
-  { label: "Financial", icon: "C" },
-  { label: "Address", icon: "D" },
-  { label: "Documents", icon: "E" },
-];
+export default function AddVendorPage() {
+  // Dropdown options data
+  const categories = ['IT Hardware', 'Software', 'Office Supplies', 'Services', 'Machinery & Equipment', 'Electronics', 'Networking', 'Furniture & Fixtures', 'Facility Management', 'Other', '+ Add New Category'];
+  
+  const subCategories = {
+    'IT Hardware': ['Servers', 'Laptops', 'Desktops', 'Storage', 'Printers', 'Networking Devices', 'Peripherals', 'Accessories', 'Consumables', 'Others', '+ Add New Sub Category'],
+    'Software': ['Operating System', 'Productivity', 'Development', 'Security', 'Others', '+ Add New Sub Category'],
+    'Office Supplies': ['Stationery', 'Furniture', 'Cleaning', 'Others', '+ Add New Sub Category'],
+  };
 
-const CATEGORIES = [
-  "IT Hardware",
-  "Cloud Services",
-  "Office Supplies",
-  "Security Systems",
-  "Consulting",
-  "Miscellaneous",
-];
+  const contacts = [
+    { name: 'Rahul Sharma', title: 'Manager - Sales' },
+    { name: 'Amit Verma', title: 'Regional Manager' },
+    { name: 'Neha Kapoor', title: 'Senior Director' },
+    { name: 'Pooja Nair', title: 'Partner Manager' },
+    { name: 'Rohit Mehta', title: 'Sales Lead' },
+    { name: '+ Add New Contact', title: '' },
+  ];
 
-const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY"];
-
-const GST_TREATMENTS = [
-  "Registered Business",
-  "Unregistered Business",
-  "Compositions Scheme",
-  "Overseas",
-  "SEZ",
-];
-
-const PAYMENT_TERMS = ["Net 15", "Net 30", "Net 45", "Net 60", "Due on Receipt"];
-
-const INDIAN_STATES = [
-  "Andhra Pradesh",
-  "Arunachal Pradesh",
-  "Assam",
-  "Bihar",
-  "Chhattisgarh",
-  "Goa",
-  "Gujarat",
-  "Haryana",
-  "Himachal Pradesh",
-  "Jharkhand",
-  "Karnataka",
-  "Kerala",
-  "Madhya Pradesh",
-  "Maharashtra",
-  "Manipur",
-  "Meghalaya",
-  "Mizoram",
-  "Nagaland",
-  "Odisha",
-  "Punjab",
-  "Rajasthan",
-  "Sikkim",
-  "Tamil Nadu",
-  "Telangana",
-  "Tripura",
-  "Uttar Pradesh",
-  "Uttarakhand",
-  "West Bengal",
-];
-
-export default function VendorOnboardingPage() {
-  const navigate = useNavigate();
-  const { id: vendorIdToEdit } = useParams<{ id: string }>();
-  const [step, setStep] = useState(0);
-  const [showMagicUpload, setShowMagicUpload] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!vendorIdToEdit);
+  const designations = ['CEO / Director', 'Managing Director', 'Vice President', 'General Manager', 'Manager', 'Assistant Manager', 'Executive', 'Specialist', 'Others', '+ Add New Designation'];
+  
+  const vendorTypes = ['Supplier', 'Manufacturer', 'Distributor', 'Reseller', 'Service Provider', 'Consultant', 'Contractor', 'OEM', 'Others', '+ Add New Vendor Type'];
+  
+  const years = ['2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015 & Below'];
+  
+  const phoneCodes = ['+91 (India)', '+1 (USA)', '+44 (UK)', '+971 (UAE)', '+65 (Singapore)', '+61 (Australia)', '+86 (China)', '+81 (Japan)', '+49 (Germany)', '+33 (France)', '+ Add New Code'];
+  
+  const countries = ['India', 'United States', 'United Kingdom', 'United Arab Emirates', 'Singapore', 'Australia', 'China', 'Japan', 'Germany', 'France', 'Others', '+ Add New Country'];
+  
+  const states = ['Karnataka', 'Maharashtra', 'Delhi', 'Tamil Nadu', 'Gujarat', 'Uttar Pradesh', 'West Bengal', 'Telangana', 'Rajasthan', 'Others', '+ Add New State'];
+  
+  const cities = ['Bangalore', 'Mumbai', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata', 'Ahmedabad', 'Noida', 'Others', '+ Add New City'];
+  
+  const paymentTerms = ['7 Days', '15 Days', '30 Days', '45 Days', '60 Days', '90 Days', '120 Days', 'Net 15', 'Net 30', 'Net 60', '+ Add New Term'];
+  
+  const currencies = ['INR - Indian Rupee', 'USD - US Dollar', 'EUR - Euro', 'GBP - British Pound', 'AED - UAE Dirham', 'SGD - Singapore Dollar', '+ Add New Currency'];
+  
+  const accountTypes = ['Current Account', 'Saving Account', 'Overdraft Account', 'Cash Credit Account', 'Others', '+ Add New Account Type'];
+  
+  const msmeStatuses = ['Micro', 'Small', 'Medium', 'Not MSME', '+ Add New Status'];
+  
+  const isoCertifications = ['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 45001', 'ISO 50001', 'Others', '+ Add New Certification'];
+  
+  const qualityCertifications = ['CE Certified', 'RoHS Compliant', 'BIS Certified', 'UL Certified', 'FCC Certified', 'Others', '+ Add New Certification'];
+  
+  const environmentalCertifications = ['ISO 14001', 'ISO 50001', 'Green Building', 'LEED Certified', 'Others', '+ Add New Certification'];
+  
+  const ratingLabels = { 5: 'Excellent', 4: 'Very Good', 3: 'Good', 2: 'Average', 1: 'Poor' };
+  
+  const blacklistedOptions = ['No', 'Under Review', 'Yes'];
+  
+  const contractStatuses = ['Active', 'Inactive', 'Expired', 'Terminated', 'Under Review', '+ Add New Status'];
+  
+  const preferredOptions = ['Yes', 'No'];
+  
+  const tagOptions = ['IT Hardware', 'Office Supplies', 'Services', 'Preferred Vendor', 'New Vendor', 'Critical Vendor', '+ Add New Tag'];
+  
+  const visibilityOptions = ['Internal Only', 'Procurement Team', 'Finance Team', 'Management', 'All Users', '+ Add New Visibility'];
 
   const [formData, setFormData] = useState({
-    // Step 1: Basic Info
-    vendor_id: "", // Auto-generated
-    company_name: "",
-    category: "",
-    vendor_tier: "",
-    contact_person: "",
-    email: "",
-    phone: "",
-    mobile: "",
-    website: "",
-    contract_start_date: "",
-    contract_end_date: "",
-    vendor_logo: null as File | null,
-    vendor_logo_url: "",
-
-    // Step 2: Business
-    gst_treatment: "",
-    gstin: "",
-    source_of_supply: "",
-    pan_number: "",
-    currency: "INR",
-    opening_balance: "",
-
-    // Step 3: Financial
-    payment_terms: "",
-    tds_rate: "",
-    bank_name: "",
-    account_number: "",
-    ifsc_code: "",
-    branch: "",
-
-    // Step 4: Address
-    billing_address: "",
-    shipping_address: "",
-    billing_city: "",
-    shipping_city: "",
-    billing_state: "",
-    shipping_state: "",
-    billing_pincode: "",
-    shipping_pincode: "",
-    same_address: false,
-
-    // Step 5: Documents
-    documents: [] as File[],
+    vendorName: '',
+    vendorCode: 'Auto-generated',
+    category: '',
+    subCategory: '',
+    vendorType: '',
+    pan: '',
+    legalEntityName: '',
+    yearOfEstablishment: '',
+    website: '',
+    contactPerson: '',
+    designation: '',
+    email: '',
+    phone: '+91 (India)',
+    phoneNumber: '',
+    mobile: '+91 (India)',
+    mobileNumber: '',
+    alternateEmail: '',
+    registeredAddress: '',
+    billingAddress: '',
+    country: '',
+    state: '',
+    city: '',
+    pincode: '',
+    sameAsRegistered: false,
+    paymentTerms: '',
+    currency: 'INR - Indian Rupee',
+    creditLimit: '',
+    bankName: '',
+    accountNumber: '',
+    ifscCode: '',
+    accountType: '',
+    msmeStatus: '',
+    isoStatus: '',
+    qualityCertification: '',
+    environmentalCertification: '',
+    qualityRating: 0,
+    deliveryRating: 0,
+    serviceRating: 0,
+    blacklisted: '',
+    contractStatus: '',
+    onboardingDate: '',
+    preferredVendor: '',
+    tags: [],
+    internalNotes: '',
+    visibility: '',
+    documents: [],
+    gstCertificate: false,
+    panCard: false,
+    businessRegistration: false,
+    bankDetails: false,
+    isoCertificate: false,
+    otherDocuments: false,
   });
 
-  const [vendorTiers, setVendorTiers] = useState([
-    "Premium Vendors",
-    "Standard Vendors",
-    "Emerging Vendors",
-  ]);
-  const [showAddTier, setShowAddTier] = useState(false);
-  const [newTier, setNewTier] = useState("");
+  const [tagInput, setTagInput] = useState('');
+  const [subCategoryOptions, setSubCategoryOptions] = useState([]);
 
-  // Load vendor data for editing or generate Vendor ID for new vendor
-  useEffect(() => {
-    if (vendorIdToEdit) {
-      // Load existing vendor data for mock
-      console.log("[v0] Loading vendor data for:", vendorIdToEdit);
-      
-      // Mock data for editing
-      const mockVendor = {
-        vendor_id: "VND-00001",
-        company_name: "Tech Supplies Inc",
-        category: "IT Hardware",
-        vendor_tier: "Premium Vendors",
-        contact_person: "Jane Smith",
-        email: "jane@techsupplies.com",
-        phone: "+91 98765 43210",
-        mobile: "+91 99876 54321",
-        website: "www.techsupplies.com",
-        contract_start_date: "2024-01-01",
-        contract_end_date: "2025-01-01",
-        gst_treatment: "Registered Business",
-        gstin: "27AABCT1234A1Z5",
-        source_of_supply: "Maharashtra",
-        pan_number: "AAAAA0000A",
-        currency: "INR",
-        opening_balance: "50000",
-        payment_terms: "Net 30",
-        tds_rate: "1.0",
-        bank_name: "ICIC Bank",
-        account_number: "9876543210",
-        ifsc_code: "ICIC0001234",
-        branch: "Mumbai",
-        billing_address: "456 Industrial Street, Suite 200",
-        billing_city: "Mumbai",
-        billing_state: "Maharashtra",
-        billing_pincode: "400002",
-        shipping_address: "456 Industrial Street, Suite 200",
-        shipping_city: "Mumbai",
-        shipping_state: "Maharashtra",
-        shipping_pincode: "400002",
-      };
-
-      setFormData((prev) => ({
+  const handleAddTag = () => {
+    if (tagInput.trim()) {
+      setFormData(prev => ({
         ...prev,
-        ...mockVendor,
+        tags: [...prev.tags, tagInput]
       }));
-      setIsLoading(false);
-    } else {
-      // Generate new Vendor ID
-      setIsLoading(true);
-      const timer = setTimeout(() => {
-        // Generate next ID: VND-00001, VND-00002, etc.
-        const nextNumber = Math.floor(Math.random() * 10000) + 1;
-        const vendorId = `VND-${String(nextNumber).padStart(5, "0")}`;
-
-        setFormData((prev) => ({
-          ...prev,
-          vendor_id: vendorId,
-        }));
-        setIsLoading(false);
-      }, 500);
-      
-      return () => clearTimeout(timer);
+      setTagInput('');
     }
-  }, [vendorIdToEdit]);
+  };
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({
+  const handleRemoveTag = (index) => {
+    setFormData(prev => ({
       ...prev,
-      [field]: value,
+      tags: prev.tags.filter((_, i) => i !== index)
     }));
   };
 
-  const handleFileSelect = (files: FileList | null) => {
-    if (files) {
-      setFormData((prev) => ({
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+    
+    // Update subcategories when category changes
+    if (name === 'category') {
+      setSubCategoryOptions(subCategories[value] || []);
+      setFormData(prev => ({
         ...prev,
-        documents: Array.from(files),
+        subCategory: ''
       }));
     }
   };
 
-  const canProceed = () => {
-    if (step === 0) {
-      return !!(
-        formData.vendor_id.trim() &&
-        formData.company_name.trim() &&
-        formData.category &&
-        formData.vendor_tier &&
-        formData.contact_person.trim() &&
-        formData.email.trim() &&
-        formData.contract_start_date &&
-        formData.contract_end_date
-      );
-    }
-    if (step === 1) {
-      return !!(
-        formData.gst_treatment &&
-        formData.gstin.trim() &&
-        formData.pan_number.trim()
-      );
-    }
-    if (step === 2) {
-      return !!(
-        formData.payment_terms &&
-        formData.bank_name.trim() &&
-        formData.account_number.trim()
-      );
-    }
-    if (step === 3) {
-      return !!(
-        formData.billing_address.trim() &&
-        formData.billing_city.trim() &&
-        formData.billing_state &&
-        formData.billing_pincode.trim() &&
-        (formData.same_address ||
-          (formData.shipping_address.trim() &&
-            formData.shipping_city.trim() &&
-            formData.shipping_state &&
-            formData.shipping_pincode.trim()))
-      );
-    }
-    return true;
+  const handleRatingChange = (fieldName, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: value
+    }));
   };
 
-  const downloadTemplate = () => {
-    const headers = [
-      "Vendor ID",
-      "Company Name",
-      "Category",
-      "Vendor Tier",
-      "Contact Person",
-      "Email",
-      "Phone",
-      "Mobile",
-      "Website",
-      "Contract Start Date",
-      "Contract End Date",
-      "GST Treatment",
-      "GSTIN",
-      "Source of Supply",
-      "PAN Number",
-      "Currency",
-      "Opening Balance",
-      "Payment Terms",
-      "TDS Rate",
-      "Bank Name",
-      "Account Number",
-      "IFSC Code",
-      "Branch",
-      "Billing Address",
-      "Billing City",
-      "Billing State",
-      "Billing Pincode",
-      "Shipping Address",
-      "Shipping City",
-      "Shipping State",
-      "Shipping Pincode",
-    ];
-
-    const csv = headers.join(",");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `vendor_template_${new Date().toISOString().split("T")[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast.success("Template downloaded successfully");
-  };
-
-  const handleSave = async () => {
-    // Validate required fields
-    if (
-      !formData.company_name.trim() ||
-      !formData.email.trim() ||
-      !formData.contact_person.trim()
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    try {
-      console.log("[v0] Saving vendor data:", formData.company_name);
-
-      // Mock save operation
-      const vendorData = {
-        company_name: formData.company_name,
-        category: formData.category,
-        vendor_tier: formData.vendor_tier,
-        contact_person: formData.contact_person,
-        email: formData.email,
-        phone: formData.phone,
-        mobile: formData.mobile,
-        website: formData.website,
-        contract_start_date: formData.contract_start_date,
-        contract_end_date: formData.contract_end_date,
-        vendor_logo_url: formData.vendor_logo_url,
-        gst_treatment: formData.gst_treatment,
-        gstin: formData.gstin,
-        source_of_supply: formData.source_of_supply,
-        pan_number: formData.pan_number,
-        currency: formData.currency,
-        opening_balance: formData.opening_balance
-          ? parseFloat(formData.opening_balance)
-          : 0,
-        payment_terms: formData.payment_terms,
-        tds_rate: formData.tds_rate
-          ? parseFloat(formData.tds_rate)
-          : 0,
-        bank_name: formData.bank_name,
-        account_number: formData.account_number,
-        ifsc_code: formData.ifsc_code,
-        branch: formData.branch,
-        billing_address: formData.billing_address,
-        billing_city: formData.billing_city,
-        billing_state: formData.billing_state,
-        billing_pincode: formData.billing_pincode,
-        shipping_address: formData.same_address
-          ? formData.billing_address
-          : formData.shipping_address,
-        shipping_city: formData.same_address
-          ? formData.billing_city
-          : formData.shipping_city,
-        shipping_state: formData.same_address
-          ? formData.billing_state
-          : formData.shipping_state,
-        shipping_pincode: formData.same_address
-          ? formData.billing_pincode
-          : formData.shipping_pincode,
-        status: "active",
-      };
-
-      // Mock save - store in localStorage for demonstration
-      const vendors = JSON.parse(localStorage.getItem("vendors") || "[]");
-      if (vendorIdToEdit) {
-        const index = vendors.findIndex(
-          (v: any) => v.vendor_id === formData.vendor_id
-        );
-        if (index > -1) {
-          vendors[index] = { ...vendors[index], ...vendorData };
-        }
-        console.log("[v0] Vendor updated successfully");
-        toast.success("Vendor updated successfully");
-      } else {
-        vendors.push({ vendor_id: formData.vendor_id, ...vendorData });
-        console.log("[v0] Vendor saved successfully");
-        toast.success("Vendor registered successfully");
-      }
-      localStorage.setItem("vendors", JSON.stringify(vendors));
-
-      // Navigate back to vendors page after successful save
-      setTimeout(() => {
-        navigate("/vendors");
-      }, 1000);
-    } catch (err) {
-      console.error("[v0] Error:", err);
-      toast.error("An error occurred while saving");
-    }
+  const StarRating = ({ value, onChange, name }) => {
+    return (
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            onClick={() => onChange(name, star)}
+            className="p-1 hover:bg-gray-100 rounded transition"
+          >
+            <Star
+              size={20}
+              className={star <= value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}
+            />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="bg-white border-b p-3 sm:p-4 md:p-6 sticky top-0 z-40">
-        <div className="flex items-start justify-between w-full">
-          <button
-            onClick={() => navigate("/vendors")}
-            className="text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to Vendors
-          </button>
-          <div className="text-right">
-            <h1 className="text-2xl font-bold">
-              {vendorIdToEdit ? "Edit Vendor" : "Vendor Onboarding"}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {vendorIdToEdit
-                ? "Update vendor information"
-                : "Complete all 5 steps to register a new vendor"}
-            </p>
+      <div className="border-b border-gray-200 sticky top-0 z-10 bg-white">
+        <div className="px-8 py-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Add New Vendor</h1>
+            <p className="text-sm text-gray-600 mt-1">Create a new vendor profile. All fields marked with <span className="text-red-600">*</span> are required.</p>
+          </div>
+          <div className="flex gap-3">
           </div>
         </div>
       </div>
 
-      <div className="p-3 sm:p-4 md:p-6 lg:p-8 w-full">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Loading vendor information...</p>
-            </div>
+      {/* Form Content */}
+      <div className="px-8 py-8 space-y-12">
+        {/* Section 1: Vendor Information */}
+        <FormSection number={1} title="Vendor Information">
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Vendor Name"
+              required
+              input={
+                <input
+                  type="text"
+                  placeholder="Enter vendor name"
+                  name="vendorName"
+                  value={formData.vendorName}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              }
+            />
+            <FormField
+              label="Vendor Code"
+              input={<input
+                type="text"
+                placeholder="Auto-generated"
+                disabled
+                value={formData.vendorCode}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />} required={undefined}            />
           </div>
-        ) : (
-          <div>
-            {/* Progress Indicator */}
-            <div className="bg-white rounded-lg p-6 mb-6">
-              <div className="flex items-center justify-between">
-                {STEPS.map((s, idx) => (
-                  <div key={idx} className="flex items-center flex-1">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center font-semibold text-sm transition-all ${
-                        step === idx
-                          ? "bg-[#4A6CF7] text-white"
-                          : step > idx
-                            ? "bg-green-500 text-white"
-                            : "bg-gray-200 text-gray-600"
-                      }`}
-                    >
-                      {step > idx ? <Check className="h-5 w-5" /> : s.icon}
-                    </div>
-                    <p
-                      className={`ml-2 text-sm font-medium ${
-                        step === idx
-                          ? "text-[#4A6CF7]"
-                          : step > idx
-                            ? "text-green-500"
-                            : "text-gray-600"
-                      }`}
-                    >
-                      {s.label}
-                    </p>
-                    {idx < STEPS.length - 1 && (
-                      <div
-                        className={`flex-1 h-1 mx-2 transition-colors ${
-                          step > idx ? "bg-green-500" : "bg-gray-200"
-                        }`}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Magic Upload Section */}
-            {step === 0 && (
-              <div
-                className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-6 mb-6 cursor-pointer hover:bg-blue-100 transition-colors"
-                onClick={() => setShowMagicUpload(true)}
-              >
-                <div className="flex items-center gap-2 text-blue-600">
-                  <Upload className="h-5 w-5" />
-                  <span className="font-medium">Magic Upload</span>
-                </div>
-                <p className="text-xs text-gray-600 mt-1">
-                  Upload a template file to auto-fill vendor details
-                </p>
-              </div>
-            )}
-
-            {/* Step Content */}
-            <Card className="bg-white">
-              <CardContent className="p-4 md:p-6 lg:p-8">
-                {/* Step 1: Basic Info */}
-                {step === 0 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-bold mb-1">Step 1: Basic Info</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Vendor ID
-                        </label>
-                        <Input
-                          placeholder="Auto-generated"
-                          value={formData.vendor_id}
-                          disabled
-                          className="bg-gray-100 cursor-not-allowed"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Auto-generated</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Company Name *
-                        </label>
-                        <Input
-                          placeholder="Legal company name"
-                          value={formData.company_name}
-                          onChange={(e) =>
-                            handleInputChange("company_name", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Category *
-                        </label>
-                        <Select
-                          value={formData.category}
-                          onValueChange={(value) =>
-                            handleInputChange("category", value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CATEGORIES.map((cat) => (
-                              <SelectItem key={cat} value={cat}>
-                                {cat}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Vendor Tier *
-                        </label>
-                        <Select
-                          value={formData.vendor_tier}
-                          onValueChange={(value) => {
-                            if (value === "add_new") {
-                              setShowAddTier(true);
-                            } else {
-                              handleInputChange("vendor_tier", value);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select tier" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {vendorTiers.map((tier) => (
-                              <SelectItem key={tier} value={tier}>
-                                {tier}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="add_new" className="text-[#4A6CF7]">
-                              + Add New Tier
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {showAddTier && (
-                          <div className="mt-3 p-3 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
-                            <div className="flex gap-2">
-                              <Input
-                                placeholder="Enter new tier name"
-                                value={newTier}
-                                onChange={(e) => setNewTier(e.target.value)}
-                              />
-                              <Button
-                                size="sm"
-                                className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                                onClick={() => {
-                                  if (newTier.trim()) {
-                                    setVendorTiers([...vendorTiers, newTier]);
-                                    handleInputChange("vendor_tier", newTier);
-                                    setNewTier("");
-                                    setShowAddTier(false);
-                                    toast.success("Tier added successfully");
-                                  }
-                                }}
-                              >
-                                Add
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setShowAddTier(false);
-                                  setNewTier("");
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Vendor Logo (PNG)
-                        </label>
-                        <input
-                          type="file"
-                          accept=".png"
-                          onChange={(e) => {
-                            if (e.target.files?.[0]) {
-                              const file = e.target.files[0];
-                              if (file.type === "image/png") {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                  handleInputChange("vendor_logo", file);
-                                  handleInputChange("vendor_logo_url", event.target?.result);
-                                };
-                                reader.readAsDataURL(file);
-                              } else {
-                                toast.error("Please upload a PNG file");
-                              }
-                            }
-                          }}
-                          className="block w-full text-sm text-gray-500 border border-gray-300 rounded-md cursor-pointer focus:outline-none"
-                        />
-                        {formData.vendor_logo_url && (
-                          <div className="mt-2">
-                            <img
-                              src={formData.vendor_logo_url}
-                              alt="Logo preview"
-                              className="h-16 w-16 rounded object-cover"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div></div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Contact Person *
-                        </label>
-                        <Input
-                          placeholder="Primary contact name"
-                          value={formData.contact_person}
-                          onChange={(e) =>
-                            handleInputChange("contact_person", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Email *
-                        </label>
-                        <Input
-                          type="email"
-                          placeholder="contact@company.com"
-                          value={formData.email}
-                          onChange={(e) =>
-                            handleInputChange("email", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Phone
-                        </label>
-                        <Input
-                          placeholder="+91 XXXXX XXXXX"
-                          value={formData.phone}
-                          onChange={(e) =>
-                            handleInputChange("phone", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Mobile
-                        </label>
-                        <Input
-                          placeholder="+91 XXXXX XXXXX"
-                          value={formData.mobile}
-                          onChange={(e) =>
-                            handleInputChange("mobile", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Website
-                        </label>
-                        <Input
-                          placeholder="www.example.com"
-                          value={formData.website}
-                          onChange={(e) =>
-                            handleInputChange("website", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div></div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Contract Start Date *
-                        </label>
-                        <Input
-                          type="date"
-                          value={formData.contract_start_date}
-                          onChange={(e) =>
-                            handleInputChange("contract_start_date", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Contract End Date *
-                        </label>
-                        <Input
-                          type="date"
-                          value={formData.contract_end_date}
-                          onChange={(e) =>
-                            handleInputChange("contract_end_date", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 2: Business */}
-                {step === 1 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-bold mb-1">Step 2: Business Details</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          GST Treatment *
-                        </label>
-                        <Select
-                          value={formData.gst_treatment}
-                          onValueChange={(value) =>
-                            handleInputChange("gst_treatment", value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select treatment" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {GST_TREATMENTS.map((treatment) => (
-                              <SelectItem key={treatment} value={treatment}>
-                                {treatment}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          GSTIN *
-                        </label>
-                        <Input
-                          placeholder="27AABCT1234A1Z5"
-                          value={formData.gstin}
-                          onChange={(e) =>
-                            handleInputChange("gstin", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Source of Supply
-                        </label>
-                        <Select
-                          value={formData.source_of_supply}
-                          onValueChange={(value) =>
-                            handleInputChange("source_of_supply", value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {INDIAN_STATES.map((state) => (
-                              <SelectItem key={state} value={state}>
-                                {state}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          PAN Number *
-                        </label>
-                        <Input
-                          placeholder="AAAAA0000A"
-                          value={formData.pan_number}
-                          onChange={(e) =>
-                            handleInputChange("pan_number", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Currency
-                        </label>
-                        <Select
-                          value={formData.currency}
-                          onValueChange={(value) =>
-                            handleInputChange("currency", value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select currency" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CURRENCIES.map((curr) => (
-                              <SelectItem key={curr} value={curr}>
-                                {curr}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Opening Balance
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={formData.opening_balance}
-                          onChange={(e) =>
-                            handleInputChange("opening_balance", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 3: Financial */}
-                {step === 2 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-bold mb-1">Step 3: Financial Information</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Payment Terms *
-                        </label>
-                        <Select
-                          value={formData.payment_terms}
-                          onValueChange={(value) =>
-                            handleInputChange("payment_terms", value)
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select terms" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PAYMENT_TERMS.map((term) => (
-                              <SelectItem key={term} value={term}>
-                                {term}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          TDS Rate (%)
-                        </label>
-                        <Input
-                          type="number"
-                          placeholder="0.0"
-                          value={formData.tds_rate}
-                          onChange={(e) =>
-                            handleInputChange("tds_rate", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Bank Name *
-                        </label>
-                        <Input
-                          placeholder="Bank name"
-                          value={formData.bank_name}
-                          onChange={(e) =>
-                            handleInputChange("bank_name", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Account Number *
-                        </label>
-                        <Input
-                          placeholder="Account number"
-                          value={formData.account_number}
-                          onChange={(e) =>
-                            handleInputChange("account_number", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          IFSC Code
-                        </label>
-                        <Input
-                          placeholder="SBIN0001234"
-                          value={formData.ifsc_code}
-                          onChange={(e) =>
-                            handleInputChange("ifsc_code", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Branch
-                        </label>
-                        <Input
-                          placeholder="Branch name"
-                          value={formData.branch}
-                          onChange={(e) =>
-                            handleInputChange("branch", e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: Address */}
-                {step === 3 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-bold mb-1">Step 4: Address</h2>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="font-semibold text-base mb-4">Billing Address</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                          <div>
-                            <label className="block text-sm font-medium mb-2">
-                              Address *
-                            </label>
-                            <Textarea
-                              placeholder="Street address"
-                              value={formData.billing_address}
-                              onChange={(e) =>
-                                handleInputChange("billing_address", e.target.value)
-                              }
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">
-                              City *
-                            </label>
-                            <Input
-                              placeholder="City"
-                              value={formData.billing_city}
-                              onChange={(e) =>
-                                handleInputChange("billing_city", e.target.value)
-                              }
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mt-6">
-                          <div>
-                            <label className="block text-sm font-medium mb-2">
-                              State *
-                            </label>
-                            <Select
-                              value={formData.billing_state}
-                              onValueChange={(value) =>
-                                handleInputChange("billing_state", value)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select state" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {INDIAN_STATES.map((state) => (
-                                  <SelectItem key={state} value={state}>
-                                    {state}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-2">
-                              Pincode *
-                            </label>
-                            <Input
-                              placeholder="400001"
-                              value={formData.billing_pincode}
-                              onChange={(e) =>
-                                handleInputChange("billing_pincode", e.target.value)
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 my-4 p-3 bg-blue-50 rounded-lg">
-                        <input
-                          type="checkbox"
-                          id="same_address"
-                          checked={formData.same_address}
-                          onChange={(e) =>
-                            handleInputChange("same_address", e.target.checked)
-                          }
-                          className="w-4 h-4"
-                        />
-                        <label htmlFor="same_address" className="text-sm font-medium">
-                          Shipping address same as billing
-                        </label>
-                      </div>
-
-                      {!formData.same_address && (
-                        <div>
-                          <h3 className="font-semibold text-base mb-4">Shipping Address</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Address
-                              </label>
-                              <Textarea
-                                placeholder="Street address"
-                                value={formData.shipping_address}
-                                onChange={(e) =>
-                                  handleInputChange("shipping_address", e.target.value)
-                                }
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                City
-                              </label>
-                              <Input
-                                placeholder="City"
-                                value={formData.shipping_city}
-                                onChange={(e) =>
-                                  handleInputChange("shipping_city", e.target.value)
-                                }
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6 mt-6">
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                State
-                              </label>
-                              <Select
-                                value={formData.shipping_state}
-                                onValueChange={(value) =>
-                                  handleInputChange("shipping_state", value)
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select state" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {INDIAN_STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>
-                                      {state}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-2">
-                                Pincode
-                              </label>
-                              <Input
-                                placeholder="400001"
-                                value={formData.shipping_pincode}
-                                onChange={(e) =>
-                                  handleInputChange("shipping_pincode", e.target.value)
-                                }
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 5: Documents */}
-                {step === 4 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-bold mb-1">Step 5: Documents</h2>
-                    </div>
-
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-6 lg:p-8 text-center">
-                      <Upload className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600">Upload GST Certificate, PAN Card, and Bank Documents</p>
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => handleFileSelect(e.target.files)}
-                        className="mt-4 hidden"
-                        id="file-upload"
-                      />
-                      <label
-                        htmlFor="file-upload"
-                        className="mt-4 px-4 py-2 bg-[#4A6CF7] text-white rounded-lg hover:bg-[#3B5DE8] cursor-pointer inline-block"
-                      >
-                        Upload Files
-                      </label>
-                    </div>
-
-                    {formData.documents.length > 0 && (
-                      <div className="border rounded-lg p-4">
-                        <h3 className="font-semibold mb-2">Uploaded Files:</h3>
-                        <ul className="space-y-2">
-                          {formData.documents.map((doc, idx) => (
-                            <li key={idx} className="text-sm text-gray-600">
-                              {doc.name}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Review Step */}
-                {step === 5 && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-xl font-bold mb-1">Review & Submit</h2>
-                    </div>
-
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <p className="text-sm text-blue-900">
-                        Please review all the information provided below and submit for verification.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 md:gap-6 text-sm">
-                      <div>
-                        <p className="text-gray-600">Company Name</p>
-                        <p className="font-semibold">{formData.company_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Category</p>
-                        <p className="font-semibold">{formData.category}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Contact Person</p>
-                        <p className="font-semibold">{formData.contact_person}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Email</p>
-                        <p className="font-semibold">{formData.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">GSTIN</p>
-                        <p className="font-semibold">{formData.gstin || "Not provided"}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Bank</p>
-                        <p className="font-semibold">{formData.bank_name || "Not provided"}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Navigation Buttons */}
-            <div className="flex items-center justify-between mt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (step > 0) {
-                    setStep(step - 1);
-                  }
-                }}
-                disabled={step === 0}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" /> Previous
-              </Button>
-
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={downloadTemplate}
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Category"
+              required
+              input={
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  Download Template
-                </Button>
-                {step === 4 ? (
-                  <Button
-                    className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                    onClick={handleSave}
-                    disabled={!canProceed()}
+                  <option value="">Select category</option>
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              }
+            />
+            <FormField
+              label="Sub Category"
+              input={<select
+                name="subCategory"
+                value={formData.subCategory}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!formData.category}
+              >
+                <option value="">Select sub category</option>
+                {subCategoryOptions.map(sub => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Vendor Type"
+              required
+              input={
+                <select
+                  name="vendorType"
+                  value={formData.vendorType}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select vendor type</option>
+                  {vendorTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              }
+            />
+            <FormField
+              label="PAN"
+              input={<input
+                type="text"
+                placeholder="Enter PAN"
+                name="pan"
+                value={formData.pan}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Legal Entity Name"
+              input={<input
+                type="text"
+                placeholder="Enter legal entity name"
+                name="legalEntityName"
+                value={formData.legalEntityName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+            <FormField
+              label="Year of Establishment"
+              input={<select
+                name="yearOfEstablishment"
+                value={formData.yearOfEstablishment}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select year</option>
+                {years.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+
+          <FormField
+            label="Website"
+            input={<input
+              type="text"
+              placeholder="Enter website URL"
+              name="website"
+              value={formData.website}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+        </FormSection>
+
+        {/* Section 2: Primary Contact */}
+        <FormSection number={2} title="Primary Contact">
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Contact Person"
+              required
+              input={
+                <select
+                  name="contactPerson"
+                  value={formData.contactPerson}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select contact person</option>
+                  {contacts.map((contact, idx) => {
+                    if (contact.name === '+ Add New Contact') {
+                      return <option key={idx} value="add-new">{contact.name}</option>;
+                    }
+                    return <option key={contact.name} value={contact.name}>{contact.name} ({contact.title})</option>;
+                  })}
+                </select>
+              }
+            />
+            <FormField
+              label="Designation"
+              input={<select
+                name="designation"
+                value={formData.designation}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select designation</option>
+                {designations.map(des => (
+                  <option key={des} value={des}>{des}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+
+          <FormField
+            label="Email"
+            required
+            input={
+              <input
+                type="email"
+                placeholder="name@company.com"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            }
+          />
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Phone"
+              required
+              input={
+                <div className="flex gap-2">
+                  <select
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
                   >
-                    Submit Vendor
-                  </Button>
-                ) : (
-                  <Button
-                    className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                    onClick={() => {
-                      if (canProceed()) {
-                        setStep(step + 1);
-                      }
-                    }}
-                    disabled={!canProceed()}
-                  >
-                    Next <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                )}
+                    {phoneCodes.map(code => (
+                      <option key={code} value={code}>{code}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Enter phone number"
+                    name="phoneNumber"
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              }
+            />
+            <FormField
+              label="Mobile"
+              input={<div className="flex gap-2">
+                <select
+                  name="mobile"
+                  value={formData.mobile}
+                  onChange={handleChange}
+                  className="px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  {phoneCodes.map(code => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Enter mobile number"
+                  name="mobileNumber"
+                  value={formData.mobileNumber}
+                  onChange={handleChange}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>} required={undefined}            />
+          </div>
+
+          <FormField
+            label="Alternate Email"
+            input={<input
+              type="email"
+              placeholder="Enter alternate email"
+              name="alternateEmail"
+              value={formData.alternateEmail}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+        </FormSection>
+
+        {/* Section 3: Business & Address Details */}
+        <FormSection number={3} title="Business & Address Details">
+          <FormField
+            label="Registered Address"
+            required
+            input={
+              <textarea
+                placeholder="Enter registered address"
+                name="registeredAddress"
+                value={formData.registeredAddress}
+                onChange={handleChange}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            }
+          />
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Country"
+              required
+              input={
+                <select
+                  name="country"
+                  value={formData.country}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select country</option>
+                  {countries.map(country => (
+                    <option key={country} value={country}>{country}</option>
+                  ))}
+                </select>
+              }
+            />
+            <FormField
+              label="State"
+              required
+              input={
+                <select
+                  name="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select state</option>
+                  {states.map(state => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="City"
+              required
+              input={
+                <select
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select city</option>
+                  {cities.map(city => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </select>
+              }
+            />
+            <FormField
+              label="Pincode"
+              required
+              input={
+                <input
+                  type="text"
+                  placeholder="Enter pincode"
+                  name="pincode"
+                  value={formData.pincode}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              }
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              name="sameAsRegistered"
+              checked={formData.sameAsRegistered}
+              onChange={handleChange}
+              className="w-4 h-4 rounded border-gray-300"
+            />
+            <label className="text-sm text-gray-700">Same as Registered Address</label>
+          </div>
+
+          <FormField
+            label="Billing Address"
+            input={<textarea
+              placeholder="Enter billing address"
+              name="billingAddress"
+              value={formData.billingAddress}
+              onChange={handleChange}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+        </FormSection>
+
+        {/* Section 4: Financial Details */}
+        <FormSection number={4} title="Financial Details">
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Payment Terms"
+              input={<select
+                name="paymentTerms"
+                value={formData.paymentTerms}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select payment terms</option>
+                {paymentTerms.map(term => (
+                  <option key={term} value={term}>{term}</option>
+                ))}
+              </select>} required={undefined}            />
+            <FormField
+              label="Currency"
+              required
+              input={
+                <select
+                  name="currency"
+                  value={formData.currency}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {currencies.map(curr => (
+                    <option key={curr} value={curr}>{curr}</option>
+                  ))}
+                </select>
+              }
+            />
+          </div>
+
+          <FormField
+            label="Credit Limit (INR)"
+            input={<input
+              type="text"
+              placeholder="Enter amount"
+              name="creditLimit"
+              value={formData.creditLimit}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Bank Name"
+              input={<input
+                type="text"
+                placeholder="Enter bank name"
+                name="bankName"
+                value={formData.bankName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+            <FormField
+              label="Account Number"
+              input={<input
+                type="text"
+                placeholder="Enter account number"
+                name="accountNumber"
+                value={formData.accountNumber}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="IFSC Code"
+              input={<input
+                type="text"
+                placeholder="Enter IFSC code"
+                name="ifscCode"
+                value={formData.ifscCode}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+            <FormField
+              label="Account Type"
+              input={<select
+                name="accountType"
+                value={formData.accountType}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select account type</option>
+                {accountTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+        </FormSection>
+
+        {/* Section 5: Vendor Classification */}
+        <FormSection number={5} title="Vendor Classification">
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="MSME Status"
+              input={<select
+                name="msmeStatus"
+                value={formData.msmeStatus}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select status</option>
+                {msmeStatuses.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>} required={undefined}            />
+            <FormField
+              label="ISO Certification"
+              input={<select
+                name="isoStatus"
+                value={formData.isoStatus}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select certification</option>
+                {isoCertifications.map(cert => (
+                  <option key={cert} value={cert}>{cert}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField
+              label="Quality Certification"
+              input={<select
+                name="qualityCertification"
+                value={formData.qualityCertification}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select certification</option>
+                {qualityCertifications.map(cert => (
+                  <option key={cert} value={cert}>{cert}</option>
+                ))}
+              </select>} required={undefined}            />
+            <FormField
+              label="Environmental Certification"
+              input={<select
+                name="environmentalCertification"
+                value={formData.environmentalCertification}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select certification</option>
+                {environmentalCertifications.map(cert => (
+                  <option key={cert} value={cert}>{cert}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+        </FormSection>
+
+        {/* Section 6: Performance & Compliance */}
+        <FormSection number={6} title="Performance & Compliance">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Quality Rating</label>
+              <StarRating value={formData.qualityRating} onChange={handleRatingChange} name="qualityRating" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Blacklisted</label>
+              <select
+                name="blacklisted"
+                value={formData.blacklisted}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select status</option>
+                {blacklistedOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Delivery Rating</label>
+              <StarRating value={formData.deliveryRating} onChange={handleRatingChange} name="deliveryRating" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Contract Status</label>
+              <select
+                name="contractStatus"
+                value={formData.contractStatus}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select status</option>
+                {contractStatuses.map(status => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Service Rating</label>
+              <StarRating value={formData.serviceRating} onChange={handleRatingChange} name="serviceRating" />
+            </div>
+            <FormField
+              label="Onboarding Date"
+              input={<input
+                type="date"
+                name="onboardingDate"
+                value={formData.onboardingDate}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+          </div>
+
+          <FormField
+            label="Preferred Vendor"
+            input={<select
+              name="preferredVendor"
+              value={formData.preferredVendor}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select status</option>
+              {preferredOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>} required={undefined}          />
+        </FormSection>
+
+        {/* Section 7: Documents */}
+        <FormSection number={7} title="Documents">
+          <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center mb-6">
+            <Cloud className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+            <p className="text-gray-700 font-medium mb-2">Drag and drop files here</p>
+            <p className="text-gray-500 text-sm mb-4">or click to upload</p>
+            <p className="text-gray-500 text-xs mb-2">Supported files: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG</p>
+            <p className="text-gray-500 text-xs">Max file size: 10MB</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-4">Document Checklist</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="gstCertificate"
+                  checked={formData.gstCertificate}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label className="text-sm text-gray-700">GST Certificate</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="bankDetails"
+                  checked={formData.bankDetails}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label className="text-sm text-gray-700">Bank Details</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="panCard"
+                  checked={formData.panCard}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label className="text-sm text-gray-700">PAN Card</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="isoCertificate"
+                  checked={formData.isoCertificate}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label className="text-sm text-gray-700">ISO Certificate</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="businessRegistration"
+                  checked={formData.businessRegistration}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label className="text-sm text-gray-700">Business Registration</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="otherDocuments"
+                  checked={formData.otherDocuments}
+                  onChange={handleChange}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label className="text-sm text-gray-700">Other Documents</label>
               </div>
             </div>
           </div>
-        )}
+        </FormSection>
+
+        {/* Section 8: Additional Information */}
+        <FormSection number={8} title="Additional Information">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Tags</label>
+              <select
+                multiple
+                name="tags"
+                value={formData.tags}
+                onChange={(e) => {
+                  const selectedTags = Array.from(e.target.selectedOptions, option => option.value);
+                  setFormData(prev => ({ ...prev, tags: selectedTags }));
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                size={6}
+              >
+                {tagOptions.map(tag => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-2">+ Create New Tag</p>
+            </div>
+            
+            <FormField
+              label="Visibility"
+              input={<select
+                name="visibility"
+                value={formData.visibility}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select visibility</option>
+                {visibilityOptions.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>} required={undefined}            />
+          </div>
+
+          <FormField
+            label="Internal Notes"
+            input={<textarea
+              placeholder="Add any internal notes"
+              name="internalNotes"
+              value={formData.internalNotes}
+              onChange={handleChange}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              maxLength={1000} />} required={undefined}          />
+          <p className="text-xs text-gray-500 text-right">{formData.internalNotes.length}/1000 characters</p>
+        </FormSection>
+
+        {/* Bottom Actions */}
+        <div className="flex gap-3 py-8 border-t border-gray-200">
+          <button className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+            Cancel
+          </button>
+          <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+            Save Vendor
+          </button>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function SectionIndicator({ number, title }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+        {number}
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      </div>
+    </div>
+  );
+}
+
+function FormSection({ number, title, children }) {
+  return (
+    <div className="border-l-4 border-blue-600 pl-6 py-2">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+          {number}
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      </div>
+      <div className="space-y-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FormField({ label, required, input }) {
+  return (
+    <div>
+      {label && (
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          {label}
+          {required && <span className="text-red-600 ml-1">*</span>}
+        </label>
+      )}
+      {input}
     </div>
   );
 }

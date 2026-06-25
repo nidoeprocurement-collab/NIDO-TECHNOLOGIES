@@ -218,12 +218,12 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen p-2.5 space-y-2"
+      className="min-h-screen p-2 space-y-1.5"
       style={{ backgroundColor: "#F4F6F9", fontFamily: "'Inter', sans-serif" }}
     >
 
       {/* ═══ ROW 1: KPI Cards ═══════════════════════════════════════ */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         {kpis.map(({ label, value, Icon, color, sub }) => (
           <SCard key={label} className="flex-1 px-3 py-2">
             <div className="flex items-center gap-2">
@@ -244,12 +244,12 @@ export default function App() {
       </div>
 
       {/* ═══ ROW 2: Spend by Vendor + SLA | Ranking | Activities ═══ */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
 
         {/* Spend by Vendor + SLA Compliance below */}
         <SCard className="flex-[2.2]">
           <SHead title="Spend by Vendor (Top 10)" link="View All" />
-          <div className="p-1 pt-2">
+          <div className="p-1 pt-1">
             <ResponsiveContainer width="100%" height={200}>
               <BarChart
                 data={spendByVendorData}
@@ -431,7 +431,7 @@ export default function App() {
       </div>
 
       {/* ═══ ROW 3: Spend by Category | NPS | Order Status | Recent Orders | Top Vendors ═══ */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
 
         {/* Spend by Category */}
         <SCard style={{ width: 148, minWidth: 148 }}>
@@ -590,7 +590,7 @@ export default function App() {
       </div>
 
       {/* ═══ ROW 4: Contract Summary | Payment Summary | Risk Monitor | Quick Actions ═══ */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
 
         {/* Contract Summary */}
         <SCard style={{ width: 190, minWidth: 190 }}>
@@ -687,7 +687,7 @@ export default function App() {
       </div>
 
       {/* ═══ ROW 5: Delivery Performance | Quality Performance | Response Time ═══ */}
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
 
         {/* Delivery Performance */}
         <SCard className="flex-1">
