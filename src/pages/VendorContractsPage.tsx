@@ -637,10 +637,15 @@ export default function ContractsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans" onClick={() => setOpenRowMenu(null)}>
-      <div className="flex h-screen overflow-hidden">
-        {/* Left: main content */}
-        <div className={`flex-1 overflow-y-auto transition-all duration-300 ${selectedContract ? "pr-0" : ""}`}>
-          <div className="max-w-[1200px] mx-auto px-4 py-6 space-y-4">
+      <div className="flex min-h-screen">
+        {/* Backdrop for mobile when panel is open */}
+        {selectedContract && (
+          <div className="fixed inset-0 bg-black/20 z-20 lg:hidden" onClick={() => setSelectedContract(null)} />
+        )}
+
+        {/* Main content — always full width; shifts right only on lg+ when panel open */}
+        <div className={`flex-1 min-w-0 overflow-y-auto transition-all duration-300`}>
+          <div className="w-full px-4 sm:px-6 py-6 space-y-4">
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -842,9 +847,9 @@ export default function ContractsPage() {
           </div>
         </div>
 
-        {/* Right Panel */}
+        {/* Right Panel — fixed overlay, full-height, responsive width */}
         {selectedContract && (
-          <div className="w-[380px] flex-shrink-0 border-l border-gray-200 overflow-y-auto bg-white shadow-lg">
+          <div className="fixed top-0 right-0 h-screen w-full sm:w-[400px] z-30 flex flex-col bg-white shadow-2xl border-l border-gray-200 overflow-hidden">
             <ContractPanel contract={selectedContract} onClose={() => setSelectedContract(null)} />
           </div>
         )}
