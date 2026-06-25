@@ -351,222 +351,210 @@ function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode 
 
 // Products Tab - Shows vendor products
 function ProductsTab() {
- import { useState } from "react";
-import {
-  Home,
-  Package,
-  BarChart2,
-  Bell,
-  Settings,
-  HelpCircle,
-  Plus,
-} from "lucide-react";
+  const sampleProducts = [
+    { id: 1, name: "Enterprise Server Rack", sku: "SRV-001", category: "Hardware", price: "₹2,50,000", stock: 45, status: "Active" },
+    { id: 2, name: "Network Switch 48P", sku: "NSW-048", category: "Networking", price: "₹1,75,000", stock: 12, status: "Active" },
+    { id: 3, name: "Database License Pack", sku: "DBL-100", category: "Software", price: "₹5,00,000", stock: 0, status: "Out of Stock" },
+    { id: 4, name: "Cloud Storage 1TB", sku: "CLD-001", category: "Services", price: "₹12,000/mo", stock: "Unlimited", status: "Active" },
+    { id: 5, name: "IT Support Contract", sku: "SUP-YR1", category: "Services", price: "₹8,50,000", stock: "Available", status: "Active" },
+  ];
 
-export default function VendorCatalog() {
   return (
-    <div className="flex h-screen bg-gray-100">
-      
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0B1B2B] text-white flex flex-col">
-        <div className="p-6 text-xl font-bold">VendorHub</div>
-
-        <nav className="flex-1 px-4 space-y-2">
-          <SidebarItem icon={<Home size={18} />} label="Dashboard" />
-          <SidebarItem icon={<Package size={18} />} label="Products" active />
-          <SidebarItem icon={<BarChart2 size={18} />} label="Analytics" />
-          <SidebarItem icon={<Bell size={18} />} label="Notifications" />
-          <SidebarItem icon={<Settings size={18} />} label="Settings" />
-          <SidebarItem icon={<HelpCircle size={18} />} label="Help & Support" />
-        </nav>
-
-        <div className="p-4 border-t border-gray-700 text-sm">
-          <div className="font-semibold">Vendor Store</div>
-          <div className="text-gray-400 text-xs">vendor@example.com</div>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Products & Services</h2>
+          <p className="text-sm text-gray-600 mt-1">Manage and view all products offered by this vendor</p>
         </div>
-      </aside>
+        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">+ Add Product</button>
+      </div>
 
-      {/* Main */}
-      <div className="flex-1 p-6 overflow-auto">
-        
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Vendor Product Catalog</h1>
-          <p className="text-gray-500">
-            Manage products, prices, and stock across your catalog.
-          </p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-6 gap-4 mb-6">
-          <StatCard title="Total Products" value="1,248" />
-          <StatCard title="Active Products" value="1,048" />
-          <StatCard title="Out of Stock" value="128" />
-          <StatCard title="Price Updates" value="324" />
-          <StatCard title="Avg. Lead Time" value="16 days" />
-          <StatCard title="Preferred Products" value="312" />
-        </div>
-
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-4 gap-4">
-          <Select label="Category" />
-          <Select label="Brand" />
-          <Select label="Stock Status" />
-          <Select label="Price Updated" />
-        </div>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 mb-4">
-          <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-            <Plus size={16} /> Add Product
-          </button>
-          <button className="border px-4 py-2 rounded-lg">
-            Bulk Price Update
-          </button>
-          <button className="border px-4 py-2 rounded-lg">
-            Import / Export
-          </button>
-          <button className="border px-4 py-2 rounded-lg">
-            Sync Vendor Feed
-          </button>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="p-3 text-left">Vendor SKU</th>
-                <th className="p-3 text-left">Product</th>
-                <th className="p-3">Category</th>
-                <th className="p-3">Price</th>
-                <th className="p-3">MOQ</th>
-                <th className="p-3">Lead Time</th>
-                <th className="p-3">Stock</th>
-                <th className="p-3">Status</th>
+      {/* Products Table */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Product Name</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">SKU</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Category</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Price</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Stock</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Status</th>
+              <th className="px-6 py-3 text-center font-semibold text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {sampleProducts.map((product) => (
+              <tr key={product.id} className="hover:bg-gray-50">
+                <td className="px-6 py-3 font-medium text-gray-900">{product.name}</td>
+                <td className="px-6 py-3 text-gray-600">{product.sku}</td>
+                <td className="px-6 py-3 text-gray-600">{product.category}</td>
+                <td className="px-6 py-3 text-gray-900 font-semibold">{product.price}</td>
+                <td className="px-6 py-3 text-gray-600">{product.stock}</td>
+                <td className="px-6 py-3">
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${product.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}>
+                    {product.status}
+                  </span>
+                </td>
+                <td className="px-6 py-3 text-center">
+                  <button className="text-blue-600 hover:text-blue-700 text-xs font-medium">View</button>
+                </td>
               </tr>
-            </thead>
-
-            <tbody>
-              {products.map((p, i) => (
-                <tr key={i} className="border-t">
-                  <td className="p-3 text-blue-600">{p.sku}</td>
-                  <td className="p-3">
-                    <div className="font-medium">{p.name}</div>
-                    <div className="text-gray-400 text-xs">
-                      {p.desc}
-                    </div>
-                  </td>
-                  <td className="p-3 text-center">{p.category}</td>
-                  <td className="p-3 text-center">{p.price}</td>
-                  <td className="p-3 text-center">{p.moq}</td>
-                  <td className="p-3 text-center">{p.lead}</td>
-                  <td className="p-3 text-center">
-                    <Badge type={p.stockType}>{p.stock}</Badge>
-                  </td>
-                  <td className="p-3 text-center">
-                    <Badge type="green">{p.status}</Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="flex justify-between items-center mt-4">
-          <span className="text-sm text-gray-500">
-            Showing 1 to 10 of 1,248 products
-          </span>
-
-          <div className="flex gap-2">
-            <button className="px-3 py-1 border rounded">Previous</button>
-            <button className="px-3 py-1 bg-blue-600 text-white rounded">
-              1
-            </button>
-            <button className="px-3 py-1 border rounded">2</button>
-            <button className="px-3 py-1 border rounded">3</button>
-            <button className="px-3 py-1 border rounded">Next</button>
-          </div>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
 }
 
-/* Components */
-
-function SidebarItem({ icon, label, active = false }: any) {
-  return (
-    <div
-      className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer ${
-        active ? "bg-blue-600" : "hover:bg-gray-700"
-      }`}
-    >
-      {icon}
-      {label}
-    </div>
-  );
-}
-
-function StatCard({ title, value }: any) {
-  return (
-    <div className="bg-white p-4 rounded-lg shadow">
-      <div className="text-sm text-gray-500">{title}</div>
-      <div className="text-xl font-bold">{value}</div>
-    </div>
-  );
-}
-
-function Select({ label }: any) {
-  return (
-    <div>
-      <label className="text-sm text-gray-500">{label}</label>
-      <select className="w-full border rounded-lg p-2 mt-1">
-        <option>All</option>
-      </select>
-    </div>
-  );
-}
-
-function Badge({ children, type }: any) {
-  const styles = {
-    green: "bg-green-100 text-green-600",
-    red: "bg-red-100 text-red-600",
-    orange: "bg-orange-100 text-orange-600",
-  };
-
-  return (
-    <span className={`px-2 py-1 rounded text-xs ${styles[type]}`}>
-      {children}
-    </span>
-  );
-}
-
-/* Mock Data */
-
-const products = [
-  {
-    sku: "VND-1001",
-    name: "Wireless Headphones",
-    desc: "Premium quality sound",
-    category: "Electronics",
-    price: "₹2,499",
-    moq: 10,
-    lead: "15 days",
-    stock: "In Stock",
-    stockType: "green",
-    status: "Active",
-  },
-  {
-    sku: "VND-1002",
-    name: "Smart Watch Series 5",
-    desc: "Fitness tracking watch",
-    category: "Electronics",
-    price: "₹8,999",
-    moq: 5,
-    lead: "10 days",
-    stock: "Low Stock",
-    stockType: "orange",
-    status: "Active",
-  },
+// ── main page ─────────────────────────────────────────────────────────────────
+const TABS = [
+  { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
+  { key: "products", label: "Products", count: 28, icon: <Package className="w-3.5 h-3.5" /> },
+  { key: "orders", label: "Orders", count: 78, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
+  { key: "performance", label: "Performance", icon: <TrendingUp className="w-3.5 h-3.5" /> },
+  { key: "contracts", label: "Contracts", count: 5, icon: <ClipboardList className="w-3.5 h-3.5" /> },
+  { key: "documents", label: "Documents", count: 34, icon: <FileText className="w-3.5 h-3.5" /> },
+  { key: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5" /> },
+  { key: "news", label: "News & Activity", icon: <Newspaper className="w-3.5 h-3.5" /> },
 ];
+
+export default function VendorDetail() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const navigate = useNavigate();
+
+  const stats = [
+    { label: "Rating", value: "4.6/5", sub: "★★★★★", accent: "text-amber-500" },
+    { label: "Total Contract Value", value: "₹4,45,00,500", sub: "+12% YoY", accent: "text-blue-600" },
+    { label: "Total Orders", value: "156", sub: "All time", accent: "text-gray-800" },
+    { label: "On-Time Delivery", value: "99.8%", sub: "Last 12 months", accent: "text-emerald-600" },
+    { label: "Quality Score", value: "85.8%", sub: "Avg last 3 reviews", accent: "text-indigo-600" },
+    { label: "Active Contracts", value: "3", sub: "Running", accent: "text-purple-600" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#f5f6fa] font-[Inter,sans-serif] flex flex-col">
+
+      {/* ── Sticky Header ───────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
+
+        {/* Vendor identity row */}
+        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {/* Back button + avatar */}
+            <button
+              onClick={() => navigate("/")}
+              className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+              D
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-lg font-bold text-gray-900">Dell India Pvt. Ltd.</h1>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active
+                </span>
+              </div>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                {[
+                  { label: "VDA-1001" },
+                  { label: "Dell_IND-001" },
+                  { label: "IT Hardware" },
+                  { label: "Supplier: IT Hardware" },
+                  { label: "Onboard: Feb 15, 2024" },
+                ].map((item, i) => (
+                  <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
+                    {i > 0 && <span className="text-gray-300">·</span>}
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Primary contact + action */}
+          <div className="flex items-start gap-6 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Primary Contact</p>
+              <p className="text-sm font-semibold text-gray-800">Rahul Sharma</p>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Phone className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">+91 98765 43210</span>
+              </div>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Mail className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">rahul@dell.com</span>
+              </div>
+            </div>
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-1">
+              <MessageSquare className="w-3.5 h-3.5" />
+              Message Vendor
+            </button>
+          </div>
+        </div>
+
+        {/* Stats strip */}
+        <div className="px-6 pb-3">
+          <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+            {stats.map((s, i) => (
+              <div key={i} className="flex flex-col items-center py-3 px-2 text-center">
+                <p className={`text-base font-bold ${s.accent}`}>{s.value}</p>
+                <p className="text-xs text-gray-500 font-medium leading-tight mt-0.5">{s.label}</p>
+                <p className="text-xs text-gray-400 leading-tight">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Horizontal scrollable tabs */}
+        <div className="relative">
+          <div className="flex items-center px-6 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
+                }`}
+              >
+                <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    activeTab === tab.key ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Page body ────────────────────────────────────────────────────── */}
+      <div className="flex-1 px-6 py-5">
+        {activeTab === "overview" && <OverviewTab />}
+        {activeTab === "products" && <ProductsTab />}
+        {activeTab === "orders" && <PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} />}
+        {activeTab === "performance" && <PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} />}
+        {activeTab === "contracts" && <PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} />}
+        {activeTab === "documents" && <PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} />}
+        {activeTab === "payments" && <PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} />}
+        {activeTab === "news" && <PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} />}
+      </div>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+    </div>
+  );
+}
