@@ -1,40 +1,17 @@
 import { useState } from "react";
 import {
-  Star,
-  Phone,
-  Mail,
-  MessageSquare,
-  ChevronLeft,
-  Building2,
-  MapPin,
-  CreditCard,
-  FileText,
-  Package,
-  ShoppingCart,
-  TrendingUp,
-  ClipboardList,
-  Newspaper,
-  DollarSign,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  ArrowUpRight,
+  Star, Phone, Mail, MessageSquare, ChevronLeft, Building2, MapPin,
+  CreditCard, FileText, Package, ShoppingCart, TrendingUp, ClipboardList,
+  Newspaper, DollarSign, AlertCircle, CheckCircle2, Clock, ArrowUpRight,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
 import VendorProductsPage from "./VendorProductsPage";
 import VendorOrdersPage from "./VendorOrdersPage";
 import VendorContractsPage from "./VendorContractsPage";
+import VendorPaymentsPage from "./VendorPaymentsPage";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
@@ -50,20 +27,11 @@ function ProgressBar({ value, color = "bg-blue-500" }: { value: number; color?: 
   );
 }
 
-// ── spend data ───────────────────────────────────────────────────────────────
 const spendData = [
-  { month: "Jan", spend: 32 },
-  { month: "Feb", spend: 45 },
-  { month: "Mar", spend: 28 },
-  { month: "Apr", spend: 58 },
-  { month: "May", spend: 41 },
-  { month: "Jun", spend: 67 },
-  { month: "Jul", spend: 52 },
-  { month: "Aug", spend: 73 },
-  { month: "Sep", spend: 61 },
-  { month: "Oct", spend: 48 },
-  { month: "Nov", spend: 55 },
-  { month: "Dec", spend: 70 },
+  { month: "Jan", spend: 32 }, { month: "Feb", spend: 45 }, { month: "Mar", spend: 28 },
+  { month: "Apr", spend: 58 }, { month: "May", spend: 41 }, { month: "Jun", spend: 67 },
+  { month: "Jul", spend: 52 }, { month: "Aug", spend: 73 }, { month: "Sep", spend: 61 },
+  { month: "Oct", spend: 48 }, { month: "Nov", spend: 55 }, { month: "Dec", spend: 70 },
 ];
 
 const activities = [
@@ -80,14 +48,11 @@ const contracts = [
   { name: "Cloud Infrastructure Deal", value: "₹1,70,00,500", progress: 74, status: "Active", end: "Aug 2025" },
 ];
 
-// ── tab content ───────────────────────────────────────────────────────────────
 function OverviewTab() {
   return (
     <div className="flex flex-col gap-5">
-
       {/* Top 3-column info */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Vendor Information */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="w-4 h-4 text-blue-500" />
@@ -110,7 +75,6 @@ function OverviewTab() {
           </div>
         </div>
 
-        {/* Additional Information */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-4 h-4 text-blue-500" />
@@ -133,7 +97,6 @@ function OverviewTab() {
           </div>
         </div>
 
-        {/* Payment & Bank Details */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard className="w-4 h-4 text-blue-500" />
@@ -159,7 +122,6 @@ function OverviewTab() {
 
       {/* Billing / Shipping + Performance */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Billing Address */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-4 h-4 text-blue-500" />
@@ -182,7 +144,6 @@ function OverviewTab() {
           </div>
         </div>
 
-        {/* Shipping Address */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-4 h-4 text-purple-500" />
@@ -205,7 +166,6 @@ function OverviewTab() {
           </div>
         </div>
 
-        {/* Vendor Performance */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="w-4 h-4 text-blue-500" />
@@ -235,7 +195,6 @@ function OverviewTab() {
 
       {/* Active Contracts + Report Activity */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Active Contracts */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -265,7 +224,6 @@ function OverviewTab() {
           </div>
         </div>
 
-        {/* Report Activity */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Newspaper className="w-4 h-4 text-blue-500" />
@@ -292,7 +250,6 @@ function OverviewTab() {
 
       {/* Spend Summary + Spend Metrics */}
       <div className="grid grid-cols-3 gap-4">
-        {/* Spend Summary chart */}
         <div className="col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -315,7 +272,6 @@ function OverviewTab() {
           </ResponsiveContainer>
         </div>
 
-        {/* Spend Metrics */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <ArrowUpRight className="w-4 h-4 text-blue-500" />
@@ -351,21 +307,19 @@ function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode 
   );
 }
 
-// ── main page ─────────────────────────────────────────────────────────────────
 const TABS = [
   { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
-  { key: "products", label: "Products", count: 28, icon: <Package className="w-3.5 h-3.5" /> },
-  { key: "orders", label: "Orders", count: 78, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
+  { key: "products", label: "Products", count: 128, icon: <Package className="w-3.5 h-3.5" /> },
+  { key: "orders", label: "Orders", count: 156, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
   { key: "performance", label: "Performance", icon: <TrendingUp className="w-3.5 h-3.5" /> },
-  { key: "contracts", label: "Contracts", count: 5, icon: <ClipboardList className="w-3.5 h-3.5" /> },
+  { key: "contracts", label: "Contracts", count: 3, icon: <ClipboardList className="w-3.5 h-3.5" /> },
   { key: "documents", label: "Documents", count: 34, icon: <FileText className="w-3.5 h-3.5" /> },
   { key: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5" /> },
   { key: "news", label: "News & Activity", icon: <Newspaper className="w-3.5 h-3.5" /> },
 ];
 
-export default function VendorDetail() {
+export default function VendorDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
-  const navigate = useNavigate();
 
   const stats = [
     { label: "Rating", value: "4.6/5", sub: "★★★★★", accent: "text-amber-500" },
@@ -378,18 +332,12 @@ export default function VendorDetail() {
 
   return (
     <div className="min-h-screen bg-[#f5f6fa] font-[Inter,sans-serif] flex flex-col">
-
-      {/* ── Sticky Header ───────────────────────────────────────────────── */}
+      {/* Sticky Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
-
         {/* Vendor identity row */}
         <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
-            {/* Back button + avatar */}
-            <button
-              onClick={() => navigate("/")}
-              className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
-            >
+            <button className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
@@ -403,16 +351,10 @@ export default function VendorDetail() {
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
-                {[
-                  { label: "VDA-1001" },
-                  { label: "Dell_IND-001" },
-                  { label: "IT Hardware" },
-                  { label: "Supplier: IT Hardware" },
-                  { label: "Onboard: Feb 15, 2024" },
-                ].map((item, i) => (
+                {["VDA-1001", "Dell_IND-001", "IT Hardware", "Supplier: IT Hardware", "Onboard: Feb 15, 2024"].map((item, i) => (
                   <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
                     {i > 0 && <span className="text-gray-300">·</span>}
-                    {item.label}
+                    {item}
                   </span>
                 ))}
               </div>
@@ -453,7 +395,7 @@ export default function VendorDetail() {
           </div>
         </div>
 
-        {/* Horizontal scrollable tabs */}
+        {/* Tabs */}
         <div className="relative">
           <div className="flex items-center px-6 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
             {TABS.map(tab => (
@@ -481,22 +423,17 @@ export default function VendorDetail() {
         </div>
       </div>
 
-      {/* ── Page body ────────────────────────────────────────────────────── */}
-      <div className="flex-1 px-0 py-0 overflow-auto">
+      {/* Page body */}
+      <div className="flex-1 overflow-auto">
         {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab /></div>}
         {activeTab === "products" && <VendorProductsPage />}
         {activeTab === "orders" && <VendorOrdersPage />}
         {activeTab === "performance" && <div className="px-6 py-5"><PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} /></div>}
         {activeTab === "contracts" && <VendorContractsPage />}
         {activeTab === "documents" && <div className="px-6 py-5"><PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} /></div>}
-        {activeTab === "payments" && <div className="px-6 py-5"><PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} /></div>}
+        {activeTab === "payments" && <VendorPaymentsPage />}
         {activeTab === "news" && <div className="px-6 py-5"><PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} /></div>}
       </div>
-
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
     </div>
   );
 }
