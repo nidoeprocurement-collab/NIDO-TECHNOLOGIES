@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   Clock,
   ArrowUpRight,
-  Edit2,
 } from "lucide-react";
 import {
   BarChart,
@@ -30,7 +29,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -65,11 +64,11 @@ const spendData = [
 ];
 
 const activities = [
-  { iconType: "check", text: "Invoice #INV-2024-0892 approved for ₹12,50,000", time: "2 hours ago", color: "bg-emerald-50" },
-  { iconType: "cart", text: "New PO #PO-2024-0334 raised for IT Hardware", time: "Yesterday", color: "bg-blue-50" },
-  { iconType: "alert", text: "Compliance document renewal due in 15 days", time: "2 days ago", color: "bg-amber-50" },
-  { iconType: "clock", text: "Contract #CNT-005 extended for 6 months", time: "1 week ago", color: "bg-purple-50" },
-  { iconType: "check", text: "Annual vendor review completed — Score: 85.8%", time: "2 weeks ago", color: "bg-emerald-50" },
+  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Invoice #INV-2024-0892 approved for ₹12,50,000", time: "2 hours ago", color: "bg-emerald-50" },
+  { icon: <ShoppingCart className="w-4 h-4 text-blue-500" />, text: "New PO #PO-2024-0334 raised for IT Hardware", time: "Yesterday", color: "bg-blue-50" },
+  { icon: <AlertCircle className="w-4 h-4 text-amber-500" />, text: "Compliance document renewal due in 15 days", time: "2 days ago", color: "bg-amber-50" },
+  { icon: <Clock className="w-4 h-4 text-purple-500" />, text: "Contract #CNT-005 extended for 6 months", time: "1 week ago", color: "bg-purple-50" },
+  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Annual vendor review completed — Score: 85.8%", time: "2 weeks ago", color: "bg-emerald-50" },
 ];
 
 const contracts = [
@@ -270,29 +269,20 @@ function OverviewTab() {
             <h3 className="text-sm font-semibold text-gray-800">Report Activity</h3>
           </div>
           <div className="flex flex-col gap-0">
-            {activities.map((a, i) => {
-              const iconConfig: Record<string, { icon: React.ReactNode; color: string }> = {
-                check: { icon: <CheckCircle2 className="w-4 h-4" />, color: "text-emerald-500" },
-                cart: { icon: <ShoppingCart className="w-4 h-4" />, color: "text-blue-500" },
-                alert: { icon: <AlertCircle className="w-4 h-4" />, color: "text-amber-500" },
-                clock: { icon: <Clock className="w-4 h-4" />, color: "text-purple-500" },
-              };
-              const config = iconConfig[a.iconType] || iconConfig.check;
-              return (
-                <div key={i} className="flex gap-3 relative pb-4 last:pb-0">
-                  {i < activities.length - 1 && (
-                    <div className="absolute left-4 top-7 bottom-0 w-px bg-gray-100" />
-                  )}
-                  <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center flex-shrink-0 z-10 ${config.color}`}>
-                    {config.icon}
-                  </div>
-                  <div className="pt-1 min-w-0">
-                    <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{a.time}</p>
-                  </div>
+            {activities.map((a, i) => (
+              <div key={i} className="flex gap-3 relative pb-4 last:pb-0">
+                {i < activities.length - 1 && (
+                  <div className="absolute left-4 top-7 bottom-0 w-px bg-gray-100" />
+                )}
+                <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center flex-shrink-0 z-10`}>
+                  {a.icon}
                 </div>
-              );
-            })}
+                <div className="pt-1 min-w-0">
+                  <p className="text-xs text-gray-700 leading-snug">{a.text}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{a.time}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -354,6 +344,156 @@ function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode 
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-24 gap-3 text-gray-300">
       <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center">{icon}</div>
       <p className="text-sm font-medium text-gray-400">{label} content coming soon</p>
+    </div>
+  );
+}
+
+// ── main page ─────────────────────────────────────────────────────────────────
+const TABS = [
+  { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
+  { key: "products", label: "Products", count: 28, icon: <Package className="w-3.5 h-3.5" /> },
+  { key: "orders", label: "Orders", count: 78, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
+  { key: "performance", label: "Performance", icon: <TrendingUp className="w-3.5 h-3.5" /> },
+  { key: "contracts", label: "Contracts", count: 5, icon: <ClipboardList className="w-3.5 h-3.5" /> },
+  { key: "documents", label: "Documents", count: 34, icon: <FileText className="w-3.5 h-3.5" /> },
+  { key: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5" /> },
+  { key: "news", label: "News & Activity", icon: <Newspaper className="w-3.5 h-3.5" /> },
+];
+
+export default function VendorDetail() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const navigate = useNavigate();
+
+  const stats = [
+    { label: "Rating", value: "4.6/5", sub: "★★★★★", accent: "text-amber-500" },
+    { label: "Total Contract Value", value: "₹4,45,00,500", sub: "+12% YoY", accent: "text-blue-600" },
+    { label: "Total Orders", value: "156", sub: "All time", accent: "text-gray-800" },
+    { label: "On-Time Delivery", value: "99.8%", sub: "Last 12 months", accent: "text-emerald-600" },
+    { label: "Quality Score", value: "85.8%", sub: "Avg last 3 reviews", accent: "text-indigo-600" },
+    { label: "Active Contracts", value: "3", sub: "Running", accent: "text-purple-600" },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#f5f6fa] font-[Inter,sans-serif] flex flex-col">
+
+      {/* ── Sticky Header ───────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
+
+        {/* Vendor identity row */}
+        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            {/* Back button + avatar */}
+            <button
+              onClick={() => navigate("/")}
+              className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0">
+              D
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-lg font-bold text-gray-900">Dell India Pvt. Ltd.</h1>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Active
+                </span>
+              </div>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                {[
+                  { label: "VDA-1001" },
+                  { label: "Dell_IND-001" },
+                  { label: "IT Hardware" },
+                  { label: "Supplier: IT Hardware" },
+                  { label: "Onboard: Feb 15, 2024" },
+                ].map((item, i) => (
+                  <span key={i} className="text-xs text-gray-500 flex items-center gap-1">
+                    {i > 0 && <span className="text-gray-300">·</span>}
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Primary contact + action */}
+          <div className="flex items-start gap-6 flex-shrink-0">
+            <div className="text-right">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Primary Contact</p>
+              <p className="text-sm font-semibold text-gray-800">Rahul Sharma</p>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Phone className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">+91 98765 43210</span>
+              </div>
+              <div className="flex items-center justify-end gap-1 mt-0.5">
+                <Mail className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-500">rahul@dell.com</span>
+              </div>
+            </div>
+            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-1">
+              <MessageSquare className="w-3.5 h-3.5" />
+              Message Vendor
+            </button>
+          </div>
+        </div>
+
+        {/* Stats strip */}
+        <div className="px-6 pb-3">
+          <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+            {stats.map((s, i) => (
+              <div key={i} className="flex flex-col items-center py-3 px-2 text-center">
+                <p className={`text-base font-bold ${s.accent}`}>{s.value}</p>
+                <p className="text-xs text-gray-500 font-medium leading-tight mt-0.5">{s.label}</p>
+                <p className="text-xs text-gray-400 leading-tight">{s.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Horizontal scrollable tabs */}
+        <div className="relative">
+          <div className="flex items-center px-6 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"
+                }`}
+              >
+                <span className={activeTab === tab.key ? "text-blue-600" : "text-gray-400"}>{tab.icon}</span>
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    activeTab === tab.key ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Page body ────────────────────────────────────────────────────── */}
+      <div className="flex-1 px-6 py-5">
+        {activeTab === "overview" && <OverviewTab />}
+        {activeTab === "products" && <PlaceholderTab label="Products" icon={<Package className="w-6 h-6" />} />}
+        {activeTab === "orders" && <PlaceholderTab label="Orders" icon={<ShoppingCart className="w-6 h-6" />} />}
+        {activeTab === "performance" && <PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} />}
+        {activeTab === "contracts" && <PlaceholderTab label="Contracts" icon={<ClipboardList className="w-6 h-6" />} />}
+        {activeTab === "documents" && <PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} />}
+        {activeTab === "payments" && <PlaceholderTab label="Payments" icon={<CreditCard className="w-6 h-6" />} />}
+        {activeTab === "news" && <PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} />}
+      </div>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 }
