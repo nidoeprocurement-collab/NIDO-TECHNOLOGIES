@@ -274,7 +274,12 @@ export default function ContractsPage() {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((contract) => (
               <tr key={contract.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-blue-600 font-medium text-xs cursor-pointer hover:underline" onClick={() => navigate(`/contracts/${contract.id}`)}>{contract.id}</td>
+                <td 
+                  className="px-4 py-3 text-blue-600 font-medium text-xs cursor-pointer hover:underline" 
+                  onClick={() => navigate(`/contracts/${contract.id}`)}
+                >
+                  {contract.id}
+                </td>
                 <td className="px-4 py-3 text-gray-800 font-medium text-xs">{contract.title}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{contract.type}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{contract.startDate}</td>
