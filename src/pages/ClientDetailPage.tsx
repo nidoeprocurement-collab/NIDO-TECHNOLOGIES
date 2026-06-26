@@ -24,7 +24,6 @@ import {
   Clock,
 } from "lucide-react";
 import ContractsPage from "./ClientContractsPage";
-import ContractDetailView from "./tabs/ContractDetailView";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
@@ -310,15 +309,7 @@ export default function ClientDetailPage() {
           {!isOverview && (
             <div className="bg-white rounded-xl border border-gray-200 flex-1 overflow-hidden">
               {activeTab === "Contracts" ? (
-                selectedContract ? (
-                  <ContractDetailView
-                    contractId={selectedContract.id}
-                    contractTitle={selectedContract.title}
-                    onBack={handleBackToContracts}
-                  />
-                ) : (
-                  <ContractsPage onViewContract={handleViewContract} />
-                )
+                <ContractsPage onViewContract={handleViewContract} />
               ) : (
                 <PlaceholderPage tab={activeTab} />
               )}
