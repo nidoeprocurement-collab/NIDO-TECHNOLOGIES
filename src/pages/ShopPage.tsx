@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Search, MessageSquare, ShoppingCart, Check } from "lucide-react";
-import type { CartItem } from "./App";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "@/contexts/CartContext";
+import type { CartItem } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 
 type Product = {
@@ -119,20 +121,15 @@ function Dropdown({
   );
 }
 
-function ProductCard({
-  product,
-  inCart,
-  onAddToCart,
-}: {
-  product: Product;
-  inCart: boolean;
-  onAddToCart: (p: Omit<CartItem, "quantity">) => void;
-}) {
-  const [added, setAdded] = useState(false);
+function ProductCard({ product }: { product: Product }) {
+  const { addItem } = useCart();
+  const navigate = useNavigate();
+  const [adding, setAdding] = useState(false);
 
   const handleAdd = () => {
-    if (!onAddToCart) return;
-    onAddToCart({
+    if (!product.inStock || adding) return;
+    setAdding(true);
+    addItem({
       id: product.id,
       name: product.name,
       image: product.image,
@@ -140,8 +137,9 @@ function ProductCard({
       moq: product.moq,
       priceNum: product.priceNum,
     });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
+    setTimeout(() => {
+      navigate("/shop/cart");
+    }, 300);
   };
 
   return (
@@ -175,17 +173,17 @@ function ProductCard({
           </button>
           <button
             onClick={handleAdd}
-            disabled={!product.inStock}
+            disabled={!product.inStock || adding}
             className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all ${
               !product.inStock
                 ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : added
+                : adding
                 ? "bg-green-600 text-white"
                 : "bg-blue-600 hover:bg-blue-700 text-white"
             }`}
           >
-            {added ? <Check size={15} /> : <ShoppingCart size={15} />}
-            {added ? "Added!" : "Add to Cart"}
+            {adding ? <Check size={15} /> : <ShoppingCart size={15} />}
+            {adding ? "Adding..." : "Add to Cart"}
           </button>
         </div>
       </div>
@@ -193,19 +191,11 @@ function ProductCard({
   );
 }
 
-export default function ShopPage({
-  cart = [],
-  onAddToCart,
-}: {
-  cart?: CartItem[];
-  onAddToCart?: (p: Omit<CartItem, "quantity">) => void;
-}) {
+export default function ShopPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
   const [availability, setAvailability] = useState("All");
   const [sortBy, setSortBy] = useState("Default");
-
-  const cartIds = new Set(cart.map((c) => c.id));
 
   let filtered = ALL_PRODUCTS.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
@@ -260,8 +250,6 @@ export default function ShopPage({
               <ProductCard
                 key={product.id}
                 product={product}
-                inCart={cartIds.has(product.id)}
-                onAddToCart={onAddToCart}
               />
             ))}
           </div>
