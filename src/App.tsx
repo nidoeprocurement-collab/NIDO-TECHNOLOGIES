@@ -205,6 +205,7 @@ const ShopPage = lazy(() => import("@/pages/ShopPage"));
 const ProductDetailPage = lazy(() => import("@/pages/ProductDetailPage"));
 const ProductEnquiryPage = lazy(() => import("@/pages/ProductEnquiryPage"));
 const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
+const PaymentPage = lazy(() => import("@/pages/PaymentPage"));
 const OrderConfirmationPage = lazy(
   () => import("@/pages/OrderConfirmationPage"),
 );
@@ -516,6 +517,17 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <CheckoutPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="shop/checkout/payment"
+            element={
+              <PageErrorBoundary
+                title="Payment failed to load"
+                resetKey={location.pathname}
+              >
+                <PaymentPage />
               </PageErrorBoundary>
             }
           />
