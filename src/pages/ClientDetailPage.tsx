@@ -31,6 +31,7 @@ import CatalogPage from "./ClientCatalogPage";
 import ActivityPage from "./ClientActivityPage";
 import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
+import DocumentsPage from "./ClientDocumentsPage";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
@@ -54,7 +55,7 @@ const spendCategories = [
   { name: "Other", value: 10, amount: "$10,500", color: "#a855f7" },
 ];
 
-const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration"];
+const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration", "Documents"];
 
 function DonutChart({ categories, size }: { categories: typeof spendCategories; size: number }) {
   const cx = size / 2;
@@ -291,7 +292,7 @@ export default function App() {
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
               {activeTab === "Roles" ? <RolesPage /> : activeTab === "Users" ? <UsersPage /> : activeTab === "Orders" ? <OrdersPage /> : activeTab === "Services" ? <ServicesPage /> : activeTab === "Contracts" ? <ContractsPage contractId={""} contractTitle={""} onBack={function (): void {
                 throw new Error("Function not implemented.");
-              } } /> : activeTab === "Catalog" ? <CatalogPage /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : <PlaceholderPage tab={activeTab} />}
+              } } /> : activeTab === "Catalog" ? <CatalogPage /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : activeTab === "Documents" ? <DocumentsPage /> : <PlaceholderPage tab={activeTab} />}
             </div>
           )}
 
