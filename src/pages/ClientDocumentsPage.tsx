@@ -1,233 +1,465 @@
-import { useState } from "react";
-import { Upload, Download, Trash2, FileText, Search, Filter, MoreVertical, Eye, Share2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import {
+  FileText, MoreVertical, FilePlus, Download, Archive,
+  X, Upload, ArrowLeft,
+} from "lucide-react";
 
-interface Document {
-  id: string;
+type Doc = {
+  id: number;
   name: string;
   type: string;
   size: string;
-  uploadedDate: string;
   uploadedBy: string;
-  category: string;
-}
+  uploadedOn: string;
+};
 
-const DOCUMENTS: Document[] = [
-  {
-    id: "doc_001",
-    name: "Service Agreement 2024.pdf",
-    type: "PDF",
-    size: "2.4 MB",
-    uploadedDate: "Jun 15, 2024",
-    uploadedBy: "John Doe",
-    category: "Contracts",
-  },
-  {
-    id: "doc_002",
-    name: "Tax Certificate.pdf",
-    type: "PDF",
-    size: "1.2 MB",
-    uploadedDate: "Jun 10, 2024",
-    uploadedBy: "Sarah Smith",
-    category: "Compliance",
-  },
-  {
-    id: "doc_003",
-    name: "Business License.jpg",
-    type: "Image",
-    size: "856 KB",
-    uploadedDate: "Jun 5, 2024",
-    uploadedBy: "Admin",
-    category: "Legal",
-  },
-  {
-    id: "doc_004",
-    name: "Insurance Certificate.pdf",
-    type: "PDF",
-    size: "1.8 MB",
-    uploadedDate: "May 28, 2024",
-    uploadedBy: "Finance Team",
-    category: "Insurance",
-  },
-  {
-    id: "doc_005",
-    name: "Banking Details.xlsx",
-    type: "Excel",
-    size: "512 KB",
-    uploadedDate: "May 20, 2024",
-    uploadedBy: "Finance Team",
-    category: "Financial",
-  },
-  {
-    id: "doc_006",
-    name: "Company Profile.docx",
-    type: "Word",
-    size: "2.1 MB",
-    uploadedDate: "May 15, 2024",
-    uploadedBy: "Marketing",
-    category: "General",
-  },
+const INITIAL_DOCS: Doc[] = [
+  { id: 1, name: "Service Agreement 2026.pdf", type: "PDF", size: "1.2 MB", uploadedBy: "Nitin Shetty", uploadedOn: "Jun 10, 2026" },
+  { id: 2, name: "Purchase Order #PO-0043.pdf", type: "PDF", size: "840 KB", uploadedBy: "Admin", uploadedOn: "Jun 5, 2026" },
+  { id: 3, name: "NDA_NitinSupplies.docx", type: "DOCX", size: "320 KB", uploadedBy: "Admin", uploadedOn: "May 28, 2026" },
+  { id: 4, name: "Hardware Inventory List.xlsx", type: "XLSX", size: "2.1 MB", uploadedBy: "Nitin Shetty", uploadedOn: "May 15, 2026" },
+  { id: 5, name: "Contract Renewal Terms.pdf", type: "PDF", size: "560 KB", uploadedBy: "Admin", uploadedOn: "Apr 30, 2026" },
 ];
 
-const CATEGORIES = ["All", "Contracts", "Compliance", "Legal", "Insurance", "Financial", "General"];
+function typeColor(type: string) {
+  if (type === "PDF") return "bg-red-50 text-red-600";
+  if (type === "DOCX") return "bg-blue-50 text-blue-600";
+  if (type === "XLSX") return "bg-green-50 text-green-600";
+  return "bg-gray-100 text-gray-600";
+}
 
-export default function ClientDocumentsPage() {
-  const [documents, setDocuments] = useState(DOCUMENTS);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-
-  const filteredDocuments = documents.filter((doc) => {
-    const matchesCategory = selectedCategory === "All" || doc.category === selectedCategory;
-    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
-
-  const handleDelete = (id: string) => {
-    setDocuments(documents.filter((doc) => doc.id !== id));
-    setOpenMenu(null);
-  };
-
-  const getFileIcon = (type: string) => {
-    const iconClass = "w-4 h-4";
-    switch (type) {
-      case "PDF":
-        return <FileText className={iconClass + " text-red-500"} />;
-      case "Excel":
-        return <FileText className={iconClass + " text-green-500"} />;
-      case "Word":
-        return <FileText className={iconClass + " text-blue-500"} />;
-      case "Image":
-        return <FileText className={iconClass + " text-purple-500"} />;
-      default:
-        return <FileText className={iconClass + " text-gray-500"} />;
+function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () => void) {
+  useEffect(() => {
+    function listener(e: MouseEvent) {
+      if (!ref.current || ref.current.contains(e.target as Node)) return;
+      handler();
     }
-  };
+    document.addEventListener("mousedown", listener);
+    return () => document.removeEventListener("mousedown", listener);
+  }, [ref, handler]);
+}
+
+function DropdownMenu({
+  items,
+  onClose,
+}: {
+  items: { label: string; icon: React.ReactNode; danger?: boolean; onClick?: () => void }[];
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, onClose);
+  return (
+    <div
+      ref={ref}
+      className="absolute z-50 top-8 right-0 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]"
+    >
+      {items.map((item) => (
+        <button
+          key={item.label}
+          onClick={() => { item.onClick?.(); onClose(); }}
+          className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
+            item.danger ? "text-red-500" : "text-gray-700"
+          }`}
+        >
+          {item.icon}
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AddDocumentModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (doc: Omit<Doc, "id">, file: File | null) => void;
+}) {
+  const [name, setName] = useState("");
+  const [type, setType] = useState("PDF");
+  const [uploadedBy, setUploadedBy] = useState("Admin");
+  const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onAdd(
+      {
+        name: name.trim() + (name.includes(".") ? "" : `.${type.toLowerCase()}`),
+        type,
+        size: file ? `${(file.size / 1024).toFixed(0)} KB` : "—",
+        uploadedBy,
+        uploadedOn: today,
+      },
+      file,
+    );
+    onClose();
+  }
+
+  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files?.[0];
+    if (!picked) return;
+    setFile(picked);
+    setName(picked.name);
+    const ext = picked.name.split(".").pop()?.toUpperCase();
+    if (ext === "PDF" || ext === "DOCX" || ext === "XLSX") setType(ext);
+  }
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage and view all client documents</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <FilePlus size={18} className="text-blue-500" />
+            <h2 className="text-sm font-semibold text-gray-900">Add Document</h2>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <Upload size={18} />
-            Upload Document
+          <button
+            onClick={onClose}
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <X size={16} />
           </button>
         </div>
-      </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 space-y-4">
-        {/* Search Bar */}
-        <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
-          <Search size={18} className="text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search documents..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 bg-transparent outline-none text-sm text-gray-900 placeholder-gray-400"
-          />
-        </div>
-
-        {/* Category Filter */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter size={18} className="text-gray-400" />
-          {CATEGORIES.map((category) => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                selectedCategory === category
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Documents List */}
-      <div className="flex-1 overflow-auto px-6 py-4">
-        {filteredDocuments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <FileText size={32} className="text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900">No documents found</h3>
-            <p className="text-sm text-gray-500 mt-1">Try adjusting your filters or search terms</p>
+        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-colors"
+          >
+            <Upload size={22} className="text-gray-400" />
+            {file ? (
+              <p className="text-xs text-blue-600 font-medium">{file.name}</p>
+            ) : (
+              <>
+                <p className="text-xs font-medium text-gray-700">Click to upload a file</p>
+                <p className="text-xs text-gray-400">PDF, DOCX, XLSX supported</p>
+              </>
+            )}
+            <input ref={fileInputRef} type="file" accept=".pdf,.docx,.xlsx" className="hidden" onChange={handleFilePick} />
           </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredDocuments.map((doc) => (
-              <div
-                key={doc.id}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow flex items-center justify-between group"
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Document Name</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Service Agreement 2026"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {getFileIcon(doc.type)}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">{doc.name}</h3>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                      <span>{doc.type}</span>
-                      <span>•</span>
-                      <span>{doc.size}</span>
-                      <span>•</span>
-                      <span>{doc.uploadedDate}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
-                    <Eye size={18} />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
-                    <Download size={18} />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
-                    <Share2 size={18} />
-                  </button>
-                  <div className="relative">
-                    <button
-                      onClick={() => setOpenMenu(openMenu === doc.id ? null : doc.id)}
-                      className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
-                    {openMenu === doc.id && (
-                      <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                        <button
-                          onClick={() => {
-                            handleDelete(doc.id);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 rounded-lg"
-                        >
-                          <Trash2 size={16} />
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+                <option>PDF</option>
+                <option>DOCX</option>
+                <option>XLSX</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Uploaded By</label>
+              <select
+                value={uploadedBy}
+                onChange={(e) => setUploadedBy(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
+              >
+                <option>Admin</option>
+                <option>Nitin Shetty</option>
+              </select>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Summary */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between text-sm text-gray-600">
-          <span>Showing {filteredDocuments.length} documents</span>
-          <span>Total size: {filteredDocuments.reduce((sum, doc) => sum + parseFloat(doc.size), 0).toFixed(1)} MB</span>
-        </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-2 rounded-lg bg-blue-600 text-sm text-white font-medium hover:bg-blue-700 transition-colors"
+            >
+              Add Document
+            </button>
+          </div>
+        </form>
       </div>
     </div>
+  );
+}
+
+function DocsTable({
+  docs,
+  readOnly,
+  fileStore,
+  onArchive,
+  onRowMenuOpen,
+  rowMenuOpen,
+}: {
+  docs: Doc[];
+  readOnly?: boolean;
+  fileStore: Map<number, File>;
+  onArchive?: (id: number) => void;
+  onRowMenuOpen?: (id: number | null) => void;
+  rowMenuOpen?: number | null;
+}) {
+  function handleDownload(doc: Doc) {
+    const stored = fileStore.get(doc.id);
+    if (stored) {
+      const url = URL.createObjectURL(stored);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = stored.name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const content = [
+        `Document: ${doc.name}`,
+        `Type: ${doc.type}`,
+        `Size: ${doc.size}`,
+        `Uploaded By: ${doc.uploadedBy}`,
+        `Uploaded On: ${doc.uploadedOn}`,
+        "",
+        "This is a placeholder download. Attach a real file via Add Document to download the original.",
+      ].join("\n");
+      const blob = new Blob([content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = doc.name.replace(/\.[^.]+$/, "") + ".txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  if (docs.length === 0) {
+    return (
+      <div className="border border-gray-200 rounded-xl py-16 flex flex-col items-center gap-2 text-center">
+        <FileText size={28} className="text-gray-300" />
+        <p className="text-sm text-gray-400">{readOnly ? "No archived documents." : "No documents yet."}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-gray-50 border-b border-gray-200">
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Name</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Type</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Size</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Uploaded By</th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Uploaded On</th>
+            <th className="px-4 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {docs.map((doc) => (
+            <tr key={doc.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-gray-100">
+                    <FileText size={14} className="text-gray-500" />
+                  </div>
+                  <span className="text-gray-800 font-medium text-xs">{doc.name}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${typeColor(doc.type)}`}>{doc.type}</span>
+              </td>
+              <td className="px-4 py-3 text-xs text-gray-500">{doc.size}</td>
+              <td className="px-4 py-3 text-xs text-gray-500">{doc.uploadedBy}</td>
+              <td className="px-4 py-3 text-xs text-gray-500">{doc.uploadedOn}</td>
+              <td className="px-4 py-3">
+                <div className="relative flex justify-end">
+                  {!readOnly && (
+                    <>
+                      <button
+                        onClick={() => onRowMenuOpen?.(rowMenuOpen === doc.id ? null : doc.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                      {rowMenuOpen === doc.id && (
+                        <DropdownMenu
+                          items={[
+                            {
+                              label: "Download",
+                              icon: <Download size={15} />,
+                              onClick: () => handleDownload(doc),
+                            },
+                            {
+                              label: "Archive",
+                              icon: <Archive size={15} />,
+                              danger: true,
+                              onClick: () => onArchive?.(doc.id),
+                            },
+                          ]}
+                          onClose={() => onRowMenuOpen?.(null)}
+                        />
+                      )}
+                    </>
+                  )}
+                  {readOnly && (
+                    <button
+                      onClick={() => handleDownload(doc)}
+                      title="Download"
+                      className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                    >
+                      <Download size={14} />
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default function ClientDocumentsPage() {
+  const [docs, setDocs] = useState<Doc[]>(INITIAL_DOCS);
+  const [archivedDocs, setArchivedDocs] = useState<Doc[]>([]);
+  const [view, setView] = useState<"active" | "archived">("active");
+  const [pageMenuOpen, setPageMenuOpen] = useState(false);
+  const [rowMenuOpen, setRowMenuOpen] = useState<number | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const fileStoreRef = useRef<Map<number, File>>(new Map());
+  const pageMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(pageMenuRef, () => setPageMenuOpen(false));
+
+  function handleArchive(id: number) {
+    const doc = docs.find((d) => d.id === id);
+    if (!doc) return;
+    setDocs((prev) => prev.filter((d) => d.id !== id));
+    setArchivedDocs((prev) => [...prev, doc]);
+  }
+
+  function handleAdd(newDoc: Omit<Doc, "id">, file: File | null) {
+    const id = Date.now();
+    if (file) fileStoreRef.current.set(id, file);
+    setDocs((prev) => [{ id, ...newDoc }, ...prev]);
+  }
+
+  function handleExport() {
+    const list = view === "active" ? docs : archivedDocs;
+    const header = "Name,Type,Size,Uploaded By,Uploaded On";
+    const rows = list.map((d) =>
+      [d.name, d.type, d.size, d.uploadedBy, d.uploadedOn]
+        .map((v) => `"${v.replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `documents-${view}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const pageMenuItems = [
+    {
+      label: "Add Document",
+      icon: <FilePlus size={15} />,
+      onClick: () => setShowAddModal(true),
+    },
+    {
+      label: "Export Documents List",
+      icon: <Download size={15} />,
+      onClick: handleExport,
+    },
+    {
+      label: `Archived Documents${archivedDocs.length > 0 ? ` (${archivedDocs.length})` : ""}`,
+      icon: <Archive size={15} />,
+      onClick: () => setView("archived"),
+    },
+  ];
+
+  const currentDocs = view === "active" ? docs : archivedDocs;
+
+  return (
+    <>
+      {showAddModal && (
+        <AddDocumentModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={handleAdd}
+        />
+      )}
+
+      <div className="p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            {view === "archived" && (
+              <button
+                onClick={() => setView("active")}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                <ArrowLeft size={14} />
+              </button>
+            )}
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                {view === "active" ? "Documents" : "Archived Documents"}
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {view === "active"
+                  ? `${docs.length} file${docs.length !== 1 ? "s" : ""} uploaded`
+                  : `${archivedDocs.length} archived file${archivedDocs.length !== 1 ? "s" : ""} — read only`}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative" ref={pageMenuRef}>
+            <button
+              onClick={() => setPageMenuOpen((o) => !o)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+            >
+              <MoreVertical size={16} />
+            </button>
+            {pageMenuOpen && (
+              <DropdownMenu
+                items={pageMenuItems}
+                onClose={() => setPageMenuOpen(false)}
+              />
+            )}
+          </div>
+        </div>
+
+        {view === "archived" && archivedDocs.length > 0 && (
+          <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+            <Archive size={13} className="text-amber-500 shrink-0" />
+            <p className="text-xs text-amber-700">Archived documents are read-only. Use the download icon to save a copy.</p>
+          </div>
+        )}
+
+        <DocsTable
+          docs={currentDocs}
+          readOnly={view === "archived"}
+          fileStore={fileStoreRef.current}
+          onArchive={handleArchive}
+          onRowMenuOpen={setRowMenuOpen}
+          rowMenuOpen={rowMenuOpen}
+        />
+      </div>
+    </>
   );
 }
