@@ -242,7 +242,7 @@ function AppRoutes() {
             }
           />
           <Route
-            path="clients/:contractsid/contracts"
+            path="clients/:id/contracts"
             element={
               <PageErrorBoundary
                 title="Client contracts failed to load"
