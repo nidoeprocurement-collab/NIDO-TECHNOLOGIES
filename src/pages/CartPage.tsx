@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import {
   Trash2, Minus, Plus, Bookmark, ChevronLeft, ChevronRight,
   Shield, Truck, RotateCcw, Star, ArrowRight, Mail, Phone, ShoppingCart
 } from "lucide-react";
-import type { CartItem } from "./App";
+import type { CartItem } from "@/App";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -130,7 +130,7 @@ export default function CartPage({
   onClear: () => void;
   onAddToCart: (p: Omit<CartItem, "quantity">) => void;
 }) {
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
   const [scrollIdx, setScrollIdx] = useState(0);
 
   const totalItems = cart.length;
@@ -148,7 +148,7 @@ export default function CartPage({
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
-          <button onClick={() => navigate("/")} className="hover:text-blue-600 transition-colors">Home</button>
+          <button onClick={() => navigate("/shop")} className="hover:text-blue-600 transition-colors">Home</button>
           <ChevronRight size={14} />
           <span>Shopping</span>
           <ChevronRight size={14} />
@@ -186,7 +186,7 @@ export default function CartPage({
                   <ShoppingCart size={48} className="mx-auto mb-3 opacity-30" />
                   <p className="font-medium">Your cart is empty</p>
                   <button
-                    onClick={() => navigate("/")}
+                    onClick={() => navigate("/shop")}
                     className="mt-3 text-blue-600 text-sm hover:underline"
                   >
                     Continue shopping
