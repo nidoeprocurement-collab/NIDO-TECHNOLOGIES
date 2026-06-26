@@ -4,7 +4,8 @@ import {
   Trash2, Minus, Plus, Bookmark, ChevronLeft, ChevronRight,
   Shield, Truck, RotateCcw, Star, ArrowRight, Mail, Phone, ShoppingCart
 } from "lucide-react";
-import type { CartItem } from "@/App";
+import { useCart } from "@/contexts/CartContext";
+import type { CartItem } from "@/contexts/CartContext";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -117,21 +118,12 @@ function SuggestedCard({
   );
 }
 
-export default function CartPage({
-  cart,
-  onUpdateQuantity,
-  onRemove,
-  onClear,
-  onAddToCart,
-}: {
-  cart: CartItem[];
-  onUpdateQuantity: (id: number, qty: number) => void;
-  onRemove: (id: number) => void;
-  onClear: () => void;
-  onAddToCart: (p: Omit<CartItem, "quantity">) => void;
-}) {
+export default function CartPage() {
+  const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
   const navigate = useNavigate();
   const [scrollIdx, setScrollIdx] = useState(0);
+
+  const onAddToCart = (p: Omit<CartItem, "quantity">) => addItem(p);
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
