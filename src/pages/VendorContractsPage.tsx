@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   FileText, CheckCircle, Clock, IndianRupee, RefreshCcw,
   MoreVertical, Eye, ChevronDown, ChevronLeft, ChevronRight,
@@ -597,7 +596,7 @@ function ArchivedContractsModal({ onClose }: { onClose: () => void }) {
               <tbody className="divide-y divide-gray-50">
                 {ARCHIVED_CONTRACTS.map(c => (
                   <tr key={c.id} onClick={() => setSelected(c)} className="hover:bg-gray-50 cursor-pointer transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap"><span onClick={(e) => { e.stopPropagation(); window.location.href = `/contracts/${c.id}`; }} className="text-blue-600 font-semibold text-sm hover:underline cursor-pointer">{c.id}</span></td>
+                    <td className="px-4 py-3 whitespace-nowrap"><span className="text-blue-600 font-semibold text-sm">{c.id}</span></td>
                     <td className="px-4 py-3 text-gray-700 text-sm">{c.name}</td>
                     <td className="px-4 py-3 whitespace-nowrap"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_STYLES[c.type]}`}>{c.type}</span></td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-500 text-sm">{c.startDate}</td>
@@ -632,9 +631,8 @@ function useDropdown() {
   return { open, setOpen, ref };
 }
 
-/* ─── Main export ─────────────────────────────────────────────────���─────── */
+/* ���── Main export ─────────────────────────────────────────────────���─────── */
 export default function VendorContractsPage() {
-  const navigate = useNavigate();
   const [contracts, setContracts] = useState(CONTRACTS);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
@@ -728,7 +726,7 @@ export default function VendorContractsPage() {
                     <tbody className="divide-y divide-gray-50">
                       {contracts.map(c => (
                         <tr key={c.id} onClick={() => setSelectedContract(selectedContract?.id === c.id ? null : c)} className={`hover:bg-gray-50 cursor-pointer transition-colors ${selectedContract?.id === c.id ? "bg-blue-50/40" : ""}`}>
-                          <td className="px-4 py-3.5 whitespace-nowrap"><span onClick={(e) => { e.stopPropagation(); navigate(`/contracts/${c.id}`); }} className="text-blue-600 font-semibold text-sm hover:underline cursor-pointer">{c.id}</span></td>
+                          <td className="px-4 py-3.5 whitespace-nowrap"><span className="text-blue-600 font-semibold text-sm">{c.id}</span></td>
                           <td className="px-4 py-3.5 max-w-[200px]"><p className="text-sm font-medium text-gray-800 truncate">{c.name}</p></td>
                           <td className="px-4 py-3.5 whitespace-nowrap"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_STYLES[c.type]}`}>{c.type}</span></td>
                           <td className="px-4 py-3.5 whitespace-nowrap text-gray-500 text-sm">{c.startDate}</td>
