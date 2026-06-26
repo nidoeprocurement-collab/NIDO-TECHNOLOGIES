@@ -252,7 +252,7 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
-          <Route path="clients/contracts" element={<ClientsPage />} />
+          <Route path="clients/contracts" element={<ClientContractsPage />} />
           <Route path="permissions" element={<PermissionsPage />} />
           <Route
             path="users"
