@@ -11,7 +11,7 @@ export default function FloatingCartButton() {
   return (
     <button
       onClick={() => navigate('/cart')}
-      className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-full shadow-lg transition-colors"
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-full shadow-lg transition-colors"
       title="View Cart"
     >
       <div className="relative">

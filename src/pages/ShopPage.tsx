@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Search, MessageSquare, ShoppingCart, Check } from "lucide-react";
 import type { CartItem } from "./App";
+import FloatingCartButton from "@/components/FloatingCartButton";
 
 type Product = {
   id: number;
@@ -222,6 +223,7 @@ export default function ShopPage({
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
+      <FloatingCartButton />
       <div className="max-w-5xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Products</h1>
