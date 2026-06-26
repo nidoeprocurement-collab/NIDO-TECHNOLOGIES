@@ -1,190 +1,107 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Filter, X, Download, FileText } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  ArrowLeft,
+  Calendar,
+  RefreshCw,
+  Bell,
+  Scale,
+  PenLine,
+  CheckCircle2,
+  IndianRupee,
+  Receipt,
+  ShieldCheck,
+  FileText,
+  ChevronRight,
+  MoreVertical,
+  Download,
+  Database,
+  Cloud,
+  Users,
+  Lock,
+  FileX,
+  Headphones,
+  Archive,
+  Mail,
+  Phone,
+  X,
+} from "lucide-react";
 
-const contractsData = [
-  {
-    id: "CON-001",
-    title: "Annual Service Agreement",
-    type: "Service",
-    startDate: "2024-01-01",
-    endDate: "2024-12-31",
-    value: "$48,000",
-    status: "Active",
-    signedBy: "Rajesh Kumar",
-  },
-  {
-    id: "CON-002",
-    title: "Hardware Supply Contract",
-    type: "Supply",
-    startDate: "2024-03-01",
-    endDate: "2025-02-28",
-    value: "$1,20,000",
-    status: "Active",
-    signedBy: "Amit Singh",
-  },
-  {
-    id: "CON-003",
-    title: "Software License Agreement",
-    type: "License",
-    startDate: "2023-06-01",
-    endDate: "2024-05-31",
-    value: "$36,000",
-    status: "Expired",
-    signedBy: "Priya Sharma",
-  },
-  {
-    id: "CON-004",
-    title: "Support & Maintenance SLA",
-    type: "SLA",
-    startDate: "2024-07-01",
-    endDate: "2025-06-30",
-    value: "$24,000",
-    status: "Active",
-    signedBy: "Vikram Patel",
-  },
-  {
-    id: "CON-005",
-    title: "Cloud Infrastructure Agreement",
-    type: "Service",
-    startDate: "2024-09-01",
-    endDate: "2025-08-31",
-    value: "$60,000",
-    status: "Draft",
-    signedBy: "—",
-  },
-];
+interface ContractDetailViewProps {
+  contractId: string;
+  contractTitle: string;
+  onBack: () => void;
+}
 
-const statusColors: Record<string, string> = {
-  Active: "bg-green-100 text-green-700",
-  Expired: "bg-red-100 text-red-600",
-  Draft: "bg-yellow-100 text-yellow-700",
-  Terminated: "bg-gray-100 text-gray-500",
-};
+interface FieldConfig {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "select";
+  options?: string[];
+}
 
-const typeOptions = ["All", "Service", "Supply", "License", "SLA"];
+interface EditModalProps {
+  title: string;
+  fields: FieldConfig[];
+  currentValues: Record<string, string>;
+  onSave: (values: Record<string, string>) => void;
+  onClose: () => void;
+}
 
-function AddContractModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({
-    title: "",
-    type: "",
-    startDate: "",
-    endDate: "",
-    value: "",
-    signedBy: "",
-  });
-
-  const set =
-    (k: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((p) => ({ ...p, [k]: e.target.value }));
+function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalProps) {
+  const [values, setValues] = useState<Record<string, string>>(currentValues);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col"
+        className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Add New Contract</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={16} />
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+            <X size={18} />
           </button>
         </div>
-
-        <div className="px-6 py-5 flex flex-col gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Contract Title <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={set("title")}
-              placeholder="e.g. Annual Service Agreement"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-              <select
-                value={form.type}
-                onChange={set("type")}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select type</option>
-                {["Service", "Supply", "License", "SLA"].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+        <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+          {fields.map((field) => (
+            <div key={field.key} className="space-y-1">
+              <label className="block text-xs font-medium text-gray-700">{field.label}</label>
+              {field.type === "text" && (
+                <input
+                  type="text"
+                  value={values[field.key] ?? ""}
+                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+              {field.type === "textarea" && (
+                <textarea
+                  value={values[field.key] ?? ""}
+                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                  rows={3}
+                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              )}
+              {field.type === "select" && field.options && (
+                <select
+                  value={values[field.key] ?? ""}
+                  onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
+                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {field.options.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              )}
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Value</label>
-              <input
-                type="text"
-                value={form.value}
-                onChange={set("value")}
-                placeholder="e.g. $12,000"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-              <input
-                type="date"
-                value={form.startDate}
-                onChange={set("startDate")}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
-              <input
-                type="date"
-                value={form.endDate}
-                onChange={set("endDate")}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Signed By</label>
-            <input
-              type="text"
-              value={form.signedBy}
-              onChange={set("signedBy")}
-              placeholder="Contact name"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          ))}
         </div>
-
-        <div className="flex justify-end gap-2 px-6 pb-5">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">
             Cancel
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Add Contract
+          <button onClick={() => onSave(values)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+            Save Changes
           </button>
         </div>
       </div>
@@ -192,125 +109,1121 @@ function AddContractModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function ContractsPage() {
-  const navigate = useNavigate();
-  const [selectedType, setSelectedType] = useState("All");
-  const [showFilter, setShowFilter] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+function MetaCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 px-4 py-3 border-r border-gray-200 last:border-0">
+      <div className="text-gray-400 mt-0.5 shrink-0">{icon}</div>
+      <div>
+        <p className="text-[10px] text-gray-400 leading-tight">{label}</p>
+        <div className="text-xs font-semibold text-gray-800 mt-0.5">{value}</div>
+      </div>
+    </div>
+  );
+}
 
-  const filtered =
-    selectedType === "All"
-      ? contractsData
-      : contractsData.filter((c) => c.type === selectedType);
+function SectionCard({ title, children, onEdit }: { title: string; children: React.ReactNode; onEdit: () => void }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden relative">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+        <h3 className="text-xs font-bold text-gray-800">{title}</h3>
+        <button
+          onClick={onEdit}
+          className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
+          data-testid={`edit-${title.replace(/\s+/g, "-").toLowerCase()}`}
+        >
+          <PenLine size={14} />
+        </button>
+      </div>
+      <div className="p-4">{children}</div>
+    </div>
+  );
+}
+
+function getDataSecurityIcon(type: string) {
+  const cls = "shrink-0";
+  switch (type) {
+    case "ssl": return <ShieldCheck size={18} className={`text-blue-500 ${cls}`} />;
+    case "backup": return <Database size={18} className={`text-indigo-500 ${cls}`} />;
+    case "disaster": return <Cloud size={18} className={`text-sky-500 ${cls}`} />;
+    case "audit": return <FileText size={18} className={`text-teal-500 ${cls}`} />;
+    case "rbac": return <Users size={18} className={`text-purple-500 ${cls}`} />;
+    case "hosting": return <Lock size={18} className={`text-emerald-500 ${cls}`} />;
+    default: return <ShieldCheck size={18} className={`text-gray-400 ${cls}`} />;
+  }
+}
+
+function getRenewalIcon(type: string) {
+  switch (type) {
+    case "renewal": return <RefreshCw size={18} className="text-blue-500" />;
+    case "notice": return <Bell size={18} className="text-amber-500" />;
+    case "termination": return <FileX size={18} className="text-red-500" />;
+    case "exit": return <Headphones size={18} className="text-indigo-500" />;
+    case "export": return <Database size={18} className="text-emerald-500" />;
+    case "retention": return <Archive size={18} className="text-gray-500" />;
+    default: return <RefreshCw size={18} className="text-gray-400" />;
+  }
+}
+
+export default function ContractDetailView({ contractId, contractTitle, onBack }: ContractDetailViewProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [phonePopup, setPhonePopup] = useState<string | null>(null);
+  const phonePopupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+      if (phonePopupRef.current && !phonePopupRef.current.contains(event.target as Node)) {
+        setPhonePopup(null);
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDropdownOpen(false);
+        setPhonePopup(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  const [editModalConfig, setEditModalConfig] = useState<{
+    title: string;
+    fields: FieldConfig[];
+    currentValues: Record<string, string>;
+    onSave: (values: Record<string, string>) => void;
+  } | null>(null);
+
+  const closeModal = () => setEditModalConfig(null);
+
+  // ── Data states ──────────────────────────────────────────────────────────────
+
+  const [relationshipOwners, setRelationshipOwners] = useState({
+    nidoTech: { name: "Rahul Sharma", email: "rahul.sharma@nido-tech.com", phone: "+91 93456 78901", initials: "RS" },
+    apex: { name: "Vikram Singh", email: "vikram.singh@apex.com", phone: "+91 98765 43210", initials: "VS" },
+  });
+
+  const [overview, setOverview] = useState({
+    purpose: "To define the terms under which Nido-Tech provides the SaaS platform and related services to Apex Tech Solutions.",
+    scope: "Provision of Nido-Tech Procurement Platform (SaaS) along with agreed professional services, support and training.",
+    deployment: "Cloud (Multi-Tenant)",
+    currency: "INR",
+    taxation: "Exclusive of applicable taxes",
+    jurisdiction: "Bangalore, Karnataka, India",
+    confidentiality: "Both parties agree to maintain confidentiality of shared information.",
+  });
+
+  const [responseTargets, setResponseTargets] = useState([
+    { priority: "Critical (P1)", response: "≤ 2 Hours", resolution: "≤ 8 Hours", color: "red" },
+    { priority: "High (P2)", response: "≤ 4 Hours", resolution: "≤ 16 Hours", color: "orange" },
+    { priority: "Medium (P3)", response: "≤ 8 Hours", resolution: "≤ 24 Hours", color: "yellow" },
+    { priority: "Low (P4)", response: "≤ 24 Hours", resolution: "≤ 72 Hours", color: "gray" },
+  ]);
+
+  const [commercialTerms, setCommercialTerms] = useState({
+    type: "SaaS Subscription + Managed Services",
+    model: "Annual Contract",
+    duration: "1 Year",
+    paymentTerms: "Net 30 Days",
+    latePenalty: "1.5% per month on outstanding amount",
+    extras: "As applicable",
+    priceRevision: "Annual (subject to 5% cap)",
+    forceMajeure: "As per standard clause",
+    dispute: "Arbitration - Bangalore, India",
+  });
+
+  const [servicesCovered, setServicesCovered] = useState([
+    { service: "Nido-Tech Procurement Platform", scope: "Included", badge: "green" },
+    { service: "AMC Management", scope: "Included", badge: "green" },
+    { service: "Smart Management", scope: "Included", badge: "green" },
+    { service: "Repair Services", scope: "Included", badge: "green" },
+    { service: "Recycling Services", scope: "Included", badge: "green" },
+    { service: "Custom Development / Enhancements", scope: "Change Request Required", badge: "amber" },
+    { service: "Third Party Integrations", scope: "Change Request Required", badge: "amber" },
+  ]);
+
+  const [dataSecurity, setDataSecurity] = useState([
+    { type: "ssl", label: "SSL Encryption", active: true },
+    { type: "backup", label: "Daily Backup", active: true },
+    { type: "disaster", label: "Disaster Recovery", active: true },
+    { type: "audit", label: "Audit Logs", active: true },
+    { type: "rbac", label: "Role-Based Access", active: true },
+    { type: "hosting", label: "Secure Cloud Hosting", active: true },
+  ]);
+
+  const [confidentiality, setConfidentiality] = useState({
+    text: "Both Nido-Tech and Apex Tech Solutions agree to maintain confidentiality of all shared business information, user data, pricing details, procurement information, contracts, and system-generated records. This information shall not be disclosed to any unauthorized party without prior written consent, except as required by law.",
+    effective: "Contract Termination + 3 Years",
+    status: "Active",
+  });
+
+  const [supportMatrix, setSupportMatrix] = useState([
+    { level: "L1 Support", team: "Support Team", email: "support@nido-tech.com", availability: "24x7" },
+    { level: "L2 Support", team: "Service Desk", email: "service@nido-tech.com", availability: "24x7" },
+    { level: "L3 Escalation", team: "Operations Team", email: "operations@nido-tech.com", availability: "24x7" },
+    { level: "Account Manager", team: "Rahul Sharma", email: "rahul.sharma@nido-tech.com", availability: "Mon–Sat (9 AM – 6 PM)" },
+    { level: "Business Head", team: "Escalation Desk", email: "escalation@nido-tech.com", availability: "Mon–Sat (9 AM – 6 PM)" },
+  ]);
+
+  const [renewalTerm, setRenewalTerm] = useState([
+    { type: "renewal", label: "Auto Renewal: Enabled" },
+    { type: "notice", label: "Renewal Notice: 60 Days Before Expiry" },
+    { type: "termination", label: "Termination Notice: 30 Days" },
+    { type: "exit", label: "Exit Support: Included" },
+    { type: "export", label: "Data Export: Available upon Request" },
+    { type: "retention", label: "Data Retention: 60 Days Post Termination" },
+  ]);
+
+  const [subscription, setSubscription] = useState({
+    userLicensing: "260",
+    licensedUsers: "260",
+    concurrent: "Unlimited",
+    additionalCost: "₹500 / User / Month",
+    transfer: "Yes",
+    minCommitment: "250 Users",
+  });
+
+  const [slaCommitments, setSlaCommitments] = useState([
+    { commitment: "Platform Uptime", target: "99.5%", color: "gray" },
+    { commitment: "Critical Issue Response", target: "2 Hours", color: "red" },
+    { commitment: "High Priority Response", target: "4 Hours", color: "orange" },
+    { commitment: "Medium Priority Response", target: "6 Hours", color: "yellow" },
+    { commitment: "Low Priority Response", target: "24 Hours", color: "gray" },
+    { commitment: "Resolution Target", target: "As per SLA Document", color: "gray" },
+  ]);
+
+  const [renewalInfo, setRenewalInfo] = useState({
+    renewalDate: "31 Mar 2026",
+    autoRenewal: "Enabled",
+    daysRemaining: "248 Days",
+  });
+
+  const [supportInfo, setSupportInfo] = useState({
+    plan: "Enterprise",
+    hours: "24x7",
+    responseSLA: "2 Hours",
+  });
+
+  const [keyContacts, setKeyContacts] = useState({
+    apex: { name: "Vikram Singh", role: "Procurement Manager", email: "vikram.singh@apex.com", phone: "+91 98765 43210", initials: "VS" },
+    nidoTech: { name: "Priya Nair", role: "Account Manager", email: "priya.nair@nido-tech.com", phone: "+91 90123 45678", initials: "PN" },
+  });
+
+  const [reminders, setReminders] = useState([
+    { label: "Contract review meeting", date: "May 15, 2025" },
+    { label: "Renewal evaluation", date: "Mar 15, 2026" },
+  ]);
+  const [showAddReminder, setShowAddReminder] = useState(false);
+  const [newReminderLabel, setNewReminderLabel] = useState("");
+  const [newReminderDate, setNewReminderDate] = useState("");
+
+  // ── Edit handlers ─────────────────────────────────────────────────────────────
+
+  const openOverviewEdit = () => {
+    setEditModalConfig({
+      title: "Edit Contract Overview",
+      fields: [
+        { key: "purpose", label: "Contract Purpose", type: "textarea" },
+        { key: "scope", label: "Scope of Work", type: "textarea" },
+        { key: "deployment", label: "Deployment Model", type: "text" },
+        { key: "currency", label: "Currency", type: "text" },
+        { key: "taxation", label: "Taxation", type: "text" },
+        { key: "jurisdiction", label: "Jurisdiction", type: "text" },
+        { key: "confidentiality", label: "Confidentiality Note", type: "textarea" },
+        { key: "nidoName", label: "Relationship Owner — Nido-Tech (Name)", type: "text" },
+        { key: "nidoEmail", label: "Relationship Owner — Nido-Tech (Email)", type: "text" },
+        { key: "nidoPhone", label: "Relationship Owner — Nido-Tech (Phone)", type: "text" },
+        { key: "apexName", label: "Relationship Owner — Apex (Name)", type: "text" },
+        { key: "apexEmail", label: "Relationship Owner — Apex (Email)", type: "text" },
+        { key: "apexPhone", label: "Relationship Owner — Apex (Phone)", type: "text" },
+      ],
+      currentValues: {
+        ...overview,
+        nidoName: relationshipOwners.nidoTech.name,
+        nidoEmail: relationshipOwners.nidoTech.email,
+        nidoPhone: relationshipOwners.nidoTech.phone,
+        apexName: relationshipOwners.apex.name,
+        apexEmail: relationshipOwners.apex.email,
+        apexPhone: relationshipOwners.apex.phone,
+      },
+      onSave: (v) => {
+        setOverview({ purpose: v.purpose, scope: v.scope, deployment: v.deployment, currency: v.currency, taxation: v.taxation, jurisdiction: v.jurisdiction, confidentiality: v.confidentiality });
+        setRelationshipOwners({
+          nidoTech: { name: v.nidoName, email: v.nidoEmail, phone: v.nidoPhone, initials: (v.nidoName || "").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) },
+          apex: { name: v.apexName, email: v.apexEmail, phone: v.apexPhone, initials: (v.apexName || "").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) },
+        });
+        closeModal();
+      },
+    });
+  };
+
+  const openResponseTargetsEdit = () => {
+    const flat: Record<string, string> = {};
+    responseTargets.forEach((row, i) => { flat[`p${i}_priority`] = row.priority; flat[`p${i}_response`] = row.response; flat[`p${i}_resolution`] = row.resolution; });
+    const fields: FieldConfig[] = responseTargets.flatMap((_, i) => [
+      { key: `p${i}_priority`, label: `Row ${i + 1} — Priority Label`, type: "text" as const },
+      { key: `p${i}_response`, label: `Row ${i + 1} — Response Time`, type: "text" as const },
+      { key: `p${i}_resolution`, label: `Row ${i + 1} — Resolution Time`, type: "text" as const },
+    ]);
+    setEditModalConfig({
+      title: "Edit Response & Resolution Targets",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setResponseTargets(responseTargets.map((row, i) => ({ ...row, priority: v[`p${i}_priority`] ?? row.priority, response: v[`p${i}_response`] ?? row.response, resolution: v[`p${i}_resolution`] ?? row.resolution })));
+        closeModal();
+      },
+    });
+  };
+
+  const openCommercialEdit = () => {
+    setEditModalConfig({
+      title: "Edit Commercial Terms",
+      fields: [
+        { key: "type", label: "Agreement Type", type: "text" },
+        { key: "model", label: "Billing Model", type: "text" },
+        { key: "duration", label: "Contract Duration", type: "text" },
+        { key: "paymentTerms", label: "Payment Terms", type: "text" },
+        { key: "latePenalty", label: "Late Payment Penalty", type: "text" },
+        { key: "extras", label: "Extras", type: "text" },
+        { key: "priceRevision", label: "Price Revision", type: "text" },
+        { key: "forceMajeure", label: "Force Majeure", type: "text" },
+        { key: "dispute", label: "Dispute Resolution", type: "text" },
+      ],
+      currentValues: commercialTerms,
+      onSave: (v) => { setCommercialTerms(v as typeof commercialTerms); closeModal(); },
+    });
+  };
+
+  const openServicesCoveredEdit = () => {
+    const scopeOptions = ["Included", "Change Request Required", "Excluded"];
+    const flat: Record<string, string> = {};
+    servicesCovered.forEach((row, i) => { flat[`s${i}_service`] = row.service; flat[`s${i}_scope`] = row.scope; });
+    const fields: FieldConfig[] = servicesCovered.flatMap((_, i) => [
+      { key: `s${i}_service`, label: `Service ${i + 1} — Name`, type: "text" as const },
+      { key: `s${i}_scope`, label: `Service ${i + 1} — Scope`, type: "select" as const, options: scopeOptions },
+    ]);
+    setEditModalConfig({
+      title: "Edit Services Covered",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setServicesCovered(servicesCovered.map((row, i) => {
+          const scope = v[`s${i}_scope`] ?? row.scope;
+          const badge = scope === "Included" ? "green" : scope === "Excluded" ? "red" : "amber";
+          return { service: v[`s${i}_service`] ?? row.service, scope, badge };
+        }));
+        closeModal();
+      },
+    });
+  };
+
+  const openDataSecurityEdit = () => {
+    const flat: Record<string, string> = {};
+    dataSecurity.forEach((item, i) => { flat[`ds${i}_label`] = item.label; });
+    const fields: FieldConfig[] = dataSecurity.map((_, i) => ({ key: `ds${i}_label`, label: `Security Feature ${i + 1}`, type: "text" as const }));
+    setEditModalConfig({
+      title: "Edit Data Security & Compliance",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setDataSecurity(dataSecurity.map((item, i) => ({ ...item, label: v[`ds${i}_label`] ?? item.label })));
+        closeModal();
+      },
+    });
+  };
+
+  const openConfidentialityEdit = () => {
+    setEditModalConfig({
+      title: "Edit Confidentiality Clause",
+      fields: [
+        { key: "text", label: "Confidentiality Text", type: "textarea" },
+        { key: "effective", label: "Effective Until", type: "text" },
+        { key: "status", label: "Status", type: "select", options: ["Active", "Inactive", "Pending"] },
+      ],
+      currentValues: confidentiality,
+      onSave: (v) => { setConfidentiality(v as typeof confidentiality); closeModal(); },
+    });
+  };
+
+  const openSupportMatrixEdit = () => {
+    const flat: Record<string, string> = {};
+    supportMatrix.forEach((row, i) => { flat[`sm${i}_level`] = row.level; flat[`sm${i}_team`] = row.team; flat[`sm${i}_email`] = row.email; flat[`sm${i}_availability`] = row.availability; });
+    const fields: FieldConfig[] = supportMatrix.flatMap((_, i) => [
+      { key: `sm${i}_level`, label: `Row ${i + 1} — Level`, type: "text" as const },
+      { key: `sm${i}_team`, label: `Row ${i + 1} — Contact / Team`, type: "text" as const },
+      { key: `sm${i}_email`, label: `Row ${i + 1} — Email`, type: "text" as const },
+      { key: `sm${i}_availability`, label: `Row ${i + 1} — Availability`, type: "text" as const },
+    ]);
+    setEditModalConfig({
+      title: "Edit Support & Escalation Matrix",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setSupportMatrix(supportMatrix.map((row, i) => ({ level: v[`sm${i}_level`] ?? row.level, team: v[`sm${i}_team`] ?? row.team, email: v[`sm${i}_email`] ?? row.email, availability: v[`sm${i}_availability`] ?? row.availability })));
+        closeModal();
+      },
+    });
+  };
+
+  const openRenewalTermEdit = () => {
+    const flat: Record<string, string> = {};
+    renewalTerm.forEach((item, i) => { flat[`rt${i}_label`] = item.label; });
+    const fields: FieldConfig[] = renewalTerm.map((_, i) => ({ key: `rt${i}_label`, label: `Item ${i + 1}`, type: "text" as const }));
+    setEditModalConfig({
+      title: "Edit Renewal & Termination",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setRenewalTerm(renewalTerm.map((item, i) => ({ ...item, label: v[`rt${i}_label`] ?? item.label })));
+        closeModal();
+      },
+    });
+  };
+
+  const openSubscriptionEdit = () => {
+    setEditModalConfig({
+      title: "Edit Subscription & Licensing",
+      fields: [
+        { key: "userLicensing", label: "User Licensing", type: "text" },
+        { key: "licensedUsers", label: "Licensed Users", type: "text" },
+        { key: "concurrent", label: "Concurrent Users", type: "text" },
+        { key: "additionalCost", label: "Additional User Cost", type: "text" },
+        { key: "transfer", label: "License Transfer (Allowed)", type: "text" },
+        { key: "minCommitment", label: "Minimum Commitment", type: "text" },
+      ],
+      currentValues: subscription,
+      onSave: (v) => { setSubscription(v as typeof subscription); closeModal(); },
+    });
+  };
+
+  const openSLAEdit = () => {
+    const flat: Record<string, string> = {};
+    slaCommitments.forEach((row, i) => { flat[`sla${i}_commitment`] = row.commitment; flat[`sla${i}_target`] = row.target; });
+    const fields: FieldConfig[] = slaCommitments.flatMap((_, i) => [
+      { key: `sla${i}_commitment`, label: `Row ${i + 1} — Commitment`, type: "text" as const },
+      { key: `sla${i}_target`, label: `Row ${i + 1} — Target`, type: "text" as const },
+    ]);
+    setEditModalConfig({
+      title: "Edit SLA Commitments",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setSlaCommitments(slaCommitments.map((row, i) => ({ ...row, commitment: v[`sla${i}_commitment`] ?? row.commitment, target: v[`sla${i}_target`] ?? row.target })));
+        closeModal();
+      },
+    });
+  };
+
+  const openRenewalInfoEdit = () => {
+    setEditModalConfig({
+      title: "Edit Renewal Information",
+      fields: [
+        { key: "renewalDate", label: "Contract Renewal Date", type: "text" },
+        { key: "autoRenewal", label: "Auto Renewal", type: "select", options: ["Enabled", "Disabled"] },
+        { key: "daysRemaining", label: "Days Remaining", type: "text" },
+      ],
+      currentValues: renewalInfo,
+      onSave: (v) => { setRenewalInfo(v as typeof renewalInfo); closeModal(); },
+    });
+  };
+
+  const openSupportInfoEdit = () => {
+    setEditModalConfig({
+      title: "Edit Support Information",
+      fields: [
+        { key: "plan", label: "Support Plan", type: "text" },
+        { key: "hours", label: "Support Hours", type: "text" },
+        { key: "responseSLA", label: "Response SLA", type: "text" },
+      ],
+      currentValues: supportInfo,
+      onSave: (v) => { setSupportInfo(v as typeof supportInfo); closeModal(); },
+    });
+  };
+
+  const openKeyContactsEdit = () => {
+    setEditModalConfig({
+      title: "Edit Key Contacts",
+      fields: [
+        { key: "apexName", label: "Apex — Contact Name", type: "text" },
+        { key: "apexRole", label: "Apex — Role", type: "text" },
+        { key: "apexEmail", label: "Apex — Email", type: "text" },
+        { key: "apexPhone", label: "Apex — Phone", type: "text" },
+        { key: "nidoName", label: "Nido-Tech — Contact Name", type: "text" },
+        { key: "nidoRole", label: "Nido-Tech — Role", type: "text" },
+        { key: "nidoEmail", label: "Nido-Tech — Email", type: "text" },
+        { key: "nidoPhone", label: "Nido-Tech — Phone", type: "text" },
+      ],
+      currentValues: {
+        apexName: keyContacts.apex.name, apexRole: keyContacts.apex.role, apexEmail: keyContacts.apex.email, apexPhone: keyContacts.apex.phone,
+        nidoName: keyContacts.nidoTech.name, nidoRole: keyContacts.nidoTech.role, nidoEmail: keyContacts.nidoTech.email, nidoPhone: keyContacts.nidoTech.phone,
+      },
+      onSave: (v) => {
+        setKeyContacts({
+          apex: { name: v.apexName, role: v.apexRole, email: v.apexEmail, phone: v.apexPhone, initials: (v.apexName || "").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) },
+          nidoTech: { name: v.nidoName, role: v.nidoRole, email: v.nidoEmail, phone: v.nidoPhone, initials: (v.nidoName || "").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) },
+        });
+        closeModal();
+      },
+    });
+  };
+
+  const openRemindersEdit = () => {
+    const flat: Record<string, string> = {};
+    reminders.forEach((r, i) => { flat[`r${i}_label`] = r.label; flat[`r${i}_date`] = r.date; });
+    const fields: FieldConfig[] = reminders.flatMap((_, i) => [
+      { key: `r${i}_label`, label: `Reminder ${i + 1} — Label`, type: "text" as const },
+      { key: `r${i}_date`, label: `Reminder ${i + 1} — Date`, type: "text" as const },
+    ]);
+    setEditModalConfig({
+      title: "Edit Reminders",
+      fields,
+      currentValues: flat,
+      onSave: (v) => {
+        setReminders(reminders.map((r, i) => ({ label: v[`r${i}_label`] ?? r.label, date: v[`r${i}_date`] ?? r.date })));
+        closeModal();
+      },
+    });
+  };
+
+  // ── JSX ───────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6">
-      {showAddModal && <AddContractModal onClose={() => setShowAddModal(false)} />}
+    <div className="min-h-full bg-gray-50 flex flex-col relative">
+      {editModalConfig && (
+        <EditModal
+          title={editModalConfig.title}
+          fields={editModalConfig.fields}
+          currentValues={editModalConfig.currentValues}
+          onSave={editModalConfig.onSave}
+          onClose={closeModal}
+        />
+      )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900">Contracts</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{filtered.length} contract{filtered.length !== 1 ? "s" : ""}</p>
+      <div className="bg-white relative">
+        <div className="absolute top-4 right-4" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+            data-testid="contract-menu"
+          >
+            <MoreVertical size={18} />
+          </button>
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
+              <button
+                onClick={() => setDropdownOpen(false)}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Download size={14} className="text-gray-400" />
+                Download Contract
+              </button>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100">
           <button
-            onClick={() => setShowFilter((v) => !v)}
-            className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors"
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-blue-600 transition-colors mb-4"
           >
-            <Filter size={13} />
-            Filter
+            <ArrowLeft size={14} />
+            Back to Contracts
           </button>
-          <button
-            className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <Download size={13} />
-            Export
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 text-xs bg-blue-600 text-white rounded-lg px-3 py-2 hover:bg-blue-700 transition-colors"
-          >
-            + Add Contract
-          </button>
+
+          <div className="flex items-start justify-between gap-6">
+            {/* Left — Service Provider */}
+            <div className="w-64 shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                  <span className="text-white font-black text-sm">N</span>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 leading-tight">Nido-Tech</p>
+                  <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Service Provider (We)</span>
+                </div>
+              </div>
+              <div className="text-[11px] text-gray-500 space-y-0.5 pl-11">
+                <p className="text-[10px] text-gray-400 font-medium">GSTIN</p>
+                <p className="font-mono">29AABCN1234D1Z5</p>
+                <p className="text-[10px] text-gray-400 font-medium mt-1">Registered Address</p>
+                <p>No. 24, 2nd Floor, MG Road,</p>
+                <p>Bangalore – 560001, Karnataka, India</p>
+              </div>
+            </div>
+
+            {/* Center */}
+            <div className="flex-1 flex flex-col items-center text-center">
+              <span className="text-[10px] border border-blue-300 text-blue-600 px-3 py-0.5 rounded tracking-widest font-semibold mb-2 bg-blue-50">CONTRACT</span>
+              <h2 className="text-lg font-bold text-gray-900 mb-3">{contractTitle || "SaaS & Services Agreement"}</h2>
+              <p className="text-[11px] text-gray-400 mb-2">Between</p>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[11px] font-medium px-3 py-1 rounded">
+                  Nido-Tech<br /><span className="text-[10px] text-yellow-600">(Service Provider)</span>
+                </div>
+                <div className="flex items-center gap-0.5 text-gray-300">
+                  <div className="w-8 h-px bg-gray-300" />
+                  <ChevronRight size={12} className="text-gray-400" />
+                </div>
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-medium px-3 py-1 rounded">
+                  Apex Tech Solutions<br /><span className="text-[10px] text-blue-600">(Client)</span>
+                </div>
+              </div>
+              <div className="flex gap-8 text-center">
+                <div>
+                  <p className="text-[10px] text-gray-400">Contract No.</p>
+                  <p className="text-xs font-semibold text-gray-800">{contractId || "CT-2025-001"}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400">Contract Type</p>
+                  <p className="text-xs font-semibold text-gray-800">SaaS & Services Agreement</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right — Client */}
+            <div className="w-64 shrink-0 text-right pr-6">
+              <div className="flex items-center justify-end gap-2 mb-2">
+                <div>
+                  <p className="text-sm font-bold text-gray-900 leading-tight">Apex Tech Solutions</p>
+                  <div className="flex justify-end">
+                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Client</span>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center shrink-0">
+                  <span className="text-white font-black text-[10px]">APEX</span>
+                </div>
+              </div>
+              <div className="text-[11px] text-gray-500 space-y-0.5 pr-11">
+                <p className="text-[10px] text-gray-400 font-medium">GSTIN</p>
+                <p className="font-mono">29AABCA1234B1Z5</p>
+                <p className="text-[10px] text-gray-400 font-medium mt-1">Registered Address</p>
+                <p>No. 45, 3rd Floor, Embassy Tech Village,</p>
+                <p>Outer Ring Road, Bangalore – 560103, Karnataka, India</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Meta bar */}
+        <div className="bg-gray-50 border-b border-gray-200 overflow-x-auto">
+          <div className="flex min-w-max">
+            <MetaCell icon={<Calendar size={13} />} label="Contract Start Date" value="Apr 01, 2025" />
+            <MetaCell icon={<Calendar size={13} />} label="Contract End Date" value="Mar 31, 2026" />
+            <MetaCell icon={<IndianRupee size={13} />} label="Contract Value" value="₹2,45,000.00" />
+            <MetaCell icon={<Receipt size={13} />} label="Billing Frequency" value="Monthly" />
+            <MetaCell icon={<FileText size={13} />} label="Payment Terms" value="Net 30 Days" />
+            <MetaCell icon={<CheckCircle2 size={13} className="text-green-500" />} label="Contract Status" value={<span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px]">Active</span>} />
+            <MetaCell icon={<RefreshCw size={13} />} label="Auto Renewal" value="Yes" />
+            <MetaCell icon={<Bell size={13} />} label="Notice Period" value="30 Days" />
+            <MetaCell icon={<Scale size={13} />} label="Governing Law" value="Laws of India" />
+            <MetaCell icon={<PenLine size={13} />} label="Signed On" value="Mar 28, 2025" />
+          </div>
         </div>
       </div>
 
-      {/* Filter bar */}
-      {showFilter && (
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          {typeOptions.map((t) => (
-            <button
-              key={t}
-              onClick={() => setSelectedType(t)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                selectedType === t
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Main Content Grid */}
+      <div className="flex-1 p-5 overflow-auto">
+        <div className="grid grid-cols-[1fr_2fr_1fr] gap-4 max-w-[1600px] mx-auto">
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 text-xs text-gray-500 font-medium">
-              <th className="text-left px-4 py-3">Contract ID</th>
-              <th className="text-left px-4 py-3">Title</th>
-              <th className="text-left px-4 py-3">Type</th>
-              <th className="text-left px-4 py-3">Start Date</th>
-              <th className="text-left px-4 py-3">End Date</th>
-              <th className="text-left px-4 py-3">Value</th>
-              <th className="text-left px-4 py-3">Signed By</th>
-              <th className="text-left px-4 py-3">Status</th>
-              <th className="text-left px-4 py-3">Document</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {filtered.map((contract) => (
-              <tr key={contract.id} className="hover:bg-gray-50 transition-colors">
-                <td 
-                  className="px-4 py-3 text-blue-600 font-medium text-xs cursor-pointer hover:underline" 
-                  onClick={() => navigate(`/contracts/${contract.id}`)}
-                >
-                  {contract.id}
-                </td>
-                <td className="px-4 py-3 text-gray-800 font-medium text-xs">{contract.title}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{contract.type}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{contract.startDate}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{contract.endDate}</td>
-                <td className="px-4 py-3 text-gray-800 font-medium text-xs">{contract.value}</td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{contract.signedBy}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      statusColors[contract.status] ?? "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {contract.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <button className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors">
-                    <FileText size={13} />
-                    View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          {/* LEFT COLUMN */}
+          <div className="space-y-4">
+            <SectionCard title="Contract Overview" onEdit={openOverviewEdit}>
+              <div className="space-y-3">
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Contract Purpose</span>
+                  <span className="text-[11px] text-gray-800 text-right">{overview.purpose}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Scope of Work</span>
+                  <span className="text-[11px] text-gray-800 text-right">{overview.scope}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Deployment Model</span>
+                  <span className="text-[11px] text-gray-800 text-right font-medium">{overview.deployment}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Currency</span>
+                  <span className="text-[11px] text-gray-800 text-right font-medium">{overview.currency}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Taxation</span>
+                  <span className="text-[11px] text-gray-800 text-right font-medium">{overview.taxation}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Jurisdiction</span>
+                  <span className="text-[11px] text-gray-800 text-right font-medium">{overview.jurisdiction}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500 w-32 shrink-0">Confidentiality</span>
+                  <span className="text-[11px] text-gray-800 text-right">{overview.confidentiality}</span>
+                </div>
 
-        {filtered.length === 0 && (
-          <div className="py-16 text-center text-sm text-gray-400">
-            No contracts found for this filter.
+                {/* Relationship Owner — Nido-Tech */}
+                <div className="pt-2 border-b border-gray-100 pb-3">
+                  <p className="text-[10px] text-gray-500 mb-1.5 uppercase font-medium">Relationship Owner (Nido-Tech)</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
+                        {relationshipOwners.nidoTech.initials}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-900">{relationshipOwners.nidoTech.name}</p>
+                        <p className="text-[10px] text-gray-500">{relationshipOwners.nidoTech.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0" ref={phonePopup === `nido-owner` ? phonePopupRef : undefined}>
+                      <a
+                        href={`mailto:${relationshipOwners.nidoTech.email}`}
+                        className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                        title={`Email ${relationshipOwners.nidoTech.name}`}
+                      >
+                        <Mail size={12} />
+                      </a>
+                      <div className="relative">
+                        <button
+                          onClick={() => setPhonePopup(phonePopup === "nido-owner" ? null : "nido-owner")}
+                          className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                          title="Show phone number"
+                        >
+                          <Phone size={12} />
+                        </button>
+                        {phonePopup === "nido-owner" && (
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                            {relationshipOwners.nidoTech.phone}
+                            <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Relationship Owner — Apex */}
+                <div className="pt-1">
+                  <p className="text-[10px] text-gray-500 mb-1.5 uppercase font-medium">Relationship Owner (Apex)</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold shrink-0">
+                        {relationshipOwners.apex.initials}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-900">{relationshipOwners.apex.name}</p>
+                        <p className="text-[10px] text-gray-500">{relationshipOwners.apex.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <a
+                        href={`mailto:${relationshipOwners.apex.email}`}
+                        className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                        title={`Email ${relationshipOwners.apex.name}`}
+                      >
+                        <Mail size={12} />
+                      </a>
+                      <div className="relative">
+                        <button
+                          onClick={() => setPhonePopup(phonePopup === "apex-owner" ? null : "apex-owner")}
+                          className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                          title="Show phone number"
+                        >
+                          <Phone size={12} />
+                        </button>
+                        {phonePopup === "apex-owner" && (
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                            {relationshipOwners.apex.phone}
+                            <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="2. Response & Resolution Targets" onEdit={openResponseTargetsEdit}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
+                    <tr>
+                      <th className="px-3 py-2 border-b border-gray-200">Priority</th>
+                      <th className="px-3 py-2 border-b border-gray-200">Response</th>
+                      <th className="px-3 py-2 border-b border-gray-200">Resolution</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {responseTargets.map((row, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-${row.color}-50 text-${row.color}-600 border border-${row.color}-200`}>
+                            {row.priority}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-medium">{row.response}</td>
+                        <td className="px-3 py-2 font-medium">{row.resolution}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
           </div>
-        )}
+
+          {/* MIDDLE COLUMN */}
+          <div className="space-y-4">
+            <SectionCard title="1. Commercial Terms" onEdit={openCommercialEdit}>
+              <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Agreement Type</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.type}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Billing Model</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.model}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Contract Duration</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.duration}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Payment Terms</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.paymentTerms}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Late Payment Penalty</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.latePenalty}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Extras</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.extras}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Price Revision</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.priceRevision}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Force Majeure</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.forceMajeure}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2 col-span-2">
+                  <span className="text-[11px] text-gray-500">Dispute Resolution</span>
+                  <span className="text-[11px] text-gray-800 font-medium text-right">{commercialTerms.dispute}</span>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="3. Services Covered" onEdit={openServicesCoveredEdit}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
+                    <tr>
+                      <th className="px-4 py-2 border-b border-gray-200">Service</th>
+                      <th className="px-4 py-2 border-b border-gray-200">In Scope</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {servicesCovered.map((row, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-2 font-medium text-gray-800">{row.service}</td>
+                        <td className="px-4 py-2">
+                          <span className={`inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-${row.badge}-50 text-${row.badge}-600 border border-${row.badge}-200`}>
+                            {row.scope}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="5. Data Security & Compliance" onEdit={openDataSecurityEdit}>
+              <div className="grid grid-cols-6 gap-2">
+                {dataSecurity.map((item, i) => (
+                  <div key={i} className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-100 text-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center">
+                      {getDataSecurityIcon(item.type)}
+                    </div>
+                    <span className="text-[10px] font-medium text-gray-700 leading-tight">{item.label}</span>
+                    {item.active && <CheckCircle2 size={12} className="text-green-500 mt-auto" />}
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="6. Confidentiality Clause" onEdit={openConfidentialityEdit}>
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <ShieldCheck size={20} className="text-blue-500" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <p className="text-[11px] text-gray-600 leading-relaxed">{confidentiality.text}</p>
+                  <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
+                    <p className="text-[11px] font-medium text-gray-800">
+                      Effective Until: <span className="text-gray-500 font-normal">{confidentiality.effective}</span>
+                    </p>
+                    <p className="text-[11px] font-medium text-gray-800 flex items-center gap-1.5">
+                      Status:{" "}
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] bg-green-50 text-green-600 border border-green-200">
+                        {confidentiality.status}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="7. Support & Escalation Matrix" onEdit={openSupportMatrixEdit}>
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
+                    <tr>
+                      <th className="px-4 py-2 border-b border-gray-200">Level</th>
+                      <th className="px-4 py-2 border-b border-gray-200">Contact / Team</th>
+                      <th className="px-4 py-2 border-b border-gray-200">Email</th>
+                      <th className="px-4 py-2 border-b border-gray-200">Availability</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {supportMatrix.map((row, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-2 font-medium text-gray-800">{row.level}</td>
+                        <td className="px-4 py-2 text-gray-700">{row.team}</td>
+                        <td className="px-4 py-2">
+                          <a href={`mailto:${row.email}`} className="text-blue-600 hover:underline">{row.email}</a>
+                        </td>
+                        <td className="px-4 py-2 text-gray-600">{row.availability}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="8. Renewal & Termination" onEdit={openRenewalTermEdit}>
+              <div className="grid grid-cols-3 gap-3">
+                {renewalTerm.map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
+                      {getRenewalIcon(item.type)}
+                    </div>
+                    <span className="text-[11px] font-medium text-gray-700">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div className="space-y-4">
+            <SectionCard title="2. Subscription & Licensing" onEdit={openSubscriptionEdit}>
+              <div className="space-y-3">
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">User Licensing</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{subscription.userLicensing}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Licensed Users</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{subscription.licensedUsers}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Concurrent Users</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{subscription.concurrent}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Additional User Cost</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{subscription.additionalCost}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">License Transfer</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{subscription.transfer}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Minimum Commitment</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{subscription.minCommitment}</span>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="4. SLA Commitments" onEdit={openSLAEdit}>
+              <div className="overflow-hidden rounded-lg border border-gray-200 mb-2">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 text-[10px] text-gray-500 font-medium">
+                    <tr>
+                      <th className="px-3 py-2 border-b border-gray-200">Commitment</th>
+                      <th className="px-3 py-2 border-b border-gray-200 text-right">Target</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-[11px]">
+                    {slaCommitments.map((row, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2 text-gray-700">{row.commitment}</td>
+                        <td className={`px-3 py-2 font-medium text-right text-${row.color}-600`}>{row.target}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Renewal Information" onEdit={openRenewalInfoEdit}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600">
+                    <Calendar size={14} className="text-gray-400" />
+                    <span>Contract Renewal</span>
+                  </div>
+                  <span className="text-[11px] font-medium text-gray-900">{renewalInfo.renewalDate}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600">
+                    <RefreshCw size={14} className="text-gray-400" />
+                    <span>Auto Renewal</span>
+                  </div>
+                  <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-600 border border-green-200">
+                    {renewalInfo.autoRenewal}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-[11px] text-gray-600">
+                    <Bell size={14} className="text-gray-400" />
+                    <span>Days Remaining</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-600">{renewalInfo.daysRemaining}</span>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Support Information" onEdit={openSupportInfoEdit}>
+              <div className="space-y-3 mb-4">
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Support Plan</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{supportInfo.plan}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Support Hours</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{supportInfo.hours}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-2">
+                  <span className="text-[11px] text-gray-500">Response SLA</span>
+                  <span className="text-[11px] text-gray-800 font-medium">{supportInfo.responseSLA}</span>
+                </div>
+              </div>
+              <button className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-blue-600 text-blue-600 text-[11px] font-medium hover:bg-blue-50 transition-colors">
+                <Headphones size={14} />
+                Create Support Ticket
+              </button>
+            </SectionCard>
+
+            <SectionCard title="Key Contacts" onEdit={openKeyContactsEdit}>
+              <div className="space-y-4">
+                {/* Apex */}
+                <div>
+                  <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Apex Tech Solutions Pvt. Ltd.</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold shrink-0">
+                        {keyContacts.apex.initials}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-900 leading-tight">{keyContacts.apex.name}</p>
+                        <p className="text-[10px] text-gray-500">{keyContacts.apex.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`mailto:${keyContacts.apex.email}`}
+                        className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                        title={`Email ${keyContacts.apex.name}`}
+                      >
+                        <Mail size={12} />
+                      </a>
+                      <div className="relative">
+                        <button
+                          onClick={() => setPhonePopup(phonePopup === "apex-key" ? null : "apex-key")}
+                          className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                          title="Show phone number"
+                        >
+                          <Phone size={12} />
+                        </button>
+                        {phonePopup === "apex-key" && (
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                            {keyContacts.apex.phone}
+                            <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nido-Tech */}
+                <div className="pt-3 border-t border-gray-100">
+                  <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Nido-Tech</h4>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
+                        {keyContacts.nidoTech.initials}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-900 leading-tight">{keyContacts.nidoTech.name}</p>
+                        <p className="text-[10px] text-gray-500">{keyContacts.nidoTech.role}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <a
+                        href={`mailto:${keyContacts.nidoTech.email}`}
+                        className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                        title={`Email ${keyContacts.nidoTech.name}`}
+                      >
+                        <Mail size={12} />
+                      </a>
+                      <div className="relative">
+                        <button
+                          onClick={() => setPhonePopup(phonePopup === "nido-key" ? null : "nido-key")}
+                          className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                          title="Show phone number"
+                        >
+                          <Phone size={12} />
+                        </button>
+                        {phonePopup === "nido-key" && (
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                            {keyContacts.nidoTech.phone}
+                            <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Reminders" onEdit={openRemindersEdit}>
+              <div className="space-y-3 mb-4">
+                {reminders.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[11px] text-gray-700">
+                      <Calendar size={14} className={i === 0 ? "text-amber-500" : "text-blue-500"} />
+                      <span>{r.label}</span>
+                    </div>
+                    <span className="text-[11px] font-medium text-gray-900">{r.date}</span>
+                  </div>
+                ))}
+              </div>
+              <button className="w-full text-center text-blue-600 text-[11px] font-medium hover:underline">
+                View All Reminders
+              </button>
+            </SectionCard>
+          </div>
+        </div>
       </div>
     </div>
   );

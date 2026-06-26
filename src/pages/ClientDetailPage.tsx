@@ -23,14 +23,8 @@ import {
   FileText,
   Clock,
 } from "lucide-react";
-import RolesPage from "./ClientRolesPage";
-import UsersPage from "./ClientUsersPage";
-import OrdersPage from "./ClientOrdersPage";
-import ServicesPage from "./ClientServicesPage";
-import CatalogPage from "./ClientCatalogPage";
-import ActivityPage from "./ClientActivityPage";
-import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
+import ContractDetailView from "./tabs/ContractDetailView";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
@@ -54,7 +48,7 @@ const spendCategories = [
   { name: "Other", value: 10, amount: "$10,500", color: "#a855f7" },
 ];
 
-const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration"];
+const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Configuration"];
 
 function DonutChart({ categories, size }: { categories: typeof spendCategories; size: number }) {
   const cx = size / 2;
@@ -103,11 +97,25 @@ function PlaceholderPage({ tab }: { tab: string }) {
   );
 }
 
-export default function App() {
+export default function ClientDetailPage() {
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [selectedContract, setSelectedContract] = useState<{ id: string; title: string } | null>(null);
 
   const isOverview = activeTab === "Overview";
+
+  function handleViewContract(id: string, title: string) {
+    setSelectedContract({ id, title });
+  }
+
+  function handleBackToContracts() {
+    setSelectedContract(null);
+  }
+
+  function handleTabChange(tab: string) {
+    setActiveTab(tab);
+    setSelectedContract(null);
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -124,6 +132,7 @@ export default function App() {
             <button
               onClick={() => setSidebarVisible(false)}
               title="Hide panel"
+              data-testid="button-hide-sidebar"
               className="absolute top-3 right-3 w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -162,11 +171,17 @@ export default function App() {
 
             {/* Action buttons */}
             <div className="flex gap-2">
-              <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+              <button
+                data-testid="button-email"
+                className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+              >
                 <Mail size={12} />
                 Email
               </button>
-              <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+              <button
+                data-testid="button-call"
+                className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+              >
                 <Phone size={12} />
                 Call
               </button>
@@ -196,18 +211,22 @@ export default function App() {
             </div>
 
             {/* Download button */}
-            <button className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-lg py-2 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors">
+            <button
+              data-testid="button-download-profile"
+              className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-lg py-2 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
               <Download size={13} />
               Download Profile
             </button>
           </aside>
         )}
 
-        {/* Show sidebar button — visible when sidebar is hidden */}
+        {/* Show sidebar button */}
         {isOverview && !sidebarVisible && (
           <button
             onClick={() => setSidebarVisible(true)}
             title="Show panel"
+            data-testid="button-show-sidebar"
             className="mr-3 mt-1 w-7 h-7 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors self-start"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -219,7 +238,7 @@ export default function App() {
           {/* Stats row — only on Overview */}
           {isOverview && (
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4" data-testid="card-total-users">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-blue-50">
                     <Users size={16} className="text-blue-500" />
@@ -233,7 +252,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4" data-testid="card-total-spends">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-green-50">
                     <DollarSign size={16} className="text-green-500" />
@@ -248,7 +267,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4" data-testid="card-open-orders">
                 <div className="flex items-start gap-3">
                   <div className="p-2 rounded-lg bg-orange-50">
                     <ShoppingCart size={16} className="text-orange-500" />
@@ -266,12 +285,13 @@ export default function App() {
 
           {/* Tabs */}
           <div className="bg-white rounded-xl border border-gray-200 px-4">
-            <div className="flex border-b border-gray-100">
+            <div className="flex border-b border-gray-100 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                  onClick={() => handleTabChange(tab)}
+                  data-testid={`tab-${tab.toLowerCase()}`}
+                  className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
                     activeTab === tab
                       ? "text-blue-600"
                       : "text-gray-500 hover:text-gray-700"
@@ -288,8 +308,20 @@ export default function App() {
 
           {/* Non-overview tab content */}
           {!isOverview && (
-            <div className="bg-white rounded-xl border border-gray-200 flex-1">
-              {activeTab === "Roles" ? <RolesPage /> : activeTab === "Users" ? <UsersPage /> : activeTab === "Orders" ? <OrdersPage /> : activeTab === "Services" ? <ServicesPage /> : activeTab === "Contracts" ? <ContractsPage /> : activeTab === "Catalog" ? <CatalogPage /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : <PlaceholderPage tab={activeTab} />}
+            <div className="bg-white rounded-xl border border-gray-200 flex-1 overflow-hidden">
+              {activeTab === "Contracts" ? (
+                selectedContract ? (
+                  <ContractDetailView
+                    contractId={selectedContract.id}
+                    contractTitle={selectedContract.title}
+                    onBack={handleBackToContracts}
+                  />
+                ) : (
+                  <ContractsPage onViewContract={handleViewContract} />
+                )
+              ) : (
+                <PlaceholderPage tab={activeTab} />
+              )}
             </div>
           )}
 
@@ -348,14 +380,13 @@ export default function App() {
                   <p className="text-xs text-green-500 font-medium mb-3">+12.5% vs last year</p>
                   <ResponsiveContainer width="100%" height={130}>
                     <BarChart data={monthlySpend} barSize={10} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                      <XAxis key="spend-xaxis" dataKey="month" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                      <YAxis key="spend-yaxis" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}K`} />
+                      <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}K`} />
                       <Tooltip
-                        key="spend-tooltip"
                         formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
                         contentStyle={{ fontSize: 11, borderRadius: 6, border: "1px solid #e5e7eb" }}
                       />
-                      <Bar key="spend-bar" dataKey="value" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
