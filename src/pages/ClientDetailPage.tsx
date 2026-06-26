@@ -30,6 +30,7 @@ import ServicesPage from "./ClientServicesPage";
 import CatalogPage from "./ClientCatalogPage";
 import ActivityPage from "./ClientActivityPage";
 import ConfigurationPage from "./ClientConfigurationPage";
+import ContractsPage from "./ClientContractsPage";
 
 const monthlySpend = [
   { month: "Jan", value: 18000 },
@@ -53,7 +54,7 @@ const spendCategories = [
   { name: "Other", value: 10, amount: "$10,500", color: "#a855f7" },
 ];
 
-const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Catalog", "Activity", "Configuration"];
+const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration"];
 
 function DonutChart({ categories, size }: { categories: typeof spendCategories; size: number }) {
   const cx = size / 2;
@@ -288,7 +289,7 @@ export default function App() {
           {/* Non-overview tab content */}
           {!isOverview && (
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
-              {activeTab === "Roles" ? <RolesPage /> : activeTab === "Users" ? <UsersPage /> : activeTab === "Orders" ? <OrdersPage /> : activeTab === "Services" ? <ServicesPage /> : activeTab === "Catalog" ? <CatalogPage /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : <PlaceholderPage tab={activeTab} />}
+              {activeTab === "Roles" ? <RolesPage /> : activeTab === "Users" ? <UsersPage /> : activeTab === "Orders" ? <OrdersPage /> : activeTab === "Services" ? <ServicesPage /> : activeTab === "Contracts" ? <ContractsPage /> : activeTab === "Catalog" ? <CatalogPage /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : <PlaceholderPage tab={activeTab} />}
             </div>
           )}
 
