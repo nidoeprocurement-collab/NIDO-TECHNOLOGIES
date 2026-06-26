@@ -137,9 +137,7 @@ function ProductCard({ product }: { product: Product }) {
       moq: product.moq,
       priceNum: product.priceNum,
     });
-    setTimeout(() => {
-      navigate("/shop/cart");
-    }, 300);
+    setTimeout(() => setAdding(false), 1500);
   };
 
   return (
@@ -183,7 +181,7 @@ function ProductCard({ product }: { product: Product }) {
             }`}
           >
             {adding ? <Check size={15} /> : <ShoppingCart size={15} />}
-            {adding ? "Adding..." : "Add to Cart"}
+            {adding ? "Added!" : "Add to Cart"}
           </button>
         </div>
       </div>

@@ -1,19 +1,18 @@
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import { Shield, Truck, RotateCcw, Mail, Phone, Star, Pencil } from "lucide-react";
-import type { CartItem } from "./App";
+import { useCart } from "@/contexts/CartContext";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
 
 export default function OrderSummaryPanel({
-  cart,
   showItemList = true,
 }: {
-  cart: CartItem[];
   showItemList?: boolean;
 }) {
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
+  const { items: cart } = useCart();
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
@@ -35,7 +34,7 @@ export default function OrderSummaryPanel({
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500">{totalItems} Items in Cart</span>
               <button
-                onClick={() => navigate("/cart")}
+                onClick={() => navigate("/shop/cart")}
                 className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
               >
                 <Pencil size={11} />
@@ -101,7 +100,7 @@ export default function OrderSummaryPanel({
             </div>
             <div className="flex items-center justify-between mb-0">
               <button
-                onClick={() => navigate("/cart")}
+                onClick={() => navigate("/shop/cart")}
                 className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
               >
                 <Pencil size={11} />

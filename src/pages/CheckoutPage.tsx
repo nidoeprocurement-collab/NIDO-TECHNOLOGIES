@@ -1,10 +1,8 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import { ChevronRight, MapPin, Building2, Home, Pencil, Plus, ChevronDown } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
-import type { CartItem } from "./App";
-import type { CheckoutData } from "./App";
 
 const ADDRESSES = [
   {
@@ -46,30 +44,24 @@ function AddressIcon({ type }: { type: string }) {
   return <MapPin size={20} className={cls} />;
 }
 
-export default function CheckoutPage({
-  cart,
-  checkout,
-  onCheckoutChange,
-}: {
-  cart: CartItem[];
-  checkout: CheckoutData;
-  onCheckoutChange: (data: Partial<CheckoutData>) => void;
-}) {
-  const [, navigate] = useLocation();
+export default function CheckoutPage() {
+  const navigate = useNavigate();
   const [notesOpen, setNotesOpen] = useState(false);
-
-  const instrLen = checkout.deliveryInstructions.length;
+  const [selectedAddressId, setSelectedAddressId] = useState(1);
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+  const [billingSameAsDelivery, setBillingSameAsDelivery] = useState(true);
+  const [orderNotes, setOrderNotes] = useState("");
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-6">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
-          <button onClick={() => navigate("/")} className="hover:text-blue-600">Home</button>
+          <button onClick={() => navigate("/shop")} className="hover:text-blue-600">Home</button>
           <ChevronRight size={14} />
           <span>Shopping</span>
           <ChevronRight size={14} />
-          <button onClick={() => navigate("/cart")} className="hover:text-blue-600">My Cart</button>
+          <button onClick={() => navigate("/shop/cart")} className="hover:text-blue-600">My Cart</button>
           <ChevronRight size={14} />
           <span className="text-gray-900 font-medium">Checkout</span>
         </div>
@@ -100,7 +92,7 @@ export default function CheckoutPage({
                   <label
                     key={addr.id}
                     className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
-                      checkout.selectedAddressId === addr.id
+                      selectedAddressId === addr.id
                         ? "border-blue-500 bg-blue-50"
                         : "border-gray-200 hover:border-gray-300"
                     }`}
@@ -109,8 +101,8 @@ export default function CheckoutPage({
                       type="radio"
                       name="address"
                       className="mt-1 accent-blue-600"
-                      checked={checkout.selectedAddressId === addr.id}
-                      onChange={() => onCheckoutChange({ selectedAddressId: addr.id })}
+                      checked={selectedAddressId === addr.id}
+                      onChange={() => setSelectedAddressId(addr.id)}
                     />
                     <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                       <AddressIcon type={addr.icon} />
@@ -148,11 +140,11 @@ export default function CheckoutPage({
                     rows={3}
                     maxLength={250}
                     placeholder="Add delivery instructions, gate entry details, timing preferences, etc."
-                    value={checkout.deliveryInstructions}
-                    onChange={(e) => onCheckoutChange({ deliveryInstructions: e.target.value })}
+                    value={deliveryInstructions}
+                    onChange={(e) => setDeliveryInstructions(e.target.value)}
                     className="w-full px-4 py-3 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
-                  <div className="px-4 pb-2 text-right text-xs text-gray-400">{instrLen}/250</div>
+                  <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>
                 </div>
               </div>
             </div>
@@ -163,8 +155,8 @@ export default function CheckoutPage({
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={checkout.billingSameAsDelivery}
-                  onChange={(e) => onCheckoutChange({ billingSameAsDelivery: e.target.checked })}
+                  checked={billingSameAsDelivery}
+                  onChange={(e) => setBillingSameAsDelivery(e.target.checked)}
                   className="w-4 h-4 accent-blue-600"
                 />
                 <span className="text-sm text-gray-700">Same as delivery address</span>
@@ -188,8 +180,8 @@ export default function CheckoutPage({
                   <textarea
                     rows={3}
                     placeholder="Add any special notes for this order..."
-                    value={checkout.orderNotes}
-                    onChange={(e) => onCheckoutChange({ orderNotes: e.target.value })}
+                    value={orderNotes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
                 </div>
@@ -199,7 +191,7 @@ export default function CheckoutPage({
             {/* Actions */}
             <div className="flex justify-center pt-2">
               <button
-                onClick={() => navigate("/payment")}
+                onClick={() => navigate("/shop/checkout/payment")}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-8 py-3 text-sm transition-colors"
               >
                 Continue to Payment
@@ -209,7 +201,7 @@ export default function CheckoutPage({
           </div>
 
           {/* Right */}
-          <OrderSummaryPanel cart={cart} showItemList />
+          <OrderSummaryPanel showItemList />
         </div>
       </div>
     </div>
