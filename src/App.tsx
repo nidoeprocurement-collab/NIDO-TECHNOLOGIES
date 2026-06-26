@@ -1,4 +1,72 @@
 /// <reference path="./types/react-query-shim.d.ts" />
+
+// ─── Types & constants merged from App.tsx ───────────────────────────────────
+
+export type CartItem = {
+  id: number;
+  name: string;
+  image: string;
+  specs: string[];
+  moq: number;
+  priceNum: number;
+  quantity: number;
+};
+
+export type CheckoutData = {
+  selectedAddressId: number;
+  deliveryInstructions: string;
+  billingSameAsDelivery: boolean;
+  orderNotes: string;
+  paymentMethod: string;
+  // Card
+  cardNumber: string;
+  cardName: string;
+  expiryDate: string;
+  cvv: string;
+  saveCard: boolean;
+  // Net Banking
+  netBankingBank: string;
+  // UPI
+  upiId: string;
+  // Wallets
+  selectedWallet: string;
+  walletMobile: string;
+  // NEFT / RTGS
+  neftAccountName: string;
+  neftAccountNumber: string;
+  neftIfscCode: string;
+  neftBankName: string;
+  // BNPL
+  bnplTenure: string;
+  // Promo
+  promoCode: string;
+};
+
+export const DEFAULT_CHECKOUT: CheckoutData = {
+  selectedAddressId: 1,
+  deliveryInstructions: "",
+  billingSameAsDelivery: true,
+  orderNotes: "",
+  paymentMethod: "card",
+  cardNumber: "",
+  cardName: "",
+  expiryDate: "",
+  cvv: "",
+  saveCard: true,
+  netBankingBank: "",
+  upiId: "",
+  selectedWallet: "",
+  walletMobile: "",
+  neftAccountName: "",
+  neftAccountNumber: "",
+  neftIfscCode: "",
+  neftBankName: "",
+  bnplTenure: "3",
+  promoCode: "",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +77,7 @@ import {
   Route,
   Navigate,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { EnhancedAuthProvider } from "@/contexts/EnhancedAuthContext";
@@ -20,11 +89,33 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import { Suspense, lazy, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { I18nProvider } from "@/i18n/I18nProvider";
-import { PreferencesProvider } from "@/store/preferencesStore";
+import { Loader2, ShoppingCart } from "lucide-react";
+import { PreferencesProvider } from "./store/preferencesStore";
+import { I18nProvider } from "./i18n/I18nProvider";
 
 const queryClient = new QueryClient();
+
+// ─── FloatingCartButton merged from App.tsx ───────────────────────────────────
+function FloatingCartButton({ count }: { count: number }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate("/cart")}
+      className="fixed top-5 right-6 z-50 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-full shadow-lg transition-colors"
+    >
+      <div className="relative">
+        <ShoppingCart size={20} />
+        {count > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
+      </div>
+      <span className="text-sm font-semibold">Cart</span>
+    </button>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
