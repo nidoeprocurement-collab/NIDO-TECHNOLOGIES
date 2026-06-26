@@ -7,14 +7,9 @@ import { visualizer } from "rollup-plugin-visualizer";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
-    port: 8080,
-    allowedHosts: [
-      "localhost",
-      "127.0.0.1",
-      ".vercel.run", // Allow all .vercel.run subdomains
-      ".vercel.app",  // Allow all .vercel.app subdomains
-    ],
+    host: "0.0.0.0",
+    port: 5000,
+    allowedHosts: true,
     hmr: {
       overlay: false,
     },
