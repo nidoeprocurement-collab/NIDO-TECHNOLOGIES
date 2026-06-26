@@ -1,4 +1,72 @@
 /// <reference path="./types/react-query-shim.d.ts" />
+
+// ─── Types & constants merged from App.tsx ───────────────────────────────────
+
+export type CartItem = {
+  id: number;
+  name: string;
+  image: string;
+  specs: string[];
+  moq: number;
+  priceNum: number;
+  quantity: number;
+};
+
+export type CheckoutData = {
+  selectedAddressId: number;
+  deliveryInstructions: string;
+  billingSameAsDelivery: boolean;
+  orderNotes: string;
+  paymentMethod: string;
+  // Card
+  cardNumber: string;
+  cardName: string;
+  expiryDate: string;
+  cvv: string;
+  saveCard: boolean;
+  // Net Banking
+  netBankingBank: string;
+  // UPI
+  upiId: string;
+  // Wallets
+  selectedWallet: string;
+  walletMobile: string;
+  // NEFT / RTGS
+  neftAccountName: string;
+  neftAccountNumber: string;
+  neftIfscCode: string;
+  neftBankName: string;
+  // BNPL
+  bnplTenure: string;
+  // Promo
+  promoCode: string;
+};
+
+export const DEFAULT_CHECKOUT: CheckoutData = {
+  selectedAddressId: 1,
+  deliveryInstructions: "",
+  billingSameAsDelivery: true,
+  orderNotes: "",
+  paymentMethod: "card",
+  cardNumber: "",
+  cardName: "",
+  expiryDate: "",
+  cvv: "",
+  saveCard: true,
+  netBankingBank: "",
+  upiId: "",
+  selectedWallet: "",
+  walletMobile: "",
+  neftAccountName: "",
+  neftAccountNumber: "",
+  neftIfscCode: "",
+  neftBankName: "",
+  bnplTenure: "3",
+  promoCode: "",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,17 +80,6 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { ShoppingCart } from "lucide-react";
-
-export type CartItem = {
-  id: number;
-  name: string;
-  image: string;
-  specs: string[];
-  moq: number;
-  priceNum: number;
-  quantity: number;
-};
 import { EnhancedAuthProvider } from "@/contexts/EnhancedAuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
@@ -32,29 +89,24 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import { Suspense, lazy, useState } from "react";
-import { Loader2 } from "lucide-react";
-import { I18nProvider } from "@/i18n/I18nProvider";
-import { PreferencesProvider } from "@/store/preferencesStore";
+import { Loader2, ShoppingCart } from "lucide-react";
+import { PreferencesProvider } from "./store/preferencesStore";
+import { I18nProvider } from "./i18n/I18nProvider";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  return <>{children}</>;
-}
-
-function FloatingCartButton({ count, onClick }: { count: number; onClick: () => void }) {
+// ─── FloatingCartButton merged from App.tsx ───────────────────────────────────
+function FloatingCartButton({ count }: { count: number }) {
+  const navigate = useNavigate();
   return (
     <button
-      onClick={onClick}
-      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-full shadow-xl transition-colors"
-      title="View Cart"
+      onClick={() => navigate("/cart")}
+      className="fixed top-5 right-6 z-50 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-full shadow-lg transition-colors"
     >
       <div className="relative">
         <ShoppingCart size={20} />
         {count > 0 && (
-          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center leading-none">
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
             {count > 99 ? "99+" : count}
           </span>
         )}
@@ -63,47 +115,12 @@ function FloatingCartButton({ count, onClick }: { count: number; onClick: () => 
     </button>
   );
 }
+// ─────────────────────────────────────────────────────────────────────────────
 
-function AppInner() {
-  const navigate = useNavigate();
-  const [cart, setCart] = useState<CartItem[]>([]);
-
-  const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
-
-  const addToCart = (product: Omit<CartItem, "quantity">) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.id === product.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === product.id ? { ...i, quantity: i.quantity + product.moq } : i
-        );
-      }
-      return [...prev, { ...product, quantity: product.moq }];
-    });
-    // Navigate to cart after adding
-    navigate("/shop/cart");
-  };
-
-  const updateQuantity = (id: number, quantity: number) => {
-    setCart((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
-  };
-
-  const removeItem = (id: number) => {
-    setCart((prev) => prev.filter((i) => i.id !== id));
-  };
-
-  const clearCart = () => setCart([]);
-
-  return (
-    <>
-      <FloatingCartButton count={totalQty} onClick={() => navigate("/shop/cart")} />
-      <Routes>
-        <Route path="/" element={<ShopPage cart={cart} onAddToCart={addToCart} />} />
-        <Route path="cart" element={<CartPage cart={cart} onUpdateQuantity={updateQuantity} onRemove={removeItem} onClear={clearCart} onAddToCart={addToCart} />} />
-        <Route path="checkout" element={<CheckoutPage cart={cart} />} />
-      </Routes>
-    </>
-  );
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
 }
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
@@ -459,17 +476,49 @@ function AppRoutes() {
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="reports/audit" element={<AuditTrailPage />} />
           <Route
-            path="shop/*"
+            path="shop"
             element={
               <PageErrorBoundary
                 title="Shop failed to load"
                 resetKey={location.pathname}
               >
-                <AppInner />
+                <ShopPage />
               </PageErrorBoundary>
             }
           />
-
+          <Route
+            path="shop/cart"
+            element={
+              <PageErrorBoundary
+                title="Cart failed to load"
+                resetKey={location.pathname}
+              >
+                <CartPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="shop/product/:productId"
+            element={
+              <PageErrorBoundary
+                title="Product detail failed to load"
+                resetKey={location.pathname}
+              >
+                <ProductDetailPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="shop/checkout"
+            element={
+              <PageErrorBoundary
+                title="Checkout failed to load"
+                resetKey={location.pathname}
+              >
+                <CheckoutPage />
+              </PageErrorBoundary>
+            }
+          />
           <Route
             path="shop/order-confirmation/:orderId"
             element={
