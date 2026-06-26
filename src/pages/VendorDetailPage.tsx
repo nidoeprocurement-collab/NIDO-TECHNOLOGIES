@@ -11,6 +11,9 @@ import VendorProductsPage from "./VendorProductsPage";
 import VendorOrdersPage from "./VendorOrdersPage";
 import VendorContractsPage from "./VendorContractsPage";
 import VendorPaymentsPage from "./VendorPaymentsPage";
+import VendorServicesPage from "./VendorServicesPage";
+import VendorNewsActivityPage from "./VendorNewsActivityPage";
+import VendorPerformancePage from "./VendorPerformancePage";
 
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -311,9 +314,10 @@ const TABS = [
   { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
   { key: "products", label: "Products", count: 128, icon: <Package className="w-3.5 h-3.5" /> },
   { key: "orders", label: "Orders", count: 156, icon: <ShoppingCart className="w-3.5 h-3.5" /> },
+  { key: "services", label: "Services", icon: <DollarSign className="w-3.5 h-3.5" /> },
   { key: "performance", label: "Performance", icon: <TrendingUp className="w-3.5 h-3.5" /> },
   { key: "contracts", label: "Contracts", count: 3, icon: <ClipboardList className="w-3.5 h-3.5" /> },
-  { key: "documents", label: "Documents", count: 34, icon: <FileText className="w-3.5 h-3.5" /> },
+  { key: "configuration", label: "Configuration", icon: <FileText className="w-3.5 h-3.5" /> },
   { key: "payments", label: "Payments", icon: <CreditCard className="w-3.5 h-3.5" /> },
   { key: "news", label: "News & Activity", icon: <Newspaper className="w-3.5 h-3.5" /> },
 ];
@@ -428,11 +432,12 @@ export default function VendorDetailPage() {
         {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab /></div>}
         {activeTab === "products" && <VendorProductsPage />}
         {activeTab === "orders" && <VendorOrdersPage />}
-        {activeTab === "performance" && <div className="px-6 py-5"><PlaceholderTab label="Performance" icon={<TrendingUp className="w-6 h-6" />} /></div>}
+        {activeTab === "services" && <VendorServicesPage />}
+        {activeTab === "performance" && <VendorPerformancePage />}
         {activeTab === "contracts" && <VendorContractsPage />}
-        {activeTab === "documents" && <div className="px-6 py-5"><PlaceholderTab label="Documents" icon={<FileText className="w-6 h-6" />} /></div>}
+        {activeTab === "configuration" && <div className="px-6 py-5"><PlaceholderTab label="Configuration" icon={<FileText className="w-6 h-6" />} /></div>}
         {activeTab === "payments" && <VendorPaymentsPage />}
-        {activeTab === "news" && <div className="px-6 py-5"><PlaceholderTab label="News & Activity" icon={<Newspaper className="w-6 h-6" />} /></div>}
+        {activeTab === "news" && <VendorNewsActivityPage />}
       </div>
     </div>
   );

@@ -631,7 +631,7 @@ function useDropdown() {
   return { open, setOpen, ref };
 }
 
-/* ─── Main export ───────────────────────────────────────────────────────── */
+/* ���── Main export ─────────────────────────────────────────────────���─────── */
 export default function VendorContractsPage() {
   const [contracts, setContracts] = useState(CONTRACTS);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);

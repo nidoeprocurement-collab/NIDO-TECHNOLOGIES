@@ -51,10 +51,11 @@ const VendorsPage = lazy(() => import("@/pages/VendorsPage"));
 const VendorDetailPage = lazy(() => import("@/pages/VendorDetailPage"));
 const VendorOrdersPage = lazy(() => import("@/pages/VendorOrdersPage"));
 const VendorOnboardingPage = lazy(() => import("@/pages/VendorOnboardingPage"));
-const AddVendorPage = lazy(() => import("@/pages/AddVendorPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
 const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
+const ClientContractsPage = lazy(() => import("@/pages/ClientContractsPage"));
+const ContractDetailsPage = lazy(() => import("@/pages/ContractDetailsPage"));
 const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
@@ -206,7 +207,6 @@ function AppRoutes() {
           <Route path="vendors/orders" element={<VendorOrdersPage />} />
           <Route path="vendors/categories" element={<VendorCategoriesPage />} />
           <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
-          <Route path="vendors/add" element={<AddVendorPage />} />
           <Route path="vendors/:id" element={<VendorDetailPage />} />
           <Route
             path="procure/orders/:id"
@@ -239,6 +239,28 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <ClientDetailPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="clients/:id/contracts"
+            element={
+              <PageErrorBoundary
+                title="Client contracts failed to load"
+                resetKey={location.pathname}
+              >
+                <ClientContractsPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="contracts/:id"
+            element={
+              <PageErrorBoundary
+                title="Contract details failed to load"
+                resetKey={location.pathname}
+              >
+                <ContractDetailsPage />
               </PageErrorBoundary>
             }
           />
