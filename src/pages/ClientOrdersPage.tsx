@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Filter, MoreVertical, X } from "lucide-react";
 
 export const ordersData = [
-  { id: "ORD-2024-1245", date: "2024-05-28", items: 12, amount: "$125,000", vendor: "TechSupply Co", status: "Delivered" },
-  { id: "ORD-2024-1233", date: "2024-05-20", items: 8, amount: "$45,000", vendor: "Office Essentials", status: "In Transit" },
-  { id: "ORD-2024-1198", date: "2024-05-15", items: 5, amount: "$22,000", vendor: "CloudServe Inc", status: "Delivered" },
-  { id: "ORD-2024-1187", date: "2024-05-10", items: 15, amount: "$89,000", vendor: "TechSupply Co", status: "Delivered" },
+  { id: "ORD-2024-1245", date: "2024-05-28", items: 12, amount: "$125,000", client: "TechSupply Co", status: "Delivered" },
+  { id: "ORD-2024-1233", date: "2024-05-20", items: 8, amount: "$45,000", client: "Office Essentials", status: "In Transit" },
+  { id: "ORD-2024-1198", date: "2024-05-15", items: 5, amount: "$22,000", client: "CloudServe Inc", status: "Delivered" },
+  { id: "ORD-2024-1187", date: "2024-05-10", items: 15, amount: "$89,000", client: "TechSupply Co", status: "Delivered" },
 ];
 
 export function OrderStatusBadge({ status }: { status: string }) {
@@ -147,7 +147,7 @@ export default function ClientOrdersPage() {
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Items</th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Vendor <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Client <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
               <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
@@ -161,7 +161,7 @@ export default function ClientOrdersPage() {
                 <td className="px-4 py-3 text-gray-700">{order.date}</td>
                 <td className="px-4 py-3 text-gray-700">{order.items} Items</td>
                 <td className="px-4 py-3 font-semibold text-gray-900">{order.amount}</td>
-                <td className="px-4 py-3 text-gray-700">{order.vendor}</td>
+                <td className="px-4 py-3 text-gray-700">{order.client}</td>
                 <td className="px-4 py-3">
                   <OrderStatusBadge status={order.status} />
                 </td>
