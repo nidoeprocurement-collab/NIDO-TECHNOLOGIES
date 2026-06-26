@@ -23,6 +23,7 @@ import { Suspense, lazy, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/store/preferencesStore";
+import FloatingCartButton from "@/components/FloatingCartButton";
 
 const queryClient = new QueryClient();
 
@@ -140,6 +141,7 @@ function AppRoutes() {
         </div>
       }
     >
+      <FloatingCartButton />
       <Routes>
         <Route
           path="/login"
