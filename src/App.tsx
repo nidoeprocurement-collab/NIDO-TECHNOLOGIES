@@ -9,8 +9,20 @@ import {
   Route,
   Navigate,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ShoppingCart } from "lucide-react";
+
+export type CartItem = {
+  id: number;
+  name: string;
+  image: string;
+  specs: string[];
+  moq: number;
+  priceNum: number;
+  quantity: number;
+};
 import { EnhancedAuthProvider } from "@/contexts/EnhancedAuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
@@ -23,7 +35,6 @@ import { Suspense, lazy, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { I18nProvider } from "@/i18n/I18nProvider";
 import { PreferencesProvider } from "@/store/preferencesStore";
-import FloatingCartButton from "@/components/FloatingCartButton";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +42,68 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
+}
+
+function FloatingCartButton({ count, onClick }: { count: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-full shadow-xl transition-colors"
+      title="View Cart"
+    >
+      <div className="relative">
+        <ShoppingCart size={20} />
+        {count > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center leading-none">
+            {count > 99 ? "99+" : count}
+          </span>
+        )}
+      </div>
+      <span className="text-sm font-semibold">Cart</span>
+    </button>
+  );
+}
+
+function AppInner() {
+  const navigate = useNavigate();
+  const [cart, setCart] = useState<CartItem[]>([]);
+
+  const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
+
+  const addToCart = (product: Omit<CartItem, "quantity">) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === product.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.id === product.id ? { ...i, quantity: i.quantity + product.moq } : i
+        );
+      }
+      return [...prev, { ...product, quantity: product.moq }];
+    });
+    // Navigate to cart after adding
+    navigate("/shop/cart");
+  };
+
+  const updateQuantity = (id: number, quantity: number) => {
+    setCart((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
+  };
+
+  const removeItem = (id: number) => {
+    setCart((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const clearCart = () => setCart([]);
+
+  return (
+    <>
+      <FloatingCartButton count={totalQty} onClick={() => navigate("/shop/cart")} />
+      <Routes>
+        <Route path="/" element={<ShopPage cart={cart} onAddToCart={addToCart} />} />
+        <Route path="cart" element={<CartPage cart={cart} onUpdateQuantity={updateQuantity} onRemove={removeItem} onClear={clearCart} onAddToCart={addToCart} />} />
+        <Route path="checkout" element={<CheckoutPage cart={cart} />} />
+      </Routes>
+    </>
+  );
 }
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
@@ -141,7 +214,6 @@ function AppRoutes() {
         </div>
       }
     >
-      <FloatingCartButton />
       <Routes>
         <Route
           path="/login"
@@ -393,43 +465,11 @@ function AppRoutes() {
                 title="Shop failed to load"
                 resetKey={location.pathname}
               >
-                <ShopPage />
+                <AppInner />
               </PageErrorBoundary>
             }
           />
-          <Route
-            path="shop/cart"
-            element={
-              <PageErrorBoundary
-                title="Cart failed to load"
-                resetKey={location.pathname}
-              >
-                <CartPage />
-              </PageErrorBoundary>
-            }
-          />
-          <Route
-            path="shop/product/:productId"
-            element={
-              <PageErrorBoundary
-                title="Product detail failed to load"
-                resetKey={location.pathname}
-              >
-                <ProductDetailPage />
-              </PageErrorBoundary>
-            }
-          />
-          <Route
-            path="shop/checkout"
-            element={
-              <PageErrorBoundary
-                title="Checkout failed to load"
-                resetKey={location.pathname}
-              >
-                <CheckoutPage />
-              </PageErrorBoundary>
-            }
-          />
+
           <Route
             path="shop/order-confirmation/:orderId"
             element={
