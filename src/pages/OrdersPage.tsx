@@ -1,65 +1,20 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Plus,
   Search,
   MoreVertical,
-  Download,
   Eye,
   Trash2,
-  Filter,
 } from "lucide-react";
-
-const MOCK_ORDERS = [
-  {
-    id: "ord_001",
-    order_number: "ORD-001",
-    client_name: "Tech Solutions Inc",
-    vendor_name: "Global Supplies",
-    status: "delivered",
-    total_amount: 15000,
-    order_date: "2024-01-10",
-    items_count: 5,
-  },
-  {
-    id: "ord_002",
-    order_number: "ORD-002",
-    client_name: "Marketing Pro Agency",
-    vendor_name: "Equipment Rentals",
-    status: "processing",
-    total_amount: 8500,
-    order_date: "2024-01-15",
-    items_count: 3,
-  },
-  {
-    id: "ord_003",
-    order_number: "ORD-003",
-    client_name: "Finance Corp",
-    vendor_name: "Tech Solutions Ltd",
-    status: "pending",
-    total_amount: 22000,
-    order_date: "2024-01-20",
-    items_count: 8,
-  },
-  {
-    id: "ord_004",
-    order_number: "ORD-004",
-    client_name: "Global Trading Ltd",
-    vendor_name: "Global Supplies",
-    status: "cancelled",
-    total_amount: 5500,
-    order_date: "2024-01-25",
-    items_count: 2,
-  },
-];
+import { useOrders } from "@/contexts/OrdersContext";
 
 export default function OrdersPage() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState(MOCK_ORDERS);
+  const { orders, deleteOrder } = useOrders();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const filteredOrders = orders.filter((o) => {
     const matchSearch =
@@ -79,7 +34,7 @@ export default function OrdersPage() {
 
   const handleDelete = (id: string) => {
     if (window.confirm("Are you sure you want to delete this order?")) {
-      setOrders(orders.filter((o) => o.id !== id));
+      deleteOrder(id);
       toast.success("Order deleted");
     }
   };
@@ -109,7 +64,7 @@ export default function OrdersPage() {
             <h1 className="text-2xl font-bold">Purchase Orders</h1>
           </div>
           <button
-            onClick={() => navigate("/orders/new")}
+            onClick={() => navigate("/transactions/purchase/purchase-orders/create")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Plus size={18} />

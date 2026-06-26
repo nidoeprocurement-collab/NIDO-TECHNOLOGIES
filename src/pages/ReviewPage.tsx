@@ -4,6 +4,7 @@ import { ChevronRight, ArrowLeft, Pencil, MapPin, Lock, Info } from "lucide-reac
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
+import { useOrders } from "@/contexts/OrdersContext";
 
 const ADDRESSES: Record<number, { label: string; line1: string; line2: string; line3: string; phone: string }> = {
   1: { label: "Office (Default)", line1: "No. 45, 3rd Floor, Embassy Tech Village,", line2: "Outer Ring Road, Bangalore - 560103,", line3: "Karnataka, India", phone: "+91 98765 43210" },
@@ -17,7 +18,8 @@ function formatPrice(n: number) {
 
 export default function ReviewPage() {
   const navigate = useNavigate();
-  const { items: cart } = useCart();
+  const { items: cart, clearCart } = useCart();
+  const { addOrder } = useOrders();
   const [placed, setPlaced] = useState(false);
 
   const addr = ADDRESSES[1];
@@ -25,6 +27,22 @@ export default function ReviewPage() {
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
   const rewardPoints = Math.floor(total / 1000);
+
+  const handlePlaceOrder = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const nextNum = Date.now().toString().slice(-4);
+    addOrder({
+      order_number: `ORD-${nextNum}`,
+      client_name: "Nido Tech CorpEssentials",
+      vendor_name: "Shop Catalogue",
+      status: "pending",
+      total_amount: total,
+      order_date: today,
+      items_count: cart.reduce((s, i) => s + i.quantity, 0),
+    });
+    clearCart();
+    setPlaced(true);
+  };
 
   if (placed) {
     return (
@@ -39,12 +57,20 @@ export default function ReviewPage() {
           <p className="text-sm text-gray-500 mb-1">Your order has been placed and is being processed.</p>
           <p className="text-sm text-gray-500 mb-6">You will earn <strong>{rewardPoints.toLocaleString("en-IN")}</strong> reward points.</p>
           <p className="text-2xl font-bold text-gray-900 mb-6">{formatPrice(total)}</p>
-          <button
-            onClick={() => navigate("/shop")}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors"
-          >
-            Continue Shopping
-          </button>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => navigate("/orders")}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors"
+            >
+              View My Orders
+            </button>
+            <button
+              onClick={() => navigate("/shop")}
+              className="w-full border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg py-3 text-sm transition-colors"
+            >
+              Continue Shopping
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -198,7 +224,7 @@ export default function ReviewPage() {
                 Back to Payment
               </button>
               <button
-                onClick={() => setPlaced(true)}
+                onClick={handlePlaceOrder}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-8 py-3 text-sm transition-colors"
               >
                 <Lock size={15} />
