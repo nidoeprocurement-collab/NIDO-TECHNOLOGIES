@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Filter, X, Download, FileText } from "lucide-react";
 
 const contractsData = [
@@ -192,6 +193,7 @@ function AddContractModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function ContractsPage() {
+  const navigate = useNavigate();
   const [selectedType, setSelectedType] = useState("All");
   const [showFilter, setShowFilter] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -272,7 +274,7 @@ export default function ContractsPage() {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((contract) => (
               <tr key={contract.id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-3 text-blue-600 font-medium text-xs">{contract.id}</td>
+                <td className="px-4 py-3 text-blue-600 font-medium text-xs cursor-pointer hover:underline" onClick={() => navigate(`/contracts/${contract.id}`)}>{contract.id}</td>
                 <td className="px-4 py-3 text-gray-800 font-medium text-xs">{contract.title}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{contract.type}</td>
                 <td className="px-4 py-3 text-gray-500 text-xs">{contract.startDate}</td>
