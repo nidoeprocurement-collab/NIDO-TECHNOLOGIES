@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Bell, Search, LogOut, ArrowLeft, ChevronRight, Home, User } from 'lucide-react';
+import { Bell, Search, LogOut, ArrowLeft, ChevronRight, Home, User, ShoppingCart } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 
 // Route to label mapping for breadcrumbs
 const routeLabels: Record<string, string> = {
@@ -71,8 +72,11 @@ export default function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { items } = useCart();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const breadcrumbs = generateBreadcrumbs(location.pathname);
+
+  const cartCount = items.reduce((total, item) => total + item.quantity, 0);
 
   const handleLogout = () => {
     console.log('[v0] User logging out');
@@ -104,6 +108,20 @@ export default function TopBar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
+          {/* Shopping Cart */}
+          <button 
+            onClick={() => navigate('/cart')}
+            className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="View Cart"
+          >
+            <ShoppingCart size={20} />
+            {cartCount > 0 && (
+              <span className="absolute top-1 right-1 w-5 h-5 bg-blue-600 text-white text-xs font-semibold rounded-full flex items-center justify-center">
+                {cartCount > 9 ? '9+' : cartCount}
+              </span>
+            )}
+          </button>
+
           {/* Notifications */}
           <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
             <Bell size={20} />
