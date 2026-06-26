@@ -130,6 +130,7 @@ function ProductCard({
   const [added, setAdded] = useState(false);
 
   const handleAdd = () => {
+    if (!onAddToCart) return;
     onAddToCart({
       id: product.id,
       name: product.name,
@@ -192,11 +193,11 @@ function ProductCard({
 }
 
 export default function ShopPage({
-  cart,
+  cart = [],
   onAddToCart,
 }: {
-  cart: CartItem[];
-  onAddToCart: (p: Omit<CartItem, "quantity">) => void;
+  cart?: CartItem[];
+  onAddToCart?: (p: Omit<CartItem, "quantity">) => void;
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
