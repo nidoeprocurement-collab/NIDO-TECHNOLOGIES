@@ -425,9 +425,9 @@ export default function PaymentPage() {
                 <ArrowLeft size={15} />
                 Back to Delivery
               </button>
-              <button onClick={() => navigate("/shop/order-confirmation/ORD-001")}
+              <button onClick={() => navigate("/shop/checkout/review")}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-8 py-3 text-sm transition-colors">
-                Place Order
+                Review Order
                 <ChevronRight size={16} />
               </button>
             </div>
