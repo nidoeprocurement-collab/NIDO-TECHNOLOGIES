@@ -459,7 +459,7 @@ function AppRoutes() {
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="reports/audit" element={<AuditTrailPage />} />
           <Route
-            path="shop"
+            path="shop/*"
             element={
               <PageErrorBoundary
                 title="Shop failed to load"
