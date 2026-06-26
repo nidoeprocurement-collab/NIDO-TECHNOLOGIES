@@ -55,6 +55,7 @@ const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
 const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
 const ClientContractsPage = lazy(() => import("@/pages/ClientContractsPage"));
+const ContractDetailsPage = lazy(() => import("@/pages/ContractDetailsPage"));
 const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
@@ -256,10 +257,10 @@ function AppRoutes() {
             path="contracts/:id"
             element={
               <PageErrorBoundary
-                title="Contracts failed to load"
+                title="Contract details failed to load"
                 resetKey={location.pathname}
               >
-                <ClientContractsPage />
+                <ContractDetailsPage />
               </PageErrorBoundary>
             }
           />
