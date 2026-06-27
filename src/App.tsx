@@ -128,7 +128,7 @@ const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const MainDashboard = lazy(() => import("@/pages/MainDashboard"));
 const VendorDashboard = lazy(() => import("@/pages/VendorDashboard"));
 const SLAOverview = lazy(() => import("@/pages/SLAOverview"));
-const OrdersPage = lazy(() => import("@/pages/OrdersPage"));
+const MyOrderPage = lazy(() => import("@/pages/MyOrderPage"));
 const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
 const PermissionsPage = lazy(() => import("./pages/PermissionsPage"));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
@@ -282,7 +282,7 @@ function AppRoutes() {
                 title="Orders failed to load"
                 resetKey={location.pathname}
               >
-                <OrdersPage />
+                <MyOrderPage />
               </PageErrorBoundary>
             }
           />
@@ -573,7 +573,7 @@ function AppRoutes() {
                 title="Orders failed to load"
                 resetKey={location.pathname}
               >
-                <OrdersPage />
+                <MyOrderPage />
               </PageErrorBoundary>
             }
           />
@@ -787,7 +787,7 @@ function AppRoutes() {
             path="invoices"
             element={<Navigate to="/sales/invoices" replace />}
           />
-          <Route path="procure/requests" element={<OrdersPage />} />
+          <Route path="procure/requests" element={<MyOrderPage />} />
           <Route path="procure/approvals" element={<ApprovalWorkflowsPage />} />
           <Route path="organizations" element={<OrganizationsPage />} />
           <Route path="archive" element={<ArchivePage />} />
