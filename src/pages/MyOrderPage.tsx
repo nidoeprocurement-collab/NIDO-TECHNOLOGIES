@@ -669,9 +669,12 @@ export default function MyOrderPage() {
                         <input type="checkbox" checked={isSel} onChange={() => toggleOne(order.id)} style={{ cursor: "pointer", width: 15, height: 15 }} />
                       </td>
                       <td style={tdSt}>
-                        <a href="#" style={{ color: "#2563eb", textDecoration: "none", fontWeight: 500 }} onClick={e => e.preventDefault()}>
+                        <button
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                          style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, fontFamily: "inherit", fontSize: "inherit" }}
+                        >
                           {order.id}
-                        </a>
+                        </button>
                       </td>
                       <td style={tdSt}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>

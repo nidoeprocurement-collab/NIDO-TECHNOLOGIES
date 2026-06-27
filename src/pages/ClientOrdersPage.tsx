@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Filter, MoreVertical, X } from "lucide-react";
 
 export const ordersData = [
@@ -116,6 +117,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function ClientOrdersPage() {
+  const navigate = useNavigate();
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
@@ -156,7 +158,10 @@ export default function ClientOrdersPage() {
             {ordersData.map((order, i) => (
               <tr key={order.id} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
                 <td className="px-4 py-3">
-                  <span className="text-blue-500 hover:underline cursor-pointer font-medium">{order.id}</span>
+                  <span
+                    className="text-blue-500 hover:underline cursor-pointer font-medium"
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                  >{order.id}</span>
                 </td>
                 <td className="px-4 py-3 text-gray-700">{order.date}</td>
                 <td className="px-4 py-3 text-gray-700">{order.items} Items</td>

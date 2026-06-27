@@ -1,5 +1,6 @@
 import { ArrowUp, ArrowDown, TrendingUp, Package, DollarSign, ShoppingCart, AlertCircle, CheckCircle, Clock, Eye } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Link } from 'react-router-dom';
 
 const expensesData = [
   { date: 'May 20', value: 45000 },
@@ -81,7 +82,9 @@ const RecentOrdersTable = () => (
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {[1, 2, 3].map((i) => (
             <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-gray-900 dark:text-white">ORD-2024-{1340 + i}</td>
+              <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium">
+                <Link to={`/orders/ORD-2024-${1340 + i}`} className="text-blue-600 hover:underline cursor-pointer">ORD-2024-{1340 + i}</Link>
+              </td>
               <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600 dark:text-gray-400">Client {i}</td>
               <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600 dark:text-gray-400">Vendor {i}</td>
               <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-gray-900 dark:text-white">₹{(5000 * i).toLocaleString()}</td>

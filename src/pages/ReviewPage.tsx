@@ -21,6 +21,7 @@ export default function ReviewPage() {
   const { items: cart, clearCart } = useCart();
   const { addOrder } = useOrders();
   const [placed, setPlaced] = useState(false);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
 
   const addr = ADDRESSES[1];
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
@@ -31,8 +32,9 @@ export default function ReviewPage() {
   const handlePlaceOrder = () => {
     const today = new Date().toISOString().split("T")[0];
     const nextNum = Date.now().toString().slice(-4);
+    const orderNumber = `ORD-${nextNum}`;
     addOrder({
-      order_number: `ORD-${nextNum}`,
+      order_number: orderNumber,
       client_name: "Nido Tech CorpEssentials",
       vendor_name: "Shop Catalogue",
       status: "pending",
@@ -41,6 +43,7 @@ export default function ReviewPage() {
       items_count: cart.reduce((s, i) => s + i.quantity, 0),
     });
     clearCart();
+    setPlacedOrderId(orderNumber);
     setPlaced(true);
   };
 
@@ -59,7 +62,7 @@ export default function ReviewPage() {
           <p className="text-2xl font-bold text-gray-900 mb-6">{formatPrice(total)}</p>
           <div className="flex flex-col gap-3">
             <button
-              onClick={() => navigate("/orders")}
+              onClick={() => navigate(placedOrderId ? `/orders/${placedOrderId}` : "/orders")}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors"
             >
               View My Orders
