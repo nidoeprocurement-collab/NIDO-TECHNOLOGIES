@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type OrderStatus =
@@ -31,7 +32,7 @@ interface Order {
   totalAmount: string;
 }
 
-const ORDERS: Order[] = [
+const INITIAL_ORDERS: Order[] = [
   {
     id: "ORD-24815779", client: "TechHub Solutions", clientColor: "#c53030", clientInitial: "T",
     poNumber: "PO-10034", requester: "Pavan", requesterRole: "System Owner", requesterInitial: "P", requesterColor: "#6b46c1",
@@ -91,13 +92,17 @@ const ORDERS: Order[] = [
 ];
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
-  Processing:           { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
-  "Partially Shipped":  { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
-  "Partially Delivered":{ bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Delivered:            { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
-  Cancelled:            { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
-  Draft:                { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
+  Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  "Partially Shipped":   { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  "Partially Delivered": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Delivered:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Cancelled:             { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
+  Draft:                 { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
 };
+
+const ALL_STATUSES: OrderStatus[] = [
+  "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
+];
 
 const ALL_TABS = [
   { key: "All Orders", label: "All Orders", count: 36 },
@@ -109,6 +114,7 @@ const ALL_TABS = [
   { key: "Cancelled", label: "Cancelled", count: 0 },
 ];
 
+// ─── Small helpers ─────────────────────────────────────────────────────────────
 function Avatar({ initial, color, size = 28 }: { initial: string; color: string; size?: number }) {
   return (
     <div style={{
@@ -134,8 +140,9 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   );
 }
 
+// ─── Filter panel ──────────────────────────────────────────────────────────────
 interface FilterState {
-  orderId: string; poNumber: string; masterOrderId: string; clientOrderRef: string;
+  orderId: string; masterOrderId: string; clientOrderRef: string;
   requestTitle: string; client: string; orderStatus: string; assignedTo: string;
   slaStatus: string; slaFrom: string; slaTo: string; orderDate: string;
   delivery: string; minAmount: string; maxAmount: string; requester: string;
@@ -144,7 +151,7 @@ interface FilterState {
 }
 
 const EMPTY_FILTERS: FilterState = {
-  orderId: "", poNumber: "", masterOrderId: "", clientOrderRef: "",
+  orderId: "", masterOrderId: "", clientOrderRef: "",
   requestTitle: "", client: "", orderStatus: "", assignedTo: "",
   slaStatus: "", slaFrom: "", slaTo: "", orderDate: "",
   delivery: "", minAmount: "", maxAmount: "", requester: "",
@@ -210,10 +217,9 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
         <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>Order Information</div>
         <div style={{ display: "flex", gap: 10 }}>
           <Inp label="Order ID" fkey="orderId" placeholder="Enter order ID" {...p} />
-          <Inp label="PO Number" fkey="poNumber" placeholder="Enter PO number" {...p} />
+          <Inp label="Master Order ID" fkey="masterOrderId" placeholder="Enter master order ID" {...p} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <Inp label="Master Order ID" fkey="masterOrderId" placeholder="Enter master order ID" {...p} />
           <Inp label="Client Order Reference" fkey="clientOrderRef" placeholder="Enter reference" {...p} />
         </div>
         <Inp label="Request Title / Description" fkey="requestTitle" placeholder="Enter request title or description" {...p} />
@@ -230,10 +236,8 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 3 }}>From</div>
-              <div style={{ position: "relative" }}>
-                <input style={inputSt} type="time" value={filters.slaFrom}
-                  onChange={e => setFilters({ ...filters, slaFrom: e.target.value })} />
-              </div>
+              <input style={inputSt} type="time" value={filters.slaFrom}
+                onChange={e => setFilters({ ...filters, slaFrom: e.target.value })} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 3 }}>To</div>
@@ -293,12 +297,19 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
   );
 }
 
-function ActionDropdown({ onClose }: { onClose: () => void }) {
+// ─── 3-dot action dropdown ─────────────────────────────────────────────────────
+function ActionDropdown({ onExport, onCreateOrder, onBulkStatus, onBulkNotes, onClose }: {
+  onExport: () => void;
+  onCreateOrder: () => void;
+  onBulkStatus: () => void;
+  onBulkNotes: () => void;
+  onClose: () => void;
+}) {
   const items = [
-    { icon: "⬆️", label: "Export" },
-    { icon: "+", label: "Create Order" },
-    { icon: "⟳", label: "Bulk Update Status" },
-    { icon: "✎", label: "Bulk Update Notes" },
+    { icon: "⬆️", label: "Export",              action: () => { onExport();      onClose(); } },
+    { icon: "＋", label: "Create Order",         action: () => { onCreateOrder(); onClose(); } },
+    { icon: "⟳",  label: "Bulk Update Status",  action: () => { onBulkStatus();  onClose(); } },
+    { icon: "✎",  label: "Bulk Update Notes",   action: () => { onBulkNotes();   onClose(); } },
   ];
   return (
     <div style={{
@@ -307,7 +318,7 @@ function ActionDropdown({ onClose }: { onClose: () => void }) {
       minWidth: 210, border: "1px solid #e5e7eb", overflow: "hidden",
     }}>
       {items.map(item => (
-        <button key={item.label} onClick={onClose} style={{
+        <button key={item.label} onClick={item.action} style={{
           display: "flex", alignItems: "center", gap: 12, width: "100%",
           padding: "11px 18px", border: "none", background: "none",
           cursor: "pointer", fontSize: 14, color: "#374151", textAlign: "left", fontFamily: "inherit",
@@ -322,13 +333,123 @@ function ActionDropdown({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Bulk Status Modal ─────────────────────────────────────────────────────────
+function BulkStatusModal({ selectedCount, onApply, onClose }: {
+  selectedCount: number;
+  onApply: (status: OrderStatus) => void;
+  onClose: () => void;
+}) {
+  const [status, setStatus] = useState<OrderStatus>("Processing");
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", background: "#fff", borderRadius: 14, padding: "28px 32px",
+        width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "inherit",
+      }}>
+        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#111827" }}>Bulk Update Status</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "#6b7280" }}>
+          Apply new status to <strong style={{ color: "#111827" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
+        </p>
+        <label style={labelSt}>New Status</label>
+        <select
+          value={status}
+          onChange={e => setStatus(e.target.value as OrderStatus)}
+          style={{ ...inputSt, marginBottom: 24, appearance: "none" as const, cursor: "pointer" }}
+        >
+          {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8,
+            background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+          }}>Cancel</button>
+          <button onClick={() => { onApply(status); onClose(); }} style={{
+            flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
+            background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+          }}>Apply</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Bulk Notes Modal ──────────────────────────────────────────────────────────
+function BulkNotesModal({ selectedCount, onApply, onClose }: {
+  selectedCount: number;
+  onApply: (note: string) => void;
+  onClose: () => void;
+}) {
+  const [note, setNote] = useState("");
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", background: "#fff", borderRadius: 14, padding: "28px 32px",
+        width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "inherit",
+      }}>
+        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#111827" }}>Bulk Update Notes</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "#6b7280" }}>
+          Add a note to <strong style={{ color: "#111827" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
+        </p>
+        <label style={labelSt}>Note</label>
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="Enter note to append to selected orders..."
+          rows={4}
+          style={{ ...inputSt, resize: "vertical", marginBottom: 24, lineHeight: 1.5 }}
+        />
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8,
+            background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+          }}>Cancel</button>
+          <button
+            onClick={() => { if (note.trim()) { onApply(note.trim()); onClose(); } }}
+            disabled={!note.trim()}
+            style={{
+              flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
+              background: note.trim() ? "#2563eb" : "#93c5fd", color: "#fff",
+              cursor: note.trim() ? "pointer" : "not-allowed",
+              fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+            }}>Save Note</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Toast banner ──────────────────────────────────────────────────────────────
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+  return (
+    <div style={{
+      position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+      background: "#111827", color: "#fff", borderRadius: 10, padding: "12px 22px",
+      fontSize: 14, fontWeight: 500, zIndex: 500, boxShadow: "0 4px 20px rgba(0,0,0,0.22)",
+      display: "flex", alignItems: "center", gap: 14, fontFamily: "inherit",
+      animation: "fadeIn 0.2s",
+    }}>
+      <span>✓ {message}</span>
+      <button onClick={onDone} style={{
+        background: "none", border: "none", color: "#9ca3af", cursor: "pointer",
+        fontSize: 18, padding: 0, lineHeight: 1,
+      }}>×</button>
+    </div>
+  );
+}
+
+// ─── Table styles ──────────────────────────────────────────────────────────────
 const thSt: React.CSSProperties = {
   padding: "10px 16px", textAlign: "left", fontSize: 11.5, fontWeight: 600,
   color: "#6b7280", letterSpacing: 0.4, whiteSpace: "nowrap", userSelect: "none" as const,
 };
 const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle" };
 
+// ─── Page ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
@@ -339,16 +460,19 @@ export default function MyOrderPage() {
     ["ORD-24815779", "ORD-24815678", "ORD-24815560", "ORD-24815321", "ORD-24815001"]
   ));
   const [currentPage, setCurrentPage] = useState(1);
+  const [showBulkStatus, setShowBulkStatus] = useState(false);
+  const [showBulkNotes, setShowBulkNotes] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
 
   const activeFilterCount = Object.values(appliedFilters).filter(v => v !== "").length;
 
   const filteredOrders = useMemo(() => {
-    return ORDERS.filter(o => {
+    return orders.filter(o => {
       if (activeTab !== "All Orders" && o.status !== activeTab) return false;
       const q = search.toLowerCase();
       if (q && !o.id.toLowerCase().includes(q) && !o.client.toLowerCase().includes(q) &&
-        !o.poNumber.toLowerCase().includes(q) && !o.requester.toLowerCase().includes(q)) return false;
+        !o.requester.toLowerCase().includes(q)) return false;
       if (appliedFilters.client && o.client !== appliedFilters.client) return false;
       if (appliedFilters.orderStatus && o.status !== appliedFilters.orderStatus) return false;
       if (appliedFilters.requester && !o.requester.toLowerCase().includes(appliedFilters.requester.toLowerCase())) return false;
@@ -365,7 +489,7 @@ export default function MyOrderPage() {
       }
       return true;
     });
-  }, [activeTab, search, appliedFilters]);
+  }, [orders, activeTab, search, appliedFilters]);
 
   const allChecked = filteredOrders.length > 0 && filteredOrders.every(o => selected.has(o.id));
   const someChecked = filteredOrders.some(o => selected.has(o.id)) && !allChecked;
@@ -381,6 +505,43 @@ export default function MyOrderPage() {
   const handleClear = () => { setFilters(EMPTY_FILTERS); setAppliedFilters(EMPTY_FILTERS); };
 
   const selectedCount = filteredOrders.filter(o => selected.has(o.id)).length;
+  const totalSelected = [...selected].length;
+
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    const headers = ["Order ID", "Client", "Requester", "Assigned", "Order Date", "Status", "SLA Time", "Total Amount"];
+    const rows = filteredOrders.map(o => [
+      o.id, o.client, `${o.requester} (${o.requesterRole})`,
+      `${o.assigned} (${o.assignedRole})`,
+      `${o.orderDate} ${o.orderTime}`, o.status,
+      o.slaTime ?? "-", o.totalAmount,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(cell => `"${cell}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `orders_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${filteredOrders.length} orders as CSV`);
+  };
+
+  // ── Bulk update status ──────────────────────────────────────────────────────
+  const handleBulkStatusApply = (status: OrderStatus) => {
+    setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, status } : o));
+    showToast(`Updated ${totalSelected} order${totalSelected !== 1 ? "s" : ""} to "${status}"`);
+  };
+
+  // ── Bulk update notes (acknowledged via toast) ──────────────────────────────
+  const handleBulkNotesApply = (note: string) => {
+    showToast(`Note added to ${totalSelected} order${totalSelected !== 1 ? "s" : ""}: "${note.slice(0, 40)}${note.length > 40 ? "…" : ""}"`);
+  };
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  };
 
   return (
     <div
@@ -390,10 +551,9 @@ export default function MyOrderPage() {
           setShowActions(false);
       }}
     >
-      {/* Page */}
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 28px 40px" }}>
 
-        {/* Header row */}
+        {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#111827" }}>Orders</h1>
@@ -408,7 +568,15 @@ export default function MyOrderPage() {
                 display: "flex", alignItems: "center", justifyContent: "center", color: "#374151",
               }}
             >⋮</button>
-            {showActions && <ActionDropdown onClose={() => setShowActions(false)} />}
+            {showActions && (
+              <ActionDropdown
+                onExport={handleExport}
+                onCreateOrder={() => navigate("/shop")}
+                onBulkStatus={() => setShowBulkStatus(true)}
+                onBulkNotes={() => setShowBulkNotes(true)}
+                onClose={() => setShowActions(false)}
+              />
+            )}
           </div>
         </div>
 
@@ -420,7 +588,7 @@ export default function MyOrderPage() {
             </span>
             <input
               value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Search by order ID, client name, PO number, or requester..."
+              placeholder="Search by order ID, client name, or requester..."
               style={{
                 width: "100%", padding: "10px 14px 10px 38px", border: "1px solid #e5e7eb",
                 borderRadius: 8, fontSize: 13.5, color: "#374151", boxSizing: "border-box",
@@ -484,7 +652,7 @@ export default function MyOrderPage() {
                       onChange={toggleAll} style={{ cursor: "pointer", width: 15, height: 15 }}
                     />
                   </th>
-                  {["ORDER ID", "CLIENT", "PO NUMBER", "REQUESTER", "ASSIGNED", "ORDER DATE ↓", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
+                  {["ORDER ID", "CLIENT", "REQUESTER", "ASSIGNED", "ORDER DATE ↓", "STATUS", "SLA TIME ⓘ", "TOTAL AMOUNT"].map(h => (
                     <th key={h} style={thSt}>{h}</th>
                   ))}
                 </tr>
@@ -510,13 +678,6 @@ export default function MyOrderPage() {
                           <Avatar initial={order.clientInitial} color={order.clientColor} size={28} />
                           <span style={{ fontWeight: 500, color: "#111827" }}>{order.client}</span>
                         </div>
-                      </td>
-                      <td style={tdSt}>
-                        {order.poNumber !== "-" ? (
-                          <a href="#" style={{ color: "#2563eb", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }} onClick={e => e.preventDefault()}>
-                            {order.poNumber} <span style={{ fontSize: 11 }}>↗</span>
-                          </a>
-                        ) : <span style={{ color: "#9ca3af" }}>-</span>}
                       </td>
                       <td style={tdSt}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -556,7 +717,7 @@ export default function MyOrderPage() {
                 })}
                 {filteredOrders.length === 0 && (
                   <tr>
-                    <td colSpan={10} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
+                    <td colSpan={9} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: 14 }}>
                       No orders match the current filters.
                     </td>
                   </tr>
@@ -565,7 +726,7 @@ export default function MyOrderPage() {
             </table>
           </div>
 
-          {/* Table Footer */}
+          {/* Footer */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", borderTop: "1px solid #f3f4f6" }}>
             <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 10 }}>
               {selectedCount > 0 && (
@@ -600,13 +761,34 @@ export default function MyOrderPage() {
         </div>
       </div>
 
-      {/* Filter Overlay */}
+      {/* Filter overlay */}
       {showFilter && (
         <>
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.12)", zIndex: 299 }} onClick={() => setShowFilter(false)} />
           <FilterPanel filters={filters} setFilters={setFilters} onClose={() => setShowFilter(false)} onApply={handleApply} onClear={handleClear} />
         </>
       )}
+
+      {/* Bulk status modal */}
+      {showBulkStatus && (
+        <BulkStatusModal
+          selectedCount={totalSelected}
+          onApply={handleBulkStatusApply}
+          onClose={() => setShowBulkStatus(false)}
+        />
+      )}
+
+      {/* Bulk notes modal */}
+      {showBulkNotes && (
+        <BulkNotesModal
+          selectedCount={totalSelected}
+          onApply={handleBulkNotesApply}
+          onClose={() => setShowBulkNotes(false)}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   );
 }
