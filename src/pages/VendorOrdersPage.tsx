@@ -1,162 +1,494 @@
-import { useState } from "react";
-import {
-  ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  ShoppingCart, IndianRupee,
-  CheckCircle, Truck, PackageCheck, XCircle, Clock, Calendar,
-} from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 
-const STATS = [
-  { icon: <ShoppingCart className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "Total Orders", value: "156", sub: "All Time" },
-  { icon: <IndianRupee className="w-5 h-5 text-blue-400" />, bg: "bg-blue-50", label: "Total Spend", value: "₹12.45 Cr", sub: "All Time", muted: true },
-  { icon: <CheckCircle className="w-5 h-5 text-green-500" />, bg: "bg-green-50", label: "Confirmed Orders", value: "96", sub: "₹8.74 Cr" },
-  { icon: <Truck className="w-5 h-5 text-blue-400" />, bg: "bg-blue-50", label: "In Transit", value: "24", sub: "₹2.18 Cr" },
-  { icon: <PackageCheck className="w-5 h-5 text-green-500" />, bg: "bg-green-50", label: "Delivered", value: "96", sub: "₹1.37 Cr" },
-  { icon: <XCircle className="w-5 h-5 text-red-400" />, bg: "bg-red-50", label: "Cancelled", value: "6", sub: "₹16.30 L" },
-  { icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", label: "Pending", value: "18", sub: "₹1.82 Cr" },
-];
-
-type OrderStatus = "Processing" | "Confirmed" | "Shipped" | "In Transit" | "Delivered" | "Cancelled" | "Overdue" | "Pending";
+type OrderStatus = "Draft" | "Processing" | "Confirmed" | "Shipped" | "Delivered" | "Closed" | "Cancelled";
 
 interface Order {
-  poId: string;
-  orderDate: string;
-  poValue: string;
-  items: number;
+  id: string;
+  orderId: string;
+  vendor: string;
+  date: string;
+  dateStr: string;
   status: OrderStatus;
-  expectedDelivery: string;
-  trackingNo: string | null;
-  createdBy: string;
+  amount: number;
+  amountStr: string;
+  delivery: string;
+  by: string;
 }
 
-const ORDERS: Order[] = [
-  { poId: "PO-10034", orderDate: "Apr 16, 2026", poValue: "₹2,19,200.00", items: 3, status: "Processing", expectedDelivery: "Apr 28, 2026", trackingNo: null, createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10033", orderDate: "Apr 15, 2026", poValue: "₹5,87,000.00", items: 5, status: "Confirmed", expectedDelivery: "Apr 27, 2026", trackingNo: null, createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10032", orderDate: "Apr 14, 2026", poValue: "₹8,45,050.00", items: 8, status: "Shipped", expectedDelivery: "Apr 26, 2026", trackingNo: "12999AA10123456784", createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10031", orderDate: "Apr 13, 2026", poValue: "₹3,25,000.00", items: 4, status: "In Transit", expectedDelivery: "Apr 25, 2026", trackingNo: "LT123456789IN", createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10030", orderDate: "Apr 12, 2026", poValue: "₹6,78,000.00", items: 6, status: "Delivered", expectedDelivery: "Apr 24, 2026", trackingNo: "DEL-456789123", createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10029", orderDate: "Apr 11, 2026", poValue: "₹1,12,000.00", items: 2, status: "Delivered", expectedDelivery: "Apr 23, 2026", trackingNo: "DEL-456789122", createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10028", orderDate: "Apr 10, 2026", poValue: "₹1,45,025.00", items: 3, status: "Cancelled", expectedDelivery: "Apr 22, 2026", trackingNo: null, createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10027", orderDate: "Apr 09, 2026", poValue: "₹4,98,000.00", items: 7, status: "Overdue", expectedDelivery: "Apr 21, 2026", trackingNo: null, createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10026", orderDate: "Apr 08, 2026", poValue: "₹2,98,000.00", items: 4, status: "Pending", expectedDelivery: "Apr 20, 2026", trackingNo: null, createdBy: "Pavan (System Owner)" },
-  { poId: "PO-10025", orderDate: "Apr 07, 2026", poValue: "₹1,89,050.00", items: 2, status: "Confirmed", expectedDelivery: "Apr 19, 2026", trackingNo: null, createdBy: "Pavan (System Owner)" },
+const INITIAL_ORDERS: Order[] = [
+  { id: "PO-10034", orderId: "ORD-8821", vendor: "TechHub Solutions", date: "2026-04-16", dateStr: "Apr 16, 2026", status: "Processing", amount: 2192.0, amountStr: "$2,192.00", delivery: "Apr 28, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10033", orderId: "ORD-8820", vendor: "Office Supplies Co.", date: "2026-04-15", dateStr: "Apr 15, 2026", status: "Confirmed", amount: 856.5, amountStr: "$856.50", delivery: "Apr 27, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10032", orderId: "ORD-8819", vendor: "Global Industrial", date: "2026-04-15", dateStr: "Apr 15, 2026", status: "Shipped", amount: 1450.0, amountStr: "$1,450.00", delivery: "Apr 25, 2026", by: "John Smith" },
+  { id: "PO-10031", orderId: "ORD-8818", vendor: "Furniture Mart", date: "2026-04-14", dateStr: "Apr 14, 2026", status: "Delivered", amount: 3200.0, amountStr: "$3,200.00", delivery: "Apr 24, 2026", by: "Sarah Johnson" },
+  { id: "PO-10030", orderId: "ORD-8817", vendor: "TechHub Solutions", date: "2026-04-14", dateStr: "Apr 14, 2026", status: "Draft", amount: 750.0, amountStr: "$750.00", delivery: "–", by: "Pavan (System Owner)" },
+  { id: "PO-10029", orderId: "ORD-8816", vendor: "Printer World", date: "2026-04-13", dateStr: "Apr 13, 2026", status: "Confirmed", amount: 620.0, amountStr: "$620.00", delivery: "Apr 23, 2026", by: "Mike Wilson" },
+  { id: "PO-10028", orderId: "ORD-8815", vendor: "Office Supplies Co.", date: "2026-04-13", dateStr: "Apr 13, 2026", status: "Processing", amount: 1125.75, amountStr: "$1,125.75", delivery: "Apr 22, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10027", orderId: "ORD-8814", vendor: "Global Industrial", date: "2026-04-12", dateStr: "Apr 12, 2026", status: "Delivered", amount: 2890.0, amountStr: "$2,890.00", delivery: "Apr 21, 2026", by: "John Smith" },
+  { id: "PO-10026", orderId: "ORD-8813", vendor: "Furniture Mart", date: "2026-04-11", dateStr: "Apr 11, 2026", status: "Shipped", amount: 1980.0, amountStr: "$1,980.00", delivery: "Apr 20, 2026", by: "Sarah Johnson" },
+  { id: "PO-10025", orderId: "ORD-8812", vendor: "TechHub Solutions", date: "2026-04-11", dateStr: "Apr 11, 2026", status: "Closed", amount: 4500.0, amountStr: "$4,500.00", delivery: "Apr 19, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10024", orderId: "ORD-8811", vendor: "Office Supplies Co.", date: "2026-04-10", dateStr: "Apr 10, 2026", status: "Delivered", amount: 1340.0, amountStr: "$1,340.00", delivery: "Apr 18, 2026", by: "Mike Wilson" },
+  { id: "PO-10023", orderId: "ORD-8810", vendor: "Global Industrial", date: "2026-04-09", dateStr: "Apr 9, 2026", status: "Closed", amount: 5200.0, amountStr: "$5,200.00", delivery: "Apr 17, 2026", by: "John Smith" },
+  { id: "PO-10022", orderId: "ORD-8809", vendor: "Printer World", date: "2026-04-09", dateStr: "Apr 9, 2026", status: "Delivered", amount: 430.0, amountStr: "$430.00", delivery: "Apr 15, 2026", by: "Sarah Johnson" },
+  { id: "PO-10021", orderId: "ORD-8808", vendor: "TechHub Solutions", date: "2026-04-08", dateStr: "Apr 8, 2026", status: "Shipped", amount: 3100.0, amountStr: "$3,100.00", delivery: "Apr 16, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10020", orderId: "ORD-8807", vendor: "Furniture Mart", date: "2026-04-07", dateStr: "Apr 7, 2026", status: "Delivered", amount: 2670.0, amountStr: "$2,670.00", delivery: "Apr 14, 2026", by: "John Smith" },
+  { id: "PO-10019", orderId: "ORD-8806", vendor: "Office Supplies Co.", date: "2026-04-07", dateStr: "Apr 7, 2026", status: "Closed", amount: 890.0, amountStr: "$890.00", delivery: "Apr 13, 2026", by: "Mike Wilson" },
+  { id: "PO-10018", orderId: "ORD-8805", vendor: "Global Industrial", date: "2026-04-06", dateStr: "Apr 6, 2026", status: "Processing", amount: 4100.0, amountStr: "$4,100.00", delivery: "Apr 20, 2026", by: "Sarah Johnson" },
+  { id: "PO-10017", orderId: "ORD-8804", vendor: "Printer World", date: "2026-04-05", dateStr: "Apr 5, 2026", status: "Delivered", amount: 710.0, amountStr: "$710.00", delivery: "Apr 11, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10016", orderId: "ORD-8803", vendor: "TechHub Solutions", date: "2026-04-04", dateStr: "Apr 4, 2026", status: "Shipped", amount: 2250.0, amountStr: "$2,250.00", delivery: "Apr 10, 2026", by: "John Smith" },
+  { id: "PO-10015", orderId: "ORD-8802", vendor: "Furniture Mart", date: "2026-04-03", dateStr: "Apr 3, 2026", status: "Closed", amount: 3750.0, amountStr: "$3,750.00", delivery: "Apr 8, 2026", by: "Sarah Johnson" },
+  { id: "PO-10014", orderId: "ORD-8801", vendor: "Office Supplies Co.", date: "2026-04-02", dateStr: "Apr 2, 2026", status: "Processing", amount: 960.0, amountStr: "$960.00", delivery: "Apr 12, 2026", by: "Mike Wilson" },
+  { id: "PO-10013", orderId: "ORD-8800", vendor: "Global Industrial", date: "2026-04-01", dateStr: "Apr 1, 2026", status: "Delivered", amount: 3300.0, amountStr: "$3,300.00", delivery: "Apr 6, 2026", by: "Pavan (System Owner)" },
+  { id: "PO-10012", orderId: "ORD-8799", vendor: "Printer World", date: "2026-03-31", dateStr: "Mar 31, 2026", status: "Processing", amount: 580.0, amountStr: "$580.00", delivery: "Apr 9, 2026", by: "John Smith" },
+  { id: "PO-10011", orderId: "ORD-8798", vendor: "TechHub Solutions", date: "2026-03-30", dateStr: "Mar 30, 2026", status: "Draft", amount: 1200.0, amountStr: "$1,200.00", delivery: "–", by: "Sarah Johnson" },
+  { id: "PO-10010", orderId: "ORD-8797", vendor: "Furniture Mart", date: "2026-03-29", dateStr: "Mar 29, 2026", status: "Delivered", amount: 4800.0, amountStr: "$4,800.00", delivery: "Apr 2, 2026", by: "Mike Wilson" },
+  { id: "PO-10009", orderId: "ORD-8796", vendor: "Office Supplies Co.", date: "2026-03-28", dateStr: "Mar 28, 2026", status: "Processing", amount: 720.0, amountStr: "$720.00", delivery: "Apr 5, 2026", by: "Pavan (System Owner)" },
 ];
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-  Processing: "bg-blue-100 text-blue-700",
-  Confirmed: "bg-green-100 text-green-700",
-  Shipped: "bg-indigo-100 text-indigo-700",
-  "In Transit": "bg-cyan-100 text-cyan-700",
-  Delivered: "bg-emerald-100 text-emerald-700",
-  Cancelled: "bg-gray-100 text-gray-500",
-  Overdue: "bg-red-100 text-red-600",
-  Pending: "bg-orange-100 text-orange-600",
+const TABS: (OrderStatus | "All")[] = ["All", "Draft", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
+const VENDORS = ["All Vendors", "TechHub Solutions", "Office Supplies Co.", "Global Industrial", "Furniture Mart", "Printer World"];
+const PER_PAGE = 10;
+
+const badgeStyles: Record<OrderStatus, { bg: string; color: string; border: string }> = {
+  Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
+  Confirmed:  { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
+  Shipped:    { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
+  Delivered:  { bg: "#e1f5ee", color: "#0f6e56", border: "#9fe1cb" },
+  Draft:      { bg: "#fafafa", color: "#777",    border: "#ddd" },
+  Closed:     { bg: "#fbeaf0", color: "#993556", border: "#f4c0d1" },
+  Cancelled:  { bg: "#fff1f0", color: "#a32d2d", border: "#f7c1c1" },
 };
 
-function SortIcon() {
-  return <span className="flex flex-col ml-1"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span>;
+function Badge({ status }: { status: OrderStatus }) {
+  const s = badgeStyles[status];
+  return (
+    <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
+      {status}
+    </span>
+  );
 }
 
-function SelectBox({ label, options }: { label: string; options: string[] }) {
-  const [val, setVal] = useState(options[0]);
+// ─── Order Detail Page ───────────────────────────────────────────────────────
+interface OrderDetailProps {
+  order: Order;
+  onBack: () => void;
+}
+
+const LINE_ITEMS = [
+  { name: "Office Chair", sku: "SKU-0041", qty: 2, unit: "$320.00", total: "$640.00" },
+  { name: "Standing Desk", sku: "SKU-0089", qty: 1, unit: "$750.00", total: "$750.00" },
+  { name: "Monitor Stand", sku: "SKU-0103", qty: 3, unit: "$60.00",  total: "$180.00" },
+];
+
+function OrderDetail({ order, onBack }: OrderDetailProps) {
+  const infoRows: [string, React.ReactNode][] = [
+    ["Order ID",   <span style={{ fontFamily: "monospace", color: "#4a6cf7", fontWeight: 500 }}>{order.orderId}</span>],
+    ["PO Number",  <span style={{ color: "#4a6cf7", fontWeight: 500 }}>{order.id}</span>],
+    ["Vendor",     order.vendor],
+    ["PO Date",    order.dateStr],
+    ["Delivery",   order.delivery],
+  ];
+  const finRows: [string, React.ReactNode][] = [
+    ["Total Amount", <strong>{order.amountStr}</strong>],
+    ["Created By",   order.by],
+    ["Status",       <Badge status={order.status} />],
+  ];
+  const timeline = [
+    { label: "Order created", who: order.by, when: order.dateStr, icon: "➕", color: "#4a6cf7" },
+    { label: `Status set to ${order.status}`, who: "System", when: order.dateStr, icon: "🔄", color: "#3b6d11" },
+    { label: "Delivery scheduled", who: "System", when: order.delivery, icon: "🚚", color: "#888" },
+  ];
+
+  const cell: React.CSSProperties = { padding: "9px 12px", fontSize: 13, borderBottom: "1px solid #f3f4f8", color: "#2d2d3a" };
+  const th: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: "1px solid #eef0f5", textAlign: "left" };
+
   return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500 font-medium">{label}</label>
-      <div className="relative">
-        <select className="appearance-none border border-gray-200 rounded-lg bg-white text-sm px-3 py-2 pr-8 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[140px]" value={val} onChange={(e) => setVal(e.target.value)}>
-          {options.map((o) => <option key={o}>{o}</option>)}
-        </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+    <div style={{ position: "fixed", inset: 0, background: "#f8f9fb", zIndex: 500, overflowY: "auto" }}>
+      <div style={{ padding: "28px 36px" }}>
+        {/* Breadcrumb */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1px solid #e2e4e9", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#555" }}>
+            ← Back to Orders
+          </button>
+          <span style={{ color: "#bbb" }}>/</span>
+          <span style={{ fontSize: 13, color: "#888" }}>{order.id}</span>
+          <span style={{ color: "#bbb" }}>/</span>
+          <span style={{ fontSize: 13, color: "#333", fontWeight: 500 }}>{order.orderId}</span>
+        </div>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 600, color: "#0f1035", marginBottom: 6 }}>
+              Order Detail — <span style={{ color: "#4a6cf7" }}>{order.orderId}</span>
+            </h1>
+            <p style={{ fontSize: 13, color: "#888" }}>Purchase Order: <strong style={{ color: "#4a6cf7" }}>{order.id}</strong></p>
+          </div>
+          <Badge status={order.status} />
+        </div>
+
+        {/* Info cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+          {[{ title: "Order Information", rows: infoRows }, { title: "Financial Summary", rows: finRows }].map(({ title, rows }) => (
+            <div key={title} style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: 20 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>{title}</p>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  {rows.map(([label, val]) => (
+                    <tr key={label}>
+                      <td style={{ ...cell, color: "#888", width: "45%" }}>{label}</td>
+                      <td style={cell}>{val}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        {/* Line items */}
+        <div style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Line Items</p>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>{["Item", "SKU", "Qty", "Unit Price", "Total"].map(h => <th key={h} style={th}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {LINE_ITEMS.map(item => (
+                <tr key={item.sku}>
+                  <td style={cell}>{item.name}</td>
+                  <td style={{ ...cell, fontFamily: "monospace", fontSize: 12, color: "#888" }}>{item.sku}</td>
+                  <td style={cell}>{item.qty}</td>
+                  <td style={cell}>{item.unit}</td>
+                  <td style={{ ...cell, fontWeight: 500 }}>{item.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Timeline */}
+        <div style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: 20 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Activity Timeline</p>
+          {timeline.map((t, i) => (
+            <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#f0f4ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13 }}>{t.icon}</div>
+              <div>
+                <p style={{ fontSize: 13, color: "#2d2d3a", fontWeight: 500 }}>{t.label}</p>
+                <p style={{ fontSize: 12, color: "#aaa" }}>{t.who} · {t.when}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-export default function VendorOrdersPage() {
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function useToast() {
+  const [msg, setMsg] = useState("");
+  const [visible, setVisible] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const show = (m: string) => {
+    setMsg(m); setVisible(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setVisible(false), 2800);
+  };
+  return { msg, visible, show };
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+export default function VendorOrderList() {
+  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
+  const [vendorFilter, setVendorFilter] = useState("All Vendors");
+  const [search, setSearch] = useState("");
+  const [sortCol, setSortCol] = useState<keyof Order | "">("");
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [statusModal, setStatusModal] = useState(false);
+  const [notesModal, setNotesModal] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState<OrderStatus | "">("");
+  const [bulkNote, setBulkNote] = useState("");
+  const toast = useToast();
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = () => setOpenDropdown(null);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  const getFiltered = (): Order[] => {
+    let rows = [...orders];
+    if (activeTab !== "All") rows = rows.filter(r => r.status === activeTab);
+    if (statusFilter !== "All") rows = rows.filter(r => r.status === statusFilter);
+    if (vendorFilter !== "All Vendors") rows = rows.filter(r => r.vendor === vendorFilter);
+    if (search) rows = rows.filter(r =>
+      r.id.toLowerCase().includes(search) ||
+      r.vendor.toLowerCase().includes(search) ||
+      r.orderId.toLowerCase().includes(search)
+    );
+    if (sortCol) {
+      rows.sort((a, b) => {
+        const va = a[sortCol as keyof Order];
+        const vb = b[sortCol as keyof Order];
+        return (typeof va === "number" ? (va as number) - (vb as number) : String(va).localeCompare(String(vb))) * sortDir;
+      });
+    }
+    return rows;
+  };
+
+  const filtered = getFiltered();
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const page = Math.min(currentPage, totalPages);
+  const pageRows = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const tabCount = (t: OrderStatus | "All") => t === "All" ? orders.length : orders.filter(r => r.status === t).length;
+
+  const handleSort = (col: keyof Order) => {
+    if (sortCol === col) setSortDir(d => (d === 1 ? -1 : 1));
+    else { setSortCol(col); setSortDir(1); }
+  };
+
+  const toggleRow = (id: string) => {
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  };
+
+  const toggleAll = () => {
+    const allSel = filtered.every(r => selected.has(r.id));
+    setSelected(allSel ? new Set() : new Set(filtered.map(r => r.id)));
+  };
+
+  const applyBulkStatus = () => {
+    if (!bulkStatus) { toast.show("Please select a status"); return; }
+    if (selected.size === 0) { toast.show("Select at least one order first"); return; }
+    setOrders(prev => prev.map(r => selected.has(r.id) ? { ...r, status: bulkStatus as OrderStatus } : r));
+    toast.show(`Status updated to "${bulkStatus}" for ${selected.size} order(s)`);
+    setStatusModal(false); setBulkStatus("");
+  };
+
+  const applyBulkNotes = () => {
+    if (!bulkNote.trim()) { toast.show("Please enter a note"); return; }
+    if (selected.size === 0) { toast.show("Select at least one order first"); return; }
+    toast.show(`Notes added to ${selected.size} order(s)`);
+    setNotesModal(false); setBulkNote("");
+  };
+
+  const doExport = () => {
+    const csv = ["PO Number,Order ID,Vendor,PO Date,Status,Total Amount,Requested Delivery,Created By",
+      ...filtered.map(r => `${r.id},${r.orderId},${r.vendor},${r.dateStr},${r.status},${r.amountStr},${r.delivery},${r.by}`)
+    ].join("\n");
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = "orders.csv"; a.click();
+    toast.show("Orders exported as CSV");
+    setOpenDropdown(null);
+  };
+
+  // ── Styles ─────────────────────────────────────────────────────────────────
+  const s = {
+    page:      { padding: "28px 36px", background: "#f8f9fb", minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: "#1a1a2e" } as React.CSSProperties,
+    card:      { background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, overflow: "hidden" } as React.CSSProperties,
+    th:        { fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase" as const, letterSpacing: ".05em", padding: "11px 14px", borderBottom: "1px solid #eef0f5", textAlign: "left" as const, background: "#fafbff", whiteSpace: "nowrap" as const },
+    td:        { padding: "13px 14px", borderBottom: "1px solid #f3f4f8", fontSize: 13, verticalAlign: "middle" as const, color: "#2d2d3a" },
+    link:      { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" } as React.CSSProperties,
+    orderLink: { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "monospace", fontSize: 13, background: "none", border: "none", padding: 0 } as React.CSSProperties,
+    btn:       { display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, background: "#fff", color: "#444", cursor: "pointer", whiteSpace: "nowrap" as const },
+    ddItem:    { display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", fontSize: 13, color: "#333", cursor: "pointer", textDecoration: "none", background: "none", border: "none", width: "100%", textAlign: "left" as const },
+    pgBtn:     (active: boolean): React.CSSProperties => ({ minWidth: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid #e2e4e9", fontSize: 13, cursor: "pointer", background: active ? "#4a6cf7" : "#fff", color: active ? "#fff" : "#555" }),
+    cb:        (checked: boolean, indeterminate?: boolean): React.CSSProperties => ({ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked || indeterminate ? "#4a6cf7" : "#ccc"}`, background: checked || indeterminate ? "#4a6cf7" : "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }),
+  };
+
+  const Dropdown = ({ id, children }: { id: string; children: React.ReactNode }) => (
+    <div style={{ display: openDropdown === id ? "block" : "none", position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e2e4e9", borderRadius: 10, minWidth: 180, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,.1)", overflow: "hidden" }}>
+      {children}
+    </div>
+  );
+
+  const SortIcon = ({ col }: { col: keyof Order }) => (
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 1, marginLeft: 3 }}>
+      <span style={{ display: "block", width: 0, height: 0, borderLeft: "3px solid transparent", borderRight: "3px solid transparent", borderBottom: `3px solid ${sortCol === col && sortDir === 1 ? "#4a6cf7" : "#ccc"}` }} />
+      <span style={{ display: "block", width: 0, height: 0, borderLeft: "3px solid transparent", borderRight: "3px solid transparent", borderTop: `3px solid ${sortCol === col && sortDir === -1 ? "#4a6cf7" : "#ccc"}` }} />
+    </span>
+  );
+
+  const Checkbox = ({ checked, indeterminate, onClick }: { checked: boolean; indeterminate?: boolean; onClick: () => void }) => (
+    <div style={s.cb(checked, indeterminate)} onClick={onClick}>
+      {(checked || indeterminate) && (
+        indeterminate
+          ? <span style={{ display: "block", width: 8, height: 2, background: "#fff", borderRadius: 1 }} />
+          : <span style={{ display: "block", width: 9, height: 5, borderLeft: "2px solid #fff", borderBottom: "2px solid #fff", transform: "rotate(-45deg) translateY(-1px)" }} />
+      )}
+    </div>
+  );
+
+  const Modal = ({ open, title, onClose, onApply, children }: { open: boolean; title: string; onClose: () => void; onApply: () => void; children: React.ReactNode }) => {
+    if (!open) return null;
+    return (
+      <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: "#fff", borderRadius: 14, padding: 24, width: 340, boxShadow: "0 16px 48px rgba(0,0,0,.15)" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{title}</h3>
+          {children}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #e2e4e9", background: "#fff", color: "#444" }}>Cancel</button>
+            <button onClick={onApply} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #4a6cf7", background: "#4a6cf7", color: "#fff" }}>Apply</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
+  const someSelected = selected.size > 0 && !allSelected;
+
+  if (detailOrder) return <OrderDetail order={detailOrder} onBack={() => setDetailOrder(null)} />;
 
   return (
-    <div className="w-full bg-gray-50 font-sans">
-      <div className="max-w-[1280px] mx-auto px-4 py-6 space-y-4">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {STATS.map((stat) => (
-            <div key={stat.label} className={`bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow ${stat.muted ? "opacity-70" : ""}`}>
-              <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>{stat.icon}</div>
-              <p className="text-xs text-gray-500 font-medium mb-1 leading-tight">{stat.label}</p>
-              <p className="text-xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>
-            </div>
-          ))}
+    <div style={s.page}>
+      {/* Toast */}
+      {toast.visible && (
+        <div style={{ position: "fixed", bottom: 24, right: 24, background: "#1a1a2e", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13, zIndex: 999 }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Modals */}
+      <Modal open={statusModal} title="Bulk update status" onClose={() => setStatusModal(false)} onApply={applyBulkStatus}>
+        <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as OrderStatus)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none" }}>
+          <option value="">Select a status...</option>
+          {(["Draft","Processing","Confirmed","Shipped","Delivered","Closed","Cancelled"] as OrderStatus[]).map(s => <option key={s}>{s}</option>)}
+        </select>
+      </Modal>
+      <Modal open={notesModal} title="Bulk update notes" onClose={() => setNotesModal(false)} onApply={applyBulkNotes}>
+        <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Enter notes for selected orders..." style={{ width: "100%", padding: "9px 12px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", resize: "vertical", minHeight: 80 }} />
+      </Modal>
+
+      <h1 style={{ fontSize: 24, fontWeight: 600, color: "#0f1035", marginBottom: 4 }}>Orders</h1>
+      <p style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>Manage and track all purchase orders across your organization</p>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
+        <div style={{ position: "relative", flex: "0 0 300px" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#aaa", fontSize: 15 }}>🔍</span>
+          <input value={search} onChange={e => { setSearch(e.target.value.toLowerCase()); setCurrentPage(1); }}
+            placeholder="Search by PO number, vendor, or items..."
+            style={{ width: "100%", padding: "8px 10px 8px 34px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, background: "#fff", outline: "none" }} />
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4">
-          <div className="flex flex-wrap items-end gap-4">
-            <SelectBox label="Order Status" options={["All Status", "Processing", "Confirmed", "Shipped", "In Transit", "Delivered", "Cancelled", "Overdue", "Pending"]} />
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 font-medium">Date Range</label>
-              <div className="flex items-center gap-2 border border-gray-200 rounded-lg bg-white px-3 py-2 text-sm text-gray-700 min-w-[240px] cursor-pointer hover:border-gray-300 transition-colors">
-                <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span>Apr 01, 2025 – Apr 30, 2026</span>
-                <Calendar className="w-4 h-4 text-gray-400 ml-auto flex-shrink-0" />
-              </div>
-            </div>
-            <SelectBox label="Order Type" options={["All Types", "Purchase Order", "Return Order", "Replacement"]} />
+        {/* Status filter */}
+        <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+          <button style={s.btn} onClick={() => setOpenDropdown(openDropdown === "status" ? null : "status")}>
+            Status ▾
+          </button>
+          <Dropdown id="status">
+            {(["All", ...Object.keys(badgeStyles)] as (OrderStatus | "All")[]).map(st => (
+              <button key={st} style={s.ddItem} onClick={() => { setStatusFilter(st); setCurrentPage(1); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
+            ))}
+          </Dropdown>
+        </div>
+
+        {/* Vendor filter */}
+        <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+          <button style={s.btn} onClick={() => setOpenDropdown(openDropdown === "vendor" ? null : "vendor")}>
+            Vendor ▾
+          </button>
+          <Dropdown id="vendor">
+            {VENDORS.map(v => (
+              <button key={v} style={s.ddItem} onClick={() => { setVendorFilter(v); setCurrentPage(1); setOpenDropdown(null); }}>{v}</button>
+            ))}
+          </Dropdown>
+        </div>
+
+        <button style={s.btn}>Date Range ▾</button>
+
+        {/* More menu */}
+        <div style={{ marginLeft: "auto", position: "relative" }} onClick={e => e.stopPropagation()}>
+          <button style={{ ...s.btn, padding: "8px 11px" }} onClick={() => setOpenDropdown(openDropdown === "more" ? null : "more")}>⋯</button>
+          <Dropdown id="more">
+            <button style={s.ddItem} onClick={doExport}>📥 Export</button>
+            <hr style={{ border: "none", borderTop: "1px solid #f0f0f0", margin: "4px 0" }} />
+            <button style={s.ddItem} onClick={() => { setStatusModal(true); setOpenDropdown(null); }}>🔄 Bulk Update Status</button>
+            <button style={s.ddItem} onClick={() => { setNotesModal(true); setOpenDropdown(null); }}>📝 Bulk Update Notes</button>
+          </Dropdown>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: "flex", borderBottom: "1.5px solid #e8eaf0", gap: 0, overflowX: "auto" }}>
+        {TABS.map(t => (
+          <div key={t} onClick={() => { setActiveTab(t); setCurrentPage(1); }}
+            style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : "#888", cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
+            {t === "All" ? "All Orders" : t} ({tabCount(t)})
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">PO ID</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap"><span className="flex items-center cursor-pointer hover:text-gray-900">Order Date <SortIcon /></span></th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap"><span className="flex items-center cursor-pointer hover:text-gray-900">PO Value <SortIcon /></span></th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Items</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Expected Delivery</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap"><span className="flex items-center cursor-pointer hover:text-gray-900">Tracking No <SortIcon /></span></th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Created By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {ORDERS.map((order) => (
-                  <tr key={order.poId} className="hover:bg-gray-50/70 transition-colors">
-                    <td className="px-4 py-3.5 whitespace-nowrap"><span className="text-blue-600 font-semibold text-sm hover:underline cursor-pointer">{order.poId}</span></td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{order.orderDate}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-semibold text-gray-800 text-sm">{order.poValue}</td>
-                    <td className="px-4 py-3.5 text-gray-600 text-sm">{order.items}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold ${STATUS_STYLES[order.status]}`}>{order.status}</span>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{order.expectedDelivery}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-sm">
-                      {order.trackingNo ? <span className="text-blue-600 font-medium hover:underline cursor-pointer">{order.trackingNo}</span> : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{order.createdBy}</td>
-                  </tr>
+      {/* Table */}
+      <div style={s.card}>
+        {/* Selection bar */}
+        {selected.size > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", fontSize: 13, color: "#555", borderBottom: "1px solid #f0f0f0", background: "#fafbff" }}>
+            <Checkbox checked={allSelected} indeterminate={someSelected} onClick={toggleAll} />
+            <span>{selected.size} of {filtered.length} selected &nbsp;|&nbsp;
+              <button onClick={() => setSelected(new Set())} style={{ color: "#4a6cf7", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, padding: 0 }}>Clear</button>
+            </span>
+          </div>
+        ) : (
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid #f0f0f0", background: "#fafbff", display: "flex", alignItems: "center" }}>
+            <Checkbox checked={false} onClick={toggleAll} />
+          </div>
+        )}
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
+            <thead>
+              <tr>
+                <th style={{ ...s.th, width: 48, paddingLeft: 16 }}></th>
+                {([["id","PO Number"],["vendor","Vendor"],["date","PO Date"],["orderId","Order ID"],["status","Status"],["amount","Total Amount"],["delivery","Requested Delivery"],["by","Created By"]] as [keyof Order, string][]).map(([col, label]) => (
+                  <th key={col} style={s.th}>
+                    <span onClick={() => handleSort(col)} style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", userSelect: "none" }}>
+                      {label} <SortIcon col={col} />
+                    </span>
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="px-4 py-3.5 flex items-center justify-between border-t border-gray-100">
-            <span className="text-sm text-gray-500">Showing 1 to 10 of 156 orders</span>
-            <div className="flex items-center gap-1.5">
-              <button className="p-1.5 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors"><ChevronLeft className="w-4 h-4" /></button>
-              {[1, 2, 3].map((p) => (
-                <button key={p} onClick={() => setCurrentPage(p)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === p ? "bg-blue-600 text-white shadow-sm" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{p}</button>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.length === 0 ? (
+                <tr><td colSpan={9} style={{ ...s.td, textAlign: "center", color: "#aaa", padding: 32 }}>No orders found</td></tr>
+              ) : pageRows.map(row => (
+                <tr key={row.id} style={{ background: selected.has(row.id) ? "#f5f7ff" : "transparent" }}>
+                  <td style={{ ...s.td, paddingLeft: 16 }}><Checkbox checked={selected.has(row.id)} onClick={() => toggleRow(row.id)} /></td>
+                  <td style={s.td}><button style={s.link as React.CSSProperties}>{row.id}</button></td>
+                  <td style={s.td}>{row.vendor}</td>
+                  <td style={s.td}>{row.dateStr}</td>
+                  <td style={s.td}>
+                    <button onClick={() => setDetailOrder(row)} style={s.orderLink}>{row.orderId}</button>
+                  </td>
+                  <td style={s.td}><Badge status={row.status} /></td>
+                  <td style={s.td}>{row.amountStr}</td>
+                  <td style={s.td}>{row.delivery}</td>
+                  <td style={s.td}>{row.by}</td>
+                </tr>
               ))}
-              <span className="text-gray-400 text-sm">...</span>
-              <button onClick={() => setCurrentPage(16)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === 16 ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>16</button>
-              <button className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"><ChevronRight className="w-4 h-4" /></button>
-              <div className="ml-2 flex items-center gap-1 text-sm text-gray-500 border border-gray-200 rounded-md px-2.5 py-1.5 cursor-pointer hover:bg-gray-50">
-                10 / page <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-0.5" />
-              </div>
-            </div>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", fontSize: 13, color: "#888", borderTop: "1px solid #f0f0f5" }}>
+          <span>{filtered.length === 0 ? "No orders found" : `Showing ${(page - 1) * PER_PAGE + 1} to ${Math.min(page * PER_PAGE, filtered.length)} of ${filtered.length} orders`}</span>
+          <div style={{ display: "flex", gap: 4 }}>
+            <div style={s.pgBtn(false)} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>‹</div>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <div key={p} style={s.pgBtn(p === page)} onClick={() => setCurrentPage(p)}>{p}</div>
+            ))}
+            <div style={s.pgBtn(false)} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>›</div>
           </div>
         </div>
       </div>

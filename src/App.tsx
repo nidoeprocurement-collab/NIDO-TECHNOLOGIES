@@ -130,6 +130,7 @@ const VendorDashboard = lazy(() => import("@/pages/VendorDashboard"));
 const SLAOverview = lazy(() => import("@/pages/SLAOverview"));
 const MyOrderPage = lazy(() => import("@/pages/MyOrderPage"));
 const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
+const VendorOrderDetailPage = lazy(() => import("@/pages/VendorOrderDetailPage"));
 const PermissionsPage = lazy(() => import("./pages/PermissionsPage"));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
 const AuditTrailPage = lazy(() => import("@/pages/AuditTrailPage"));
@@ -294,6 +295,17 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <OrderDetailsPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="vendor-orders/:id"
+            element={
+              <PageErrorBoundary
+                title="Vendor order details failed to load"
+                resetKey={location.pathname}
+              >
+                <VendorOrderDetailPage />
               </PageErrorBoundary>
             }
           />
