@@ -815,7 +815,7 @@ export default function MyOrderPage() {
   const navigate = useNavigate();
   const orderId = id || "ORD-24815779";
 
-  const TABS = ["Sub Orders / Items", "Vendor Selected Summary", "Vendor Selection", "Documents & Notes"];
+  const TABS = ["Sub Orders / Items", "Vendor Selected Summary", "Documents & Notes"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   const [masterStatus, setMasterStatus] = useState("Partially Shipped");
   const [showStatusDd, setShowStatusDd] = useState(false);
@@ -977,13 +977,15 @@ export default function MyOrderPage() {
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                {["#","SUB ORDER ID","ITEM DETAILS","VENDOR","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","ACTIONS"].map(h => <div key={h}>{h}</div>)}
+              <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 130px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                {["#","SUB ORDER ID","ITEM DETAILS","VENDOR","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"].map(h => <div key={h}>{h}</div>)}
               </div>
               {filtered.map((sub, idx) => {
                 const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
+                const selVendorId = selectedVendors[sub.id];
+                const selVendor = selVendorId ? VENDOR_POOL.find(v => v.id === selVendorId) : null;
                 return (
-                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 130px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                     <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
@@ -1021,6 +1023,24 @@ export default function MyOrderPage() {
                     <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
                       {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12.5 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
                     </div>
+                    <div>
+                      {selVendor ? (
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            <Avatar initial={selVendor.id} color={selVendor.color} size={22} />
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{selVendor.name}</span>
+                          </div>
+                          <button onClick={() => setVendorModalSub(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setVendorModalSub(sub)}
+                          style={{ padding: "5px 12px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                        >
+                          Select Vendor
+                        </button>
+                      )}
+                    </div>
                     <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
                   </div>
                 );
@@ -1042,15 +1062,6 @@ export default function MyOrderPage() {
               selectedVendors={selectedVendors}
               createdPOs={createdPOs}
               onCreatePurchaseOrders={handleCreatePurchaseOrders}
-            />
-          )}
-
-          {/* Vendor Selection tab */}
-          {activeTab === "Vendor Selection" && (
-            <VendorSelectionTab
-              subOrders={subOrders}
-              selectedVendors={selectedVendors}
-              onOpenModal={sub => setVendorModalSub(sub)}
             />
           )}
 
