@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { POLink, OrderLink } from "@/components/shared/IdLinks";
 
 type OrderStatus = "Draft" | "Processing" | "Confirmed" | "Shipped" | "Delivered" | "Closed" | "Cancelled";
 
@@ -81,8 +83,8 @@ const LINE_ITEMS = [
 
 function OrderDetail({ order, onBack }: OrderDetailProps) {
   const infoRows: [string, React.ReactNode][] = [
-    ["Order ID",   <span style={{ fontFamily: "monospace", color: "#4a6cf7", fontWeight: 500 }}>{order.orderId}</span>],
-    ["PO Number",  <span style={{ color: "#4a6cf7", fontWeight: 500 }}>{order.id}</span>],
+    ["Order ID",   <OrderLink id={order.orderId} style={{ fontFamily: "monospace", fontWeight: 500 }} />],
+    ["PO Number",  <POLink id={order.id} style={{ fontWeight: 500 }} />],
     ["Vendor",     order.vendor],
     ["PO Date",    order.dateStr],
     ["Delivery",   order.delivery],
@@ -110,18 +112,18 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
             ← Back to Orders
           </button>
           <span style={{ color: "#bbb" }}>/</span>
-          <span style={{ fontSize: 13, color: "#888" }}>{order.id}</span>
+          <POLink id={order.id} style={{ fontSize: 13 }} />
           <span style={{ color: "#bbb" }}>/</span>
-          <span style={{ fontSize: 13, color: "#333", fontWeight: 500 }}>{order.orderId}</span>
+          <OrderLink id={order.orderId} style={{ fontSize: 13 }} />
         </div>
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 600, color: "#0f1035", marginBottom: 6 }}>
-              Order Detail — <span style={{ color: "#4a6cf7" }}>{order.orderId}</span>
+              Order Detail — <OrderLink id={order.orderId} style={{ fontSize: 22 }} />
             </h1>
-            <p style={{ fontSize: 13, color: "#888" }}>Purchase Order: <strong style={{ color: "#4a6cf7" }}>{order.id}</strong></p>
+            <p style={{ fontSize: 13, color: "#888" }}>Purchase Order: <POLink id={order.id} style={{ fontWeight: 700 }} /></p>
           </div>
           <Badge status={order.status} />
         </div>
@@ -464,11 +466,11 @@ export default function VendorOrderList() {
               ) : pageRows.map(row => (
                 <tr key={row.id} style={{ background: selected.has(row.id) ? "#f5f7ff" : "transparent" }}>
                   <td style={{ ...s.td, paddingLeft: 16 }}><Checkbox checked={selected.has(row.id)} onClick={() => toggleRow(row.id)} /></td>
-                  <td style={s.td}><button style={s.link as React.CSSProperties}>{row.id}</button></td>
+                  <td style={s.td}><POLink id={row.id} /></td>
                   <td style={s.td}>{row.vendor}</td>
                   <td style={s.td}>{row.dateStr}</td>
                   <td style={s.td}>
-                    <button onClick={() => setDetailOrder(row)} style={s.orderLink}>{row.orderId}</button>
+                    <OrderLink id={row.orderId} />
                   </td>
                   <td style={s.td}><Badge status={row.status} /></td>
                   <td style={s.td}>{row.amountStr}</td>

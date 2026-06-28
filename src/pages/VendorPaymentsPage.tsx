@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { POLink } from "@/components/shared/IdLinks";
 import {
   Wallet, CheckCircle, Clock, AlertTriangle, TrendingUp,
   Eye, Download, MoreVertical, ChevronDown, Calendar, ArrowUpRight, X,
@@ -279,7 +280,7 @@ export default function VendorPaymentsPage() {
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className="text-blue-600 font-semibold text-sm hover:underline cursor-pointer">{p.id}</span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{p.poRef}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-sm"><POLink id={p.poRef} /></td>
                     <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{p.invoiceDate}</td>
                     <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{p.dueDate}</td>
                     <td className="px-4 py-3.5 whitespace-nowrap text-gray-500 text-sm">{p.paymentDate}</td>
