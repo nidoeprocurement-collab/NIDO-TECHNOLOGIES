@@ -127,39 +127,6 @@ function DocIcon({ ext }: { ext: string }) {
   );
 }
 
-// ── Three-dot menu ────────────────────────────────────────────────────────────
-function ThreeDotMenu({ onDownload, onDelete }: { onDownload: () => void; onDelete: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, color: "#6b7280", fontSize: 18, lineHeight: 1, display: "flex", alignItems: "center" }}
-      >
-        ⋮
-      </button>
-      {open && (
-        <div style={{ position: "absolute", right: 0, top: 30, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 200, minWidth: 150, overflow: "hidden" }}>
-          <button onClick={() => { onDownload(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" }}>
-            ⬇ Download
-          </button>
-          <button onClick={() => { onDelete(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}>
-            🗑 Delete
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Status Dropdown ───────────────────────────────────────────────────────────
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -363,7 +330,6 @@ export default function VendorOrderDetailPage() {
   const [documents, setDocuments] = useState(initialData.documents);
   const [notes, setNotes] = useState(initialData.notes);
   const [assignment, setAssignment] = useState(initialData.assignment);
-  const [activeTab, setActiveTab] = useState<"items" | "documents" | "notes">("items");
   const [search, setSearch] = useState("");
   const [showCancelPO, setShowCancelPO] = useState(false);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
@@ -500,179 +466,143 @@ export default function VendorOrderDetailPage() {
           </div>
         </div>
 
-        {/* Tabs Section */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          {/* Tab bar */}
+        {/* Items Section */}
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
-            <div style={{ display: "flex" }}>
-              {([
-                { key: "items", label: `Items (${items.length})` },
-                { key: "documents", label: `Documents (${documents.length})` },
-                { key: "notes", label: `Notes (${notes.length})` },
-              ] as { key: "items" | "documents" | "notes"; label: string }[]).map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab.key ? 700 : 400, color: activeTab === tab.key ? "#2563eb" : "#6b7280", borderBottom: activeTab === tab.key ? "2px solid #2563eb" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit" }}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div style={{ padding: "14px 0", fontSize: 14, fontWeight: 700, color: "#111827" }}>
+              Items ({items.length})
             </div>
-            {activeTab === "items" && (
-              <div style={{ position: "relative" }}>
-                <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 14 }}>🔍</span>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 14 }}>🔍</span>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+            {["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO"].map(h => <div key={h}>{h}</div>)}
+          </div>
+          {filteredItems.length === 0 && (
+            <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
+          )}
+          {filteredItems.map((item, idx) => (
+            <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+              <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
+                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit" }}>View more</button>
+                  </div>
+                </div>
               </div>
-            )}
-            {activeTab === "notes" && (
-              <button onClick={() => setShowAddNote(true)} style={{ padding: "7px 16px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Add Note</button>
+              <div>
+                <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 500 }}>{item.sku}</div>
+                {item.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{item.qty}</div>
+              <div style={{ fontSize: 13 }}>{item.unitPrice}</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
+              <div>
+                <StatusDropdown status={item.status} onChange={s => handleItemStatusChange(item.id, s)} />
+              </div>
+              <div style={{ fontSize: 12.5, color: "#374151" }}>{item.expectedDelivery}</div>
+              <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
+                {item.tracking ? (
+                  <>
+                    <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
+                    <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
+                    <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
+                    <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
+                  </>
+                ) : <span style={{ color: "#d1d5db" }}>-</span>}
+              </div>
+            </div>
+          ))}
+          {/* Totals */}
+          <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ width: 260 }}>
+              {[["Sub-total", "$1,790.00"], ["Tax (10%)", "$222.00"]].map(([l, v]) => (
+                <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
+                <span style={{ fontSize: 15, fontWeight: 800 }}>{initialData.totalAmount}</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>
+            Showing 1 to {filteredItems.length} of {items.length} items
+          </div>
+        </div>
+
+        {/* Documents Section */}
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
+            <button style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
+          </div>
+          <div style={{ padding: "20px 24px" }}>
+            {documents.length === 0 ? (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No documents</div>
+              </div>
+            ) : (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                  {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON"].map(h => <div key={h}>{h}</div>)}
+                </div>
+                {documents.map((doc, idx) => (
+                  <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <DocIcon ext={doc.ext} />
+                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
+                    <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
+        </div>
 
-          {/* Items tab */}
-          {activeTab === "items" && (
-            <>
-              <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                {["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", ""].map(h => <div key={h}>{h}</div>)}
+        {/* Notes Section */}
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes ({notes.length})</div>
+            <button onClick={() => setShowAddNote(true)} style={{ padding: "7px 16px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Add Note</button>
+          </div>
+          <div style={{ padding: "20px 24px" }}>
+            {notes.length === 0 ? (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No notes yet</div>
               </div>
-              {filteredItems.length === 0 && (
-                <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
-              )}
-              {filteredItems.map((item, idx) => (
-                <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                  <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
-                        <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit" }}>View more</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 500 }}>{item.sku}</div>
-                    {item.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{item.qty}</div>
-                  <div style={{ fontSize: 13 }}>{item.unitPrice}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
-                  <div>
-                    <StatusDropdown status={item.status} onChange={s => handleItemStatusChange(item.id, s)} />
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "#374151" }}>{item.expectedDelivery}</div>
-                  <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
-                    {item.tracking ? (
-                      <>
-                        <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
-                        <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
-                        <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
-                        <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
-                      </>
-                    ) : <span style={{ color: "#d1d5db" }}>-</span>}
-                  </div>
-                  <div>
-                    <ThreeDotMenu
-                      onDownload={() => alert(`Downloading item: ${item.name}`)}
-                      onDelete={() => handleDeleteItem(item.id)}
-                    />
-                  </div>
-                </div>
-              ))}
-              {/* Totals */}
-              <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
-                <div style={{ width: 260 }}>
-                  {[["Sub-total", "$1,790.00"], ["Tax (10%)", "$222.00"]].map(([l, v]) => (
-                    <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                      <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
-                    </div>
-                  ))}
-                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
-                    <span style={{ fontSize: 15, fontWeight: 800 }}>{initialData.totalAmount}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>
-                Showing 1 to {filteredItems.length} of {items.length} items
-              </div>
-            </>
-          )}
-
-          {/* Documents tab */}
-          {activeTab === "documents" && (
-            <div style={{ padding: "20px 24px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <div style={{ fontWeight: 700, fontSize: 14.5 }}>Documents</div>
-                <button style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
-              </div>
-              {documents.length === 0 ? (
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No documents</div>
-                </div>
-              ) : (
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                    {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
-                  </div>
-                  {documents.map((doc, idx) => (
-                    <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {notes.map(note => (
+                  <div key={note.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px", background: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <DocIcon ext={doc.ext} />
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
-                      </div>
-                      <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
-                      <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
-                      <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
-                      <ThreeDotMenu
-                        onDownload={() => alert(`Downloading: ${doc.name}`)}
-                        onDelete={() => handleDeleteDoc(doc.id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Notes tab */}
-          {activeTab === "notes" && (
-            <div style={{ padding: "20px 24px" }}>
-              {notes.length === 0 ? (
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No notes yet</div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {notes.map(note => (
-                    <div key={note.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px", background: "#fff" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <Avatar initials={note.initials} color={note.color} size={30} />
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{note.author}</div>
-                            <div style={{ fontSize: 11.5, color: "#9ca3af" }}>{note.date}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span style={{ fontSize: 11.5, background: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: 8 }}>{note.visibility}</span>
-                          <ThreeDotMenu
-                            onDownload={() => {}}
-                            onDelete={() => handleDeleteNote(note.id)}
-                          />
+                        <Avatar initials={note.initials} color={note.color} size={30} />
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{note.author}</div>
+                          <div style={{ fontSize: 11.5, color: "#9ca3af" }}>{note.date}</div>
                         </div>
                       </div>
-                      <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
+                      <span style={{ fontSize: 11.5, background: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: 8 }}>{note.visibility}</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
       </div>
