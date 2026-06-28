@@ -943,7 +943,7 @@ export default function MyOrderPage() {
   const navigate = useNavigate();
   const orderId = id || "ORD-24815779";
 
-  const TABS = ["Sub Orders / Items", "Vendor Selected Summary", "Documents & Notes"];
+  const TABS = ["Sub Orders / Items", "Vendor Selected Summary"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   const [masterStatus, setMasterStatus] = useState("Partially Shipped");
   const [showStatusDd, setShowStatusDd] = useState(false);
@@ -1102,7 +1102,6 @@ export default function MyOrderPage() {
                 let label = tab;
                 if (tab === "Sub Orders / Items") label = `Sub Orders / Items (${subOrders.length})`;
                 if (tab === "Vendor Selected Summary") label = selectedSummaryCount > 0 ? `Vendor Selected Summary (${selectedSummaryCount})` : "Vendor Selected Summary";
-                if (tab === "Documents & Notes") label = "Documents & Notes (3)";
                 return (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "#2563eb" : "#6b7280", borderBottom: activeTab === tab ? "2px solid #2563eb" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -1209,7 +1208,11 @@ export default function MyOrderPage() {
             />
           )}
 
-          {activeTab === "Documents & Notes" && <DocumentsNotesTab />}
+        </div>
+
+        {/* Documents & Notes — standalone section */}
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
+          <DocumentsNotesTab />
         </div>
       </div>
 
