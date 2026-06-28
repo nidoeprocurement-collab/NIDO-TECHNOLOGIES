@@ -179,24 +179,43 @@ function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName
 // ── Doc Actions Menu ──────────────────────────────────────────────────────────
 function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.right - 150 });
+    }
+    setOpen(v => !v);
+  };
+
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <>
       <button
-        onClick={() => setOpen(v => !v)}
+        ref={btnRef}
+        onClick={handleOpen}
         style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, color: "#6b7280", fontSize: 20, lineHeight: 1, display: "flex", alignItems: "center" }}
       >
         ⋮
       </button>
       {open && (
-        <div style={{ position: "absolute", right: 0, top: 30, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, minWidth: 150, overflow: "hidden" }}>
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.14)", zIndex: 9999, minWidth: 150, overflow: "hidden" }}
+        >
           <button onClick={() => { onDownload(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" }}>
             ⬇ Download
           </button>
@@ -205,6 +224,95 @@ function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDe
           </button>
         </div>
       )}
+    </>
+  );
+}
+
+// ── Upload Document Modal ─────────────────────────────────────────────────────
+function UploadDocumentModal({ onSave, onClose }: { onSave: (doc: any) => void; onClose: () => void }) {
+  const [form, setForm] = useState({ name: "", type: "Order Confirmation", uploadedBy: "", file: null as File | null });
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const DOC_TYPES = ["Order Confirmation", "Invoice", "Packing Slip", "Delivery Note", "Contract", "Other"];
+
+  const handleSubmit = () => {
+    const fileName = form.file ? form.file.name : form.name.trim();
+    if (!fileName || !form.uploadedBy.trim()) return;
+    const ext = fileName.split(".").pop()?.toLowerCase() || "file";
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " +
+      now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    onSave({ id: "d" + Date.now(), name: fileName, ext, type: form.type, uploadedBy: form.uploadedBy.trim(), uploadedOn: dateStr });
+    onClose();
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 480, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+          <span style={{ fontSize: 15, fontWeight: 700 }}>Upload Document</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+        </div>
+        <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* File picker */}
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>File</label>
+            <div
+              onClick={() => fileRef.current?.click()}
+              style={{ border: "2px dashed #d1d5db", borderRadius: 8, padding: "20px", textAlign: "center", cursor: "pointer", background: "#f9fafb" }}
+            >
+              {form.file ? (
+                <div style={{ fontSize: 13.5, fontWeight: 500, color: "#374151" }}>📄 {form.file.name}</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>📁</div>
+                  <div style={{ fontSize: 13, color: "#6b7280" }}>Click to choose a file</div>
+                </>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                style={{ display: "none" }}
+                onChange={e => {
+                  const f = e.target.files?.[0] || null;
+                  setForm(prev => ({ ...prev, file: f, name: f?.name || prev.name }));
+                }}
+              />
+            </div>
+          </div>
+          {/* Document type */}
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Document Type</label>
+            <select
+              value={form.type}
+              onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit" }}
+            >
+              {DOC_TYPES.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          {/* Uploaded By */}
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>Uploaded By</label>
+            <input
+              value={form.uploadedBy}
+              onChange={e => setForm(f => ({ ...f, uploadedBy: e.target.value }))}
+              placeholder="Your name"
+              style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
+          <button
+            onClick={handleSubmit}
+            disabled={!form.file && !form.name.trim()}
+            style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: (!form.file && !form.name.trim()) ? "#93c5fd" : "#2563eb", color: "#fff", cursor: (!form.file && !form.name.trim()) ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+          >
+            Upload
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -418,6 +526,7 @@ export default function VendorOrderDetailPage() {
   const [showAddNote, setShowAddNote] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
+  const [showUploadDocument, setShowUploadDocument] = useState(false);
 
   const filteredItems = items.filter(it =>
     it.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -636,7 +745,7 @@ export default function VendorOrderDetailPage() {
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Documents ({documents.length})</div>
-            <button style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
+            <button onClick={() => setShowUploadDocument(true)} style={{ padding: "7px 16px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Upload Document</button>
           </div>
           <div style={{ padding: "20px 24px" }}>
             {documents.length === 0 ? (
@@ -734,6 +843,12 @@ export default function VendorOrderDetailPage() {
           tracking={updateTrackingItem.tracking}
           onSave={t => handleUpdateTracking(updateTrackingItem.id, t)}
           onClose={() => setUpdateTrackingItem(null)}
+        />
+      )}
+      {showUploadDocument && (
+        <UploadDocumentModal
+          onSave={doc => setDocuments(prev => [...prev, doc])}
+          onClose={() => setShowUploadDocument(false)}
         />
       )}
     </div>
