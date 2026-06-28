@@ -330,7 +330,7 @@ function ViewItemsModal({ group, onClose }) {
 }
 
 // ── Vendor Selected Summary Tab ───────────────────────────────────────────────
-function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCreatePurchaseOrders }) {
+function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
   const [viewItemsGroup, setViewItemsGroup] = useState<any>(null);
 
   const vendorMap: Record<string, { vendor: typeof VENDOR_POOL[0], subOrders: typeof subOrders }> = {};
@@ -373,13 +373,13 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
         {/* PO cards */}
         <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827", marginBottom: 14 }}>Created Purchase Orders</div>
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 120px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-            {["PO NUMBER", "VENDOR", "ITEM", "QTY", "AMOUNT (INR)", "STATUS"].map(h => <div key={h}>{h}</div>)}
+          <div style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 110px 90px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+            {["PO NUMBER", "VENDOR", "ITEM", "QTY", "AMOUNT (INR)", "STATUS", "ACTION"].map(h => <div key={h}>{h}</div>)}
           </div>
           {poList.map((po, i) => {
             const vendor = VENDOR_POOL.find(v => v.id === po.vendorId);
             return (
-              <div key={po.poNumber} style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 120px", padding: "16px 20px", alignItems: "center", borderBottom: i < poList.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+              <div key={po.poNumber} style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 110px 90px", padding: "16px 20px", alignItems: "center", borderBottom: i < poList.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 13.5, color: "#2563eb" }}>{po.poNumber}</div>
                   <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Purchase Order</div>
@@ -403,13 +403,21 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
                     Created
                   </span>
                 </div>
+                <div>
+                  <button
+                    onClick={() => { if (window.confirm(`Cancel ${po.poNumber}? This will remove the PO and allow vendor re-selection for this item.`)) onCancelPO(po.subOrderId); }}
+                    style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 6, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", fontFamily: "inherit" }}
+                  >
+                    Cancel PO
+                  </button>
+                </div>
               </div>
             );
           })}
-          <div style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 120px", padding: "13px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 110px 90px", padding: "13px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
             <div style={{ fontWeight: 700, fontSize: 13, color: "#111827", gridColumn: "1 / 5" }}>{poList.length} PO{poList.length !== 1 ? "s" : ""} Created</div>
             <div style={{ fontWeight: 800, fontSize: 14, color: "#111827" }}>₹ {poTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div />
+            <div /><div />
           </div>
         </div>
 
@@ -926,8 +934,12 @@ export default function MyOrderPage() {
   const [subOrders, setSubOrders] = useState(INITIAL_ORDERS);
   const [subSearch, setSubSearch] = useState("");
   const [expandedItems, setExpandedItems] = useState(new Set<string>());
-  const [createdPOs, setCreatedPOs] = useState<Record<string, any>>({});
-  const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>({});
+  const [createdPOs, setCreatedPOs] = useState<Record<string, any>>(() => {
+    try { return JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}"); } catch { return {}; }
+  });
+  const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
+  });
   const [vendorModalSub, setVendorModalSub] = useState<any>(null);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
@@ -935,17 +947,27 @@ export default function MyOrderPage() {
   const [returnTarget, setReturnTarget] = useState(null);
   const [assignment, setAssignment] = useState({ assignedTo: "Anita Kapoor", role: "Procurement Manager", assignedOn: "Apr 16, 2026 12:35 PM", notes: "Oversees end-to-end execution and vendor coordination for this order." });
 
+  useEffect(() => {
+    localStorage.setItem(`nido_pos_${orderId}`, JSON.stringify(createdPOs));
+  }, [createdPOs, orderId]);
+
+  useEffect(() => {
+    localStorage.setItem(`nido_vendors_${orderId}`, JSON.stringify(selectedVendors));
+  }, [selectedVendors, orderId]);
+
   const isReturnAllowed = sub => sub.itemStatus === "Delivered" && sub.deliveredAt && Date.now() - sub.deliveredAt.getTime() <= 3 * 24 * 60 * 60 * 1000;
   const updateStatus = (id, status) => setSubOrders(prev => prev.map(s => s.id === id ? { ...s, itemStatus: status, deliveredAt: status === "Delivered" ? new Date() : s.deliveredAt, updatedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) } : s));
   const filtered = subOrders.filter(s => !subSearch || s.itemName.toLowerCase().includes(subSearch.toLowerCase()) || s.id.toLowerCase().includes(subSearch.toLowerCase()));
 
   const handleSelectVendor = (subId: string, vendorId: string) => {
+    if (createdPOs[subId]) return;
     setSelectedVendors(prev => ({ ...prev, [subId]: vendorId }));
   };
 
   const handleCreatePurchaseOrders = () => {
     const newPOs: Record<string, any> = {};
     for (const sub of subOrders) {
+      if (createdPOs[sub.id]) continue;
       const vendorId = selectedVendors[sub.id];
       if (!vendorId) continue;
       const vendor = VENDOR_POOL.find(v => v.id === vendorId);
@@ -963,6 +985,19 @@ export default function MyOrderPage() {
       };
     }
     setCreatedPOs(prev => ({ ...prev, ...newPOs }));
+  };
+
+  const handleCancelPO = (subId: string) => {
+    setCreatedPOs(prev => {
+      const next = { ...prev };
+      delete next[subId];
+      return next;
+    });
+    setSelectedVendors(prev => {
+      const next = { ...prev };
+      delete next[subId];
+      return next;
+    });
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
@@ -1154,6 +1189,7 @@ export default function MyOrderPage() {
               selectedVendors={selectedVendors}
               createdPOs={createdPOs}
               onCreatePurchaseOrders={handleCreatePurchaseOrders}
+              onCancelPO={handleCancelPO}
             />
           )}
 
