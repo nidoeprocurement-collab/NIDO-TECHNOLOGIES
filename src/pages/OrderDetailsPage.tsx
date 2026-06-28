@@ -1,47 +1,38 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
+// ── Mock Data ─────────────────────────────────────────────────────────────────
+const VENDOR_POOL = [
+  { id: "VA", name: "Vendor A", location: "Bengaluru, Karnataka", color: "#e6a817", rating: 4.6, deliveryDays: "3 - 4 Days", pricePerUnit: 120, gstin: "29ABCDE1234F1Z5", onTimeDelivery: "95%", qualityRating: "4.5 / 5", totalOrders: 152 },
+  { id: "VB", name: "Vendor B", location: "Mumbai, Maharashtra",  color: "#2b6cb0", rating: 4.2, deliveryDays: "5 - 6 Days", pricePerUnit: 115, gstin: "27BCDFE5678G2Z1", onTimeDelivery: "89%", qualityRating: "4.2 / 5", totalOrders: 98  },
+  { id: "VC", name: "Vendor C", location: "Pune, Maharashtra",    color: "#276749", rating: 4.0, deliveryDays: "2 - 3 Days", pricePerUnit: 125, gstin: "27CDEFG9012H3Z4", onTimeDelivery: "82%", qualityRating: "4.0 / 5", totalOrders: 74  },
+  { id: "VD", name: "Vendor D", location: "Delhi, NCR",           color: "#6b21a8", rating: 3.8, deliveryDays: "4 - 5 Days", pricePerUnit: 110, gstin: "07DEFGH3456I4Z7", onTimeDelivery: "78%", qualityRating: "3.8 / 5", totalOrders: 61  },
+];
+
 const INITIAL_ORDERS = [
   {
-    num: 1, id: "SUB-24815779-1", itemName: "Mechanical Keyboard", sku: "SKU/SHOP-10", category: "General",
+    num: 1, id: "SO-1001", itemName: "Mechanical Keyboard", sku: "SKU/SHOP-10", category: "General",
     specs: ["USB Wired", "Black | Ergonomic Design"],
     vendorName: "TechHub Solutions", vendorInitial: "T", vendorColor: "#c53030",
-    poNumber: "PO-10034", qty: 8, unitPrice: "$149.00", total: "$1,192.00",
+    poNumber: "PO-10034", qty: 50, unitPrice: "₹120.00", total: "₹6,000.00", requiredDate: "30 May 2024",
     itemStatus: "Shipped", updatedOn: "Apr 17, 2026", deliveredAt: null,
     tracking: { trackingNumber: "1Z999AA1234567890", carrier: "UPS", note: "Shipped on Apr 17, 2026", linkLabel: "Track Package" },
-    vendors: [
-      { id: "VA", name: "Vendor A", availQty: 15, price: 149, deliveryDays: 2, stars: 5, score: 92 },
-      { id: "VB", name: "Vendor B", availQty: 10, price: 155, deliveryDays: 1, stars: 5, score: 89 },
-      { id: "VC", name: "Vendor C", availQty: 8,  price: 152, deliveryDays: 3, stars: 4, score: 85 },
-      { id: "VD", name: "Vendor D", availQty: 20, price: 160, deliveryDays: 4, stars: 4, score: 81 },
-    ],
   },
   {
-    num: 2, id: "SUB-24815779-2", itemName: "Filing Cabinet", sku: "SKU/SHOP-3", category: "General",
+    num: 2, id: "SO-1002", itemName: "Filing Cabinet", sku: "SKU/SHOP-3", category: "General",
     specs: ["3 Drawers", "Metal | Lockable"],
     vendorName: "OfficeMart Supplies", vendorInitial: "O", vendorColor: "#2b6cb0",
-    poNumber: "PO-10035", qty: 2, unitPrice: "$299.00", total: "$598.00",
+    poNumber: "PO-10035", qty: 30, unitPrice: "₹115.00", total: "₹3,450.00", requiredDate: "28 May 2024",
     itemStatus: "Confirmed", updatedOn: "Apr 16, 2026", deliveredAt: null, tracking: null,
-    vendors: [
-      { id: "VA", name: "Vendor A", availQty: 5,  price: 299, deliveryDays: 3, stars: 4, score: 88 },
-      { id: "VB", name: "Vendor B", availQty: 3,  price: 310, deliveryDays: 2, stars: 5, score: 91 },
-      { id: "VC", name: "Vendor C", availQty: 10, price: 285, deliveryDays: 5, stars: 4, score: 80 },
-      { id: "VD", name: "Vendor D", availQty: 7,  price: 305, deliveryDays: 2, stars: 5, score: 86 },
-    ],
   },
   {
-    num: 3, id: "SUB-24815779-3", itemName: "Printer Paper (Box)", sku: "SKU/SHOP-5", category: "Office Supplies",
+    num: 3, id: "SO-1003", itemName: "Printer Paper (Box)", sku: "SKU/SHOP-5", category: "Office Supplies",
     specs: ["5000 Sheets", "A4 | 80 GSM"],
     vendorName: "PaperWorld Distributors", vendorInitial: "A", vendorColor: "#276749",
-    poNumber: "PO-10036", qty: 4, unitPrice: "$45.00", total: "$180.00",
+    poNumber: "PO-10036", qty: 82, unitPrice: "₹125.00", total: "₹10,250.00", requiredDate: "01 Jun 2024",
     itemStatus: "Delivered", updatedOn: "Apr 18, 2026",
-    deliveredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), tracking: { trackingNumber: "1Z999AA9876543210", carrier: "FedEx", note: "Delivered on Apr 18, 2026", linkLabel: "Proof of Delivery" },
-    vendors: [
-      { id: "VA", name: "Vendor A", availQty: 20, price: 45, deliveryDays: 1, stars: 5, score: 95 },
-      { id: "VB", name: "Vendor B", availQty: 15, price: 48, deliveryDays: 2, stars: 4, score: 83 },
-      { id: "VC", name: "Vendor C", availQty: 30, price: 42, deliveryDays: 3, stars: 4, score: 79 },
-      { id: "VD", name: "Vendor D", availQty: 50, price: 50, deliveryDays: 1, stars: 5, score: 90 },
-    ],
+    deliveredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    tracking: { trackingNumber: "1Z999AA9876543210", carrier: "FedEx", note: "Delivered on Apr 18, 2026", linkLabel: "Proof of Delivery" },
   },
 ];
 
@@ -56,18 +47,25 @@ const INITIAL_NOTES = [
 ];
 
 const ALL_STATUS_MAP = {
-  Pending: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
-  Confirmed: { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
-  Processing: { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
-  Shipped: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
-  Delivered: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Pending:             { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
+  Confirmed:           { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Processing:          { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
+  Shipped:             { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  Delivered:           { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   "Partially Shipped": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
-  "Partially Delivered": { bg: "#ecfdf5", color: "#065f46", border: "#6ee7b7" },
+  "Partially Delivered":{ bg: "#ecfdf5",color: "#065f46", border: "#6ee7b7" },
 };
 
-const DOC_ICON = { pdf: { bg: "#fee2e2", color: "#dc2626", label: "PDF" }, xlsx: { bg: "#d1fae5", color: "#059669", label: "XLS" }, docx: { bg: "#dbeafe", color: "#2563eb", label: "DOC" }, png: { bg: "#fef9c3", color: "#ca8a04", label: "IMG" }, jpg: { bg: "#fef9c3", color: "#ca8a04", label: "IMG" } };
+const DOC_ICON = {
+  pdf:  { bg: "#fee2e2", color: "#dc2626", label: "PDF" },
+  xlsx: { bg: "#d1fae5", color: "#059669", label: "XLS" },
+  docx: { bg: "#dbeafe", color: "#2563eb", label: "DOC" },
+  png:  { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
+  jpg:  { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
+};
 const getDocIcon = ext => DOC_ICON[ext?.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280", label: ext?.toUpperCase() || "FILE" };
 
+// ── Shared UI Helpers ─────────────────────────────────────────────────────────
 function DocTypeIcon({ ext, size = 38 }) {
   const ic = getDocIcon(ext);
   return (
@@ -90,18 +88,307 @@ function StatusPill({ status }) {
   return <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap", display: "inline-block" }}>{status}</span>;
 }
 
-function Stars({ count, max = 5 }) {
-  return <span>{Array.from({ length: max }).map((_, i) => <span key={i} style={{ color: i < count ? "#f59e0b" : "#d1d5db", fontSize: 13 }}>★</span>)}</span>;
+function StarRating({ rating, max = 5 }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+      {Array.from({ length: max }).map((_, i) => {
+        const filled = i < Math.floor(rating);
+        const half = !filled && i < rating;
+        return (
+          <span key={i} style={{ color: filled || half ? "#f59e0b" : "#d1d5db", fontSize: 13 }}>
+            {filled ? "★" : half ? "⯨" : "★"}
+          </span>
+        );
+      })}
+      <span style={{ fontSize: 12.5, color: "#374151", fontWeight: 600, marginLeft: 4 }}>{rating}</span>
+    </span>
+  );
 }
 
-function ScoreBar({ score }) {
-  const color = score >= 90 ? "#16a34a" : "#ca8a04";
+const lbSt = { display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 };
+const inSt: any = { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", outline: "none" };
+
+// ── Overlay / ModalBox helpers ────────────────────────────────────────────────
+function Overlay({ children, onClose }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <div style={{ width: 64, height: 8, background: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{ width: `${score}%`, height: "100%", background: color, borderRadius: 4 }} />
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}>{children}</div>
+    </div>
+  );
+}
+function ModalBox({ title, onClose, children, width = 440 }) {
+  return (
+    <div style={{ background: "#fff", borderRadius: 12, width, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+        <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
+        <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
       </div>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", minWidth: 24 }}>{score}</span>
+      {children}
+    </div>
+  );
+}
+function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
+  return (
+    <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+      <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
+      <button onClick={onSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>{saveLabel}</button>
+    </div>
+  );
+}
+
+// ── Vendor Selection Modal (popup) ────────────────────────────────────────────
+function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
+  const [picked, setPicked] = useState(selectedVendorId || VENDOR_POOL[0].id);
+  const pickedVendor = VENDOR_POOL.find(v => v.id === picked);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 580, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #e5e7eb" }}>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>Vendor Selection - Sub Order : {sub.id} ( {sub.itemName} )</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
+        </div>
+
+        {/* Req info */}
+        <div style={{ padding: "14px 22px 0", display: "flex", gap: 32 }}>
+          <div style={{ fontSize: 13.5 }}>Required Quantity : <b style={{ color: "#111827" }}>{sub.qty} Nos</b></div>
+          <div style={{ fontSize: 13.5 }}>Required Date : <b style={{ color: "#111827" }}>{sub.requiredDate}</b></div>
+        </div>
+
+        {/* Vendor table */}
+        <div style={{ padding: "14px 22px 0", overflow: "auto" }}>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
+            {/* Header row */}
+            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 140px 130px 130px 110px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
+              {["", "Vendor", "Rating", "Delivery Time", "Cost (Per Unit)", "Total Cost"].map(h => <div key={h}>{h}</div>)}
+            </div>
+            {VENDOR_POOL.map((v, i) => {
+              const isSelected = picked === v.id;
+              const totalCost = v.pricePerUnit * sub.qty;
+              return (
+                <div
+                  key={v.id}
+                  onClick={() => setPicked(v.id)}
+                  style={{ display: "grid", gridTemplateColumns: "36px 1fr 140px 130px 130px 110px", padding: "13px 16px", alignItems: "center", borderBottom: i < VENDOR_POOL.length - 1 ? "1px solid #f3f4f6" : "none", background: isSelected ? "#eff6ff" : "#fff", cursor: "pointer" }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isSelected ? "#2563eb" : "#d1d5db"}`, background: isSelected ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {isSelected && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: isSelected ? 600 : 400, fontSize: 13.5, color: "#111827" }}>{v.name}</div>
+                  <div><StarRating rating={v.rating} /></div>
+                  <div style={{ fontSize: 13, color: "#374151" }}>{v.deliveryDays}</div>
+                  <div style={{ fontSize: 13, color: "#374151" }}>₹ {v.pricePerUnit.toFixed(2)}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>₹ {totalCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Vendor Details */}
+        {pickedVendor && (
+          <div style={{ margin: "14px 22px 0", border: "1px solid #e5e7eb", borderRadius: 9, padding: "14px 18px", background: "#fafafa" }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Vendor Details</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 0" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{pickedVendor.name}</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 4 }}>GSTIN : {pickedVendor.gstin}</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>Location : {pickedVendor.location}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>On Time Delivery : <b>{pickedVendor.onTimeDelivery}</b></div>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>Quality Rating : <b>{pickedVendor.qualityRating}</b></div>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>Total Orders : <b>{pickedVendor.totalOrders}</b></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 22px 18px", marginTop: "auto" }}>
+          <button
+            onClick={() => { onSelect(sub.id, picked); onClose(); }}
+            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+          >
+            Select Vendor
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Vendor Selection Tab ──────────────────────────────────────────────────────
+function VendorSelectionTab({ subOrders, selectedVendors, onOpenModal }) {
+  return (
+    <div style={{ padding: "20px 24px 28px" }}>
+      <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>Vendor Selection</div>
+      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Select a vendor for each sub-order. Click "Select Vendor" to open the vendor selection dialog.</div>
+
+      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+        {/* Table header */}
+        <div style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+          {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "SELECTED VENDOR", "ACTION"].map(h => <div key={h}>{h}</div>)}
+        </div>
+
+        {subOrders.map((sub, idx) => {
+          const selVendorId = selectedVendors[sub.id];
+          const selVendor = selVendorId ? VENDOR_POOL.find(v => v.id === selVendorId) : null;
+          return (
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "16px 20px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+              <div style={{ color: "#6b7280", fontSize: 13 }}>{sub.num}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{sub.id}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 38, height: 38, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>📦</div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
+                  <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty} Nos</div>
+              <div style={{ fontSize: 12.5, color: "#374151" }}>{sub.requiredDate}</div>
+              <div>
+                {selVendor ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Avatar initial={selVendor.id} color={selVendor.color} size={26} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{selVendor.name}</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>{selVendor.location.split(",")[0]}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12.5, color: "#9ca3af" }}>Not selected</span>
+                )}
+              </div>
+              <div>
+                <button
+                  onClick={() => onOpenModal(sub)}
+                  style={{ padding: "7px 16px", border: `1px solid ${selVendor ? "#2563eb" : "#d1d5db"}`, borderRadius: 7, background: selVendor ? "#eff6ff" : "#fff", color: selVendor ? "#2563eb" : "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+                >
+                  {selVendor ? "Change Vendor" : "Select Vendor"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Vendor Selected Summary Tab ───────────────────────────────────────────────
+function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCreatePurchaseOrders }) {
+  // Group sub-orders by selected vendor
+  const vendorMap: Record<string, { vendor: typeof VENDOR_POOL[0], subOrders: typeof subOrders }> = {};
+  for (const sub of subOrders) {
+    const vid = selectedVendors[sub.id];
+    if (!vid) continue;
+    const vendor = VENDOR_POOL.find(v => v.id === vid);
+    if (!vendor) continue;
+    if (!vendorMap[vid]) vendorMap[vid] = { vendor, subOrders: [] };
+    vendorMap[vid].subOrders.push(sub);
+  }
+
+  const vendorGroups = Object.values(vendorMap);
+  const totalItems = vendorGroups.reduce((acc, g) => acc + g.subOrders.length, 0);
+  const totalQty = vendorGroups.reduce((acc, g) => acc + g.subOrders.reduce((a, s) => a + s.qty, 0), 0);
+  const totalAmount = vendorGroups.reduce((acc, g) => {
+    return acc + g.subOrders.reduce((a, s) => {
+      const v = g.vendor;
+      return a + v.pricePerUnit * s.qty;
+    }, 0);
+  }, 0);
+
+  const hasPOs = Object.keys(createdPOs).length > 0;
+  const allSelected = subOrders.length > 0 && subOrders.every(s => !!selectedVendors[s.id]);
+
+  return (
+    <div style={{ padding: "20px 24px 28px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Vendors Selected Summary</div>
+        {allSelected && !hasPOs && (
+          <button
+            onClick={onCreatePurchaseOrders}
+            style={{ padding: "9px 22px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+          >
+            Create Purchase Orders
+          </button>
+        )}
+        {hasPOs && (
+          <span style={{ padding: "9px 18px", borderRadius: 8, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", fontWeight: 600, fontSize: 13 }}>
+            ✅ Purchase Orders Created
+          </span>
+        )}
+      </div>
+
+      {vendorGroups.length === 0 ? (
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px 20px", textAlign: "center", color: "#9ca3af", background: "#fafafa" }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>🏪</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 4 }}>No vendors selected yet</div>
+          <div style={{ fontSize: 13 }}>Go to the "Vendor Selection" tab to select vendors for each sub-order.</div>
+        </div>
+      ) : (
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+          {/* Table header */}
+          <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "11px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
+            {["Vendor", "Items Count", "Sub Orders", "Total Quantity", "Total Amount (INR)", "Action"].map(h => <div key={h}>{h}</div>)}
+          </div>
+
+          {vendorGroups.map((g, i) => {
+            const vendorQty = g.subOrders.reduce((a, s) => a + s.qty, 0);
+            const vendorAmount = g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0);
+            return (
+              <div key={g.vendor.id} style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "16px 20px", alignItems: "center", borderBottom: i < vendorGroups.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                {/* Vendor */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar initial={g.vendor.id} color={g.vendor.color} size={36} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{g.vendor.name}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.vendor.location}</div>
+                  </div>
+                </div>
+                {/* Items count */}
+                <div style={{ fontSize: 13.5, color: "#374151" }}>{g.subOrders.length} {g.subOrders.length === 1 ? "Item" : "Items"}</div>
+                {/* Sub order badges */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {g.subOrders.map(s => (
+                    <span key={s.id} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{s.id}</span>
+                  ))}
+                </div>
+                {/* Total qty */}
+                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{vendorQty} Nos</div>
+                {/* Total amount */}
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>₹ {vendorAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                {/* Action */}
+                <div>
+                  <button
+                    style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}
+                    onClick={() => alert(`Viewing items for ${g.vendor.name}`)}
+                  >
+                    View Items
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Total row */}
+          <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "13px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Total : {totalItems} Items</div>
+            <div />
+            <div />
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{totalQty} Nos</div>
+            <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>₹ {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+            <div />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -111,16 +398,16 @@ function UploadDocModal({ onSave, onClose }) {
   const [file, setFile] = useState(null);
   const [form, setForm] = useState({ type: "", description: "" });
   const [dragging, setDragging] = useState(false);
-  const fileRef = useRef();
+  const fileRef = useRef<any>();
 
   const handleFile = f => { if (f) setFile(f); };
-  const ext = file ? file.name.split(".").pop() : "";
+  const ext = file ? (file as any).name.split(".").pop() : "";
 
   const handleSave = () => {
     if (!file) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + "\n" + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    onSave({ id: "d" + Date.now(), name: file.name, ext, size: (file.size / 1024).toFixed(0) + " KB", type: form.type || "Other", uploadedBy: "System Owner", uploadedOn: dateStr, description: form.description });
+    onSave({ id: "d" + Date.now(), name: (file as any).name, ext, size: ((file as any).size / 1024).toFixed(0) + " KB", type: form.type || "Other", uploadedBy: "System Owner", uploadedOn: dateStr, description: form.description });
     onClose();
   };
 
@@ -132,20 +419,19 @@ function UploadDocModal({ onSave, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ padding: "20px 22px" }}>
-          {/* Drop zone */}
           <div
             onDragOver={e => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
             onClick={() => fileRef.current.click()}
             style={{ border: `2px dashed ${dragging ? "#2563eb" : "#d1d5db"}`, borderRadius: 10, padding: "28px 20px", textAlign: "center", cursor: "pointer", background: dragging ? "#eff6ff" : "#f9fafb", marginBottom: 18, transition: "all 0.15s" }}>
-            <input ref={fileRef} type="file" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
+            <input ref={fileRef} type="file" style={{ display: "none" }} onChange={e => handleFile((e.target.files as any)[0])} />
             {file ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
                 <DocTypeIcon ext={ext} size={36} />
                 <div style={{ textAlign: "left" }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{file.name}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>{(file.size / 1024).toFixed(0)} KB</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{(file as any).name}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>{((file as any).size / 1024).toFixed(0)} KB</div>
                 </div>
                 <button onClick={e => { e.stopPropagation(); setFile(null); }} style={{ marginLeft: 8, background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 18 }}>×</button>
               </div>
@@ -157,7 +443,6 @@ function UploadDocModal({ onSave, onClose }) {
               </>
             )}
           </div>
-          {/* Type */}
           <div style={{ marginBottom: 14 }}>
             <label style={lbSt}>Document Type</label>
             <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={{ ...inSt, appearance: "none" }}>
@@ -165,7 +450,6 @@ function UploadDocModal({ onSave, onClose }) {
               {["Purchase Order","Quotation","Invoice","Contract","Shipping Document","Other"].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
-          {/* Description */}
           <div style={{ marginBottom: 6 }}>
             <label style={lbSt}>Description</label>
             <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Add a description..." style={{ ...inSt, resize: "vertical" }} />
@@ -180,16 +464,16 @@ function UploadDocModal({ onSave, onClose }) {
   );
 }
 
-// ── Documents & Notes Tab Content ─────────────────────────────────────────────
+// ── Documents & Notes Tab ─────────────────────────────────────────────────────
 function DocTypeTag({ type }) {
-  const map = { "Purchase Order": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" }, "Quotation": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" }, "Invoice": { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" }, "Contract": { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" }, "Shipping Document": { bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" }, "Other": { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" } };
+  const map: any = { "Purchase Order": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" }, "Quotation": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" }, "Invoice": { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" }, "Contract": { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" }, "Shipping Document": { bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" }, "Other": { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" } };
   const s = map[type] || map["Other"];
   return <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>{type}</span>;
 }
 
 function DocRowMenu({ onDownload, onRemove }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<any>(null);
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);
@@ -201,12 +485,12 @@ function DocRowMenu({ onDownload, onRemove }) {
       {open && (
         <div style={{ position: "absolute", top: 28, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", zIndex: 300, minWidth: 170, overflow: "hidden" }}>
           <button onClick={() => { onDownload(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"} onMouseLeave={e => e.currentTarget.style.background = "none"}>
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
             <span>⬇</span> Download Document
           </button>
           <div style={{ height: 1, background: "#f3f4f6" }} />
           <button onClick={() => { onRemove(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"} onMouseLeave={e => e.currentTarget.style.background = "none"}>
+            onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
             <span>🗑</span> Remove
           </button>
         </div>
@@ -235,7 +519,6 @@ function DocumentsNotesTab() {
 
   return (
     <div style={{ padding: "20px 24px 28px" }}>
-      {/* Documents section */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <div>
@@ -254,8 +537,6 @@ function DocumentsNotesTab() {
             </button>
           </div>
         </div>
-
-        {/* Doc table */}
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "2fr 130px 160px 140px 1fr 48px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
             {["DOCUMENT NAME","TYPE","UPLOADED BY","UPLOADED ON","DESCRIPTION","ACTIONS"].map(h => <div key={h}>{h}</div>)}
@@ -278,21 +559,15 @@ function DocumentsNotesTab() {
               </div>
               <div style={{ fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5 }}>{doc.uploadedOn}</div>
               <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.45 }}>{doc.description}</div>
-              <DocRowMenu
-                onDownload={() => alert(`Downloading ${doc.name}...`)}
-                onRemove={() => setDocs(prev => prev.filter(d => d.id !== doc.id))}
-              />
+              <DocRowMenu onDownload={() => alert(`Downloading ${doc.name}...`)} onRemove={() => setDocs(prev => prev.filter(d => d.id !== doc.id))} />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Notes section */}
       <div>
         <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827", marginBottom: 1 }}>Notes</div>
         <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
-
-        {/* Existing notes */}
         {notes.map((note, i) => (
           <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
             <Avatar initial="S" color="#2563eb" size={32} />
@@ -308,24 +583,20 @@ function DocumentsNotesTab() {
             </div>
           </div>
         ))}
-
-        {/* Add note */}
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
-            {/* Text area side */}
             <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
               <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
               <textarea value={noteText} onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }} placeholder="Write your note here..."
                 rows={4} style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }} />
               <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
             </div>
-            {/* Visibility side */}
             <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <div>
                 <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
                 {[["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]].map(([label, icon, sub]) => (
                   <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
-                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0, transition: "all 0.15s" }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
                       {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
                     </div>
                     <div>
@@ -345,166 +616,12 @@ function DocumentsNotesTab() {
           </div>
         </div>
       </div>
-
       {showUpload && <UploadDocModal onSave={doc => setDocs(prev => [...prev, doc])} onClose={() => setShowUpload(false)} />}
     </div>
   );
 }
 
-// ── Vendor Selection Panel ────────────────────────────────────────────────────
-function VendorSelectionPanel({ sub, createdPOs, onCreatePO, onClose }) {
-  const best = sub.vendors.reduce((b, v) => v.score > b.score ? v : b, sub.vendors[0]);
-  const existingPO = createdPOs[sub.id];
-  const [selected, setSelected] = useState(existingPO ? existingPO.vendorId : best.id);
-  const [justCreated, setJustCreated] = useState(false);
-
-  const handleCreate = () => {
-    const vendor = sub.vendors.find(v => v.id === selected);
-    const poNum = "PO-" + Math.floor(10000 + Math.random() * 90000);
-    onCreatePO(sub.id, { vendorId: selected, vendorName: vendor.name, poNumber: poNum, item: sub.itemName, qty: sub.qty, unitPrice: vendor.price, total: vendor.price * sub.qty });
-    setJustCreated(true);
-  };
-
-  return (
-    <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderTop: "none", padding: "18px 24px 20px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 14.5 }}>Vendor Selection</div>
-          <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Select a vendor for <b style={{ color: "#111827" }}>{sub.qty} {sub.itemName}</b> units.</div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontSize: 12.5, fontFamily: "inherit", color: "#374151" }}>↻ Refresh vendors</button>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9ca3af" }}>×</button>
-        </div>
-      </div>
-
-      {!existingPO && (
-        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#166534", display: "flex", alignItems: "center", gap: 8 }}>
-          ✅ <span><b>Best Vendor : {best.name}</b> has been selected based on price, delivery time, and availability score.</span>
-        </div>
-      )}
-      {existingPO && !justCreated && (
-        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#1e40af", display: "flex", alignItems: "center", gap: 8 }}>
-          📋 <span>PO <b>{existingPO.poNumber}</b> already created with <b>{existingPO.vendorName}</b>. Delete it from Vendor Orders to create a new one.</span>
-        </div>
-      )}
-      {justCreated && (
-        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#166534", display: "flex", alignItems: "center", gap: 8 }}>
-          🎉 <span>Purchase Order <b>{createdPOs[sub.id]?.poNumber}</b> created with <b>{createdPOs[sub.id]?.vendorName}</b>!</span>
-        </div>
-      )}
-
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 110px 150px 160px 70px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
-          {["Vendor Matching Panel","Available Qty","Price per Unit","Est. Delivery Time","Availability Score","Select"].map(h => <div key={h}>{h}</div>)}
-        </div>
-        {sub.vendors.map((v, i) => {
-          const isBest = v.id === best.id, isSelected = selected === v.id, isPOCreated = !!existingPO;
-          return (
-            <div key={v.id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 110px 150px 160px 70px", padding: "13px 16px", alignItems: "center", borderBottom: i < sub.vendors.length - 1 ? "1px solid #f3f4f6" : "none", background: isSelected ? "#f0f7ff" : "#fff" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                {isSelected ? <span style={{ color: "#16a34a", fontSize: 18 }}>✅</span> : <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid #d1d5db", display: "inline-block" }} />}
-                <span style={{ fontSize: 13.5, fontWeight: isBest ? 600 : 400, color: isBest ? "#2563eb" : "#374151" }}>{v.name}</span>
-                {isBest && <span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 7px", borderRadius: 10, fontWeight: 600 }}>Best</span>}
-              </div>
-              <div style={{ fontSize: 13.5 }}>{v.availQty}</div>
-              <div style={{ fontSize: 13.5 }}>${v.price.toLocaleString()}</div>
-              <div style={{ fontSize: 13.5 }}>{v.deliveryDays}d &nbsp;<Stars count={v.stars} /></div>
-              <ScoreBar score={v.score} />
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <div onClick={() => { if (!isPOCreated) setSelected(v.id); }}
-                  style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelected ? "#16a34a" : "#d1d5db"}`, background: isSelected ? "#16a34a" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: isPOCreated ? "not-allowed" : "pointer" }}>
-                  {isSelected && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff" }} />}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 14 }}>
-        <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.6, maxWidth: 520 }}>
-          ● The best vendor is selected based on price, estimated delivery time, and availability score. You can manually override the selection if needed.
-        </div>
-        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-          <button onClick={handleCreate} disabled={!!existingPO}
-            style={{ padding: "9px 22px", border: "none", borderRadius: 8, background: existingPO ? "#93c5fd" : "#2563eb", color: "#fff", cursor: existingPO ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit", opacity: existingPO ? 0.7 : 1 }}>
-            Create Purchase Order
-          </button>
-          <button onClick={onClose} style={{ padding: "9px 22px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Vendor Orders Modal ───────────────────────────────────────────────────────
-function VendorOrdersModal({ orders, onDelete, onClose }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 700, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
-          <span style={{ fontSize: 15, fontWeight: 700 }}>📋 Vendor Orders List</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
-        </div>
-        {Object.keys(orders).length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No purchase orders created yet.</div>
-        ) : (
-          <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 90px 90px 70px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280" }}>
-              {["PO NUMBER","VENDOR","QTY","UNIT PRICE","TOTAL","ACTION"].map(h => <div key={h}>{h}</div>)}
-            </div>
-            {Object.entries(orders).map(([subId, po]) => (
-              <div key={subId} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px 90px 90px 70px", padding: "14px 20px", alignItems: "center", borderBottom: "1px solid #f3f4f6" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{po.poNumber}</div>
-                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{po.item}</div>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{po.vendorName}</div>
-                <div style={{ fontSize: 13 }}>{po.qty}</div>
-                <div style={{ fontSize: 13 }}>${po.unitPrice.toLocaleString()}</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>${po.total.toLocaleString()}</div>
-                <button onClick={() => onDelete(subId)} style={{ padding: "5px 12px", border: "1px solid #fecaca", borderRadius: 6, background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>Delete</button>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Shared ────────────────────────────────────────────────────────────────────
-function Overlay({ children, onClose }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}>{children}</div>
-    </div>
-  );
-}
-function ModalBox({ title, onClose, children }) {
-  return (
-    <div style={{ background: "#fff", borderRadius: 12, width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
-        <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
-        <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
-      </div>
-      {children}
-    </div>
-  );
-}
-function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
-  return (
-    <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
-      <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
-      <button onClick={onSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>{saveLabel}</button>
-    </div>
-  );
-}
-
-const lbSt = { display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 };
-const inSt = { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", outline: "none" };
-
+// ── Misc modals ───────────────────────────────────────────────────────────────
 function EditAssignmentModal({ data, onSave, onClose }) {
   const [form, setForm] = useState(data);
   return (
@@ -638,12 +755,12 @@ function Stepper({ currentStatus }) {
   );
 }
 
-const menuItemSt = { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" };
-const STATUS_STYLE = { Pending: { color: "#6b7280" }, Confirmed: { color: "#92400e" }, Processing: { color: "#6b21a8" }, Shipped: { color: "#1e40af" }, Delivered: { color: "#166534" } };
+const menuItemSt: any = { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" };
+const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "#92400e" }, Processing: { color: "#6b21a8" }, Shipped: { color: "#1e40af" }, Delivered: { color: "#166534" } };
 
 function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onCancel, onRaiseReturn, returnAllowed }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<any>(null);
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setStatusSub(false); } };
     document.addEventListener("mousedown", h);
@@ -697,15 +814,17 @@ export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const orderId = id || "ORD-24815779";
-  const [activeTab, setActiveTab] = useState("Sub Orders");
+
+  const TABS = ["Sub Orders / Items", "Vendor Selected Summary", "Vendor Selection", "Documents & Notes"];
+  const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   const [masterStatus, setMasterStatus] = useState("Partially Shipped");
   const [showStatusDd, setShowStatusDd] = useState(false);
   const [subOrders, setSubOrders] = useState(INITIAL_ORDERS);
   const [subSearch, setSubSearch] = useState("");
-  const [expandedItems, setExpandedItems] = useState(new Set());
-  const [openVendorPanel, setOpenVendorPanel] = useState(null);
-  const [createdPOs, setCreatedPOs] = useState({});
-  const [showVendorOrders, setShowVendorOrders] = useState(false);
+  const [expandedItems, setExpandedItems] = useState(new Set<string>());
+  const [createdPOs, setCreatedPOs] = useState<Record<string, any>>({});
+  const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>({});
+  const [vendorModalSub, setVendorModalSub] = useState<any>(null);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
@@ -715,10 +834,36 @@ export default function MyOrderPage() {
   const isReturnAllowed = sub => sub.itemStatus === "Delivered" && sub.deliveredAt && Date.now() - sub.deliveredAt.getTime() <= 3 * 24 * 60 * 60 * 1000;
   const updateStatus = (id, status) => setSubOrders(prev => prev.map(s => s.id === id ? { ...s, itemStatus: status, deliveredAt: status === "Delivered" ? new Date() : s.deliveredAt, updatedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) } : s));
   const filtered = subOrders.filter(s => !subSearch || s.itemName.toLowerCase().includes(subSearch.toLowerCase()) || s.id.toLowerCase().includes(subSearch.toLowerCase()));
-  const handleCreatePO = (subId, po) => setCreatedPOs(prev => ({ ...prev, [subId]: po }));
-  const handleDeletePO = subId => setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
 
-  const card = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
+  const handleSelectVendor = (subId: string, vendorId: string) => {
+    setSelectedVendors(prev => ({ ...prev, [subId]: vendorId }));
+  };
+
+  const handleCreatePurchaseOrders = () => {
+    const newPOs: Record<string, any> = {};
+    for (const sub of subOrders) {
+      const vendorId = selectedVendors[sub.id];
+      if (!vendorId) continue;
+      const vendor = VENDOR_POOL.find(v => v.id === vendorId);
+      if (!vendor) continue;
+      const poNum = "PO-" + Math.floor(10000 + Math.random() * 90000);
+      newPOs[sub.id] = {
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        poNumber: poNum,
+        item: sub.itemName,
+        qty: sub.qty,
+        unitPrice: vendor.pricePerUnit,
+        total: vendor.pricePerUnit * sub.qty,
+        subOrderId: sub.id,
+      };
+    }
+    setCreatedPOs(prev => ({ ...prev, ...newPOs }));
+  };
+
+  const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
+
+  const selectedSummaryCount = Object.keys(selectedVendors).length;
 
   return (
     <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f9fafb", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
@@ -735,10 +880,6 @@ export default function MyOrderPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Order Details / <span style={{ color: "#374151" }}>Order #{orderId}</span></h1>
             <StatusPill status="Processing" />
-            <button onClick={() => setShowVendorOrders(true)}
-              style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", color: "#374151" }}>
-              📋 Vendor Orders {Object.keys(createdPOs).length > 0 && <span style={{ background: "#2563eb", color: "#fff", borderRadius: 10, padding: "1px 7px", fontSize: 11 }}>{Object.keys(createdPOs).length}</span>}
-            </button>
           </div>
           <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
@@ -752,7 +893,7 @@ export default function MyOrderPage() {
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div><Field label="Billing Address" value="1235 Ave, San, CA 94821" /><Field label="Payment Method" value="Bank Transfer" /><Field label="Payment Terms" value="Net 30" /></div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div><Field label="Shipping Address" value="1235 Ave, San, CA 94821" /><Field label="Delivery Method" value="Standard Ground" /><Field label="Requested Delivery" value="Apr 28, 2026" /></div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div><Field label="Name" value="Pavan" /><Field label="Email" value="pavan@corpessentials.com" /><Field label="Phone" value="+1 (408) 035-3779673" /><Field label="Organization" value="Infosys" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[["Master Order ID","ORD-24815779"],["Sub Orders","3"],["Total Items","14"],["Total Amount","$2,192.00"],["Created On","Apr 16, 2026 12:33 PM"]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[["Master Order ID","ORD-24815779"],["Sub Orders","3"],["Total Items","14"],["Total Amount","₹19,700.00"],["Created On","Apr 16, 2026 12:33 PM"]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
         </div>
 
         {/* Stepper + Assignment */}
@@ -797,18 +938,25 @@ export default function MyOrderPage() {
           </div>
         </div>
 
-        {/* Sub Orders / Docs & Notes */}
+        {/* Tabs section */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+          {/* Tab bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
             <div style={{ display: "flex" }}>
-              {["Sub Orders","Documents & Notes"].map(tab => (
-                <button key={tab} onClick={() => setActiveTab(tab)}
-                  style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "#2563eb" : "#6b7280", borderBottom: activeTab === tab ? "2px solid #2563eb" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
-                  {tab === "Sub Orders" ? "Sub Orders (3)" : "Documents & Notes (3)"}
-                </button>
-              ))}
+              {TABS.map(tab => {
+                let label = tab;
+                if (tab === "Sub Orders / Items") label = `Sub Orders / Items (${subOrders.length})`;
+                if (tab === "Vendor Selected Summary") label = selectedSummaryCount > 0 ? `Vendor Selected Summary (${selectedSummaryCount})` : "Vendor Selected Summary";
+                if (tab === "Documents & Notes") label = "Documents & Notes (3)";
+                return (
+                  <button key={tab} onClick={() => setActiveTab(tab)}
+                    style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "#2563eb" : "#6b7280", borderBottom: activeTab === tab ? "2px solid #2563eb" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    {label}
+                  </button>
+                );
+              })}
             </div>
-            {activeTab === "Sub Orders" && (
+            {activeTab === "Sub Orders / Items" && (
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div style={{ position: "relative" }}>
                   <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 14 }}>🔍</span>
@@ -816,72 +964,94 @@ export default function MyOrderPage() {
                 </div>
               </div>
             )}
+            {activeTab === "Vendor Selected Summary" && Object.keys(createdPOs).length === 0 && selectedSummaryCount === subOrders.length && subOrders.length > 0 && (
+              <button
+                onClick={handleCreatePurchaseOrders}
+                style={{ padding: "8px 20px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13.5, fontFamily: "inherit" }}
+              >
+                Create Purchase Orders
+              </button>
+            )}
           </div>
 
-          {activeTab === "Sub Orders" && (
+          {/* Sub Orders / Items tab */}
+          {activeTab === "Sub Orders / Items" && (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
                 {["#","SUB ORDER ID","ITEM DETAILS","VENDOR","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","ACTIONS"].map(h => <div key={h}>{h}</div>)}
               </div>
               {filtered.map((sub, idx) => {
-                const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), vendorPanelOpen = openVendorPanel === sub.id, hasPO = !!createdPOs[sub.id];
+                const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
                 return (
-                  <div key={sub.id}>
-                    <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 48px", padding: "16px 20px", alignItems: "start", borderBottom: vendorPanelOpen ? "none" : (idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none"), background: vendorPanelOpen ? "#f0f7ff" : "#fff" }}>
-                      <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
-                      <div>
-                        <a href="#" onClick={e => { e.preventDefault(); setOpenVendorPanel(vendorPanelOpen ? null : sub.id); }}
-                          style={{ color: "#2563eb", textDecoration: "none", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                          {sub.id} <span style={{ fontSize: 10, transition: "transform 0.15s", display: "inline-block", transform: vendorPanelOpen ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
-                        </a>
-                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                        {hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>PO Created</span></div>}
-                      </div>
-                      <div>
-                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                          <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{sub.itemName}</div>
-                            <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
-                            {sub.specs.slice(0, expanded ? undefined : 1).map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
-                            {sub.specs.length > 1 && <button onClick={() => setExpandedItems(s => { const n = new Set(s); n.has(sub.id) ? n.delete(sub.id) : n.add(sub.id); return n; })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 2 }}>{expanded ? "View less" : "View more"}</button>}
-                          </div>
+                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                    <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
+                      {hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>PO Created</span></div>}
+                      {selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>Vendor Selected</span></div>}
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{sub.itemName}</div>
+                          <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
+                          {sub.specs.slice(0, expanded ? undefined : 1).map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
+                          {sub.specs.length > 1 && <button onClick={() => setExpandedItems(s => { const n = new Set(s); n.has(sub.id) ? n.delete(sub.id) : n.add(sub.id); return n; })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 2 }}>{expanded ? "View less" : "View more"}</button>}
                         </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar initial={sub.vendorInitial} color={sub.vendorColor} size={28} /><span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35 }}>{sub.vendorName}</span></div>
-                      <div>
-                        <button
-                          onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
-                          style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
-                        >
-                          {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
-                        </button>
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
-                      <div style={{ fontSize: 13 }}>{sub.unitPrice}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>{sub.total}</div>
-                      <div><StatusPill status={sub.itemStatus} /><div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div></div>
-                      <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
-                        {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12.5 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
-                      </div>
-                      <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
                     </div>
-                    {vendorPanelOpen && (
-                      <div style={{ borderBottom: idx < filtered.length - 1 ? "1px solid #e2e8f0" : "none" }}>
-                        <VendorSelectionPanel sub={sub} createdPOs={createdPOs} onCreatePO={handleCreatePO} onClose={() => setOpenVendorPanel(null)} />
-                      </div>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Avatar initial={sub.vendorInitial} color={sub.vendorColor} size={28} />
+                      <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35 }}>{sub.vendorName}</span>
+                    </div>
+                    <div>
+                      <button
+                        onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
+                        style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
+                      >
+                        {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
+                    <div style={{ fontSize: 13 }}>{sub.unitPrice}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{sub.total}</div>
+                    <div><StatusPill status={sub.itemStatus} /><div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div></div>
+                    <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
+                      {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12.5 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
+                    </div>
+                    <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
                   </div>
                 );
               })}
               <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
                 <div style={{ width: 270 }}>
-                  {[["Sub-total","$1,970.00"],["Tax (10%)","$222.00"]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span></div>))}
-                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span><span style={{ fontSize: 15, fontWeight: 800 }}>$2,192.00</span></div>
+                  {[["Sub-total","₹19,700.00"],["Tax (10%)","₹1,970.00"]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span></div>))}
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span><span style={{ fontSize: 15, fontWeight: 800 }}>₹21,670.00</span></div>
                 </div>
               </div>
               <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>Showing 1 to {filtered.length} of {subOrders.length} sub orders</div>
             </>
+          )}
+
+          {/* Vendor Selected Summary tab */}
+          {activeTab === "Vendor Selected Summary" && (
+            <VendorSelectedSummaryTab
+              subOrders={subOrders}
+              selectedVendors={selectedVendors}
+              createdPOs={createdPOs}
+              onCreatePurchaseOrders={handleCreatePurchaseOrders}
+            />
+          )}
+
+          {/* Vendor Selection tab */}
+          {activeTab === "Vendor Selection" && (
+            <VendorSelectionTab
+              subOrders={subOrders}
+              selectedVendors={selectedVendors}
+              onOpenModal={sub => setVendorModalSub(sub)}
+            />
           )}
 
           {activeTab === "Documents & Notes" && <DocumentsNotesTab />}
@@ -907,11 +1077,20 @@ export default function MyOrderPage() {
         </div>
       </div>
 
+      {/* Vendor Selection Popup Modal */}
+      {vendorModalSub && (
+        <VendorSelectionModal
+          sub={vendorModalSub}
+          selectedVendorId={selectedVendors[vendorModalSub.id] || null}
+          onSelect={handleSelectVendor}
+          onClose={() => setVendorModalSub(null)}
+        />
+      )}
+
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={() => setSubOrders(prev => prev.map(s => s.id === cancelTarget ? { ...s, itemStatus: "Pending" } : s))} onClose={() => setCancelTarget(null)} />}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
-      {showVendorOrders && <VendorOrdersModal orders={createdPOs} onDelete={handleDeletePO} onClose={() => setShowVendorOrders(false)} />}
     </div>
   );
 }
