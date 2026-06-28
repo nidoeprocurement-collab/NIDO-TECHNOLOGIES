@@ -127,6 +127,88 @@ function DocIcon({ ext }: { ext: string }) {
   );
 }
 
+// ── Update Tracking Modal ─────────────────────────────────────────────────────
+function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName: string; tracking: any; onSave: (t: any) => void; onClose: () => void }) {
+  const [form, setForm] = useState({
+    number: tracking?.number || "",
+    carrier: tracking?.carrier || "",
+    note: tracking?.note || "",
+    link: tracking?.link || "Track Package",
+  });
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 460, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Update Tracking Info</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{itemName}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+        </div>
+        <div style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {([
+            ["number", "Tracking Number", "e.g. 1Z999AA1234567890"],
+            ["carrier", "Carrier", "e.g. UPS, FedEx, DHL"],
+            ["note", "Note", "e.g. Shipped on Apr 17, 2026"],
+          ] as [string, string, string][]).map(([key, label, placeholder]) => (
+            <div key={key}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 5 }}>{label}</label>
+              <input
+                value={form[key as keyof typeof form]}
+                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                placeholder={placeholder}
+                style={{ width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
+          <button
+            onClick={() => { onSave({ ...form, link: form.link || "Track Package" }); onClose(); }}
+            style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+          >
+            Save Tracking
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Doc Actions Menu ──────────────────────────────────────────────────────────
+function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, color: "#6b7280", fontSize: 20, lineHeight: 1, display: "flex", alignItems: "center" }}
+      >
+        ⋮
+      </button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: 30, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 300, minWidth: 150, overflow: "hidden" }}>
+          <button onClick={() => { onDownload(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" }}>
+            ⬇ Download
+          </button>
+          <button onClick={() => { onDelete(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}>
+            🗑 Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Status Dropdown ───────────────────────────────────────────────────────────
 function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -335,6 +417,7 @@ export default function VendorOrderDetailPage() {
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [showAddNote, setShowAddNote] = useState(false);
   const [cancelled, setCancelled] = useState(false);
+  const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
 
   const filteredItems = items.filter(it =>
     it.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -346,6 +429,9 @@ export default function VendorOrderDetailPage() {
   };
   const handleDeleteItem = (id: string) => {
     setItems(prev => prev.filter(it => it.id !== id));
+  };
+  const handleUpdateTracking = (id: string, tracking: any) => {
+    setItems(prev => prev.map(it => it.id === id ? { ...it, tracking } : it));
   };
   const handleDeleteDoc = (id: string) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
@@ -514,7 +600,15 @@ export default function VendorOrderDetailPage() {
                     <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
                     <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
                   </>
-                ) : <span style={{ color: "#d1d5db" }}>-</span>}
+                ) : <span style={{ color: "#d1d5db" }}>—</span>}
+                <div style={{ marginTop: 7 }}>
+                  <button
+                    onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
+                    style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                  >
+                    Update
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -552,11 +646,11 @@ export default function VendorOrderDetailPage() {
               </div>
             ) : (
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                  {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON"].map(h => <div key={h}>{h}</div>)}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                  {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
                 </div>
                 {documents.map((doc, idx) => (
-                  <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px 180px 60px", padding: "14px 16px", alignItems: "center", borderBottom: idx < documents.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <DocIcon ext={doc.ext} />
                       <span style={{ fontSize: 13.5, fontWeight: 500 }}>{doc.name}</span>
@@ -564,6 +658,10 @@ export default function VendorOrderDetailPage() {
                     <div style={{ fontSize: 13, color: "#374151" }}>{doc.type}</div>
                     <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
                     <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
+                    <DocActionsMenu
+                      onDownload={() => alert(`Downloading: ${doc.name}`)}
+                      onDelete={() => handleDeleteDoc(doc.id)}
+                    />
                   </div>
                 ))}
               </div>
@@ -628,6 +726,14 @@ export default function VendorOrderDetailPage() {
             id: "n" + Date.now(), author: "System Owner", initials: "SO", color: "#6b7280", date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }), text, visibility: vis
           }, ...prev])}
           onClose={() => setShowAddNote(false)}
+        />
+      )}
+      {updateTrackingItem && (
+        <UpdateTrackingModal
+          itemName={updateTrackingItem.name}
+          tracking={updateTrackingItem.tracking}
+          onSave={t => handleUpdateTracking(updateTrackingItem.id, t)}
+          onClose={() => setUpdateTrackingItem(null)}
         />
       )}
     </div>
