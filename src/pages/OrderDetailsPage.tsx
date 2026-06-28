@@ -333,169 +333,185 @@ function ViewItemsModal({ group, onClose }) {
 function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
   const [viewItemsGroup, setViewItemsGroup] = useState<any>(null);
 
-  const vendorMap: Record<string, { vendor: typeof VENDOR_POOL[0], subOrders: typeof subOrders }> = {};
+  // --- Pending: vendor selected but no PO yet ---
+  const pendingMap: Record<string, { vendor: typeof VENDOR_POOL[0], subOrders: typeof subOrders }> = {};
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
-    if (!vid) continue;
+    if (!vid || createdPOs[sub.id]) continue;
     const vendor = VENDOR_POOL.find(v => v.id === vid);
     if (!vendor) continue;
-    if (!vendorMap[vid]) vendorMap[vid] = { vendor, subOrders: [] };
-    vendorMap[vid].subOrders.push(sub);
+    if (!pendingMap[vid]) pendingMap[vid] = { vendor, subOrders: [] };
+    pendingMap[vid].subOrders.push(sub);
   }
+  const pendingGroups = Object.values(pendingMap);
+  const pendingItems = pendingGroups.reduce((a, g) => a + g.subOrders.length, 0);
+  const pendingQty   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + o.qty, 0), 0);
+  const pendingAmt   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + g.vendor.pricePerUnit * o.qty, 0), 0);
 
-  const vendorGroups = Object.values(vendorMap);
-  const totalItems = vendorGroups.reduce((acc, g) => acc + g.subOrders.length, 0);
-  const totalQty = vendorGroups.reduce((acc, g) => acc + g.subOrders.reduce((a, s) => a + s.qty, 0), 0);
-  const totalAmount = vendorGroups.reduce((acc, g) => acc + g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0), 0);
-
-  const hasPOs = Object.keys(createdPOs).length > 0;
-  const anySelected = vendorGroups.length > 0;
-  const poList = Object.values(createdPOs) as any[];
+  // --- Created POs ---
+  const poList  = Object.values(createdPOs) as any[];
+  const hasPOs  = poList.length > 0;
   const poTotal = poList.reduce((a, p) => a + p.total, 0);
-  const createdAt = hasPOs ? new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "";
+  const poCreatedAt = hasPOs
+    ? new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) +
+      " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+    : "";
 
-  if (hasPOs) {
-    return (
-      <div style={{ padding: "28px 28px 36px" }}>
-        {/* Success banner */}
-        <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", border: "1px solid #86efac", borderRadius: 14, padding: "28px 32px", marginBottom: 28, display: "flex", alignItems: "flex-start", gap: 20 }}>
-          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>✓</div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 18, color: "#14532d", marginBottom: 6 }}>Purchase Orders Created Successfully!</div>
-            <div style={{ fontSize: 14, color: "#166534", lineHeight: 1.6 }}>
-              Thank you! <strong>{poList.length} Purchase Order{poList.length !== 1 ? "s" : ""}</strong> have been generated and dispatched to the respective vendors.
-              Your order is now being processed.
-            </div>
-            <div style={{ fontSize: 12.5, color: "#4ade80", marginTop: 8, fontWeight: 500 }}>Generated on {createdAt}</div>
-          </div>
-        </div>
+  const nothingAtAll = !hasPOs && pendingGroups.length === 0;
 
-        {/* PO cards */}
-        <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827", marginBottom: 14 }}>Created Purchase Orders</div>
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 110px 90px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-            {["PO NUMBER", "VENDOR", "ITEM", "QTY", "AMOUNT (INR)", "STATUS", "ACTION"].map(h => <div key={h}>{h}</div>)}
-          </div>
-          {poList.map((po, i) => {
-            const vendor = VENDOR_POOL.find(v => v.id === po.vendorId);
-            return (
-              <div key={po.poNumber} style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 110px 90px", padding: "16px 20px", alignItems: "center", borderBottom: i < poList.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#2563eb" }}>{po.poNumber}</div>
-                  <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Purchase Order</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Avatar initial={po.vendorId} color={vendor?.color || "#6b7280"} size={30} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{po.vendorName}</div>
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>{vendor?.location?.split(",")[0]}</div>
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{po.item}</div>
-                  <div style={{ fontSize: 11, color: "#9ca3af" }}>Sub Order: {po.subOrderId}</div>
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{po.qty} Nos</div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>₹ {po.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                <div>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", fontSize: 12, fontWeight: 600 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
-                    Created
-                  </span>
-                </div>
-                <div>
-                  <button
-                    onClick={() => { if (window.confirm(`Cancel ${po.poNumber}? This will remove the PO and allow vendor re-selection for this item.`)) onCancelPO(po.subOrderId); }}
-                    style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 6, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", fontFamily: "inherit" }}
-                  >
-                    Cancel PO
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          <div style={{ display: "grid", gridTemplateColumns: "160px 180px 1fr 80px 140px 110px 90px", padding: "13px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: "#111827", gridColumn: "1 / 5" }}>{poList.length} PO{poList.length !== 1 ? "s" : ""} Created</div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: "#111827" }}>₹ {poTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div /><div />
-          </div>
-        </div>
-
-        {/* Thank you note */}
-        <div style={{ marginTop: 22, padding: "16px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, display: "flex", alignItems: "center", gap: 14 }}>
-          <span style={{ fontSize: 22 }}>📋</span>
-          <div style={{ fontSize: 13.5, color: "#1e40af", lineHeight: 1.6 }}>
-            <strong>What's next?</strong> The vendors will receive their POs shortly and confirm delivery timelines. You can track each order's status under the <strong>Sub Orders / Items</strong> tab.
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const COL_PO  = "160px 180px 1fr 80px 140px 110px 90px";
+  const COL_PND = "200px 100px 1fr 130px 160px 100px";
 
   return (
-    <div style={{ padding: "20px 24px 28px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Vendors Selected Summary</div>
-        {anySelected && (
-          <button
-            onClick={onCreatePurchaseOrders}
-            style={{ padding: "9px 22px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
-          >
-            Create Purchase Orders
-          </button>
-        )}
-      </div>
+    <div style={{ padding: "20px 24px 28px", display: "flex", flexDirection: "column", gap: 28 }}>
 
-      {vendorGroups.length === 0 ? (
+      {/* ── Empty state ── */}
+      {nothingAtAll && (
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px 20px", textAlign: "center", color: "#9ca3af", background: "#fafafa" }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>🏪</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 4 }}>No vendors selected yet</div>
           <div style={{ fontSize: 13 }}>Use the "Select Vendor" button in each row of the Sub Orders tab.</div>
         </div>
-      ) : (
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "11px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
-            {["Vendor", "Items Count", "Sub Orders", "Total Quantity", "Total Amount (INR)", "Action"].map(h => <div key={h}>{h}</div>)}
+      )}
+
+      {/* ── Created POs section ── */}
+      {hasPOs && (
+        <div>
+          {/* success banner */}
+          <div style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)", border: "1px solid #86efac", borderRadius: 14, padding: "22px 28px", marginBottom: 18, display: "flex", alignItems: "flex-start", gap: 18 }}>
+            <div style={{ width: 46, height: 46, borderRadius: "50%", background: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0, color: "#fff" }}>✓</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#14532d", marginBottom: 4 }}>
+                {poList.length} Purchase Order{poList.length !== 1 ? "s" : ""} Created Successfully!
+              </div>
+              <div style={{ fontSize: 13.5, color: "#166534", lineHeight: 1.6 }}>
+                Thank you! POs have been dispatched to the respective vendors. Your order is being processed.
+              </div>
+              <div style={{ fontSize: 12, color: "#4ade80", marginTop: 6, fontWeight: 500 }}>Generated on {poCreatedAt}</div>
+            </div>
           </div>
 
-          {vendorGroups.map((g, i) => {
-            const vendorQty = g.subOrders.reduce((a, s) => a + s.qty, 0);
-            const vendorAmount = g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0);
-            return (
-              <div key={g.vendor.id} style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "16px 20px", alignItems: "center", borderBottom: i < vendorGroups.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <Avatar initial={g.vendor.id} color={g.vendor.color} size={36} />
+          {/* PO table */}
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 10 }}>Created Purchase Orders</div>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: COL_PO, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+              {["PO NUMBER","VENDOR","ITEM","QTY","AMOUNT (INR)","STATUS","ACTION"].map(h => <div key={h}>{h}</div>)}
+            </div>
+            {poList.map((po, i) => {
+              const vendor = VENDOR_POOL.find(v => v.id === po.vendorId);
+              return (
+                <div key={po.poNumber} style={{ display: "grid", gridTemplateColumns: COL_PO, padding: "15px 20px", alignItems: "center", borderBottom: i < poList.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{g.vendor.name}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.vendor.location}</div>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: "#2563eb" }}>{po.poNumber}</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Purchase Order</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Avatar initial={po.vendorId} color={vendor?.color || "#6b7280"} size={30} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{po.vendorName}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{vendor?.location?.split(",")[0]}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>{po.item}</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>Sub Order: {po.subOrderId}</div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{po.qty} Nos</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>₹ {po.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  <div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", fontSize: 12, fontWeight: 600 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />Created
+                    </span>
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => { if (window.confirm(`Cancel ${po.poNumber}? This will remove the PO and allow vendor re-selection for this item.`)) onCancelPO(po.subOrderId); }}
+                      style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 6, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", fontFamily: "inherit" }}
+                    >Cancel PO</button>
                   </div>
                 </div>
-                <div style={{ fontSize: 13.5, color: "#374151" }}>{g.subOrders.length} {g.subOrders.length === 1 ? "Item" : "Items"}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {g.subOrders.map(s => (
-                    <span key={s.id} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{s.id}</span>
-                  ))}
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{vendorQty} Nos</div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>₹ {vendorAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                <div>
-                  <button
-                    style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}
-                    onClick={() => setViewItemsGroup(g)}
-                  >
-                    View Items
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+            <div style={{ display: "grid", gridTemplateColumns: COL_PO, padding: "12px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#111827", gridColumn: "1 / 5" }}>{poList.length} PO{poList.length !== 1 ? "s" : ""} Created</div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: "#111827" }}>₹ {poTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+              <div /><div />
+            </div>
+          </div>
+        </div>
+      )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "13px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Total : {totalItems} Items</div>
-            <div /><div />
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{totalQty} Nos</div>
-            <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>₹ {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-            <div />
+      {/* ── Pending selections section ── */}
+      {pendingGroups.length > 0 && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
+                {hasPOs ? "Additional Vendor Selections — Pending PO" : "Vendors Selected Summary"}
+              </div>
+              {hasPOs && (
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>
+                  {pendingItems} item{pendingItems !== 1 ? "s" : ""} ready — click "Create Purchase Orders" to generate POs.
+                </div>
+              )}
+            </div>
+            <button
+              onClick={onCreatePurchaseOrders}
+              style={{ padding: "9px 22px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+            >
+              Create Purchase Orders
+            </button>
+          </div>
+
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "11px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
+              {["Vendor","Items Count","Sub Orders","Total Quantity","Total Amount (INR)","Action"].map(h => <div key={h}>{h}</div>)}
+            </div>
+            {pendingGroups.map((g, i) => {
+              const vQty = g.subOrders.reduce((a, s) => a + s.qty, 0);
+              const vAmt = g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0);
+              return (
+                <div key={g.vendor.id} style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "15px 20px", alignItems: "center", borderBottom: i < pendingGroups.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <Avatar initial={g.vendor.id} color={g.vendor.color} size={36} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{g.vendor.name}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.vendor.location}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13.5, color: "#374151" }}>{g.subOrders.length} {g.subOrders.length === 1 ? "Item" : "Items"}</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {g.subOrders.map(s => (
+                      <span key={s.id} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "#fffbeb", color: "#92400e", border: "1px solid #fcd34d" }}>{s.id}</span>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{vQty} Nos</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>₹ {vAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  <div>
+                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }} onClick={() => setViewItemsGroup(g)}>
+                      View Items
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "12px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Total : {pendingItems} Item{pendingItems !== 1 ? "s" : ""}</div>
+              <div /><div />
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{pendingQty} Nos</div>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>₹ {pendingAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+              <div />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* what's next note — only when all have POs and nothing pending */}
+      {hasPOs && pendingGroups.length === 0 && (
+        <div style={{ padding: "16px 20px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, display: "flex", alignItems: "center", gap: 14 }}>
+          <span style={{ fontSize: 22 }}>📋</span>
+          <div style={{ fontSize: 13.5, color: "#1e40af", lineHeight: 1.6 }}>
+            <strong>What's next?</strong> The vendors will receive their POs shortly and confirm delivery timelines. You can track each order's status under the <strong>Sub Orders / Items</strong> tab.
           </div>
         </div>
       )}
