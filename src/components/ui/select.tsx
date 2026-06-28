@@ -1,86 +1,115 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 
 interface SelectContextType {
   value?: string;
   onValueChange?: (value: string) => void;
-  isOpen?: boolean;
-  setIsOpen?: (open: boolean) => void;
+  isOpen: boolean;
+  openDropdown: (rect: DOMRect) => void;
+  closeDropdown: () => void;
   disabled?: boolean;
+  itemLabels: Record<string, string>;
+  registerItem: (value: string, label: string) => void;
+  triggerRect: DOMRect | null;
+  contentRef: React.MutableRefObject<HTMLDivElement | null>;
 }
 
-const SelectContext = React.createContext<SelectContextType>({});
+const SelectContext = React.createContext<SelectContextType>({
+  isOpen: false,
+  openDropdown: () => {},
+  closeDropdown: () => {},
+  itemLabels: {},
+  registerItem: () => {},
+  triggerRect: null,
+  contentRef: { current: null },
+});
 
-export interface SelectProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface SelectProps {
   value?: string;
   onValueChange?: (value: string) => void;
   disabled?: boolean;
   children: React.ReactNode;
+  className?: string;
 }
 
-const Select: React.FC<SelectProps> = ({
-  value,
-  onValueChange,
-  disabled,
-  children,
-  ...props
-}) => {
+const Select: React.FC<SelectProps> = ({ value, onValueChange, disabled, children, className }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState<string>("");
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+  const [itemLabels, setItemLabels] = useState<Record<string, string>>({});
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  const registerItem = useCallback((itemValue: string, label: string) => {
+    setItemLabels(prev => prev[itemValue] === label ? prev : { ...prev, [itemValue]: label });
+  }, []);
+
+  const openDropdown = useCallback((rect: DOMRect) => {
+    setTriggerRect(rect);
+    setIsOpen(true);
+  }, []);
+
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+  }, []);
 
   useEffect(() => {
+    if (!isOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const inContainer = containerRef.current?.contains(target);
+      const inContent = contentRef.current?.contains(target);
+      if (!inContainer && !inContent) {
         setIsOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [isOpen]);
 
   return (
-    <SelectContext.Provider
-      value={{
-        value,
-        onValueChange,
-        isOpen,
-        setIsOpen,
-        disabled,
-      }}
-    >
-      <div ref={dropdownRef} {...props} className={`relative w-full ${props.className || ""}`}>
+    <SelectContext.Provider value={{ value, onValueChange, isOpen, openDropdown, closeDropdown, disabled, itemLabels, registerItem, triggerRect, contentRef }}>
+      <div ref={containerRef} className={`relative w-full ${className || ""}`}>
         {children}
       </div>
     </SelectContext.Provider>
   );
 };
 
-const SelectTrigger = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, children, ...props }, ref) => {
-  const context = React.useContext(SelectContext);
+const SelectTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
+  ({ className, children, ...props }, ref) => {
+    const context = React.useContext(SelectContext);
+    const btnRef = useRef<HTMLButtonElement>(null);
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      onClick={() => {
-        if (!context.disabled) {
-          context.setIsOpen?.(!context.isOpen);
-        }
-      }}
-      disabled={context.disabled}
-      className={`flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${className || ""}`}
-      {...props}
-    >
-      {children}
-      <ChevronDown className="h-4 w-4 opacity-50" />
-    </button>
-  );
-});
+    const handleClick = () => {
+      if (context.disabled) return;
+      if (context.isOpen) {
+        context.closeDropdown();
+      } else {
+        const rect = btnRef.current?.getBoundingClientRect();
+        if (rect) context.openDropdown(rect);
+      }
+    };
+
+    return (
+      <button
+        ref={(el) => {
+          (btnRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+          if (typeof ref === 'function') ref(el);
+          else if (ref) (ref as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+        }}
+        type="button"
+        onClick={handleClick}
+        disabled={context.disabled}
+        className={`flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${className || ""}`}
+        {...props}
+      >
+        {children}
+        <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0 ml-1" />
+      </button>
+    );
+  }
+);
 SelectTrigger.displayName = "SelectTrigger";
 
 const SelectValue = React.forwardRef<
@@ -88,45 +117,63 @@ const SelectValue = React.forwardRef<
   React.HTMLAttributes<HTMLDivElement> & { placeholder?: string }
 >(({ className, placeholder, children, ...props }, ref) => {
   const context = React.useContext(SelectContext);
-  const [label, setLabel] = React.useState<string>(placeholder || "");
-
-  React.useEffect(() => {
-    if (context.value) {
-      const items = document.querySelectorAll("[data-value]");
-      items.forEach((item) => {
-        if (item.getAttribute("data-value") === context.value) {
-          setLabel(item.textContent || "");
-        }
-      });
-    }
-  }, [context.value]);
+  const label = context.value
+    ? (context.itemLabels[context.value] || context.value)
+    : "";
 
   return (
-    <div ref={ref} className={`text-gray-700 ${className || ""}`} {...props}>
-      {label || placeholder || children}
+    <div ref={ref} className={`text-gray-700 flex-1 text-left truncate ${className || ""}`} {...props}>
+      {label || <span className="text-gray-400">{placeholder || children}</span>}
     </div>
   );
 });
 SelectValue.displayName = "SelectValue";
 
-const SelectContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, children, ...props }, ref) => {
-  const context = React.useContext(SelectContext);
+const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => {
+    const context = React.useContext(SelectContext);
 
-  if (!context.isOpen) return null;
+    if (!context.isOpen || !context.triggerRect) return null;
 
-  return (
-    <div
-      ref={ref}
-      className={`absolute top-full left-0 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg z-50 max-h-60 overflow-y-auto ${className || ""}`}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-});
+    const rect = context.triggerRect;
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const openUpward = spaceBelow < 150 && spaceAbove > spaceBelow;
+
+    const maxHeight = Math.min(openUpward ? spaceAbove : spaceBelow, 320);
+    const width = Math.max(rect.width, 160);
+    const left = Math.min(rect.left, viewportWidth - width - 8);
+
+    const fixedStyle: React.CSSProperties = {
+      position: 'fixed',
+      left,
+      width,
+      zIndex: 99999,
+      maxHeight: Math.max(maxHeight, 120),
+      ...(openUpward
+        ? { bottom: viewportHeight - rect.top + 4 }
+        : { top: rect.bottom + 4 }),
+    };
+
+    return createPortal(
+      <div
+        ref={(el) => {
+          context.contentRef.current = el;
+          if (typeof ref === 'function') ref(el);
+          else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+        }}
+        style={fixedStyle}
+        className={`rounded-md border border-gray-300 bg-white shadow-xl overflow-y-auto ${className || ""}`}
+        {...props}
+      >
+        {children}
+      </div>,
+      document.body
+    );
+  }
+);
 SelectContent.displayName = "SelectContent";
 
 const SelectItem = React.forwardRef<
@@ -135,10 +182,19 @@ const SelectItem = React.forwardRef<
 >(({ className, value, children, onClick, ...props }, ref) => {
   const context = React.useContext(SelectContext);
 
-  const handleSelect = () => {
+  useEffect(() => {
+    if (value !== undefined) {
+      const label = typeof children === 'string' ? children : (value || "");
+      context.registerItem(value, label);
+    }
+  }, [value]);
+
+  const handleSelect = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     context.onValueChange?.(value || "");
-    context.setIsOpen?.(false);
-    onClick?.({} as any);
+    context.closeDropdown();
+    onClick?.({} as React.MouseEvent<HTMLDivElement>);
   };
 
   const isSelected = context.value === value;
