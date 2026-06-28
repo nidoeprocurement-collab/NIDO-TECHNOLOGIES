@@ -1,6 +1,7 @@
 modules = ["nodejs-20", "web", "bash"]
 [agent]
 expertMode = true
+stack = "FULLSTACK_JS"
 
 [nix]
 channel = "stable-25_05"
@@ -26,9 +27,14 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm run dev"
+args = "npm run dev"
 waitForPort = 5000
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "./dist/index.cjs"]
+build = ["npm", "run", "build"]
