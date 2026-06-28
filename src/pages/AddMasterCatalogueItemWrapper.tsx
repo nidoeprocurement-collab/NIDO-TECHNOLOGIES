@@ -65,6 +65,11 @@ export default function AddMasterCatalogueItemWrapper() {
   const [vendorPrice, setVendorPrice] = useState('');
   const [vendorLeadTime, setVendorLeadTime] = useState('');
 
+  // State for new spec row inputs
+  const [newSpecName, setNewSpecName] = useState('');
+  const [newSpecValue, setNewSpecValue] = useState('');
+  const [newSpecUnit, setNewSpecUnit] = useState('-');
+
   // State for adding new dropdown options
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addDialogType, setAddDialogType] = useState<string>('');
@@ -78,11 +83,6 @@ export default function AddMasterCatalogueItemWrapper() {
   const [unitsList, setUnitsList] = useState(['-', 'ppm', 'dpi', 'pages', 'GB', 'Hz', 'mm', 'cm', 'kg', 'inch']);
   const [specificationsList, setSpecificationsList] = useState(['Print/Scan/Copy', 'Print Speed', 'Resolution', 'Function', 'Performance', 'Design']);
 
-  const specifications = [
-    { name: 'Function', value: 'Print/Scan/Copy' },
-    { name: 'Print Speed', value: '30' },
-    { name: 'Resolution', value: '1200 x 1200' },
-  ];
 
   // Handler to add new option to a dropdown
   const handleAddNewOption = () => {
@@ -168,6 +168,41 @@ export default function AddMasterCatalogueItemWrapper() {
       ...formData,
       tags: formData.tags.filter((_, i) => i !== index),
     });
+  };
+
+  // Add a specification row (called by "Add" button next to category OR "Add Specification Row" button)
+  const handleAddSpecRow = () => {
+    if (!newSpecName.trim()) {
+      toast.error('Please enter a Specification Category name');
+      return;
+    }
+    const newSpec: Specification = {
+      id: Date.now().toString(),
+      specification: newSpecName.trim(),
+      value: newSpecValue,
+      unit: newSpecUnit,
+    };
+    if (!specificationsList.includes(newSpecName.trim())) {
+      setSpecificationsList([...specificationsList, newSpecName.trim()]);
+    }
+    setFormData({ ...formData, specifications: [...formData.specifications, newSpec] });
+    setNewSpecName('');
+    setNewSpecValue('');
+    setNewSpecUnit('-');
+    toast.success('Specification added');
+  };
+
+  // Update a field on an existing spec row
+  const handleUpdateSpec = (id: string, field: keyof Specification, value: string) => {
+    setFormData({
+      ...formData,
+      specifications: formData.specifications.map(s => s.id === id ? { ...s, [field]: value } : s),
+    });
+  };
+
+  // Remove a spec row
+  const handleRemoveSpec = (id: string) => {
+    setFormData({ ...formData, specifications: formData.specifications.filter(s => s.id !== id) });
   };
 
   const addRow = () => {
@@ -377,30 +412,84 @@ export default function AddMasterCatalogueItemWrapper() {
                       </tr>
                     </thead>
                     <tbody>
-                      {specifications.map((spec, idx) => (
-                        <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
-                          <td className="p-2">
-                            <div className="flex items-center gap-2">
-                              <GripVertical size={16} className="text-gray-400 cursor-grab" />
-                              <span className="text-gray-700">{spec.name}</span>
-                            </div>
+                      {formData.specifications.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-4 text-center text-xs text-gray-400">
+                            No specifications yet. Use the panel below to add one.
                           </td>
-                          <td className="p-2"><Input value={spec.value} className="text-xs h-8" readOnly /></td>
-                          <td className="p-2"><Select><SelectTrigger className="h-8 text-xs"><SelectValue  placeholder="-" /></SelectTrigger><SelectContent>{unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></td>
-                          <td className="p-2"><button className="text-red-500 hover:text-red-700"><X size={16} /></button></td>
                         </tr>
-                      ))}
+                      ) : (
+                        formData.specifications.map((spec) => (
+                          <tr key={spec.id} className="border-b border-gray-200 hover:bg-gray-50">
+                            <td className="p-2">
+                              <div className="flex items-center gap-2">
+                                <GripVertical size={16} className="text-gray-400 cursor-grab" />
+                                <span className="text-gray-700 font-medium">{spec.specification}</span>
+                              </div>
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                value={spec.value}
+                                onChange={(e) => handleUpdateSpec(spec.id, 'value', e.target.value)}
+                                className="text-xs h-8"
+                                placeholder="Enter value"
+                              />
+                            </td>
+                            <td className="p-2 min-w-[140px]">
+                              <div className="flex gap-1">
+                                <Select
+                                  value={spec.unit}
+                                  onValueChange={(val) => {
+                                    if (val === '__add_unit__') { openAddDialog('unit'); }
+                                    else { handleUpdateSpec(spec.id, 'unit', val); }
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 text-xs flex-1">
+                                    <SelectValue placeholder="-" />
+                                  </SelectTrigger>
+                                  <SelectContent style={{ maxHeight: 'none', overflow: 'visible' }}>
+                                    {unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                                    <div className="border-t border-gray-100 mt-1 pt-1">
+                                      <SelectItem value="__add_unit__" className="text-blue-600 font-medium">
+                                        + Add New Unit
+                                      </SelectItem>
+                                    </div>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </td>
+                            <td className="p-2">
+                              <button
+                                onClick={() => handleRemoveSpec(spec.id)}
+                                className="text-red-400 hover:text-red-600 transition-colors"
+                              >
+                                <X size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Add Specification Panel */}
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-                  <div className="mb-3">
-                    <Label className="text-xs sm:text-sm font-medium text-gray-700">Add Specification Category</Label>
+                  <div>
+                    <Label className="text-xs sm:text-sm font-medium text-gray-700">Specification Category</Label>
                     <div className="flex gap-2 mt-2">
-                      <Input placeholder="e.g., Connectivity" className="text-sm flex-1" />
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700 px-4">
+                      <Input
+                        placeholder="e.g., Connectivity"
+                        className="text-sm flex-1"
+                        value={newSpecName}
+                        onChange={(e) => setNewSpecName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpecRow(); }}
+                      />
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 px-4"
+                        onClick={handleAddSpecRow}
+                      >
                         <Plus size={16} className="mr-1" />
                         Add
                       </Button>
@@ -409,25 +498,43 @@ export default function AddMasterCatalogueItemWrapper() {
 
                   <div>
                     <Label className="text-xs sm:text-sm font-medium text-gray-700">Value</Label>
-                    <Input placeholder="e.g., 1200 x 1200" className="text-sm" />
+                    <Input
+                      placeholder="e.g., 1200 x 1200"
+                      className="text-sm"
+                      value={newSpecValue}
+                      onChange={(e) => setNewSpecValue(e.target.value)}
+                    />
                   </div>
+
                   <div>
                     <Label className="text-xs sm:text-sm font-medium text-gray-700">Unit</Label>
                     <div className="flex gap-2">
-                      <Select>
+                      <Select
+                        value={newSpecUnit}
+                        onValueChange={(val) => {
+                          if (val === '__add_unit__') { openAddDialog('unit'); }
+                          else { setNewSpecUnit(val); }
+                        }}
+                      >
                         <SelectTrigger className="text-sm flex-1">
                           <SelectValue placeholder="Select unit..." />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent style={{ maxHeight: 'none', overflow: 'visible' }}>
                           {unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          <div className="border-t border-gray-100 mt-1 pt-1">
+                            <SelectItem value="__add_unit__" className="text-blue-600 font-medium">
+                              + Add New Unit
+                            </SelectItem>
+                          </div>
                         </SelectContent>
                       </Select>
-                      <Button variant="outline" size="sm" className="px-2" onClick={() => openAddDialog('unit')} title="Add new Unit">
-                        <Plus size={16} />
-                      </Button>
                     </div>
                   </div>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+
+                  <Button
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={handleAddSpecRow}
+                  >
                     <Plus size={16} className="mr-2" />
                     Add Specification Row
                   </Button>
