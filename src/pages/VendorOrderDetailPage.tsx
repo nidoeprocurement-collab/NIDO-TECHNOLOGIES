@@ -523,7 +523,8 @@ export default function VendorOrderDetailPage() {
   const [search, setSearch] = useState("");
   const [showCancelPO, setShowCancelPO] = useState(false);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
-  const [showAddNote, setShowAddNote] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteVisibility, setNoteVisibility] = useState("Internal Note");
   const [cancelled, setCancelled] = useState(false);
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
@@ -547,6 +548,13 @@ export default function VendorOrderDetailPage() {
   };
   const handleDeleteNote = (id: string) => {
     setNotes(prev => prev.filter(n => n.id !== id));
+  };
+  const handleAddNote = () => {
+    if (!noteText.trim()) return;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    setNotes(prev => [{ id: "n" + Date.now(), author: "System Owner", initials: "SO", color: "#2563eb", date: dateStr, text: noteText.trim(), visibility: noteVisibility }, ...prev]);
+    setNoteText("");
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 20px" };
@@ -780,35 +788,69 @@ export default function VendorOrderDetailPage() {
 
         {/* Notes Section */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes ({notes.length})</div>
-            <button onClick={() => setShowAddNote(true)} style={{ padding: "7px 16px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>+ Add Note</button>
+          <div style={{ borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Notes</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
           </div>
-          <div style={{ padding: "20px 24px" }}>
-            {notes.length === 0 ? (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px", textAlign: "center", color: "#9ca3af" }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>📝</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No notes yet</div>
+          <div style={{ padding: "20px 24px 28px" }}>
+            {/* Note list */}
+            {notes.map((note, i) => (
+              <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
+                    <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                      {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
+                </div>
               </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {notes.map(note => (
-                  <div key={note.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px 18px", background: "#fff" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Avatar initials={note.initials} color={note.color} size={30} />
+            ))}
+
+            {/* Inline Add Note composer */}
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: notes.length > 0 ? 8 : 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
+                <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
+                  <textarea
+                    value={noteText}
+                    onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }}
+                    placeholder="Write your note here..."
+                    rows={4}
+                    style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }}
+                  />
+                  <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
+                </div>
+                <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                    {([["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]] as [string, string, string][]).map(([label, icon, sub]) => (
+                      <div key={label} onClick={() => setNoteVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                        <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${noteVisibility === label ? "#2563eb" : "#d1d5db"}`, background: noteVisibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                          {noteVisibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                        </div>
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{note.author}</div>
-                          <div style={{ fontSize: 11.5, color: "#9ca3af" }}>{note.date}</div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                          <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
                         </div>
                       </div>
-                      <span style={{ fontSize: 11.5, background: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: 8 }}>{note.visibility}</span>
-                    </div>
-                    <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
+                    ))}
                   </div>
-                ))}
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      onClick={handleAddNote}
+                      disabled={!noteText.trim()}
+                      style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -827,14 +869,6 @@ export default function VendorOrderDetailPage() {
           data={assignment}
           onSave={d => setAssignment(d)}
           onClose={() => setShowEditAssignment(false)}
-        />
-      )}
-      {showAddNote && (
-        <AddNoteModal
-          onSave={(text, vis) => setNotes(prev => [{
-            id: "n" + Date.now(), author: "System Owner", initials: "SO", color: "#6b7280", date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }), text, visibility: vis
-          }, ...prev])}
-          onClose={() => setShowAddNote(false)}
         />
       )}
       {updateTrackingItem && (
