@@ -943,7 +943,7 @@ export default function MyOrderPage() {
   const navigate = useNavigate();
   const orderId = id || "ORD-24815779";
 
-  const TABS = ["Sub Orders / Items", "Vendor Selected Summary", "Documents & Notes"];
+  const TABS = ["Sub Orders / Items", "Vendor Selected Summary", "Order Activity Timeline"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   const [masterStatus, setMasterStatus] = useState("Partially Shipped");
   const [showStatusDd, setShowStatusDd] = useState(false);
@@ -1102,7 +1102,7 @@ export default function MyOrderPage() {
                 let label = tab;
                 if (tab === "Sub Orders / Items") label = `Sub Orders / Items (${subOrders.length})`;
                 if (tab === "Vendor Selected Summary") label = selectedSummaryCount > 0 ? `Vendor Selected Summary (${selectedSummaryCount})` : "Vendor Selected Summary";
-                if (tab === "Documents & Notes") label = "Documents & Notes (3)";
+                if (tab === "Order Activity Timeline") label = "Order Activity Timeline";
                 return (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "#2563eb" : "#6b7280", borderBottom: activeTab === tab ? "2px solid #2563eb" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -1209,26 +1209,24 @@ export default function MyOrderPage() {
             />
           )}
 
-          {activeTab === "Documents & Notes" && <DocumentsNotesTab />}
-        </div>
-
-        {/* Activity Timeline */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 18 }}>Order Activity Timeline</div>
-          {[{ label: "Order Created", date: "Apr 16, 2026 12:33 PM", by: "by Pavan" }, { label: "Sent to Vendors", date: "Apr 16, 2026 01:15 PM", by: "by System" }, { label: "POs Generated", date: "Apr 16, 2026 02:05 PM", by: "by System" }, { label: "Partially Shipped", date: "Apr 17, 2026 10:20 AM", by: "by System" }].map((ev, i, arr) => (
-            <div key={ev.label} style={{ display: "flex", gap: 14 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#2563eb", marginTop: 3 }} />
-                {i < arr.length - 1 && <div style={{ width: 2, flex: 1, background: "#e5e7eb", minHeight: 26 }} />}
-              </div>
-              <div style={{ paddingBottom: i < arr.length - 1 ? 18 : 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>{ev.label}</div>
-                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>{ev.date}</div>
-                <div style={{ fontSize: 12, color: "#9ca3af" }}>{ev.by}</div>
-              </div>
+          {activeTab === "Order Activity Timeline" && (
+            <div style={{ padding: "20px 24px 28px" }}>
+              {[{ label: "Order Created", date: "Apr 16, 2026 12:33 PM", by: "by Pavan" }, { label: "Sent to Vendors", date: "Apr 16, 2026 01:15 PM", by: "by System" }, { label: "POs Generated", date: "Apr 16, 2026 02:05 PM", by: "by System" }, { label: "Partially Shipped", date: "Apr 17, 2026 10:20 AM", by: "by System" }].map((ev, i, arr) => (
+                <div key={ev.label} style={{ display: "flex", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#2563eb", marginTop: 3 }} />
+                    {i < arr.length - 1 && <div style={{ width: 2, flex: 1, background: "#e5e7eb", minHeight: 26 }} />}
+                  </div>
+                  <div style={{ paddingBottom: i < arr.length - 1 ? 18 : 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{ev.label}</div>
+                    <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 1 }}>{ev.date}</div>
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>{ev.by}</div>
+                  </div>
+                </div>
+              ))}
+              <button style={{ marginTop: 14, background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>View Full Timeline →</button>
             </div>
-          ))}
-          <button style={{ marginTop: 14, background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>View Full Timeline →</button>
+          )}
         </div>
       </div>
 
