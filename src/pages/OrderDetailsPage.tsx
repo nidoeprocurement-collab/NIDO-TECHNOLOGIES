@@ -143,7 +143,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 580, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 860, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #e5e7eb" }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>Vendor Selection - Sub Order : {sub.id} ( {sub.itemName} )</div>
@@ -282,9 +282,57 @@ function VendorSelectionTab({ subOrders, selectedVendors, onOpenModal }) {
   );
 }
 
+// ── View Items Modal ──────────────────────────────────────────────────────────
+function ViewItemsModal({ group, onClose }) {
+  const total = group.subOrders.reduce((a, s) => a + group.vendor.pricePerUnit * s.qty, 0);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 780, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid #e5e7eb" }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Items for {group.vendor.name}</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>{group.subOrders.length} item{group.subOrders.length !== 1 ? "s" : ""} · {group.vendor.location}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ overflow: "auto", flex: 1 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "36px 120px 1fr 70px 130px 130px", padding: "10px 22px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+            {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL"].map(h => <div key={h}>{h}</div>)}
+          </div>
+          {group.subOrders.map((sub, idx) => (
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 120px 1fr 70px 130px 130px", padding: "15px 22px", alignItems: "start", borderBottom: idx < group.subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+              <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
+                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
+                  <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
+                  {sub.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
+              <div style={{ fontSize: 13, color: "#374151" }}>₹ {group.vendor.pricePerUnit.toFixed(2)}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>₹ {(group.vendor.pricePerUnit * sub.qty).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
+          <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Total</span>
+          <span style={{ fontWeight: 800, fontSize: 15, color: "#111827" }}>₹ {total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Vendor Selected Summary Tab ───────────────────────────────────────────────
 function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCreatePurchaseOrders }) {
-  // Group sub-orders by selected vendor
+  const [viewItemsGroup, setViewItemsGroup] = useState<any>(null);
+
   const vendorMap: Record<string, { vendor: typeof VENDOR_POOL[0], subOrders: typeof subOrders }> = {};
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
@@ -298,21 +346,16 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
   const vendorGroups = Object.values(vendorMap);
   const totalItems = vendorGroups.reduce((acc, g) => acc + g.subOrders.length, 0);
   const totalQty = vendorGroups.reduce((acc, g) => acc + g.subOrders.reduce((a, s) => a + s.qty, 0), 0);
-  const totalAmount = vendorGroups.reduce((acc, g) => {
-    return acc + g.subOrders.reduce((a, s) => {
-      const v = g.vendor;
-      return a + v.pricePerUnit * s.qty;
-    }, 0);
-  }, 0);
+  const totalAmount = vendorGroups.reduce((acc, g) => acc + g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0), 0);
 
   const hasPOs = Object.keys(createdPOs).length > 0;
-  const allSelected = subOrders.length > 0 && subOrders.every(s => !!selectedVendors[s.id]);
+  const anySelected = vendorGroups.length > 0;
 
   return (
     <div style={{ padding: "20px 24px 28px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
         <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Vendors Selected Summary</div>
-        {allSelected && !hasPOs && (
+        {anySelected && !hasPOs && (
           <button
             onClick={onCreatePurchaseOrders}
             style={{ padding: "9px 22px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
@@ -331,11 +374,10 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px 20px", textAlign: "center", color: "#9ca3af", background: "#fafafa" }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>🏪</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 4 }}>No vendors selected yet</div>
-          <div style={{ fontSize: 13 }}>Go to the "Vendor Selection" tab to select vendors for each sub-order.</div>
+          <div style={{ fontSize: 13 }}>Use the "Select Vendor" button in each row of the Sub Orders tab.</div>
         </div>
       ) : (
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-          {/* Table header */}
           <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "11px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
             {["Vendor", "Items Count", "Sub Orders", "Total Quantity", "Total Amount (INR)", "Action"].map(h => <div key={h}>{h}</div>)}
           </div>
@@ -345,7 +387,6 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
             const vendorAmount = g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0);
             return (
               <div key={g.vendor.id} style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "16px 20px", alignItems: "center", borderBottom: i < vendorGroups.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                {/* Vendor */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <Avatar initial={g.vendor.id} color={g.vendor.color} size={36} />
                   <div>
@@ -353,23 +394,18 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.vendor.location}</div>
                   </div>
                 </div>
-                {/* Items count */}
                 <div style={{ fontSize: 13.5, color: "#374151" }}>{g.subOrders.length} {g.subOrders.length === 1 ? "Item" : "Items"}</div>
-                {/* Sub order badges */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {g.subOrders.map(s => (
                     <span key={s.id} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{s.id}</span>
                   ))}
                 </div>
-                {/* Total qty */}
                 <div style={{ fontSize: 13.5, fontWeight: 500 }}>{vendorQty} Nos</div>
-                {/* Total amount */}
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>₹ {vendorAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                {/* Action */}
                 <div>
                   <button
                     style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}
-                    onClick={() => alert(`Viewing items for ${g.vendor.name}`)}
+                    onClick={() => setViewItemsGroup(g)}
                   >
                     View Items
                   </button>
@@ -378,17 +414,17 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
             );
           })}
 
-          {/* Total row */}
           <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 130px 160px 100px", padding: "13px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
             <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Total : {totalItems} Items</div>
-            <div />
-            <div />
+            <div /><div />
             <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{totalQty} Nos</div>
             <div style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>₹ {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
             <div />
           </div>
         </div>
       )}
+
+      {viewItemsGroup && <ViewItemsModal group={viewItemsGroup} onClose={() => setViewItemsGroup(null)} />}
     </div>
   );
 }
@@ -964,28 +1000,20 @@ export default function MyOrderPage() {
                 </div>
               </div>
             )}
-            {activeTab === "Vendor Selected Summary" && Object.keys(createdPOs).length === 0 && selectedSummaryCount === subOrders.length && subOrders.length > 0 && (
-              <button
-                onClick={handleCreatePurchaseOrders}
-                style={{ padding: "8px 20px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13.5, fontFamily: "inherit" }}
-              >
-                Create Purchase Orders
-              </button>
-            )}
           </div>
 
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 130px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                {["#","SUB ORDER ID","ITEM DETAILS","VENDOR","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"].map(h => <div key={h}>{h}</div>)}
+              <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                {["#","SUB ORDER ID","ITEM DETAILS","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"].map(h => <div key={h}>{h}</div>)}
               </div>
               {filtered.map((sub, idx) => {
                 const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
                 const selVendorId = selectedVendors[sub.id];
                 const selVendor = selVendorId ? VENDOR_POOL.find(v => v.id === selVendorId) : null;
                 return (
-                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 150px 110px 52px 90px 80px 130px 180px 130px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                     <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
@@ -1003,10 +1031,6 @@ export default function MyOrderPage() {
                           {sub.specs.length > 1 && <button onClick={() => setExpandedItems(s => { const n = new Set(s); n.has(sub.id) ? n.delete(sub.id) : n.add(sub.id); return n; })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 2 }}>{expanded ? "View less" : "View more"}</button>}
                         </div>
                       </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Avatar initial={sub.vendorInitial} color={sub.vendorColor} size={28} />
-                      <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.35 }}>{sub.vendorName}</span>
                     </div>
                     <div>
                       <button
