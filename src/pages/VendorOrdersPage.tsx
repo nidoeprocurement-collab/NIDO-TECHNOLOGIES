@@ -201,6 +201,7 @@ function useToast() {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function VendorOrderList() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
@@ -464,12 +465,18 @@ export default function VendorOrderList() {
               {pageRows.length === 0 ? (
                 <tr><td colSpan={9} style={{ ...s.td, textAlign: "center", color: "#aaa", padding: 32 }}>No orders found</td></tr>
               ) : pageRows.map(row => (
-                <tr key={row.id} style={{ background: selected.has(row.id) ? "#f5f7ff" : "transparent" }}>
-                  <td style={{ ...s.td, paddingLeft: 16 }}><Checkbox checked={selected.has(row.id)} onClick={() => toggleRow(row.id)} /></td>
+                <tr
+                  key={row.id}
+                  onClick={() => navigate(`/vendor-orders/${row.id}`)}
+                  style={{ background: selected.has(row.id) ? "#f5f7ff" : "transparent", cursor: "pointer" }}
+                  onMouseEnter={e => { if (!(e.target as HTMLElement).closest('button')) (e.currentTarget as HTMLElement).style.background = "#f0f4ff"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selected.has(row.id) ? "#f5f7ff" : "transparent"; }}
+                >
+                  <td style={{ ...s.td, paddingLeft: 16 }} onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(row.id)} onClick={() => toggleRow(row.id)} /></td>
                   <td style={s.td}><POLink id={row.id} /></td>
                   <td style={s.td}>{row.vendor}</td>
                   <td style={s.td}>{row.dateStr}</td>
-                  <td style={s.td}>
+                  <td style={s.td} onClick={e => e.stopPropagation()}>
                     <OrderLink id={row.orderId} />
                   </td>
                   <td style={s.td}><Badge status={row.status} /></td>
