@@ -146,7 +146,7 @@ export default function AddMasterCatalogueItemWrapper() {
       createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
     };
     localStorage.setItem('nido_preview_draft', JSON.stringify(previewData));
-    window.open('/preview-product', '_blank');
+    navigate('/preview-product');
   };
 
   const handleSaveDraft = () => {
