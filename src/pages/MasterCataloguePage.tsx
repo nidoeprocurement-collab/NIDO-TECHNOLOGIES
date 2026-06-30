@@ -28,6 +28,7 @@ import {
 
 interface CatalogItem {
   id: string;
+  masterProductCode?: string;
   name: string;
   sku: string;
   publishStatus?: 'draft' | 'published';
@@ -98,6 +99,7 @@ export default function CatalogUpdatesTab() {
   const [items, setItems] = useState<CatalogItem[]>(() => {
     const stored = getCatalogProducts().map(p => ({
       id: p.id,
+      masterProductCode: p.masterProductCode,
       name: p.productName,
       sku: p.skuCode || p.masterProductCode,
       publishStatus: p.publishStatus,
@@ -152,6 +154,7 @@ export default function CatalogUpdatesTab() {
   const loadFromStore = () => {
     const stored = getCatalogProducts().map(p => ({
       id: p.id,
+      masterProductCode: p.masterProductCode,
       name: p.productName,
       sku: p.skuCode || p.masterProductCode,
       publishStatus: p.publishStatus,
@@ -174,6 +177,30 @@ export default function CatalogUpdatesTab() {
       trackPerformance: false, performanceRating: 4,
     }));
     setItems(stored);
+  };
+
+  const openPreview = (id: string) => {
+    const product = getCatalogProducts().find(p => p.id === id);
+    if (!product) return;
+    const draft = {
+      masterProductCode: product.masterProductCode,
+      skuCode: product.skuCode || product.masterProductCode,
+      productName: product.productName,
+      brand: product.brand,
+      category: product.category,
+      subcategory: product.subcategory,
+      price: product.price,
+      moq: product.moq,
+      description: product.description,
+      productNotes: product.productNotes || '',
+      specifications: product.specifications || [],
+      generalSpecs: product.generalSpecs || [],
+      images: product.images || [],
+      videoUrl: product.videoUrl || '',
+      publishStatus: product.publishStatus,
+    };
+    localStorage.setItem('nido_preview_draft', JSON.stringify(draft));
+    navigate('/preview-product');
   };
 
   useEffect(() => {
@@ -609,7 +636,17 @@ export default function CatalogUpdatesTab() {
           <Table>
             <TableHeader>
               <TableRow className="border-gray-200 bg-gray-50">
+                <TableHead className="w-10 pl-4">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 cursor-pointer"
+                    checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                    onChange={toggleAll}
+                    data-testid="checkbox-select-all"
+                  />
+                </TableHead>
                 <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
+                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Master Product Code</TableHead>
                 <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
                 <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
                 <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
@@ -620,13 +657,27 @@ export default function CatalogUpdatesTab() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-600">
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-600">
                     No items match the selected filters. Adjust search, category, or status to view catalog entries.
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map(item => (
-                  <TableRow key={item.id} className="border-gray-200 hover:bg-gray-50">
+                  <TableRow
+                    key={item.id}
+                    className="border-gray-200 hover:bg-blue-50 cursor-pointer"
+                    onClick={() => openPreview(item.id)}
+                    data-testid={`row-product-${item.id}`}
+                  >
+                    <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 cursor-pointer"
+                        checked={selectedIds.includes(item.id)}
+                        onChange={() => toggleSelect(item.id)}
+                        data-testid={`checkbox-product-${item.id}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -639,6 +690,7 @@ export default function CatalogUpdatesTab() {
                         <span className="font-medium text-sm">{item.name}</span>
                       </div>
                     </TableCell>
+                    <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
                     <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
                     <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
                     <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
@@ -651,7 +703,7 @@ export default function CatalogUpdatesTab() {
                         <Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200">
@@ -676,7 +728,7 @@ export default function CatalogUpdatesTab() {
             </TableBody>
           </Table>
           <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
-            <span>Showing 0 of {items.length} entries</span>
+            <span>{selectedIds.length > 0 ? `${selectedIds.length} selected · ` : ''}Showing {filtered.length} of {items.length} entries</span>
           </div>
         </CardContent>
       </Card>
