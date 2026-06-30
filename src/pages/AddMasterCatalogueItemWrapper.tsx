@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   Plus, X, Bold, Italic, Underline, List, AlignLeft, AlignCenter, AlignRight, Link2, Image, Upload, 
-  ChevronDown, ChevronUp, GripVertical, PackageIcon, Download
+  GripVertical, PackageIcon, Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -71,11 +71,6 @@ export default function AddMasterCatalogueItemWrapper() {
   });
 
   const [tagInput, setTagInput] = useState('');
-  const [expandVendorPanel, setExpandVendorPanel] = useState(false);
-  const [vendorName, setVendorName] = useState('');
-  const [vendorQuantity, setVendorQuantity] = useState('');
-  const [vendorPrice, setVendorPrice] = useState('');
-  const [vendorLeadTime, setVendorLeadTime] = useState('');
 
   // State for new spec row inputs
   const [newSpecName, setNewSpecName] = useState('');
@@ -703,86 +698,6 @@ export default function AddMasterCatalogueItemWrapper() {
                       <p className="text-xs font-medium text-gray-600">Product Summary</p>
                       <p className="text-sm font-bold text-gray-900 truncate">{formData.productName || 'Untitled product'}</p>
                     </div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <Badge className="text-xs bg-blue-100 text-blue-700 border-0">MOD-1</Badge>
-                    <Badge className="text-xs bg-green-100 text-green-700 border-0">Warranty</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Inventory Management */}
-              <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4" style={{ marginLeft: '10px', marginRight: '-10px' }}>
-                  <h3 className="text-xs font-bold text-green-600 uppercase tracking-wide">Inventory Management</h3>
-                  <p className="text-xs text-gray-600 mt-1">Multi-vendor stock allocation</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-xs text-gray-600">Total Stock</p>
-                      <p className="text-2xl font-bold text-gray-900">0</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">0 Vendors</p>
-                      <p className="text-2xl font-bold text-green-600">₹0</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-3">No vendors added yet</p>
-                  <p className="text-xs text-blue-600 mt-2">Add vendor contributions to track multi-source inventory</p>
-
-                  {/* Add Vendor Stock Panel */}
-                  <div className="mt-3 border-t border-gray-300 pt-3" style={{ marginRight: '20px' }}>
-                    <button 
-                      onClick={() => setExpandVendorPanel(!expandVendorPanel)}
-                      className="flex items-center justify-between w-full text-xs font-semibold text-gray-700 hover:text-gray-900"
-                    >
-                      <span>Add Vendor Stock</span>
-                      {expandVendorPanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-
-                    {expandVendorPanel && (
-                      <div className="mt-3 space-y-2">
-                        <div>
-                          <Label className="text-xs text-gray-600">Vendor</Label>
-                          <Input 
-                            placeholder="Search vendor name..." 
-                            value={vendorName}
-                            onChange={(e) => setVendorName(e.target.value)}
-                            className="mt-1 text-xs h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-gray-600">Quantity</Label>
-                          <Input 
-                            placeholder="0" 
-                            value={vendorQuantity}
-                            onChange={(e) => setVendorQuantity(e.target.value)}
-                            className="mt-1 text-xs h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-gray-600">Price per item</Label>
-                          <Input 
-                            placeholder="0.00" 
-                            value={vendorPrice}
-                            onChange={(e) => setVendorPrice(e.target.value)}
-                            className="mt-1 text-xs h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-gray-600">Lead time (e.g., 5-7 days)</Label>
-                          <Input 
-                            placeholder="5-7 days" 
-                            value={vendorLeadTime}
-                            onChange={(e) => setVendorLeadTime(e.target.value)}
-                            className="mt-1 text-xs h-8"
-                          />
-                        </div>
-                        <Button className="w-full bg-blue-600 hover:bg-blue-700 h-8 text-xs mt-2">
-                          <Plus size={14} className="mr-1" />
-                          Add Vendor
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
