@@ -207,20 +207,26 @@ export default function AddVendorProductsPage() {
         </p>
       </div>
 
-      {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
+      {/* ── Body: two panels that share the remaining height, never scroll as a whole ── */}
+      <div className="flex-1 min-h-0 px-6 py-4 flex flex-col gap-4 overflow-hidden">
 
-        {/* Section 1: Search & Select — hidden in edit mode */}
+        {/* ── Section 1: Search & Select ── capped at 48% of body, scrolls internally */}
         {!isEditMode && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
-            {/* Section header */}
-            <div className="flex-shrink-0 px-5 py-3.5 border-b border-gray-100 flex items-center gap-3">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden flex-shrink-0" style={{ maxHeight: "48%" }}>
+
+            {/* Header */}
+            <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
               <h2 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h2>
+              {selectedIds.size > 0 && (
+                <span className="ml-auto text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                  {selectedIds.size} selected
+                </span>
+              )}
             </div>
 
-            {/* Search */}
-            <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100">
+            {/* Search bar */}
+            <div className="flex-shrink-0 px-5 py-2.5 border-b border-gray-100">
               <div className="relative max-w-lg">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -238,19 +244,19 @@ export default function AddVendorProductsPage() {
               </div>
             </div>
 
-            {/* Table */}
-            {catalog.length === 0 ? (
-              <div className="px-5 py-12 text-center text-gray-400 text-sm">
-                No products in master catalog yet. Add products via Master Catalog first.
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="px-5 py-10 text-center text-gray-400 text-sm">
-                No products match "<span className="font-medium text-gray-600">{query}</span>"
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
-                  <thead>
+            {/* Scrollable table area */}
+            <div className="flex-1 min-h-0 overflow-auto">
+              {catalog.length === 0 ? (
+                <div className="px-5 py-10 text-center text-gray-400 text-sm">
+                  No products in master catalog yet. Add products via Master Catalog first.
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="px-5 py-8 text-center text-gray-400 text-sm">
+                  No products match "<span className="font-medium text-gray-600">{query}</span>"
+                </div>
+              ) : (
+                <table className="w-full text-sm" style={{ minWidth: "620px" }}>
+                  <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">Select</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Name</th>
@@ -269,7 +275,7 @@ export default function AddVendorProductsPage() {
                           onClick={() => toggleSelect(product)}
                           className={`cursor-pointer transition-colors ${checked ? "bg-blue-50/60 hover:bg-blue-50" : "hover:bg-gray-50"}`}
                         >
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2.5">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -278,7 +284,7 @@ export default function AddVendorProductsPage() {
                               className="w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer"
                             />
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2.5">
                               <ProductThumb images={product.images} name={product.productName} />
                               <div>
@@ -287,12 +293,12 @@ export default function AddVendorProductsPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2.5 whitespace-nowrap">
                             <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{product.skuCode || "—"}</span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-600 text-sm">{product.category || "—"}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-600 text-sm">{product.brand || "—"}</td>
-                          <td className="px-4 py-3 max-w-[200px]">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 text-sm">{product.category || "—"}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 text-sm">{product.brand || "—"}</td>
+                          <td className="px-4 py-2.5 max-w-[200px]">
                             <span className="text-gray-500 text-xs line-clamp-2">{product.description || "—"}</span>
                           </td>
                         </tr>
@@ -300,14 +306,14 @@ export default function AddVendorProductsPage() {
                     })}
                   </tbody>
                 </table>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Pagination */}
+            {/* Pagination — always visible at bottom of section 1 */}
             {filtered.length > 0 && (
-              <div className="flex-shrink-0 px-5 py-3 flex items-center justify-between border-t border-gray-100">
+              <div className="flex-shrink-0 px-5 py-2.5 flex items-center justify-between border-t border-gray-100 bg-white">
                 <span className="text-xs text-gray-500">
-                  Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+                  Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
                 </span>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-30 transition-colors">
@@ -335,9 +341,11 @@ export default function AddVendorProductsPage() {
           </div>
         )}
 
-        {/* Section 2: Selected / Edit Products */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
-          <div className="flex-shrink-0 px-5 py-3.5 border-b border-gray-100 flex items-center gap-3">
+        {/* ── Section 2: Selected Products ── fills remaining height, scrolls internally */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden flex-1 min-h-0">
+
+          {/* Header */}
+          <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3">
             {!isEditMode && (
               <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
             )}
@@ -350,15 +358,15 @@ export default function AddVendorProductsPage() {
           </div>
 
           {selectedRows.length === 0 ? (
-            <div className="px-5 py-10 text-center text-gray-400 text-sm">
-              No products selected yet. Check products above to add them here.
+            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
+              No products selected yet — check items in the list above.
             </div>
           ) : (
             <>
-              {/* Selected products table — full width, horizontal scroll only when truly needed */}
-              <div className="overflow-x-auto w-full">
+              {/* Scrollable table */}
+              <div className="flex-1 min-h-0 overflow-auto">
                 <table className="w-full text-sm" style={{ minWidth: "900px" }}>
-                  <thead>
+                  <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-100">
                       {!isEditMode && <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>}
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
@@ -459,7 +467,7 @@ export default function AddVendorProductsPage() {
               </div>
 
               {!isEditMode && (
-                <div className="flex-shrink-0 px-5 py-2.5 border-t border-gray-100">
+                <div className="flex-shrink-0 px-5 py-2 border-t border-gray-100 bg-white">
                   <span className="text-xs text-gray-500">
                     {selectedRows.length} product{selectedRows.length !== 1 ? "s" : ""} selected
                   </span>
@@ -468,9 +476,6 @@ export default function AddVendorProductsPage() {
             </>
           )}
         </div>
-
-        {/* Spacer to push content above sticky footer */}
-        <div className="h-1" />
       </div>
 
       {/* ── Sticky footer ── */}
