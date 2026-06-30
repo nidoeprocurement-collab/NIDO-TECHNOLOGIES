@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,31 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import {
   Plus, X, Bold, Italic, Underline, List, AlignLeft, AlignCenter, AlignRight,
-  Link2, Image, Upload, GripVertical, Download, Printer, Timer, Wifi, FileText,
-  Shield, Cpu, HardDrive, Settings2, Monitor, Package, ChevronLeft, ShoppingCart,
-  ZoomIn, Clock, Star
+  Link2, Image, Upload, GripVertical, ChevronLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  generateMasterProductCode, saveCatalogProduct, getCatalogProducts,
-  type CatalogProduct, type CatalogSpec, type GeneralSpec
+  generateMasterProductCode, saveCatalogProduct,
+  type CatalogSpec, type GeneralSpec
 } from '@/lib/catalogStore';
-
-const LEAD_TIME_OPTIONS = ['1–3 Days', '4–6 Days', '7–10 Days', '10–15 Days', '15–30 Days', '30+ Days', 'On Backorder', 'TBD'];
-const WARRANTY_OPTIONS = ['No Warranty', '6 Months', '1 Year', '2 Years', '3 Years', '5 Years', 'Lifetime'];
-
-function getSpecIcon(name: string) {
-  const n = name.toLowerCase();
-  if (n.includes('print') || n.includes('scan') || n.includes('copy') || n.includes('function')) return <Printer size={18} className="text-blue-500" />;
-  if (n.includes('speed') || n.includes('time') || n.includes('rate')) return <Timer size={18} className="text-blue-500" />;
-  if (n.includes('connect') || n.includes('wifi') || n.includes('network') || n.includes('wireless')) return <Wifi size={18} className="text-blue-500" />;
-  if (n.includes('paper') || n.includes('size') || n.includes('format') || n.includes('sheet')) return <FileText size={18} className="text-blue-500" />;
-  if (n.includes('warrant') || n.includes('guarantee')) return <Shield size={18} className="text-blue-500" />;
-  if (n.includes('processor') || n.includes('cpu') || n.includes('memory') || n.includes('ram')) return <Cpu size={18} className="text-blue-500" />;
-  if (n.includes('storage') || n.includes('ssd') || n.includes('hdd') || n.includes('disk')) return <HardDrive size={18} className="text-blue-500" />;
-  if (n.includes('display') || n.includes('screen') || n.includes('resolution') || n.includes('monitor')) return <Monitor size={18} className="text-blue-500" />;
-  return <Settings2 size={18} className="text-blue-500" />;
-}
 
 export default function AddMasterCatalogueItemWrapper() {
   const navigate = useNavigate();
@@ -51,10 +32,6 @@ export default function AddMasterCatalogueItemWrapper() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [moq, setMoq] = useState('1');
-  const [leadTime, setLeadTime] = useState('4–6 Days');
-  const [warranty, setWarranty] = useState('1 Year');
   const [specifications, setSpecifications] = useState<CatalogSpec[]>([]);
   const [generalSpecs, setGeneralSpecs] = useState<GeneralSpec[]>([]);
   const [productNotes, setProductNotes] = useState('');
@@ -68,9 +45,6 @@ export default function AddMasterCatalogueItemWrapper() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addDialogType, setAddDialogType] = useState('');
   const [newOptionValue, setNewOptionValue] = useState('');
-
-  const [showPreview, setShowPreview] = useState(false);
-  const [previewQty, setPreviewQty] = useState(1);
 
   const [productTypesList, setProductTypesList] = useState(['Product', 'Service', 'Bundle']);
   const [physicalTypesList, setPhysicalTypesList] = useState(['Physical', 'Digital', 'Service']);
@@ -88,7 +62,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const handleAddNewOption = () => {
     const val = newOptionValue.trim();
     if (!val) { toast.error('Please enter a value'); return; }
-    const setters: Record<string, () => void> = {
+    const map: Record<string, () => void> = {
       productType: () => { if (!productTypesList.includes(val)) { setProductTypesList(p => [...p, val]); setProductType(val); toast.success('Added'); } else toast.error('Already exists'); },
       physicalType: () => { if (!physicalTypesList.includes(val)) { setPhysicalTypesList(p => [...p, val]); setPhysicalType(val); toast.success('Added'); } else toast.error('Already exists'); },
       category: () => { if (!categoriesList.includes(val)) { setCategoriesList(p => [...p, val]); setCategory(val); toast.success('Added'); } else toast.error('Already exists'); },
@@ -96,7 +70,7 @@ export default function AddMasterCatalogueItemWrapper() {
       brand: () => { if (!brandsList.includes(val)) { setBrandsList(p => [...p, val]); setBrand(val); toast.success('Added'); } else toast.error('Already exists'); },
       unit: () => { if (!unitsList.includes(val)) { setUnitsList(p => [...p, val]); toast.success('Added'); } else toast.error('Already exists'); },
     };
-    setters[addDialogType]?.();
+    map[addDialogType]?.();
     setNewOptionValue('');
     setShowAddDialog(false);
   };
@@ -137,7 +111,7 @@ export default function AddMasterCatalogueItemWrapper() {
     });
   };
 
-  const buildProduct = (status: 'draft' | 'published'): CatalogProduct => ({
+  const buildProduct = (status: 'draft' | 'published') => ({
     id: Date.now().toString(),
     masterProductCode,
     skuCode,
@@ -155,15 +129,24 @@ export default function AddMasterCatalogueItemWrapper() {
     videoUrl,
     images,
     publishStatus: status,
-    price: parseFloat(price) || 0,
-    moq: parseInt(moq) || 1,
-    leadTime,
-    warranty,
+    price: 0,
+    moq: 1,
+    leadTime: '',
+    warranty: '',
   });
 
   const handlePreview = () => {
-    setPreviewQty(parseInt(moq) || 1);
-    setShowPreview(true);
+    if (!productName.trim()) { toast.error('Enter a product name first'); return; }
+    const previewData = {
+      masterProductCode,
+      skuCode,
+      productName: productName || 'Untitled Product',
+      productType, physicalType, category, subcategory, brand, tags,
+      description, specifications, generalSpecs, productNotes, videoUrl, images,
+      createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+    };
+    localStorage.setItem('nido_preview_draft', JSON.stringify(previewData));
+    window.open('/preview-product', '_blank');
   };
 
   const handleSaveDraft = () => {
@@ -175,13 +158,10 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const handlePublish = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
-    if (!price || parseFloat(price) <= 0) { toast.error('Price is required'); return; }
     saveCatalogProduct(buildProduct('published'));
     toast.success('Product published successfully!');
     navigate('/configuration/master-catalogue');
   };
-
-  const relatedProducts = getCatalogProducts().filter(p => p.publishStatus === 'published').slice(0, 4);
 
   const SelectWithAdd = ({
     value, onValueChange, options, placeholder, dialogType
@@ -265,45 +245,7 @@ export default function AddMasterCatalogueItemWrapper() {
               </div>
             </div>
 
-            {/* Row 3: Price, MOQ, Lead Time, Warranty */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-              <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">Price (₹, Excl. GST)</Label>
-                <Input type="number" placeholder="e.g., 28000" value={price} onChange={e => setPrice(e.target.value)} className="mt-1 text-sm" min="0" />
-              </div>
-              <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">MOQ (Min Order Qty)</Label>
-                <Input type="number" placeholder="e.g., 5" value={moq} onChange={e => setMoq(e.target.value)} className="mt-1 text-sm" min="1" />
-              </div>
-              <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">Lead Time</Label>
-                <div className="flex gap-2 mt-1">
-                  <Select value={leadTime} onValueChange={setLeadTime}>
-                    <SelectTrigger className="text-sm flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="z-50">
-                      {LEAD_TIME_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">Warranty</Label>
-                <div className="flex gap-2 mt-1">
-                  <Select value={warranty} onValueChange={setWarranty}>
-                    <SelectTrigger className="text-sm flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="z-50">
-                      {WARRANTY_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* Row 4: Tags */}
+            {/* Row 3: Tags */}
             <div>
               <Label className="text-xs sm:text-sm font-medium text-gray-700">Tags</Label>
               <Input placeholder="Add tag and press Enter" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleAddTag} className="mt-1 text-sm" />
@@ -373,15 +315,13 @@ export default function AddMasterCatalogueItemWrapper() {
                         <Input value={spec.value} onChange={e => updateSpec(spec.id, 'value', e.target.value)} className="text-xs h-8" placeholder="Enter value" />
                       </td>
                       <td className="p-2 min-w-[160px]">
-                        <div className="flex gap-1">
-                          <Select value={spec.unit} onValueChange={val => val === '__add__' ? openAddDialog('unit') : updateSpec(spec.id, 'unit', val)}>
-                            <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
-                            <SelectContent position="popper" className="z-50">
-                              {unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                              <SelectItem value="__add__" className="text-blue-600 font-medium">+ Add New Unit</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <Select value={spec.unit} onValueChange={val => val === '__add__' ? openAddDialog('unit') : updateSpec(spec.id, 'unit', val)}>
+                          <SelectTrigger className="h-8 text-xs flex-1"><SelectValue /></SelectTrigger>
+                          <SelectContent position="popper" className="z-50">
+                            {unitsList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            <SelectItem value="__add__" className="text-blue-600 font-medium">+ Add New Unit</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="p-2">
                         <button onClick={() => setSpecifications(s => s.filter(x => x.id !== spec.id))} className="text-red-400 hover:text-red-600">
@@ -571,168 +511,6 @@ export default function AddMasterCatalogueItemWrapper() {
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
             <Button onClick={handleAddNewOption} className="bg-blue-600 hover:bg-blue-700">Add</Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Preview Dialog */}
-      <Dialog open={showPreview} onOpenChange={setShowPreview}>
-        <DialogContent className="max-w-5xl w-full p-0 overflow-hidden max-h-[90vh] overflow-y-auto">
-          <div className="bg-white">
-            {/* Top: Image + Details + Price */}
-            <div className="flex flex-col md:flex-row gap-0 p-6 border-b border-gray-100">
-              {/* Image Gallery */}
-              <div className="md:w-[340px] shrink-0">
-                <div className="flex gap-2">
-                  {/* Thumbnails */}
-                  <div className="flex flex-col gap-1.5">
-                    {images.slice(0, 4).map((img, i) => (
-                      <div key={i} className={`w-12 h-12 rounded border-2 overflow-hidden cursor-pointer ${i === 0 ? 'border-blue-500' : 'border-gray-200'}`}>
-                        <img src={img} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    ))}
-                    {images.length === 0 && (
-                      <div className="w-12 h-12 rounded border-2 border-blue-500 bg-gray-100 flex items-center justify-center">
-                        <Package size={20} className="text-gray-400" />
-                      </div>
-                    )}
-                    {images.length > 4 && (
-                      <div className="w-12 h-12 rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-600">
-                        +{images.length - 4}
-                      </div>
-                    )}
-                  </div>
-                  {/* Main Image */}
-                  <div className="flex-1 aspect-square max-h-[260px] rounded-lg border border-gray-200 overflow-hidden bg-gray-50 relative flex items-center justify-center">
-                    {images[0] ? (
-                      <img src={images[0]} alt={productName} className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="flex flex-col items-center text-gray-300">
-                        <Package size={64} />
-                        <span className="text-xs mt-2">No image</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1"><ZoomIn size={12} /> Click image to zoom</p>
-              </div>
-
-              {/* Product Info */}
-              <div className="flex-1 md:px-6 mt-4 md:mt-0">
-                <h1 className="text-2xl font-bold text-gray-900">{productName || 'Untitled Product'}</h1>
-                {category && <span className="inline-block mt-2 px-3 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">{category}</span>}
-                {description && <p className="mt-3 text-sm text-gray-600 leading-relaxed">{description}</p>}
-
-                {specifications.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Key Specifications</h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      {specifications.map(spec => (
-                        <div key={spec.id} className="flex items-start gap-2 p-2 border border-gray-100 rounded-lg bg-gray-50">
-                          <div className="mt-0.5 shrink-0">{getSpecIcon(spec.specification)}</div>
-                          <div className="min-w-0">
-                            <p className="text-[10px] text-gray-500 uppercase tracking-wide truncate">{spec.specification}</p>
-                            <p className="text-xs font-semibold text-gray-800 mt-0.5 truncate">
-                              {spec.value}{spec.unit !== '-' ? ` ${spec.unit}` : ''}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Price Panel */}
-              <div className="md:w-[220px] shrink-0">
-                <div className="border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500 font-medium">Price (Excl. GST)</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {price ? `₹${parseFloat(price).toLocaleString('en-IN')}` : '₹—'} <span className="text-sm font-normal text-gray-500">/ each</span>
-                  </p>
-
-                  <div className="flex items-center gap-2 mt-4">
-                    <button onClick={() => setPreviewQty(q => Math.max(parseInt(moq) || 1, q - 1))} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50">−</button>
-                    <span className="flex-1 text-center font-semibold text-sm">{previewQty}</span>
-                    <button onClick={() => setPreviewQty(q => q + 1)} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50">+</button>
-                    <span className="text-xs text-gray-400 ml-1">(Min: {moq})</span>
-                  </div>
-
-                  <Button className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm h-10" disabled>
-                    <ShoppingCart size={15} className="mr-2" /> Add to Cart
-                  </Button>
-
-                  <div className="mt-4 space-y-2 border-t border-gray-100 pt-3">
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Package size={14} className="text-gray-400" />
-                      <span>MOQ: {moq} Units</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Clock size={14} className="text-gray-400" />
-                      <span>Lead Time: {leadTime}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                      <Shield size={14} className="text-gray-400" />
-                      <span>Warranty: {warranty}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bottom: General Specs + Related Products */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* General Specifications */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">General Specifications</h3>
-                {generalSpecs.filter(r => r.category || r.attributeValue).length > 0 ? (
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {generalSpecs.filter(r => r.category || r.attributeValue).map(row => (
-                        <tr key={row.id} className="border-b border-gray-100">
-                          <td className="py-2 pr-4 text-xs text-gray-500 w-1/3">{row.category}</td>
-                          <td className="py-2 text-xs text-gray-800 font-medium">{row.attributeValue}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-xs text-gray-400">No general specifications added.</p>
-                )}
-              </div>
-
-              {/* Related Products */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Related Products</h3>
-                  <span className="text-xs text-blue-600 cursor-pointer">View All</span>
-                </div>
-                {relatedProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {relatedProducts.map(p => (
-                      <div key={p.id} className="border border-gray-200 rounded-lg p-2">
-                        <div className="w-full h-16 bg-gray-100 rounded mb-2 flex items-center justify-center overflow-hidden">
-                          {p.images[0] ? <img src={p.images[0]} alt={p.productName} className="w-full h-full object-cover" /> : <Package size={24} className="text-gray-300" />}
-                        </div>
-                        <p className="text-xs font-semibold text-gray-800 truncate">{p.productName}</p>
-                        <p className="text-[10px] text-blue-600">{p.category}</p>
-                        <p className="text-xs font-bold text-gray-800 mt-1">₹{p.price.toLocaleString('en-IN')} / each</p>
-                        <p className="text-[10px] text-gray-400">MOQ: {p.moq}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400">No related products yet.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 px-6 pb-6">
-              <Button variant="outline" onClick={() => setShowPreview(false)}>Close Preview</Button>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setShowPreview(false); handlePublish(); }}>
-                Publish Product
-              </Button>
-            </div>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

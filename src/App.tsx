@@ -204,6 +204,7 @@ const DepartmentsPage = lazy(() => import("@/pages/DepartmentsPage"));
 const UserInvitationPage = lazy(() => import("@/pages/UserInvitationPage"));
 const AuditLogPage = lazy(() => import("@/pages/AuditLogPage"));
 const ShopPage = lazy(() => import("@/pages/ShopPage"));
+const ProductPreviewPage = lazy(() => import("@/pages/ProductPreviewPage"));
 const ProductDetailPage = lazy(() => import("@/pages/ProductDetailPage"));
 const ProductEnquiryPage = lazy(() => import("@/pages/ProductEnquiryPage"));
 const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
@@ -252,6 +253,7 @@ function AppRoutes() {
           }
         />
         <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
+        <Route path="/preview-product" element={<ProductPreviewPage />} />
         <Route
           path="/support/track/:ticketId"
           element={<TicketTrackingPage />}
