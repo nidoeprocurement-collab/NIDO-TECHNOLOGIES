@@ -123,7 +123,12 @@ const ALL_CATEGORIES = ["All Categories", "Cloud Servers", "IT Hardware", "Offic
 const PAGE_SIZE = 8;
 
 function formatPrice(n: number) {
+  if (!n || n === 0) return "Price on request";
   return "₹" + n.toLocaleString("en-IN");
+}
+
+function formatLeadTime(t: string) {
+  return t || "—";
 }
 
 function ProductDetailDialog({ product, open, onClose }: { product: Product | null; open: boolean; onClose: () => void }) {
@@ -212,7 +217,7 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
 
                 <div className="mt-4 space-y-2 border-t border-gray-100 pt-3">
                   <div className="flex items-center gap-2 text-xs text-gray-600"><Package size={13} className="text-gray-400" /><span>MOQ: {product.moq} Units</span></div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600"><Clock size={13} className="text-gray-400" /><span>Lead Time: {product.leadTime}</span></div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600"><Clock size={13} className="text-gray-400" /><span>Lead Time: {formatLeadTime(product.leadTime)}</span></div>
                   <div className="flex items-center gap-2 text-xs text-gray-600"><Shield size={13} className="text-gray-400" />
                     <span>{product.specs.find(s => s.toLowerCase().includes('warrant'))?.split(': ')[1] || 'Subject to Availability'}</span>
                   </div>
@@ -297,11 +302,14 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: (p: 
       {/* Footer */}
       <div className="px-3 pb-3 border-t border-gray-100 mt-auto pt-2">
         <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
-          <span>Lead Time: {product.leadTime}</span>
+          <span>Lead Time: {formatLeadTime(product.leadTime)}</span>
           <span>MOQ: {product.moq}</span>
         </div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-base font-bold text-gray-900">{formatPrice(product.priceNum)} <span className="text-xs font-normal text-gray-500">/ each</span></span>
+          <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
+            {formatPrice(product.priceNum)}
+            {product.priceNum > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
+          </span>
         </div>
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
           <button
@@ -335,16 +343,15 @@ export default function ShopPage() {
 
   const loadCatalogProducts = () => {
     const stored = getCatalogProducts()
-      .filter(p => p.publishStatus === 'published')
-      .map((p, i) => ({
+      .map((p) => ({
         id: `store-${p.id}`,
         name: p.productName,
         category: p.category || 'General',
         image: p.images[0] || '',
-        specs: p.specifications.map(s => `${s.specification}: ${s.value}${s.unit !== '-' ? ' ' + s.unit : ''}`),
-        leadTime: p.leadTime,
-        moq: p.moq,
-        priceNum: p.price,
+        specs: p.specifications.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== '-' ? ' ' + s.unit : ''}`).filter(Boolean),
+        leadTime: p.leadTime || '',
+        moq: p.moq || 1,
+        priceNum: p.price || 0,
         inStock: true,
         description: p.description,
         fromStore: true,
