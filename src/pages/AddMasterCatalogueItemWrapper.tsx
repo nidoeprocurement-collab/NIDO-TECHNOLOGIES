@@ -228,11 +228,11 @@ export default function AddMasterCatalogueItemWrapper() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-white px-3 sm:px-4 md:px-6 py-4 sm:py-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {/* Main Content - Left Side */}
-          <div className="lg:col-span-2 space-y-6">
+    <div className="w-full min-h-screen bg-white px-3 sm:px-6 md:px-10 xl:px-16 py-4 sm:py-6">
+      <div className="w-full">
+        <div className="w-full">
+          {/* Main Content */}
+          <div className="w-full space-y-6">
 
             {/* Section 1: Product Information */}
             <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
@@ -682,13 +682,6 @@ export default function AddMasterCatalogueItemWrapper() {
             </div>
           </div>
 
-          {/* Right Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="space-y-4 lg:sticky lg:top-6">
-              
-
-            </div>
-          </div>
         </div>
       </div>
 
