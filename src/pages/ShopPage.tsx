@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
+import { getCatalogProducts } from "@/lib/catalogStore";
 
 type Product = {
   id: number;
@@ -194,8 +195,33 @@ export default function ShopPage() {
   const [category, setCategory] = useState("All Categories");
   const [availability, setAvailability] = useState("All");
   const [sortBy, setSortBy] = useState("Default");
+  const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
 
-  let filtered = ALL_PRODUCTS.filter((p) => {
+  const loadCatalogProducts = () => {
+    const stored = getCatalogProducts()
+      .filter(p => p.publishStatus === 'published')
+      .map((p, i) => ({
+        id: 10000 + i,
+        name: p.productName,
+        image: p.images[0] || '',
+        specs: p.specifications.map(s => `${s.specification}: ${s.value}${s.unit !== '-' ? ' ' + s.unit : ''}`),
+        moq: p.moq,
+        priceNum: p.price,
+        category: p.category || 'General',
+        inStock: true,
+      }));
+    setCatalogProducts(stored);
+  };
+
+  useEffect(() => {
+    loadCatalogProducts();
+    window.addEventListener('catalogUpdated', loadCatalogProducts);
+    return () => window.removeEventListener('catalogUpdated', loadCatalogProducts);
+  }, []);
+
+  const ALL_COMBINED = [...ALL_PRODUCTS, ...catalogProducts];
+
+  let filtered = ALL_COMBINED.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = category === "All Categories" || p.category === category;
     const matchAvail =

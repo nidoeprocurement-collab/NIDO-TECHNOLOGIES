@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getCatalogProducts, deleteCatalogProduct } from '@/lib/catalogStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,7 @@ interface CatalogItem {
   id: string;
   name: string;
   sku: string;
+  publishStatus?: 'draft' | 'published';
   category: string;
   subCategory: string;
   brand: string;
@@ -93,7 +95,32 @@ const emptyItem: Omit<CatalogItem, 'id'> = {
 
 export default function CatalogUpdatesTab() {
   const navigate = useNavigate();
-  const [items, setItems] = useState<CatalogItem[]>(initialItems);
+  const [items, setItems] = useState<CatalogItem[]>(() => {
+    const stored = getCatalogProducts().map(p => ({
+      id: p.id,
+      name: p.productName,
+      sku: p.skuCode || p.masterProductCode,
+      publishStatus: p.publishStatus,
+      category: p.category,
+      subCategory: p.subcategory,
+      brand: p.brand,
+      price: p.price,
+      status: 'In Stock' as const,
+      tags: p.tags,
+      initialStock: 0,
+      minStockThreshold: 0,
+      description: p.description,
+      specification: '',
+      warranty: p.warranty,
+      hsnCode: '',
+      dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
+      customsDeclaration: 'Exempt',
+      primaryVendor: '', vendorSku: '', leadTime: p.leadTime,
+      vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
+      trackPerformance: false, performanceRating: 4,
+    }));
+    return stored;
+  });
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -122,6 +149,39 @@ export default function CatalogUpdatesTab() {
   const bulkFileRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  const loadFromStore = () => {
+    const stored = getCatalogProducts().map(p => ({
+      id: p.id,
+      name: p.productName,
+      sku: p.skuCode || p.masterProductCode,
+      publishStatus: p.publishStatus,
+      category: p.category,
+      subCategory: p.subcategory,
+      brand: p.brand,
+      price: p.price,
+      status: 'In Stock' as const,
+      tags: p.tags,
+      initialStock: 0,
+      minStockThreshold: 0,
+      description: p.description,
+      specification: '',
+      warranty: p.warranty,
+      hsnCode: '',
+      dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
+      customsDeclaration: 'Exempt',
+      primaryVendor: '', vendorSku: '', leadTime: p.leadTime,
+      vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
+      trackPerformance: false, performanceRating: 4,
+    }));
+    setItems(stored);
+  };
+
+  useEffect(() => {
+    loadFromStore();
+    window.addEventListener('catalogUpdated', loadFromStore);
+    return () => window.removeEventListener('catalogUpdated', loadFromStore);
+  }, []);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'In Stock': return 'bg-success text-success-foreground';
@@ -141,9 +201,9 @@ export default function CatalogUpdatesTab() {
 
   const stats = {
     total: items.length,
-    inStock: items.filter(i => i.status === 'In Stock').length,
-    lowStock: items.filter(i => i.status === 'Low Stock').length,
-    outOfStock: items.filter(i => i.status === 'Out of Stock').length,
+    published: items.filter(i => i.publishStatus === 'published').length,
+    drafts: items.filter(i => i.publishStatus === 'draft').length,
+    outOfStock: 0,
   };
 
   const toggleSelect = (id: string) => {
@@ -203,6 +263,7 @@ export default function CatalogUpdatesTab() {
   };
 
   const deleteItem = (id: string) => {
+    deleteCatalogProduct(id);
     setItems(prev => prev.filter(i => i.id !== id));
     toast.success('Item deleted');
   };
@@ -353,7 +414,7 @@ export default function CatalogUpdatesTab() {
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">Master Catalogue</h2>
         <p className="text-sm text-gray-600 mt-1">Manage and register all products/services available for client contracts and downstream client-specific mapping.</p>
-        <p className="text-xs text-gray-500 mt-1">Loading catalog from backend...</p>
+        <p className="text-xs text-gray-500 mt-1">Add items via "Add New Item" — drafts and published products appear here.</p>
       </div>
 
       {/* Stats Cards */}
@@ -367,13 +428,13 @@ export default function CatalogUpdatesTab() {
         <Card className="border-0 cursor-pointer">
           <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-white" style={{ backgroundColor: 'rgba(225, 86, 99, 0.98)' }}>
             <ShoppingCart size={18} />
-            <span className="font-medium text-sm">{filtered.length} Published</span>
+            <span className="font-medium text-sm">{stats.published} Published</span>
           </CardContent>
         </Card>
         <Card className="bg-yellow-100 text-yellow-700 border-0 cursor-pointer hover:bg-yellow-200">
           <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px]">
             <ShoppingCart size={18} />
-            <span className="font-medium text-sm">0 Drafts</span>
+            <span className="font-medium text-sm">{stats.drafts} Drafts</span>
           </CardContent>
         </Card>
         <Card className="border-0 cursor-pointer">
@@ -439,7 +500,15 @@ export default function CatalogUpdatesTab() {
                     <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
                     <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
                     <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
-                    <TableCell><Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge></TableCell>
+                    <TableCell>
+                      {item.publishStatus ? (
+                        <Badge className={`border-none text-xs ${item.publishStatus === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          {item.publishStatus === 'published' ? 'Published' : 'Draft'}
+                        </Badge>
+                      ) : (
+                        <Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -582,7 +651,15 @@ export default function CatalogUpdatesTab() {
                 <div><Label className="text-muted-foreground">Category</Label><p>{viewItem.category}</p></div>
                 <div><Label className="text-muted-foreground">Brand</Label><p>{viewItem.brand}</p></div>
                 <div><Label className="text-muted-foreground">Price</Label><p>₹{viewItem.price.toLocaleString()}</p></div>
-                <div><Label className="text-muted-foreground">Status</Label><Badge className={`${getStatusColor(viewItem.status)} border-none`}>{viewItem.status}</Badge></div>
+                <div><Label className="text-muted-foreground">Status</Label>
+                  {viewItem.publishStatus ? (
+                    <Badge className={`border-none ${viewItem.publishStatus === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      {viewItem.publishStatus === 'published' ? 'Published' : 'Draft'}
+                    </Badge>
+                  ) : (
+                    <Badge className={`${getStatusColor(viewItem.status)} border-none`}>{viewItem.status}</Badge>
+                  )}
+                </div>
               </div>
             </div>
           )}
