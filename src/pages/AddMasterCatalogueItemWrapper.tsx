@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -687,20 +686,6 @@ export default function AddMasterCatalogueItemWrapper() {
           <div className="lg:col-span-1">
             <div className="space-y-4 lg:sticky lg:top-6">
               
-              {/* Product Summary */}
-              <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4" style={{ marginLeft: '10px', marginRight: '-10px' }}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-                      <PackageIcon size={20} className="text-gray-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-600">Product Summary</p>
-                      <p className="text-sm font-bold text-gray-900 truncate">{formData.productName || 'Untitled product'}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
 
             </div>
           </div>
