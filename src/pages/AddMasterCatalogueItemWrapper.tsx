@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,15 +13,18 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  generateMasterProductCode, saveCatalogProduct,
+  generateMasterProductCode, saveCatalogProduct, getCatalogProducts,
   type CatalogSpec, type GeneralSpec
 } from '@/lib/catalogStore';
 
 export default function AddMasterCatalogueItemWrapper() {
   const navigate = useNavigate();
+  const { itemId } = useParams<{ itemId: string }>();
+  const isEditMode = Boolean(itemId);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const [masterProductCode] = useState(() => generateMasterProductCode());
+  const [editProductId, setEditProductId] = useState<string>('');
+  const [editMasterCode, setEditMasterCode] = useState<string>('');
   const [skuCode, setSkuCode] = useState('');
   const [productName, setProductName] = useState('');
   const [productType, setProductType] = useState('Product');
@@ -37,6 +40,31 @@ export default function AddMasterCatalogueItemWrapper() {
   const [productNotes, setProductNotes] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [images, setImages] = useState<string[]>([]);
+
+  // Load product data when in edit mode
+  useEffect(() => {
+    if (!isEditMode || !itemId) return;
+    const product = getCatalogProducts().find(p => p.id === itemId);
+    if (!product) { toast.error('Product not found'); navigate('/configuration/master-catalogue'); return; }
+    setEditProductId(product.id);
+    setEditMasterCode(product.masterProductCode);
+    setSkuCode(product.skuCode || '');
+    setProductName(product.productName || '');
+    setProductType(product.productType || 'Product');
+    setPhysicalType(product.physicalType || 'Physical');
+    setCategory(product.category || '');
+    setSubcategory(product.subcategory || '');
+    setBrand(product.brand || '');
+    setTags(product.tags || []);
+    setDescription(product.description || '');
+    setSpecifications(product.specifications || []);
+    setGeneralSpecs(product.generalSpecs || []);
+    setProductNotes(product.productNotes || '');
+    setVideoUrl(product.videoUrl || '');
+    setImages(product.images || []);
+  }, [itemId]);
+
+  const currentMasterProductCode = isEditMode ? editMasterCode : masterProductCode;
 
   const [newSpecName, setNewSpecName] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
@@ -112,8 +140,8 @@ export default function AddMasterCatalogueItemWrapper() {
   };
 
   const buildProduct = (status: 'draft' | 'published') => ({
-    id: Date.now().toString(),
-    masterProductCode,
+    id: isEditMode ? editProductId : Date.now().toString(),
+    masterProductCode: currentMasterProductCode,
     skuCode,
     productName: productName || 'Untitled Product',
     productType,
@@ -138,7 +166,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const handlePreview = () => {
     if (!productName.trim()) { toast.error('Enter a product name first'); return; }
     const previewData = {
-      masterProductCode,
+      masterProductCode: currentMasterProductCode,
       skuCode,
       productName: productName || 'Untitled Product',
       productType, physicalType, category, subcategory, brand, tags,
@@ -160,6 +188,14 @@ export default function AddMasterCatalogueItemWrapper() {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
     saveCatalogProduct(buildProduct('published'));
     toast.success('Product published successfully!');
+    navigate('/configuration/master-catalogue');
+  };
+
+  const handleSaveChanges = () => {
+    if (!productName.trim()) { toast.error('Product name is required'); return; }
+    const existing = getCatalogProducts().find(p => p.id === editProductId);
+    saveCatalogProduct(buildProduct(existing?.publishStatus || 'draft'));
+    toast.success('Changes saved successfully');
     navigate('/configuration/master-catalogue');
   };
 
@@ -191,8 +227,11 @@ export default function AddMasterCatalogueItemWrapper() {
         {/* Back button */}
         <button onClick={() => navigate('/configuration/master-catalogue')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
           <ChevronLeft size={16} />
-          Back to Master Catalogue
+          {isEditMode ? 'Back to Master Catalogue' : 'Back to Master Catalogue'}
         </button>
+        {isEditMode && (
+          <h1 className="text-xl font-bold text-gray-900">Edit Product</h1>
+        )}
 
         {/* Section 1: Product Information */}
         <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
@@ -204,7 +243,7 @@ export default function AddMasterCatalogueItemWrapper() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <Label className="text-xs sm:text-sm font-medium text-gray-700">Master Product Code</Label>
-                <Input value={masterProductCode} readOnly className="mt-1 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+                <Input value={currentMasterProductCode} readOnly className="mt-1 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
                 <p className="text-xs text-gray-400 mt-1">Auto-generated · Read only</p>
               </div>
               <div>
@@ -468,12 +507,20 @@ export default function AddMasterCatalogueItemWrapper() {
           <Button variant="outline" className="flex-1 text-sm h-11 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handlePreview}>
             Preview Product
           </Button>
-          <Button variant="outline" className="flex-1 text-sm h-11 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handleSaveDraft}>
-            Save as Draft
-          </Button>
-          <Button className="flex-1 text-sm h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={handlePublish}>
-            Publish Product
-          </Button>
+          {isEditMode ? (
+            <Button className="flex-1 text-sm h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={handleSaveChanges}>
+              Save Changes
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" className="flex-1 text-sm h-11 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handleSaveDraft}>
+                Save as Draft
+              </Button>
+              <Button className="flex-1 text-sm h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={handlePublish}>
+                Publish Product
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
