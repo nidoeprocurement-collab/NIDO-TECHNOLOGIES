@@ -143,14 +143,7 @@ export default function VendorProductsPage() {
         {/* Table Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           {/* Actions Bar */}
-          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
-            <button
-              onClick={() => navigate(`/vendors/${vendorId}/add-products`)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Product
-            </button>
+          <div className="px-4 py-3 flex items-center justify-end border-b border-gray-100">
             <div className="relative" ref={menuRef}>
               <button onClick={() => setMenuOpen((o) => !o)} className="p-2 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
                 <MoreVertical className="w-4 h-4" />
@@ -260,7 +253,10 @@ export default function VendorProductsPage() {
                             <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                               <button
                                 className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                                onClick={() => setOpenRowMenu(null)}
+                                onClick={() => {
+                                  setOpenRowMenu(null);
+                                  navigate(`/vendors/${vendorId}/add-products?edit=${product.id}`);
+                                }}
                               >
                                 <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
                               </button>

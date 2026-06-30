@@ -13,7 +13,7 @@ export interface VendorProduct {
   moq: string;
   leadTime: string;
   stock: string;
-  remarks: string;
+  vendorProductCode: string;
   addedAt: string;
   status: 'Active' | 'Inactive';
 }
@@ -48,6 +48,13 @@ export function addVendorProducts(vendorId: string, newProducts: VendorProduct[]
   const existingIds = new Set(existing.map(p => p.id));
   const toAdd = newProducts.filter(p => !existingIds.has(p.id));
   saveVendorProducts(vendorId, [...existing, ...toAdd]);
+}
+
+export function updateVendorProduct(vendorId: string, productId: string, updates: Partial<VendorProduct>): void {
+  const products = getVendorProducts(vendorId).map(p =>
+    p.id === productId ? { ...p, ...updates } : p
+  );
+  saveVendorProducts(vendorId, products);
 }
 
 export function removeVendorProduct(vendorId: string, productId: string): void {
