@@ -25,6 +25,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const [editProductId, setEditProductId] = useState<string>('');
   const [editMasterCode, setEditMasterCode] = useState<string>('');
+  const [masterProductCode] = useState(() => generateMasterProductCode());
   const [skuCode, setSkuCode] = useState('');
   const [productName, setProductName] = useState('');
   const [productType, setProductType] = useState('Product');
@@ -158,7 +159,7 @@ export default function AddMasterCatalogueItemWrapper() {
     images,
     publishStatus: status,
     price: 0,
-    moq: 1,
+    moq: 0,
     leadTime: '',
     warranty: '',
   });

@@ -131,18 +131,22 @@ function formatLeadTime(t: string) {
   return t || "—";
 }
 
+function formatMoq(n: number) {
+  return n > 0 ? String(n) : "—";
+}
+
 function ProductDetailDialog({ product, open, onClose }: { product: Product | null; open: boolean; onClose: () => void }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [added, setAdded] = useState(false);
 
-  useEffect(() => { if (product) setQty(product.moq); }, [product]);
+  useEffect(() => { if (product) setQty(Math.max(1, product.moq)); }, [product]);
 
   if (!product) return null;
 
   const handleAdd = () => {
     if (added) return;
-    addItem({ id: typeof product.id === 'string' ? parseInt(product.id) || Math.random() * 10000 : product.id as number, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum });
+    addItem({ id: typeof product.id === 'string' ? parseInt(product.id) || Math.random() * 10000 : product.id as number, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum }, Math.max(1, qty));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -201,11 +205,11 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
                 </p>
 
                 <div className="flex items-center gap-2 mt-4">
-                  <button onClick={() => setQty(q => Math.max(product.moq, q - 1))} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none">−</button>
+                  <button onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none">−</button>
                   <span className="flex-1 text-center font-semibold text-sm">{qty}</span>
                   <button onClick={() => setQty(q => q + 1)} className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none">+</button>
                 </div>
-                <p className="text-center text-xs text-gray-400 mt-1">(Min: {product.moq})</p>
+                <p className="text-center text-xs text-gray-400 mt-1">(Min: {formatMoq(product.moq)})</p>
 
                 <button
                   onClick={handleAdd}
@@ -216,7 +220,7 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
                 </button>
 
                 <div className="mt-4 space-y-2 border-t border-gray-100 pt-3">
-                  <div className="flex items-center gap-2 text-xs text-gray-600"><Package size={13} className="text-gray-400" /><span>MOQ: {product.moq} Units</span></div>
+                  <div className="flex items-center gap-2 text-xs text-gray-600"><Package size={13} className="text-gray-400" /><span>MOQ: {product.moq > 0 ? `${product.moq} Units` : '—'}</span></div>
                   <div className="flex items-center gap-2 text-xs text-gray-600"><Clock size={13} className="text-gray-400" /><span>Lead Time: {formatLeadTime(product.leadTime)}</span></div>
                   <div className="flex items-center gap-2 text-xs text-gray-600"><Shield size={13} className="text-gray-400" />
                     <span>{product.specs.find(s => s.toLowerCase().includes('warrant'))?.split(': ')[1] || 'Subject to Availability'}</span>
@@ -252,14 +256,14 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
 
 function ProductCard({ product, onPreview }: { product: Product; onPreview: (p: Product) => void }) {
   const { addItem } = useCart();
-  const [qty, setQty] = useState(product.moq);
+  const [qty, setQty] = useState(Math.max(1, product.moq));
   const [adding, setAdding] = useState(false);
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!product.inStock || adding) return;
     setAdding(true);
-    addItem({ id: typeof product.id === 'string' ? Math.random() * 10000 : product.id as number, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum });
+    addItem({ id: typeof product.id === 'string' ? Math.random() * 10000 : product.id as number, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum }, Math.max(1, qty));
     setTimeout(() => setAdding(false), 1500);
   };
 
@@ -303,7 +307,7 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: (p: 
       <div className="px-3 pb-3 border-t border-gray-100 mt-auto pt-2">
         <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
           <span>Lead Time: {formatLeadTime(product.leadTime)}</span>
-          <span>MOQ: {product.moq}</span>
+          <span>MOQ: {formatMoq(product.moq)}</span>
         </div>
         <div className="flex items-center justify-between mb-2">
           <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
@@ -321,7 +325,7 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: (p: 
             {adding ? "Added!" : "Add to Cart"}
           </button>
           <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
-            <button onClick={() => setQty(q => Math.max(product.moq, q - 1))} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
+            <button onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
             <span className="px-2 text-xs font-semibold text-gray-800 min-w-[28px] text-center">{qty}</span>
             <button onClick={() => setQty(q => q + 1)} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">+</button>
           </div>
@@ -350,7 +354,7 @@ export default function ShopPage() {
         image: p.images[0] || '',
         specs: p.specifications.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== '-' ? ' ' + s.unit : ''}`).filter(Boolean),
         leadTime: p.leadTime || '',
-        moq: p.moq || 1,
+        moq: p.moq || 0,
         priceNum: p.price || 0,
         inStock: true,
         description: p.description,

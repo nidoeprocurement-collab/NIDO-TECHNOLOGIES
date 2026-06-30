@@ -412,9 +412,9 @@ export default function CatalogUpdatesTab() {
             videoUrl: col(row, 'video url'),
             images,
             publishStatus: 'draft' as const,
-            price: parseFloat(col(row, 'price')) || 0,
-            moq: parseInt(col(row, 'moq')) || 1,
-            leadTime: col(row, 'lead time'),
+            price: 0,
+            moq: 0,
+            leadTime: '',
             warranty: col(row, 'warranty'),
           };
 
@@ -482,7 +482,7 @@ export default function CatalogUpdatesTab() {
       'Category', 'Subcategory', 'Brand',
       'Tags',           // semicolon-separated e.g. CoreEssentials;New Arrival
       'Description',
-      'Price', 'MOQ', 'Lead Time', 'Warranty',
+      'Warranty',
       'Video URL', 'Product Notes',
       // Key Specifications (up to 8 rows)
       'KeySpec1_Name', 'KeySpec1_Value', 'KeySpec1_Unit',
@@ -961,22 +961,8 @@ export default function CatalogUpdatesTab() {
 
               {/* Pricing & Inventory */}
               <div>
-                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Pricing & Inventory</h3>
-                <div className="grid grid-cols-5 gap-3">
-                  <div>
-                    <Label>Regular Price</Label>
-                    <div className="flex items-center">
-                      <span className="text-xs mr-1">₹</span>
-                      <Input type="number" value={form.price} onChange={e => updateForm({ price: parseFloat(e.target.value) || 0 })} />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Discount Price</Label>
-                    <div className="flex items-center">
-                      <span className="text-xs mr-1">₹</span>
-                      <Input type="number" placeholder="(optional)" value={form.discountPrice || ''} onChange={e => updateForm({ discountPrice: parseFloat(e.target.value) || undefined })} />
-                    </div>
-                  </div>
+                <h3 className="font-semibold text-sm border-b pb-1 mb-3">Inventory</h3>
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label>Inventory Status</Label>
                     <Select value={form.status} onValueChange={v => updateForm({ status: v as any })}>
@@ -1085,7 +1071,7 @@ export default function CatalogUpdatesTab() {
               {/* Vendor & Sourcing */}
               <div>
                 <h3 className="font-semibold text-sm border-b pb-1 mb-3">Vendor & Sourcing</h3>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Primary Vendor</Label>
                     <Select value={form.primaryVendor || ''} onValueChange={v => updateForm({ primaryVendor: v })}>
@@ -1096,13 +1082,6 @@ export default function CatalogUpdatesTab() {
                   <div>
                     <Label>Vendor SKU (optional)</Label>
                     <Input placeholder="V-HP-MB-M3" value={form.vendorSku || ''} onChange={e => updateForm({ vendorSku: e.target.value })} />
-                  </div>
-                  <div>0
-                    <Label>Estimated Lead Time</Label>
-                    <Select value={form.leadTime || '10 Days'} onValueChange={v => updateForm({ leadTime: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{leadTimeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                    </Select>
                   </div>
                 </div>
               </div>
