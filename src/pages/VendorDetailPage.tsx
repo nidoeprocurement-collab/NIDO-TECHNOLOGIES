@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Star, Phone, Mail, MessageSquare, ChevronLeft, Building2, MapPin,
   CreditCard, FileText, Package, ShoppingCart, TrendingUp, ClipboardList,
@@ -323,7 +324,18 @@ const TABS = [
 ];
 
 export default function VendorDetailPage() {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
+
+  // When navigated back from AddVendorProductsPage, switch to products tab
+  useEffect(() => {
+    const state = location.state as { tab?: string } | null;
+    if (state?.tab) {
+      setActiveTab(state.tab);
+      // Clear the state so a refresh doesn't re-apply it
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
 
   const stats = [
     { label: "Rating", value: "4.6/5", sub: "★★★★★", accent: "text-amber-500" },

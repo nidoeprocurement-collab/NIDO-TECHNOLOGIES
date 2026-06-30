@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Plus,
   MoreVertical,
@@ -22,6 +23,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
+import { getVendorProducts, removeVendorProduct, VendorProduct } from "@/lib/vendorStore";
 
 const STATS = [
   { icon: <Package className="w-5 h-5 text-blue-500" />, label: "Total Products", value: "128", sub: "All Products", bg: "bg-blue-50" },
@@ -94,11 +96,25 @@ const MENU_ITEMS = [
 ];
 
 export default function VendorProductsPage() {
+  const { id: vendorId = "" } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Load vendor products from store
+  useEffect(() => {
+    if (vendorId) setVendorProducts(getVendorProducts(vendorId));
+  }, [vendorId]);
+
+  useEffect(() => {
+    const handler = () => { if (vendorId) setVendorProducts(getVendorProducts(vendorId)); };
+    window.addEventListener("vendorProductsUpdated", handler);
+    return () => window.removeEventListener("vendorProductsUpdated", handler);
+  }, [vendorId]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -127,7 +143,14 @@ export default function VendorProductsPage() {
         {/* Table Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           {/* Actions Bar */}
-          <div className="px-4 py-3 flex items-center justify-end border-b border-gray-100">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+            <button
+              onClick={() => navigate(`/vendors/${vendorId}/add-products`)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Product
+            </button>
             <div className="relative" ref={menuRef}>
               <button onClick={() => setMenuOpen((o) => !o)} className="p-2 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
                 <MoreVertical className="w-4 h-4" />
@@ -137,7 +160,13 @@ export default function VendorProductsPage() {
                   {MENU_ITEMS.map((item, i) => (
                     <div key={item.label}>
                       {i === 1 && <div className="my-1 border-t border-gray-100" />}
-                      <button className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left" onClick={() => setMenuOpen(false)}>
+                      <button
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          if (item.label === "Add Product") navigate(`/vendors/${vendorId}/add-products`);
+                        }}
+                      >
                         <span className="text-gray-400">{item.icon}</span>
                         {item.label}
                       </button>
@@ -149,13 +178,21 @@ export default function VendorProductsPage() {
           </div>
 
           {/* Table */}
+          {vendorProducts.length === 0 ? (
+            <div className="px-4 py-16 text-center text-gray-400 text-sm">
+              No products assigned to this vendor yet.{" "}
+              <button
+                onClick={() => navigate(`/vendors/${vendorId}/add-products`)}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Add products from master catalog
+              </button>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
-                    <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">VPI <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
-                  </th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">MPI</th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Product Name</th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Category</th>
@@ -166,73 +203,117 @@ export default function VendorProductsPage() {
                     <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Stock <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
-                    <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Last Updated <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
+                    <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Added On <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {PRODUCTS.map((product) => (
-                  <tr key={product.vendorSku} className="hover:bg-gray-50/70 transition-colors group">
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center text-base flex-shrink-0 border border-gray-200">{product.image}</div>
-                        <span className="text-blue-600 font-medium text-xs hover:underline cursor-pointer">{product.vendorSku}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className="text-gray-600 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{product.masterSku}</span>
-                    </td>
-                    <td className="px-4 py-3.5 max-w-[200px]">
-                      <div className="font-medium text-gray-800 text-sm leading-tight">{product.name}</div>
-                      <div className="text-xs text-gray-400 mt-0.5 leading-tight">{product.spec}</div>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.category}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="font-semibold text-gray-800 text-sm">{product.price}</div>
-                      <PriceIndicator dir={product.priceDir} change={product.priceChange} />
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.moq}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.leadTime}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap"><StockBadge status={product.stockStatus} count={product.stock} /></td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-500 text-sm">{product.lastUpdated}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="relative inline-block">
-                        <button onClick={(e) => { e.stopPropagation(); setOpenRowMenu(openRowMenu === product.vendorSku ? null : product.vendorSku); }} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                        {openRowMenu === product.vendorSku && (
-                          <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
-                            <button className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left" onClick={() => setOpenRowMenu(null)}>
-                              <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
-                            </button>
-                            <button className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left" onClick={() => setOpenRowMenu(null)}>
-                              <Trash2 className="w-4 h-4 text-red-400" /> Remove Product
-                            </button>
+                {vendorProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
+                  const initials = product.productName.slice(0, 2).toUpperCase();
+                  return (
+                    <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="text-gray-600 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{product.masterProductCode}</span>
+                      </td>
+                      <td className="px-4 py-3.5 max-w-[220px]">
+                        <div className="flex items-center gap-2.5">
+                          {product.images && product.images.length > 0 ? (
+                            <img src={product.images[0]} alt={product.productName} className="w-8 h-8 rounded-md object-cover border border-gray-200 flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0 border border-blue-200">{initials}</div>
+                          )}
+                          <div>
+                            <div className="font-medium text-gray-800 text-sm leading-tight">{product.productName}</div>
+                            <div className="text-xs text-gray-400 mt-0.5 font-mono">{product.skuCode || "—"}</div>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.category || "—"}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <div className="font-semibold text-gray-800 text-sm">
+                          {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.moq || "—"}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">
+                        {product.leadTime ? `${product.leadTime} day${product.leadTime !== "1" ? "s" : ""}` : "—"}
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        {product.stock ? (
+                          <StockBadge
+                            status={parseInt(product.stock) > 10 ? "In Stock" : parseInt(product.stock) > 0 ? "Low Stock" : "Out of Stock"}
+                            count={parseInt(product.stock)}
+                          />
+                        ) : <span className="text-gray-400 text-sm">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-500 text-sm">{product.addedAt}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <div className="relative inline-block">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenRowMenu(openRowMenu === product.id ? null : product.id); }}
+                            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          {openRowMenu === product.id && (
+                            <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                              <button
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                                onClick={() => setOpenRowMenu(null)}
+                              >
+                                <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
+                              </button>
+                              <button
+                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                onClick={() => {
+                                  setOpenRowMenu(null);
+                                  removeVendorProduct(vendorId, product.id);
+                                  setVendorProducts((prev) => prev.filter((p) => p.id !== product.id));
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-400" /> Remove Product
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+          )}
 
           {/* Pagination */}
+          {vendorProducts.length > 0 && (
           <div className="px-4 py-3.5 flex items-center justify-between border-t border-gray-100">
-            <span className="text-sm text-gray-500">Showing 1 to {Math.min(perPage, PRODUCTS.length)} of 128 products</span>
+            <span className="text-sm text-gray-500">
+              Showing {Math.min((currentPage - 1) * perPage + 1, vendorProducts.length)}–{Math.min(currentPage * perPage, vendorProducts.length)} of {vendorProducts.length} product{vendorProducts.length !== 1 ? "s" : ""}
+            </span>
             <div className="flex items-center gap-1.5">
-              <button className="p-1.5 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40 transition-colors"><ChevronLeft className="w-4 h-4" /></button>
-              {[1, 2, 3].map((p) => (
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-md border border-gray-200 text-gray-400 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {Array.from({ length: Math.ceil(vendorProducts.length / perPage) }, (_, i) => i + 1).map((p) => (
                 <button key={p} onClick={() => setCurrentPage(p)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === p ? "bg-blue-600 text-white shadow-sm" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>{p}</button>
               ))}
-              <span className="text-gray-400 text-sm">...</span>
-              <button onClick={() => setCurrentPage(16)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === 16 ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>16</button>
-              <button className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"><ChevronRight className="w-4 h-4" /></button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(Math.ceil(vendorProducts.length / perPage), p + 1))}
+                disabled={currentPage >= Math.ceil(vendorProducts.length / perPage)}
+                className="p-1.5 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
               <div className="ml-2 flex items-center gap-1.5 text-sm text-gray-500">10 / page <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
