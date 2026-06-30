@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Printer, Timer, Wifi, FileText, Shield, Cpu, HardDrive, Monitor, Settings2, Package, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 import { getCatalogProducts } from '@/lib/catalogStore';
 
@@ -35,6 +36,7 @@ function getSpecIcon(name: string) {
 }
 
 export default function ProductPreviewPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<PreviewData | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
 
@@ -59,8 +61,8 @@ export default function ProductPreviewPage() {
           <Package size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500 font-medium">No preview data found.</p>
           <p className="text-sm text-gray-400 mt-1">Go back and click "Preview Product" from the Add New Item page.</p>
-          <button onClick={() => window.close()} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-            Close Window
+          <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+            Go Back
           </button>
         </div>
       </div>
@@ -68,7 +70,7 @@ export default function ProductPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="h-screen overflow-y-auto bg-white">
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-0">
 
         {/* Section 1: Product Header */}
@@ -286,7 +288,7 @@ export default function ProductPreviewPage() {
 
         {/* Bottom actions */}
         <div className="pt-6 flex justify-end gap-3">
-          <button onClick={() => window.close()} className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+          <button onClick={() => navigate(-1)} className="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
             Close Preview
           </button>
         </div>
