@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCatalogProducts, deleteCatalogProduct } from '@/lib/catalogStore';
+import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode } from '@/lib/catalogStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -282,6 +282,27 @@ export default function CatalogUpdatesTab() {
     });
   };
 
+  // Proper CSV row parser — handles quoted fields containing commas/newlines
+  const parseCSVRow = (row: string): string[] => {
+    const result: string[] = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < row.length; i++) {
+      const ch = row[i];
+      if (ch === '"') {
+        if (inQuotes && row[i + 1] === '"') { cur += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        result.push(cur.trim());
+        cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+
   const handleBulkImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -289,41 +310,103 @@ export default function CatalogUpdatesTab() {
     reader.onload = (ev) => {
       try {
         const text = ev.target?.result as string;
-        const lines = text.split('\n').filter(l => l.trim());
-        if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        let added = 0;
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map(c => c.trim());
-          const nameIdx = headers.indexOf('item name');
-          const skuIdx = headers.indexOf('sku');
-          const catIdx = headers.indexOf('category');
-          const brandIdx = headers.indexOf('brand');
-          const priceIdx = headers.indexOf('price');
-          const statusIdx = headers.indexOf('status');
-          if (nameIdx === -1 || skuIdx === -1) continue;
-          const newItem: CatalogItem = {
-            id: Date.now().toString() + i,
-            name: cols[nameIdx] || '',
-            sku: cols[skuIdx] || '',
-            category: cols[catIdx] || 'IT Hardware',
-            subCategory: '',
-            brand: cols[brandIdx] || '',
-            price: parseFloat(cols[priceIdx]) || 0,
-            status: (cols[statusIdx] as any) || 'In Stock',
-            tags: [],
-            initialStock: 50,
-            minStockThreshold: 5,
-          };
-          if (newItem.name && newItem.sku) {
-            setItems(prev => [...prev, newItem]);
-            added++;
-          }
+        // Split preserving quoted newlines — simple approach: split on \n then re-join quoted blocks
+        const rawLines = text.split(/\r?\n/);
+        const lines: string[] = [];
+        let buffer = '';
+        for (const line of rawLines) {
+          buffer += (buffer ? '\n' : '') + line;
+          const quoteCount = (buffer.match(/"/g) || []).length;
+          if (quoteCount % 2 === 0) { lines.push(buffer); buffer = ''; }
         }
-        toast.success(`${added} item(s) imported successfully`);
-        setBulkImportOpen(false);
-      } catch {
-        toast.error('Failed to parse CSV file');
+        if (buffer) lines.push(buffer);
+        const nonEmpty = lines.filter(l => l.trim());
+        if (nonEmpty.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
+
+        const headers = parseCSVRow(nonEmpty[0]).map(h => h.toLowerCase().replace(/\s+/g, ' '));
+        const col = (row: string[], key: string) => {
+          const idx = headers.indexOf(key);
+          return idx >= 0 ? row[idx] || '' : '';
+        };
+
+        let added = 0;
+        for (let i = 1; i < nonEmpty.length; i++) {
+          const row = parseCSVRow(nonEmpty[i]);
+          const productName = col(row, 'product name');
+          if (!productName.trim()) continue;
+
+          // Key Specifications — up to 8 sets
+          const specifications = [];
+          for (let s = 1; s <= 8; s++) {
+            const name = col(row, `keyspec${s}_name`);
+            const value = col(row, `keyspec${s}_value`);
+            const unit = col(row, `keyspec${s}_unit`);
+            if (name.trim()) {
+              specifications.push({ id: `${Date.now()}-ks${s}-${i}`, specification: name, value, unit: unit || '-' });
+            }
+          }
+
+          // General Specifications — up to 8 sets
+          const generalSpecs = [];
+          for (let g = 1; g <= 8; g++) {
+            const category = col(row, `genspec${g}_category`);
+            const attributeValue = col(row, `genspec${g}_attributevalue`);
+            if (category.trim()) {
+              generalSpecs.push({ id: `${Date.now()}-gs${g}-${i}`, category, attributeValue });
+            }
+          }
+
+          // Images — up to 5 URL columns
+          const images: string[] = [];
+          for (let im = 1; im <= 5; im++) {
+            const url = col(row, `image${im}_url`);
+            if (url.trim()) images.push(url.trim());
+          }
+
+          // Tags — semicolon-separated
+          const tagsRaw = col(row, 'tags');
+          const tags = tagsRaw ? tagsRaw.split(';').map(t => t.trim()).filter(Boolean) : [];
+
+          const product = {
+            id: `csv-${Date.now()}-${i}`,
+            masterProductCode: generateMasterProductCode(),
+            skuCode: col(row, 'sku code'),
+            productName,
+            productType: col(row, 'product type') || 'Product',
+            physicalType: col(row, 'physical type') || 'Physical',
+            category: col(row, 'category'),
+            subcategory: col(row, 'subcategory'),
+            brand: col(row, 'brand'),
+            tags,
+            description: col(row, 'description'),
+            specifications,
+            generalSpecs,
+            productNotes: col(row, 'product notes'),
+            videoUrl: col(row, 'video url'),
+            images,
+            publishStatus: 'draft' as const,
+            price: parseFloat(col(row, 'price')) || 0,
+            moq: parseInt(col(row, 'moq')) || 1,
+            leadTime: col(row, 'lead time'),
+            warranty: col(row, 'warranty'),
+          };
+
+          saveCatalogProduct(product);
+          added++;
+        }
+
+        if (added > 0) {
+          loadFromStore();
+          toast.success(`${added} product(s) imported successfully as drafts`);
+          setBulkImportOpen(false);
+        } else {
+          toast.error('No valid rows found. Ensure "Product Name" column has values.');
+        }
+        // reset file input
+        if (bulkFileRef.current) bulkFileRef.current.value = '';
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to parse CSV file. Please use the downloaded template.');
       }
     };
     reader.readAsText(file);
@@ -364,15 +447,130 @@ export default function CatalogUpdatesTab() {
   };
 
   const downloadTemplate = () => {
-    const headers = ['Item Name', 'SKU', 'Category', 'Brand', 'Price', 'Status'];
-    const example = ['Example Product', 'ITH-1001', 'IT Hardware', 'HP', '5000', 'In Stock'];
-    const csv = [headers.join(','), example.join(',')].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csvCell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+    const headers = [
+      // Core product info
+      'Product Name', 'SKU Code', 'Product Type', 'Physical Type',
+      'Category', 'Subcategory', 'Brand',
+      'Tags',           // semicolon-separated e.g. CoreEssentials;New Arrival
+      'Description',
+      'Price', 'MOQ', 'Lead Time', 'Warranty',
+      'Video URL', 'Product Notes',
+      // Key Specifications (up to 8 rows)
+      'KeySpec1_Name', 'KeySpec1_Value', 'KeySpec1_Unit',
+      'KeySpec2_Name', 'KeySpec2_Value', 'KeySpec2_Unit',
+      'KeySpec3_Name', 'KeySpec3_Value', 'KeySpec3_Unit',
+      'KeySpec4_Name', 'KeySpec4_Value', 'KeySpec4_Unit',
+      'KeySpec5_Name', 'KeySpec5_Value', 'KeySpec5_Unit',
+      'KeySpec6_Name', 'KeySpec6_Value', 'KeySpec6_Unit',
+      'KeySpec7_Name', 'KeySpec7_Value', 'KeySpec7_Unit',
+      'KeySpec8_Name', 'KeySpec8_Value', 'KeySpec8_Unit',
+      // General Specifications (up to 8 rows)
+      'GenSpec1_Category', 'GenSpec1_AttributeValue',
+      'GenSpec2_Category', 'GenSpec2_AttributeValue',
+      'GenSpec3_Category', 'GenSpec3_AttributeValue',
+      'GenSpec4_Category', 'GenSpec4_AttributeValue',
+      'GenSpec5_Category', 'GenSpec5_AttributeValue',
+      'GenSpec6_Category', 'GenSpec6_AttributeValue',
+      'GenSpec7_Category', 'GenSpec7_AttributeValue',
+      'GenSpec8_Category', 'GenSpec8_AttributeValue',
+      // Product Images — paste public image URLs (up to 5)
+      'Image1_URL', 'Image2_URL', 'Image3_URL', 'Image4_URL', 'Image5_URL',
+    ];
+
+    // Helper: pad/trim row to exactly `len` columns
+    const padRow = (row: string[], len: number): string[] => {
+      while (row.length < len) row.push('');
+      return row.slice(0, len);
+    };
+    const COL = headers.length; // 60
+
+    // Instruction rows — Product Name is empty so importer skips them
+    const instr1 = padRow(['', '<<< INSTRUCTIONS: Fill one product per row below. Product Name column is REQUIRED. >>>', '', '', '', '', '', 'Tags: use semicolons to separate multiple tags e.g. Tag1;Tag2', 'Wrap text containing commas in double-quotes when editing manually.', '', '', 'Lead Time examples: 10 Days | 1 Month | On Backorder', ''], COL);
+    const instr2 = padRow(['', '<<< KeySpec columns: enter Specification Name + Value + Unit for each spec. Leave unused sets blank. >>>', '', '', '', '', '', '', '', '', '', '', '', '', '', 'KeySpec units e.g. GB | TB | GHz | ppm | dpi | mm | cm | kg | W | V | hours | days | -'], COL);
+    const instr3 = padRow(['', '<<< GenSpec columns: enter a Category label (e.g. Color) and its Attribute Value (e.g. Black). Leave unused sets blank. >>>', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '<<< Image columns: paste full public image URLs (https://...). Leave blank if not applicable. >>>'], COL);
+
+    // Example row 1 — MacBook (60 cols = 15 core + 24 keyspecs + 16 genspecs + 5 images)
+    const ex1 = padRow([
+      // Core (15)
+      'Apple MacBook Air M3', 'SKU-MAC-AIR-M3', 'Product', 'Physical',
+      'IT Hardware', 'Laptops', 'Apple',
+      'CoreEssentials;New Arrival',
+      'The Apple MacBook Air M3 delivers exceptional performance with the M3 chip, long battery life, and a thin lightweight design.',
+      '112000', '1', '10 Days', '1 Year',
+      '', 'Available in Space Gray and Midnight colors.',
+      // KeySpecs (24 = 8×3)
+      'Processor', 'Apple M3 chip', '-',
+      'RAM', '8', 'GB',
+      'Storage', '256', 'GB',
+      'Display', '13.6', 'inch',
+      'Battery Life', '18', 'hours',
+      'Weight', '1.24', 'kg',
+      '', '', '',
+      '', '', '',
+      // GenSpecs (16 = 8×2)
+      'Color', 'Space Gray',
+      'OS', 'macOS Sonoma',
+      'Connectivity', 'Wi-Fi 6E; Bluetooth 5.3',
+      'Ports', '2x USB-C; MagSafe 3',
+      '', '',
+      '', '',
+      '', '',
+      '', '',
+      // Images (5)
+      'https://example.com/macbook-front.jpg', 'https://example.com/macbook-side.jpg', '', '', '',
+    ], COL);
+
+    // Example row 2 — Logitech Mouse (60 cols)
+    const ex2 = padRow([
+      // Core (15)
+      'Logitech MX Master 3S', 'SKU-LOG-MX3S', 'Product', 'Physical',
+      'IT Hardware', 'Peripherals', 'Logitech',
+      'CoreEssentials',
+      'Advanced wireless mouse with ultra-fast MagSpeed scrolling and precise 8000 DPI tracking.',
+      '8500', '1', '10 Days', '2 Years',
+      '', '',
+      // KeySpecs (24 = 8×3)
+      'DPI', '200-8000', 'dpi',
+      'Connectivity', 'Bluetooth; USB Receiver', '-',
+      'Battery Life', '70', 'days',
+      'Buttons', '7', '-',
+      '', '', '',
+      '', '', '',
+      '', '', '',
+      '', '', '',
+      // GenSpecs (16 = 8×2)
+      'Color', 'Graphite',
+      'Weight', '141 g',
+      'Compatibility', 'Windows; macOS; Linux',
+      '', '',
+      '', '',
+      '', '',
+      '', '',
+      '', '',
+      // Images (5)
+      'https://example.com/mx-master-3s.jpg', '', '', '', '',
+    ], COL);
+
+    const escRow = (row: string[]) => row.map(csvCell).join(',');
+    const csv = [
+      escRow(headers),
+      escRow(instr1),
+      escRow(instr2),
+      escRow(instr3),
+      escRow(ex1),
+      escRow(ex2),
+    ].join('\r\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'catalogue-import-template.csv'; a.click();
+    a.href = url;
+    a.download = 'nido-master-catalogue-import-template.csv';
+    a.click();
     URL.revokeObjectURL(url);
-    toast.success('Template downloaded');
+    toast.success('Template downloaded — fill it and use Bulk Import to upload');
   };
 
   const addTag = () => {
