@@ -363,6 +363,18 @@ export default function CatalogUpdatesTab() {
     })), 'audit-logs.csv');
   };
 
+  const downloadTemplate = () => {
+    const headers = ['Item Name', 'SKU', 'Category', 'Brand', 'Price', 'Status'];
+    const example = ['Example Product', 'ITH-1001', 'IT Hardware', 'HP', '5000', 'In Stock'];
+    const csv = [headers.join(','), example.join(',')].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'catalogue-import-template.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Template downloaded');
+  };
+
   const addTag = () => {
     if (tagInput.trim() && !form.tags.includes(tagInput.trim())) {
       updateForm({ tags: [...form.tags, tagInput.trim()] });
@@ -446,19 +458,32 @@ export default function CatalogUpdatesTab() {
       </div>
 
       {/* Actions Bar */}
-      <div className="flex items-center justify-end gap-3">
-        <Button variant="outline" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100">
-          <FileDown size={16} />
-          Export CSV
-        </Button>
-        <Button variant="outline" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={() => setBulkImportOpen(true)}>
-          <Upload size={16} />
-          Bulk Import
-        </Button>
-        <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => navigate('/configuration/master-catalogue/add')}>
-          <Plus size={16} />
-          Add New Item
-        </Button>
+      <div className="flex items-center justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-9 w-9 border-gray-300 text-gray-700 hover:bg-gray-100" data-testid="button-catalog-actions">
+              <MoreVertical size={18} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => navigate('/configuration/master-catalogue/add')} className="cursor-pointer">
+              <Plus size={14} className="mr-2" />
+              Add New Item
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={exportCatalogExcel} className="cursor-pointer">
+              <FileDown size={14} className="mr-2" />
+              Export CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setBulkImportOpen(true)} className="cursor-pointer">
+              <Upload size={14} className="mr-2" />
+              Bulk Import
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={downloadTemplate} className="cursor-pointer">
+              <Download size={14} className="mr-2" />
+              Download Template
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Table */}
