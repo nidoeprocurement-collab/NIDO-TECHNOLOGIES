@@ -29,6 +29,8 @@ interface GeneralSpec {
 
 interface ProductFormData {
   productName: string;
+  masterProductCode: string;
+  skuCode: string;
   productType: string;
   physicalType: string;
   category: string;
@@ -42,9 +44,19 @@ interface ProductFormData {
   videoUrl: string;
 }
 
+let mpcCounter = 1;
+
+function generateMasterProductCode(): string {
+  const year = new Date().getFullYear();
+  const serial = String(mpcCounter++).padStart(6, '0');
+  return `MPC-${year}-${serial}`;
+}
+
 export default function AddMasterCatalogueItemWrapper() {
   const [formData, setFormData] = useState<ProductFormData>({
     productName: '',
+    masterProductCode: generateMasterProductCode(),
+    skuCode: '',
     productType: 'Product',
     physicalType: 'Physical',
     category: '',
@@ -234,6 +246,28 @@ export default function AddMasterCatalogueItemWrapper() {
               <p className="text-xs sm:text-sm text-gray-600 mt-1">Capture core catalog identity for enterprise procurement mapping.</p>
               
               <div className="mt-4 space-y-4">
+                {/* Row 0: Master Product Code + SKU Code */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <Label className="text-xs sm:text-sm font-medium text-gray-700">Master Product Code</Label>
+                    <Input
+                      value={formData.masterProductCode}
+                      readOnly
+                      className="mt-1 text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Auto-generated · Read only</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs sm:text-sm font-medium text-gray-700">SKU Code</Label>
+                    <Input
+                      placeholder="e.g., SKU-XXXX-YYYY"
+                      value={formData.skuCode}
+                      onChange={(e) => setFormData({ ...formData, skuCode: e.target.value })}
+                      className="mt-1 text-sm"
+                    />
+                  </div>
+                </div>
+
                 {/* Row 1 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   <div>
@@ -628,6 +662,30 @@ export default function AddMasterCatalogueItemWrapper() {
                 </div>
               </div>
             </div>
+
+            {/* Action Buttons - horizontal below Section 5 */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 text-sm h-11 border-gray-300 text-gray-700 hover:bg-gray-50"
+                onClick={handlePreview}
+              >
+                Preview Product
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 text-sm h-11 border-gray-300 text-gray-700 hover:bg-gray-50"
+                onClick={handleSaveDraft}
+              >
+                Save as Draft
+              </Button>
+              <Button
+                className="flex-1 text-sm h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                onClick={handlePublish}
+              >
+                Publish Product
+              </Button>
+            </div>
           </div>
 
           {/* Right Sidebar */}
@@ -649,24 +707,6 @@ export default function AddMasterCatalogueItemWrapper() {
                   <div className="flex gap-2 flex-wrap">
                     <Badge className="text-xs bg-blue-100 text-blue-700 border-0">MOD-1</Badge>
                     <Badge className="text-xs bg-green-100 text-green-700 border-0">Warranty</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Product Identifiers */}
-              <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4" style={{ paddingLeft: '10px', paddingRight: '-10px', marginRight: '10px' }}>
-                  <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide">Product Identifiers</h3>
-                  <p className="text-xs text-gray-600 mt-1">Unique codes for tracking</p>
-                  <div className="mt-3 space-y-2">
-                    <div>
-                      <p className="text-xs text-gray-600">Product Code</p>
-                      <Input value="PROD-2026-521438" readOnly className="mt-1 text-xs h-8" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">SKU Code</p>
-                      <Input value="SKU-XXXX-YYYY" readOnly className="mt-1 text-xs h-8" />
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -747,21 +787,6 @@ export default function AddMasterCatalogueItemWrapper() {
                 </CardContent>
               </Card>
 
-              {/* Quick Actions */}
-              <Card className="border border-gray-300">
-                <CardContent className="pt-4 pb-4 space-y-2" style={{ marginRight: '10px', marginLeft: '10px' }}>
-                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-3">Quick Actions</h3>
-                  <Button variant="outline" className="w-full text-sm h-10 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handlePreview}>
-                    Preview Product
-                  </Button>
-                  <Button variant="outline" className="w-full text-sm h-10 border-gray-300 text-gray-700 hover:bg-gray-50" onClick={handleSaveDraft}>
-                    Save as Draft
-                  </Button>
-                  <Button className="w-full text-sm h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={handlePublish}>
-                    Publish Product
-                  </Button>
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>

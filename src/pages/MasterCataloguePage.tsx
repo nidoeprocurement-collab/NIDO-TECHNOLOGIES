@@ -73,13 +73,7 @@ const leadTimeOptions = ['10 Days', '1 Month', 'On Backorder', 'TBD'];
 const customsOptions = ['Exempt', 'Taxable', 'Restricted'];
 const defaultTags = ['CoreEssentials', 'New Arrival', 'High-End', 'Budget', 'Eco-Friendly'];
 
-const initialItems: CatalogItem[] = [
-  { id: '1', name: 'HP Envy Laptop', sku: 'LAP-1001', category: 'IT Hardware', subCategory: 'Laptops', brand: 'HP', price: 80000, status: 'In Stock', tags: ['CoreEssentials'], initialStock: 50, minStockThreshold: 5 },
-  { id: '2', name: 'Sandisk 1TB SSD', sku: 'SSD-2025', category: 'IT Hardware', subCategory: 'Storage', brand: 'Sandisk', price: 12000, status: 'Low Stock', tags: ['High-End'], initialStock: 12, minStockThreshold: 5 },
-  { id: '3', name: 'Logitech Wireless Mouse', sku: 'MOU-3301', category: 'IT Hardware', subCategory: 'Peripherals', brand: 'Logitech', price: 1000, status: 'In Stock', tags: [], initialStock: 200, minStockThreshold: 20 },
-  { id: '4', name: 'Apple iPad Air', sku: 'TAB-1110', category: 'IT Hardware', subCategory: 'Laptops', brand: 'Apple', price: 450, status: 'Low Stock', tags: ['New Arrival'], initialStock: 8, minStockThreshold: 3 },
-  { id: '5', name: 'Epson Workforce Printer', sku: 'PRN-3215', category: 'Stationery', subCategory: 'Paper', brand: 'Epson', price: 62000, status: 'Out of Stock', tags: [], initialStock: 0, minStockThreshold: 2 },
-];
+const initialItems: CatalogItem[] = [];
 
 const auditLogs = [
   { event: 'New Item Added', detail: 'Apple MacBook Air M3', user: 'Annit Kumar', date: '26 Mar 2024 11:55 PM', status: 'Approved' },
