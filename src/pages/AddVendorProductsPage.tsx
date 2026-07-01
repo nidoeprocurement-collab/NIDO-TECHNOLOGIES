@@ -260,7 +260,7 @@ export default function AddVendorProductsPage() {
                     <tr className="bg-gray-50 border-b border-gray-100">
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">Select</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Name</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Master Product Code</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
                       <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
@@ -294,7 +294,7 @@ export default function AddVendorProductsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap">
-                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{product.skuCode || "—"}</span>
+                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{product.masterProductCode || "—"}</span>
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 text-sm">{product.category || "—"}</td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 text-sm">{product.brand || "—"}</td>
@@ -370,7 +370,7 @@ export default function AddVendorProductsPage() {
                     <tr className="bg-gray-50 border-b border-gray-100">
                       {!isEditMode && <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>}
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Master SKU</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Master Product Code</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         <span className="flex items-center gap-1">Price (₹) <Info className="w-3 h-3 text-gray-400" /></span>
                       </th>
@@ -403,7 +403,7 @@ export default function AddVendorProductsPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
-                          <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{row.catalogProduct.skuCode || "—"}</span>
+                          <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{row.catalogProduct.masterProductCode || "—"}</span>
                         </td>
                         <td className="px-3 py-3">
                           <input
