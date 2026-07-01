@@ -40,7 +40,7 @@ interface SelectedRow {
   vendorProductCode: string;
 }
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -188,10 +188,10 @@ export default function AddVendorProductsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="h-screen flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif] overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif]">
 
       {/* ── Sticky header ── */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
         <div className="flex items-center gap-2 mb-0.5">
           <button onClick={goBack} className="p-1 rounded-md hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0">
             <ChevronLeft className="w-4 h-4" />
@@ -207,12 +207,12 @@ export default function AddVendorProductsPage() {
         </p>
       </div>
 
-      {/* ── Body: two panels that share the remaining height, never scroll as a whole ── */}
-      <div className="flex-1 min-h-0 px-6 py-4 flex flex-col gap-4 overflow-hidden">
+      {/* ── Body ── */}
+      <div className="flex-1 px-6 py-4 flex flex-col gap-4">
 
-        {/* ── Section 1: Search & Select ── capped at 48% of body, scrolls internally */}
+        {/* ── Section 1: Search & Select ── */}
         {!isEditMode && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden flex-shrink-0" style={{ maxHeight: "48%" }}>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
 
             {/* Header */}
             <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3">
@@ -244,8 +244,8 @@ export default function AddVendorProductsPage() {
               </div>
             </div>
 
-            {/* Scrollable table area */}
-            <div className="flex-1 min-h-0 overflow-auto">
+            {/* Table area */}
+            <div className="w-full overflow-x-auto">
               {catalog.length === 0 ? (
                 <div className="px-5 py-10 text-center text-gray-400 text-sm">
                   No products in master catalog yet. Add products via Master Catalog first.
@@ -341,8 +341,8 @@ export default function AddVendorProductsPage() {
           </div>
         )}
 
-        {/* ── Section 2: Selected Products ── fills remaining height, scrolls internally */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden flex-1 min-h-0">
+        {/* ── Section 2: Selected Products ── */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
 
           {/* Header */}
           <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3">
@@ -363,8 +363,8 @@ export default function AddVendorProductsPage() {
             </div>
           ) : (
             <>
-              {/* Scrollable table */}
-              <div className="flex-1 min-h-0 overflow-auto">
+              {/* Table */}
+              <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm" style={{ minWidth: "900px" }}>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-100">
@@ -479,7 +479,7 @@ export default function AddVendorProductsPage() {
       </div>
 
       {/* ── Sticky footer ── */}
-      <div className="flex-shrink-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 shadow-[0_-1px_4px_rgba(0,0,0,0.06)]">
+      <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 shadow-[0_-1px_4px_rgba(0,0,0,0.06)]">
         <button
           onClick={goBack}
           className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
