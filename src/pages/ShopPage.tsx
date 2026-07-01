@@ -60,66 +60,6 @@ function getSpecIcon(name: string) {
   return <Settings2 size={18} className="text-blue-500" />;
 }
 
-const BASE_PRODUCTS: Product[] = [
-  {
-    id: 1, name: "Dell PowerEdge R750", category: "Cloud Servers", image: "",
-    specs: ["CPU: Intel Xeon Silver", "RAM: 32GB DDR5", "Storage: 1TB SSD", "Form Factor: 2U Rack", "Power Supply: Dual 750W", "Warranty: 3 Years"],
-    leadTime: "5–7 Days", moq: 5, priceNum: 125000, inStock: true,
-    description: "Enterprise-grade rack server for high-performance computing and virtualization workloads.",
-    generalSpecs: [{ label: "Brand", value: "Dell" }, { label: "Model", value: "PowerEdge R750" }, { label: "Form Factor", value: "2U Rack" }, { label: "Power Supply", value: "Dual 750W" }],
-  },
-  {
-    id: 2, name: "Dell Latitude 5420", category: "IT Hardware", image: "",
-    specs: ["RAM: 16GB DDR4", "Storage: 512GB SSD", "Processor: i5 11th Gen", "Display: 14\" FHD", "OS: Windows 11 Pro", "Warranty: 1 Year"],
-    leadTime: "3–5 Days", moq: 10, priceNum: 50000, inStock: true,
-    description: "Reliable business laptop with enterprise security features and long battery life.",
-    generalSpecs: [{ label: "Brand", value: "Dell" }, { label: "Model", value: "Latitude 5420" }, { label: "OS", value: "Windows 11 Pro" }, { label: "Connectivity", value: "Wi-Fi 6, Bluetooth 5" }],
-  },
-  {
-    id: 3, name: "Ergonomic Office Chair", category: "Office Supplies", image: "",
-    specs: ["Material: Mesh & Fabric", "Adjustable: Yes", "Weight Capacity: 120 kg", "Armrest: 3D Adjustable", "Back Support: Lumbar", "Warranty: 1 Year"],
-    leadTime: "7–10 Days", moq: 5, priceNum: 8500, inStock: true,
-    description: "Premium ergonomic chair designed for all-day comfort and productivity.",
-    generalSpecs: [{ label: "Material", value: "Mesh & Fabric" }, { label: "Color", value: "Black" }, { label: "Weight", value: "12 kg" }, { label: "Max Capacity", value: "120 kg" }],
-  },
-  {
-    id: 4, name: "Nescafe Classic 50g", category: "Pantry & Consumables", image: "",
-    specs: ["Type: Coffee", "Weight: 50g", "Form: Powder", "Shelf Life: 12 Months", "Packaging: Pouch", "Brand: Nescafe"],
-    leadTime: "2–3 Days", moq: 20, priceNum: 120, inStock: true,
-    description: "Smooth and rich instant coffee for the office pantry.",
-    generalSpecs: [{ label: "Brand", value: "Nescafe" }, { label: "Type", value: "Instant Coffee" }, { label: "Weight", value: "50g" }, { label: "Shelf Life", value: "12 Months" }],
-  },
-  {
-    id: 5, name: "Premium Notebook A5", category: "Stationery & Miscellaneous", image: "",
-    specs: ["Size: A5", "Pages: 200", "Type: Ruled", "Cover: Hard Cover", "Paper: 80 GSM", "Binding: Spiral"],
-    leadTime: "3–5 Days", moq: 50, priceNum: 45, inStock: true,
-    description: "High-quality ruled notebook ideal for office and fieldwork use.",
-    generalSpecs: [{ label: "Size", value: "A5" }, { label: "Pages", value: "200" }, { label: "Cover", value: "Hard Cover" }, { label: "Paper GSM", value: "80 GSM" }],
-  },
-  {
-    id: 6, name: "HP LaserJet Pro MFP", category: "IT Hardware", image: "",
-    specs: ["Function: Print/Scan/Copy", "Connectivity: Wi-Fi, USB", "Print Speed: 30 ppm", "Resolution: 1200 x 1200 dpi", "Paper Size: A4", "Warranty: 1 Year"],
-    leadTime: "4–6 Days", moq: 5, priceNum: 28000, inStock: true,
-    description: "High-performance multifunction printer designed for enterprise productivity.",
-    generalSpecs: [{ label: "Brand", value: "HP" }, { label: "Model", value: "LaserJet Pro MFP" }, { label: "Print Type", value: "Laser" }, { label: "Duty Cycle", value: "Up to 8,000 pages/month" }],
-  },
-  {
-    id: 7, name: "Storage Rack 5 Layer", category: "Office Supplies", image: "",
-    specs: ["Material: Steel", "Load Capacity: 50kg/layer", "Layers: 5", "Dimensions: 180x90x40 cm", "Finish: Powder Coated", "Assembly: Boltless"],
-    leadTime: "6–8 Days", moq: 10, priceNum: 4500, inStock: true,
-    description: "Heavy-duty steel shelving rack suitable for warehouse and office storage.",
-    generalSpecs: [{ label: "Material", value: "Steel" }, { label: "Layers", value: "5" }, { label: "Finish", value: "Powder Coated" }, { label: "Color", value: "Grey" }],
-  },
-  {
-    id: 8, name: "Bisleri Water Bottle 1L", category: "Pantry & Consumables", image: "",
-    specs: ["Type: Drinking Water", "Volume: 1 Liter", "Packaging: Bottle", "Source: Natural", "Shelf Life: 6 Months", "Brand: Bisleri"],
-    leadTime: "1–2 Days", moq: 30, priceNum: 15, inStock: true,
-    description: "Pure and natural drinking water in 1L sealed bottles for office pantries.",
-    generalSpecs: [{ label: "Brand", value: "Bisleri" }, { label: "Volume", value: "1 Liter" }, { label: "Source", value: "Natural Spring" }, { label: "Shelf Life", value: "6 Months" }],
-  },
-];
-
-const ALL_CATEGORIES = ["All Categories", "Cloud Servers", "IT Hardware", "Office Supplies", "Pantry & Consumables", "Stationery & Miscellaneous"];
 const PAGE_SIZE = 8;
 
 function formatPrice(n: number) {
@@ -370,7 +310,7 @@ export default function ShopPage() {
     return () => window.removeEventListener('catalogUpdated', loadCatalogProducts);
   }, []);
 
-  const ALL_COMBINED = [...BASE_PRODUCTS, ...catalogProducts];
+  const ALL_COMBINED = [...catalogProducts];
 
   const allCats = ["All Categories", ...Array.from(new Set(ALL_COMBINED.map(p => p.category)))];
 

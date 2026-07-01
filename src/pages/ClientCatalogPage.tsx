@@ -2,38 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Download, Filter, MoreVertical, Search, X } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 
-const catalogProducts = [
-  {
-    productCode: "PC-DL-001",
-    sku: "PRD-001",
-    name: "Dell Laptop XPS 15",
-    category: "Hardware",
-    roles: ["Admin", "IT Manager"],
-    price: "₹21,004",
-    availability: "In Stock",
-    img: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=40&h=40&fit=crop&auto=format",
-  },
-  {
-    productCode: "PC-MS-002",
-    sku: "PRD-002",
-    name: "Microsoft Office 365",
-    category: "Software",
-    roles: ["IT Manager", "Finance"],
-    price: "₹83,375",
-    availability: "In Stock",
-    img: "https://images.unsplash.com/photo-1633419461186-7d40a38105ec?w=40&h=40&fit=crop&auto=format",
-  },
-  {
-    productCode: "PC-EO-003",
-    sku: "PRD-003",
-    name: "Ergonomic Office Chair",
-    category: "Accessories",
-    roles: ["IT Staff", "Support"],
-    price: "₹1,740",
-    availability: "In Stock",
-    img: "https://images.unsplash.com/photo-1580480055273-228ff5388ef8?w=40&h=40&fit=crop&auto=format",
-  },
-];
 
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
 
@@ -213,7 +181,18 @@ function RoleDropdown({
   );
 }
 
-function AddNewProductModal({ onClose }: { onClose: () => void }) {
+interface CatalogEntry {
+  productCode: string;
+  sku: string;
+  name: string;
+  category: string;
+  roles: string[];
+  price: string;
+  availability: string;
+  img: string;
+}
+
+function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (entries: CatalogEntry[]) => void }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -486,6 +465,22 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
             disabled={rows.length === 0}
+            onClick={() => {
+              const entries: CatalogEntry[] = rows.map((row) => ({
+                productCode: row.product.masterProductCode,
+                sku: row.product.skuCode,
+                name: row.product.productName,
+                category: row.product.category,
+                roles: row.role ? [row.role] : [],
+                price: row.product.price > 0
+                  ? "₹" + row.product.price.toLocaleString("en-IN")
+                  : "Price on request",
+                availability: "In Stock",
+                img: row.product.images[0] || "",
+              }));
+              onAdd(entries);
+              onClose();
+            }}
             className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add Product{rows.length > 1 ? "s" : ""}
@@ -502,7 +497,7 @@ export default function ClientCatalogPage() {
   const [headerMenu, setHeaderMenu] = useState(false);
   const [page, setPage] = useState(1);
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [products, setProducts] = useState(catalogProducts.map((p) => ({ ...p, roles: [...p.roles] })));
+  const [products, setProducts] = useState<CatalogEntry[]>([]);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -523,7 +518,16 @@ export default function ClientCatalogPage() {
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setHeaderMenu(false); }}>
-      {showAddProduct && <AddNewProductModal onClose={() => setShowAddProduct(false)} />}
+      {showAddProduct && (
+        <AddNewProductModal
+          onClose={() => setShowAddProduct(false)}
+          onAdd={(entries) => setProducts((prev) => {
+            // avoid duplicates by productCode
+            const existing = new Set(prev.map((p) => p.productCode));
+            return [...prev, ...entries.filter((e) => !existing.has(e.productCode))];
+          })}
+        />
+      )}
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-3">
         <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white">
@@ -608,7 +612,11 @@ export default function ClientCatalogPage() {
                   <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.sku}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <img src={product.img} alt={product.name} className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0" />
+                      {product.img ? (
+                        <img src={product.img} alt={product.name} className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0 border border-blue-200">{product.name.slice(0, 2).toUpperCase()}</div>
+                      )}
                       <span className="font-medium text-gray-800 text-[11px]">{product.name}</span>
                     </div>
                   </td>
