@@ -55,12 +55,171 @@ function ProductThumb({ images, name }: { images: string[]; name: string }) {
   );
 }
 
+interface SelectedRow {
+  product: CatalogProduct;
+  role: string;
+  preference: string;
+}
+
+function PreferenceDropdown({
+  value,
+  preferences,
+  onSelect,
+  onAddNew,
+}: {
+  value: string;
+  preferences: string[];
+  onSelect: (p: string) => void;
+  onAddNew: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const commit = () => {
+    const name = newName.trim();
+    if (!name) return;
+    onAddNew(name);
+    onSelect(name);
+    setNewName("");
+    setAdding(false);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => { setOpen((v) => !v); setAdding(false); }}
+        className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[120px] w-full"
+      >
+        <span className={value ? "text-gray-700" : "text-gray-400"}>{value || "Select…"}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-gray-400"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[150px]">
+          {preferences.map((p) => (
+            <button
+              key={p}
+              onClick={() => { onSelect(p); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === p ? "text-blue-600 font-medium" : "text-gray-700"}`}
+            >
+              {p}
+            </button>
+          ))}
+          <div className="border-t border-gray-100 mt-1 pt-1">
+            {adding ? (
+              <div className="px-2 py-1.5 flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && commit()}
+                  placeholder="Preference name…"
+                  className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+                <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAdding(true)}
+                className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+              >
+                <span className="text-sm leading-none">+</span> Add new
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoleDropdown({
+  value,
+  roles,
+  onSelect,
+  onAddNew,
+}: {
+  value: string;
+  roles: string[];
+  onSelect: (r: string) => void;
+  onAddNew: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const commit = () => {
+    const name = newName.trim();
+    if (!name) return;
+    onAddNew(name);
+    onSelect(name);
+    setNewName("");
+    setAdding(false);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => { setOpen((v) => !v); setAdding(false); }}
+        className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[120px] w-full"
+      >
+        <span className={value ? "text-gray-700" : "text-gray-400"}>{value || "Select role…"}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-gray-400"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[150px]">
+          {roles.map((r) => (
+            <button
+              key={r}
+              onClick={() => { onSelect(r); setOpen(false); }}
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === r ? "text-blue-600 font-medium" : "text-gray-700"}`}
+            >
+              {r}
+            </button>
+          ))}
+          <div className="border-t border-gray-100 mt-1 pt-1">
+            {adding ? (
+              <div className="px-2 py-1.5 flex items-center gap-1.5">
+                <input
+                  autoFocus
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && commit()}
+                  placeholder="Role name…"
+                  className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+                <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAdding(true)}
+                className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+              >
+                <span className="text-sm leading-none">+</span> Add new
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddNewProductModal({ onClose }: { onClose: () => void }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectedProducts, setSelectedProducts] = useState<CatalogProduct[]>([]);
-  const [role, setRole] = useState("");
+  const [rows, setRows] = useState<SelectedRow[]>([]);
+  const [preferences, setPreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
+  const [roles, setRoles] = useState([...catalogRoleOptions]);
 
   useEffect(() => {
     setCatalog(getCatalogProducts());
@@ -86,10 +245,10 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
       const next = new Set(prev);
       if (next.has(product.id)) {
         next.delete(product.id);
-        setSelectedProducts((rows) => rows.filter((r) => r.id !== product.id));
+        setRows((r) => r.filter((row) => row.product.id !== product.id));
       } else {
         next.add(product.id);
-        setSelectedProducts((rows) => [...rows, product]);
+        setRows((r) => [...r, { product, role: "", preference: "" }]);
       }
       return next;
     });
@@ -97,8 +256,30 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
 
   const removeProduct = (id: string) => {
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
-    setSelectedProducts((rows) => rows.filter((r) => r.id !== id));
+    setRows((r) => r.filter((row) => row.product.id !== id));
   };
+
+  const updateRow = (id: string, field: "role" | "preference", value: string) => {
+    setRows((r) => r.map((row) => row.product.id === id ? { ...row, [field]: value } : row));
+  };
+
+  const addPreference = (name: string) => {
+    setPreferences((prev) => prev.includes(name) ? prev : [...prev, name]);
+  };
+
+  const addRole = (name: string) => {
+    setRoles((prev) => prev.includes(name) ? prev : [...prev, name]);
+  };
+
+  // Sort rows by preference index, then by insertion order within same preference
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      const ai = a.preference ? preferences.indexOf(a.preference) : Infinity;
+      const bi = b.preference ? preferences.indexOf(b.preference) : Infinity;
+      if (ai !== bi) return ai - bi;
+      return rows.indexOf(a) - rows.indexOf(b);
+    });
+  }, [rows, preferences]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
@@ -218,22 +399,21 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
 
           {/* ── Section 2: Selected Products ── */}
           <div className="flex flex-col">
-            {/* Section header */}
             <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
               <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
               <h3 className="text-sm font-semibold text-gray-800">
-                Selected Products{selectedProducts.length > 0 && <span className="ml-1.5 text-blue-600">({selectedProducts.length})</span>}
+                Selected Products{rows.length > 0 && <span className="ml-1.5 text-blue-600">({rows.length})</span>}
               </h3>
             </div>
 
-            {selectedProducts.length === 0 ? (
+            {rows.length === 0 ? (
               <div className="px-5 py-8 text-center text-gray-400 text-sm">
                 No products selected yet — check items in the list above.
               </div>
             ) : (
               <>
                 <div className="w-full overflow-x-auto">
-                  <table className="w-full text-sm" style={{ minWidth: "700px" }}>
+                  <table className="w-full text-sm" style={{ minWidth: "900px" }}>
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
@@ -242,41 +422,47 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">Remove</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {selectedProducts.map((prod, idx) => (
-                        <tr key={prod.id} className="hover:bg-gray-50/40 transition-colors">
+                      {sortedRows.map((row, idx) => (
+                        <tr key={row.product.id} className="hover:bg-gray-50/40 transition-colors">
                           <td className="px-3 py-3 text-gray-500 text-sm font-medium">{idx + 1}</td>
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-2">
-                              <ProductThumb images={prod.images} name={prod.productName} />
+                              <ProductThumb images={row.product.images} name={row.product.productName} />
                               <div className="min-w-0">
-                                <div className="font-medium text-gray-800 text-sm leading-tight truncate max-w-[180px]">{prod.productName}</div>
-                                <div className="text-xs text-gray-400 font-mono mt-0.5">{prod.masterProductCode}</div>
+                                <div className="font-medium text-gray-800 text-sm leading-tight truncate max-w-[160px]">{row.product.productName}</div>
+                                <div className="text-xs text-gray-400 font-mono mt-0.5">{row.product.masterProductCode}</div>
                               </div>
                             </div>
                           </td>
                           <td className="px-3 py-3 whitespace-nowrap">
-                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{prod.masterProductCode || "—"}</span>
+                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{row.product.masterProductCode || "—"}</span>
                           </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{prod.category || "—"}</td>
-                          <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{prod.brand || "—"}</td>
+                          <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{row.product.category || "—"}</td>
+                          <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{row.product.brand || "—"}</td>
                           <td className="px-3 py-3">
-                            <select
-                              value={role}
-                              onChange={(e) => setRole(e.target.value)}
-                              className="px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[120px]"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <option value="">Select role</option>
-                              {catalogRoleOptions.map((r) => <option key={r}>{r}</option>)}
-                            </select>
+                            <RoleDropdown
+                              value={row.role}
+                              roles={roles}
+                              onSelect={(v) => updateRow(row.product.id, "role", v)}
+                              onAddNew={addRole}
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <PreferenceDropdown
+                              value={row.preference}
+                              preferences={preferences}
+                              onSelect={(v) => updateRow(row.product.id, "preference", v)}
+                              onAddNew={addPreference}
+                            />
                           </td>
                           <td className="px-3 py-3">
                             <button
-                              onClick={() => removeProduct(prod.id)}
+                              onClick={() => removeProduct(row.product.id)}
                               className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                             >
                               <X className="w-4 h-4" />
@@ -288,7 +474,7 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
                   </table>
                 </div>
                 <div className="px-5 py-2 border-t border-gray-100">
-                  <span className="text-xs text-gray-500">{selectedProducts.length} product{selectedProducts.length !== 1 ? "s" : ""} selected</span>
+                  <span className="text-xs text-gray-500">{rows.length} product{rows.length !== 1 ? "s" : ""} selected</span>
                 </div>
               </>
             )}
@@ -299,10 +485,10 @@ function AddNewProductModal({ onClose }: { onClose: () => void }) {
         <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
-            disabled={selectedProducts.length === 0}
+            disabled={rows.length === 0}
             className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Add Product{selectedProducts.length > 1 ? "s" : ""}
+            Add Product{rows.length > 1 ? "s" : ""}
           </button>
         </div>
       </div>
