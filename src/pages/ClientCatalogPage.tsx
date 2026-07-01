@@ -25,7 +25,7 @@ function ProductThumb({ images, name }: { images: string[]; name: string }) {
 
 interface SelectedRow {
   product: CatalogProduct;
-  role: string;
+  roles: string[];
   preference: string;
 }
 
@@ -106,14 +106,14 @@ function PreferenceDropdown({
 }
 
 function RoleDropdown({
-  value,
+  values,
   roles,
-  onSelect,
+  onToggle,
   onAddNew,
 }: {
-  value: string;
+  values: string[];
   roles: string[];
-  onSelect: (r: string) => void;
+  onToggle: (r: string) => void;
   onAddNew: (name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -124,58 +124,89 @@ function RoleDropdown({
     const name = newName.trim();
     if (!name) return;
     onAddNew(name);
-    onSelect(name);
+    onToggle(name);
     setNewName("");
     setAdding(false);
-    setOpen(false);
   };
+
+  const label = values.length === 0
+    ? "Select roles…"
+    : values.length === 1
+      ? values[0]
+      : `${values.length} roles selected`;
 
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => { setOpen((v) => !v); setAdding(false); }}
-        className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[120px] w-full"
+        className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[140px] w-full"
       >
-        <span className={value ? "text-gray-700" : "text-gray-400"}>{value || "Select role…"}</span>
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-gray-400"><polyline points="6 9 12 15 18 9"/></svg>
+        <span className={values.length > 0 ? "text-gray-700 truncate" : "text-gray-400"}>{label}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-gray-400 ml-1"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[150px]">
-          {roles.map((r) => (
-            <button
-              key={r}
-              onClick={() => { onSelect(r); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === r ? "text-blue-600 font-medium" : "text-gray-700"}`}
-            >
+
+      {/* Selected role tags shown below trigger */}
+      {values.length > 1 && (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {values.map((r) => (
+            <span key={r} className="inline-flex items-center gap-0.5 text-[10px] bg-blue-50 text-blue-600 border border-blue-100 px-1.5 py-0.5 rounded-full">
               {r}
-            </button>
-          ))}
-          <div className="border-t border-gray-100 mt-1 pt-1">
-            {adding ? (
-              <div className="px-2 py-1.5 flex items-center gap-1.5">
-                <input
-                  autoFocus
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && commit()}
-                  placeholder="Role name…"
-                  className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                />
-                <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
-                <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
-              </div>
-            ) : (
               <button
-                onClick={() => setAdding(true)}
-                className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
-              >
-                <span className="text-sm leading-none">+</span> Add new
-              </button>
-            )}
-          </div>
+                onClick={(e) => { e.stopPropagation(); onToggle(r); }}
+                className="text-blue-400 hover:text-blue-700 leading-none ml-0.5"
+              >×</button>
+            </span>
+          ))}
         </div>
+      )}
+
+      {open && (
+        <>
+          {/* Backdrop to close */}
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[180px]">
+            {roles.map((r) => {
+              const checked = values.includes(r);
+              return (
+                <button
+                  key={r}
+                  onClick={() => onToggle(r)}
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${checked ? "text-blue-600" : "text-gray-700"}`}
+                >
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-blue-600 border-blue-600" : "border-gray-300"}`}>
+                    {checked && <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  </span>
+                  {r}
+                </button>
+              );
+            })}
+            <div className="border-t border-gray-100 mt-1 pt-1">
+              {adding ? (
+                <div className="px-2 py-1.5 flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && commit()}
+                    placeholder="Role name…"
+                    className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+                  <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAdding(true)}
+                  className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+                >
+                  <span className="text-sm leading-none">+</span> Add new
+                </button>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -227,7 +258,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
         setRows((r) => r.filter((row) => row.product.id !== product.id));
       } else {
         next.add(product.id);
-        setRows((r) => [...r, { product, role: "", preference: "" }]);
+        setRows((r) => [...r, { product, roles: [], preference: "" }]);
       }
       return next;
     });
@@ -238,7 +269,15 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
     setRows((r) => r.filter((row) => row.product.id !== id));
   };
 
-  const updateRow = (id: string, field: "role" | "preference", value: string) => {
+  const toggleRowRole = (id: string, role: string) => {
+    setRows((r) => r.map((row) => {
+      if (row.product.id !== id) return row;
+      const has = row.roles.includes(role);
+      return { ...row, roles: has ? row.roles.filter((r) => r !== role) : [...row.roles, role] };
+    }));
+  };
+
+  const updateRow = (id: string, field: "preference", value: string) => {
     setRows((r) => r.map((row) => row.product.id === id ? { ...row, [field]: value } : row));
   };
 
@@ -425,9 +464,9 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                           <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{row.product.brand || "—"}</td>
                           <td className="px-3 py-3">
                             <RoleDropdown
-                              value={row.role}
+                              values={row.roles}
                               roles={roles}
-                              onSelect={(v) => updateRow(row.product.id, "role", v)}
+                              onToggle={(r) => toggleRowRole(row.product.id, r)}
                               onAddNew={addRole}
                             />
                           </td>
@@ -471,7 +510,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                 sku: row.product.skuCode,
                 name: row.product.productName,
                 category: row.product.category,
-                roles: row.role ? [row.role] : [],
+                roles: row.roles,
                 price: row.product.price > 0
                   ? "₹" + row.product.price.toLocaleString("en-IN")
                   : "Price on request",
