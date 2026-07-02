@@ -119,11 +119,11 @@ export default function ClientPriceEngine() {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mb-4">
           <div>
-            <Label className="text-xs text-gray-600">Overhead (Per Unit)</Label>
+            <Label className="text-xs text-gray-600">Overhead (% of Landed Cost)</Label>
             <div className="flex items-center gap-1 mt-1">
-              <span className="text-gray-400 text-xs">₹</span>
-              <Input type="number" value={settings.overhead}
-                onChange={e => updateField('overhead', parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+              <Input type="number" value={settings.overheadPct}
+                onChange={e => updateField('overheadPct', parseFloat(e.target.value) || 0)} className="h-8 text-xs" />
+              <span className="text-gray-400 text-xs">%</span>
             </div>
           </div>
           <div>
@@ -154,7 +154,7 @@ export default function ClientPriceEngine() {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-gray-600">Additional Per-Unit Charges</Label>
+            <Label className="text-xs text-gray-600">Additional Charges (% of Landed Cost)</Label>
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addCharge}>
               <Plus size={12} /> Add Charge
             </Button>
@@ -168,10 +168,10 @@ export default function ClientPriceEngine() {
                   <Input placeholder="Charge name" value={c.name}
                     onChange={e => updateCharge(c.id, { name: e.target.value })} className="h-8 text-xs flex-1" />
                   <div className="flex items-center gap-1">
-                    <span className="text-gray-400 text-xs">₹</span>
                     <Input type="number" value={c.value}
                       onChange={e => updateCharge(c.id, { value: parseFloat(e.target.value) || 0 })}
                       className="h-8 text-xs w-28" />
+                    <span className="text-gray-400 text-xs">%</span>
                   </div>
                   <button onClick={() => removeCharge(c.id)} className="text-red-500 hover:text-red-700">
                     <Trash2 size={14} />
@@ -235,7 +235,7 @@ export default function ClientPriceEngine() {
                       <>
                         <td className="py-2 px-3 text-green-700 font-medium">{r.winningVendor.vendorName}</td>
                         <td className="py-2 px-3 text-right">{fmt(r.landedCostPerUnit)}</td>
-                        <td className="py-2 px-3 text-right">{fmt(r.calc.perUnitTotal + settings.overhead)}</td>
+                        <td className="py-2 px-3 text-right">{fmt(r.calc.perUnitTotal)}</td>
                         <td className="py-2 px-3 text-right">{fmt(r.calc.profit)}</td>
                         <td className="py-2 px-3 text-right text-red-600">-{fmt(r.calc.discount)}</td>
                         <td className="py-2 px-3 text-right">{fmt(r.calc.tax)}</td>

@@ -45,7 +45,7 @@ export default function VendorPriceEngine() {
     return () => events.forEach(ev => window.removeEventListener(ev, refresh));
   }, []);
 
-  const updateSetting = (field: 'logistics' | 'handling' | 'taxPct', value: number) => {
+  const updateSetting = (field: 'logisticsPct' | 'handlingPct' | 'taxPct', value: number) => {
     const next = { ...settings, [field]: value };
     setSettings(next);
     saveVendorCommonSettings(next);
@@ -96,21 +96,21 @@ export default function VendorPriceEngine() {
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-xl">
           <div>
-            <Label className="text-xs text-gray-600">Logistics Cost (Per Unit)</Label>
+            <Label className="text-xs text-gray-600">Logistics Cost (% of Base Price)</Label>
             <div className="flex items-center gap-1 mt-1">
-              <span className="text-gray-400 text-xs">₹</span>
-              <Input type="number" value={settings.logistics}
-                onChange={e => updateSetting('logistics', parseFloat(e.target.value) || 0)}
+              <Input type="number" value={settings.logisticsPct}
+                onChange={e => updateSetting('logisticsPct', parseFloat(e.target.value) || 0)}
                 className="h-8 text-xs" />
+              <span className="text-gray-400 text-xs">%</span>
             </div>
           </div>
           <div>
-            <Label className="text-xs text-gray-600">Handling Charges (Per Unit)</Label>
+            <Label className="text-xs text-gray-600">Handling Charges (% of Base Price)</Label>
             <div className="flex items-center gap-1 mt-1">
-              <span className="text-gray-400 text-xs">₹</span>
-              <Input type="number" value={settings.handling}
-                onChange={e => updateSetting('handling', parseFloat(e.target.value) || 0)}
+              <Input type="number" value={settings.handlingPct}
+                onChange={e => updateSetting('handlingPct', parseFloat(e.target.value) || 0)}
                 className="h-8 text-xs" />
+              <span className="text-gray-400 text-xs">%</span>
             </div>
           </div>
           <div>
@@ -126,7 +126,7 @@ export default function VendorPriceEngine() {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-gray-600">Additional Charges (Per Unit)</Label>
+            <Label className="text-xs text-gray-600">Additional Charges (% of Base Price)</Label>
             <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addCharge}>
               <Plus size={12} /> Add New
             </Button>
@@ -140,10 +140,10 @@ export default function VendorPriceEngine() {
                   <Input placeholder="Charge name" value={c.name}
                     onChange={e => updateCharge(c.id, { name: e.target.value })} className="h-8 text-xs flex-1" />
                   <div className="flex items-center gap-1">
-                    <span className="text-gray-400 text-xs">₹</span>
                     <Input type="number" value={c.value}
                       onChange={e => updateCharge(c.id, { value: parseFloat(e.target.value) || 0 })}
                       className="h-8 text-xs w-28" />
+                    <span className="text-gray-400 text-xs">%</span>
                   </div>
                   <button onClick={() => removeCharge(c.id)} className="text-red-500 hover:text-red-700">
                     <Trash2 size={14} />

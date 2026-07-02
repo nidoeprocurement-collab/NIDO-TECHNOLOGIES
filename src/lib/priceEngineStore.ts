@@ -26,13 +26,13 @@ export interface ChargeItem {
 }
 
 export interface VendorCommonSettings {
-  logistics: number;
-  handling: number;
+  logisticsPct: number;
+  handlingPct: number;
   taxPct: number;
   extraCharges: ChargeItem[];
 }
 
-const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logistics: 0, handling: 0, taxPct: 18, extraCharges: [] };
+const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logisticsPct: 0, handlingPct: 0, taxPct: 18, extraCharges: [] };
 
 export function getVendorCommonSettings(): VendorCommonSettings {
   try {
@@ -51,7 +51,7 @@ export function saveVendorCommonSettings(settings: VendorCommonSettings): void {
 
 export interface ClientCommonSettings {
   perUnitCharges: ChargeItem[];
-  overhead: number;
+  overheadPct: number;
   profitPct: number;
   discountPct: number;
   taxPct: number;
@@ -60,7 +60,7 @@ export interface ClientCommonSettings {
 
 const DEFAULT_CLIENT_SETTINGS: ClientCommonSettings = {
   perUnitCharges: [],
-  overhead: 0,
+  overheadPct: 0,
   profitPct: 20,
   discountPct: 0,
   taxPct: 18,
@@ -90,8 +90,9 @@ const TERMS_MAP: Record<string, string> = {
 };
 
 export function getLandedCost(basePrice: number, settings: VendorCommonSettings): number {
-  const extraTotal = settings.extraCharges.reduce((sum, c) => sum + c.value, 0);
-  const preTax = basePrice + settings.logistics + settings.handling + extraTotal;
+  const extraPct = settings.extraCharges.reduce((sum, c) => sum + c.value, 0);
+  const totalPct = settings.logisticsPct + settings.handlingPct + extraPct;
+  const preTax = basePrice * (1 + totalPct / 100);
   return preTax * (1 + settings.taxPct / 100);
 }
 
@@ -202,8 +203,10 @@ export function computeClientFinalPrice(
   settings?: ClientCommonSettings,
 ): ClientPriceCalc {
   const s = settings || getClientCommonSettings();
-  const perUnitTotal = s.perUnitCharges.reduce((sum, c) => sum + c.value, 0);
-  const subtotal = landedCostPerUnit + perUnitTotal + s.overhead;
+  const perUnitPct = s.perUnitCharges.reduce((sum, c) => sum + c.value, 0);
+  const totalPct = s.overheadPct + perUnitPct;
+  const perUnitTotal = (landedCostPerUnit * totalPct) / 100;
+  const subtotal = landedCostPerUnit + perUnitTotal;
   const profit = (subtotal * s.profitPct) / 100;
   const discount = ((subtotal + profit) * s.discountPct) / 100;
   const taxBase = subtotal + profit - discount;
