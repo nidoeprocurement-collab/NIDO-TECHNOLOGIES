@@ -19,13 +19,20 @@ import { getClientCatalog, updateClientCatalogProductPrice } from './clientCatal
 const VENDOR_SETTINGS_KEY = 'nido_price_engine_vendor_settings';
 const CLIENT_SETTINGS_KEY = 'nido_price_engine_client_settings';
 
+export interface ChargeItem {
+  id: string;
+  name: string;
+  value: number;
+}
+
 export interface VendorCommonSettings {
   logistics: number;
   handling: number;
   taxPct: number;
+  extraCharges: ChargeItem[];
 }
 
-const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logistics: 0, handling: 0, taxPct: 18 };
+const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logistics: 0, handling: 0, taxPct: 18, extraCharges: [] };
 
 export function getVendorCommonSettings(): VendorCommonSettings {
   try {
@@ -40,12 +47,6 @@ export function getVendorCommonSettings(): VendorCommonSettings {
 export function saveVendorCommonSettings(settings: VendorCommonSettings): void {
   localStorage.setItem(VENDOR_SETTINGS_KEY, JSON.stringify(settings));
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
-}
-
-export interface ChargeItem {
-  id: string;
-  name: string;
-  value: number;
 }
 
 export interface ClientCommonSettings {
@@ -89,7 +90,8 @@ const TERMS_MAP: Record<string, string> = {
 };
 
 export function getLandedCost(basePrice: number, settings: VendorCommonSettings): number {
-  const preTax = basePrice + settings.logistics + settings.handling;
+  const extraTotal = settings.extraCharges.reduce((sum, c) => sum + c.value, 0);
+  const preTax = basePrice + settings.logistics + settings.handling + extraTotal;
   return preTax * (1 + settings.taxPct / 100);
 }
 

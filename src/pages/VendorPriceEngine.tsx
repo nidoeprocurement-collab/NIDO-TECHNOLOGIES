@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import {
   getAllProductPricing,
   getVendorCommonSettings,
   saveVendorCommonSettings,
   type ProductPricing,
   type VendorCommonSettings,
+  type ChargeItem,
 } from '@/lib/priceEngineStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -43,11 +45,31 @@ export default function VendorPriceEngine() {
     return () => events.forEach(ev => window.removeEventListener(ev, refresh));
   }, []);
 
-  const updateSetting = (field: keyof VendorCommonSettings, value: number) => {
+  const updateSetting = (field: 'logistics' | 'handling' | 'taxPct', value: number) => {
     const next = { ...settings, [field]: value };
     setSettings(next);
     saveVendorCommonSettings(next);
     setProducts(getAllProductPricing());
+  };
+
+  const persistCharges = (extraCharges: ChargeItem[]) => {
+    const next = { ...settings, extraCharges };
+    setSettings(next);
+    saveVendorCommonSettings(next);
+    setProducts(getAllProductPricing());
+  };
+
+  const addCharge = () => {
+    const charge: ChargeItem = { id: `chg-${Date.now()}`, name: '', value: 0 };
+    persistCharges([...settings.extraCharges, charge]);
+  };
+
+  const updateCharge = (id: string, patch: Partial<ChargeItem>) => {
+    persistCharges(settings.extraCharges.map(c => (c.id === id ? { ...c, ...patch } : c)));
+  };
+
+  const removeCharge = (id: string) => {
+    persistCharges(settings.extraCharges.filter(c => c.id !== id));
   };
 
   const toggle = (code: string) => setExpanded(e => ({ ...e, [code]: !e[code] }));
@@ -100,6 +122,36 @@ export default function VendorPriceEngine() {
               <span className="text-gray-400 text-xs">%</span>
             </div>
           </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-xs text-gray-600">Additional Charges (Per Unit)</Label>
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addCharge}>
+              <Plus size={12} /> Add New
+            </Button>
+          </div>
+          {settings.extraCharges.length === 0 ? (
+            <p className="text-xs text-gray-400">No additional charges configured.</p>
+          ) : (
+            <div className="space-y-2 max-w-xl">
+              {settings.extraCharges.map(c => (
+                <div key={c.id} className="flex items-center gap-2">
+                  <Input placeholder="Charge name" value={c.name}
+                    onChange={e => updateCharge(c.id, { name: e.target.value })} className="h-8 text-xs flex-1" />
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-400 text-xs">₹</span>
+                    <Input type="number" value={c.value}
+                      onChange={e => updateCharge(c.id, { value: parseFloat(e.target.value) || 0 })}
+                      className="h-8 text-xs w-28" />
+                  </div>
+                  <button onClick={() => removeCharge(c.id)} className="text-red-500 hover:text-red-700">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
