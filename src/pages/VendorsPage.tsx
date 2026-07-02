@@ -398,10 +398,10 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-50">
       {/* Sticky Header */}
       <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="w-full px-4 py-3 flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-500">Vendors / Vendor List</p>
             <h1 className="text-2xl font-bold">Vendors</h1>
@@ -435,15 +435,15 @@ export default function App() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-4 py-4">
         {/* Stats tiles */}
-        <div className="grid grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
           {stats.map(s => (
             <Card key={s.label}>
-              <CardContent className="p-5 flex justify-between items-start">
+              <CardContent className="p-4 flex justify-between items-start">
                 <div>
-                  <p className="text-sm text-gray-600">{s.label}</p>
-                  <p className={`text-3xl font-bold mt-2 ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-gray-500">{s.label}</p>
+                  <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
                 </div>
                 {s.icon}
               </CardContent>
@@ -455,7 +455,7 @@ export default function App() {
         <Card>
           <CardContent className="p-0">
             {/* Filters */}
-            <div className="flex items-center gap-2 px-6 py-3 border-b flex-wrap">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b flex-wrap">
               <span className="text-xs font-semibold text-gray-400 mr-1">Filters:</span>
               <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilterCategory} />
               <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilterStatus} />
@@ -466,18 +466,19 @@ export default function App() {
               <span className="ml-auto text-xs text-gray-400">{filteredVendors.length} of {activeVendors.length} vendors</span>
             </div>
 
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
-                  <th className="px-6 py-4 text-left">Vendor ID</th>
-                  <th className="px-6 py-4 text-left">Vendor Name</th>
-                  <th className="px-6 py-4 text-left">Category</th>
-                  <th className="px-6 py-4 text-left">Primary Contact</th>
-                  <th className="px-6 py-4 text-left">Rating</th>
-                  <th className="px-6 py-4 text-left">Region</th>
-                  <th className="px-6 py-4 text-left">Status</th>
-                  <th className="px-6 py-4 text-left">This Month</th>
-                  <th className="px-6 py-4 text-center">Actions</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Vendor ID</th>
+                  <th className="px-3 py-3 text-left">Vendor Name</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Category</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Primary Contact</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Rating</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Region</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Status</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">This Month</th>
+                  <th className="px-3 py-3 text-center whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -491,45 +492,46 @@ export default function App() {
                 ) : filteredVendors.map((v) => (
                   <tr key={v.id} className="border-b hover:bg-gray-50 transition-colors">
                     <td
-                      className="px-6 py-4 text-blue-600 font-medium cursor-pointer hover:underline text-sm"
+                      className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm whitespace-nowrap"
                       onClick={() => navigate(`/vendors/${v.id}`)}
                     >
                       {v.id}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">{v.name[0]}</div>
-                        <div>
-                          <p className="font-medium text-gray-800 text-sm leading-tight">{v.name}</p>
-                          <p className="text-xs text-gray-400 leading-tight">{v.email}</p>
+                    <td className="px-3 py-3 min-w-[160px]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">{v.name[0]}</div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 text-sm leading-tight truncate">{v.name}</p>
+                          <p className="text-xs text-gray-400 leading-tight truncate">{v.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium">{v.category}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-700 font-medium leading-tight">{v.primaryContact}</p>
-                      <p className="text-xs text-gray-400 leading-tight">{v.phone}</p>
+                    <td className="px-3 py-3 min-w-[130px]">
+                      <p className="text-sm text-gray-700 font-medium leading-tight truncate">{v.primaryContact}</p>
+                      <p className="text-xs text-gray-400 leading-tight truncate">{v.phone}</p>
                     </td>
-                    <td className="px-6 py-4"><StarRating rating={v.rating} /></td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{v.region}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 whitespace-nowrap"><StarRating rating={v.rating} /></td>
+                    <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{v.region}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <Badge className={statusColors[v.status]}>{v.status}</Badge>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <span className={`text-sm font-semibold ${v.monthSpend > 0 ? "text-gray-800" : "text-gray-300"}`}>{formatLakhs(v.monthSpend)}</span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-3 py-3 text-center">
                       <RowActionsMenu vendor={v} onEdit={() => setEditVendor(v)} onArchive={() => archiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
 
             {/* Pagination */}
-            <div className="px-6 py-4 flex justify-between text-sm text-gray-600 border-t">
+            <div className="px-4 py-3 flex justify-between text-sm text-gray-600 border-t">
               <span>1–{filteredVendors.length} of {activeVendors.length} vendors</span>
               <div className="flex gap-2">
                 <button className="p-2 hover:bg-gray-100 rounded">←</button>
