@@ -4,7 +4,7 @@ import { useCart } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
-import { mockDataService } from "@/lib/mockData";
+import { getClients as getStoredClients } from "@/lib/clientStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,21 +90,8 @@ function entryToProduct(e: ClientCatalogEntry): Product {
 }
 
 function loadClients(): Client[] {
-  // merge mock clients with any saved from localStorage
-  const base = mockDataService.getClients().map((c: any) => ({
-    id: c.id,
-    name: c.company_name,
-  }));
-  try {
-    const stored = JSON.parse(localStorage.getItem("clients") || "[]");
-    const storedMapped: Client[] = stored.map((c: any) => ({
-      id: c.client_id || c.id,
-      name: c.company_name || c.name || c.client_id || c.id,
-    }));
-    const existingIds = new Set(base.map((c: Client) => c.id));
-    storedMapped.forEach((c: Client) => { if (!existingIds.has(c.id)) base.push(c); });
-  } catch { /* ignore */ }
-  return base;
+  const stored = getStoredClients();
+  return stored.map((c) => ({ id: c.id, name: c.name }));
 }
 
 // ── Product Detail Dialog ────────────────────────────────────────────────────
@@ -324,9 +311,12 @@ export default function ShopPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
 
-  // Load clients once on mount
+  // Load clients on mount and re-load when the shared store updates
   useEffect(() => {
     setClients(loadClients());
+    const onUpdate = () => setClients(loadClients());
+    window.addEventListener('nidoClientsUpdated', onUpdate);
+    return () => window.removeEventListener('nidoClientsUpdated', onUpdate);
   }, []);
 
   // Load client catalog whenever selectedClientId changes

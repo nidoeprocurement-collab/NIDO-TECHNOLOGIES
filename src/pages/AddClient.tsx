@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { addClient as addStoredClient } from "@/lib/clientStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -375,23 +376,19 @@ export default function AddClient() {
         status: "active",
       };
 
-      // Mock save - store in localStorage for demonstration
-      const clients = JSON.parse(localStorage.getItem("clients") || "[]");
+      // Save to shared client store
+      addStoredClient({
+        id: formData.client_id,
+        name: clientData.company_name || formData.client_id,
+        ...clientData,
+      });
       if (clientIdToEdit) {
-        const index = clients.findIndex(
-          (c: any) => c.client_id === formData.client_id
-        );
-        if (index > -1) {
-          clients[index] = { ...clients[index], ...clientData };
-        }
         console.log("[v0] Client updated successfully");
         toast.success("Client updated successfully");
       } else {
-        clients.push({ client_id: formData.client_id, ...clientData });
         console.log("[v0] Client saved successfully");
         toast.success("Client registered successfully");
       }
-      localStorage.setItem("clients", JSON.stringify(clients));
 
       // Navigate back to clients page after successful save
       setTimeout(() => {
