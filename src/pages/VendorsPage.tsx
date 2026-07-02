@@ -321,6 +321,8 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterRating, setFilterRating] = useState("All");
   const [filterRegion, setFilterRegion] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const activeVendors = vendors.filter(v => !v.archived);
   const archivedVendors = vendors.filter(v => v.archived);
@@ -343,6 +345,15 @@ export default function App() {
     if (filterRating === "3★ (Below 3.5)" && v.rating >= 3.5) return false;
     return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredVendors.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedVendors = filteredVendors.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+
+  const setFilter = (setter: (v: string) => void) => (val: string) => {
+    setter(val);
+    setCurrentPage(1);
+  };
 
   const archiveVendor = (id: string) => {
     const updated = vendors.map(v => v.id === id ? { ...v, archived: true } : v);
@@ -457,48 +468,58 @@ export default function App() {
             {/* Filters */}
             <div className="flex items-center gap-2 px-4 py-2.5 border-b flex-wrap">
               <span className="text-xs font-semibold text-gray-400 mr-1">Filters:</span>
-              <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilterCategory} />
-              <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilterStatus} />
-              <FilterSelect label="Rating" value={filterRating} options={["All", "5★ (4.5+)", "4★ (3.5–4.5)", "3★ (Below 3.5)"]} onChange={setFilterRating} />
-              <FilterSelect label="Region" value={filterRegion} options={regions} onChange={setFilterRegion} />
-              <button onClick={() => { setFilterCategory("All"); setFilterStatus("All"); setFilterRating("All"); setFilterRegion("All"); }}
+              <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilter(setFilterCategory)} />
+              <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilter(setFilterStatus)} />
+              <FilterSelect label="Rating" value={filterRating} options={["All", "5★ (4.5+)", "4★ (3.5–4.5)", "3★ (Below 3.5)"]} onChange={setFilter(setFilterRating)} />
+              <FilterSelect label="Region" value={filterRegion} options={regions} onChange={setFilter(setFilterRegion)} />
+              <button onClick={() => { setFilterCategory("All"); setFilterStatus("All"); setFilterRating("All"); setFilterRegion("All"); setCurrentPage(1); }}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium">Clear all</button>
               <span className="ml-auto text-xs text-gray-400">{filteredVendors.length} of {activeVendors.length} vendors</span>
             </div>
 
-            <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "11%" }} />
+                <col style={{ width: "16%" }} />
+                <col style={{ width: "7%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "7%" }} />
+              </colgroup>
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
-                  <th className="px-3 py-3 text-left whitespace-nowrap">Vendor ID</th>
+                  <th className="px-3 py-3 text-left">Vendor ID</th>
                   <th className="px-3 py-3 text-left">Vendor Name</th>
-                  <th className="px-3 py-3 text-left whitespace-nowrap">Category</th>
-                  <th className="px-3 py-3 text-left whitespace-nowrap">Primary Contact</th>
-                  <th className="px-3 py-3 text-left whitespace-nowrap">Rating</th>
-                  <th className="px-3 py-3 text-left whitespace-nowrap">Region</th>
-                  <th className="px-3 py-3 text-left whitespace-nowrap">Status</th>
-                  <th className="px-3 py-3 text-left whitespace-nowrap">This Month</th>
-                  <th className="px-3 py-3 text-center whitespace-nowrap">Actions</th>
+                  <th className="px-3 py-3 text-left">Category</th>
+                  <th className="px-3 py-3 text-left">Primary Contact</th>
+                  <th className="px-3 py-3 text-left">Rating</th>
+                  <th className="px-3 py-3 text-left">Region</th>
+                  <th className="px-3 py-3 text-left">Status</th>
+                  <th className="px-3 py-3 text-left">This Month</th>
+                  <th className="px-3 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredVendors.length === 0 ? (
+                {pagedVendors.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="text-center py-16 text-gray-400">
                       <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
                       <p className="text-sm">No vendors match the current filters</p>
                     </td>
                   </tr>
-                ) : filteredVendors.map((v) => (
+                ) : pagedVendors.map((v) => (
                   <tr key={v.id} className="border-b hover:bg-gray-50 transition-colors">
                     <td
-                      className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm whitespace-nowrap"
+                      className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm truncate"
                       onClick={() => navigate(`/vendors/${v.id}`)}
                     >
                       {v.id}
                     </td>
-                    <td className="px-3 py-3 min-w-[160px]">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">{v.name[0]}</div>
                         <div className="min-w-0">
                           <p className="font-medium text-gray-800 text-sm leading-tight truncate">{v.name}</p>
@@ -506,19 +527,19 @@ export default function App() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
-                      <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium">{v.category}</span>
+                    <td className="px-3 py-3">
+                      <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium truncate block max-w-full">{v.category}</span>
                     </td>
-                    <td className="px-3 py-3 min-w-[130px]">
+                    <td className="px-3 py-3">
                       <p className="text-sm text-gray-700 font-medium leading-tight truncate">{v.primaryContact}</p>
                       <p className="text-xs text-gray-400 leading-tight truncate">{v.phone}</p>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap"><StarRating rating={v.rating} /></td>
-                    <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">{v.region}</td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3"><StarRating rating={v.rating} /></td>
+                    <td className="px-3 py-3 text-sm text-gray-600 truncate">{v.region}</td>
+                    <td className="px-3 py-3">
                       <Badge className={statusColors[v.status]}>{v.status}</Badge>
                     </td>
-                    <td className="px-3 py-3 whitespace-nowrap">
+                    <td className="px-3 py-3">
                       <span className={`text-sm font-semibold ${v.monthSpend > 0 ? "text-gray-800" : "text-gray-300"}`}>{formatLakhs(v.monthSpend)}</span>
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -528,15 +549,30 @@ export default function App() {
                 ))}
               </tbody>
             </table>
-            </div>
 
             {/* Pagination */}
-            <div className="px-4 py-3 flex justify-between text-sm text-gray-600 border-t">
-              <span>1–{filteredVendors.length} of {activeVendors.length} vendors</span>
-              <div className="flex gap-2">
-                <button className="p-2 hover:bg-gray-100 rounded">←</button>
-                <button className="px-3 py-1 border rounded bg-blue-600 text-white">1</button>
-                <button className="p-2 hover:bg-gray-100 rounded">→</button>
+            <div className="px-4 py-3 flex items-center justify-between text-sm text-gray-600 border-t">
+              <span>
+                {filteredVendors.length === 0 ? "0 vendors" : `${(safePage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(safePage * ITEMS_PER_PAGE, filteredVendors.length)} of ${filteredVendors.length} vendors`}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="p-1.5 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >←</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-8 h-8 rounded border text-xs font-medium transition-colors ${p === safePage ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 hover:bg-gray-50"}`}
+                  >{p}</button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="p-1.5 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >→</button>
               </div>
             </div>
           </CardContent>
