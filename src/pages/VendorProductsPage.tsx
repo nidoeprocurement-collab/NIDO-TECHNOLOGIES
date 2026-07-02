@@ -22,8 +22,13 @@ import {
   BookOpen,
   Pencil,
   Trash2,
+  X,
+  IndianRupee,
+  Layers,
+  Timer,
+  Warehouse,
 } from "lucide-react";
-import { getVendorProducts, removeVendorProduct, VendorProduct } from "@/lib/vendorStore";
+import { getVendorProducts, removeVendorProduct, updateVendorProduct, VendorProduct } from "@/lib/vendorStore";
 
 const STATS = [
   { icon: <Package className="w-5 h-5 text-blue-500" />, label: "Total Products", value: "128", sub: "All Products", bg: "bg-blue-50" },
@@ -95,6 +100,281 @@ const MENU_ITEMS = [
   { icon: <BookOpen className="w-4 h-4" />, label: "Assign to Master Catalog" },
 ];
 
+// ── Edit Product Screen ────────────────────────────────────────────────────────
+
+function EditProductScreen({
+  product,
+  onClose,
+  onSave,
+}: {
+  product: VendorProduct;
+  onClose: () => void;
+  onSave: (updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock">) => void;
+}) {
+  const [price, setPrice] = useState(product.price || "");
+  const [moq, setMoq] = useState(product.moq || "");
+  const [leadTime, setLeadTime] = useState(product.leadTime || "");
+  const [stock, setStock] = useState(product.stock || "");
+
+  const initials = product.productName.slice(0, 2).toUpperCase();
+
+  const handleSave = () => {
+    onSave({ price: price.trim(), moq: moq.trim(), leadTime: leadTime.trim(), stock: stock.trim() });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors shrink-0"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-gray-900">Edit Product</h2>
+            <p className="text-xs text-gray-400 truncate">{product.productName}</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-8 py-8 flex gap-8">
+
+          {/* Left: Product card (read-only) */}
+          <div className="w-64 shrink-0">
+            <div className="border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="w-full aspect-square bg-gray-50 flex items-center justify-center">
+                {product.images && product.images.length > 0 ? (
+                  <img src={product.images[0]} alt={product.productName} className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center text-blue-700 text-2xl font-bold border border-blue-200">
+                    {initials}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-gray-100 space-y-2">
+                <h3 className="font-semibold text-gray-900 text-sm leading-snug">{product.productName}</h3>
+                <p className="text-xs text-gray-500">{product.category}</p>
+                <div className="space-y-1.5 text-xs text-gray-600 pt-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">MPI Code</span>
+                    <span className="font-mono">{product.masterProductCode}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">SKU</span>
+                    <span className="font-mono">{product.skuCode || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Brand</span>
+                    <span>{product.brand || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Status</span>
+                    <span className={`font-medium ${product.status === "Active" ? "text-green-600" : "text-gray-400"}`}>{product.status}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Editable fields */}
+          <div className="flex-1 min-w-0">
+            <div className="border border-gray-200 rounded-2xl p-6">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">Pricing &amp; Inventory</h3>
+              <p className="text-sm text-gray-400 mb-6">Update the purchase price, minimum order quantity, lead time, and current stock for this product.</p>
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Purchase Price */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Purchase Price
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Vendor purchase price (excl. GST)</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <IndianRupee className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="e.g. 52000"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* MOQ */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Minimum Order Quantity (MOQ)
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Minimum units per order</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Layers className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={moq}
+                      onChange={(e) => setMoq(e.target.value)}
+                      placeholder="e.g. 5"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Lead Time */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Lead Time (days)
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Days from order to delivery</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Timer className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={leadTime}
+                      onChange={(e) => setLeadTime(e.target.value)}
+                      placeholder="e.g. 3"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Stock */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Stock
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Current units available</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Warehouse className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stock}
+                      onChange={(e) => setStock(e.target.value)}
+                      placeholder="e.g. 120"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex-shrink-0 px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
+        <button
+          onClick={onClose}
+          className="px-5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          className="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Confirm Remove Dialog ──────────────────────────────────────────────────────
+
+function ConfirmRemoveDialog({
+  product,
+  onCancel,
+  onConfirm,
+}: {
+  product: VendorProduct;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+              <Trash2 className="w-4 h-4 text-red-500" />
+            </div>
+            <h3 className="text-base font-semibold text-gray-900">Remove Product</h3>
+          </div>
+          <button
+            onClick={onCancel}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl mb-4">
+            {product.images && product.images.length > 0 ? (
+              <img src={product.images[0]} alt={product.productName} className="w-10 h-10 rounded-lg object-cover border border-gray-200 shrink-0" />
+            ) : (
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-700 text-xs font-bold border border-blue-200 shrink-0">
+                {product.productName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="font-medium text-gray-900 text-sm truncate">{product.productName}</p>
+              <p className="text-xs text-gray-400 font-mono">{product.masterProductCode}</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Are you sure you want to remove this product from the vendor list? This action cannot be undone.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+          >
+            Remove Product
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function VendorProductsPage() {
   const { id: vendorId = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -102,6 +382,8 @@ export default function VendorProductsPage() {
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
+  const [editProduct, setEditProduct] = useState<VendorProduct | null>(null);
+  const [removeProduct, setRemoveProduct] = useState<VendorProduct | null>(null);
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -125,8 +407,33 @@ export default function VendorProductsPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const handleSaveEdit = (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock">) => {
+    updateVendorProduct(vendorId, id, updates);
+    setVendorProducts((prev) => prev.map((p) => p.id === id ? { ...p, ...updates } : p));
+  };
+
+  const handleConfirmRemove = (id: string) => {
+    removeVendorProduct(vendorId, id);
+    setVendorProducts((prev) => prev.filter((p) => p.id !== id));
+    setRemoveProduct(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+      {editProduct && (
+        <EditProductScreen
+          product={editProduct}
+          onClose={() => setEditProduct(null)}
+          onSave={(updates) => handleSaveEdit(editProduct.id, updates)}
+        />
+      )}
+      {removeProduct && (
+        <ConfirmRemoveDialog
+          product={removeProduct}
+          onCancel={() => setRemoveProduct(null)}
+          onConfirm={() => handleConfirmRemove(removeProduct.id)}
+        />
+      )}
       <div className="max-w-[1200px] mx-auto px-4 py-6 space-y-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -253,20 +560,13 @@ export default function VendorProductsPage() {
                             <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                               <button
                                 className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                                onClick={() => {
-                                  setOpenRowMenu(null);
-                                  navigate(`/vendors/${vendorId}/add-products?edit=${product.id}`);
-                                }}
+                                onClick={() => { setOpenRowMenu(null); setEditProduct(product); }}
                               >
                                 <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
                               </button>
                               <button
                                 className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                onClick={() => {
-                                  setOpenRowMenu(null);
-                                  removeVendorProduct(vendorId, product.id);
-                                  setVendorProducts((prev) => prev.filter((p) => p.id !== product.id));
-                                }}
+                                onClick={() => { setOpenRowMenu(null); setRemoveProduct(product); }}
                               >
                                 <Trash2 className="w-4 h-4 text-red-400" /> Remove Product
                               </button>
