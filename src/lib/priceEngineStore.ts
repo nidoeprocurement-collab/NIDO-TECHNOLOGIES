@@ -6,7 +6,7 @@
 // carries the product.
 
 import { getCatalogProducts } from './catalogStore';
-import { getAllVendorProducts } from './vendorStore';
+import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
 import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
 import { getClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
@@ -155,6 +155,25 @@ export function computeVendorComparisons(
   });
 
   return rows.sort((a, b) => b.score - a.score);
+}
+
+// Update the MOQ on the winning vendor's product listing for a given master
+// product. This is the single source of truth for MOQ, so any consumer
+// (Shop page, Client Catalog, etc.) that edits it here will automatically
+// flow through to the Price Engine and trigger a price recalculation via the
+// 'vendorProductsUpdated' event.
+export function updateWinningVendorMoq(masterProductCode: string, newMoq: number): boolean {
+  const settings = getVendorCommonSettings();
+  const comparisons = computeVendorComparisons(masterProductCode, settings);
+  const winner = comparisons[0];
+  if (!winner) return false;
+
+  const vendorProducts = getAllVendorProducts()[winner.vendorId] || [];
+  const match = vendorProducts.find(p => p.masterProductCode === masterProductCode && p.status === 'Active');
+  if (!match) return false;
+
+  updateVendorProduct(winner.vendorId, match.id, { moq: String(newMoq) });
+  return true;
 }
 
 export interface ProductPricing {

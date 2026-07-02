@@ -4,7 +4,7 @@ import { useCart } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
-import { getAllProductPricing } from "@/lib/priceEngineStore";
+import { getAllProductPricing, updateWinningVendorMoq } from "@/lib/priceEngineStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,6 +12,7 @@ type Client = { id: string; name: string };
 
 type Product = {
   id: string;
+  productCode: string;
   name: string;
   category: string;
   image: string;
@@ -92,6 +93,7 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
   const match = vendorMatches.get(e.productCode);
   return {
     id: `client-${e.productCode}`,
+    productCode: e.productCode,
     name: e.name,
     category: e.category || "General",
     image: e.img || "",
@@ -112,13 +114,16 @@ function loadClients(): Client[] {
 
 // ── Product Detail Dialog ────────────────────────────────────────────────────
 
-function ProductDetailDialog({ product, open, onClose }: { product: Product | null; open: boolean; onClose: () => void }) {
+function ProductDetailDialog({ product, open, onClose, onMoqChange }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [added, setAdded] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [editingMoq, setEditingMoq] = useState(false);
+  const [moqDraft, setMoqDraft] = useState(String(product?.moq ?? 0));
 
   useEffect(() => { if (product) setQty(Math.max(1, product.moq)); }, [product]);
+  useEffect(() => { if (product) setMoqDraft(String(product.moq)); }, [product?.moq]);
 
   if (!product) return null;
 
@@ -268,7 +273,27 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
                 <div className="mt-5 space-y-2.5 border-t border-gray-100 pt-4">
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Package size={14} className="text-gray-400 shrink-0" />
-                    <span>MOQ: {product.moq > 0 ? `${product.moq} Units` : '—'}</span>
+                    {editingMoq ? (
+                      <input
+                        type="number"
+                        min={1}
+                        autoFocus
+                        value={moqDraft}
+                        onChange={e => setMoqDraft(e.target.value)}
+                        onBlur={() => {
+                          setEditingMoq(false);
+                          const parsed = parseInt(moqDraft, 10);
+                          if (!isNaN(parsed) && parsed > 0 && parsed !== product.moq) onMoqChange(product, parsed);
+                          else setMoqDraft(String(product.moq));
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        className="w-16 h-6 text-sm border border-gray-300 rounded px-1"
+                      />
+                    ) : (
+                      <button onClick={() => setEditingMoq(true)} className="hover:underline underline-offset-2 decoration-dotted">
+                        MOQ: {product.moq > 0 ? `${product.moq} Units` : '—'}
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-600">
                     <Clock size={14} className="text-gray-400 shrink-0" />
