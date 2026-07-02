@@ -292,7 +292,7 @@ export default function App() {
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
               {activeTab === "Roles" ? <RolesPage /> : activeTab === "Users" ? <UsersPage /> : activeTab === "Orders" ? <OrdersPage /> : activeTab === "Services" ? <ServicesPage /> : activeTab === "Contracts" ? <ContractsPage contractId={""} contractTitle={""} onBack={function (): void {
                 throw new Error("Function not implemented.");
-              } } /> : activeTab === "Catalog" ? <CatalogPage /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : activeTab === "Documents" ? <DocumentsPage /> : <PlaceholderPage tab={activeTab} />}
+              } } /> : activeTab === "Catalog" ? <CatalogPage clientId="CLI-NITIN" /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : activeTab === "Documents" ? <DocumentsPage /> : <PlaceholderPage tab={activeTab} />}
             </div>
           )}
 

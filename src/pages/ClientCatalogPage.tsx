@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { Download, Filter, MoreVertical, Search, X } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
+import {
+  getClientCatalog,
+  saveClientCatalog,
+  type ClientCatalogEntry,
+} from "@/lib/clientCatalogStore";
 
 
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
@@ -212,16 +217,8 @@ function RoleDropdown({
   );
 }
 
-interface CatalogEntry {
-  productCode: string;
-  sku: string;
-  name: string;
-  category: string;
-  roles: string[];
-  price: string;
-  availability: string;
-  img: string;
-}
+// Use the shared interface from the store (aliased for local use)
+type CatalogEntry = ClientCatalogEntry;
 
 function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (entries: CatalogEntry[]) => void }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
@@ -516,6 +513,17 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                   : "Price on request",
                 availability: "In Stock",
                 img: row.product.images[0] || "",
+                // Enriched fields for Shop display
+                description: row.product.description,
+                specs: row.product.specifications
+                  .map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== '-' ? ' ' + s.unit : ''}`)
+                  .filter(Boolean),
+                leadTime: row.product.leadTime,
+                moq: row.product.moq || 0,
+                priceNum: row.product.price || 0,
+                generalSpecs: row.product.generalSpecs
+                  .filter(g => g.category || g.attributeValue)
+                  .map(g => ({ label: g.category, value: g.attributeValue })),
               }));
               onAdd(entries);
               onClose();
@@ -530,13 +538,23 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
   );
 }
 
-export default function ClientCatalogPage() {
+export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { clientId?: string }) {
   const [search, setSearch] = useState("");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [page, setPage] = useState(1);
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [products, setProducts] = useState<CatalogEntry[]>([]);
+  const [products, setProducts] = useState<CatalogEntry[]>(() => getClientCatalog(clientId));
+
+  // Reload from store when clientId changes
+  useEffect(() => {
+    setProducts(getClientCatalog(clientId));
+  }, [clientId]);
+
+  // Persist to store whenever products change
+  useEffect(() => {
+    saveClientCatalog(clientId, products);
+  }, [products, clientId]);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
