@@ -164,7 +164,7 @@ export default function TopBar() {
       {/* Breadcrumb section */}
       <div className="h-10 px-4 md:px-6 flex items-center gap-2 bg-gray-50">
         {breadcrumbs.map((crumb, index) => (
-          <div key={crumb.path} className="flex items-center gap-2">
+          <div key={`${crumb.path}-${index}`} className="flex items-center gap-2">
             {index === 0 ? (
               <button
                 onClick={() => navigate(crumb.path)}
