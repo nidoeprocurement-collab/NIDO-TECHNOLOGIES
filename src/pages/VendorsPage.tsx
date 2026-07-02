@@ -20,7 +20,17 @@ import {
   PauseCircle,
   XCircle,
   Phone,
+  Plus,
+  Download,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { getVendors, saveVendors, type StoredVendor, type VendorStatus } from "@/lib/vendorDataStore";
 
 type Vendor = StoredVendor;
@@ -345,130 +355,190 @@ export default function App() {
     setVendors(updated);
   };
 
+  const onHoldCount = activeVendors.filter(v => v.status === "On Hold").length;
+  const pendingCount = activeVendors.filter(v => v.status === "Pending").length;
+
   const stats = [
-    { label: "Total Vendors", value: activeVendors.length, sub: "registered", icon: <Building2 className="w-4 h-4 text-blue-600" />, bg: "bg-blue-50" },
-    { label: "Active Vendors", value: activeCount, sub: "currently active", icon: <Users className="w-4 h-4 text-emerald-600" />, bg: "bg-emerald-50" },
-    { label: "Compliance Issues", value: complianceIssues, sub: "need attention", icon: <AlertTriangle className="w-4 h-4 text-amber-600" />, bg: "bg-amber-50" },
-    { label: "Avg Rating", value: avgRating.toFixed(1), sub: "out of 5.0", icon: <Star className="w-4 h-4 fill-amber-400 text-amber-400" />, bg: "bg-yellow-50" },
-    { label: "Total Spend", value: formatCrores(totalSpend), sub: "all time", icon: <IndianRupee className="w-4 h-4 text-purple-600" />, bg: "bg-purple-50" },
-    { label: "Avg Score", value: `${avgScore.toFixed(1)}/5`, sub: "performance", icon: <Award className="w-4 h-4 text-indigo-600" />, bg: "bg-indigo-50" },
+    {
+      label: "Total Vendors",
+      value: activeVendors.length,
+      color: "text-gray-900",
+      icon: <Building2 className="text-gray-400" />,
+    },
+    {
+      label: "Active Vendors",
+      value: activeCount,
+      color: "text-green-600",
+      icon: <Users className="text-green-400" />,
+    },
+    {
+      label: "On Hold",
+      value: onHoldCount,
+      color: "text-orange-600",
+      icon: <PauseCircle className="text-orange-400" />,
+    },
+    {
+      label: "Pending",
+      value: pendingCount,
+      color: "text-blue-600",
+      icon: <Clock className="text-blue-400" />,
+    },
+    {
+      label: "Compliance Issues",
+      value: complianceIssues,
+      color: "text-red-600",
+      icon: <AlertTriangle className="text-red-400" />,
+    },
+    {
+      label: "Total Spend",
+      value: formatCrores(totalSpend),
+      color: "text-purple-700",
+      icon: <IndianRupee className="text-purple-400" />,
+    },
   ];
 
-
   return (
-    <div className="w-full h-screen overflow-hidden flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif] px-4 py-3 gap-2 mx-auto max-w-6xl">
-
-      {/* Header */}
-      <div className="flex items-center justify-between flex-shrink-0 py-1">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 leading-tight">Vendors List</h1>
-          <p className="text-xs text-gray-400 mt-0">Manage and monitor all your vendor relationships</p>
+    <div className="min-h-screen bg-slate-50 p-6">
+      {/* Sticky Header */}
+      <div className="bg-white border-b sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div>
+            <p className="text-xs text-gray-500">Vendors / Vendor List</p>
+            <h1 className="text-2xl font-bold">Vendors</h1>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-full">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/vendors/onboarding')}>
+                <Plus className="h-4 w-4 mr-2" /> Vendor Onboarding
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                const csv = activeVendors.map(v => `${v.id},${v.name},${v.category},${v.primaryContact},${v.email},${v.status}`).join('\n');
+                const headers = 'Vendor ID,Name,Category,Contact,Email,Status\n';
+                const blob = new Blob([headers + csv], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'vendors-export.csv';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+              }}>
+                <Download className="h-4 w-4 mr-2" /> Export Vendors
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
+                <Archive className="h-4 w-4 mr-2" /> Archived Vendors
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <TopMenu onArchived={() => setShowArchived(true)} onOnboarding={() => navigate('/vendors/onboarding')} />
       </div>
 
-      {/* Stats tiles */}
-      <div className="grid grid-cols-6 gap-1.5 flex-shrink-0">
-        {stats.map(s => (
-          <div key={s.label} className="bg-white rounded-md border border-gray-100 shadow-sm p-3 py-4 flex flex-col items-center justify-center gap-1 text-center">
-            <div className={`w-5 h-5 rounded-md ${s.bg} flex items-center justify-center flex-shrink-0 text-xs`}>{s.icon}</div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-gray-900 leading-tight">{s.value}</p>
-              <p className="text-xs text-gray-500 leading-tight truncate">{s.label}</p>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats tiles */}
+        <div className="grid grid-cols-6 gap-4 mb-8">
+          {stats.map(s => (
+            <Card key={s.label}>
+              <CardContent className="p-5 flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-gray-600">{s.label}</p>
+                  <p className={`text-3xl font-bold mt-2 ${s.color}`}>{s.value}</p>
+                </div>
+                {s.icon}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Table Card */}
+        <Card>
+          <CardContent className="p-0">
+            {/* Filters */}
+            <div className="flex items-center gap-2 px-6 py-3 border-b flex-wrap">
+              <span className="text-xs font-semibold text-gray-400 mr-1">Filters:</span>
+              <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilterCategory} />
+              <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilterStatus} />
+              <FilterSelect label="Rating" value={filterRating} options={["All", "5★ (4.5+)", "4★ (3.5–4.5)", "3★ (Below 3.5)"]} onChange={setFilterRating} />
+              <FilterSelect label="Region" value={filterRegion} options={regions} onChange={setFilterRegion} />
+              <button onClick={() => { setFilterCategory("All"); setFilterStatus("All"); setFilterRating("All"); setFilterRegion("All"); }}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium">Clear all</button>
+              <span className="ml-auto text-xs text-gray-400">{filteredVendors.length} of {activeVendors.length} vendors</span>
             </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Table card — fills remaining space, no scrollbars */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
-
-        {/* Filters */}
-        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 flex-shrink-0 flex-wrap">
-          <span className="text-xs font-semibold text-gray-400 mr-0.5">Filters:</span>
-          <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilterCategory} />
-          <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilterStatus} />
-          <FilterSelect label="Rating" value={filterRating} options={["All", "5★ (4.5+)", "4★ (3.5–4.5)", "3★ (Below 3.5)"]} onChange={setFilterRating} />
-          <FilterSelect label="Region" value={filterRegion} options={regions} onChange={setFilterRegion} />
-            <button onClick={() => { setFilterCategory("All"); setFilterStatus("All"); setFilterRating("All"); setFilterRegion("All"); }}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium">Clear all</button> 
-          <span className="ml-auto text-xs text-gray-400">{filteredVendors.length} of {activeVendors.length} vendors</span>
-        </div>
-
-        {/* Table — table-fixed so columns respect widths, no overflow */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <table className="w-full h-full table-fixed text-xs border-collapse">
-            <colgroup>
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "19%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "16%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "8%" }} />
-              <col style={{ width: "9%" }} />
-              <col style={{ width: "10%" }} />
-              <col style={{ width: "7%" }} />
-            </colgroup>
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                {["Vendor ID", "Vendor Name", "Category", "Primary Contact", "Rating", "Region", "Status", "This Month Spend","Action", ""].map((h, i) => (
-                  <th key={i} className="px-2.5 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredVendors.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-12 text-gray-400">
-                    <Building2 className="w-7 h-7 mx-auto mb-2 opacity-30" />
-                    <p>No vendors match the current filters</p>
-                  </td>
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b text-xs text-gray-600">
+                  <th className="px-6 py-4 text-left">Vendor ID</th>
+                  <th className="px-6 py-4 text-left">Vendor Name</th>
+                  <th className="px-6 py-4 text-left">Category</th>
+                  <th className="px-6 py-4 text-left">Primary Contact</th>
+                  <th className="px-6 py-4 text-left">Rating</th>
+                  <th className="px-6 py-4 text-left">Region</th>
+                  <th className="px-6 py-4 text-left">Status</th>
+                  <th className="px-6 py-4 text-left">This Month</th>
+                  <th className="px-6 py-4 text-center">Actions</th>
                 </tr>
-              ) : filteredVendors.map((v, idx) => (
-                <tr key={v.id} className={`border-b border-gray-50 hover:bg-blue-50/30 transition-colors ${idx % 2 === 0 ? "" : "bg-gray-50/30"}`}>
-                  <td className="px-2.5 py-2.5">
-                    <button onClick={() => navigate(`/vendors/${v.id}`)} className="text-blue-600 font-bold hover:underline text-xs">{v.id}</button>
-                  </td>
-                  <td className="px-2.5 py-2.5">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">{v.name[0]}</div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 truncate text-xs leading-tight">{v.name}</p>
-                        <p className="text-gray-400 truncate text-xs leading-tight">{v.email}</p>
+              </thead>
+              <tbody>
+                {filteredVendors.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-16 text-gray-400">
+                      <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No vendors match the current filters</p>
+                    </td>
+                  </tr>
+                ) : filteredVendors.map((v) => (
+                  <tr key={v.id} className="border-b hover:bg-gray-50 transition-colors">
+                    <td
+                      className="px-6 py-4 text-blue-600 font-medium cursor-pointer hover:underline text-sm"
+                      onClick={() => navigate(`/vendors/${v.id}`)}
+                    >
+                      {v.id}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">{v.name[0]}</div>
+                        <div>
+                          <p className="font-medium text-gray-800 text-sm leading-tight">{v.name}</p>
+                          <p className="text-xs text-gray-400 leading-tight">{v.email}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-2.5 py-2.5">
-                    <span className="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs font-medium truncate block max-w-full">{v.category}</span>
-                  </td>
-                  <td className="px-2.5 py-2.5">
-                    <p className="text-gray-700 font-medium text-xs truncate leading-tight">{v.primaryContact}</p>
-                    <p className="text-gray-400 text-xs truncate leading-tight">{v.phone}</p>
-                  </td>
-                  <td className="px-2.5 py-2.5"><StarRating rating={v.rating} /></td>
-                  <td className="px-2.5 py-2.5 text-gray-500 text-xs">{v.region}</td>
-                  <td className="px-2.5 py-2.5"><Badge className={statusColors[v.status]}>{v.status}</Badge></td>
-                  <td className="px-2.5 py-2.5">
-                    <span className={`font-semibold text-xs ${v.monthSpend > 0 ? "text-gray-800" : "text-gray-300"}`}>{formatLakhs(v.monthSpend)}</span>
-                  </td>
-                  <td className="px-1 py-2.5">
-                    <RowActionsMenu vendor={v} onEdit={() => setEditVendor(v)} onArchive={() => archiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium">{v.category}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm text-gray-700 font-medium leading-tight">{v.primaryContact}</p>
+                      <p className="text-xs text-gray-400 leading-tight">{v.phone}</p>
+                    </td>
+                    <td className="px-6 py-4"><StarRating rating={v.rating} /></td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{v.region}</td>
+                    <td className="px-6 py-4">
+                      <Badge className={statusColors[v.status]}>{v.status}</Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-sm font-semibold ${v.monthSpend > 0 ? "text-gray-800" : "text-gray-300"}`}>{formatLakhs(v.monthSpend)}</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <RowActionsMenu vendor={v} onEdit={() => setEditVendor(v)} onArchive={() => archiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-        {/* Footer */}
-        <div className="px-4 py-2 border-t border-gray-100 flex items-center justify-between flex-shrink-0 bg-gray-50/50">
-          <p className="text-xs text-gray-400">Showing {filteredVendors.length} of {activeVendors.length} active vendors</p>
-          <div className="flex items-center gap-1">
-            {[1, 2, 3].map(p => (
-              <button key={p} className={`w-6 h-6 rounded text-xs font-medium ${p === 1 ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-gray-100"}`}>{p}</button>
-            ))}
-          </div>
-        </div>
+            {/* Pagination */}
+            <div className="px-6 py-4 flex justify-between text-sm text-gray-600 border-t">
+              <span>1–{filteredVendors.length} of {activeVendors.length} vendors</span>
+              <div className="flex gap-2">
+                <button className="p-2 hover:bg-gray-100 rounded">←</button>
+                <button className="px-3 py-1 border rounded bg-blue-600 text-white">1</button>
+                <button className="p-2 hover:bg-gray-100 rounded">→</button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Vendor Overview Popup */}
@@ -482,13 +552,13 @@ export default function App() {
 
       {/* Edit Vendor Modal */}
       {editVendor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setEditVendor(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditVendor(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
-              <h2 className="text-base font-semibold text-gray-900">Edit Vendor</h2>
-              <button onClick={() => setEditVendor(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
+            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white rounded-t-2xl">
+              <h2 className="text-lg font-semibold">Edit Vendor — {editVendor.id}</h2>
+              <button onClick={() => setEditVendor(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <div className="px-6 py-4 flex flex-col gap-3">
+            <div className="px-6 py-4 flex flex-col gap-4">
               {[
                 { label: "Vendor Name", value: editVendor.name },
                 { label: "Category", value: editVendor.category },
@@ -499,14 +569,14 @@ export default function App() {
                 { label: "Address", value: editVendor.address },
               ].map(f => (
                 <div key={f.label}>
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">{f.label}</label>
-                  <input defaultValue={f.value} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400 bg-gray-50" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
+                  <input defaultValue={f.value} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400" />
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 px-6 pb-5">
-              <button className="flex-1 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors" onClick={() => setEditVendor(null)}>Save Changes</button>
-              <button className="flex-1 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors" onClick={() => setEditVendor(null)}>Cancel</button>
+            <div className="flex gap-3 px-6 pb-6 pt-2">
+              <button className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors" onClick={() => setEditVendor(null)}>Save Changes</button>
+              <button className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors" onClick={() => setEditVendor(null)}>Cancel</button>
             </div>
           </div>
         </div>
