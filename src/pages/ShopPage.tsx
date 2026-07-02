@@ -99,6 +99,7 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
   const { addItem } = useCart();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [added, setAdded] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => { if (product) setQty(Math.max(1, product.moq)); }, [product]);
 
@@ -152,17 +153,43 @@ function ProductDetailDialog({ product, open, onClose }: { product: Product | nu
 
             {/* Image */}
             <div className="w-80 shrink-0">
-              <div className="w-full aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50">
+              <div
+                className={`w-full aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50 ${product.image ? "cursor-zoom-in" : ""}`}
+                onClick={() => product.image && setZoomed(true)}
+              >
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
                 ) : (
                   getProductIcon(product.name, product.category)
                 )}
               </div>
-              <p className="text-xs text-gray-400 mt-2 flex items-center gap-1 justify-center">
-                <ZoomIn size={12} /> Click image to zoom
-              </p>
+              {product.image && (
+                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1 justify-center">
+                  <ZoomIn size={12} /> Click image to zoom
+                </p>
+              )}
             </div>
+
+            {/* Lightbox */}
+            {zoomed && product.image && (
+              <div
+                className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+                onClick={() => setZoomed(false)}
+              >
+                <button
+                  onClick={() => setZoomed(false)}
+                  className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl cursor-zoom-out"
+                  onClick={e => e.stopPropagation()}
+                />
+              </div>
+            )}
 
             {/* Details */}
             <div className="flex-1 min-w-0">
