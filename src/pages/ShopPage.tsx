@@ -4,6 +4,7 @@ import { useCart } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
+import { getAllProductPricing } from "@/lib/priceEngineStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,15 +73,31 @@ function formatPrice(n: number) {
 function formatLeadTime(t: string) { return t || "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
-function entryToProduct(e: ClientCatalogEntry): Product {
+type VendorMatch = { leadTime: string; moq: number };
+
+function getVendorMatchMap(): Map<string, VendorMatch> {
+  const map = new Map<string, VendorMatch>();
+  getAllProductPricing().forEach(p => {
+    if (!p.winningVendor) return;
+    const days = p.winningVendor.leadTime;
+    map.set(p.masterProductCode, {
+      leadTime: days > 0 ? `${days} Day${days !== 1 ? "s" : ""}` : "",
+      moq: p.winningVendor.moq,
+    });
+  });
+  return map;
+}
+
+function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
+  const match = vendorMatches.get(e.productCode);
   return {
     id: `client-${e.productCode}`,
     name: e.name,
     category: e.category || "General",
     image: e.img || "",
     specs: e.specs || [],
-    leadTime: e.leadTime || "",
-    moq: e.moq ?? 0,
+    leadTime: match?.leadTime || e.leadTime || "",
+    moq: match?.moq ?? e.moq ?? 0,
     priceNum: e.priceNum ?? 0,
     inStock: e.availability !== "Out of Stock",
     description: e.description,
@@ -395,17 +412,20 @@ export default function ShopPage() {
     return () => window.removeEventListener('nidoClientsUpdated', onUpdate);
   }, []);
 
-  // Load client catalog whenever selectedClientId changes
+  // Load client catalog whenever selectedClientId changes, merging in the
+  // live winning-vendor Lead Time / MOQ from the Vendor Product List for every product.
   const loadClientProducts = () => {
     if (!selectedClientId) { setCatalogProducts([]); return; }
     const entries = getClientCatalog(selectedClientId);
-    setCatalogProducts(entries.map(entryToProduct));
+    const vendorMatches = getVendorMatchMap();
+    setCatalogProducts(entries.map(e => entryToProduct(e, vendorMatches)));
   };
 
   useEffect(() => {
     loadClientProducts();
-    window.addEventListener('clientCatalogUpdated', loadClientProducts);
-    return () => window.removeEventListener('clientCatalogUpdated', loadClientProducts);
+    const events = ['clientCatalogUpdated', 'vendorProductsUpdated', 'nidoVendorsUpdated', 'catalogUpdated', 'priceEngineSettingsUpdated'];
+    events.forEach(ev => window.addEventListener(ev, loadClientProducts));
+    return () => events.forEach(ev => window.removeEventListener(ev, loadClientProducts));
   }, [selectedClientId]);
 
   // Reset page on filter change
