@@ -310,7 +310,8 @@ export default function CatalogUpdatesTab() {
   });
   const [viewMode, setViewMode] = useState<'list' | 'thumbnail'>('list');
   const [thumbPage, setThumbPage] = useState(1);
-  const THUMB_PAGE_SIZE = 20;
+  const [listPage, setListPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -418,10 +419,14 @@ export default function CatalogUpdatesTab() {
     return true;
   });
 
-  // Reset thumbnail page when filters/search change
-  const thumbTotalPages = Math.max(1, Math.ceil(filtered.length / THUMB_PAGE_SIZE));
+  // Paginated slices (both views share PAGE_SIZE = 20)
+  const listTotalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const listSafePage = Math.min(listPage, listTotalPages);
+  const listItems = filtered.slice((listSafePage - 1) * PAGE_SIZE, listSafePage * PAGE_SIZE);
+
+  const thumbTotalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const thumbSafePage = Math.min(thumbPage, thumbTotalPages);
-  const thumbItems = filtered.slice((thumbSafePage - 1) * THUMB_PAGE_SIZE, thumbSafePage * THUMB_PAGE_SIZE);
+  const thumbItems = filtered.slice((thumbSafePage - 1) * PAGE_SIZE, thumbSafePage * PAGE_SIZE);
 
   const stats = {
     total: items.length,
@@ -888,7 +893,7 @@ export default function CatalogUpdatesTab() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map(item => (
+                  listItems.map(item => (
                     <TableRow
                       key={item.id}
                       className="border-gray-200 hover:bg-blue-50 cursor-pointer"
@@ -941,7 +946,37 @@ export default function CatalogUpdatesTab() {
               </TableBody>
             </Table>
             <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
-              <span>{selectedIds.length > 0 ? `${selectedIds.length} selected · ` : ''}Showing {filtered.length} of {items.length} entries</span>
+              <span>
+                {selectedIds.length > 0 ? `${selectedIds.length} selected · ` : ''}
+                Showing {filtered.length === 0 ? 0 : (listSafePage - 1) * PAGE_SIZE + 1}–{Math.min(listSafePage * PAGE_SIZE, filtered.length)} of {filtered.length} entries
+              </span>
+              {listTotalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setListPage(p => Math.max(1, p - 1))}
+                    disabled={listSafePage === 1}
+                    className="px-2.5 py-1 rounded border border-gray-300 bg-white disabled:opacity-40 hover:bg-gray-100 transition-colors"
+                  >
+                    ‹ Prev
+                  </button>
+                  {Array.from({ length: listTotalPages }, (_, i) => i + 1).map(pg => (
+                    <button
+                      key={pg}
+                      onClick={() => setListPage(pg)}
+                      className={`w-7 h-7 rounded border text-xs transition-colors ${pg === listSafePage ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
+                    >
+                      {pg}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setListPage(p => Math.min(listTotalPages, p + 1))}
+                    disabled={listSafePage === listTotalPages}
+                    className="px-2.5 py-1 rounded border border-gray-300 bg-white disabled:opacity-40 hover:bg-gray-100 transition-colors"
+                  >
+                    Next ›
+                  </button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -972,7 +1007,7 @@ export default function CatalogUpdatesTab() {
           {/* Pagination bar */}
           <div className="mt-4 flex items-center justify-between text-xs text-gray-600">
             <span>
-              Showing {filtered.length === 0 ? 0 : (thumbSafePage - 1) * THUMB_PAGE_SIZE + 1}–{Math.min(thumbSafePage * THUMB_PAGE_SIZE, filtered.length)} of {filtered.length} products
+              Showing {filtered.length === 0 ? 0 : (thumbSafePage - 1) * PAGE_SIZE + 1}–{Math.min(thumbSafePage * PAGE_SIZE, filtered.length)} of {filtered.length} products
             </span>
             {thumbTotalPages > 1 && (
               <div className="flex items-center gap-1">
