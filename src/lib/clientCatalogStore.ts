@@ -58,3 +58,17 @@ export function removeFromClientCatalog(clientId: string, productCode: string): 
   const entries = getClientCatalog(clientId).filter(e => e.productCode !== productCode);
   saveClientCatalog(clientId, entries);
 }
+
+export function updateClientCatalogProductPrice(
+  clientId: string,
+  productCode: string,
+  price: string,
+  priceNum: number
+): boolean {
+  const catalog = getClientCatalog(clientId);
+  const idx = catalog.findIndex(e => e.productCode === productCode);
+  if (idx === -1) return false;
+  catalog[idx] = { ...catalog[idx], price, priceNum };
+  saveClientCatalog(clientId, catalog);
+  return true;
+}

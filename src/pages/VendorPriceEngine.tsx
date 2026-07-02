@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getAllVendorProducts } from '@/lib/vendorStore';
+import { getVendors as getAllVendors } from '@/lib/vendorDataStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,14 +91,17 @@ function Stars({ r }: { r: number }) {
 interface Props {
   onVendorSelect: (data: SelectedVendorData) => void;
   onProceedToClient: () => void;
+  onProductSelect?: (code: string) => void;
 }
 
-export default function VendorPriceEngine({ onVendorSelect, onProceedToClient }: Props) {
+export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, onProductSelect }: Props) {
   const [product, setProduct] = useState({
     name: 'Industrial Valve 2 inch', sku: 'VALV-2002',
     category: 'Industrial Equipment', reqQty: 500, reqDate: '2025-07-30',
   });
   const [vendors, setVendors] = useState<VendorCol[]>(INIT_VENDORS);
+  const [selectedProductCode, setSelectedProductCode] = useState('');
+  const [allStoreProducts, setAllStoreProducts] = useState<{ code: string; name: string; sku: string; category: string }[]>([]);
   const [selectedId, setSelectedId] = useState('B');
   const [extraRows, setExtraRows] = useState<ExtraRow[]>([]);
   const [newExtraLabel, setNewExtraLabel] = useState('');
@@ -113,6 +118,84 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient }:
   const [notes, setNotes] = useState('');
   const [currency, setCurrency] = useState('INR (₹)');
   const [lastSaved, setLastSaved] = useState('25/06/2025 11:30 AM');
+
+  // Load unique products from vendor store on mount
+  useEffect(() => {
+    const storeMap = getAllVendorProducts();
+    const productMap = new Map<string, { code: string; name: string; sku: string; category: string }>();
+    Object.values(storeMap).forEach(products => {
+      products.forEach(p => {
+        if (p.masterProductCode && !productMap.has(p.masterProductCode)) {
+          productMap.set(p.masterProductCode, {
+            code: p.masterProductCode,
+            name: p.productName,
+            sku: p.skuCode || '',
+            category: p.category || '',
+          });
+        }
+      });
+    });
+    setAllStoreProducts(Array.from(productMap.values()));
+  }, []);
+
+  // When a product is picked, rebuild vendor columns from real data
+  const handleProductSelect = (code: string) => {
+    setSelectedProductCode(code);
+    onProductSelect?.(code);
+    if (!code) { setVendors(INIT_VENDORS); return; }
+
+    const storeMap = getAllVendorProducts();
+    const allVendorList = getAllVendors();
+    const newVendors: VendorCol[] = [];
+    const letters = 'ABCDEFGHIJ';
+    const termsMap: Record<string, string> = {
+      'NET 30': '30 Days Credit', 'NET 15': '15 Days Credit',
+      'NET 45': '45 Days Credit', 'NET 60': '60 Days Credit', 'NET 7': '7 Days Credit',
+    };
+    let firstProductName = '';
+    let firstSku = '';
+    let firstCategory = '';
+
+    Object.entries(storeMap).forEach(([vendorId, products]) => {
+      const match = products.find(p => p.masterProductCode === code && p.status === 'Active');
+      if (!match) return;
+      const vendorInfo = allVendorList.find(v => v.id === vendorId);
+      const id = letters[newVendors.length] || `V${newVendors.length + 1}`;
+      const rawTerms = (vendorInfo?.paymentTerms as string) || '';
+      const mappedTerms = termsMap[rawTerms] || PAYMENT_OPTS[2];
+      if (newVendors.length === 0) {
+        firstProductName = match.productName;
+        firstSku = match.skuCode || match.masterProductCode;
+        firstCategory = match.category || '';
+      }
+      newVendors.push({
+        id,
+        name: vendorInfo?.name || vendorId,
+        basePrice: parseFloat(match.price) || 0,
+        moq: parseInt(match.moq) || 0,
+        leadTime: parseInt(match.leadTime) || 0,
+        paymentTerms: mappedTerms,
+        logistics: 0,
+        handling: 0,
+        taxPct: 18,
+        stock: parseInt(match.stock) || 0,
+        rating: vendorInfo?.rating || 0,
+        extras: {},
+      });
+    });
+
+    if (newVendors.length > 0) {
+      setVendors(newVendors);
+      setProduct(prev => ({
+        ...prev,
+        name: firstProductName || prev.name,
+        sku: firstSku || prev.sku,
+        category: firstCategory || prev.category,
+      }));
+    } else {
+      toast.error('No active vendors carry this product yet');
+    }
+  };
 
   // Auto-recommend
   const recommendedId = useMemo(() => {
@@ -247,6 +330,34 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient }:
       {/* ── Section 1: Product Details ── */}
       <div className="border border-gray-300 rounded-lg p-4">
         <h2 className="text-xs font-bold text-blue-700 uppercase mb-3">1. Product / Item Details</h2>
+
+        {/* Product picker from vendor catalog */}
+        <div className="mb-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100 flex items-end gap-3 flex-wrap">
+          <div className="flex-1 min-w-[240px]">
+            <Label className="text-xs text-gray-600">
+              {allStoreProducts.length > 0 ? 'Load from Vendor Catalog' : 'No products in vendor catalog yet'}
+            </Label>
+            <Select value={selectedProductCode} onValueChange={handleProductSelect} disabled={allStoreProducts.length === 0}>
+              <SelectTrigger className="h-8 text-xs mt-1">
+                <SelectValue placeholder={allStoreProducts.length > 0 ? 'Select a product to auto-fill vendor data…' : 'Add products to vendors first'} />
+              </SelectTrigger>
+              <SelectContent>
+                {allStoreProducts.map(p => (
+                  <SelectItem key={p.code} value={p.code}>{p.name} — {p.code}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedProductCode && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-green-700 font-medium bg-green-100 px-2 py-1 rounded">
+                ✓ {vendors.length} vendor{vendors.length !== 1 ? 's' : ''} loaded with real data
+              </span>
+              <button onClick={() => handleProductSelect('')} className="text-xs text-gray-400 hover:text-gray-600 underline">Clear</button>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div>
             <Label className="text-xs text-gray-600">Product / Item Name *</Label>

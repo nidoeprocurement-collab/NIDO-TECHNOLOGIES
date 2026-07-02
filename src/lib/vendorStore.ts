@@ -61,3 +61,7 @@ export function removeVendorProduct(vendorId: string, productId: string): void {
   const products = getVendorProducts(vendorId).filter(p => p.id !== productId);
   saveVendorProducts(vendorId, products);
 }
+
+export function getAllVendorProducts(): Record<string, VendorProduct[]> {
+  return readStore();
+}

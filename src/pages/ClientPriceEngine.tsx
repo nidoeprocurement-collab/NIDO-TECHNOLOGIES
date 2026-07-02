@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SelectedVendorData } from './VendorPriceEngine';
+import { getClients } from '@/lib/clientStore';
+import { updateClientCatalogProductPrice } from '@/lib/clientCatalogStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,10 +106,13 @@ function catBadge(cat: ChargeCategory) {
 
 interface Props {
   vendorData: SelectedVendorData | null;
+  productCode?: string;
 }
 
-export default function ClientPriceEngine({ vendorData }: Props) {
+export default function ClientPriceEngine({ vendorData, productCode }: Props) {
   const vendor = vendorData || DEFAULT_VENDOR;
+  const allClients = useMemo(() => getClients(), []);
+  const [pushClientId, setPushClientId] = useState('');
 
   const [charges, setCharges] = useState<ChargeRow[]>(INIT_CHARGES);
   const [otherCharges, setOtherCharges] = useState<OtherCharge[]>(INIT_OTHER);
@@ -187,6 +192,20 @@ export default function ClientPriceEngine({ vendorData }: Props) {
   const defaultProfit = charges.find(c => c.category === 'profit')?.value ?? 20;
   const setDefaultProfit = (v: number) =>
     setCharges(cs => cs.map(c => c.category === 'profit' ? { ...c, value: v } : c));
+
+  const handlePushToClientCatalog = () => {
+    if (!pushClientId) { toast.error('Please select a client'); return; }
+    if (!productCode) { toast.error('No product selected in Vendor Price Engine'); return; }
+    const success = updateClientCatalogProductPrice(
+      pushClientId, productCode, fmt(calc.finalPrice), calc.finalPrice
+    );
+    const clientName = allClients.find(c => c.id === pushClientId)?.name || pushClientId;
+    if (success) {
+      toast.success(`Selling price ${fmt(calc.finalPrice)} pushed to ${clientName}'s catalog`);
+    } else {
+      toast.error(`Product not found in ${clientName}'s catalog — add it there first`);
+    }
+  };
 
   return (
     <div className="max-w-full space-y-5 pb-10">
@@ -529,6 +548,44 @@ export default function ClientPriceEngine({ vendorData }: Props) {
             className="text-xs min-h-28 resize-none"
           />
         </div>
+      </div>
+
+      {/* ── Section 8: Push Final Price to Client Catalog ── */}
+      <div className={`border rounded-lg p-4 ${productCode ? 'border-green-300 bg-green-50/30' : 'border-gray-200 bg-gray-50/30'}`}>
+        <h2 className="text-xs font-bold text-green-700 uppercase mb-3">8. Push Final Price to Client Catalog</h2>
+        {!productCode ? (
+          <p className="text-xs text-gray-500">
+            ← Go to the <strong>Vendor Price Engine</strong>, select a product from the catalog, then click "Proceed to Client Engine" — the product code will appear here and you can push the final price to any client's catalog.
+          </p>
+        ) : (
+          <div className="flex items-end gap-4 flex-wrap">
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Product Code</p>
+              <p className="text-sm font-bold text-gray-800">{productCode}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 mb-0.5">Final Selling Price (Per Unit)</p>
+              <p className="text-xl font-black text-blue-700">{fmt(calc.finalPrice)}</p>
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-xs text-gray-600">Select Client</Label>
+              <Select value={pushClientId} onValueChange={setPushClientId}>
+                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue placeholder="Choose client…" /></SelectTrigger>
+                <SelectContent>
+                  {allClients.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name} ({c.id})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handlePushToClientCatalog}
+              className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs px-5"
+            >
+              Push to Client Catalog
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

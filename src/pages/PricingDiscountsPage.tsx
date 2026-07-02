@@ -6,6 +6,7 @@ import type { SelectedVendorData } from './VendorPriceEngine';
 export default function PricingDiscountsPage() {
   const [activeTab, setActiveTab] = useState<'vendor' | 'client'>('vendor');
   const [selectedVendorData, setSelectedVendorData] = useState<SelectedVendorData | null>(null);
+  const [selectedProductCode, setSelectedProductCode] = useState('');
 
   return (
     <div className="w-full min-h-screen bg-white px-4 py-4">
@@ -28,9 +29,10 @@ export default function PricingDiscountsPage() {
         <VendorPriceEngine
           onVendorSelect={setSelectedVendorData}
           onProceedToClient={() => setActiveTab('client')}
+          onProductSelect={setSelectedProductCode}
         />
       ) : (
-        <ClientPriceEngine vendorData={selectedVendorData} />
+        <ClientPriceEngine vendorData={selectedVendorData} productCode={selectedProductCode} />
       )}
     </div>
   );
