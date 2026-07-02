@@ -92,9 +92,10 @@ interface Props {
   onVendorSelect: (data: SelectedVendorData) => void;
   onProceedToClient: () => void;
   onProductSelect?: (code: string) => void;
+  onProductInfoChange?: (info: { name: string; sku: string }) => void;
 }
 
-export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, onProductSelect }: Props) {
+export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, onProductSelect, onProductInfoChange }: Props) {
   const [product, setProduct] = useState({
     name: 'Industrial Valve 2 inch', sku: 'VALV-2002',
     category: 'Industrial Equipment', reqQty: 500, reqDate: '2025-07-30',
@@ -147,7 +148,6 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, o
     const storeMap = getAllVendorProducts();
     const allVendorList = getAllVendors();
     const newVendors: VendorCol[] = [];
-    const letters = 'ABCDEFGHIJ';
     const termsMap: Record<string, string> = {
       'NET 30': '30 Days Credit', 'NET 15': '15 Days Credit',
       'NET 45': '45 Days Credit', 'NET 60': '60 Days Credit', 'NET 7': '7 Days Credit',
@@ -160,7 +160,9 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, o
       const match = products.find(p => p.masterProductCode === code && p.status === 'Active');
       if (!match) return;
       const vendorInfo = allVendorList.find(v => v.id === vendorId);
-      const id = letters[newVendors.length] || `V${newVendors.length + 1}`;
+      // Use the real vendor id (not a reassigned letter) so selection stays
+      // correctly tied to the same vendor when switching between products.
+      const id = vendorId;
       const rawTerms = (vendorInfo?.paymentTerms as string) || '';
       const mappedTerms = termsMap[rawTerms] || PAYMENT_OPTS[2];
       if (newVendors.length === 0) {
@@ -186,6 +188,9 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, o
 
     if (newVendors.length > 0) {
       setVendors(newVendors);
+      // Always re-select the winning vendor for this specific product —
+      // a vendor id from the previously loaded product must never carry over.
+      setSelectedId(computeRecommendedId(newVendors));
       setProduct(prev => ({
         ...prev,
         name: firstProductName || prev.name,
@@ -198,14 +203,14 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, o
   };
 
   // Auto-recommend
-  const recommendedId = useMemo(() => {
-    if (!vendors.length) return '';
-    const minL = Math.min(...vendors.map(getLanded));
-    const maxR = Math.max(...vendors.map(v => v.rating));
-    const minLT = Math.min(...vendors.map(v => v.leadTime));
-    const maxLT = Math.max(...vendors.map(v => v.leadTime));
-    const maxS = Math.max(...vendors.map(v => v.stock));
-    const scored = vendors.map(v => {
+  const computeRecommendedId = (list: VendorCol[]) => {
+    if (!list.length) return '';
+    const minL = Math.min(...list.map(getLanded));
+    const maxR = Math.max(...list.map(v => v.rating));
+    const minLT = Math.min(...list.map(v => v.leadTime));
+    const maxLT = Math.max(...list.map(v => v.leadTime));
+    const maxS = Math.max(...list.map(v => v.stock));
+    const scored = list.map(v => {
       const s =
         (1 - (getLanded(v) - minL) / (minL || 1)) * 40 +
         (v.rating / (maxR || 1)) * 30 +
@@ -214,7 +219,9 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, o
       return { id: v.id, s };
     });
     return scored.sort((a, b) => b.s - a.s)[0].id;
-  }, [vendors]);
+  };
+
+  const recommendedId = useMemo(() => computeRecommendedId(vendors), [vendors]);
 
   const selectedVendor = vendors.find(v => v.id === selectedId) || vendors[0];
 
@@ -232,6 +239,12 @@ export default function VendorPriceEngine({ onVendorSelect, onProceedToClient, o
       });
     }
   }, [selectedId, vendors]);
+
+  // Keep parent informed of which product is currently being priced, so the
+  // Client Price Engine can display/verify it before pushing to a catalog.
+  useEffect(() => {
+    onProductInfoChange?.({ name: product.name, sku: product.sku });
+  }, [product.name, product.sku]);
 
   const updateVendor = (id: string, field: keyof VendorCol, val: unknown) =>
     setVendors(vs => vs.map(v => v.id === id ? { ...v, [field]: val } : v));

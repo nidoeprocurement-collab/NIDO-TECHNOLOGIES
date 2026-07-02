@@ -7,6 +7,7 @@ export default function PricingDiscountsPage() {
   const [activeTab, setActiveTab] = useState<'vendor' | 'client'>('vendor');
   const [selectedVendorData, setSelectedVendorData] = useState<SelectedVendorData | null>(null);
   const [selectedProductCode, setSelectedProductCode] = useState('');
+  const [selectedProductInfo, setSelectedProductInfo] = useState<{ name: string; sku: string } | null>(null);
 
   return (
     <div className="w-full min-h-screen bg-white px-4 py-4">
@@ -30,9 +31,15 @@ export default function PricingDiscountsPage() {
           onVendorSelect={setSelectedVendorData}
           onProceedToClient={() => setActiveTab('client')}
           onProductSelect={setSelectedProductCode}
+          onProductInfoChange={setSelectedProductInfo}
         />
       ) : (
-        <ClientPriceEngine vendorData={selectedVendorData} productCode={selectedProductCode} />
+        <ClientPriceEngine
+          vendorData={selectedVendorData}
+          productCode={selectedProductCode}
+          productName={selectedProductInfo?.name}
+          productSku={selectedProductInfo?.sku}
+        />
       )}
     </div>
   );

@@ -107,9 +107,11 @@ function catBadge(cat: ChargeCategory) {
 interface Props {
   vendorData: SelectedVendorData | null;
   productCode?: string;
+  productName?: string;
+  productSku?: string;
 }
 
-export default function ClientPriceEngine({ vendorData, productCode }: Props) {
+export default function ClientPriceEngine({ vendorData, productCode, productName, productSku }: Props) {
   const vendor = vendorData || DEFAULT_VENDOR;
   const allClients = useMemo(() => getClients(), []);
   const [pushClientId, setPushClientId] = useState('');
@@ -215,6 +217,15 @@ export default function ClientPriceEngine({ vendorData, productCode }: Props) {
         <div>
           <h1 className="text-2xl font-black text-gray-900 uppercase tracking-wide">CLIENT PRICE ENGINE</h1>
           <p className="text-sm text-gray-500 mt-0.5">Add margins &amp; other costs to get final client price</p>
+          {productCode ? (
+            <p className="text-xs mt-1.5 inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1 font-medium">
+              Pricing: {productName || 'Unnamed Product'} {productSku ? `(${productSku})` : ''} — Code: {productCode}
+            </p>
+          ) : (
+            <p className="text-xs mt-1.5 inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded px-2 py-1 font-medium">
+              No product selected yet — go to Vendor Price Engine first
+            </p>
+          )}
         </div>
         <div className="flex items-end gap-4">
           <div>
