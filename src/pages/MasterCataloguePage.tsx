@@ -168,7 +168,7 @@ function ProductThumbnailCard({
   const firstImage = item.images?.[0] || item.image;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow group">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow">
       {/* Image area */}
       <div className="relative h-36 bg-gray-100 flex-shrink-0">
         {firstImage ? (
@@ -178,26 +178,59 @@ function ProductThumbnailCard({
             <ImageIcon size={36} className="text-gray-300" />
           </div>
         )}
-        {/* Status badge overlay */}
-        <div className="absolute top-2 left-2">
-          <PublishStatusBadge status={item.publishStatus} />
-        </div>
-        {/* Actions menu — always visible so touch/keyboard users can access */}
-        <div className="absolute top-1 right-1">
-          <ProductActionsMenu item={item} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
-        </div>
       </div>
 
       {/* Content */}
       <div className="p-3 flex flex-col flex-1">
-        <div className="mb-1">
-          <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">{item.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{item.category}{item.subCategory ? ` · ${item.subCategory}` : ''}</p>
-          {item.brand && <p className="text-xs text-gray-500">{item.brand}</p>}
+        {/* Name + 3-dot menu row */}
+        <div className="flex items-start justify-between gap-1 mb-1">
+          <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 flex-1">{item.name}</p>
+          <div className="flex-shrink-0 -mt-1 -mr-1">
+            <ProductActionsMenu item={item} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
+          </div>
         </div>
 
+        {/* Meta fields */}
+        <div className="space-y-0.5 mb-2">
+          {item.masterProductCode && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-400 w-[88px] flex-shrink-0">Master Code</span>
+              <span className="text-[10px] font-mono text-gray-700 truncate">{item.masterProductCode}</span>
+            </div>
+          )}
+          {item.sku && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-400 w-[88px] flex-shrink-0">SKU</span>
+              <span className="text-[10px] text-gray-700 truncate">{item.sku}</span>
+            </div>
+          )}
+          {item.category && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-400 w-[88px] flex-shrink-0">Category</span>
+              <span className="text-[10px] text-gray-700 truncate">{item.category}{item.subCategory ? ` · ${item.subCategory}` : ''}</span>
+            </div>
+          )}
+          {item.brand && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-gray-400 w-[88px] flex-shrink-0">Brand</span>
+              <span className="text-[10px] text-gray-700 truncate">{item.brand}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-400 w-[88px] flex-shrink-0">Status</span>
+            <div>
+              {item.publishStatus ? (
+                <PublishStatusBadge status={item.publishStatus} />
+              ) : (
+                <span className="text-[10px] text-gray-700">{item.status}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Key Specs */}
         {specBullets.length > 0 && (
-          <div className="mt-2 flex-1">
+          <div className="mb-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Key Specifications</p>
             <ul className="space-y-0.5">
               {specBullets.map((s, i) => (
@@ -213,7 +246,7 @@ function ProductThumbnailCard({
         {/* Footer */}
         <button
           onClick={onView}
-          className="mt-3 w-full py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold tracking-wide transition-colors"
+          className="mt-auto w-full py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold tracking-wide transition-colors"
         >
           VIEW PRODUCT
         </button>
@@ -276,6 +309,8 @@ export default function CatalogUpdatesTab() {
     return stored;
   });
   const [viewMode, setViewMode] = useState<'list' | 'thumbnail'>('list');
+  const [thumbPage, setThumbPage] = useState(1);
+  const THUMB_PAGE_SIZE = 20;
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -382,6 +417,11 @@ export default function CatalogUpdatesTab() {
     if (brandFilter !== 'all' && i.brand !== brandFilter) return false;
     return true;
   });
+
+  // Reset thumbnail page when filters/search change
+  const thumbTotalPages = Math.max(1, Math.ceil(filtered.length / THUMB_PAGE_SIZE));
+  const thumbSafePage = Math.min(thumbPage, thumbTotalPages);
+  const thumbItems = filtered.slice((thumbSafePage - 1) * THUMB_PAGE_SIZE, thumbSafePage * THUMB_PAGE_SIZE);
 
   const stats = {
     total: items.length,
@@ -916,7 +956,7 @@ export default function CatalogUpdatesTab() {
             </Card>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filtered.map(item => (
+              {thumbItems.map(item => (
                 <ProductThumbnailCard
                   key={item.id}
                   item={item}
@@ -928,8 +968,39 @@ export default function CatalogUpdatesTab() {
               ))}
             </div>
           )}
-          <div className="mt-3 text-xs text-gray-600">
-            Showing {filtered.length} of {items.length} entries
+
+          {/* Pagination bar */}
+          <div className="mt-4 flex items-center justify-between text-xs text-gray-600">
+            <span>
+              Showing {filtered.length === 0 ? 0 : (thumbSafePage - 1) * THUMB_PAGE_SIZE + 1}–{Math.min(thumbSafePage * THUMB_PAGE_SIZE, filtered.length)} of {filtered.length} products
+            </span>
+            {thumbTotalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setThumbPage(p => Math.max(1, p - 1))}
+                  disabled={thumbSafePage === 1}
+                  className="px-2.5 py-1 rounded border border-gray-300 bg-white disabled:opacity-40 hover:bg-gray-100 transition-colors"
+                >
+                  ‹ Prev
+                </button>
+                {Array.from({ length: thumbTotalPages }, (_, i) => i + 1).map(pg => (
+                  <button
+                    key={pg}
+                    onClick={() => setThumbPage(pg)}
+                    className={`w-7 h-7 rounded border text-xs transition-colors ${pg === thumbSafePage ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
+                  >
+                    {pg}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setThumbPage(p => Math.min(thumbTotalPages, p + 1))}
+                  disabled={thumbSafePage === thumbTotalPages}
+                  className="px-2.5 py-1 rounded border border-gray-300 bg-white disabled:opacity-40 hover:bg-gray-100 transition-colors"
+                >
+                  Next ›
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
