@@ -17,12 +17,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import {
   Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Trash2,
-  Settings, ShoppingCart, X, Star, Image as ImageIcon, Download, MoreVertical
+  Settings, ShoppingCart, X, Star, Image as ImageIcon, Download, MoreVertical,
+  LayoutGrid, LayoutList, CheckCircle, Clock, FileEdit
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -31,7 +33,7 @@ interface CatalogItem {
   masterProductCode?: string;
   name: string;
   sku: string;
-  publishStatus?: 'draft' | 'published';
+  publishStatus?: 'draft' | 'published' | 'pending';
   category: string;
   subCategory: string;
   brand: string;
@@ -62,6 +64,9 @@ interface CatalogItem {
   vendorPhone2?: string;
   trackPerformance?: boolean;
   performanceRating?: number;
+  specifications?: { id: string; specification: string; value: string; unit: string }[];
+  generalSpecs?: { id: string; category: string; attributeValue: string }[];
+  images?: string[];
 }
 
 const defaultCategories: Record<string, string[]> = {
@@ -75,6 +80,149 @@ const defaultVendors = ['HP Direct', 'Sandisk Global', 'Epson Hub', 'Apple Store
 const leadTimeOptions = ['10 Days', '1 Month', 'On Backorder', 'TBD'];
 const customsOptions = ['Exempt', 'Taxable', 'Restricted'];
 const defaultTags = ['CoreEssentials', 'New Arrival', 'High-End', 'Budget', 'Eco-Friendly'];
+
+// ─── Helper Components ────────────────────────────────────────────────────────
+
+function PublishStatusBadge({ status }: { status?: 'draft' | 'published' | 'pending' }) {
+  if (!status) return null;
+  const cfg = {
+    published: 'bg-green-100 text-green-700',
+    draft: 'bg-yellow-100 text-yellow-700',
+    pending: 'bg-blue-100 text-blue-700',
+  }[status];
+  const label = status.charAt(0).toUpperCase() + status.slice(1);
+  return <Badge className={`border-none text-xs ${cfg}`}>{label}</Badge>;
+}
+
+function ProductActionsMenu({
+  item, onEdit, onDelete, onStatusChange,
+}: {
+  item: CatalogItem;
+  onEdit: () => void;
+  onDelete: () => void;
+  onStatusChange: (s: 'draft' | 'published' | 'pending') => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200">
+          <MoreVertical size={16} className="text-gray-600" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
+          <Pencil size={14} className="mr-2" /> Edit Product
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1 text-[10px] font-semibold uppercase text-gray-400 tracking-wider">Update Status</div>
+        <DropdownMenuItem
+          onClick={() => onStatusChange('published')}
+          className={`cursor-pointer ${item.publishStatus === 'published' ? 'bg-green-50 text-green-700' : ''}`}
+        >
+          <CheckCircle size={14} className="mr-2 text-green-600" /> Published
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onStatusChange('pending')}
+          className={`cursor-pointer ${item.publishStatus === 'pending' ? 'bg-blue-50 text-blue-700' : ''}`}
+        >
+          <Clock size={14} className="mr-2 text-blue-600" /> Pending
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onStatusChange('draft')}
+          className={`cursor-pointer ${item.publishStatus === 'draft' ? 'bg-yellow-50 text-yellow-700' : ''}`}
+        >
+          <FileEdit size={14} className="mr-2 text-yellow-600" /> Draft
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDelete} className="cursor-pointer text-red-600">
+          <Trash2 size={14} className="mr-2" /> Delete Product
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ProductThumbnailCard({
+  item, onView, onEdit, onDelete, onStatusChange,
+}: {
+  item: CatalogItem;
+  onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onStatusChange: (s: 'draft' | 'published' | 'pending') => void;
+}) {
+  const specs = item.specifications || [];
+  const generalSpecs = item.generalSpecs || [];
+
+  // Build key spec bullets: first from keyspecs, fall back to generalSpecs
+  const specBullets: { label: string; value: string }[] = [];
+  specs.slice(0, 5).forEach(s => {
+    if (s.specification) specBullets.push({ label: s.specification, value: s.unit && s.unit !== '-' ? `${s.value} ${s.unit}` : s.value });
+  });
+  if (specBullets.length === 0) {
+    generalSpecs.slice(0, 5).forEach(g => {
+      if (g.category) specBullets.push({ label: g.category, value: g.attributeValue });
+    });
+  }
+
+  const firstImage = item.images?.[0] || item.image;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow group">
+      {/* Image area */}
+      <div className="relative h-36 bg-gray-100 flex-shrink-0">
+        {firstImage ? (
+          <img src={firstImage} alt={item.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon size={36} className="text-gray-300" />
+          </div>
+        )}
+        {/* Status badge overlay */}
+        <div className="absolute top-2 left-2">
+          <PublishStatusBadge status={item.publishStatus} />
+        </div>
+        {/* Actions menu — always visible so touch/keyboard users can access */}
+        <div className="absolute top-1 right-1">
+          <ProductActionsMenu item={item} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-3 flex flex-col flex-1">
+        <div className="mb-1">
+          <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">{item.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{item.category}{item.subCategory ? ` · ${item.subCategory}` : ''}</p>
+          {item.brand && <p className="text-xs text-gray-500">{item.brand}</p>}
+        </div>
+
+        {specBullets.length > 0 && (
+          <div className="mt-2 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Key Specifications</p>
+            <ul className="space-y-0.5">
+              {specBullets.map((s, i) => (
+                <li key={i} className="text-[11px] text-gray-700 flex items-start gap-1">
+                  <span className="mt-1 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
+                  <span><span className="font-medium">{s.label}:</span> {s.value}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Footer */}
+        <button
+          onClick={onView}
+          className="mt-3 w-full py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold tracking-wide transition-colors"
+        >
+          VIEW PRODUCT
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── End Helper Components ────────────────────────────────────────────────────
 
 const initialItems: CatalogItem[] = [];
 
@@ -120,9 +268,14 @@ export default function CatalogUpdatesTab() {
       primaryVendor: '', vendorSku: '', leadTime: p.leadTime,
       vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
       trackPerformance: false, performanceRating: 4,
+      specifications: p.specifications || [],
+      generalSpecs: p.generalSpecs || [],
+      images: p.images || [],
+      image: p.images?.[0] || undefined,
     }));
     return stored;
   });
+  const [viewMode, setViewMode] = useState<'list' | 'thumbnail'>('list');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -175,6 +328,10 @@ export default function CatalogUpdatesTab() {
       primaryVendor: '', vendorSku: '', leadTime: p.leadTime,
       vendorContact: '', vendorEmail: '', vendorPhone: '', vendorPhone2: '',
       trackPerformance: false, performanceRating: 4,
+      specifications: p.specifications || [],
+      generalSpecs: p.generalSpecs || [],
+      images: p.images || [],
+      image: p.images?.[0] || undefined,
     }));
     setItems(stored);
   };
@@ -221,7 +378,7 @@ export default function CatalogUpdatesTab() {
   const filtered = items.filter(i => {
     if (search && !i.name.toLowerCase().includes(search.toLowerCase()) && !i.sku.toLowerCase().includes(search.toLowerCase())) return false;
     if (categoryFilter !== 'all' && i.category !== categoryFilter) return false;
-    if (statusFilter !== 'all' && i.status !== statusFilter) return false;
+    if (statusFilter !== 'all' && (i.publishStatus || 'draft') !== statusFilter) return false;
     if (brandFilter !== 'all' && i.brand !== brandFilter) return false;
     return true;
   });
@@ -230,7 +387,7 @@ export default function CatalogUpdatesTab() {
     total: items.length,
     published: items.filter(i => i.publishStatus === 'published').length,
     drafts: items.filter(i => i.publishStatus === 'draft').length,
-    outOfStock: 0,
+    pending: items.filter(i => i.publishStatus === 'pending').length,
   };
 
   const toggleSelect = (id: string) => {
@@ -293,6 +450,17 @@ export default function CatalogUpdatesTab() {
     deleteCatalogProduct(id);
     setItems(prev => prev.filter(i => i.id !== id));
     toast.success('Item deleted');
+  };
+
+  const updateItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
+    const products = getCatalogProducts();
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    const updated = { ...product, publishStatus: newStatus };
+    saveCatalogProduct(updated);
+    setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: newStatus } : i));
+    const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+    toast.success(`Status updated to ${label}`);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,7 +579,7 @@ export default function CatalogUpdatesTab() {
             productNotes: col(row, 'product notes'),
             videoUrl: col(row, 'video url'),
             images,
-            publishStatus: 'draft' as const,
+            publishStatus: 'published' as const,
             price: 0,
             moq: 0,
             leadTime: '',
@@ -424,7 +592,7 @@ export default function CatalogUpdatesTab() {
 
         if (added > 0) {
           loadFromStore();
-          toast.success(`${added} product(s) imported successfully as drafts`);
+          toast.success(`${added} product(s) imported successfully as published`);
           setBulkImportOpen(false);
         } else {
           toast.error('No valid rows found. Ensure "Product Name" column has values.');
@@ -594,15 +762,32 @@ export default function CatalogUpdatesTab() {
           </CardContent>
         </Card>
         <Card className="border-0 cursor-pointer">
-          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-red-700" style={{ backgroundColor: 'rgba(0, 0, 0, 0.22)' }}>
+          <CardContent className="pt-4 pb-4 flex items-center gap-2 justify-center rounded-[10px] text-blue-700" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)' }}>
             <ShoppingCart size={18} />
-            <span className="font-medium text-sm">0 Archived</span>
+            <span className="font-medium text-sm">{stats.pending} Pending</span>
           </CardContent>
         </Card>
       </div>
 
       {/* Actions Bar */}
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {/* View Toggle */}
+        <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            title="List view"
+          >
+            <LayoutList size={16} />
+          </button>
+          <button
+            onClick={() => setViewMode('thumbnail')}
+            className={`p-2 transition-colors ${viewMode === 'thumbnail' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            title="Thumbnail view"
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" className="h-9 w-9 border-gray-300 text-gray-700 hover:bg-gray-100" data-testid="button-catalog-actions">
@@ -630,108 +815,124 @@ export default function CatalogUpdatesTab() {
         </DropdownMenu>
       </div>
 
-      {/* Table */}
-      <Card className="border-gray-200">
-        <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-gray-200 bg-gray-50">
-                <TableHead className="w-10 pl-4">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300 cursor-pointer"
-                    checked={filtered.length > 0 && selectedIds.length === filtered.length}
-                    onChange={toggleAll}
-                    data-testid="checkbox-select-all"
-                  />
-                </TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Master Product Code</TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
-                <TableHead className="text-gray-700 font-semibold uppercase text-xs">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-gray-600">
-                    No items match the selected filters. Adjust search, category, or status to view catalog entries.
-                  </TableCell>
+      {/* Product List / Thumbnail View */}
+      {viewMode === 'list' ? (
+        <Card className="border-gray-200">
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-gray-200 bg-gray-50">
+                  <TableHead className="w-10 pl-4">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 cursor-pointer"
+                      checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                      onChange={toggleAll}
+                      data-testid="checkbox-select-all"
+                    />
+                  </TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Master Product Code</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Actions</TableHead>
                 </TableRow>
-              ) : (
-                filtered.map(item => (
-                  <TableRow
-                    key={item.id}
-                    className="border-gray-200 hover:bg-blue-50 cursor-pointer"
-                    onClick={() => openPreview(item.id)}
-                    data-testid={`row-product-${item.id}`}
-                  >
-                    <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-300 cursor-pointer"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelect(item.id)}
-                        data-testid={`checkbox-product-${item.id}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {item.image ? (
-                            <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
-                          ) : (
-                            <ImageIcon size={14} className="text-gray-500" />
-                          )}
-                        </div>
-                        <span className="font-medium text-sm">{item.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
-                    <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
-                    <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
-                    <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
-                    <TableCell>
-                      {item.publishStatus ? (
-                        <Badge className={`border-none text-xs ${item.publishStatus === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                          {item.publishStatus === 'published' ? 'Published' : 'Draft'}
-                        </Badge>
-                      ) : (
-                        <Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={e => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-200">
-                            <MoreVertical size={16} className="text-gray-600" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => navigate(`/configuration/master-catalogue/edit/${item.id}`)} className="cursor-pointer">
-                            <Pencil size={14} className="mr-2" />
-                            Edit Product
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => deleteItem(item.id)} className="cursor-pointer text-red-600">
-                            <Trash2 size={14} className="mr-2" />
-                            Delete Product
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-600">
+                      No items match the selected filters. Adjust search, category, or status to view catalog entries.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
-            <span>{selectedIds.length > 0 ? `${selectedIds.length} selected · ` : ''}Showing {filtered.length} of {items.length} entries</span>
+                ) : (
+                  filtered.map(item => (
+                    <TableRow
+                      key={item.id}
+                      className="border-gray-200 hover:bg-blue-50 cursor-pointer"
+                      onClick={() => openPreview(item.id)}
+                      data-testid={`row-product-${item.id}`}
+                    >
+                      <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 cursor-pointer"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={() => toggleSelect(item.id)}
+                          data-testid={`checkbox-product-${item.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {item.image ? (
+                              <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
+                            ) : (
+                              <ImageIcon size={14} className="text-gray-500" />
+                            )}
+                          </div>
+                          <span className="font-medium text-sm">{item.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
+                      <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
+                      <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
+                      <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
+                      <TableCell>
+                        {item.publishStatus ? (
+                          <PublishStatusBadge status={item.publishStatus} />
+                        ) : (
+                          <Badge className={`${getStatusColor(item.status)} border-none text-xs`}>{item.status}</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell onClick={e => e.stopPropagation()}>
+                        <ProductActionsMenu
+                          item={item}
+                          onEdit={() => navigate(`/configuration/master-catalogue/edit/${item.id}`)}
+                          onDelete={() => deleteItem(item.id)}
+                          onStatusChange={(s) => updateItemStatus(item.id, s)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            <div className="flex items-center justify-between mt-4 text-xs text-gray-600">
+              <span>{selectedIds.length > 0 ? `${selectedIds.length} selected · ` : ''}Showing {filtered.length} of {items.length} entries</span>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        /* Thumbnail Grid View */
+        <div>
+          {filtered.length === 0 ? (
+            <Card className="border-gray-200">
+              <CardContent className="py-12 text-center text-gray-600">
+                No items match the selected filters. Adjust search, category, or status to view catalog entries.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              {filtered.map(item => (
+                <ProductThumbnailCard
+                  key={item.id}
+                  item={item}
+                  onView={() => openPreview(item.id)}
+                  onEdit={() => navigate(`/configuration/master-catalogue/edit/${item.id}`)}
+                  onDelete={() => deleteItem(item.id)}
+                  onStatusChange={(s) => updateItemStatus(item.id, s)}
+                />
+              ))}
+            </div>
+          )}
+          <div className="mt-3 text-xs text-gray-600">
+            Showing {filtered.length} of {items.length} entries
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
 
       {/* Import/Export + Audit Logs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -838,13 +1039,13 @@ export default function CatalogUpdatesTab() {
                 <div><Label className="text-muted-foreground">Brand</Label><p>{viewItem.brand}</p></div>
                 <div><Label className="text-muted-foreground">Price</Label><p>₹{viewItem.price.toLocaleString()}</p></div>
                 <div><Label className="text-muted-foreground">Status</Label>
-                  {viewItem.publishStatus ? (
-                    <Badge className={`border-none ${viewItem.publishStatus === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {viewItem.publishStatus === 'published' ? 'Published' : 'Draft'}
-                    </Badge>
-                  ) : (
-                    <Badge className={`${getStatusColor(viewItem.status)} border-none`}>{viewItem.status}</Badge>
-                  )}
+                  <div className="mt-1">
+                    {viewItem.publishStatus ? (
+                      <PublishStatusBadge status={viewItem.publishStatus} />
+                    ) : (
+                      <Badge className={`${getStatusColor(viewItem.status)} border-none`}>{viewItem.status}</Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
