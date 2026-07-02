@@ -297,87 +297,100 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
   }, [rows, preferences]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
 
-        {/* Header */}
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
-            </button>
-            <h2 className="text-sm font-semibold text-gray-900">Add New Product</h2>
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Add New Product</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Search and select products from the master catalog to add to this client</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={16} /></button>
         </div>
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <X size={18} />
+        </button>
+      </div>
 
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 flex flex-col">
+      {/* Scrollable body */}
+      <div className="overflow-y-auto flex-1 flex flex-col">
 
           {/* ── Section 1: Search & Select ── */}
-          <div className="flex flex-col border-b border-gray-100">
+          <div className="flex flex-col border-b border-gray-200">
             {/* Section header */}
-            <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
-              <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
-              <h3 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h3>
+            <div className="flex-shrink-0 px-8 py-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
+              <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Check the boxes next to the products you want to add</p>
+              </div>
               {selectedIds.size > 0 && (
-                <span className="ml-auto text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                <span className="ml-auto text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
                   {selectedIds.size} selected
                 </span>
               )}
             </div>
 
             {/* Search bar */}
-            <div className="flex-shrink-0 px-5 py-2.5 border-b border-gray-100">
-              <div className="relative max-w-lg">
+            <div className="flex-shrink-0 px-8 py-4 border-b border-gray-100">
+              <div className="relative max-w-xl">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by product name, master product code, category, brand…"
-                  className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Search by product name, master product code, category or brand…"
+                  className="w-full pl-9 pr-8 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {query && (
-                  <button onClick={() => setQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <button onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Table — no internal scroll, expands to show all */}
+            {/* Products table */}
             <div className="w-full overflow-x-auto">
               {catalog.length === 0 ? (
-                <div className="px-5 py-10 text-center text-gray-400 text-sm">
+                <div className="px-8 py-16 text-center text-gray-400 text-sm">
                   No products in master catalog yet. Add products via Master Catalog first.
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="px-5 py-8 text-center text-gray-400 text-sm">
+                <div className="px-8 py-12 text-center text-gray-400 text-sm">
                   No products match "<span className="font-medium text-gray-600">{query}</span>"
                 </div>
               ) : (
-                <table className="w-full text-sm" style={{ minWidth: "650px" }}>
+                <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">Select</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Name</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Master Product Code</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
+                    <tr className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                      <th className="px-8 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14"></th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-gray-100">
                     {filtered.map((product) => {
                       const checked = selectedIds.has(product.id);
                       return (
                         <tr
                           key={product.id}
                           onClick={() => toggleSelect(product)}
-                          className={`cursor-pointer transition-colors ${checked ? "bg-blue-50/60 hover:bg-blue-50" : "hover:bg-gray-50"}`}
+                          className={`cursor-pointer transition-colors ${checked ? "bg-blue-50 hover:bg-blue-50" : "hover:bg-gray-50"}`}
                         >
-                          <td className="px-4 py-2.5">
+                          <td className="px-8 py-3">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -386,22 +399,22 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                               className="w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer"
                             />
                           </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2.5">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
                               <ProductThumb images={product.images} name={product.productName} />
                               <div>
-                                <div className="font-medium text-gray-800 text-sm leading-tight">{product.productName}</div>
+                                <div className="font-medium text-gray-900 text-sm leading-tight">{product.productName}</div>
                                 <div className="text-xs text-gray-400 font-mono mt-0.5">{product.masterProductCode}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
-                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{product.masterProductCode || "—"}</span>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">{product.masterProductCode || "—"}</span>
                           </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 text-sm">{product.category || "—"}</td>
-                          <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 text-sm">{product.brand || "—"}</td>
-                          <td className="px-4 py-2.5 max-w-[200px]">
-                            <span className="text-gray-500 text-xs line-clamp-2">{product.description || "—"}</span>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-700 text-sm">{product.category || "—"}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-gray-700 text-sm">{product.brand || "—"}</td>
+                          <td className="px-4 py-3 max-w-xs">
+                            <span className="text-gray-500 text-sm line-clamp-2">{product.description || "—"}</span>
                           </td>
                         </tr>
                       );
@@ -412,93 +425,96 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
             </div>
           </div>
 
-          {/* ── Section 2: Selected Products ── */}
+          {/* ── Section 2: Assign Roles & Preferences ── */}
           <div className="flex flex-col">
-            <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3 bg-gray-50/50">
-              <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
-              <h3 className="text-sm font-semibold text-gray-800">
-                Selected Products{rows.length > 0 && <span className="ml-1.5 text-blue-600">({rows.length})</span>}
-              </h3>
+            <div className="flex-shrink-0 px-8 py-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
+              <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">
+                  Assign Roles &amp; Preferences
+                  {rows.length > 0 && <span className="ml-2 text-blue-600">({rows.length} product{rows.length !== 1 ? "s" : ""})</span>}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">Set roles and preferences for each selected product</p>
+              </div>
             </div>
 
             {rows.length === 0 ? (
-              <div className="px-5 py-8 text-center text-gray-400 text-sm">
-                No products selected yet — check items in the list above.
+              <div className="px-8 py-12 text-center text-gray-400 text-sm">
+                No products selected yet — check items in the list above to assign roles and preferences.
               </div>
             ) : (
-              <>
-                <div className="w-full overflow-x-auto">
-                  <table className="w-full text-sm" style={{ minWidth: "900px" }}>
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Master Product Code</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">Remove</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {sortedRows.map((row, idx) => (
-                        <tr key={row.product.id} className="hover:bg-gray-50/40 transition-colors">
-                          <td className="px-3 py-3 text-gray-500 text-sm font-medium">{idx + 1}</td>
-                          <td className="px-3 py-3">
-                            <div className="flex items-center gap-2">
-                              <ProductThumb images={row.product.images} name={row.product.productName} />
-                              <div className="min-w-0">
-                                <div className="font-medium text-gray-800 text-sm leading-tight truncate max-w-[160px]">{row.product.productName}</div>
-                                <div className="text-xs text-gray-400 font-mono mt-0.5">{row.product.masterProductCode}</div>
-                              </div>
+              <div className="w-full overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-8 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">#</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">Remove</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {sortedRows.map((row, idx) => (
+                      <tr key={row.product.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-8 py-3.5 text-gray-500 text-sm font-medium">{idx + 1}</td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <ProductThumb images={row.product.images} name={row.product.productName} />
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 text-sm leading-tight">{row.product.productName}</div>
+                              <div className="text-xs text-gray-400 font-mono mt-0.5">{row.product.masterProductCode}</div>
                             </div>
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap">
-                            <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{row.product.masterProductCode || "—"}</span>
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{row.product.category || "—"}</td>
-                          <td className="px-3 py-3 whitespace-nowrap text-gray-600 text-sm">{row.product.brand || "—"}</td>
-                          <td className="px-3 py-3">
-                            <RoleDropdown
-                              values={row.roles}
-                              roles={roles}
-                              onToggle={(r) => toggleRowRole(row.product.id, r)}
-                              onAddNew={addRole}
-                            />
-                          </td>
-                          <td className="px-3 py-3">
-                            <PreferenceDropdown
-                              value={row.preference}
-                              preferences={preferences}
-                              onSelect={(v) => updateRow(row.product.id, "preference", v)}
-                              onAddNew={addPreference}
-                            />
-                          </td>
-                          <td className="px-3 py-3">
-                            <button
-                              onClick={() => removeProduct(row.product.id)}
-                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="px-5 py-2 border-t border-gray-100">
-                  <span className="text-xs text-gray-500">{rows.length} product{rows.length !== 1 ? "s" : ""} selected</span>
-                </div>
-              </>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">{row.product.masterProductCode || "—"}</span>
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-gray-700 text-sm">{row.product.category || "—"}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap text-gray-700 text-sm">{row.product.brand || "—"}</td>
+                        <td className="px-4 py-3.5">
+                          <RoleDropdown
+                            values={row.roles}
+                            roles={roles}
+                            onToggle={(r) => toggleRowRole(row.product.id, r)}
+                            onAddNew={addRole}
+                          />
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <PreferenceDropdown
+                            value={row.preference}
+                            preferences={preferences}
+                            onSelect={(v) => updateRow(row.product.id, "preference", v)}
+                            onAddNew={addPreference}
+                          />
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <button
+                            onClick={() => removeProduct(row.product.id)}
+                            className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+      {/* Footer */}
+      <div className="flex-shrink-0 px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-between gap-3">
+        <span className="text-sm text-gray-500">
+          {rows.length === 0 ? "No products selected yet" : `${rows.length} product${rows.length !== 1 ? "s" : ""} selected`}
+        </span>
+        <div className="flex items-center gap-3">
+          <button onClick={onClose} className="px-5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
             disabled={rows.length === 0}
             onClick={() => {
@@ -513,7 +529,6 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                   : "Price on request",
                 availability: "In Stock",
                 img: row.product.images[0] || "",
-                // Enriched fields for Shop display
                 description: row.product.description,
                 specs: row.product.specifications
                   .map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== '-' ? ' ' + s.unit : ''}`)
@@ -528,7 +543,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
               onAdd(entries);
               onClose();
             }}
-            className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add Product{rows.length > 1 ? "s" : ""}
           </button>
