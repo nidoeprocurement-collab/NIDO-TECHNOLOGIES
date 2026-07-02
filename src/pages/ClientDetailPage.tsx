@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -23,6 +23,7 @@ import {
   ChevronRight,
   FileText,
   Clock,
+  ChevronLeft,
 } from "lucide-react";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
@@ -33,21 +34,9 @@ import ActivityPage from "./ClientActivityPage";
 import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
+import { getClients } from "@/lib/clientStore";
 
-const monthlySpend = [
-  { month: "Jan", value: 18000 },
-  { month: "Feb", value: 22000 },
-  { month: "Mar", value: 19000 },
-  { month: "Apr", value: 25000 },
-  { month: "May", value: 21000 },
-  { month: "Jun", value: 28000 },
-  { month: "Jul", value: 32000 },
-  { month: "Aug", value: 38000 },
-  { month: "Sep", value: 45000 },
-  { month: "Oct", value: 52000 },
-  { month: "Nov", value: 58000 },
-  { month: "Dec", value: 60000 },
-];
+const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration", "Documents"];
 
 const spendCategories = [
   { name: "Hardware", value: 45, amount: "$200,250", color: "#3b82f6" },
@@ -56,7 +45,13 @@ const spendCategories = [
   { name: "Other", value: 10, amount: "$10,500", color: "#a855f7" },
 ];
 
-const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration", "Documents"];
+function generateMonthlySpend(seed: number) {
+  const base = [18, 22, 19, 25, 21, 28, 32, 38, 45, 52, 58, 60];
+  return base.map((v, i) => ({
+    month: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i],
+    value: Math.round(v * 1000 * (0.8 + ((seed * (i + 1)) % 40) / 100)),
+  }));
+}
 
 function DonutChart({ categories, size }: { categories: typeof spendCategories; size: number }) {
   const cx = size / 2;
@@ -105,18 +100,85 @@ function PlaceholderPage({ tab }: { tab: string }) {
   );
 }
 
+function NotFoundPage({ id }: { id: string }) {
+  const navigate = useNavigate();
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+        <Building2 size={28} className="text-red-400" />
+      </div>
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800">Client not found</h2>
+        <p className="text-sm text-gray-400 mt-1">No client with ID <span className="font-mono">{id}</span> exists.</p>
+      </div>
+      <button
+        onClick={() => navigate("/clients")}
+        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        <ChevronLeft size={14} /> Back to Clients
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const { id: clientId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarVisible, setSidebarVisible] = useState(true);
 
+  const clients = getClients();
+  const client = clients.find(c => c.id === clientId);
+
+  if (!client) {
+    return <NotFoundPage id={clientId || ""} />;
+  }
+
+  const initials = client.name
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const seed = client.id.replace(/\D/g, "").slice(-3);
+  const seedNum = parseInt(seed || "1", 10);
+  const monthlySpend = generateMonthlySpend(seedNum);
+  const totalSpend = monthlySpend.reduce((s, m) => s + m.value, 0);
+
+  const contractStart = client.contractStartDate
+    ? new Date(client.contractStartDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    : "N/A";
+  const contractEnd = client.contractEndDate
+    ? new Date(client.contractEndDate)
+    : null;
+  const today = new Date();
+  const daysLeft = contractEnd
+    ? Math.max(0, Math.round((contractEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const contractProgress = contractEnd && client.contractStartDate
+    ? Math.min(100, Math.round(
+        ((today.getTime() - new Date(client.contractStartDate).getTime()) /
+          (contractEnd.getTime() - new Date(client.contractStartDate).getTime())) * 100
+      ))
+    : 100;
+
   const isOverview = activeTab === "Overview";
+  const address = [client.billingAddress, client.billingCity, client.billingState, client.billingPincode]
+    .filter(Boolean)
+    .join(", ") || "No address";
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Page header */}
-      <div className="px-6 pt-5 pb-0">
-        <h1 className="text-lg font-semibold text-gray-900">Nitin Supplies</h1>
+      <div className="px-6 pt-5 pb-0 flex items-center gap-2">
+        <button
+          onClick={() => navigate("/clients")}
+          className="p-1 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900">{client.name}</h1>
       </div>
 
       <div className="flex gap-0 p-4 pt-3 min-h-[calc(100vh-48px)]">
@@ -135,11 +197,11 @@ export default function App() {
             {/* Avatar */}
             <div className="flex flex-col items-center gap-2 pt-2">
               <div className="w-16 h-16 rounded-full border-2 border-blue-500 flex items-center justify-center bg-white">
-                <span className="text-blue-600 font-bold text-lg">NS</span>
+                <span className="text-blue-600 font-bold text-lg">{initials}</span>
               </div>
               <div className="text-center">
-                <p className="font-semibold text-gray-900 text-sm">Nitin Supplies</p>
-                <p className="text-xs text-gray-500">Premium Client • Since 2026</p>
+                <p className="font-semibold text-gray-900 text-sm">{client.name}</p>
+                <p className="text-xs text-gray-500">{client.tier || "Client"} • Since {contractStart}</p>
               </div>
             </div>
 
@@ -147,42 +209,58 @@ export default function App() {
             <div className="flex flex-col gap-2 text-xs text-gray-600">
               <div className="flex items-center gap-2">
                 <Mail size={13} className="text-gray-400 shrink-0" />
-                <span>nitinshetty@gmail.com</span>
+                <span className="truncate">{client.email || "No email"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone size={13} className="text-gray-400 shrink-0" />
-                <span>080-4000017</span>
+                <span>{client.phone || "No phone"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin size={13} className="text-gray-400 shrink-0" />
-                <span>No address</span>
+                <span className="truncate">{address}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar size={13} className="text-gray-400 shrink-0" />
-                <span>N/A</span>
+                <span>{client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "N/A"}</span>
               </div>
             </div>
 
             {/* Action buttons */}
             <div className="flex gap-2">
-              <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                <Mail size={12} />
-                Email
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                <Phone size={12} />
-                Call
-              </button>
+              {client.email ? (
+                <a
+                  href={`mailto:${client.email}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Mail size={12} /> Email
+                </a>
+              ) : (
+                <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <Mail size={12} /> Email
+                </button>
+              )}
+              {client.phone ? (
+                <a
+                  href={`tel:${client.phone}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Phone size={12} /> Call
+                </a>
+              ) : (
+                <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <Phone size={12} /> Call
+                </button>
+              )}
             </div>
 
             {/* Contract Progress */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-xs text-gray-600">Contract Progress</span>
-                <span className="text-xs text-gray-500">0 days left</span>
+                <span className="text-xs text-gray-500">{daysLeft} days left</span>
               </div>
               <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full" style={{ width: "100%" }} />
+                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${contractProgress}%` }} />
               </div>
             </div>
 
@@ -190,11 +268,11 @@ export default function App() {
             <div className="flex justify-between text-xs">
               <div>
                 <p className="text-gray-500">Client Since</p>
-                <p className="font-medium text-gray-800">Jun 2026</p>
+                <p className="font-medium text-gray-800">{contractStart}</p>
               </div>
               <div>
                 <p className="text-gray-500">Client ID</p>
-                <p className="font-medium text-gray-800">CI-00020</p>
+                <p className="font-medium text-gray-800">{client.id}</p>
               </div>
             </div>
 
@@ -229,9 +307,8 @@ export default function App() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Total Users</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-tight">24</p>
-                    <p className="text-xs text-gray-400 mt-0.5">12 Active</p>
-                    <p className="text-xs text-gray-400">3 Pending Invites</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-tight">—</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Managed under {client.name}</p>
                   </div>
                 </div>
               </div>
@@ -243,10 +320,8 @@ export default function App() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Total Spends</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-tight">$101,000</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-tight">${totalSpend.toLocaleString()}</p>
                     <p className="text-xs text-gray-400 mt-0.5">Year to date</p>
-                    <p className="text-xs text-gray-400">Last Payment: $25,000</p>
-                    <p className="text-xs text-gray-400">Jan 11, 2026</p>
                   </div>
                 </div>
               </div>
@@ -258,9 +333,8 @@ export default function App() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Open Orders</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-tight">3</p>
-                    <p className="text-xs text-gray-400 mt-0.5">$32,500 value</p>
-                    <p className="text-xs text-gray-400">Contracts</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-tight">—</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Active contracts</p>
                   </div>
                 </div>
               </div>
@@ -269,12 +343,12 @@ export default function App() {
 
           {/* Tabs */}
           <div className="bg-white rounded-xl border border-gray-200 px-4">
-            <div className="flex border-b border-gray-100">
+            <div className="flex border-b border-gray-100 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                  className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
                     activeTab === tab
                       ? "text-blue-600"
                       : "text-gray-500 hover:text-gray-700"
@@ -292,9 +366,16 @@ export default function App() {
           {/* Non-overview tab content */}
           {!isOverview && (
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
-              {activeTab === "Roles" ? <RolesPage /> : activeTab === "Users" ? <UsersPage /> : activeTab === "Orders" ? <OrdersPage /> : activeTab === "Services" ? <ServicesPage /> : activeTab === "Contracts" ? <ContractsPage contractId={""} contractTitle={""} onBack={function (): void {
-                throw new Error("Function not implemented.");
-              } } /> : activeTab === "Catalog" ? <CatalogPage clientId={clientId || "CLI-DEFAULT"} /> : activeTab === "Activity" ? <ActivityPage /> : activeTab === "Configuration" ? <ConfigurationPage /> : activeTab === "Documents" ? <DocumentsPage /> : <PlaceholderPage tab={activeTab} />}
+              {activeTab === "Roles" ? <RolesPage />
+                : activeTab === "Users" ? <UsersPage />
+                : activeTab === "Orders" ? <OrdersPage />
+                : activeTab === "Services" ? <ServicesPage />
+                : activeTab === "Contracts" ? <ContractsPage contractId={""} contractTitle={""} onBack={() => setActiveTab("Overview")} />
+                : activeTab === "Catalog" ? <CatalogPage clientId={clientId || "CLI-DEFAULT"} />
+                : activeTab === "Activity" ? <ActivityPage />
+                : activeTab === "Configuration" ? <ConfigurationPage />
+                : activeTab === "Documents" ? <DocumentsPage />
+                : <PlaceholderPage tab={activeTab} />}
             </div>
           )}
 
@@ -308,35 +389,41 @@ export default function App() {
                   <div className="flex flex-col gap-3 text-xs text-gray-700">
                     <div className="flex items-center gap-2">
                       <Building2 size={14} className="text-gray-400 shrink-0" />
-                      <span>Nitin Supplies</span>
+                      <span>{client.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText size={14} className="text-gray-400 shrink-0" />
-                      <span>Technology</span>
+                      <span>{client.category || "—"}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Users size={14} className="text-gray-400 shrink-0" />
-                      <span>51-200 employees</span>
+                      <span>{client.tier ? `${client.tier} tier` : "—"}</span>
                     </div>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-gray-400">Website</span>
-                      <div className="flex items-center gap-2">
-                        <Globe size={14} className="text-gray-400 shrink-0" />
-                        <a href="#" className="text-blue-500 hover:underline">www.nitinsupplies.com</a>
+                    {client.website && (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-gray-400">Website</span>
+                        <div className="flex items-center gap-2">
+                          <Globe size={14} className="text-gray-400 shrink-0" />
+                          <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline truncate">{client.website}</a>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div className="flex flex-col gap-0.5">
                       <span className="text-gray-400">Phone</span>
                       <div className="flex items-center gap-2">
                         <Phone size={14} className="text-gray-400 shrink-0" />
-                        <span>080-4000017</span>
+                        <span>{client.phone || "—"}</span>
                       </div>
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <span className="text-gray-400">Billing Email</span>
                       <div className="flex items-center gap-2">
                         <Mail size={14} className="text-gray-400 shrink-0" />
-                        <a href="#" className="text-blue-500 hover:underline">nitinshetty@gmail.com</a>
+                        {client.email ? (
+                          <a href={`mailto:${client.email}`} className="text-blue-500 hover:underline truncate">{client.email}</a>
+                        ) : (
+                          <span>—</span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -348,19 +435,18 @@ export default function App() {
                     <h3 className="font-semibold text-gray-900 text-sm">Spending Overview</h3>
                     <span className="text-xs border border-gray-200 rounded-md px-2 py-0.5 text-gray-500">This Year</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">$101,000</p>
+                  <p className="text-2xl font-bold text-gray-900">${totalSpend.toLocaleString()}</p>
                   <p className="text-xs text-gray-400 mb-1">Total Spend</p>
                   <p className="text-xs text-green-500 font-medium mb-3">+12.5% vs last year</p>
                   <ResponsiveContainer width="100%" height={130}>
                     <BarChart data={monthlySpend} barSize={10} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                      <XAxis key="spend-xaxis" dataKey="month" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                      <YAxis key="spend-yaxis" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}K`} />
+                      <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v / 1000}K`} />
                       <Tooltip
-                        key="spend-tooltip"
                         formatter={(v: number) => [`$${v.toLocaleString()}`, "Spend"]}
                         contentStyle={{ fontSize: 11, borderRadius: 6, border: "1px solid #e5e7eb" }}
                       />
-                      <Bar key="spend-bar" dataKey="value" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -396,23 +482,15 @@ export default function App() {
                       <Users size={15} className="text-gray-400" />
                       <h3 className="font-semibold text-gray-900 text-sm">User Summary</h3>
                     </div>
-                    <ChevronRight size={15} className="text-gray-400" />
+                    <button onClick={() => setActiveTab("Users")} className="hover:text-blue-500 transition-colors">
+                      <ChevronRight size={15} className="text-gray-400" />
+                    </button>
                   </div>
                   <div className="flex items-end gap-6">
                     <div>
                       <Users size={22} className="text-gray-300 mb-1" />
-                      <p className="text-2xl font-bold text-gray-900">24</p>
+                      <p className="text-2xl font-bold text-gray-900">—</p>
                       <p className="text-xs text-gray-400">Total Users</p>
-                    </div>
-                    <div className="flex gap-4 pb-1">
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-green-500">12</p>
-                        <p className="text-xs text-gray-400">Active</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xl font-bold text-orange-400">4</p>
-                        <p className="text-xs text-gray-400">Inactive</p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -424,17 +502,15 @@ export default function App() {
                       <ShoppingCart size={15} className="text-gray-400" />
                       <h3 className="font-semibold text-gray-900 text-sm">Recent Orders</h3>
                     </div>
-                    <ChevronRight size={15} className="text-gray-400" />
+                    <button onClick={() => setActiveTab("Orders")} className="hover:text-blue-500 transition-colors">
+                      <ChevronRight size={15} className="text-gray-400" />
+                    </button>
                   </div>
                   <div className="flex items-end gap-6">
                     <div>
                       <ShoppingCart size={22} className="text-gray-300 mb-1" />
-                      <p className="text-2xl font-bold text-gray-900">3</p>
+                      <p className="text-2xl font-bold text-gray-900">—</p>
                       <p className="text-xs text-gray-400">Open Orders</p>
-                    </div>
-                    <div className="pb-1">
-                      <p className="text-xl font-bold text-gray-900">$32,500</p>
-                      <p className="text-xs text-gray-400">Total Value</p>
                     </div>
                   </div>
                 </div>
@@ -446,16 +522,18 @@ export default function App() {
                       <Clock size={15} className="text-gray-400" />
                       <h3 className="font-semibold text-gray-900 text-sm">Active Services</h3>
                     </div>
-                    <ChevronRight size={15} className="text-gray-400" />
+                    <button onClick={() => setActiveTab("Contracts")} className="hover:text-blue-500 transition-colors">
+                      <ChevronRight size={15} className="text-gray-400" />
+                    </button>
                   </div>
                   <div className="flex items-end gap-6">
                     <div>
                       <FileText size={22} className="text-gray-300 mb-1" />
-                      <p className="text-2xl font-bold text-gray-900">2</p>
+                      <p className="text-2xl font-bold text-gray-900">—</p>
                       <p className="text-xs text-gray-400">Active Contracts</p>
                     </div>
                     <div className="pb-1">
-                      <p className="text-xl font-bold text-blue-500">0 days</p>
+                      <p className="text-xl font-bold text-blue-500">{daysLeft} days</p>
                       <p className="text-xs text-gray-400">Until Renewal</p>
                     </div>
                   </div>

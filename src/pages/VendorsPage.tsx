@@ -21,40 +21,9 @@ import {
   XCircle,
   Phone,
 } from "lucide-react";
+import { getVendors, saveVendors, type StoredVendor, type VendorStatus } from "@/lib/vendorDataStore";
 
-type VendorStatus = "Active" | "Inactive" | "On Hold" | "Pending";
-
-interface Vendor {
-  id: string;
-  name: string;
-  category: string;
-  primaryContact: string;
-  email: string;
-  phone: string;
-  rating: number;
-  region: string;
-  status: VendorStatus;
-  onboardedDate: string;
-  monthSpend: number;
-  score: number;
-  address: string;
-  totalSpend: number;
-  complianceIssues: number;
-  archived: boolean;
-}
-
-const initialVendors: Vendor[] = [
-  { id: "VND-1001", name: "InfoTech Pvt. Ltd.", category: "IT Services", primaryContact: "Rahul Sharma", email: "rahul@infotech.com", phone: "+91 98765 43210", rating: 4.5, region: "North",  status: "Active", onboardedDate: "12 Jan 2023", monthSpend: 75000000, score: 4.8, address: "Delhi, India", totalSpend: 850000000, complianceIssues: 0, archived: false },
-  { id: "VND-1002", name: "Logistics Express", category: "Logistics", primaryContact: "Priya Mehta", email: "priya@logexp.com", phone: "+91 87654 32109", rating: 3.8, region: "West",  status: "Active", onboardedDate: "5 Mar 2023", monthSpend: 42000000, score: 3.9, address: "Mumbai, India", totalSpend: 420000000, complianceIssues: 2, archived: false },
-  { id: "VND-1003", name: "GreenLeaf Supplies", category: "Raw Materials", primaryContact: "Ankit Patel", email: "ankit@greenleaf.com", phone: "+91 76543 21098", rating: 4.2, region: "South",  status: "On Hold", onboardedDate: "20 Jun 2022", monthSpend: 0, score: 4.1, address: "Bangalore, India", totalSpend: 310000000, complianceIssues: 5, archived: false },
-  { id: "VND-1004", name: "Cloud Systems India", category: "IT Services", primaryContact: "Sneha Reddy", email: "sneha@cloudsys.in", phone: "+91 65432 10987", rating: 4.7, region: "South",  status: "Active", onboardedDate: "8 Sep 2022", monthSpend: 96000000, score: 4.9, address: "Hyderabad, India", totalSpend: 960000000, complianceIssues: 0, archived: false },
-  { id: "VND-1005", name: "FastTrack Movers", category: "Logistics", primaryContact: "Vikram Singh", email: "vikram@fasttrack.co", phone: "+91 54321 09876", rating: 3.5, region: "East",  status: "Pending", onboardedDate: "14 Nov 2023", monthSpend: 18000000, score: 3.6, address: "Kolkata, India", totalSpend: 75000000, complianceIssues: 1, archived: false },
-  { id: "VND-1006", name: "Steel Forge Ltd.", category: "Manufacturing", primaryContact: "Kavita Joshi", email: "kavita@steelforge.com", phone: "+91 43210 98765", rating: 4.0, region: "West",  status: "Active", onboardedDate: "2 Feb 2022", monthSpend: 130000000, score: 4.2, address: "Pune, India", totalSpend: 1250000000, complianceIssues: 3, archived: false },
-  { id: "VND-1007", name: "Digital Wave Media", category: "Marketing", primaryContact: "Arjun Nair", email: "arjun@digitalwave.io", phone: "+91 32109 87654", rating: 4.3, region: "South",  status: "Active", onboardedDate: "30 Apr 2023", monthSpend: 22000000, score: 4.4, address: "Chennai, India", totalSpend: 190000000, complianceIssues: 0, archived: false },
-  { id: "VND-1008", name: "Ecopack Solutions", category: "Packaging", primaryContact: "Neha Gupta", email: "neha@ecopack.com", phone: "+91 21098 76543", rating: 3.9, region: "North",  status: "Inactive", onboardedDate: "11 Jul 2021", monthSpend: 0, score: 3.7, address: "Jaipur, India", totalSpend: 145000000, complianceIssues: 4, archived: false },
-  { id: "VND-1009", name: "TechBridge Corp", category: "IT Services", primaryContact: "Suresh Kumar", email: "suresh@techbridge.in", phone: "+91 10987 65432", rating: 4.6, region: "West",  status: "Active", onboardedDate: "19 Oct 2022", monthSpend: 88000000, score: 4.7, address: "Ahmedabad, India", totalSpend: 780000000, complianceIssues: 1, archived: false },
-  { id: "VND-1010", name: "Agro Fresh Farms", category: "Agriculture", primaryContact: "Deepa Iyer", email: "deepa@agrofresh.com", phone: "+91 09876 54321", rating: 4.1, region: "South",  status: "Active", onboardedDate: "7 Jan 2024", monthSpend: 35000000, score: 4.0, address: "Coimbatore, India", totalSpend: 120000000, complianceIssues: 0, archived: false },
-];
+type Vendor = StoredVendor;
 
 const formatCrores = (val: number) => {
   const cr = val / 10000000;
@@ -326,8 +295,14 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
 // ----- Main App -----
 export default function App() {
   const navigate = useNavigate();
-  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
+  const [vendors, setVendors] = useState<Vendor[]>(() => getVendors());
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
+
+  useEffect(() => {
+    const onUpdate = () => setVendors(getVendors());
+    window.addEventListener('nidoVendorsUpdated', onUpdate);
+    return () => window.removeEventListener('nidoVendorsUpdated', onUpdate);
+  }, []);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedOverview, setArchivedOverview] = useState<Vendor | null>(null);
   const [editVendor, setEditVendor] = useState<Vendor | null>(null);
@@ -359,8 +334,16 @@ export default function App() {
     return true;
   });
 
-  const archiveVendor = (id: string) => setVendors(prev => prev.map(v => v.id === id ? { ...v, archived: true } : v));
-  const setVendorStatus = (id: string, status: VendorStatus) => setVendors(prev => prev.map(v => v.id === id ? { ...v, status } : v));
+  const archiveVendor = (id: string) => {
+    const updated = vendors.map(v => v.id === id ? { ...v, archived: true } : v);
+    saveVendors(updated);
+    setVendors(updated);
+  };
+  const setVendorStatus = (id: string, status: VendorStatus) => {
+    const updated = vendors.map(v => v.id === id ? { ...v, status } : v);
+    saveVendors(updated);
+    setVendors(updated);
+  };
 
   const stats = [
     { label: "Total Vendors", value: activeVendors.length, sub: "registered", icon: <Building2 className="w-4 h-4 text-blue-600" />, bg: "bg-blue-50" },
