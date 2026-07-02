@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Download, Filter, MoreVertical, Search, X } from "lucide-react";
+import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import {
   getClientCatalog,
@@ -219,6 +219,407 @@ function RoleDropdown({
 
 // Use the shared interface from the store (aliased for local use)
 type CatalogEntry = ClientCatalogEntry;
+
+// ── Helpers shared by view/edit screens ───────────────────────────────────────
+
+function getCategoryColor(cat: string): string {
+  const c = (cat || "").toLowerCase();
+  if (c.includes("cloud") || c.includes("server")) return "text-blue-600";
+  if (c.includes("it") || c.includes("hardware") || c.includes("tech")) return "text-blue-600";
+  if (c.includes("office")) return "text-emerald-600";
+  if (c.includes("pantry") || c.includes("food") || c.includes("beverage") || c.includes("consumable")) return "text-orange-600";
+  if (c.includes("furniture")) return "text-amber-600";
+  if (c.includes("network")) return "text-cyan-600";
+  return "text-gray-600";
+}
+
+function getSpecIcon(name: string) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("print") || n.includes("scan") || n.includes("copy")) return <Printer size={16} className="text-blue-500" />;
+  if (n.includes("speed") || n.includes("rate")) return <Timer size={16} className="text-blue-500" />;
+  if (n.includes("connect") || n.includes("wifi") || n.includes("network")) return <Wifi size={16} className="text-blue-500" />;
+  if (n.includes("paper") || n.includes("size") || n.includes("format")) return <FileText size={16} className="text-blue-500" />;
+  if (n.includes("warrant") || n.includes("guarantee")) return <Shield size={16} className="text-blue-500" />;
+  if (n.includes("processor") || n.includes("cpu") || n.includes("memory") || n.includes("ram")) return <Cpu size={16} className="text-blue-500" />;
+  if (n.includes("storage") || n.includes("ssd") || n.includes("hdd")) return <HardDrive size={16} className="text-blue-500" />;
+  if (n.includes("display") || n.includes("screen") || n.includes("resolution")) return <Monitor size={16} className="text-blue-500" />;
+  return <Settings2 size={16} className="text-blue-500" />;
+}
+
+// ── Product View Screen ────────────────────────────────────────────────────────
+
+function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClose: () => void }) {
+  const [zoomed, setZoomed] = useState(false);
+
+  const specPairs = (product.specs || []).map((s) => {
+    const idx = s.indexOf(": ");
+    return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: "", val: s };
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors shrink-0"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-gray-900 truncate">{product.name}</h2>
+            <span className={`text-xs font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-7xl mx-auto px-8 py-8">
+          <div className="flex gap-8">
+            {/* Image */}
+            <div className="w-80 shrink-0">
+              <div
+                className={`w-full aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50 ${product.img ? "cursor-zoom-in" : ""}`}
+                onClick={() => product.img && setZoomed(true)}
+              >
+                {product.img ? (
+                  <img src={product.img} alt={product.name} className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package size={64} className="text-gray-300" />
+                  </div>
+                )}
+              </div>
+              {product.img && (
+                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1 justify-center">
+                  <ZoomIn size={12} /> Click image to zoom
+                </p>
+              )}
+            </div>
+
+            {/* Lightbox */}
+            {zoomed && product.img && (
+              <div
+                className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
+                onClick={() => setZoomed(false)}
+              >
+                <button
+                  onClick={() => setZoomed(false)}
+                  className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                >
+                  <X size={20} />
+                </button>
+                <img
+                  src={product.img}
+                  alt={product.name}
+                  className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl cursor-zoom-out"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
+
+            {/* Details */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
+              <span className={`inline-block mt-2 text-sm font-semibold ${getCategoryColor(product.category)}`}>{product.category}</span>
+
+              {product.description && (
+                <p className="mt-4 text-sm text-gray-600 leading-relaxed max-w-2xl">{product.description}</p>
+              )}
+
+              {specPairs.filter(s => s.key).length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">Key Specifications</h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                    {specPairs.filter(s => s.key).map((sp, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50">
+                        <div className="mt-0.5 shrink-0">{getSpecIcon(sp.key)}</div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-gray-500 uppercase tracking-wide">{sp.key}</p>
+                          <p className="text-sm font-semibold text-gray-800 mt-0.5">{sp.val}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Info panel */}
+            <div className="w-60 shrink-0">
+              <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
+                <div>
+                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{product.price || "—"}</p>
+                </div>
+                <div className="border-t border-gray-100 pt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Package size={14} className="text-gray-400 shrink-0" />
+                    <span>MOQ: {product.moq ? `${product.moq} Units` : "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Clock size={14} className="text-gray-400 shrink-0" />
+                    <span>Lead Time: {product.leadTime || "—"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Shield size={14} className="text-gray-400 shrink-0" />
+                    <span className={`font-medium ${
+                      product.availability === "In Stock" ? "text-green-600"
+                      : product.availability === "Low Stock" ? "text-orange-500"
+                      : "text-red-500"
+                    }`}>{product.availability || "—"}</span>
+                  </div>
+                </div>
+                {(product.roles.length > 0 || product.preference) && (
+                  <div className="border-t border-gray-100 pt-4 space-y-3">
+                    {product.roles.length > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1.5">Roles</p>
+                        <div className="flex flex-wrap gap-1">
+                          {product.roles.map(r => (
+                            <span key={r} className="text-[11px] bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-full">{r}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {product.preference && (
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Preference</p>
+                        <span className="text-[11px] bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-full">{product.preference}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* General Specs */}
+          {product.generalSpecs && product.generalSpecs.length > 0 && (
+            <div className="mt-8 border border-gray-200 rounded-2xl p-6">
+              <h3 className="text-base font-semibold text-gray-900 mb-4">General Specifications</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8">
+                {product.generalSpecs.map((gs, i) => (
+                  <div key={i} className="flex justify-between border-b border-gray-100 py-2.5">
+                    <span className="text-sm text-gray-500">{gs.label}</span>
+                    <span className="text-sm font-medium text-gray-800">{gs.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Edit Product Screen ────────────────────────────────────────────────────────
+
+function EditProductScreen({
+  product,
+  onClose,
+  onSave,
+}: {
+  product: CatalogEntry;
+  onClose: () => void;
+  onSave: (updated: Partial<CatalogEntry>) => void;
+}) {
+  const [roles, setRoles] = useState<string[]>([...product.roles]);
+  const [preference, setPreference] = useState(product.preference || "");
+  const [availableRoles, setAvailableRoles] = useState([...catalogRoleOptions]);
+  const [availablePreferences, setAvailablePreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
+
+  const addRole = (name: string) => setAvailableRoles((prev) => prev.includes(name) ? prev : [...prev, name]);
+  const addPreference = (name: string) => setAvailablePreferences((prev) => prev.includes(name) ? prev : [...prev, name]);
+
+  const toggleRole = (r: string) => setRoles((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);
+
+  const specPairs = (product.specs || []).map((s) => {
+    const idx = s.indexOf(": ");
+    return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: "", val: s };
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors shrink-0"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-gray-900">Edit Product</h2>
+            <p className="text-xs text-gray-400 truncate">{product.name}</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors shrink-0"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-8 py-8 flex gap-8">
+
+          {/* Left: Product details (read-only) */}
+          <div className="w-72 shrink-0">
+            <div className="border border-gray-200 rounded-2xl overflow-hidden">
+              <div className="w-full aspect-square bg-gray-50">
+                {product.img ? (
+                  <img src={product.img} alt={product.name} className="w-full h-full object-contain" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package size={56} className="text-gray-300" />
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-gray-100">
+                <h3 className="font-semibold text-gray-900 text-sm">{product.name}</h3>
+                <span className={`text-xs font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+                <div className="mt-3 space-y-2 text-xs text-gray-600">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">SKU</span>
+                    <span className="font-mono">{product.sku}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Code</span>
+                    <span className="font-mono">{product.productCode}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Price</span>
+                    <span className="font-semibold text-gray-900">{product.price || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Availability</span>
+                    <span className={`font-medium ${
+                      product.availability === "In Stock" ? "text-green-600"
+                      : product.availability === "Low Stock" ? "text-orange-500"
+                      : "text-red-500"
+                    }`}>{product.availability}</span>
+                  </div>
+                  {product.moq ? (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">MOQ</span>
+                      <span>{product.moq} Units</span>
+                    </div>
+                  ) : null}
+                  {product.leadTime ? (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Lead Time</span>
+                      <span>{product.leadTime}</span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            {/* Key specs preview */}
+            {specPairs.filter(s => s.key).length > 0 && (
+              <div className="mt-4 border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-700 mb-2">Key Specifications</p>
+                <div className="space-y-1.5">
+                  {specPairs.filter(s => s.key).slice(0, 6).map((sp, i) => (
+                    <div key={i} className="flex justify-between text-xs">
+                      <span className="text-gray-400 truncate mr-2">{sp.key}</span>
+                      <span className="font-medium text-gray-700 text-right">{sp.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Editable fields */}
+          <div className="flex-1 min-w-0">
+            <div className="border border-gray-200 rounded-2xl p-6">
+              <h3 className="text-base font-semibold text-gray-900 mb-1">Roles &amp; Preferences</h3>
+              <p className="text-sm text-gray-400 mb-6">Assign roles and set the preference level for this product in the client catalog.</p>
+
+              {/* Roles */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Assigned Roles</label>
+                <p className="text-xs text-gray-400 mb-3">Select one or more roles that have access to this product.</p>
+                <RoleDropdown
+                  values={roles}
+                  roles={availableRoles}
+                  onToggle={toggleRole}
+                  onAddNew={addRole}
+                />
+                {roles.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {roles.map(r => (
+                      <span key={r} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2.5 py-1 rounded-full">
+                        {r}
+                        <button
+                          onClick={() => toggleRole(r)}
+                          className="text-blue-400 hover:text-blue-700 leading-none ml-0.5"
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Preference */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Preference</label>
+                <p className="text-xs text-gray-400 mb-3">Set a preference level or category for this product.</p>
+                <PreferenceDropdown
+                  value={preference}
+                  preferences={availablePreferences}
+                  onSelect={setPreference}
+                  onAddNew={addPreference}
+                />
+                {preference && (
+                  <div className="mt-2">
+                    <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2.5 py-1 rounded-full">
+                      {preference}
+                      <button
+                        onClick={() => setPreference("")}
+                        className="text-purple-400 hover:text-purple-700 leading-none ml-0.5"
+                      >×</button>
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex-shrink-0 px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
+        <button
+          onClick={onClose}
+          className="px-5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => { onSave({ roles, preference }); onClose(); }}
+          className="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (entries: CatalogEntry[]) => void }) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
@@ -559,6 +960,8 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const [headerMenu, setHeaderMenu] = useState(false);
   const [page, setPage] = useState(1);
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [viewProduct, setViewProduct] = useState<CatalogEntry | null>(null);
+  const [editProduct, setEditProduct] = useState<CatalogEntry | null>(null);
   const [products, setProducts] = useState<CatalogEntry[]>(() => getClientCatalog(clientId));
 
   // Reload from store when clientId changes
@@ -588,16 +991,29 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
     );
   };
 
+  const handleSaveEdit = (sku: string, updated: Partial<CatalogEntry>) => {
+    setProducts((prev) => prev.map((p) => p.sku === sku ? { ...p, ...updated } : p));
+  };
+
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setHeaderMenu(false); }}>
       {showAddProduct && (
         <AddNewProductModal
           onClose={() => setShowAddProduct(false)}
           onAdd={(entries) => setProducts((prev) => {
-            // avoid duplicates by productCode
             const existing = new Set(prev.map((p) => p.productCode));
             return [...prev, ...entries.filter((e) => !existing.has(e.productCode))];
           })}
+        />
+      )}
+      {viewProduct && (
+        <ProductViewScreen product={viewProduct} onClose={() => setViewProduct(null)} />
+      )}
+      {editProduct && (
+        <EditProductScreen
+          product={editProduct}
+          onClose={() => setEditProduct(null)}
+          onSave={(updated) => handleSaveEdit(editProduct.sku, updated)}
         />
       )}
       {/* Stat cards */}
@@ -721,11 +1137,26 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       <MoreVertical size={13} />
                     </button>
                     {rowMenu === product.sku && (
-                      <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-44" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => setRowMenu(null)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">View Product</button>
-                        <button onClick={() => setRowMenu(null)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit Roles & Preferences</button>
+                      <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => { setViewProduct(product); setRowMenu(null); }}
+                          className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700"
+                        >
+                          <Eye size={12} className="text-gray-400" /> View Product
+                        </button>
+                        <button
+                          onClick={() => { setEditProduct(product); setRowMenu(null); }}
+                          className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700"
+                        >
+                          <Pencil size={12} className="text-gray-400" /> Edit Roles &amp; Preferences
+                        </button>
                         <div className="my-1 border-t border-gray-100" />
-                        <button onClick={() => { setProducts((prev) => prev.filter((p) => p.sku !== product.sku)); setRowMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500">Remove Product</button>
+                        <button
+                          onClick={() => { setProducts((prev) => prev.filter((p) => p.sku !== product.sku)); setRowMenu(null); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500"
+                        >
+                          Remove Product
+                        </button>
                       </div>
                     )}
                   </td>

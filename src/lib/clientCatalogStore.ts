@@ -7,6 +7,7 @@ export interface ClientCatalogEntry {
   name: string;
   category: string;
   roles: string[];
+  preference?: string;
   price: string;
   availability: string;
   img: string;
