@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Printer, Timer, Wifi, FileText, Shield, Cpu, HardDrive, Monitor, Settings2, Package, ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
-import { getCatalogProducts } from '@/lib/catalogStore';
+import { Printer, Timer, Wifi, FileText, Shield, Cpu, HardDrive, Monitor, Settings2, Package } from 'lucide-react';
 
 interface PreviewData {
   masterProductCode: string;
@@ -41,7 +40,7 @@ export default function ProductPreviewPage() {
   const [selectedImage, setSelectedImage] = useState(0);
 
   useEffect(() => {
-    const raw = localStorage.getItem('nido_preview_draft');
+    const raw = sessionStorage.getItem('nido_preview_draft');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
@@ -49,10 +48,6 @@ export default function ProductPreviewPage() {
       } catch {}
     }
   }, []);
-
-  const relatedProducts = getCatalogProducts()
-    .filter(p => p.publishStatus === 'published')
-    .slice(0, 5);
 
   if (!data) {
     return (
@@ -243,48 +238,8 @@ export default function ProductPreviewPage() {
           </div>
         )}
 
-        {/* Section 8: Related Products */}
-        {relatedProducts.length > 0 && (
-          <div className="border-x border-b border-gray-200 rounded-b-xl px-6 py-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-gray-900">Related Products</h2>
-              <span className="text-sm text-blue-600 cursor-pointer hover:underline">View All</span>
-            </div>
-            <div className="relative">
-              <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
-                {relatedProducts.map(p => (
-                  <div key={p.id} className="shrink-0 w-44 border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="w-full h-28 bg-gray-100 flex items-center justify-center overflow-hidden">
-                      {p.images[0] ? (
-                        <img src={p.images[0]} alt={p.productName} className="w-full h-full object-cover" />
-                      ) : (
-                        <Package size={32} className="text-gray-300" />
-                      )}
-                    </div>
-                    <div className="p-2.5">
-                      <p className="text-xs font-semibold text-gray-900 line-clamp-2 leading-snug">{p.productName}</p>
-                      {p.category && <p className="text-[10px] text-blue-600 mt-0.5">{p.category}</p>}
-                      <p className="text-xs font-bold text-gray-900 mt-1.5">
-                        {p.price > 0 ? `₹${p.price.toLocaleString('en-IN')} / each` : 'Price on request'}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">MOQ: {p.moq}</p>
-                      <button className="mt-2 w-full flex items-center justify-center gap-1 py-1.5 border border-gray-200 rounded-lg text-[10px] text-gray-700 hover:bg-gray-50">
-                        <ShoppingCart size={11} /> Cart
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-gray-200 rounded-full shadow flex items-center justify-center hover:bg-gray-50 z-10">
-                <ChevronRight size={16} className="text-gray-600" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {!relatedProducts.length && (
-          <div className="border-x border-b border-gray-200 rounded-b-xl h-4" />
-        )}
+        {/* closing bottom border */}
+        <div className="border-x border-b border-gray-200 rounded-b-xl h-4" />
 
         {/* Bottom actions */}
         <div className="pt-6 flex justify-end gap-3">

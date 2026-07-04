@@ -26,21 +26,29 @@ export default function AddMasterCatalogueItemWrapper() {
   const [editProductId, setEditProductId] = useState<string>('');
   const [editMasterCode, setEditMasterCode] = useState<string>('');
   const [masterProductCode] = useState(() => generateMasterProductCode());
-  const [skuCode, setSkuCode] = useState('');
-  const [productName, setProductName] = useState('');
-  const [productType, setProductType] = useState('Product');
-  const [physicalType, setPhysicalType] = useState('Physical');
-  const [category, setCategory] = useState('');
-  const [subcategory, setSubcategory] = useState('');
-  const [brand, setBrand] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
+
+  // In add-mode, seed state from the preview draft (if returning from preview)
+  // so the user's in-progress work is never lost.
+  // sessionStorage is used intentionally: it is scoped to the current browser
+  // tab and cleared when the tab closes, preventing old drafts from silently
+  // pre-filling a brand-new Add Item form in a future session.
+  const draft = !isEditMode ? (() => { try { const r = sessionStorage.getItem('nido_preview_draft'); return r ? JSON.parse(r) : null; } catch { return null; } })() : null;
+
+  const [skuCode, setSkuCode] = useState(draft?.skuCode ?? '');
+  const [productName, setProductName] = useState(draft?.productName ?? '');
+  const [productType, setProductType] = useState(draft?.productType ?? 'Product');
+  const [physicalType, setPhysicalType] = useState(draft?.physicalType ?? 'Physical');
+  const [category, setCategory] = useState(draft?.category ?? '');
+  const [subcategory, setSubcategory] = useState(draft?.subcategory ?? '');
+  const [brand, setBrand] = useState(draft?.brand ?? '');
+  const [tags, setTags] = useState<string[]>(draft?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
-  const [description, setDescription] = useState('');
-  const [specifications, setSpecifications] = useState<CatalogSpec[]>([]);
-  const [generalSpecs, setGeneralSpecs] = useState<GeneralSpec[]>([]);
-  const [productNotes, setProductNotes] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [images, setImages] = useState<string[]>([]);
+  const [description, setDescription] = useState(draft?.description ?? '');
+  const [specifications, setSpecifications] = useState<CatalogSpec[]>(draft?.specifications ?? []);
+  const [generalSpecs, setGeneralSpecs] = useState<GeneralSpec[]>(draft?.generalSpecs ?? []);
+  const [productNotes, setProductNotes] = useState(draft?.productNotes ?? '');
+  const [videoUrl, setVideoUrl] = useState(draft?.videoUrl ?? '');
+  const [images, setImages] = useState<string[]>(draft?.images ?? []);
 
   // Load product data when in edit mode
   useEffect(() => {
@@ -174,13 +182,16 @@ export default function AddMasterCatalogueItemWrapper() {
       description, specifications, generalSpecs, productNotes, videoUrl, images,
       createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
     };
-    localStorage.setItem('nido_preview_draft', JSON.stringify(previewData));
+    sessionStorage.setItem('nido_preview_draft', JSON.stringify(previewData));
     navigate('/preview-product');
   };
+
+  const clearDraft = () => sessionStorage.removeItem('nido_preview_draft');
 
   const handleSaveDraft = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
     saveCatalogProduct(buildProduct('draft'));
+    clearDraft();
     toast.success('Saved as draft');
     navigate('/configuration/master-catalogue');
   };
@@ -188,6 +199,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const handlePublish = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
     saveCatalogProduct(buildProduct('published'));
+    clearDraft();
     toast.success('Product published successfully!');
     navigate('/configuration/master-catalogue');
   };
@@ -196,6 +208,7 @@ export default function AddMasterCatalogueItemWrapper() {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
     const existing = getCatalogProducts().find(p => p.id === editProductId);
     saveCatalogProduct(buildProduct(existing?.publishStatus || 'draft'));
+    clearDraft();
     toast.success('Changes saved successfully');
     navigate('/configuration/master-catalogue');
   };
