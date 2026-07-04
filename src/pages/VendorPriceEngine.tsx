@@ -1,15 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import {
   getAllProductPricing,
-  getVendorCommonSettings,
-  saveVendorCommonSettings,
   type ProductPricing,
-  type VendorCommonSettings,
-  type ChargeItem,
 } from '@/lib/priceEngineStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,7 +25,6 @@ function Stars({ r }: { r: number }) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function VendorPriceEngine() {
-  const [settings, setSettings] = useState<VendorCommonSettings>(getVendorCommonSettings());
   const [products, setProducts] = useState<ProductPricing[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
@@ -45,33 +37,6 @@ export default function VendorPriceEngine() {
     return () => events.forEach(ev => window.removeEventListener(ev, refresh));
   }, []);
 
-  const updateSetting = (field: 'logisticsPct' | 'handlingPct' | 'taxPct', value: number) => {
-    const next = { ...settings, [field]: value };
-    setSettings(next);
-    saveVendorCommonSettings(next);
-    setProducts(getAllProductPricing());
-  };
-
-  const persistCharges = (extraCharges: ChargeItem[]) => {
-    const next = { ...settings, extraCharges };
-    setSettings(next);
-    saveVendorCommonSettings(next);
-    setProducts(getAllProductPricing());
-  };
-
-  const addCharge = () => {
-    const charge: ChargeItem = { id: `chg-${Date.now()}`, name: '', value: 0 };
-    persistCharges([...settings.extraCharges, charge]);
-  };
-
-  const updateCharge = (id: string, patch: Partial<ChargeItem>) => {
-    persistCharges(settings.extraCharges.map(c => (c.id === id ? { ...c, ...patch } : c)));
-  };
-
-  const removeCharge = (id: string) => {
-    persistCharges(settings.extraCharges.filter(c => c.id !== id));
-  };
-
   const toggle = (code: string) => setExpanded(e => ({ ...e, [code]: !e[code] }));
 
   return (
@@ -82,76 +47,10 @@ export default function VendorPriceEngine() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 uppercase tracking-wide">VENDOR PRICE ENGINE</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Automatically compares real vendor listings for every catalog product and picks the winning vendor
+            Automatically compares real vendor listings for every catalog product and picks the winning vendor.
+            Logistics, handling, tax and extra charges are configured individually per vendor from that vendor's
+            <span className="font-semibold"> Configuration </span> tab on their profile page.
           </p>
-        </div>
-      </div>
-
-      {/* ── Common Charges (the only manual inputs — applied to every product/vendor) ── */}
-      <div className="border border-blue-200 bg-blue-50/40 rounded-lg p-4">
-        <h2 className="text-xs font-bold text-blue-700 uppercase mb-1">Common Charges (Applied to All Products)</h2>
-        <p className="text-xs text-gray-500 mb-3">
-          Base price, MOQ, lead time and stock are pulled automatically from each vendor's product listing.
-          These charges aren't captured anywhere else, so they're set once and applied uniformly.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-xl">
-          <div>
-            <Label className="text-xs text-gray-600">Logistics Cost (% of Base Price)</Label>
-            <div className="flex items-center gap-1 mt-1">
-              <Input type="number" value={settings.logisticsPct}
-                onChange={e => updateSetting('logisticsPct', parseFloat(e.target.value) || 0)}
-                className="h-8 text-xs" />
-              <span className="text-gray-400 text-xs">%</span>
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs text-gray-600">Handling Charges (% of Base Price)</Label>
-            <div className="flex items-center gap-1 mt-1">
-              <Input type="number" value={settings.handlingPct}
-                onChange={e => updateSetting('handlingPct', parseFloat(e.target.value) || 0)}
-                className="h-8 text-xs" />
-              <span className="text-gray-400 text-xs">%</span>
-            </div>
-          </div>
-          <div>
-            <Label className="text-xs text-gray-600">Tax (%)</Label>
-            <div className="flex items-center gap-1 mt-1">
-              <Input type="number" value={settings.taxPct}
-                onChange={e => updateSetting('taxPct', parseFloat(e.target.value) || 0)}
-                className="h-8 text-xs" />
-              <span className="text-gray-400 text-xs">%</span>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label className="text-xs text-gray-600">Additional Charges (% of Base Price)</Label>
-            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={addCharge}>
-              <Plus size={12} /> Add New
-            </Button>
-          </div>
-          {settings.extraCharges.length === 0 ? (
-            <p className="text-xs text-gray-400">No additional charges configured.</p>
-          ) : (
-            <div className="space-y-2 max-w-xl">
-              {settings.extraCharges.map(c => (
-                <div key={c.id} className="flex items-center gap-2">
-                  <Input placeholder="Charge name" value={c.name}
-                    onChange={e => updateCharge(c.id, { name: e.target.value })} className="h-8 text-xs flex-1" />
-                  <div className="flex items-center gap-1">
-                    <Input type="number" value={c.value}
-                      onChange={e => updateCharge(c.id, { value: parseFloat(e.target.value) || 0 })}
-                      className="h-8 text-xs w-28" />
-                    <span className="text-gray-400 text-xs">%</span>
-                  </div>
-                  <button onClick={() => removeCharge(c.id)} className="text-red-500 hover:text-red-700">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 

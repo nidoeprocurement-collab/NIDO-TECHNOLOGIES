@@ -1,9 +1,8 @@
 // Price Engine — fully automatic pricing pipeline.
 // Reads real data from the Master Catalog, Vendor Product Lists and Vendor
 // Master data, computes the winning vendor + landed cost per product, then
-// computes the client selling price from a small set of common (global)
-// charge settings, and syncs the result into every client catalog that
-// carries the product.
+// computes the client selling price from per-client charge settings, and
+// syncs the result into every client catalog that carries the product.
 
 import { getCatalogProducts } from './catalogStore';
 import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
@@ -11,10 +10,10 @@ import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
 import { getClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
 
-// ─── Common (global) settings — the only manually entered inputs ──────────────
-// These apply uniformly to every product/vendor because the real data sources
-// (vendor product listings, master catalog, client catalog) don't carry
-// logistics/handling/margin information themselves.
+// ─── Per-vendor / per-client settings ──────────────────────────────────────
+// Charges/margins aren't captured anywhere else in the real data sources
+// (vendor product listings, master catalog, client catalog), so they're
+// configured individually per vendor / per client and stored keyed by id.
 
 const VENDOR_SETTINGS_KEY = 'nido_price_engine_vendor_settings';
 const CLIENT_SETTINGS_KEY = 'nido_price_engine_client_settings';
@@ -34,18 +33,25 @@ export interface VendorCommonSettings {
 
 const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logisticsPct: 0, handlingPct: 0, taxPct: 18, extraCharges: [] };
 
-export function getVendorCommonSettings(): VendorCommonSettings {
+function getAllVendorSettings(): Record<string, VendorCommonSettings> {
   try {
     const raw = localStorage.getItem(VENDOR_SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_VENDOR_SETTINGS, ...JSON.parse(raw) };
+    if (raw) return JSON.parse(raw);
   } catch {
     // ignore malformed storage
   }
-  return DEFAULT_VENDOR_SETTINGS;
+  return {};
 }
 
-export function saveVendorCommonSettings(settings: VendorCommonSettings): void {
-  localStorage.setItem(VENDOR_SETTINGS_KEY, JSON.stringify(settings));
+export function getVendorCommonSettings(vendorId: string): VendorCommonSettings {
+  const all = getAllVendorSettings();
+  return { ...DEFAULT_VENDOR_SETTINGS, ...(all[vendorId] || {}) };
+}
+
+export function saveVendorCommonSettings(vendorId: string, settings: VendorCommonSettings): void {
+  const all = getAllVendorSettings();
+  all[vendorId] = settings;
+  localStorage.setItem(VENDOR_SETTINGS_KEY, JSON.stringify(all));
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
@@ -67,18 +73,25 @@ const DEFAULT_CLIENT_SETTINGS: ClientCommonSettings = {
   roundOff: 'none',
 };
 
-export function getClientCommonSettings(): ClientCommonSettings {
+function getAllClientSettings(): Record<string, ClientCommonSettings> {
   try {
     const raw = localStorage.getItem(CLIENT_SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_CLIENT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) return JSON.parse(raw);
   } catch {
     // ignore malformed storage
   }
-  return DEFAULT_CLIENT_SETTINGS;
+  return {};
 }
 
-export function saveClientCommonSettings(settings: ClientCommonSettings): void {
-  localStorage.setItem(CLIENT_SETTINGS_KEY, JSON.stringify(settings));
+export function getClientCommonSettings(clientId: string): ClientCommonSettings {
+  const all = getAllClientSettings();
+  return { ...DEFAULT_CLIENT_SETTINGS, ...(all[clientId] || {}) };
+}
+
+export function saveClientCommonSettings(clientId: string, settings: ClientCommonSettings): void {
+  const all = getAllClientSettings();
+  all[clientId] = settings;
+  localStorage.setItem(CLIENT_SETTINGS_KEY, JSON.stringify(all));
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
@@ -109,11 +122,7 @@ export interface VendorComparisonRow {
   score: number;
 }
 
-export function computeVendorComparisons(
-  masterProductCode: string,
-  settings?: VendorCommonSettings,
-): VendorComparisonRow[] {
-  const s = settings || getVendorCommonSettings();
+export function computeVendorComparisons(masterProductCode: string): VendorComparisonRow[] {
   const storeMap = getAllVendorProducts();
   const allVendors = getVendors();
   const rows: VendorComparisonRow[] = [];
@@ -124,6 +133,7 @@ export function computeVendorComparisons(
     const info = allVendors.find(v => v.id === vendorId);
     const rawTerms = info?.paymentTerms || '';
     const basePrice = parseFloat(match.price) || 0;
+    const vendorSettings = getVendorCommonSettings(vendorId);
     rows.push({
       vendorId,
       vendorName: info?.name || vendorId,
@@ -133,7 +143,7 @@ export function computeVendorComparisons(
       stock: parseInt(match.stock) || 0,
       rating: info?.rating || 0,
       paymentTerms: TERMS_MAP[rawTerms] || rawTerms || '—',
-      landedCostPerUnit: getLandedCost(basePrice, s),
+      landedCostPerUnit: getLandedCost(basePrice, vendorSettings),
       score: 0,
     });
   });
@@ -163,8 +173,7 @@ export function computeVendorComparisons(
 // flow through to the Price Engine and trigger a price recalculation via the
 // 'vendorProductsUpdated' event.
 export function updateWinningVendorMoq(masterProductCode: string, newMoq: number): boolean {
-  const settings = getVendorCommonSettings();
-  const comparisons = computeVendorComparisons(masterProductCode, settings);
+  const comparisons = computeVendorComparisons(masterProductCode);
   const winner = comparisons[0];
   if (!winner) return false;
 
@@ -188,10 +197,9 @@ export interface ProductPricing {
 }
 
 export function getAllProductPricing(): ProductPricing[] {
-  const settings = getVendorCommonSettings();
   const catalog = getCatalogProducts();
   return catalog.map(p => {
-    const comparisons = computeVendorComparisons(p.masterProductCode, settings);
+    const comparisons = computeVendorComparisons(p.masterProductCode);
     const winner = comparisons[0] || null;
     return {
       masterProductCode: p.masterProductCode,
@@ -219,9 +227,9 @@ export interface ClientPriceCalc {
 
 export function computeClientFinalPrice(
   landedCostPerUnit: number,
-  settings?: ClientCommonSettings,
+  settings: ClientCommonSettings,
 ): ClientPriceCalc {
-  const s = settings || getClientCommonSettings();
+  const s = settings;
   const perUnitPct = s.perUnitCharges.reduce((sum, c) => sum + c.value, 0);
   const totalPct = s.overheadPct + perUnitPct;
   const perUnitTotal = (landedCostPerUnit * totalPct) / 100;
@@ -237,44 +245,66 @@ export function computeClientFinalPrice(
   return { perUnitTotal, subtotal, profit, discount, tax, finalPrice };
 }
 
-export interface ClientPricingRow extends ProductPricing {
-  calc: ClientPriceCalc;
-  matchingClients: { clientId: string; clientName: string }[];
+// Since pricing settings are now configured per-client, each row represents
+// one (client, product-in-that-client's-catalog) pair with its own calc.
+export interface ClientPricingRow {
+  clientId: string;
+  clientName: string;
+  masterProductCode: string;
+  productName: string;
+  sku: string;
+  category: string;
+  winningVendor: VendorComparisonRow | null;
+  landedCostPerUnit: number;
+  calc: ClientPriceCalc | null;
 }
 
 export function getAllClientPricing(): ClientPricingRow[] {
-  const clientSettings = getClientCommonSettings();
   const clients = getClients();
   const productPricing = getAllProductPricing();
+  const pricingByCode = new Map(productPricing.map(p => [p.masterProductCode, p]));
+  const rows: ClientPricingRow[] = [];
 
-  return productPricing.map(pp => {
-    const calc = computeClientFinalPrice(pp.landedCostPerUnit, clientSettings);
-    const matchingClients = clients
-      .filter(c => getClientCatalog(c.id).some(e => e.productCode === pp.masterProductCode))
-      .map(c => ({ clientId: c.id, clientName: c.name }));
-    return { ...pp, calc, matchingClients };
+  clients.forEach(c => {
+    const catalog = getClientCatalog(c.id);
+    const settings = getClientCommonSettings(c.id);
+    catalog.forEach(entry => {
+      const pp = pricingByCode.get(entry.productCode);
+      if (!pp) return;
+      const calc = pp.winningVendor ? computeClientFinalPrice(pp.landedCostPerUnit, settings) : null;
+      rows.push({
+        clientId: c.id,
+        clientName: c.name,
+        masterProductCode: pp.masterProductCode,
+        productName: pp.productName,
+        sku: pp.sku,
+        category: pp.category,
+        winningVendor: pp.winningVendor,
+        landedCostPerUnit: pp.landedCostPerUnit,
+        calc,
+      });
+    });
   });
+
+  return rows;
 }
 
-// Push every computed final price into every client catalog entry that
-// carries the corresponding product. Returns the number of entries updated.
+// Push every computed final price into the corresponding client catalog
+// entry. Returns the number of entries updated.
 export function syncAllPricesToClientCatalogs(): number {
   const rows = getAllClientPricing();
-  const clients = getClients();
   let updated = 0;
 
   rows.forEach(row => {
-    if (!row.winningVendor) return;
+    if (!row.calc) return;
     const fmtPrice =
       '₹' + row.calc.finalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    clients.forEach(c => {
-      const catalog = getClientCatalog(c.id);
-      const entry = catalog.find(e => e.productCode === row.masterProductCode);
-      if (entry && entry.priceNum !== row.calc.finalPrice) {
-        updateClientCatalogProductPrice(c.id, row.masterProductCode, fmtPrice, row.calc.finalPrice);
-        updated++;
-      }
-    });
+    const catalog = getClientCatalog(row.clientId);
+    const entry = catalog.find(e => e.productCode === row.masterProductCode);
+    if (entry && entry.priceNum !== row.calc.finalPrice) {
+      updateClientCatalogProductPrice(row.clientId, row.masterProductCode, fmtPrice, row.calc.finalPrice);
+      updated++;
+    }
   });
 
   return updated;

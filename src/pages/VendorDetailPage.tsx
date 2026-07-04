@@ -15,6 +15,7 @@ import VendorPaymentsPage from "./VendorPaymentsPage";
 import VendorServicesPage from "./VendorServicesPage";
 import VendorNewsActivityPage from "./VendorNewsActivityPage";
 import VendorPerformancePage from "./VendorPerformancePage";
+import VendorConfigurationTab from "./VendorConfigurationTab";
 import { getVendorById, type StoredVendor } from "@/lib/vendorDataStore";
 
 function fmt(n: number) {
@@ -320,15 +321,6 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
   );
 }
 
-function PlaceholderTab({ label, icon }: { label: string; icon: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-24 gap-3 text-gray-300">
-      <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center">{icon}</div>
-      <p className="text-sm font-medium text-gray-400">{label} content coming soon</p>
-    </div>
-  );
-}
-
 const TABS = [
   { key: "overview", label: "Overview", icon: <Building2 className="w-3.5 h-3.5" /> },
   { key: "products", label: "Products", icon: <Package className="w-3.5 h-3.5" /> },
@@ -504,7 +496,7 @@ export default function VendorDetailPage() {
         {activeTab === "services" && <VendorServicesPage />}
         {activeTab === "performance" && <VendorPerformancePage />}
         {activeTab === "contracts" && <VendorContractsPage />}
-        {activeTab === "configuration" && <div className="px-6 py-5"><PlaceholderTab label="Configuration" icon={<FileText className="w-6 h-6" />} /></div>}
+        {activeTab === "configuration" && <div className="px-6 py-5"><VendorConfigurationTab vendorId={vendor.id} /></div>}
         {activeTab === "payments" && <VendorPaymentsPage />}
         {activeTab === "news" && <VendorNewsActivityPage />}
       </div>

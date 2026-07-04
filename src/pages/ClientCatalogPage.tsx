@@ -6,6 +6,7 @@ import {
   saveClientCatalog,
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
+import ClientPricingSettingsPanel from "./ClientPricingSettingsPanel";
 
 
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
@@ -955,6 +956,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
 }
 
 export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { clientId?: string }) {
+  const [activeSection, setActiveSection] = useState<"catalog" | "pricing">("catalog");
   const [search, setSearch] = useState("");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
@@ -997,6 +999,25 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setHeaderMenu(false); }}>
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setActiveSection("catalog")}
+          className={`px-5 py-2.5 text-sm font-semibold transition-colors border-b-2 ${activeSection === "catalog" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+        >
+          Catalog
+        </button>
+        <button
+          onClick={() => setActiveSection("pricing")}
+          className={`px-5 py-2.5 text-sm font-semibold transition-colors border-b-2 ${activeSection === "pricing" ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-800"}`}
+        >
+          Pricing Settings
+        </button>
+      </div>
+
+      {activeSection === "pricing" && <ClientPricingSettingsPanel clientId={clientId} />}
+
+      {activeSection === "catalog" && (
+      <>
       {showAddProduct && (
         <AddNewProductModal
           onClose={() => setShowAddProduct(false)}
@@ -1181,6 +1202,8 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
