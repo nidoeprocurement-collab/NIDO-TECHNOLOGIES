@@ -8,7 +8,7 @@ import { getCatalogProducts } from './catalogStore';
 import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
 import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
-import { getClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
+import { getClientCatalog, saveClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
 
 // ─── Per-vendor / per-client settings ──────────────────────────────────────
 // Charges/margins aren't captured anywhere else in the real data sources
@@ -92,6 +92,10 @@ export function saveClientCommonSettings(clientId: string, settings: ClientCommo
   const all = getAllClientSettings();
   all[clientId] = settings;
   localStorage.setItem(CLIENT_SETTINGS_KEY, JSON.stringify(all));
+  // Immediately push recomputed prices into the client catalog so every
+  // part of the app that reads the catalog reflects the new charges without
+  // requiring the user to visit the Price Engine tab first.
+  syncClientPrices(clientId);
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
@@ -322,17 +326,24 @@ export function syncClientPrices(clientId: string): number {
   const catalog = getClientCatalog(clientId);
   let updated = 0;
 
-  catalog.forEach(entry => {
+  // Mutate the catalog array in one pass, then write once to avoid firing
+  // 'clientCatalogUpdated' for every individual product change.
+  const updatedCatalog = catalog.map(entry => {
     const pp = pricingByCode.get(entry.productCode);
-    if (!pp || !pp.winningVendor) return;
+    if (!pp || !pp.winningVendor) return entry;
     const calc = computeClientFinalPrice(pp.landedCostPerUnit, settings);
-    const fmtPrice =
+    if (entry.priceNum === calc.finalPrice) return entry;
+    updated++;
+    const price =
       '₹' + calc.finalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    if (entry.priceNum !== calc.finalPrice) {
-      updateClientCatalogProductPrice(clientId, entry.productCode, fmtPrice, calc.finalPrice);
-      updated++;
-    }
+    return { ...entry, price, priceNum: calc.finalPrice };
   });
+
+  if (updated > 0) {
+    // Write the whole catalog in one shot → single 'clientCatalogUpdated' event
+    // instead of one event per changed product.
+    saveClientCatalog(clientId, updatedCatalog);
+  }
 
   return updated;
 }
