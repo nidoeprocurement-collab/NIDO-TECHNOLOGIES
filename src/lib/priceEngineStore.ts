@@ -309,3 +309,30 @@ export function syncAllPricesToClientCatalogs(): number {
 
   return updated;
 }
+
+// Recompute and push selling prices for a single client only, using that
+// client's own pricing settings. Called whenever a client's catalog is
+// viewed or that client's Pricing Settings are changed, so the selling
+// price shown always reflects the latest per-client charges — without
+// touching any other client's catalog.
+export function syncClientPrices(clientId: string): number {
+  const productPricing = getAllProductPricing();
+  const pricingByCode = new Map(productPricing.map(p => [p.masterProductCode, p]));
+  const settings = getClientCommonSettings(clientId);
+  const catalog = getClientCatalog(clientId);
+  let updated = 0;
+
+  catalog.forEach(entry => {
+    const pp = pricingByCode.get(entry.productCode);
+    if (!pp || !pp.winningVendor) return;
+    const calc = computeClientFinalPrice(pp.landedCostPerUnit, settings);
+    const fmtPrice =
+      '₹' + calc.finalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (entry.priceNum !== calc.finalPrice) {
+      updateClientCatalogProductPrice(clientId, entry.productCode, fmtPrice, calc.finalPrice);
+      updated++;
+    }
+  });
+
+  return updated;
+}
