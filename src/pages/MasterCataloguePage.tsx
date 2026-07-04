@@ -508,6 +508,30 @@ export default function CatalogUpdatesTab() {
     toast.success(`Status updated to ${label}`);
   };
 
+  const bulkUpdateStatus = (newStatus: 'draft' | 'published' | 'pending') => {
+    if (selectedIds.length === 0) return;
+    const products = getCatalogProducts();
+    selectedIds.forEach(id => {
+      const product = products.find(p => p.id === id);
+      if (product) saveCatalogProduct({ ...product, publishStatus: newStatus });
+    });
+    setItems(prev => prev.map(i => selectedIds.includes(i.id) ? { ...i, publishStatus: newStatus } : i));
+    const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} updated to ${label}`);
+    setSelectedIds([]);
+  };
+
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+
+  const bulkDeleteItems = () => {
+    if (selectedIds.length === 0) return;
+    selectedIds.forEach(id => deleteCatalogProduct(id));
+    setItems(prev => prev.filter(i => !selectedIds.includes(i.id)));
+    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} deleted`);
+    setSelectedIds([]);
+    setBulkDeleteConfirmOpen(false);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -860,6 +884,53 @@ export default function CatalogUpdatesTab() {
         </DropdownMenu>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+          <span className="text-sm font-medium text-blue-900" data-testid="text-selected-count">
+            {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 bg-white border-gray-300" data-testid="button-bulk-status">
+                  <CheckCircle size={14} /> Update Status
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => bulkUpdateStatus('published')} className="cursor-pointer" data-testid="menuitem-bulk-published">
+                  <CheckCircle size={14} className="mr-2 text-green-600" /> Published
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => bulkUpdateStatus('pending')} className="cursor-pointer" data-testid="menuitem-bulk-pending">
+                  <Clock size={14} className="mr-2 text-blue-600" /> Pending
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => bulkUpdateStatus('draft')} className="cursor-pointer" data-testid="menuitem-bulk-draft">
+                  <FileEdit size={14} className="mr-2 text-yellow-600" /> Draft
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 bg-white border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+              onClick={() => setBulkDeleteConfirmOpen(true)}
+              data-testid="button-bulk-delete"
+            >
+              <Trash2 size={14} /> Delete
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-600 hover:bg-gray-100"
+              onClick={() => setSelectedIds([])}
+              data-testid="button-clear-selection"
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Product List / Thumbnail View */}
       {viewMode === 'list' ? (
         <Card className="border-gray-200">
@@ -1114,6 +1185,20 @@ export default function CatalogUpdatesTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Delete {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''}?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently remove the selected product{selectedIds.length > 1 ? 's' : ''} from the master catalogue. This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)} data-testid="button-cancel-bulk-delete">Cancel</Button>
+            <Button variant="destructive" onClick={bulkDeleteItems} data-testid="button-confirm-bulk-delete">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Import Dialog */}
       <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
