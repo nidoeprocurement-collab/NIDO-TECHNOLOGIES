@@ -3,7 +3,7 @@ import { ChevronRight, ArrowLeft, Pencil, MapPin, Lock, Info } from "lucide-reac
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
-import { useOrders } from "@/contexts/OrdersContext";
+import { useMyOrders } from "@/contexts/MyOrdersContext";
 
 const ADDRESSES: Record<number, { label: string; line1: string; line2: string; line3: string; phone: string }> = {
   1: { label: "Office (Default)", line1: "No. 45, 3rd Floor, Embassy Tech Village,", line2: "Outer Ring Road, Bangalore - 560103,", line3: "Karnataka, India", phone: "+91 98765 43210" },
@@ -18,7 +18,7 @@ function formatPrice(n: number) {
 export default function ReviewPage() {
   const navigate = useNavigate();
   const { items: cart, clearCart } = useCart();
-  const { addOrder } = useOrders();
+  const { addOrder } = useMyOrders();
   const addr = ADDRESSES[1];
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
@@ -27,19 +27,37 @@ export default function ReviewPage() {
   const SHIPPING_FEE = 500;
 
   const handlePlaceOrder = () => {
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
     const nextNum = Date.now().toString().slice(-6);
     const orderNumber = `ORD-${nextNum}`;
     // Snapshot cart items before clearing
     const itemsSnapshot = cart.map(i => ({ ...i }));
+    const totalAmount = subtotal + gst + SHIPPING_FEE;
+    // Format date/time as MyOrderPage displays them
+    const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
     addOrder({
-      order_number: orderNumber,
-      client_name: "Nido Tech CorpEssentials",
-      vendor_name: "Shop Catalogue",
-      status: "pending",
-      total_amount: subtotal + gst + SHIPPING_FEE,
-      order_date: today,
-      items_count: cart.reduce((s, i) => s + i.quantity, 0),
+      id: orderNumber,
+      client: "Nido Tech CorpEssentials",
+      clientColor: "#2563eb",
+      clientInitial: "N",
+      poNumber: `PO-${nextNum}`,
+      requester: "Owner",
+      requesterRole: "System Owner",
+      requesterInitial: "O",
+      requesterColor: "#6b46c1",
+      assigned: "Admin",
+      assignedRole: "Admin",
+      assignedInitial: "A",
+      assignedColor: "#276749",
+      orderDate,
+      orderTime,
+      status: "Processing",
+      slaTime: "02:00",
+      slaAlert: false,
+      totalAmount: formattedTotal,
     });
     clearCart();
     navigate(`/shop/order-confirmation/${orderNumber}`, {

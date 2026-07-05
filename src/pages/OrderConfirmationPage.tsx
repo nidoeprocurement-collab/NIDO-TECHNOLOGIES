@@ -95,17 +95,7 @@ export default function OrderConfirmationPage() {
           <div className="absolute left-1/2 bottom-0 w-48 h-48 rounded-full bg-blue-200/30 blur-2xl" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-8 pt-5 pb-8">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-xs text-blue-700/80 mb-6 font-medium">
-            <ShoppingBag size={14} className="text-blue-600 shrink-0" />
-            <button onClick={() => navigate("/shop")} className="hover:underline">Catalog</button>
-            <ChevronRight size={12} />
-            <span>Checkout</span>
-            <ChevronRight size={12} />
-            <span className="text-blue-900 font-semibold">Order Confirmation</span>
-          </div>
-
+        <div className="relative max-w-5xl mx-auto px-8 pt-8 pb-8">
           {/* Thank you heading */}
           <div className="flex items-center justify-center flex-col gap-3">
             <div className="flex items-center gap-4">
@@ -151,7 +141,7 @@ export default function OrderConfirmationPage() {
 
               {/* Track Order button */}
               <button
-                onClick={() => navigate("/procure/orders")}
+                onClick={() => navigate("/orders")}
                 className="w-full max-w-xs bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg py-3 text-sm transition-colors mb-6"
               >
                 Track Order

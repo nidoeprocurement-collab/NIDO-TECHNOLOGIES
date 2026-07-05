@@ -84,6 +84,7 @@ import { EnhancedAuthProvider } from "@/contexts/EnhancedAuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { OrdersProvider } from "@/contexts/OrdersContext";
+import { MyOrdersProvider } from "@/contexts/MyOrdersContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
@@ -850,9 +851,11 @@ const App = () => (
                     <DataProvider>
                       <CartProvider>
                         <OrdersProvider>
-                          <OrganizationProvider>
-                            <AppRoutes />
-                          </OrganizationProvider>
+                          <MyOrdersProvider>
+                            <OrganizationProvider>
+                              <AppRoutes />
+                            </OrganizationProvider>
+                          </MyOrdersProvider>
                         </OrdersProvider>
                       </CartProvider>
                     </DataProvider>
