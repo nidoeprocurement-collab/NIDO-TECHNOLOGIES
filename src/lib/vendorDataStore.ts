@@ -169,7 +169,7 @@ const DEFAULT_VENDORS: StoredVendor[] = [
     bankBranch: "Bhosari MIDC, Pune",
     billingAddressLine1: "Plot 14, Bhosari MIDC", billingAddressLine2: "",
     billingCity: "Pune", billingState: "Maharashtra", billingZip: "411026", billingCountry: "India",
-    shippingAddressLine1: "Plot 14, Bhosari MIDC", billingAddressLine2: "",
+    shippingAddressLine1: "Plot 14, Bhosari MIDC", shippingAddressLine2: "",
     shippingCity: "Pune", shippingState: "Maharashtra", shippingZip: "411026", shippingCountry: "India",
     performanceQuality: 83, performanceDelivery: 86, performanceResponsiveness: 79, performanceCompliance: 82,
   },
