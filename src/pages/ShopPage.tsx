@@ -519,7 +519,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 export default function ShopPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [selectedClientId, setSelectedClientId] = useState<string>(
+    () => localStorage.getItem("nido_shop_selected_client") ?? ""
+  );
   const [category, setCategory] = useState("All Categories");
   const [availability, setAvailability] = useState("All");
   const [catOpen, setCatOpen] = useState(false);
@@ -573,6 +575,7 @@ export default function ShopPage() {
 
   const handleClientChange = (id: string) => {
     setSelectedClientId(id);
+    localStorage.setItem("nido_shop_selected_client", id);
     setCategory("All Categories");
     setAvailability("All");
     setSearch("");
