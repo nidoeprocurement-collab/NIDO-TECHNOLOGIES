@@ -114,11 +114,41 @@ function loadClients(): Client[] {
 
 // ── Product Detail Dialog ────────────────────────────────────────────────────
 
-function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string }) {
+function ZoomableImage({ src, alt }: { src: string; alt: string }) {
+  const [zoomStyle, setZoomStyle] = useState<{ backgroundPosition: string } | null>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setZoomStyle({ backgroundPosition: `${x}% ${y}%` });
+  };
+
+  return (
+    <div
+      className="relative w-full h-full overflow-hidden cursor-zoom-in"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setZoomStyle(null)}
+    >
+      <img src={src} alt={alt} className={`w-full h-full object-contain transition-opacity duration-150 ${zoomStyle ? "opacity-0" : "opacity-100"}`} />
+      {zoomStyle && (
+        <div
+          className="absolute inset-0 bg-no-repeat"
+          style={{
+            backgroundImage: `url(${src})`,
+            backgroundSize: "220%",
+            backgroundPosition: zoomStyle.backgroundPosition,
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, allProducts, onSelectProduct }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string; allProducts: Product[]; onSelectProduct: (p: Product) => void }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [added, setAdded] = useState(false);
-  const [zoomed, setZoomed] = useState(false);
   const [editingMoq, setEditingMoq] = useState(false);
   const [moqDraft, setMoqDraft] = useState(String(product?.moq ?? 0));
 
@@ -142,24 +172,28 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
     return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: '', val: s };
   });
 
+  const related = allProducts
+    .filter(p => p.id !== product.id)
+    .sort((a, b) => (a.category === product.category ? -1 : 0) - (b.category === product.category ? -1 : 0))
+    .slice(0, 4);
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
 
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Breadcrumb header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white">
+        <div className="flex items-center gap-2 text-sm min-w-0">
           <button
             onClick={onClose}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline shrink-0"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+            Products
           </button>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-gray-900 truncate">{product.name}</h2>
-            <span className={`text-xs font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
-          </div>
+          <ChevronRight size={14} className="text-gray-300 shrink-0" />
+          <span className="text-gray-800 font-medium truncate">{product.name}</span>
         </div>
         <button
           onClick={onClose}
@@ -170,63 +204,50 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-white">
         <div className="max-w-7xl mx-auto px-8 py-8">
 
           {/* Top section: image + details + price */}
           <div className="flex gap-8">
 
-            {/* Image */}
-            <div className="w-80 shrink-0">
-              <div
-                className={`w-full aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50 ${product.image ? "cursor-zoom-in" : ""}`}
-                onClick={() => product.image && setZoomed(true)}
-              >
-                {product.image ? (
-                  <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
-                ) : (
-                  getProductIcon(product.name, product.category)
-                )}
+            {/* Image column: thumbnail rail + main image */}
+            <div className="w-[340px] shrink-0">
+              <div className="flex gap-3">
+                <div className="flex flex-col gap-2 shrink-0">
+                  <div className="w-14 h-14 rounded-lg border-2 border-blue-500 bg-gray-50 overflow-hidden flex items-center justify-center">
+                    {product.image ? (
+                      <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="scale-[0.35] origin-center">{getProductIcon(product.name, product.category)}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50">
+                  {product.image ? (
+                    <ZoomableImage src={product.image} alt={product.name} />
+                  ) : (
+                    getProductIcon(product.name, product.category)
+                  )}
+                </div>
               </div>
               {product.image && (
                 <p className="text-xs text-gray-400 mt-2 flex items-center gap-1 justify-center">
-                  <ZoomIn size={12} /> Click image to zoom
+                  <ZoomIn size={12} /> Hover image to zoom
                 </p>
               )}
             </div>
 
-            {/* Lightbox */}
-            {zoomed && product.image && (
-              <div
-                className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
-                onClick={() => setZoomed(false)}
-              >
-                <button
-                  onClick={() => setZoomed(false)}
-                  className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-                >
-                  <X size={20} />
-                </button>
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="max-w-[90vw] max-h-[90vh] object-contain rounded-xl shadow-2xl cursor-zoom-out"
-                  onClick={e => e.stopPropagation()}
-                />
-              </div>
-            )}
-
             {/* Details */}
             <div className="flex-1 min-w-0">
-              <h1 className="text-3xl font-bold text-gray-900">{product.name}</h1>
-              <span className={`inline-block mt-2 text-sm font-semibold ${getCategoryColor(product.category)}`}>{product.category}</span>
+              <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
+              <span className={`inline-block mt-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 ${getCategoryColor(product.category)}`}>{product.category}</span>
 
               {product.description && (
-                <p className="mt-4 text-sm text-gray-600 leading-relaxed max-w-2xl">{product.description}</p>
+                <p className="mt-4 text-sm text-gray-500 leading-relaxed max-w-2xl">{product.description}</p>
               )}
 
               {specPairs.length > 0 && (
-                <div className="mt-6">
+                <div className="mt-6 pt-5 border-t border-gray-100">
                   <h3 className="text-sm font-semibold text-gray-800 mb-3">Key Specifications</h3>
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                     {specPairs.map((sp, i) => (
@@ -244,7 +265,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
             </div>
 
             {/* Price panel */}
-            <div className="w-60 shrink-0">
+            <div className="w-72 shrink-0">
               <div className="border border-gray-200 rounded-2xl p-5 sticky top-4">
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price (Excl. GST)</p>
                 {dialogDiscountPct > 0 ? (
@@ -252,28 +273,29 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
                     <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(product.priceNum)}</p>
                     <p className="text-3xl font-bold text-green-600 mt-0.5">
                       {formatPrice(dialogEffectivePrice)}
+                      {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
                     </p>
                     <p className="text-xs text-green-600 font-semibold mt-1">{dialogDiscountPct}% volume discount applied</p>
                   </>
                 ) : (
                   <p className="text-3xl font-bold text-gray-900 mt-1">
                     {formatPrice(product.priceNum)}
+                    {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
                   </p>
                 )}
-                {product.priceNum > 0 && <p className="text-xs text-gray-400 mt-0.5">per unit</p>}
 
-                <div className="flex items-center gap-2 mt-5">
+                <div className="flex items-center gap-3 mt-5">
                   <button
                     onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))}
-                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none"
+                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
                   >−</button>
                   <span className="flex-1 text-center font-bold text-base">{qty}</span>
                   <button
                     onClick={() => setQty(q => q + 1)}
-                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none"
+                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
                   >+</button>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">(Min: {formatMoq(product.moq)})</span>
                 </div>
-                <p className="text-center text-xs text-gray-400 mt-1">Min. qty: {formatMoq(product.moq)}</p>
 
                 <button
                   onClick={handleAdd}
@@ -321,20 +343,70 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
             </div>
           </div>
 
-          {/* General Specifications */}
-          {product.generalSpecs && product.generalSpecs.length > 0 && (
-            <div className="mt-8 border border-gray-200 rounded-2xl p-6">
-              <h3 className="text-base font-semibold text-gray-900 mb-4">General Specifications</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-8">
-                {product.generalSpecs.map((gs, i) => (
-                  <div key={i} className="flex justify-between border-b border-gray-100 py-2.5">
-                    <span className="text-sm text-gray-500">{gs.label}</span>
-                    <span className="text-sm font-medium text-gray-800">{gs.value}</span>
-                  </div>
-                ))}
+          {/* Bottom section: General Specifications + Related Products */}
+          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6 items-start">
+
+            {/* General Specifications */}
+            {product.generalSpecs && product.generalSpecs.length > 0 && (
+              <div className="border border-gray-200 rounded-2xl p-6">
+                <h3 className="text-base font-semibold text-gray-900 mb-4">General Specifications</h3>
+                <div className="flex flex-col">
+                  {product.generalSpecs.map((gs, i) => (
+                    <div key={i} className="flex justify-between border-b border-gray-100 last:border-0 py-2.5">
+                      <span className="text-sm text-gray-500">{gs.label}</span>
+                      <span className="text-sm font-medium text-gray-800">{gs.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Related Products */}
+            {related.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-semibold text-gray-900">Related Products</h3>
+                </div>
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                  {related.map(rp => {
+                    const rpDiscountPct = clientId ? getSlabDiscountPct(clientId, rp.category, Math.max(1, rp.moq)) : 0;
+                    const rpPrice = rpDiscountPct > 0 ? rp.priceNum * (1 - rpDiscountPct / 100) : rp.priceNum;
+                    return (
+                      <div
+                        key={rp.id}
+                        onClick={() => onSelectProduct(rp)}
+                        className="border border-gray-200 rounded-xl p-3 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+                      >
+                        <div className="w-full aspect-square rounded-lg bg-gray-50 overflow-hidden mb-2">
+                          {rp.image ? (
+                            <img src={rp.image} alt={rp.name} className="w-full h-full object-contain" />
+                          ) : (
+                            getProductIcon(rp.name, rp.category)
+                          )}
+                        </div>
+                        <p className="text-xs font-semibold text-gray-900 leading-snug line-clamp-2">{rp.name}</p>
+                        <span className={`text-[11px] font-medium mt-1 ${getCategoryColor(rp.category)}`}>{rp.category}</span>
+                        <p className="text-sm font-bold text-gray-900 mt-1.5">
+                          {formatPrice(rpPrice)}
+                          {rp.priceNum > 0 && <span className="text-[11px] font-normal text-gray-500"> / each</span>}
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">MOQ: {formatMoq(rp.moq)}</p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addItem({ id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category }, Math.max(1, rp.moq));
+                          }}
+                          className="mt-2 flex items-center justify-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 text-[11px] font-semibold transition-colors"
+                        >
+                          <ShoppingCart size={12} /> Cart
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
         </div>
       </div>
