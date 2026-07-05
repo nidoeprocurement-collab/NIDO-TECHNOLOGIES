@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, ArrowLeft, Pencil, MapPin, Lock, Info } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
@@ -20,64 +19,47 @@ export default function ReviewPage() {
   const navigate = useNavigate();
   const { items: cart, clearCart } = useCart();
   const { addOrder } = useOrders();
-  const [placed, setPlaced] = useState(false);
-  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
-
   const addr = ADDRESSES[1];
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
-  const total = subtotal + gst;
-  const rewardPoints = Math.floor(total / 1000);
+  const rewardPoints = Math.floor((subtotal + gst) / 1000);
+
+  const SHIPPING_FEE = 500;
 
   const handlePlaceOrder = () => {
     const today = new Date().toISOString().split("T")[0];
-    const nextNum = Date.now().toString().slice(-4);
+    const nextNum = Date.now().toString().slice(-6);
     const orderNumber = `ORD-${nextNum}`;
+    // Snapshot cart items before clearing
+    const itemsSnapshot = cart.map(i => ({ ...i }));
     addOrder({
       order_number: orderNumber,
       client_name: "Nido Tech CorpEssentials",
       vendor_name: "Shop Catalogue",
       status: "pending",
-      total_amount: total,
+      total_amount: subtotal + gst + SHIPPING_FEE,
       order_date: today,
       items_count: cart.reduce((s, i) => s + i.quantity, 0),
     });
     clearCart();
-    setPlacedOrderId(orderNumber);
-    setPlaced(true);
+    navigate(`/shop/order-confirmation/${orderNumber}`, {
+      state: {
+        orderNumber,
+        orderDate: today,
+        items: itemsSnapshot,
+        subtotal,
+        gst,
+        shipping: SHIPPING_FEE,
+        total: subtotal + gst + SHIPPING_FEE,
+        address: addr,
+        paymentMethod: "Credit Card",
+        cardLast4: "5432",
+        paymentTerms: "Net 30 (Payment due in 30 days)",
+        clientEmail: "owner@nidotech.com",
+        clientName: "Nido Tech CorpEssentials",
+      },
+    });
   };
-
-  if (placed) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center max-w-md">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h2>
-          <p className="text-sm text-gray-500 mb-1">Your order has been placed and is being processed.</p>
-          <p className="text-sm text-gray-500 mb-6">You will earn <strong>{rewardPoints.toLocaleString("en-IN")}</strong> reward points.</p>
-          <p className="text-2xl font-bold text-gray-900 mb-6">{formatPrice(total)}</p>
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => navigate(placedOrderId ? `/orders/${placedOrderId}` : "/orders")}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors"
-            >
-              View My Orders
-            </button>
-            <button
-              onClick={() => navigate("/shop")}
-              className="w-full border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg py-3 text-sm transition-colors"
-            >
-              Continue Shopping
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-6">
