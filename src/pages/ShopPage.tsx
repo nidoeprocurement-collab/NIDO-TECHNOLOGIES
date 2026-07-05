@@ -4,7 +4,7 @@ import { useCart } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
-import { getAllProductPricing, updateWinningVendorMoq } from "@/lib/priceEngineStore";
+import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct } from "@/lib/priceEngineStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -127,6 +127,9 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
 
   if (!product) return null;
 
+  const dialogDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
+  const dialogEffectivePrice = dialogDiscountPct > 0 ? product.priceNum * (1 - dialogDiscountPct / 100) : product.priceNum;
+
   const handleAdd = () => {
     if (added) return;
     addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category }, Math.max(1, qty));
@@ -244,9 +247,19 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: 
             <div className="w-60 shrink-0">
               <div className="border border-gray-200 rounded-2xl p-5 sticky top-4">
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price (Excl. GST)</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {formatPrice(product.priceNum)}
-                </p>
+                {dialogDiscountPct > 0 ? (
+                  <>
+                    <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(product.priceNum)}</p>
+                    <p className="text-3xl font-bold text-green-600 mt-0.5">
+                      {formatPrice(dialogEffectivePrice)}
+                    </p>
+                    <p className="text-xs text-green-600 font-semibold mt-1">{dialogDiscountPct}% volume discount applied</p>
+                  </>
+                ) : (
+                  <p className="text-3xl font-bold text-gray-900 mt-1">
+                    {formatPrice(product.priceNum)}
+                  </p>
+                )}
                 {product.priceNum > 0 && <p className="text-xs text-gray-400 mt-0.5">per unit</p>}
 
                 <div className="flex items-center gap-2 mt-5">
@@ -336,6 +349,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [qty, setQty] = useState(Math.max(1, product.moq));
   const [adding, setAdding] = useState(false);
 
+  const cardDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
+  const cardEffectivePrice = cardDiscountPct > 0 ? product.priceNum * (1 - cardDiscountPct / 100) : product.priceNum;
+
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!product.inStock || adding) return;
@@ -389,10 +405,21 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
           <span>MOQ: {formatMoq(product.moq)}</span>
         </div>
         <div className="flex items-center justify-between mb-2">
-          <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
-            {formatPrice(product.priceNum)}
-            {product.priceNum > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
-          </span>
+          {cardDiscountPct > 0 ? (
+            <div className="flex flex-col">
+              <span className="text-[10px] text-gray-400 line-through leading-tight">{formatPrice(product.priceNum)}</span>
+              <span className="font-bold text-green-600 text-base leading-tight">
+                {formatPrice(cardEffectivePrice)}
+                <span className="text-xs font-normal text-gray-500"> / each</span>
+              </span>
+              <span className="text-[10px] text-green-600 font-semibold leading-tight">{cardDiscountPct}% off</span>
+            </div>
+          ) : (
+            <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
+              {formatPrice(product.priceNum)}
+              {product.priceNum > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
           <button
