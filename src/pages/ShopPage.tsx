@@ -114,7 +114,7 @@ function loadClients(): Client[] {
 
 // ── Product Detail Dialog ────────────────────────────────────────────────────
 
-function ProductDetailDialog({ product, open, onClose, onMoqChange }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void }) {
+function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [added, setAdded] = useState(false);
@@ -129,7 +129,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange }: { product:
 
   const handleAdd = () => {
     if (added) return;
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category }, Math.max(1, qty));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -331,7 +331,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange }: { product:
 
 // ── Product Card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, onPreview }: { product: Product; onPreview: (p: Product) => void }) {
+function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(Math.max(1, product.moq));
   const [adding, setAdding] = useState(false);
@@ -340,7 +340,7 @@ function ProductCard({ product, onPreview }: { product: Product; onPreview: (p: 
     e.stopPropagation();
     if (!product.inStock || adding) return;
     setAdding(true);
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category }, Math.max(1, qty));
     setTimeout(() => setAdding(false), 1500);
   };
 
@@ -635,7 +635,7 @@ export default function ShopPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {paginated.map(product => (
-              <ProductCard key={product.id} product={product} onPreview={setPreviewProduct} />
+              <ProductCard key={product.id} product={product} onPreview={setPreviewProduct} clientId={selectedClientId} />
             ))}
           </div>
 
@@ -680,7 +680,7 @@ export default function ShopPage() {
       )}
 
       {/* Product Detail Dialog */}
-      <ProductDetailDialog product={previewProduct} open={!!previewProduct} onClose={() => setPreviewProduct(null)} />
+      <ProductDetailDialog product={previewProduct} open={!!previewProduct} onClose={() => setPreviewProduct(null)} onMoqChange={() => {}} clientId={selectedClientId} />
 
       {/* Close dropdowns on outside click */}
       {(catOpen || availOpen || clientOpen) && (

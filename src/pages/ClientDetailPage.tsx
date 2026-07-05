@@ -373,7 +373,7 @@ export default function App() {
                 : activeTab === "Contracts" ? <ContractsPage contractId={""} contractTitle={""} onBack={() => setActiveTab("Overview")} />
                 : activeTab === "Catalog" ? <CatalogPage clientId={clientId || "CLI-DEFAULT"} />
                 : activeTab === "Activity" ? <ActivityPage />
-                : activeTab === "Configuration" ? <ConfigurationPage />
+                : activeTab === "Configuration" ? <ConfigurationPage clientId={clientId || "CLI-DEFAULT"} />
                 : activeTab === "Documents" ? <DocumentsPage />
                 : <PlaceholderPage tab={activeTab} />}
             </div>

@@ -8,6 +8,8 @@ export type CartItem = {
   moq: number;
   priceNum: number;
   quantity: number;
+  clientId?: string;
+  category?: string;
 };
 
 interface CartContextType {

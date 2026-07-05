@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
 import { StatusBadge, usersData } from "./ClientUsersPage";
+import ClientPricingSettingsPanel from "./ClientPricingSettingsPanel";
+import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
 
-export default function ClientConfigurationPage() {
+export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { clientId?: string }) {
   const [configTab, setConfigTab] = useState("General");
-  const configTabs = ["General", "Invite Users"];
+  const configTabs = ["General", "Price Setting", "Invite Users"];
 
   const [notifications, setNotifications] = useState({
     emailOrders: true,
@@ -122,6 +124,13 @@ export default function ClientConfigurationPage() {
               Archive Client
             </button>
           </div>
+        </div>
+      )}
+
+      {configTab === "Price Setting" && (
+        <div className="flex flex-col">
+          <ClientPricingSettingsPanel clientId={clientId} />
+          <ClientPriceSlabsPanel clientId={clientId} />
         </div>
       )}
 

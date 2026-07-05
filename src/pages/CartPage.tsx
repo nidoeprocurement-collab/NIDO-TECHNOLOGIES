@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
+import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -127,7 +128,11 @@ export default function CartPage() {
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
-  const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
+  const subtotal = cart.reduce((s, i) => {
+    const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
+    const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
+    return s + effectivePrice * i.quantity;
+  }, 0);
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
   const rewardPoints = Math.floor(total / 1000);
@@ -195,7 +200,13 @@ export default function CartPage() {
                     </tr>
                   </thead>
                   <tbody className="px-5">
-                    {cart.map((item) => (
+                    {cart.map((item) => {
+                      const discountPct = item.clientId
+                        ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity)
+                        : 0;
+                      const effectivePrice = discountPct > 0 ? item.priceNum * (1 - discountPct / 100) : item.priceNum;
+                      const lineTotal = effectivePrice * item.quantity;
+                      return (
                       <tr key={item.id} className="border-b border-gray-100 last:border-0">
                         <td className="py-5 px-5">
                           <div className="flex items-start gap-3">
@@ -215,8 +226,18 @@ export default function CartPage() {
                           </div>
                         </td>
                         <td className="py-5 pr-4 align-top">
-                          <p className="font-semibold text-gray-900 text-sm">{formatPrice(item.priceNum)}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">Unit Price</p>
+                          {discountPct > 0 ? (
+                            <>
+                              <p className="text-xs text-gray-400 line-through">{formatPrice(item.priceNum)}</p>
+                              <p className="font-semibold text-green-600 text-sm">{formatPrice(effectivePrice)}</p>
+                              <p className="text-[10px] text-green-600 font-medium mt-0.5">{discountPct}% slab discount</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-gray-900 text-sm">{formatPrice(item.priceNum)}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">Unit Price</p>
+                            </>
+                          )}
                         </td>
                         <td className="py-5 pr-4 align-top">
                           <div className="flex items-center gap-2">
@@ -231,14 +252,15 @@ export default function CartPage() {
                         </td>
                         <td className="py-5 pr-5 align-top">
                           <div className="flex items-start justify-between">
-                            <p className="font-semibold text-gray-900 text-sm">{formatPrice(item.priceNum * item.quantity)}</p>
+                            <p className="font-semibold text-gray-900 text-sm">{formatPrice(lineTotal)}</p>
                             <button onClick={() => onRemove(item.id)} className="ml-6 text-gray-400 hover:text-red-500 transition-colors">
                               <Trash2 size={16} />
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

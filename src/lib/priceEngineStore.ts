@@ -99,6 +99,73 @@ export function saveClientCommonSettings(clientId: string, settings: ClientCommo
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
+// ─── Client price slabs (volume-based discounts) ───────────────────────────
+// Individually configured per client. Each slab defines a quantity range
+// that applies an additional discount % on top of the client's standard
+// pricing settings, either across all products or a specific category.
+
+const CLIENT_SLABS_KEY = 'nido_price_engine_client_slabs';
+
+export interface PriceSlab {
+  id: string;
+  name: string;
+  minQty: number;
+  maxQty: number;
+  discountPct: number;
+  applyTo: string; // "All Products" or a specific category name
+  status: 'Active' | 'Inactive';
+}
+
+const DEFAULT_PRICE_SLABS: PriceSlab[] = [
+  { id: 'slab-1', name: 'Bulk Order - Tier 1', minQty: 1, maxQty: 50, discountPct: 0, applyTo: 'All Products', status: 'Active' },
+  { id: 'slab-2', name: 'Bulk Order - Tier 2', minQty: 51, maxQty: 100, discountPct: 5, applyTo: 'All Products', status: 'Active' },
+  { id: 'slab-3', name: 'Bulk Order - Tier 3', minQty: 101, maxQty: 500, discountPct: 10, applyTo: 'All Products', status: 'Active' },
+];
+
+function getAllClientSlabs(): Record<string, PriceSlab[]> {
+  try {
+    const raw = localStorage.getItem(CLIENT_SLABS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore malformed storage
+  }
+  return {};
+}
+
+export function getClientPriceSlabs(clientId: string): PriceSlab[] {
+  const all = getAllClientSlabs();
+  if (all[clientId]) return all[clientId];
+  return DEFAULT_PRICE_SLABS;
+}
+
+export function saveClientPriceSlabs(clientId: string, slabs: PriceSlab[]): void {
+  const all = getAllClientSlabs();
+  all[clientId] = slabs;
+  localStorage.setItem(CLIENT_SLABS_KEY, JSON.stringify(all));
+  syncClientPrices(clientId);
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
+// Find the discount % that applies for a given client, product category and
+// quantity. Category-specific slabs take priority over "All Products" slabs
+// when both match the same quantity.
+export function getSlabDiscountPct(clientId: string, category: string, qty: number): number {
+  const slabs = getClientPriceSlabs(clientId).filter(s => s.status === 'Active' && qty >= s.minQty && qty <= s.maxQty);
+  if (slabs.length === 0) return 0;
+  const catMatch = slabs.find(s => s.applyTo !== 'All Products' && s.applyTo.toLowerCase() === (category || '').toLowerCase());
+  if (catMatch) return catMatch.discountPct;
+  const allMatch = slabs.find(s => s.applyTo === 'All Products');
+  return allMatch ? allMatch.discountPct : 0;
+}
+
+// Apply a client's quantity-based price slab discount on top of an already
+// computed final (per-unit) price for that client.
+export function applySlabDiscount(finalPrice: number, clientId: string, category: string, qty: number): number {
+  const discountPct = getSlabDiscountPct(clientId, category, qty);
+  if (!discountPct) return finalPrice;
+  return finalPrice * (1 - discountPct / 100);
+}
+
 // ─── Vendor-side computation ────────────────────────────────────────────────
 
 const TERMS_MAP: Record<string, string> = {
