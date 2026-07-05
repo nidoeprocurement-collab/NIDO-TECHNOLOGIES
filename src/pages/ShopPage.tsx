@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
@@ -516,6 +517,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ShopPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [category, setCategory] = useState("All Categories");
@@ -524,7 +526,6 @@ export default function ShopPage() {
   const [availOpen, setAvailOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
 
@@ -734,7 +735,12 @@ export default function ShopPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {paginated.map(product => (
-              <ProductCard key={product.id} product={product} onPreview={setPreviewProduct} clientId={selectedClientId} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                onPreview={p => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } })}
+                clientId={selectedClientId}
+              />
             ))}
           </div>
 
@@ -777,9 +783,6 @@ export default function ShopPage() {
           )}
         </>
       )}
-
-      {/* Product Detail Dialog */}
-      <ProductDetailDialog product={previewProduct} open={!!previewProduct} onClose={() => setPreviewProduct(null)} onMoqChange={() => {}} clientId={selectedClientId} />
 
       {/* Close dropdowns on outside click */}
       {(catOpen || availOpen || clientOpen) && (
