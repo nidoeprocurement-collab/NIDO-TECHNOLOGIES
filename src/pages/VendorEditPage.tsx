@@ -276,22 +276,6 @@ export default function VendorEditPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/vendors')}
-              className="px-5 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
-            >
-              Save Changes
-            </button>
-          </div>
         </div>
       </div>
 
