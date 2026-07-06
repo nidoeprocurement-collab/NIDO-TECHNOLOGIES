@@ -6,6 +6,7 @@ import {
   saveClientCatalog,
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
+import { syncClientPrices } from "@/lib/priceEngineStore";
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
 
 function ProductThumb({ images, name }: { images: string[]; name: string }) {
@@ -993,16 +994,25 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
     setProducts((prev) => prev.map((p) => p.sku === sku ? { ...p, ...updated } : p));
   };
 
+  // Merge new entries, persist, run price engine, then reload synced prices into state.
+  // Side effects are kept outside the state updater so they run exactly once.
+  const handleAddProducts = (entries: CatalogEntry[]) => {
+    const existing = new Set(products.map((p) => p.productCode));
+    const toAdd = entries.filter((e) => !existing.has(e.productCode));
+    if (toAdd.length === 0) return;
+    const merged = [...products, ...toAdd];
+    saveClientCatalog(clientId, merged);
+    syncClientPrices(clientId);
+    setProducts(getClientCatalog(clientId));
+  };
+
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setHeaderMenu(false); }}>
       <>
       {showAddProduct && (
         <AddNewProductModal
           onClose={() => setShowAddProduct(false)}
-          onAdd={(entries) => setProducts((prev) => {
-            const existing = new Set(prev.map((p) => p.productCode));
-            return [...prev, ...entries.filter((e) => !existing.has(e.productCode))];
-          })}
+          onAdd={handleAddProducts}
         />
       )}
       {viewProduct && (
