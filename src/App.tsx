@@ -145,6 +145,7 @@ const VendorsPage = lazy(() => import("@/pages/VendorsPage"));
 const VendorDetailPage = lazy(() => import("@/pages/VendorDetailPage"));
 const VendorOrdersPage = lazy(() => import("@/pages/VendorOrdersPage"));
 const VendorOnboardingPage = lazy(() => import("@/pages/VendorOnboardingPage"));
+const VendorEditPage = lazy(() => import("@/pages/VendorEditPage"));
 const AddVendorProductsPage = lazy(() => import("@/pages/AddVendorProductsPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
@@ -317,6 +318,7 @@ function AppRoutes() {
           <Route path="vendors/orders" element={<VendorOrdersPage />} />
           <Route path="vendors/categories" element={<VendorCategoriesPage />} />
           <Route path="vendors/onboarding" element={<VendorOnboardingPage />} />
+          <Route path="vendors/:id/edit" element={<VendorEditPage />} />
           <Route path="vendors/:id" element={<VendorDetailPage />} />
           <Route path="vendors/:id/add-products" element={<AddVendorProductsPage />} />
           <Route

@@ -315,8 +315,6 @@ export default function App() {
   }, []);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedOverview, setArchivedOverview] = useState<Vendor | null>(null);
-  const [editVendor, setEditVendor] = useState<Vendor | null>(null);
-
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
   const [filterRating, setFilterRating] = useState("All");
@@ -543,7 +541,7 @@ export default function App() {
                       <span className={`text-sm font-semibold ${v.monthSpend > 0 ? "text-gray-800" : "text-gray-300"}`}>{formatLakhs(v.monthSpend)}</span>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <RowActionsMenu vendor={v} onEdit={() => setEditVendor(v)} onArchive={() => archiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
+                      <RowActionsMenu vendor={v} onEdit={() => navigate(`/vendors/${v.id}/edit`)} onArchive={() => archiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
                     </td>
                   </tr>
                 ))}
@@ -588,37 +586,6 @@ export default function App() {
       {/* Archived vendor overview popup */}
       {archivedOverview && <VendorOverviewPopup vendor={archivedOverview} onClose={() => setArchivedOverview(null)} />}
 
-      {/* Edit Vendor Modal */}
-      {editVendor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditVendor(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white rounded-t-2xl">
-              <h2 className="text-lg font-semibold">Edit Vendor — {editVendor.id}</h2>
-              <button onClick={() => setEditVendor(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="px-6 py-4 flex flex-col gap-4">
-              {[
-                { label: "Vendor Name", value: editVendor.name },
-                { label: "Category", value: editVendor.category },
-                { label: "Primary Contact", value: editVendor.primaryContact },
-                { label: "Email", value: editVendor.email },
-                { label: "Phone", value: editVendor.phone },
-                { label: "Region", value: editVendor.region },
-                { label: "Address", value: editVendor.address },
-              ].map(f => (
-                <div key={f.label}>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}</label>
-                  <input defaultValue={f.value} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400" />
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 px-6 pb-6 pt-2">
-              <button className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors" onClick={() => setEditVendor(null)}>Save Changes</button>
-              <button className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors" onClick={() => setEditVendor(null)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
