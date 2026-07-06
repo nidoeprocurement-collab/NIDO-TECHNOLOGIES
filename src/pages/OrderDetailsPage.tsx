@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useMyOrders } from "@/contexts/MyOrdersContext";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -9,42 +10,10 @@ const VENDOR_POOL = [
   { id: "VD", name: "Vendor D", location: "Delhi, NCR",           color: "#6b21a8", rating: 3.8, deliveryDays: "4 - 5 Days", pricePerUnit: 110, gstin: "07DEFGH3456I4Z7", onTimeDelivery: "78%", qualityRating: "3.8 / 5", totalOrders: 61  },
 ];
 
-const INITIAL_ORDERS = [
-  {
-    num: 1, id: "SO-1001", itemName: "Mechanical Keyboard", sku: "SKU/SHOP-10", category: "General",
-    specs: ["USB Wired", "Black | Ergonomic Design"],
-    vendorName: "TechHub Solutions", vendorInitial: "T", vendorColor: "#c53030",
-    poNumber: "PO-10034", qty: 50, unitPrice: "₹120.00", total: "₹6,000.00", requiredDate: "30 May 2024",
-    itemStatus: "Shipped", updatedOn: "Apr 17, 2026", deliveredAt: null,
-    tracking: { trackingNumber: "1Z999AA1234567890", carrier: "UPS", note: "Shipped on Apr 17, 2026", linkLabel: "Track Package" },
-  },
-  {
-    num: 2, id: "SO-1002", itemName: "Filing Cabinet", sku: "SKU/SHOP-3", category: "General",
-    specs: ["3 Drawers", "Metal | Lockable"],
-    vendorName: "OfficeMart Supplies", vendorInitial: "O", vendorColor: "#2b6cb0",
-    poNumber: "PO-10035", qty: 30, unitPrice: "₹115.00", total: "₹3,450.00", requiredDate: "28 May 2024",
-    itemStatus: "Confirmed", updatedOn: "Apr 16, 2026", deliveredAt: null, tracking: null,
-  },
-  {
-    num: 3, id: "SO-1003", itemName: "Printer Paper (Box)", sku: "SKU/SHOP-5", category: "Office Supplies",
-    specs: ["5000 Sheets", "A4 | 80 GSM"],
-    vendorName: "PaperWorld Distributors", vendorInitial: "A", vendorColor: "#276749",
-    poNumber: "PO-10036", qty: 82, unitPrice: "₹125.00", total: "₹10,250.00", requiredDate: "01 Jun 2024",
-    itemStatus: "Delivered", updatedOn: "Apr 18, 2026",
-    deliveredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    tracking: { trackingNumber: "1Z999AA9876543210", carrier: "FedEx", note: "Delivered on Apr 18, 2026", linkLabel: "Proof of Delivery" },
-  },
-];
 
-const INITIAL_DOCS = [
-  { id: "d1", name: "PO-24815779.pdf", ext: "pdf", size: "245 KB", type: "Purchase Order", uploadedBy: "System Owner", uploadedOn: "Apr 16, 2026\n12:35 PM", description: "Master purchase order ORD-24815779" },
-  { id: "d2", name: "Vendor_Quotation_TechHub.xlsx", ext: "xlsx", size: "112 KB", type: "Quotation", uploadedBy: "System Owner", uploadedOn: "Apr 16, 2026\n12:40 PM", description: "Quotation from TechHub Solutions" },
-  { id: "d3", name: "Shipping_Requirements.pdf", ext: "pdf", size: "89 KB", type: "Other", uploadedBy: "System Owner", uploadedOn: "Apr 16, 2026\n12:42 PM", description: "Special shipping instructions and delivery notes" },
-];
-
-const INITIAL_NOTES = [
-  { id: "n1", author: "System Owner", date: "Apr 16, 2026 12:45 PM", text: "Confirmed delivery date with TechHub Solutions. They will ship all items by Apr 17, 2026.", visibility: "Internal Note" },
-];
+// Documents and notes start empty; users add them interactively
+const INITIAL_DOCS: { id: string; name: string; ext: string; size: string; type: string; uploadedBy: string; uploadedOn: string; description: string }[] = [];
+const INITIAL_NOTES: { id: string; author: string; date: string; text: string; visibility: string }[] = [];
 
 const ALL_STATUS_MAP = {
   Pending:             { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
@@ -937,17 +906,49 @@ function Field({ label, value }) {
   );
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: string, poNumber: string) {
+  return (cartItems || []).map((item: any, idx: number) => ({
+    num: idx + 1,
+    id: `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
+    itemName: item.name,
+    sku: `SKU/SHOP-${item.id}`,
+    category: item.category || "General",
+    specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
+    vendorName: "Pending Assignment",
+    vendorInitial: "P",
+    vendorColor: "#6b7280",
+    poNumber: poNumber,
+    qty: item.quantity,
+    unitPrice: `₹${Number(item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    total: `₹${(item.priceNum * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    requiredDate: "Within 30 days",
+    itemStatus: "Processing",
+    updatedOn: orderDate,
+    deliveredAt: null,
+    tracking: null,
+  }));
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const orderId = id || "ORD-24815779";
+  const { orders } = useMyOrders();
+  const orderId = id || "";
+
+  // Find the real order from context
+  const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
   const TABS = ["Sub Orders / Items", "Vendor Selected Summary"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
-  const [masterStatus, setMasterStatus] = useState("Partially Shipped");
+  const [masterStatus, setMasterStatus] = useState(() => order?.status || "Processing");
   const [showStatusDd, setShowStatusDd] = useState(false);
-  const [subOrders, setSubOrders] = useState(INITIAL_ORDERS);
+  const [subOrders, setSubOrders] = useState(() =>
+    order?.cartItems?.length
+      ? cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber)
+      : []
+  );
   const [subSearch, setSubSearch] = useState("");
   const [expandedItems, setExpandedItems] = useState(new Set<string>());
   const [createdPOs, setCreatedPOs] = useState<Record<string, any>>(() => {
@@ -956,12 +957,42 @@ export default function MyOrderPage() {
   const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
   });
+
+  // Reload per-order localStorage state when navigating between orders
+  useEffect(() => {
+    try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
+    try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
+  }, [orderId]);
   const [vendorModalSub, setVendorModalSub] = useState<any>(null);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [returnTarget, setReturnTarget] = useState(null);
-  const [assignment, setAssignment] = useState({ assignedTo: "Anita Kapoor", role: "Procurement Manager", assignedOn: "Apr 16, 2026 12:35 PM", notes: "Oversees end-to-end execution and vendor coordination for this order." });
+  const [assignment, setAssignment] = useState({
+    assignedTo: order?.assigned || "Admin",
+    role: order?.assignedRole || "Admin",
+    assignedOn: order ? `${order.orderDate} ${order.orderTime}` : "—",
+    notes: "Oversees end-to-end execution and vendor coordination for this order.",
+  });
+
+  // Reset all derived state whenever the orderId changes or order first resolves from context
+  useEffect(() => {
+    if (!order) return;
+    setSubOrders(
+      order.cartItems?.length
+        ? cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber)
+        : []
+    );
+    setMasterStatus(order.status);
+    setAssignment({
+      assignedTo: order.assigned,
+      role: order.assignedRole,
+      assignedOn: `${order.orderDate} ${order.orderTime}`,
+      notes: "Oversees end-to-end execution and vendor coordination for this order.",
+    });
+  // Run whenever orderId changes (navigation between orders) or order first resolves
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId, order?.id]);
 
   useEffect(() => {
     localStorage.setItem(`nido_pos_${orderId}`, JSON.stringify(createdPOs));
@@ -1020,6 +1051,27 @@ export default function MyOrderPage() {
 
   const selectedSummaryCount = Object.keys(selectedVendors).length;
 
+  // ── Order not found ───────────────────────────────────────────────────────────
+  if (!order) {
+    return (
+      <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f9fafb", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ textAlign: "center", padding: 40 }}>
+          <div style={{ fontSize: 52, marginBottom: 16 }}>📋</div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>Order Not Found</h2>
+          <p style={{ fontSize: 14, color: "#6b7280", margin: "0 0 24px" }}>
+            {orderId ? `Order "${orderId}" doesn't exist or hasn't been placed yet.` : "No order ID provided."}
+          </p>
+          <button
+            onClick={() => navigate("/orders")}
+            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
+          >
+            Back to Orders
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f9fafb", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
       <div style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 24px 48px" }}>
@@ -1034,21 +1086,27 @@ export default function MyOrderPage() {
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Order Details / <span style={{ color: "#374151" }}>Order #{orderId}</span></h1>
-            <StatusPill status="Processing" />
+            <StatusPill status={masterStatus} />
           </div>
           <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
-            <span>Created on <b style={{ color: "#374151" }}>Apr 16, 2026 12:33 PM</b></span><span style={{ color: "#d1d5db" }}>•</span>
-            <span>Requested by <b style={{ color: "#374151" }}>Pavan (System Owner)</b></span>
+            <span>Created on <b style={{ color: "#374151" }}>{order ? `${order.orderDate} ${order.orderTime}` : "—"}</b></span><span style={{ color: "#d1d5db" }}>•</span>
+            <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
           </div>
         </div>
 
         {/* Info Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div><Field label="Billing Address" value="1235 Ave, San, CA 94821" /><Field label="Payment Method" value="Bank Transfer" /><Field label="Payment Terms" value="Net 30" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div><Field label="Shipping Address" value="1235 Ave, San, CA 94821" /><Field label="Delivery Method" value="Standard Ground" /><Field label="Requested Delivery" value="Apr 28, 2026" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div><Field label="Name" value="Pavan" /><Field label="Email" value="pavan@corpessentials.com" /><Field label="Phone" value="+1 (408) 035-3779673" /><Field label="Organization" value="Infosys" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[["Master Order ID","ORD-24815779"],["Sub Orders","3"],["Total Items","14"],["Total Amount","₹19,700.00"],["Created On","Apr 16, 2026 12:33 PM"]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div><Field label="Client" value={order?.client || "—"} /><Field label="Payment Method" value="Credit Card" /><Field label="Payment Terms" value="Net 30 (Payment due in 30 days)" /></div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div><Field label="Shipping Address" value="No. 45, 3rd Floor, Embassy Tech Village, Outer Ring Road, Bangalore - 560103" /><Field label="Delivery Method" value="Standard Shipping" /><Field label="Requested Delivery" value="Within 30 days" /></div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div><Field label="Name" value={order?.requester || "—"} /><Field label="Role" value={order?.requesterRole || "—"} /><Field label="Organization" value={order?.client || "—"} /></div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[
+            ["Master Order ID", orderId],
+            ["Sub Orders", String(subOrders.length)],
+            ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
+            ["Total Amount", order?.totalAmount || "—"],
+            ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
+          ].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
         </div>
 
         {/* Stepper + Assignment */}
@@ -1057,7 +1115,7 @@ export default function MyOrderPage() {
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexShrink: 0 }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🚚</div>
-                <div><div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Master Order Status</div><div style={{ fontSize: 17, fontWeight: 700 }}>{masterStatus}</div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>3 of 3 sub-orders are in progress</div></div>
+                <div><div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Master Order Status</div><div style={{ fontSize: 17, fontWeight: 700 }}>{masterStatus}</div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{subOrders.length} sub-order{subOrders.length !== 1 ? "s" : ""} in this order</div></div>
               </div>
               <Stepper currentStatus={masterStatus} />
             </div>
@@ -1187,12 +1245,37 @@ export default function MyOrderPage() {
                   </div>
                 );
               })}
-              <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
-                <div style={{ width: 270 }}>
-                  {[["Sub-total","₹19,700.00"],["Tax (10%)","₹1,970.00"]].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span></div>))}
-                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}><span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span><span style={{ fontSize: 15, fontWeight: 800 }}>₹21,670.00</span></div>
-                </div>
-              </div>
+              {(() => {
+                const itemsSubtotal = subOrders.reduce((s, o) => {
+                  const raw = o.total.replace(/[₹,]/g, "");
+                  return s + (parseFloat(raw) || 0);
+                }, 0);
+                const gst = Math.round(itemsSubtotal * 0.18);
+                // Shipping fee matches ReviewPage (₹500 flat rate)
+                const SHIPPING = 500;
+                const grandTotal = order.totalAmountNum ?? (itemsSubtotal + gst + SHIPPING);
+                const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+                return (
+                  <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
+                    <div style={{ width: 270 }}>
+                      {[
+                        ["Sub-total", fmt(itemsSubtotal)],
+                        ["GST (18%)", fmt(gst)],
+                        ["Standard Shipping", fmt(SHIPPING)],
+                      ].map(([l, v]) => (
+                        <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
+                        </div>
+                      ))}
+                      <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
+                        <span style={{ fontSize: 15, fontWeight: 800 }}>{order.totalAmount || fmt(grandTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ padding: "10px 20px", borderTop: "1px solid #f3f4f6", fontSize: 13, color: "#6b7280" }}>Showing 1 to {filtered.length} of {subOrders.length} sub orders</div>
             </>
           )}

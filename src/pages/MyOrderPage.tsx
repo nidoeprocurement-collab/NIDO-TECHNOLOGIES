@@ -15,15 +15,7 @@ const ALL_STATUSES: OrderStatus[] = [
   "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
 ];
 
-const ALL_TABS = [
-  { key: "All Orders", label: "All Orders", count: 36 },
-  { key: "Draft", label: "Draft", count: 4 },
-  { key: "Processing", label: "Processing", count: 8 },
-  { key: "Partially Shipped", label: "Partially Shipped", count: 6 },
-  { key: "Partially Delivered", label: "Partially Delivered", count: 5 },
-  { key: "Delivered", label: "Delivered", count: 13 },
-  { key: "Cancelled", label: "Cancelled", count: 0 },
-];
+// ALL_TABS is now derived inside the component from live orders
 
 // ─── Small helpers ─────────────────────────────────────────────────────────────
 function Avatar({ initial, color, size = 28 }: { initial: string; color: string; size?: number }) {
@@ -367,9 +359,7 @@ export default function MyOrderPage() {
   const [showActions, setShowActions] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [selected, setSelected] = useState<Set<string>>(new Set(
-    ["ORD-24815779", "ORD-24815678", "ORD-24815560", "ORD-24815321", "ORD-24815001"]
-  ));
+  const [selected, setSelected] = useState<Set<string>>(new Set<string>());
   const [currentPage, setCurrentPage] = useState(1);
   const [showBulkStatus, setShowBulkStatus] = useState(false);
   const [showBulkNotes, setShowBulkNotes] = useState(false);
@@ -377,6 +367,15 @@ export default function MyOrderPage() {
   const actionsRef = useRef<HTMLDivElement>(null);
 
   const activeFilterCount = Object.values(appliedFilters).filter(v => v !== "").length;
+
+  // Derive tab counts from live orders
+  const ALL_TABS = useMemo(() => {
+    const statuses: OrderStatus[] = ["Draft", "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled"];
+    return [
+      { key: "All Orders", label: "All Orders", count: orders.length },
+      ...statuses.map(s => ({ key: s, label: s, count: orders.filter(o => o.status === s).length })),
+    ];
+  }, [orders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
@@ -389,13 +388,13 @@ export default function MyOrderPage() {
       if (appliedFilters.requester && !o.requester.toLowerCase().includes(appliedFilters.requester.toLowerCase())) return false;
       if (appliedFilters.assignedTo && !o.assigned.toLowerCase().includes(appliedFilters.assignedTo.toLowerCase())) return false;
       if (appliedFilters.minAmount) {
-        const min = parseFloat(appliedFilters.minAmount.replace(/,/g, ""));
-        const amt = parseFloat(o.totalAmount.replace(/[$,]/g, ""));
+        const min = parseFloat(appliedFilters.minAmount.replace(/[^0-9.]/g, ""));
+        const amt = parseFloat(o.totalAmount.replace(/[^0-9.]/g, ""));
         if (!isNaN(min) && amt < min) return false;
       }
       if (appliedFilters.maxAmount) {
-        const max = parseFloat(appliedFilters.maxAmount.replace(/,/g, ""));
-        const amt = parseFloat(o.totalAmount.replace(/[$,]/g, ""));
+        const max = parseFloat(appliedFilters.maxAmount.replace(/[^0-9.]/g, ""));
+        const amt = parseFloat(o.totalAmount.replace(/[^0-9.]/g, ""));
         if (!isNaN(max) && amt > max) return false;
       }
       return true;

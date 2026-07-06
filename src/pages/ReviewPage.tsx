@@ -3,7 +3,7 @@ import { ChevronRight, ArrowLeft, Pencil, MapPin, Lock, Info } from "lucide-reac
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
-import { useMyOrders } from "@/contexts/MyOrdersContext";
+import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 
 const ADDRESSES: Record<number, { label: string; line1: string; line2: string; line3: string; phone: string }> = {
   1: { label: "Office (Default)", line1: "No. 45, 3rd Floor, Embassy Tech Village,", line2: "Outer Ring Road, Bangalore - 560103,", line3: "Karnataka, India", phone: "+91 98765 43210" },
@@ -58,6 +58,18 @@ export default function ReviewPage() {
       slaTime: "02:00",
       slaAlert: false,
       totalAmount: formattedTotal,
+      totalAmountNum: totalAmount,
+      cartItems: itemsSnapshot.map(i => ({
+        id: i.id,
+        name: i.name,
+        image: i.image,
+        priceNum: i.priceNum,
+        quantity: i.quantity,
+        category: i.category,
+        specs: Array.isArray(i.specs) ? i.specs : (i.specs ? [i.specs] : []),
+        moq: i.moq,
+        clientId: i.clientId,
+      })) satisfies OrderCartItem[],
     });
     clearCart();
     navigate(`/shop/order-confirmation/${orderNumber}`, {
