@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import {
@@ -6,7 +6,7 @@ import {
   saveClientCatalog,
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
-import { syncClientPrices } from "@/lib/priceEngineStore";
+import { syncClientPrices, getClientCategoryRules } from "@/lib/priceEngineStore";
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
 
 function ProductThumb({ images, name }: { images: string[]; name: string }) {
@@ -962,14 +962,39 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const [viewProduct, setViewProduct] = useState<CatalogEntry | null>(null);
   const [editProduct, setEditProduct] = useState<CatalogEntry | null>(null);
   const [products, setProducts] = useState<CatalogEntry[]>(() => getClientCatalog(clientId));
+  // When prices are refreshed externally (price engine rules changed) we update
+  // state directly from the store without triggering the save-back effect.
+  const skipNextSave = useRef(false);
 
   // Reload from store when clientId changes
   useEffect(() => {
     setProducts(getClientCatalog(clientId));
   }, [clientId]);
 
-  // Persist to store whenever products change
+  // Listen for price-engine updates (category rules, slabs, margin changes) and
+  // pull fresh price/priceNum values into state so the table re-renders immediately.
   useEffect(() => {
+    const refreshPrices = () => {
+      const fresh = getClientCatalog(clientId);
+      skipNextSave.current = true;
+      setProducts(prev =>
+        prev.map(p => {
+          const updated = fresh.find(f => f.productCode === p.productCode);
+          return updated ? { ...p, price: updated.price, priceNum: updated.priceNum } : p;
+        })
+      );
+    };
+    window.addEventListener('priceEngineSettingsUpdated', refreshPrices);
+    return () => window.removeEventListener('priceEngineSettingsUpdated', refreshPrices);
+  }, [clientId]);
+
+  // Persist to store whenever products change — skipped when triggered by an
+  // external price refresh so we don't overwrite freshly computed prices.
+  useEffect(() => {
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
     saveClientCatalog(clientId, products);
   }, [products, clientId]);
 

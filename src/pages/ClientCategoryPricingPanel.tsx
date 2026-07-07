@@ -7,19 +7,17 @@ import {
   saveClientCategoryRules,
   type CategoryPricingRule,
 } from '@/lib/priceEngineStore';
+import { getCatalogProducts } from '@/lib/catalogStore';
+import { getClientCatalog } from '@/lib/clientCatalogStore';
 
-const BASE_CATEGORIES = [
-  'Office Supplies',
-  'Electronics',
-  'Furniture',
-  'Pantry',
-  'Networking',
-  'Services',
-  'Stationery',
-  'Cleaning',
-  'IT Peripherals',
-  'Other',
-];
+/** Pull the unique category names that actually exist in the master catalog
+ *  and/or this client's catalog, so rules always match real product categories. */
+function loadCatalogCategories(clientId: string): string[] {
+  const masterCats = getCatalogProducts().map(p => p.category).filter(Boolean);
+  const clientCats = getClientCatalog(clientId).map(p => p.category).filter(Boolean);
+  const all = Array.from(new Set([...masterCats, ...clientCats])).sort();
+  return all.length > 0 ? all : ['Office Supplies', 'Electronics', 'Furniture', 'Services'];
+}
 
 const ADD_NEW_SENTINEL = '__ADD_NEW__';
 
@@ -50,8 +48,7 @@ function CategorySelect({
   const [newCat, setNewCat] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const allKnown = [...BASE_CATEGORIES, ...extraCategories.filter(c => !BASE_CATEGORIES.includes(c))];
-  const available = allKnown.filter(c => !usedCategories.has(c) || c === value);
+  const available = extraCategories.filter(c => !usedCategories.has(c) || c === value);
 
   const commitNew = () => {
     const trimmed = newCat.trim();
@@ -123,12 +120,13 @@ function CategorySelect({
 
 export default function ClientCategoryPricingPanel({ clientId }: { clientId: string }) {
   const [rules, setRules] = useState<CategoryPricingRule[]>(() => getClientCategoryRules(clientId));
-  // Extra categories created by the user (not in BASE_CATEGORIES)
-  const [customCategories, setCustomCategories] = useState<string[]>(() =>
-    getClientCategoryRules(clientId)
-      .map(r => r.category)
-      .filter(c => !BASE_CATEGORIES.includes(c))
+  // catalogCategories: live category names from the master catalog + this client's catalog.
+  // These are the exact strings stored on products, so rules will always match.
+  const [catalogCategories, setCatalogCategories] = useState<string[]>(() =>
+    loadCatalogCategories(clientId)
   );
+  // User-typed custom categories not present in the catalog
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CategoryPricingRule | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -136,10 +134,22 @@ export default function ClientCategoryPricingPanel({ clientId }: { clientId: str
   useEffect(() => {
     const saved = getClientCategoryRules(clientId);
     setRules(saved);
-    setCustomCategories(saved.map(r => r.category).filter(c => !BASE_CATEGORIES.includes(c)));
+    setCatalogCategories(loadCatalogCategories(clientId));
+    setCustomCategories([]);
     setEditingId(null);
     setDraft(null);
     setIsNew(false);
+  }, [clientId]);
+
+  // Refresh catalog categories whenever the master catalog or client catalog changes
+  useEffect(() => {
+    const refresh = () => setCatalogCategories(loadCatalogCategories(clientId));
+    window.addEventListener('catalogUpdated', refresh);
+    window.addEventListener('clientCatalogUpdated', refresh);
+    return () => {
+      window.removeEventListener('catalogUpdated', refresh);
+      window.removeEventListener('clientCatalogUpdated', refresh);
+    };
   }, [clientId]);
 
   const persist = (next: CategoryPricingRule[]) => {
@@ -151,10 +161,12 @@ export default function ClientCategoryPricingPanel({ clientId }: { clientId: str
     setCustomCategories(prev => prev.includes(cat) ? prev : [...prev, cat]);
   };
 
+  // All known categories = catalog ones + any user-typed custom ones
+  const allKnown = Array.from(new Set([...catalogCategories, ...customCategories]));
+
   const startAdd = () => {
     const usedCats = new Set(rules.map(r => r.category));
-    const allKnown = [...BASE_CATEGORIES, ...customCategories];
-    const first = allKnown.find(c => !usedCats.has(c)) ?? '';
+    const first = allKnown.find(c => !usedCats.has(c)) ?? (allKnown[0] ?? '');
     const rule = emptyRule(first);
     setDraft(rule);
     setEditingId(rule.id);
@@ -188,8 +200,7 @@ export default function ClientCategoryPricingPanel({ clientId }: { clientId: str
   };
 
   const usedCategories = new Set(rules.map(r => r.category));
-  const allKnown = [...BASE_CATEGORIES, ...customCategories];
-  const hasAvailable = allKnown.some(c => !usedCategories.has(c)) || true; // always allow (custom)
+  const hasAvailable = true; // always allow — user can type a new category
 
   return (
     <div className="mt-6">
@@ -223,7 +234,7 @@ export default function ClientCategoryPricingPanel({ clientId }: { clientId: str
                         value={draft.category}
                         onChange={val => setDraft({ ...draft, category: val })}
                         usedCategories={new Set([...usedCategories].filter(c => c !== rule.category))}
-                        extraCategories={customCategories}
+                        extraCategories={allKnown}
                         onNewCategory={cat => {
                           addCustomCategory(cat);
                           setDraft({ ...draft, category: cat });
@@ -292,7 +303,7 @@ export default function ClientCategoryPricingPanel({ clientId }: { clientId: str
                     value={draft.category}
                     onChange={val => setDraft({ ...draft, category: val })}
                     usedCategories={usedCategories}
-                    extraCategories={customCategories}
+                    extraCategories={allKnown}
                     onNewCategory={cat => {
                       addCustomCategory(cat);
                       setDraft({ ...draft, category: cat });
