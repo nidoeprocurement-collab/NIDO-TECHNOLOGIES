@@ -345,13 +345,15 @@ export interface ClientPriceCalc {
 export function computeClientFinalPrice(
   landedCostPerUnit: number,
   settings: ClientCommonSettings,
+  overrideProfitPct?: number,
 ): ClientPriceCalc {
   const s = settings;
+  const effectiveProfitPct = overrideProfitPct ?? s.profitPct;
   const perUnitPct = s.perUnitCharges.reduce((sum, c) => sum + c.value, 0);
   const totalPct = s.overheadPct + perUnitPct;
   const perUnitTotal = (landedCostPerUnit * totalPct) / 100;
   const subtotal = landedCostPerUnit + perUnitTotal;
-  const profit = (subtotal * s.profitPct) / 100;
+  const profit = (subtotal * effectiveProfitPct) / 100;
   const discount = ((subtotal + profit) * s.discountPct) / 100;
   const taxBase = subtotal + profit - discount;
   const tax = (taxBase * s.taxPct) / 100;
@@ -388,7 +390,13 @@ export function getAllClientPricing(): ClientPricingRow[] {
     catalog.forEach(entry => {
       const pp = pricingByCode.get(entry.productCode);
       if (!pp) return;
-      const calc = pp.winningVendor ? computeClientFinalPrice(pp.landedCostPerUnit, settings) : null;
+      const calc = pp.winningVendor
+        ? computeClientFinalPrice(
+            pp.landedCostPerUnit,
+            settings,
+            getCategoryMarginPct(c.id, pp.category, settings.profitPct),
+          )
+        : null;
       rows.push({
         clientId: c.id,
         clientName: c.name,
@@ -444,7 +452,11 @@ export function syncClientPrices(clientId: string): number {
   const updatedCatalog = catalog.map(entry => {
     const pp = pricingByCode.get(entry.productCode);
     if (!pp || !pp.winningVendor) return entry;
-    const calc = computeClientFinalPrice(pp.landedCostPerUnit, settings);
+    const calc = computeClientFinalPrice(
+      pp.landedCostPerUnit,
+      settings,
+      getCategoryMarginPct(clientId, pp.category, settings.profitPct),
+    );
     if (entry.priceNum === calc.finalPrice) return entry;
     updated++;
     const price =
