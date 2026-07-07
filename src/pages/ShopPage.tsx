@@ -163,7 +163,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
   const handleAdd = () => {
     if (added) return;
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -395,7 +395,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            addItem({ id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category }, Math.max(1, rp.moq));
+                            addItem({ id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category, productCode: rp.productCode }, Math.max(1, rp.moq));
                           }}
                           className="mt-2 flex items-center justify-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 text-[11px] font-semibold transition-colors"
                         >
@@ -429,7 +429,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     e.stopPropagation();
     if (!product.inStock || adding) return;
     setAdding(true);
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setTimeout(() => setAdding(false), 1500);
   };
 

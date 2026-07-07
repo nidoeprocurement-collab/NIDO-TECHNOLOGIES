@@ -10,6 +10,7 @@ export type CartItem = {
   quantity: number;
   clientId?: string;
   category?: string;
+  productCode?: string;
 };
 
 interface CartContextType {

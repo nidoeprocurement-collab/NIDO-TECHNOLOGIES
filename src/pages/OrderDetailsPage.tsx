@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
+import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
+import { getVendorById } from "@/lib/vendorDataStore";
+import { savePO, generatePoNumber, type StoredPO } from "@/lib/purchaseOrderStore";
+import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -105,72 +109,135 @@ function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
   );
 }
 
-// ── Vendor Selection Modal (popup) ────────────────────────────────────────────
+// ── Vendor Selection Modal (popup) — uses Price Engine top-4 ─────────────────
 function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
-  const [picked, setPicked] = useState(selectedVendorId || VENDOR_POOL[0].id);
-  const pickedVendor = VENDOR_POOL.find(v => v.id === picked);
+  // Load top-4 vendors from Price Engine for this product
+  const comparisons: VendorComparisonRow[] = useMemo(() => {
+    if (!sub.productCode) return [];
+    return computeVendorComparisons(sub.productCode).slice(0, 4);
+  }, [sub.productCode]);
+
+  const [pickedId, setPickedId] = useState<string>(
+    selectedVendorId || comparisons[0]?.vendorId || ""
+  );
+  const picked = comparisons.find(c => c.vendorId === pickedId);
+  const pickedVendorInfo = picked ? getVendorById(picked.vendorId) : undefined;
+
+  const fmt = (n: number) =>
+    "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleConfirm = () => {
+    if (!picked) return;
+    const v = getVendorById(picked.vendorId);
+    onSelect(sub.id, picked.vendorId, {
+      vendorId:     picked.vendorId,
+      vendorName:   picked.vendorName,
+      unitPrice:    picked.landedCostPerUnit,
+      location:     v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : picked.vendorId,
+      gstin:        v?.taxId || v?.pan || "",
+      contact:      v?.primaryContact || "",
+      email:        v?.email || "",
+      phone:        v?.phone || "",
+      addressLine1: v?.addressLine1 || v?.address || "",
+      addressLine2: v?.addressLine2 || "",
+      city:         v?.city || "",
+      state:        v?.state || "",
+      pincode:      v?.zipCode || "",
+    });
+    onClose();
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 860, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 920, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #e5e7eb" }}>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>Vendor Selection - Sub Order : {sub.id} ( {sub.itemName} )</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Vendor Selection — {sub.id} ({sub.itemName})</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by score</div>
+          </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
 
         {/* Req info */}
-        <div style={{ padding: "14px 22px 0", display: "flex", gap: 32 }}>
-          <div style={{ fontSize: 13.5 }}>Required Quantity : <b style={{ color: "#111827" }}>{sub.qty} Nos</b></div>
+        <div style={{ padding: "12px 22px", display: "flex", gap: 32, background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
+          <div style={{ fontSize: 13.5 }}>Required Qty : <b style={{ color: "#111827" }}>{sub.qty} Nos</b></div>
           <div style={{ fontSize: 13.5 }}>Required Date : <b style={{ color: "#111827" }}>{sub.requiredDate}</b></div>
+          {sub.productCode && <div style={{ fontSize: 13.5, color: "#6b7280" }}>Product Code : <b style={{ color: "#374151" }}>{sub.productCode}</b></div>}
         </div>
 
         {/* Vendor table */}
         <div style={{ padding: "14px 22px 0", overflow: "auto" }}>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
-            {/* Header row */}
-            <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 140px 130px 130px 110px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
-              {["", "Vendor", "Rating", "Delivery Time", "Cost (Per Unit)", "Total Cost"].map(h => <div key={h}>{h}</div>)}
+          {comparisons.length === 0 ? (
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>🏪</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No vendor pricing data found</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Add this product to a vendor's catalog in the Vendor Catalog page, then set up the Price Engine to see recommendations here.</div>
             </div>
-            {VENDOR_POOL.map((v, i) => {
-              const isSelected = picked === v.id;
-              const totalCost = v.pricePerUnit * sub.qty;
-              return (
-                <div
-                  key={v.id}
-                  onClick={() => setPicked(v.id)}
-                  style={{ display: "grid", gridTemplateColumns: "36px 1fr 140px 130px 130px 110px", padding: "13px 16px", alignItems: "center", borderBottom: i < VENDOR_POOL.length - 1 ? "1px solid #f3f4f6" : "none", background: isSelected ? "#eff6ff" : "#fff", cursor: "pointer" }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isSelected ? "#2563eb" : "#d1d5db"}`, background: isSelected ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {isSelected && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
+          ) : (
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "36px 30px 1fr 120px 120px 140px 120px 110px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+                {["", "#", "Vendor", "Score", "Rating", "Lead Time", "Unit Cost", "Total Cost"].map(h => <div key={h}>{h}</div>)}
+              </div>
+              {comparisons.map((c, i) => {
+                const isSel = pickedId === c.vendorId;
+                const total = c.landedCostPerUnit * sub.qty;
+                const scorePct = Math.round(c.score);
+                return (
+                  <div
+                    key={c.vendorId}
+                    onClick={() => setPickedId(c.vendorId)}
+                    style={{ display: "grid", gridTemplateColumns: "36px 30px 1fr 120px 120px 140px 120px 110px", padding: "13px 16px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#eff6ff" : "#fff", cursor: "pointer" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isSel ? "#2563eb" : "#d1d5db"}`, background: isSel ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {isSel && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
+                      </div>
                     </div>
+                    {/* Rank badge */}
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fef9c3" : "#f3f4f6", color: i === 0 ? "#92400e" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
+                      {i + 1}
+                    </div>
+                    <div style={{ fontWeight: isSel ? 600 : 400, fontSize: 13.5, color: "#111827" }}>
+                      {c.vendorName}
+                      {i === 0 && <span style={{ marginLeft: 8, fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Recommended</span>}
+                    </div>
+                    {/* Score */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${scorePct}%`, background: scorePct >= 70 ? "#16a34a" : scorePct >= 50 ? "#f59e0b" : "#dc2626", borderRadius: 3 }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", minWidth: 28 }}>{scorePct}</span>
+                      </div>
+                    </div>
+                    <div><StarRating rating={c.rating} /></div>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{c.leadTime} day{c.leadTime !== 1 ? "s" : ""}</div>
+                    <div style={{ fontSize: 13, color: "#374151" }}>{fmt(c.landedCostPerUnit)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(total)}</div>
                   </div>
-                  <div style={{ fontWeight: isSelected ? 600 : 400, fontSize: 13.5, color: "#111827" }}>{v.name}</div>
-                  <div><StarRating rating={v.rating} /></div>
-                  <div style={{ fontSize: 13, color: "#374151" }}>{v.deliveryDays}</div>
-                  <div style={{ fontSize: 13, color: "#374151" }}>₹ {v.pricePerUnit.toFixed(2)}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>₹ {totalCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Vendor Details */}
-        {pickedVendor && (
+        {/* Selected vendor details */}
+        {picked && pickedVendorInfo && (
           <div style={{ margin: "14px 22px 0", border: "1px solid #e5e7eb", borderRadius: 9, padding: "14px 18px", background: "#fafafa" }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Vendor Details</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 0" }}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Selected Vendor Details</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 0" }}>
               <div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{pickedVendor.name}</div>
-                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 4 }}>GSTIN : {pickedVendor.gstin}</div>
-                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>Location : {pickedVendor.location}</div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{pickedVendorInfo.name}</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>GSTIN : {pickedVendorInfo.taxId || pickedVendorInfo.pan || "—"}</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Location : {pickedVendorInfo.city || pickedVendorInfo.address}</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Contact : {pickedVendorInfo.primaryContact}</div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>On Time Delivery : <b>{pickedVendor.onTimeDelivery}</b></div>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>Quality Rating : <b>{pickedVendor.qualityRating}</b></div>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>Total Orders : <b>{pickedVendor.totalOrders}</b></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>Rating : <b>{pickedVendorInfo.rating.toFixed(1)} / 5</b></div>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>Category : <b>{pickedVendorInfo.category}</b></div>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>MOQ : <b>{picked.moq} units</b></div>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>Payment Terms : <b>{picked.paymentTerms || "—"}</b></div>
               </div>
             </div>
           </div>
@@ -179,8 +246,9 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
         {/* Footer */}
         <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 22px 18px", marginTop: "auto" }}>
           <button
-            onClick={() => { onSelect(sub.id, picked); onClose(); }}
-            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+            onClick={handleConfirm}
+            disabled={!picked}
+            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: picked ? "#2563eb" : "#93c5fd", color: "#fff", cursor: picked ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
           >
             Select Vendor
           </button>
@@ -191,21 +259,22 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 }
 
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
-function VendorSelectionTab({ subOrders, selectedVendors, onOpenModal }) {
+function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
   return (
     <div style={{ padding: "20px 24px 28px" }}>
       <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>Vendor Selection</div>
-      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Select a vendor for each sub-order. Click "Select Vendor" to open the vendor selection dialog.</div>
+      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Click "Select Vendor" to open the Price Engine recommendation dialog and pick from top-4 vendors.</div>
 
       <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        {/* Table header */}
         <div style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
           {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "SELECTED VENDOR", "ACTION"].map(h => <div key={h}>{h}</div>)}
         </div>
 
         {subOrders.map((sub, idx) => {
-          const selVendorId = selectedVendors[sub.id];
-          const selVendor = selVendorId ? VENDOR_POOL.find(v => v.id === selVendorId) : null;
+          const meta = selectedVendorMeta[sub.id];
+          const hasVendor = !!meta || !!selectedVendors[sub.id];
+          const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
+          const displayLoc  = meta?.location || "";
           return (
             <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "16px 20px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13 }}>{sub.num}</div>
@@ -223,12 +292,14 @@ function VendorSelectionTab({ subOrders, selectedVendors, onOpenModal }) {
               <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty} Nos</div>
               <div style={{ fontSize: 12.5, color: "#374151" }}>{sub.requiredDate}</div>
               <div>
-                {selVendor ? (
+                {displayName ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Avatar initial={selVendor.id} color={selVendor.color} size={26} />
+                    <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                      {(displayName[0] || "V").toUpperCase()}
+                    </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{selVendor.name}</div>
-                      <div style={{ fontSize: 11, color: "#6b7280" }}>{selVendor.location.split(",")[0]}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{displayName}</div>
+                      {displayLoc && <div style={{ fontSize: 11, color: "#6b7280" }}>{displayLoc.split(",")[0]}</div>}
                     </div>
                   </div>
                 ) : (
@@ -238,9 +309,9 @@ function VendorSelectionTab({ subOrders, selectedVendors, onOpenModal }) {
               <div>
                 <button
                   onClick={() => onOpenModal(sub)}
-                  style={{ padding: "7px 16px", border: `1px solid ${selVendor ? "#2563eb" : "#d1d5db"}`, borderRadius: 7, background: selVendor ? "#eff6ff" : "#fff", color: selVendor ? "#2563eb" : "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+                  style={{ padding: "7px 16px", border: `1px solid ${hasVendor ? "#2563eb" : "#d1d5db"}`, borderRadius: 7, background: hasVendor ? "#eff6ff" : "#fff", color: hasVendor ? "#2563eb" : "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
                 >
-                  {selVendor ? "Change Vendor" : "Select Vendor"}
+                  {hasVendor ? "Change Vendor" : "Select Vendor"}
                 </button>
               </div>
             </div>
@@ -253,14 +324,16 @@ function VendorSelectionTab({ subOrders, selectedVendors, onOpenModal }) {
 
 // ── View Items Modal ──────────────────────────────────────────────────────────
 function ViewItemsModal({ group, onClose }) {
-  const total = group.subOrders.reduce((a, s) => a + group.vendor.pricePerUnit * s.qty, 0);
+  // group: { vendorName, location, unitPrice, subOrders }
+  const fmtINR = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+  const total = group.subOrders.reduce((a, s) => a + group.unitPrice * s.qty, 0);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 780, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid #e5e7eb" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Items for {group.vendor.name}</div>
-            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>{group.subOrders.length} item{group.subOrders.length !== 1 ? "s" : ""} · {group.vendor.location}</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#111827" }}>Items for {group.vendorName}</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>{group.subOrders.length} item{group.subOrders.length !== 1 ? "s" : ""}{group.location ? ` · ${group.location}` : ""}</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
@@ -284,14 +357,14 @@ function ViewItemsModal({ group, onClose }) {
                 </div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
-              <div style={{ fontSize: 13, color: "#374151" }}>₹ {group.vendor.pricePerUnit.toFixed(2)}</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>₹ {(group.vendor.pricePerUnit * sub.qty).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+              <div style={{ fontSize: 13, color: "#374151" }}>{fmtINR(group.unitPrice)}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmtINR(group.unitPrice * sub.qty)}</div>
             </div>
           ))}
         </div>
         <div style={{ padding: "14px 24px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f9fafb" }}>
           <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Total</span>
-          <span style={{ fontWeight: 800, fontSize: 15, color: "#111827" }}>₹ {total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+          <span style={{ fontWeight: 800, fontSize: 15, color: "#111827" }}>{fmtINR(total)}</span>
         </div>
       </div>
     </div>
@@ -299,23 +372,26 @@ function ViewItemsModal({ group, onClose }) {
 }
 
 // ── Vendor Selected Summary Tab ───────────────────────────────────────────────
-function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
+function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMeta, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
   const [viewItemsGroup, setViewItemsGroup] = useState<any>(null);
+  const fmtINR = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
   // --- Pending: vendor selected but no PO yet ---
-  const pendingMap: Record<string, { vendor: typeof VENDOR_POOL[0], subOrders: typeof subOrders }> = {};
+  const pendingMap: Record<string, { vendorId: string; vendorName: string; location: string; unitPrice: number; subOrders: typeof subOrders }> = {};
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
     if (!vid || createdPOs[sub.id]) continue;
-    const vendor = VENDOR_POOL.find(v => v.id === vid);
-    if (!vendor) continue;
-    if (!pendingMap[vid]) pendingMap[vid] = { vendor, subOrders: [] };
+    const meta = selectedVendorMeta[sub.id];
+    const vendorName = meta?.vendorName || vid;
+    const location   = meta?.location || "";
+    const unitPrice  = meta?.unitPrice || 0;
+    if (!pendingMap[vid]) pendingMap[vid] = { vendorId: vid, vendorName, location, unitPrice, subOrders: [] };
     pendingMap[vid].subOrders.push(sub);
   }
   const pendingGroups = Object.values(pendingMap);
   const pendingItems = pendingGroups.reduce((a, g) => a + g.subOrders.length, 0);
   const pendingQty   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + o.qty, 0), 0);
-  const pendingAmt   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + g.vendor.pricePerUnit * o.qty, 0), 0);
+  const pendingAmt   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + g.unitPrice * o.qty, 0), 0);
 
   // --- Created POs ---
   const poList  = Object.values(createdPOs) as any[];
@@ -367,7 +443,6 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
               {["PO NUMBER","VENDOR","ITEM","QTY","AMOUNT (INR)","STATUS","ACTION"].map(h => <div key={h}>{h}</div>)}
             </div>
             {poList.map((po, i) => {
-              const vendor = VENDOR_POOL.find(v => v.id === po.vendorId);
               return (
                 <div key={po.poNumber} style={{ display: "grid", gridTemplateColumns: COL_PO, padding: "15px 20px", alignItems: "center", borderBottom: i < poList.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                   <div>
@@ -375,10 +450,11 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
                     <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Purchase Order</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <Avatar initial={po.vendorId} color={vendor?.color || "#6b7280"} size={30} />
+                    <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                      {(po.vendorName?.[0] || "V").toUpperCase()}
+                    </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{po.vendorName}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{vendor?.location?.split(",")[0]}</div>
                     </div>
                   </div>
                   <div>
@@ -438,14 +514,16 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
             </div>
             {pendingGroups.map((g, i) => {
               const vQty = g.subOrders.reduce((a, s) => a + s.qty, 0);
-              const vAmt = g.subOrders.reduce((a, s) => a + g.vendor.pricePerUnit * s.qty, 0);
+              const vAmt = g.subOrders.reduce((a, s) => a + g.unitPrice * s.qty, 0);
               return (
-                <div key={g.vendor.id} style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "15px 20px", alignItems: "center", borderBottom: i < pendingGroups.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                <div key={g.vendorId} style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "15px 20px", alignItems: "center", borderBottom: i < pendingGroups.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Avatar initial={g.vendor.id} color={g.vendor.color} size={36} />
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                      {(g.vendorName?.[0] || "V").toUpperCase()}
+                    </div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{g.vendor.name}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.vendor.location}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{g.vendorName}</div>
+                      {g.location && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{g.location}</div>}
                     </div>
                   </div>
                   <div style={{ fontSize: 13.5, color: "#374151" }}>{g.subOrders.length} {g.subOrders.length === 1 ? "Item" : "Items"}</div>
@@ -455,9 +533,10 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, createdPOs, onCr
                     ))}
                   </div>
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>{vQty} Nos</div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>₹ {vAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{fmtINR(vAmt)}</div>
                   <div>
-                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }} onClick={() => setViewItemsGroup(g)}>
+                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", padding: 0 }}
+                      onClick={() => setViewItemsGroup({ ...g })}>
                       View Items
                     </button>
                   </div>
@@ -915,6 +994,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     sku: `SKU/SHOP-${item.id}`,
     category: item.category || "General",
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
+    productCode: item.productCode || "",
     vendorName: "Pending Assignment",
     vendorInitial: "P",
     vendorColor: "#6b7280",
@@ -957,11 +1037,18 @@ export default function MyOrderPage() {
   const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
   });
+  // Rich vendor info (unit price, address, etc.) — not persisted, set when user picks a vendor
+  const [selectedVendorMeta, setSelectedVendorMeta] = useState<Record<string, {
+    vendorId: string; vendorName: string; unitPrice: number; location: string;
+    gstin: string; contact: string; email: string; phone: string;
+    addressLine1: string; addressLine2: string; city: string; state: string; pincode: string;
+  }>>({});
 
   // Reload per-order localStorage state when navigating between orders
   useEffect(() => {
     try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
     try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
+    setSelectedVendorMeta({});
   }, [orderId]);
   const [vendorModalSub, setVendorModalSub] = useState<any>(null);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
@@ -1006,45 +1093,114 @@ export default function MyOrderPage() {
   const updateStatus = (id, status) => setSubOrders(prev => prev.map(s => s.id === id ? { ...s, itemStatus: status, deliveredAt: status === "Delivered" ? new Date() : s.deliveredAt, updatedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) } : s));
   const filtered = subOrders.filter(s => !subSearch || s.itemName.toLowerCase().includes(subSearch.toLowerCase()) || s.id.toLowerCase().includes(subSearch.toLowerCase()));
 
-  const handleSelectVendor = (subId: string, vendorId: string) => {
+  const handleSelectVendor = (subId: string, vendorId: string, meta?: any) => {
     if (createdPOs[subId]) return;
     setSelectedVendors(prev => ({ ...prev, [subId]: vendorId }));
+    if (meta) setSelectedVendorMeta(prev => ({ ...prev, [subId]: meta }));
   };
 
   const handleCreatePurchaseOrders = () => {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const displayDate = `${dd}/${mm}/${yyyy}`;
+
     const newPOs: Record<string, any> = {};
+
     for (const sub of subOrders) {
       if (createdPOs[sub.id]) continue;
       const vendorId = selectedVendors[sub.id];
       if (!vendorId) continue;
-      const vendor = VENDOR_POOL.find(v => v.id === vendorId);
-      if (!vendor) continue;
-      const poNum = "PO-" + Math.floor(10000 + Math.random() * 90000);
+      const meta = selectedVendorMeta[sub.id];
+      if (!meta) continue;
+
+      const poNumber = generatePoNumber();
+      const unitPrice = meta.unitPrice || 0;
+      const subtotal  = unitPrice * sub.qty;
+      const sgstPct = 9, cgstPct = 9;
+      const sgstAmt   = Math.round(subtotal * sgstPct) / 100;
+      const cgstAmt   = Math.round(subtotal * cgstPct) / 100;
+      const grandTotal = subtotal + sgstAmt + cgstAmt;
+
+      const po: StoredPO = {
+        poNumber,
+        orderId,
+        subOrderId: sub.id,
+        vendorId,
+        vendorName:        meta.vendorName,
+        vendorContact:     meta.contact,
+        vendorEmail:       meta.email,
+        vendorPhone:       meta.phone,
+        vendorGstin:       meta.gstin,
+        vendorAddress:     [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
+        vendorAddressLine1: meta.addressLine1,
+        vendorAddressLine2: meta.addressLine2,
+        vendorCity:        meta.city,
+        vendorState:       meta.state,
+        vendorPincode:     meta.pincode,
+        item:        sub.itemName,
+        sku:         sub.sku,
+        category:    sub.category,
+        hsnCode:     "",
+        specs:       sub.specs,
+        qty:         sub.qty,
+        unitPrice,
+        subtotal,
+        sgstPct,
+        cgstPct,
+        sgstAmt,
+        cgstAmt,
+        grandTotal,
+        paymentTerms:       "Net 30",
+        status:             "Processing",
+        createdOn:          now.toISOString(),
+        createdOnDisplay:   displayDate,
+        requestedDelivery:  sub.requiredDate,
+        documents: [],
+        notes: [],
+      };
+
+      // Generate PDF, store data-URI, trigger download
+      try {
+        const dataUri = getPODataUri(po);
+        po.documents = [{
+          id:         `doc-${poNumber}-pdf`,
+          name:       `${poNumber}.pdf`,
+          ext:        "pdf",
+          type:       "Purchase Order",
+          uploadedBy: "System",
+          uploadedOn: displayDate,
+          dataUrl:    dataUri,
+        }];
+        downloadPOPdf(po);
+      } catch (e) {
+        console.warn("PDF generation failed:", e);
+      }
+
+      savePO(po);
+
       newPOs[sub.id] = {
-        vendorId: vendor.id,
-        vendorName: vendor.name,
-        poNumber: poNum,
-        item: sub.itemName,
-        qty: sub.qty,
-        unitPrice: vendor.pricePerUnit,
-        total: vendor.pricePerUnit * sub.qty,
+        vendorId,
+        vendorName: meta.vendorName,
+        poNumber,
+        item:       sub.itemName,
+        qty:        sub.qty,
+        unitPrice,
+        total:      grandTotal,
         subOrderId: sub.id,
       };
     }
-    setCreatedPOs(prev => ({ ...prev, ...newPOs }));
+
+    if (Object.keys(newPOs).length > 0) {
+      setCreatedPOs(prev => ({ ...prev, ...newPOs }));
+    }
   };
 
   const handleCancelPO = (subId: string) => {
-    setCreatedPOs(prev => {
-      const next = { ...prev };
-      delete next[subId];
-      return next;
-    });
-    setSelectedVendors(prev => {
-      const next = { ...prev };
-      delete next[subId];
-      return next;
-    });
+    setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
+    setSelectedVendors(prev => { const n = { ...prev }; delete n[subId]; return n; });
+    setSelectedVendorMeta(prev => { const n = { ...prev }; delete n[subId]; return n; });
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
@@ -1187,7 +1343,8 @@ export default function MyOrderPage() {
               {filtered.map((sub, idx) => {
                 const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
                 const selVendorId = selectedVendors[sub.id];
-                const selVendor = selVendorId ? VENDOR_POOL.find(v => v.id === selVendorId) : null;
+                const selMeta = selectedVendorMeta[sub.id] || null;
+                const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
                 return (
                   <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                     <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
@@ -1227,7 +1384,9 @@ export default function MyOrderPage() {
                       {selVendor ? (
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                            <Avatar initial={selVendor.id} color={selVendor.color} size={22} />
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                              {(selVendor.name?.[0] || "V").toUpperCase()}
+                            </div>
                             <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{selVendor.name}</span>
                           </div>
                           <button onClick={() => setVendorModalSub(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
@@ -1285,6 +1444,7 @@ export default function MyOrderPage() {
             <VendorSelectedSummaryTab
               subOrders={subOrders}
               selectedVendors={selectedVendors}
+              selectedVendorMeta={selectedVendorMeta}
               createdPOs={createdPOs}
               onCreatePurchaseOrders={handleCreatePurchaseOrders}
               onCancelPO={handleCancelPO}

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
+import { downloadPOPdf } from "@/lib/generatePO";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -507,13 +509,87 @@ function UpdateStatusDropdown({ current, onChange }: { current: string; onChange
   );
 }
 
+// ── Convert StoredPO → detail page shape ──────────────────────────────────────
+function storedPOToDetail(po: StoredPO) {
+  const fmtINR = (n: number) =>
+    "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dateObj = new Date(po.createdOn);
+  const dateDisp =
+    dateObj.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) +
+    " " +
+    dateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  return {
+    poNumber: po.poNumber,
+    status: po.status,
+    createdOn: dateDisp,
+    vendorName: po.vendorName,
+    linkedMasterOrder: po.orderId,
+    totalItems: 1,
+    totalAmount: fmtINR(po.grandTotal),
+    orderDate: dateDisp,
+    vendor: {
+      name: po.vendorName,
+      contactPerson: po.vendorContact || "—",
+      email: po.vendorEmail || "—",
+      phone: po.vendorPhone || "—",
+    },
+    shipping: {
+      address: [po.vendorAddressLine1, po.vendorCity, po.vendorState].filter(Boolean).join(", ") || "—",
+      deliveryMethod: "Standard Ground",
+      requestedDelivery: po.requestedDelivery || "Within 30 days",
+    },
+    billing: {
+      address: "No. 41/1, 2nd Floor, 10th Cross, Bangalore 560027",
+      paymentTerms: po.paymentTerms,
+      paymentMethod: "Bank Transfer",
+    },
+    assignment: {
+      assignedTo: "System Owner",
+      initials: "SO",
+      role: "Procurement Manager",
+      assignedOn: dateDisp,
+      notes: "Auto-generated purchase order from the Nido procurement system.",
+    },
+    items: [
+      {
+        id: "i1",
+        num: 1,
+        name: po.item,
+        image: "📦",
+        sku: `SKU: ${po.sku}`,
+        specs: po.specs || [],
+        qty: po.qty,
+        unitPrice: fmtINR(po.unitPrice),
+        total: fmtINR(po.grandTotal),
+        status: po.status === "Cancelled" ? "Cancelled" : "Processing",
+        expectedDelivery: po.requestedDelivery || "Within 30 days",
+        tracking: null,
+      },
+    ],
+    documents: po.documents || [],
+    notes: po.notes || [],
+    // keep subtotal rows for the footer
+    _subtotal: po.subtotal,
+    _sgstAmt: po.sgstAmt,
+    _cgstAmt: po.cgstAmt,
+    _grandTotal: po.grandTotal,
+    _sgstPct: po.sgstPct,
+    _cgstPct: po.cgstPct,
+  };
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function VendorOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const poKey = id || "PO-10034";
-  const initialData = PO_DATA[poKey] || { ...PO_DATA.default, poNumber: poKey };
+
+  // Load from shared PO store if available, else fall back to static mock data
+  const realPO: StoredPO | undefined = getPOByNumber(poKey);
+  const initialData = realPO
+    ? storedPOToDetail(realPO)
+    : (PO_DATA[poKey] || { ...PO_DATA.default, poNumber: poKey });
 
   const [orderStatus, setOrderStatus] = useState(initialData.status);
   const [items, setItems] = useState(initialData.items);
@@ -528,6 +604,26 @@ export default function VendorOrderDetailPage() {
   const [cancelled, setCancelled] = useState(false);
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
+
+  // Reset all state when navigating between different PO detail pages
+  useEffect(() => {
+    const po = getPOByNumber(poKey);
+    const data = po
+      ? storedPOToDetail(po)
+      : (PO_DATA[poKey] || { ...PO_DATA.default, poNumber: poKey });
+    setOrderStatus(data.status);
+    setItems(data.items);
+    setDocuments(data.documents);
+    setNotes(data.notes);
+    setAssignment(data.assignment);
+    setCancelled(false);
+  }, [poKey]);
+
+  // Sync status changes back to the shared PO store (only for real POs)
+  useEffect(() => {
+    const currentRealPO = getPOByNumber(poKey);
+    if (currentRealPO) updatePO(poKey, { status: orderStatus as any });
+  }, [orderStatus, poKey]);
 
   const filteredItems = items.filter(it =>
     it.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -731,13 +827,28 @@ export default function VendorOrderDetailPage() {
           ))}
           {/* Totals */}
           <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
-            <div style={{ width: 260 }}>
-              {[["Sub-total", "$1,790.00"], ["Tax (10%)", "$222.00"]].map(([l, v]) => (
-                <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
-                </div>
-              ))}
+            <div style={{ width: 280 }}>
+              {realPO ? (
+                <>
+                  {[
+                    ["Sub-total", "₹ " + realPO.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
+                    [`SGST (${realPO.sgstPct}%)`, "₹ " + realPO.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
+                    [`CGST (${realPO.cgstPct}%)`, "₹ " + realPO.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
+                  ].map(([l, v]) => (
+                    <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
+                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                [["Sub-total", "$1,790.00"], ["Tax (10%)", "$222.00"]].map(([l, v]) => (
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
+                  </div>
+                ))
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
                 <span style={{ fontSize: 15, fontWeight: 800 }}>{initialData.totalAmount}</span>
@@ -776,7 +887,20 @@ export default function VendorOrderDetailPage() {
                     <div style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</div>
                     <div style={{ fontSize: 12.5, color: "#6b7280" }}>{doc.uploadedOn}</div>
                     <DocActionsMenu
-                      onDownload={() => alert(`Downloading: ${doc.name}`)}
+                      onDownload={() => {
+                        if ((doc as any).dataUrl) {
+                          const a = document.createElement("a");
+                          a.href = (doc as any).dataUrl;
+                          a.download = doc.name;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        } else if (realPO) {
+                          downloadPOPdf(realPO);
+                        } else {
+                          alert(`Downloading: ${doc.name}`);
+                        }
+                      }}
                       onDelete={() => handleDeleteDoc(doc.id)}
                     />
                   </div>

@@ -1,0 +1,1 @@
+- [Purchase Order Flow Architecture](po-flow-architecture.md) — full PO creation flow: price-engine vendor selection, PDF via jsPDF, shared localStorage store, VendorOrdersPage merge strategy.

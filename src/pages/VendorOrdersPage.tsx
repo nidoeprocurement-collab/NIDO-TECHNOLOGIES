@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
+import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 
 type OrderStatus = "Draft" | "Processing" | "Confirmed" | "Shipped" | "Delivered" | "Closed" | "Cancelled";
 
@@ -199,10 +200,45 @@ function useToast() {
   return { msg, visible, show };
 }
 
+// ── Map a StoredPO → the Order shape used by this list ───────────────────────
+function storedPOToOrder(po: StoredPO): Order {
+  const createdDate = new Date(po.createdOn);
+  const fmtINR = (n: number) =>
+    "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return {
+    id:        po.poNumber,
+    orderId:   po.orderId,
+    vendor:    po.vendorName,
+    date:      createdDate.toISOString().split("T")[0],
+    dateStr:   createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+    status:    po.status as OrderStatus,
+    amount:    po.grandTotal,
+    amountStr: fmtINR(po.grandTotal),
+    delivery:  po.requestedDelivery || "Within 30 days",
+    by:        "System Owner",
+  };
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function VendorOrderList() {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+
+  // Build orders list: real POs from store (prepended) + static demo orders
+  const [orders, setOrders] = useState<Order[]>(() => {
+    const realPOs = getAllPOs().map(storedPOToOrder);
+    // De-duplicate: real POs take precedence over static entries with the same ID
+    const realIds = new Set(realPOs.map(o => o.id));
+    const staticOrders = INITIAL_ORDERS.filter(o => !realIds.has(o.id));
+    return [...realPOs, ...staticOrders];
+  });
+
+  // Re-read store when page mounts (e.g. after navigation back from a PO detail)
+  useEffect(() => {
+    const realPOs = getAllPOs().map(storedPOToOrder);
+    const realIds = new Set(realPOs.map(o => o.id));
+    const staticOrders = INITIAL_ORDERS.filter(o => !realIds.has(o.id));
+    setOrders([...realPOs, ...staticOrders]);
+  }, []);
   const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
   const [vendorFilter, setVendorFilter] = useState("All Vendors");

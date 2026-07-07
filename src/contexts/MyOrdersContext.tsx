@@ -20,6 +20,7 @@ export interface OrderCartItem {
   specs: string[];
   moq: number;
   clientId: string;
+  productCode?: string;
 }
 
 export interface MyOrder {

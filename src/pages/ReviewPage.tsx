@@ -69,6 +69,7 @@ export default function ReviewPage() {
         specs: Array.isArray(i.specs) ? i.specs : (i.specs ? [i.specs] : []),
         moq: i.moq,
         clientId: i.clientId,
+        productCode: i.productCode,
       })) satisfies OrderCartItem[],
     });
     clearCart();
