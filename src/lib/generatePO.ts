@@ -129,21 +129,23 @@ export function generatePOPdf(po: StoredPO): jsPDF {
   y += 6;
 
   // ── 5. Items table ─────────────────────────────────────────────────────────
-  const qtyLabel = `${po.qty.toFixed(2)}\nNos`;
+  // Support both multi-item POs (po.items[]) and legacy single-item POs
+  const tableBody =
+    po.items && po.items.length > 0
+      ? po.items.map((li, i) => [
+          String(i + 1),
+          li.item,
+          li.hsnCode || "",
+          `${li.qty.toFixed(2)}\nNos`,
+          fmt(li.unitPrice),
+          fmt(li.lineSubtotal),
+        ])
+      : [["1", po.item, po.hsnCode || "", `${po.qty.toFixed(2)}\nNos`, fmt(po.unitPrice), fmt(po.subtotal)]];
 
   autoTable(doc, {
     startY: y,
     head: [["#", "Item & Description", "HSN/SAC", "Qty", "Rate", "Amount"]],
-    body: [
-      [
-        "1",
-        po.item,
-        po.hsnCode || "",
-        qtyLabel,
-        fmt(po.unitPrice),
-        fmt(po.subtotal),
-      ],
-    ],
+    body: tableBody,
     margin: { left: L, right: L },
     theme: "grid",
     headStyles: {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -58,8 +58,21 @@ interface MyOrdersContextType {
 
 const MyOrdersContext = createContext<MyOrdersContextType | undefined>(undefined);
 
+const ORDERS_KEY = "nido_my_orders";
+
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<MyOrder[]>([]);
+  const [orders, setOrders] = useState<MyOrder[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(ORDERS_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  // Persist every change to localStorage so orders survive page refresh
+  useEffect(() => {
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+  }, [orders]);
 
   const addOrder = (order: MyOrder) => {
     setOrders((prev) => [order, ...prev]);

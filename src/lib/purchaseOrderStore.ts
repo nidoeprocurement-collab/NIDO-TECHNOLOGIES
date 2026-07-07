@@ -31,10 +31,25 @@ export type POStatus =
   | "Closed"
   | "Cancelled";
 
+/** One line-item inside a multi-item PO */
+export interface POLineItem {
+  subOrderId: string;
+  item: string;
+  sku: string;
+  category: string;
+  hsnCode: string;
+  specs: string[];
+  qty: number;
+  unitPrice: number;
+  lineSubtotal: number;
+}
+
 export interface StoredPO {
   poNumber: string;
   orderId: string;       // master order ID
-  subOrderId: string;
+  subOrderId: string;   // primary sub-order (first item; kept for backward compat)
+  subOrderIds: string[]; // all sub-order IDs covered by this PO
+  items: POLineItem[];   // all line items (may be more than one if same vendor)
   vendorId: string;
   vendorName: string;
   vendorContact: string;

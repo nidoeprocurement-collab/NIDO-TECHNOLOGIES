@@ -1106,7 +1106,9 @@ export default function MyOrderPage() {
     const yyyy = now.getFullYear();
     const displayDate = `${dd}/${mm}/${yyyy}`;
 
-    const newPOs: Record<string, any> = {};
+    // ── Group pending sub-orders by vendor so one PO is created per vendor ──
+    type GroupEntry = { vendorId: string; meta: any; subs: typeof subOrders };
+    const vendorGroups = new Map<string, GroupEntry>();
 
     for (const sub of subOrders) {
       if (createdPOs[sub.id]) continue;
@@ -1115,18 +1117,50 @@ export default function MyOrderPage() {
       const meta = selectedVendorMeta[sub.id];
       if (!meta) continue;
 
+      if (!vendorGroups.has(vendorId)) {
+        vendorGroups.set(vendorId, { vendorId, meta, subs: [] });
+      }
+      vendorGroups.get(vendorId)!.subs.push(sub);
+    }
+
+    const newPOs: Record<string, any> = {};
+
+    for (const { vendorId, meta, subs } of vendorGroups.values()) {
       const poNumber = generatePoNumber();
-      const unitPrice = meta.unitPrice || 0;
-      const subtotal  = unitPrice * sub.qty;
       const sgstPct = 9, cgstPct = 9;
+
+      // Build one line item per sub-order
+      const lineItems = subs.map(sub => {
+        const unitPrice = (selectedVendorMeta[sub.id] ?? meta).unitPrice || 0;
+        const lineSubtotal = unitPrice * sub.qty;
+        return {
+          subOrderId: sub.id,
+          item:       sub.itemName,
+          sku:        sub.sku,
+          category:   sub.category,
+          hsnCode:    "",
+          specs:      sub.specs,
+          qty:        sub.qty,
+          unitPrice,
+          lineSubtotal,
+        };
+      });
+
+      const subtotal  = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
       const sgstAmt   = Math.round(subtotal * sgstPct) / 100;
       const cgstAmt   = Math.round(subtotal * cgstPct) / 100;
       const grandTotal = subtotal + sgstAmt + cgstAmt;
 
+      // Primary item (first) used for single-item compat fields
+      const primarySub = subs[0];
+      const primaryLine = lineItems[0];
+
       const po: StoredPO = {
         poNumber,
         orderId,
-        subOrderId: sub.id,
+        subOrderId:   primarySub.id,
+        subOrderIds:  subs.map(s => s.id),
+        items:        lineItems,
         vendorId,
         vendorName:        meta.vendorName,
         vendorContact:     meta.contact,
@@ -1139,29 +1173,30 @@ export default function MyOrderPage() {
         vendorCity:        meta.city,
         vendorState:       meta.state,
         vendorPincode:     meta.pincode,
-        item:        sub.itemName,
-        sku:         sub.sku,
-        category:    sub.category,
-        hsnCode:     "",
-        specs:       sub.specs,
-        qty:         sub.qty,
-        unitPrice,
+        // Single-item compat fields — populated from the first line item
+        item:      primarySub.itemName,
+        sku:       primarySub.sku,
+        category:  primarySub.category,
+        hsnCode:   "",
+        specs:     primarySub.specs,
+        qty:       primaryLine.qty,
+        unitPrice: primaryLine.unitPrice,
         subtotal,
         sgstPct,
         cgstPct,
         sgstAmt,
         cgstAmt,
         grandTotal,
-        paymentTerms:       "Net 30",
-        status:             "Processing",
-        createdOn:          now.toISOString(),
-        createdOnDisplay:   displayDate,
-        requestedDelivery:  sub.requiredDate,
+        paymentTerms:      "Net 30",
+        status:            "Processing",
+        createdOn:         now.toISOString(),
+        createdOnDisplay:  displayDate,
+        requestedDelivery: primarySub.requiredDate,
         documents: [],
         notes: [],
       };
 
-      // Generate PDF, store data-URI, trigger download
+      // Generate PDF, store data-URI, trigger one download per PO
       try {
         const dataUri = getPODataUri(po);
         po.documents = [{
@@ -1180,16 +1215,20 @@ export default function MyOrderPage() {
 
       savePO(po);
 
-      newPOs[sub.id] = {
-        vendorId,
-        vendorName: meta.vendorName,
-        poNumber,
-        item:       sub.itemName,
-        qty:        sub.qty,
-        unitPrice,
-        total:      grandTotal,
-        subOrderId: sub.id,
-      };
+      // Map every sub-order in this group to the same PO entry
+      for (const sub of subs) {
+        const lineItem = lineItems.find(li => li.subOrderId === sub.id)!;
+        newPOs[sub.id] = {
+          vendorId,
+          vendorName: meta.vendorName,
+          poNumber,
+          item:       sub.itemName,
+          qty:        sub.qty,
+          unitPrice:  lineItem.unitPrice,
+          total:      grandTotal,
+          subOrderId: sub.id,
+        };
+      }
     }
 
     if (Object.keys(newPOs).length > 0) {
