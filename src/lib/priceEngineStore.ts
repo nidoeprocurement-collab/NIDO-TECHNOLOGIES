@@ -166,6 +166,52 @@ export function applySlabDiscount(finalPrice: number, clientId: string, category
   return finalPrice * (1 - discountPct / 100);
 }
 
+// ─── Client category pricing rules ─────────────────────────────────────────
+// Per-client margin % and buffer % overrides by product category.
+// When a category rule exists, its marginPct overrides the client's global
+// profitPct for products in that category. bufferPct is an additional markup
+// stacked on top of the margin (e.g. logistics buffer, shrinkage).
+
+const CLIENT_CATEGORY_RULES_KEY = 'nido_price_engine_client_category_rules';
+
+export interface CategoryPricingRule {
+  id: string;
+  category: string;
+  marginPct: number;   // overrides global profitPct for this category
+  bufferPct: number;   // additional % stacked on top of margin
+}
+
+function getAllClientCategoryRules(): Record<string, CategoryPricingRule[]> {
+  try {
+    const raw = localStorage.getItem(CLIENT_CATEGORY_RULES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore malformed storage
+  }
+  return {};
+}
+
+export function getClientCategoryRules(clientId: string): CategoryPricingRule[] {
+  const all = getAllClientCategoryRules();
+  return all[clientId] || [];
+}
+
+export function saveClientCategoryRules(clientId: string, rules: CategoryPricingRule[]): void {
+  const all = getAllClientCategoryRules();
+  all[clientId] = rules;
+  localStorage.setItem(CLIENT_CATEGORY_RULES_KEY, JSON.stringify(all));
+  syncClientPrices(clientId);
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
+// Return the effective margin % for a given category, falling back to the
+// client's global profitPct when no category-specific rule is configured.
+export function getCategoryMarginPct(clientId: string, category: string, globalProfitPct: number): number {
+  const rules = getClientCategoryRules(clientId);
+  const rule = rules.find(r => r.category.toLowerCase() === (category || '').toLowerCase());
+  return rule ? rule.marginPct + rule.bufferPct : globalProfitPct;
+}
+
 // ─── Vendor-side computation ────────────────────────────────────────────────
 
 const TERMS_MAP: Record<string, string> = {
