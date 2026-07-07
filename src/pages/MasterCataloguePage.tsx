@@ -911,7 +911,7 @@ export default function CatalogUpdatesTab() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => navigate('/configuration/master-catalogue/add')} className="cursor-pointer">
+            <DropdownMenuItem onClick={() => { sessionStorage.removeItem('nido_preview_draft'); navigate('/configuration/master-catalogue/add'); }} className="cursor-pointer">
               <Plus size={14} className="mr-2" />
               Add New Item
             </DropdownMenuItem>
