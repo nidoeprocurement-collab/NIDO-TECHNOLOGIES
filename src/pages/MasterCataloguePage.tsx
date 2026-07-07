@@ -266,6 +266,33 @@ const auditLogs = [
   { event: 'Bulk Update', detail: 'CSV Catalog Accounts', user: 'Sakelti Gupta', date: '07 Mar 2023 2:50 PM', status: 'Approved' },
 ];
 
+/** Single source of truth for the CSV column order used by both
+ *  exportCatalogExcel (export) and downloadTemplate (blank import template). */
+const CATALOGUE_CSV_HEADERS: string[] = [
+  'Master Product Code', 'Product Name', 'SKU Code', 'Product Type', 'Physical Type',
+  'Category', 'Subcategory', 'Brand',
+  'Tags',          // semicolon-separated e.g. CoreEssentials;New Arrival
+  'Description', 'Warranty', 'Video URL', 'Product Notes',
+  'Price', 'MOQ', 'Lead Time', 'Publish Status',
+  'KeySpec1_Name', 'KeySpec1_Value', 'KeySpec1_Unit',
+  'KeySpec2_Name', 'KeySpec2_Value', 'KeySpec2_Unit',
+  'KeySpec3_Name', 'KeySpec3_Value', 'KeySpec3_Unit',
+  'KeySpec4_Name', 'KeySpec4_Value', 'KeySpec4_Unit',
+  'KeySpec5_Name', 'KeySpec5_Value', 'KeySpec5_Unit',
+  'KeySpec6_Name', 'KeySpec6_Value', 'KeySpec6_Unit',
+  'KeySpec7_Name', 'KeySpec7_Value', 'KeySpec7_Unit',
+  'KeySpec8_Name', 'KeySpec8_Value', 'KeySpec8_Unit',
+  'GenSpec1_Category', 'GenSpec1_AttributeValue',
+  'GenSpec2_Category', 'GenSpec2_AttributeValue',
+  'GenSpec3_Category', 'GenSpec3_AttributeValue',
+  'GenSpec4_Category', 'GenSpec4_AttributeValue',
+  'GenSpec5_Category', 'GenSpec5_AttributeValue',
+  'GenSpec6_Category', 'GenSpec6_AttributeValue',
+  'GenSpec7_Category', 'GenSpec7_AttributeValue',
+  'GenSpec8_Category', 'GenSpec8_AttributeValue',
+  'Image1_URL', 'Image2_URL', 'Image3_URL', 'Image4_URL', 'Image5_URL',
+];
+
 const emptyItem: Omit<CatalogItem, 'id'> = {
   name: '', sku: '', category: '', subCategory: '', brand: '', price: 0, status: 'In Stock',
   tags: [], initialStock: 50, minStockThreshold: 5, description: '', specification: '', warranty: '',
@@ -379,20 +406,25 @@ export default function CatalogUpdatesTab() {
       masterProductCode: product.masterProductCode,
       skuCode: product.skuCode || product.masterProductCode,
       productName: product.productName,
+      productType: product.productType || '',
+      physicalType: product.physicalType || '',
       brand: product.brand,
       category: product.category,
       subcategory: product.subcategory,
+      tags: product.tags || [],
       price: product.price,
       moq: product.moq,
       description: product.description,
+      warranty: product.warranty || '',
       productNotes: product.productNotes || '',
       specifications: product.specifications || [],
       generalSpecs: product.generalSpecs || [],
       images: product.images || [],
       videoUrl: product.videoUrl || '',
       publishStatus: product.publishStatus,
+      createdAt: new Date().toISOString(),
     };
-    localStorage.setItem('nido_preview_draft', JSON.stringify(draft));
+    sessionStorage.setItem('nido_preview_draft', JSON.stringify(draft));
     navigate('/preview-product');
   };
 
@@ -689,10 +721,57 @@ export default function CatalogUpdatesTab() {
   };
 
   const exportCatalogExcel = () => {
-    exportToCSV(items.map(i => ({
-      'Item Name': i.name, SKU: i.sku, Category: i.category, Brand: i.brand,
-      Price: i.price, Status: i.status, 'Initial Stock': i.initialStock,
-    })), 'master-catalogue.csv');
+    const csvCell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const headers = CATALOGUE_CSV_HEADERS;
+
+    const raw = getCatalogProducts();
+    const dataRows = raw.map(p => {
+      const specs = p.specifications || [];
+      const gens = p.generalSpecs || [];
+      const imgs = p.images || [];
+      const row: (string | number)[] = [
+        p.masterProductCode,
+        p.productName,
+        p.skuCode || p.masterProductCode,
+        p.productType || '',
+        p.physicalType || '',
+        p.category,
+        p.subcategory || '',
+        p.brand,
+        (p.tags || []).join(';'),
+        p.description || '',
+        p.warranty || '',
+        p.videoUrl || '',
+        p.productNotes || '',
+        p.price,
+        p.moq ?? '',
+        p.leadTime || '',
+        p.publishStatus,
+      ];
+      // KeySpecs (up to 8)
+      for (let i = 0; i < 8; i++) {
+        const s = specs[i];
+        row.push(s ? s.specification : '', s ? s.value : '', s ? s.unit : '');
+      }
+      // GenSpecs (up to 8)
+      for (let i = 0; i < 8; i++) {
+        const g = gens[i];
+        row.push(g ? g.category : '', g ? g.attributeValue : '');
+      }
+      // Images (up to 5)
+      for (let i = 0; i < 5; i++) {
+        row.push(imgs[i] || '');
+      }
+      return row.map(csvCell).join(',');
+    });
+
+    const csv = [headers.map(csvCell).join(','), ...dataRows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'master-catalogue.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast.success('master-catalogue.csv downloaded');
   };
 
   const exportCatalogPDF = () => {
@@ -712,40 +791,8 @@ export default function CatalogUpdatesTab() {
 
   const downloadTemplate = () => {
     const csvCell = (v: string) => `"${v.replace(/"/g, '""')}"`;
-
-    const headers = [
-      // Core product info
-      'Product Name', 'SKU Code', 'Product Type', 'Physical Type',
-      'Category', 'Subcategory', 'Brand',
-      'Tags',           // semicolon-separated e.g. CoreEssentials;New Arrival
-      'Description',
-      'Warranty',
-      'Video URL', 'Product Notes',
-      // Key Specifications (up to 8 rows)
-      'KeySpec1_Name', 'KeySpec1_Value', 'KeySpec1_Unit',
-      'KeySpec2_Name', 'KeySpec2_Value', 'KeySpec2_Unit',
-      'KeySpec3_Name', 'KeySpec3_Value', 'KeySpec3_Unit',
-      'KeySpec4_Name', 'KeySpec4_Value', 'KeySpec4_Unit',
-      'KeySpec5_Name', 'KeySpec5_Value', 'KeySpec5_Unit',
-      'KeySpec6_Name', 'KeySpec6_Value', 'KeySpec6_Unit',
-      'KeySpec7_Name', 'KeySpec7_Value', 'KeySpec7_Unit',
-      'KeySpec8_Name', 'KeySpec8_Value', 'KeySpec8_Unit',
-      // General Specifications (up to 8 rows)
-      'GenSpec1_Category', 'GenSpec1_AttributeValue',
-      'GenSpec2_Category', 'GenSpec2_AttributeValue',
-      'GenSpec3_Category', 'GenSpec3_AttributeValue',
-      'GenSpec4_Category', 'GenSpec4_AttributeValue',
-      'GenSpec5_Category', 'GenSpec5_AttributeValue',
-      'GenSpec6_Category', 'GenSpec6_AttributeValue',
-      'GenSpec7_Category', 'GenSpec7_AttributeValue',
-      'GenSpec8_Category', 'GenSpec8_AttributeValue',
-      // Product Images — paste public image URLs (up to 5)
-      'Image1_URL', 'Image2_URL', 'Image3_URL', 'Image4_URL', 'Image5_URL',
-    ];
-
     const escRow = (row: string[]) => row.map(csvCell).join(',');
-    const csv = escRow(headers);
-
+    const csv = escRow(CATALOGUE_CSV_HEADERS);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
