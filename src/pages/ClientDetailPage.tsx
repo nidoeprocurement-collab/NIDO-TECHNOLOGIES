@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
 import {
   BarChart,
   Bar,
@@ -168,6 +169,174 @@ export default function App() {
     .filter(Boolean)
     .join(", ") || "No address";
 
+  const shippingAddress = [client.shipping_address || client.shippingAddress, client.shipping_city || client.shippingCity, client.shipping_state || client.shippingState, client.shipping_pincode || client.shippingPincode]
+    .filter(Boolean)
+    .join(", ") || null;
+
+  function handleDownloadProfile() {
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 18;
+    let y = 0;
+
+    // Header band
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageW, 42, "F");
+
+    // Avatar circle
+    doc.setFillColor(255, 255, 255);
+    doc.circle(margin + 12, 21, 12, "F");
+    doc.setTextColor(37, 99, 235);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(initials, margin + 12, 24.5, { align: "center" });
+
+    // Client name & ID
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(client.name, margin + 30, 18);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Client ID: ${client.id}`, margin + 30, 25);
+    doc.text(`Status: ${(client.status || "N/A").toUpperCase()}`, margin + 30, 31);
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-IN")}`, margin + 30, 37);
+
+    y = 52;
+
+    // Helper to draw a section heading
+    function sectionHead(title: string) {
+      doc.setFillColor(239, 246, 255);
+      doc.rect(margin, y - 4, pageW - margin * 2, 8, "F");
+      doc.setTextColor(37, 99, 235);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text(title.toUpperCase(), margin + 2, y + 1);
+      y += 7;
+    }
+
+    // Helper to draw a labeled value row (two-column layout)
+    function row(label: string, value: string, x = margin, colW = pageW - margin * 2) {
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(label, x, y);
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "bold");
+      const lines = doc.splitTextToSize(value || "N/A", colW - 32);
+      doc.text(lines, x + 32, y);
+      y += 5.5 * lines.length;
+    }
+
+    // ── Basic Information ────────────────────────────────────────
+    sectionHead("Basic Information");
+    const halfW = (pageW - margin * 2) / 2;
+    const rightX = margin + halfW + 4;
+
+    // Left column
+    const savedY = y;
+    row("Company Name", client.name, margin, halfW);
+    row("Category", client.category || client.client_category || "N/A", margin, halfW);
+    row("Client Tier", client.tier || client.client_tier || "N/A", margin, halfW);
+    row("Client Rep", client.rep || client.client_rep || "N/A", margin, halfW);
+    const leftEndY = y;
+
+    // Right column
+    y = savedY;
+    row("Email", client.email || "N/A", rightX, halfW);
+    row("Phone", client.phone || "N/A", rightX, halfW);
+    row("Mobile", client.mobile || "N/A", rightX, halfW);
+    row("Website", client.website || "N/A", rightX, halfW);
+    const rightEndY = y;
+
+    y = Math.max(leftEndY, rightEndY) + 3;
+
+    // ── Business Details ─────────────────────────────────────────
+    sectionHead("Business Details");
+    const b1Y = y;
+    row("GST Number", client.gst_number || client.gstNumber || "N/A", margin, halfW);
+    row("PAN Number", client.pan_number || client.panNumber || "N/A", margin, halfW);
+    row("Currency", client.currency || client.preferred_currency || "N/A", margin, halfW);
+    row("Industry", client.industry || "N/A", margin, halfW);
+    const b1End = y;
+
+    y = b1Y;
+    row("Bank Name", client.bank_name || client.bankName || "N/A", rightX, halfW);
+    row("Account No.", client.account_number || client.accountNumber || "N/A", rightX, halfW);
+    row("IFSC Code", client.ifsc_code || client.ifscCode || "N/A", rightX, halfW);
+    row("Branch", client.branch || "N/A", rightX, halfW);
+    const b2End = y;
+
+    y = Math.max(b1End, b2End) + 3;
+
+    // ── Contract Details ──────────────────────────────────────────
+    sectionHead("Contract Details");
+    const c1Y = y;
+    row("Contract Start", contractStart, margin, halfW);
+    row("Days Remaining", daysLeft.toString(), margin, halfW);
+    const c1End = y;
+
+    y = c1Y;
+    row("Contract End", contractEnd ? contractEnd.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "N/A", rightX, halfW);
+    row("Progress", `${contractProgress}%`, rightX, halfW);
+    const c2End = y;
+
+    y = Math.max(c1End, c2End) + 3;
+
+    // ── Address ───────────────────────────────────────────────────
+    sectionHead("Address");
+    const a1Y = y;
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("BILLING ADDRESS", margin, y);
+    y += 4;
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    const billingLines = doc.splitTextToSize(address, halfW - 4);
+    doc.text(billingLines, margin, y);
+    const a1End = y + 5.5 * billingLines.length;
+
+    y = a1Y;
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("SHIPPING ADDRESS", rightX, y);
+    y += 4;
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    const shipLines = doc.splitTextToSize(shippingAddress || address, halfW - 4);
+    doc.text(shipLines, rightX, y);
+
+    y = Math.max(a1End, y + 5.5 * shipLines.length) + 3;
+
+    // ── Notes ─────────────────────────────────────────────────────
+    if (client.notes || client.client_notes) {
+      sectionHead("Notes");
+      const noteLines = doc.splitTextToSize(client.notes || client.client_notes, pageW - margin * 2);
+      doc.setTextColor(30, 41, 59);
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.text(noteLines, margin, y);
+      y += 5.5 * noteLines.length + 3;
+    }
+
+    // Footer
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, pageH - 10, pageW, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text("NIDO Procurement Platform — Confidential", margin, pageH - 3.5);
+    doc.text(`Page 1`, pageW - margin, pageH - 3.5, { align: "right" });
+
+    doc.save(`${client.name.replace(/\s+/g, "_")}_Profile.pdf`);
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Page header */}
@@ -285,7 +454,10 @@ export default function App() {
             </div>
 
             {/* Download button */}
-            <button className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-lg py-2 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors">
+            <button
+              onClick={handleDownloadProfile}
+              className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-lg py-2 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors"
+            >
               <Download size={13} />
               Download Profile
             </button>

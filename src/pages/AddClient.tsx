@@ -1457,7 +1457,7 @@ export default function AddClient() {
                 onClick={handleSave}
                 className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
               >
-                <Check className="h-4 w-4" /> Register Client
+                <Check className="h-4 w-4" /> {clientIdToEdit ? "Save Changes" : "Register Client"}
               </Button>
             )}
           </div>
