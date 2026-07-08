@@ -6,6 +6,9 @@ import {
   addVendorProducts,
   updateVendorProduct,
   getVendorProducts,
+  getAllVendorProducts,
+  reserveVendorProductCode,
+  VPC_FORMAT_RE,
   VendorProduct,
 } from "@/lib/vendorStore";
 
@@ -126,9 +129,12 @@ export default function AddVendorProductsPage() {
         setSelectedRows((rows) => rows.filter((r) => r.catalogProduct.id !== product.id));
       } else {
         next.add(product.id);
+        // Reserve a new VPC from the persistent global counter so the code is
+        // unique even across sessions and across vendors.
+        const vpc = reserveVendorProductCode();
         setSelectedRows((rows) => [
           ...rows,
-          { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: "" },
+          { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: vpc },
         ]);
       }
       return next;
@@ -150,6 +156,31 @@ export default function AddVendorProductsPage() {
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = () => {
     if (selectedRows.length === 0) return;
+
+    // Validate VPC codes before saving
+    const allExistingCodes = new Set(
+      Object.values(getAllVendorProducts()).flat().map((p) => p.vendorProductCode?.trim().toUpperCase())
+    );
+    for (const row of selectedRows) {
+      const code = row.vendorProductCode?.trim();
+      if (!code) {
+        alert(`"${row.catalogProduct.productName}" is missing a Vendor Product Code.`);
+        return;
+      }
+      if (!VPC_FORMAT_RE.test(code)) {
+        alert(`"${code}" is not a valid Vendor Product Code.\nExpected format: VPC-00001`);
+        return;
+      }
+      // In edit mode allow the product to keep its own existing code
+      const isOwnCode = isEditMode && editProductId
+        ? getVendorProducts(vendorId).find((p) => p.id === editProductId)?.vendorProductCode?.trim().toUpperCase() === code.toUpperCase()
+        : false;
+      if (!isOwnCode && allExistingCodes.has(code.toUpperCase())) {
+        alert(`Vendor Product Code "${code}" is already in use. Each product must have a unique VPC.`);
+        return;
+      }
+    }
+
     const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
     if (isEditMode && editProductId) {
