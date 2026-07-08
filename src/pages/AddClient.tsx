@@ -38,6 +38,15 @@ const CATEGORIES = [
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY"];
 
+const isAlphaOnly = (value: string) => /^[A-Za-z\s]*$/.test(value);
+
+const isValidAlphanumeric = (value: string) => {
+  if (!value.trim()) return true;
+  const hasLetter = /[A-Za-z]/.test(value);
+  const hasNumber = /[0-9]/.test(value);
+  return hasLetter && hasNumber;
+};
+
 const GST_TREATMENTS = [
   "Registered Business",
   "Unregistered Business",
@@ -105,6 +114,7 @@ export default function AddClient() {
     // Step 2: Business
     gst_treatment: "",
     gstin: "",
+    id_reference_number: "",
     source_of_supply: "",
     pan_number: "",
     currency: "INR",
@@ -140,6 +150,14 @@ export default function AddClient() {
   ]);
   const [showAddTier, setShowAddTier] = useState(false);
   const [newTier, setNewTier] = useState("");
+
+  const [categoriesList, setCategoriesList] = useState<string[]>(CATEGORIES);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+
+  const [currenciesList, setCurrenciesList] = useState<string[]>(CURRENCIES);
+  const [showAddCurrency, setShowAddCurrency] = useState(false);
+  const [newCurrency, setNewCurrency] = useState("");
 
   // Load client data for editing or generate Client ID for new client
   useEffect(() => {
@@ -236,9 +254,10 @@ export default function AddClient() {
       );
     }
     if (step === 1) {
+      const gstinRequired = formData.gst_treatment === "Registered Business";
       return !!(
         formData.gst_treatment &&
-        formData.gstin.trim() &&
+        (!gstinRequired || (formData.gstin.trim() && isValidAlphanumeric(formData.gstin))) &&
         formData.pan_number.trim()
       );
     }
@@ -531,21 +550,64 @@ export default function AddClient() {
                     </label>
                     <Select
                       value={formData.category}
-                      onValueChange={(value) =>
-                        handleInputChange("category", value)
-                      }
+                      onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddCategory(true);
+                        } else {
+                          handleInputChange("category", value);
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map((cat) => (
+                        {categoriesList.map((cat) => (
                           <SelectItem key={cat} value={cat}>
                             {cat}
                           </SelectItem>
                         ))}
+                        <SelectItem value="add_new" className="text-[#4A6CF7]">
+                          + Add New Category
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+                    {showAddCategory && (
+                      <div className="mt-3 p-3 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter new category name"
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
+                            onClick={() => {
+                              if (newCategory.trim()) {
+                                setCategoriesList([...categoriesList, newCategory]);
+                                handleInputChange("category", newCategory);
+                                setNewCategory("");
+                                setShowAddCategory(false);
+                                toast.success("Category added successfully");
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowAddCategory(false);
+                              setNewCategory("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -728,9 +790,17 @@ export default function AddClient() {
                     <Input
                       type="date"
                       value={formData.contract_start_date}
-                      onChange={(e) =>
-                        handleInputChange("contract_start_date", e.target.value)
-                      }
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          contract_start_date: newStart,
+                          contract_end_date:
+                            prev.contract_end_date && newStart && prev.contract_end_date <= newStart
+                              ? ""
+                              : prev.contract_end_date,
+                        }));
+                      }}
                     />
                   </div>
                   <div>
@@ -740,10 +810,34 @@ export default function AddClient() {
                     <Input
                       type="date"
                       value={formData.contract_end_date}
-                      onChange={(e) =>
-                        handleInputChange("contract_end_date", e.target.value)
+                      min={
+                        formData.contract_start_date
+                          ? new Date(
+                              new Date(formData.contract_start_date).getTime() + 86400000
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          : undefined
                       }
+                      disabled={!formData.contract_start_date}
+                      onChange={(e) => {
+                        if (
+                          formData.contract_start_date &&
+                          e.target.value <= formData.contract_start_date
+                        ) {
+                          toast.error(
+                            "Contract End Date must be after the Contract Start Date"
+                          );
+                          return;
+                        }
+                        handleInputChange("contract_end_date", e.target.value);
+                      }}
                     />
+                    {!formData.contract_start_date && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select a Contract Start Date first
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -786,9 +880,11 @@ export default function AddClient() {
                     <Input
                       placeholder="State/UT"
                       value={formData.source_of_supply}
-                      onChange={(e) =>
-                        handleInputChange("source_of_supply", e.target.value)
-                      }
+                      onChange={(e) => {
+                        if (isAlphaOnly(e.target.value)) {
+                          handleInputChange("source_of_supply", e.target.value);
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -796,7 +892,7 @@ export default function AddClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      GSTIN *
+                      GSTIN {formData.gst_treatment === "Registered Business" ? "*" : ""}
                     </label>
                     <Input
                       placeholder="27AABCT1234A1Z5"
@@ -804,7 +900,17 @@ export default function AddClient() {
                       onChange={(e) =>
                         handleInputChange("gstin", e.target.value)
                       }
+                      className={
+                        formData.gstin && !isValidAlphanumeric(formData.gstin)
+                          ? "border-red-400 focus-visible:ring-red-400"
+                          : ""
+                      }
                     />
+                    {formData.gstin && !isValidAlphanumeric(formData.gstin) && (
+                      <p className="text-xs text-red-500 mt-1">
+                        GSTIN must be alphanumeric (letters and numbers only, not all letters or all numbers)
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -823,25 +929,83 @@ export default function AddClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
+                      ID/Reference Number
+                    </label>
+                    <Input
+                      placeholder="Enter ID or reference number"
+                      value={formData.id_reference_number}
+                      onChange={(e) =>
+                        handleInputChange("id_reference_number", e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
                       Currency
                     </label>
                     <Select
                       value={formData.currency}
-                      onValueChange={(value) =>
-                        handleInputChange("currency", value)
-                      }
+                      onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddCurrency(true);
+                        } else {
+                          handleInputChange("currency", value);
+                        }
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CURRENCIES.map((curr) => (
+                        {currenciesList.map((curr) => (
                           <SelectItem key={curr} value={curr}>
                             {curr}
                           </SelectItem>
                         ))}
+                        <SelectItem value="add_new" className="text-[#4A6CF7]">
+                          + Add New Currency
+                        </SelectItem>
                       </SelectContent>
                     </Select>
+                    {showAddCurrency && (
+                      <div className="mt-3 p-3 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter new currency code (e.g., AUD)"
+                            value={newCurrency}
+                            onChange={(e) => setNewCurrency(e.target.value.toUpperCase())}
+                          />
+                          <Button
+                            size="sm"
+                            className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
+                            onClick={() => {
+                              if (newCurrency.trim()) {
+                                setCurrenciesList([...currenciesList, newCurrency]);
+                                handleInputChange("currency", newCurrency);
+                                setNewCurrency("");
+                                setShowAddCurrency(false);
+                                toast.success("Currency added successfully");
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowAddCurrency(false);
+                              setNewCurrency("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">
