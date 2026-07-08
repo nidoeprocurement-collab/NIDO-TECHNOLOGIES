@@ -344,6 +344,7 @@ function AppRoutes() {
             }
           />
           <Route path="clients/add" element={<AddClient />} />
+          <Route path="clients/:id/edit" element={<AddClient />} />
           <Route
             path="clients/:id"
             element={
