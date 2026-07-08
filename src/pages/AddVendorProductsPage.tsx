@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import {
   addVendorProducts,
@@ -156,9 +156,28 @@ export default function AddVendorProductsPage() {
     []
   );
 
+  // ── Validation modal ─────────────────────────────────────────────────────
+  type MissingField = { productName: string; missing: string[] };
+  const [validationErrors, setValidationErrors] = useState<MissingField[]>([]);
+
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = () => {
     if (selectedRows.length === 0) return;
+
+    // Validate required vendor-specific fields before saving
+    const errors: MissingField[] = [];
+    for (const row of selectedRows) {
+      const missing: string[] = [];
+      if (!row.price || row.price.trim() === "" || Number(row.price) <= 0) missing.push("Purchase Price");
+      if (!row.moq   || row.moq.trim()   === "") missing.push("MOQ");
+      if (!row.leadTime || row.leadTime.trim() === "") missing.push("Lead Time");
+      if (!row.stock || row.stock.trim() === "") missing.push("Stock");
+      if (missing.length > 0) errors.push({ productName: row.catalogProduct.productName, missing });
+    }
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
 
     const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -259,7 +278,7 @@ export default function AddVendorProductsPage() {
             </div>
 
             {/* Table area */}
-            <div className="w-full overflow-x-auto">
+            <div className="w-full overflow-x-visible">
               {catalog.length === 0 ? (
                 <div className="px-5 py-10 text-center text-gray-400 text-sm">
                   No products in master catalog yet. Add products via Master Catalog first.
@@ -378,7 +397,7 @@ export default function AddVendorProductsPage() {
           ) : (
             <>
               {/* Table */}
-              <div className="w-full overflow-x-auto">
+              <div className="w-full overflow-x-visible">
                 <table className="w-full text-sm" style={{ minWidth: "900px" }}>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-100">
@@ -487,6 +506,46 @@ export default function AddVendorProductsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Validation warning modal ── */}
+      {validationErrors.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Missing Required Details</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Please fill in all required fields before adding products.
+                </p>
+              </div>
+            </div>
+
+            {/* Error list */}
+            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+              {validationErrors.map((err, i) => (
+                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5">
+                  <p className="text-sm font-medium text-gray-800 leading-tight truncate">{err.productName}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Missing: {err.missing.join(", ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Action */}
+            <button
+              onClick={() => setValidationErrors([])}
+              className="w-full py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Go Back &amp; Fill Details
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Sticky footer ── */}
       <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 shadow-[0_-1px_4px_rgba(0,0,0,0.06)]">

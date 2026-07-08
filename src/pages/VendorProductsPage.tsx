@@ -489,7 +489,7 @@ export default function VendorProductsPage() {
               </button>
             </div>
           ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-visible">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
