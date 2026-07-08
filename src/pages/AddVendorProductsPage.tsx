@@ -122,6 +122,13 @@ export default function AddVendorProductsPage() {
   }, [editProductId, isEditMode, vendorId]);
 
   const toggleSelect = useCallback((product: CatalogProduct) => {
+    // Reserve the VPC OUTSIDE the state updater so it runs exactly once.
+    // Inside a functional updater React 18 Strict Mode runs the function
+    // twice (to detect side-effects), which would increment the counter twice
+    // and create gaps in the sequence (e.g. 5 → 7 instead of 5 → 6).
+    const isAlreadySelected = selectedIds.has(product.id);
+    const vpc = isAlreadySelected ? "" : reserveVendorProductCode();
+
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(product.id)) {
@@ -129,9 +136,6 @@ export default function AddVendorProductsPage() {
         setSelectedRows((rows) => rows.filter((r) => r.catalogProduct.id !== product.id));
       } else {
         next.add(product.id);
-        // Reserve a new VPC from the persistent global counter so the code is
-        // unique even across sessions and across vendors.
-        const vpc = reserveVendorProductCode();
         setSelectedRows((rows) => [
           ...rows,
           { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: vpc },
@@ -139,7 +143,7 @@ export default function AddVendorProductsPage() {
       }
       return next;
     });
-  }, []);
+  }, [selectedIds]);
 
   const removeSelected = useCallback((id: string) => {
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
@@ -473,13 +477,9 @@ export default function AddVendorProductsPage() {
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <input
-                            type="text"
-                            value={row.vendorProductCode}
-                            onChange={(e) => updateRow(row.catalogProduct.id, "vendorProductCode", e.target.value)}
-                            placeholder="e.g. VPC-001"
-                            className="w-full min-w-[110px] max-w-[150px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
+                          <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md select-all">
+                            {row.vendorProductCode}
+                          </span>
                         </td>
                         {!isEditMode && (
                           <td className="px-3 py-3">
