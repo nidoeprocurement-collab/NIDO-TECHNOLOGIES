@@ -680,7 +680,7 @@ export default function CatalogUpdatesTab() {
             productNotes: col(row, 'product notes'),
             videoUrl: col(row, 'video url'),
             images,
-            publishStatus: 'published' as const,
+            publishStatus: 'draft' as const,
             price: 0,
             moq: 0,
             leadTime: '',
@@ -693,7 +693,7 @@ export default function CatalogUpdatesTab() {
 
         if (added > 0) {
           loadFromStore();
-          toast.success(`${added} product(s) imported successfully as published`);
+          toast.success(`${added} product(s) imported as Draft. Review and publish when ready.`);
           setBulkImportOpen(false);
         } else {
           toast.error('No valid rows found. Ensure "Product Name" column has values.');
