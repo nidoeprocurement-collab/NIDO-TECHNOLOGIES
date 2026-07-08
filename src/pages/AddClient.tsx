@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { addClient as addStoredClient } from "@/lib/clientStore";
+import { addClient as addStoredClient, getClients } from "@/lib/clientStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -162,48 +162,91 @@ export default function AddClient() {
   // Load client data for editing or generate Client ID for new client
   useEffect(() => {
     if (clientIdToEdit) {
-      // Load existing client data for mock
+      // Load the real, previously saved client data
       console.log("[v0] Loading client data for:", clientIdToEdit);
-      
-      // Mock data for editing
-      const mockClient = {
-        client_id: "CL-00001",
-        company_name: "Acme Corporation",
-        category: "IT Hardware",
-        client_tier: "Premium Clients",
-        contact_person: "John Doe",
-        email: "john@acme.com",
-        phone: "+91 98765 43210",
-        mobile: "+91 99876 54321",
-        website: "www.acme.com",
-        contract_start_date: "2024-01-01",
-        contract_end_date: "2025-01-01",
-        gst_treatment: "Registered Business",
-        gstin: "27AABCT1234A1Z5",
-        source_of_supply: "Maharashtra",
-        pan_number: "AAAAA0000A",
-        currency: "INR",
-        opening_balance: "10000",
-        payment_terms: "Net 30",
-        tds_rate: "2.5",
-        bank_name: "State Bank of India",
-        account_number: "1234567890",
-        ifsc_code: "SBIN0001234",
-        branch: "Mumbai",
-        billing_address: "123 Business Street, Suite 100",
-        billing_city: "Mumbai",
-        billing_state: "Maharashtra",
-        billing_pincode: "400001",
-        shipping_address: "123 Business Street, Suite 100",
-        shipping_city: "Mumbai",
-        shipping_state: "Maharashtra",
-        shipping_pincode: "400001",
-      };
 
-      setFormData((prev) => ({
-        ...prev,
-        ...mockClient,
-      }));
+      const existing = getClients().find((c) => c.id === clientIdToEdit);
+
+      if (existing) {
+        const loadedClient = {
+          client_id: existing.id || clientIdToEdit,
+          company_name: existing.company_name || existing.name || "",
+          category: existing.category || "",
+          client_tier: existing.client_tier || existing.tier || "",
+          contact_person: existing.contact_person || existing.rep || "",
+          email: existing.email || "",
+          phone: existing.phone || "",
+          mobile: existing.mobile || "",
+          website: existing.website || "",
+          contract_start_date:
+            existing.contract_start_date || existing.contractStartDate || "",
+          contract_end_date:
+            existing.contract_end_date || existing.contractEndDate || "",
+          client_logo_url: existing.client_logo_url || "",
+          gst_treatment: existing.gst_treatment || "",
+          gstin: existing.gstin || "",
+          id_reference_number: existing.id_reference_number || "",
+          source_of_supply: existing.source_of_supply || "",
+          pan_number: existing.pan_number || "",
+          currency: existing.currency || "INR",
+          opening_balance:
+            existing.opening_balance != null
+              ? String(existing.opening_balance)
+              : "",
+          payment_terms: existing.payment_terms || "",
+          tds_rate: existing.tds_rate != null ? String(existing.tds_rate) : "",
+          bank_name: existing.bank_name || "",
+          account_number: existing.account_number || "",
+          ifsc_code: existing.ifsc_code || "",
+          branch: existing.branch || "",
+          billing_address:
+            existing.billing_address || existing.billingAddress || "",
+          billing_city: existing.billing_city || existing.billingCity || "",
+          billing_state: existing.billing_state || existing.billingState || "",
+          billing_pincode:
+            existing.billing_pincode || existing.billingPincode || "",
+          shipping_address:
+            existing.shipping_address || existing.shippingAddress || "",
+          shipping_city:
+            existing.shipping_city || existing.shippingCity || "",
+          shipping_state:
+            existing.shipping_state || existing.shippingState || "",
+          shipping_pincode:
+            existing.shipping_pincode || existing.shippingPincode || "",
+          same_address: !!existing.same_address,
+        };
+
+        setFormData((prev) => ({
+          ...prev,
+          ...loadedClient,
+        }));
+
+        // Make sure dropdown lists include the client's saved values
+        if (loadedClient.category) {
+          setCategoriesList((prev) =>
+            prev.includes(loadedClient.category)
+              ? prev
+              : [...prev, loadedClient.category]
+          );
+        }
+        if (loadedClient.client_tier) {
+          setClientTiers((prev) =>
+            prev.includes(loadedClient.client_tier)
+              ? prev
+              : [...prev, loadedClient.client_tier]
+          );
+        }
+        if (loadedClient.currency) {
+          setCurrenciesList((prev) =>
+            prev.includes(loadedClient.currency)
+              ? prev
+              : [...prev, loadedClient.currency]
+          );
+        }
+      } else {
+        toast.error("Client not found");
+      }
+
       setIsLoading(false);
     } else {
       // Generate new Client ID
