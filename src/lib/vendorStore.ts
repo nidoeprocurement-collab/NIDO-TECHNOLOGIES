@@ -102,6 +102,15 @@ function writeVpcCounter(value: number): void {
 }
 
 /**
+ * Peek at the current counter value without incrementing it.
+ * Use this to compute preview VPC codes for display only —
+ * the counter is not advanced, so cancelling wastes nothing.
+ */
+export function peekVpcCounter(): number {
+  return readVpcCounter();
+}
+
+/**
  * Reserve `count` sequential VPC codes atomically.
  * The counter is incremented before returning so the same codes
  * are never issued twice, even across separate sessions.

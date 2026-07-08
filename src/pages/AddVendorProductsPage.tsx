@@ -7,6 +7,7 @@ import {
   updateVendorProduct,
   getVendorProducts,
   getAllVendorProducts,
+  peekVpcCounter,
   reserveVendorProductCodes,
   VendorProduct,
 } from "@/lib/vendorStore";
@@ -128,12 +129,16 @@ export default function AddVendorProductsPage() {
         setSelectedRows((rows) => rows.filter((r) => r.catalogProduct.id !== product.id));
       } else {
         next.add(product.id);
-        // VPC is left blank here — codes are reserved only when the user
-        // confirms by clicking "Add Products", so cancelling wastes nothing.
-        setSelectedRows((rows) => [
-          ...rows,
-          { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: "" },
-        ]);
+        // Compute a *preview* VPC for display — peekVpcCounter() is a pure
+        // localStorage read with no side-effects, so it is safe to call inside
+        // a React state updater (even under Strict Mode's double-invocation).
+        // The persistent counter is NOT incremented here; codes are only
+        // reserved when the user confirms with "Add Products", so cancelling
+        // the page wastes no sequence numbers.
+        setSelectedRows((rows) => {
+          const preview = `VPC-${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
+          return [...rows, { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: preview }];
+        });
       }
       return next;
     });
@@ -451,15 +456,9 @@ export default function AddVendorProductsPage() {
                           />
                         </td>
                         <td className="px-3 py-3">
-                          {row.vendorProductCode ? (
-                            <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md">
-                              {row.vendorProductCode}
-                            </span>
-                          ) : (
-                            <span className="inline-block min-w-[110px] px-2 py-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md italic">
-                              Auto-assigned on save
-                            </span>
-                          )}
+                          <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md">
+                            {row.vendorProductCode}
+                          </span>
                         </td>
                         {!isEditMode && (
                           <td className="px-3 py-3">
