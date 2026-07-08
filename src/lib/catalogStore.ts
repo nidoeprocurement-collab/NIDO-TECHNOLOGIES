@@ -73,6 +73,77 @@ export function saveCatalogProduct(product: CatalogProduct): void {
   }
   localStorage.setItem(STORE_KEY, JSON.stringify(products));
   window.dispatchEvent(new Event('catalogUpdated'));
+
+  // ── Propagate master catalog changes downstream ──────────────────────────
+  // We use raw localStorage reads here (no imports from other stores) to avoid
+  // circular-dependency issues. Only the snapshot fields that originate from
+  // the master catalog are overwritten; vendor-specific / client-specific fields
+  // (price, moq, leadTime, stock, roles, preference, etc.) are left untouched.
+
+  // 1. Vendor products — matched by id (= catalog product id)
+  try {
+    const VENDOR_KEY = 'nido_vendor_products';
+    const vendorStore: Record<string, Record<string, unknown>[]> =
+      JSON.parse(localStorage.getItem(VENDOR_KEY) || '{}');
+    let vendorChanged = false;
+    for (const vendorId of Object.keys(vendorStore)) {
+      vendorStore[vendorId] = vendorStore[vendorId].map((p) => {
+        if (p.id !== product.id) return p;
+        vendorChanged = true;
+        return {
+          ...p,
+          masterProductCode: product.masterProductCode,
+          skuCode:           product.skuCode,
+          productName:       product.productName,
+          category:          product.category,
+          brand:             product.brand,
+          images:            product.images,
+        };
+      });
+    }
+    if (vendorChanged) {
+      localStorage.setItem(VENDOR_KEY, JSON.stringify(vendorStore));
+      window.dispatchEvent(new Event('vendorProductsUpdated'));
+    }
+  } catch { /* never block the save */ }
+
+  // 2. Client catalogs — matched by productCode (= masterProductCode)
+  try {
+    const CLIENT_KEY = 'nido_client_catalogs';
+    const clientStore: Record<string, Record<string, unknown>[]> =
+      JSON.parse(localStorage.getItem(CLIENT_KEY) || '{}');
+
+    // Pre-format specs so we don't repeat the work per client
+    const specs: string[] = (product.specifications ?? []).map(
+      (s) => `${s.specification}: ${s.value}${s.unit ? ' ' + s.unit : ''}`.trim()
+    );
+    const generalSpecs: { label: string; value: string }[] = (product.generalSpecs ?? []).map(
+      (s) => ({ label: s.category, value: s.attributeValue })
+    );
+
+    let clientChanged = false;
+    for (const clientId of Object.keys(clientStore)) {
+      clientStore[clientId] = clientStore[clientId].map((e) => {
+        if (e.productCode !== product.masterProductCode) return e;
+        clientChanged = true;
+        return {
+          ...e,
+          productCode:  product.masterProductCode,
+          sku:          product.skuCode,
+          name:         product.productName,
+          category:     product.category,
+          img:          product.images?.[0] ?? (e.img as string) ?? '',
+          description:  product.description,
+          specs,
+          generalSpecs,
+        };
+      });
+    }
+    if (clientChanged) {
+      localStorage.setItem(CLIENT_KEY, JSON.stringify(clientStore));
+      window.dispatchEvent(new Event('clientCatalogUpdated'));
+    }
+  } catch { /* never block the save */ }
 }
 
 export function deleteCatalogProduct(id: string): void {
