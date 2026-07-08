@@ -49,6 +49,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const [productNotes, setProductNotes] = useState(draft?.productNotes ?? '');
   const [videoUrl, setVideoUrl] = useState(draft?.videoUrl ?? '');
   const [images, setImages] = useState<string[]>(draft?.images ?? []);
+  const [imageUrlInputs, setImageUrlInputs] = useState<string[]>(['', '', '', '', '']);
 
   // Load product data when in edit mode
   useEffect(() => {
@@ -146,6 +147,24 @@ export default function AddMasterCatalogueItemWrapper() {
       reader.onload = ev => { if (ev.target?.result) setImages(p => [...p, ev.target!.result as string]); };
       reader.readAsDataURL(file);
     });
+  };
+
+  const updateImageUrlInput = (idx: number, val: string) =>
+    setImageUrlInputs(rows => rows.map((r, i) => i === idx ? val : r));
+
+  const addImageUrlInputRow = () => setImageUrlInputs(rows => [...rows, '']);
+
+  const removeImageUrlInputRow = (idx: number) =>
+    setImageUrlInputs(rows => rows.length > 1 ? rows.filter((_, i) => i !== idx) : rows);
+
+  const handleAddImageUrls = () => {
+    const urls = imageUrlInputs.map(u => u.trim()).filter(Boolean);
+    if (urls.length === 0) { toast.error('Enter at least one image URL'); return; }
+    const invalid = urls.find(u => !/^https?:\/\//i.test(u));
+    if (invalid) { toast.error('Please enter valid image URLs starting with http:// or https://'); return; }
+    setImages(p => [...p, ...urls]);
+    setImageUrlInputs(['', '', '', '', '']);
+    toast.success(`${urls.length} image URL(s) added`);
   };
 
   const buildProduct = (status: 'draft' | 'published') => ({
@@ -507,6 +526,41 @@ export default function AddMasterCatalogueItemWrapper() {
                   ))}
                 </div>
               )}
+            </div>
+
+            <div>
+              <Label className="text-xs sm:text-sm font-medium text-gray-700">Add Images via URL</Label>
+              <p className="text-xs text-gray-500 mt-0.5">Same as the Image1_URL...Image5_URL columns used in the Bulk Import template — paste one link per row.</p>
+              <div className="mt-2 space-y-2">
+                {imageUrlInputs.map((url, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      placeholder={`https://example.com/image${idx + 1}.jpg`}
+                      value={url}
+                      onChange={e => updateImageUrlInput(idx, e.target.value)}
+                      className="text-sm flex-1"
+                    />
+                    {imageUrlInputs.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeImageUrlInputRow(idx)}
+                        className="text-gray-400 hover:text-red-500 shrink-0"
+                        title="Remove row"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addImageUrlInputRow}>
+                  <Plus size={14} /> Add Another URL
+                </Button>
+                <Button type="button" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5" onClick={handleAddImageUrls}>
+                  <Link2 size={14} /> Add URL(s) to Product
+                </Button>
+              </div>
             </div>
 
             <div>
