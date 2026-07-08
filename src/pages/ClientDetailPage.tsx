@@ -196,8 +196,16 @@ export default function App() {
 
             {/* Avatar */}
             <div className="flex flex-col items-center gap-2 pt-2">
-              <div className="w-16 h-16 rounded-full border-2 border-blue-500 flex items-center justify-center bg-white">
-                <span className="text-blue-600 font-bold text-lg">{initials}</span>
+              <div className="w-16 h-16 rounded-full border-2 border-blue-500 flex items-center justify-center bg-white overflow-hidden">
+                {client.client_logo_url ? (
+                  <img
+                    src={client.client_logo_url}
+                    alt={`${client.name} logo`}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  <span className="text-blue-600 font-bold text-lg">{initials}</span>
+                )}
               </div>
               <div className="text-center">
                 <p className="font-semibold text-gray-900 text-sm">{client.name}</p>

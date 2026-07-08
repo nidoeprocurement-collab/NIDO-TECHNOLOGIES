@@ -265,7 +265,9 @@ export default function AddClient() {
       return !!(
         formData.payment_terms &&
         formData.bank_name.trim() &&
-        formData.account_number.trim()
+        formData.account_number.trim() &&
+        formData.ifsc_code.trim() &&
+        formData.branch.trim()
       );
     }
     if (step === 3) {
@@ -1099,7 +1101,7 @@ export default function AddClient() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      IFSC Code
+                      IFSC Code *
                     </label>
                     <Input
                       placeholder="SBIN0001234"
@@ -1111,7 +1113,7 @@ export default function AddClient() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Branch
+                      Branch *
                     </label>
                     <Input
                       placeholder="Branch name"
@@ -1132,149 +1134,192 @@ export default function AddClient() {
                   <h2 className="text-xl font-bold mb-1">Step 4: Address</h2>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Billing Address *
-                  </label>
-                  <Textarea
-                    placeholder="Street address"
-                    value={formData.billing_address}
-                    onChange={(e) =>
-                      handleInputChange("billing_address", e.target.value)
-                    }
-                    rows={3}
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.same_address}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          same_address: true,
+                          shipping_address: prev.billing_address,
+                          shipping_city: prev.billing_city,
+                          shipping_state: prev.billing_state,
+                          shipping_pincode: prev.billing_pincode,
+                        }));
+                      } else {
+                        handleInputChange("same_address", false);
+                      }
+                    }}
+                    className="mr-2"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Shipping Address
-                  </label>
-                  <Textarea
-                    placeholder="Street address"
-                    value={formData.shipping_address}
-                    onChange={(e) =>
-                      handleInputChange("shipping_address", e.target.value)
-                    }
-                    rows={3}
-                    disabled={formData.same_address}
-                  />
-                  <label className="flex items-center mt-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.same_address}
-                      onChange={(e) =>
-                        handleInputChange("same_address", e.target.checked)
-                      }
-                      className="mr-2"
-                    />
-                    <span className="text-sm">
-                      Shipping address same as billing
-                    </span>
-                  </label>
-                </div>
+                  <span className="text-sm">
+                    Shipping address same as billing
+                  </span>
+                </label>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Billing City *
-                    </label>
-                    <Input
-                      placeholder="City"
-                      value={formData.billing_city}
-                      onChange={(e) =>
-                        handleInputChange("billing_city", e.target.value)
-                      }
-                    />
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700">
+                      Billing Address
+                    </h3>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Billing Address *
+                      </label>
+                      <Textarea
+                        placeholder="Street address"
+                        value={formData.billing_address}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            billing_address: value,
+                            shipping_address: prev.same_address
+                              ? value
+                              : prev.shipping_address,
+                          }));
+                        }}
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Billing City *
+                      </label>
+                      <Input
+                        placeholder="City"
+                        value={formData.billing_city}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            billing_city: value,
+                            shipping_city: prev.same_address
+                              ? value
+                              : prev.shipping_city,
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Billing State *
+                      </label>
+                      <Select
+                        value={formData.billing_state}
+                        onValueChange={(value) =>
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            billing_state: value,
+                            shipping_state: prev.same_address
+                              ? value
+                              : prev.shipping_state,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {INDIAN_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Billing Pincode *
+                      </label>
+                      <Input
+                        placeholder="400001"
+                        value={formData.billing_pincode}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData((prev: any) => ({
+                            ...prev,
+                            billing_pincode: value,
+                            shipping_pincode: prev.same_address
+                              ? value
+                              : prev.shipping_pincode,
+                          }));
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Shipping City
-                    </label>
-                    <Input
-                      placeholder="City"
-                      value={formData.shipping_city}
-                      onChange={(e) =>
-                        handleInputChange("shipping_city", e.target.value)
-                      }
-                      disabled={formData.same_address}
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Billing State *
-                    </label>
-                    <Select
-                      value={formData.billing_state}
-                      onValueChange={(value) =>
-                        handleInputChange("billing_state", value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select state" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDIAN_STATES.map((state) => (
-                          <SelectItem key={state} value={state}>
-                            {state}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Shipping State
-                    </label>
-                    <Select
-                      value={formData.shipping_state}
-                      onValueChange={(value) =>
-                        handleInputChange("shipping_state", value)
-                      }
-                      disabled={formData.same_address}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select state" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {INDIAN_STATES.map((state) => (
-                          <SelectItem key={state} value={state}>
-                            {state}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Billing Pincode *
-                    </label>
-                    <Input
-                      placeholder="400001"
-                      value={formData.billing_pincode}
-                      onChange={(e) =>
-                        handleInputChange("billing_pincode", e.target.value)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Shipping Pincode
-                    </label>
-                    <Input
-                      placeholder="400001"
-                      value={formData.shipping_pincode}
-                      onChange={(e) =>
-                        handleInputChange("shipping_pincode", e.target.value)
-                      }
-                      disabled={formData.same_address}
-                    />
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700">
+                      Shipping Address
+                    </h3>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Shipping Address
+                      </label>
+                      <Textarea
+                        placeholder="Street address"
+                        value={formData.shipping_address}
+                        onChange={(e) =>
+                          handleInputChange("shipping_address", e.target.value)
+                        }
+                        rows={3}
+                        disabled={formData.same_address}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Shipping City
+                      </label>
+                      <Input
+                        placeholder="City"
+                        value={formData.shipping_city}
+                        onChange={(e) =>
+                          handleInputChange("shipping_city", e.target.value)
+                        }
+                        disabled={formData.same_address}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Shipping State
+                      </label>
+                      <Select
+                        value={formData.shipping_state}
+                        onValueChange={(value) =>
+                          handleInputChange("shipping_state", value)
+                        }
+                        disabled={formData.same_address}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {INDIAN_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Shipping Pincode
+                      </label>
+                      <Input
+                        placeholder="400001"
+                        value={formData.shipping_pincode}
+                        onChange={(e) =>
+                          handleInputChange("shipping_pincode", e.target.value)
+                        }
+                        disabled={formData.same_address}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
