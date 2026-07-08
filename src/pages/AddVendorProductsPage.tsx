@@ -7,8 +7,7 @@ import {
   updateVendorProduct,
   getVendorProducts,
   getAllVendorProducts,
-  reserveVendorProductCode,
-  VPC_FORMAT_RE,
+  reserveVendorProductCodes,
   VendorProduct,
 } from "@/lib/vendorStore";
 
@@ -122,13 +121,6 @@ export default function AddVendorProductsPage() {
   }, [editProductId, isEditMode, vendorId]);
 
   const toggleSelect = useCallback((product: CatalogProduct) => {
-    // Reserve the VPC OUTSIDE the state updater so it runs exactly once.
-    // Inside a functional updater React 18 Strict Mode runs the function
-    // twice (to detect side-effects), which would increment the counter twice
-    // and create gaps in the sequence (e.g. 5 → 7 instead of 5 → 6).
-    const isAlreadySelected = selectedIds.has(product.id);
-    const vpc = isAlreadySelected ? "" : reserveVendorProductCode();
-
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(product.id)) {
@@ -136,14 +128,16 @@ export default function AddVendorProductsPage() {
         setSelectedRows((rows) => rows.filter((r) => r.catalogProduct.id !== product.id));
       } else {
         next.add(product.id);
+        // VPC is left blank here — codes are reserved only when the user
+        // confirms by clicking "Add Products", so cancelling wastes nothing.
         setSelectedRows((rows) => [
           ...rows,
-          { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: vpc },
+          { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: "" },
         ]);
       }
       return next;
     });
-  }, [selectedIds]);
+  }, []);
 
   const removeSelected = useCallback((id: string) => {
     setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
@@ -161,33 +155,10 @@ export default function AddVendorProductsPage() {
   const handleSubmit = () => {
     if (selectedRows.length === 0) return;
 
-    // Validate VPC codes before saving
-    const allExistingCodes = new Set(
-      Object.values(getAllVendorProducts()).flat().map((p) => p.vendorProductCode?.trim().toUpperCase())
-    );
-    for (const row of selectedRows) {
-      const code = row.vendorProductCode?.trim();
-      if (!code) {
-        alert(`"${row.catalogProduct.productName}" is missing a Vendor Product Code.`);
-        return;
-      }
-      if (!VPC_FORMAT_RE.test(code)) {
-        alert(`"${code}" is not a valid Vendor Product Code.\nExpected format: VPC-00001`);
-        return;
-      }
-      // In edit mode allow the product to keep its own existing code
-      const isOwnCode = isEditMode && editProductId
-        ? getVendorProducts(vendorId).find((p) => p.id === editProductId)?.vendorProductCode?.trim().toUpperCase() === code.toUpperCase()
-        : false;
-      if (!isOwnCode && allExistingCodes.has(code.toUpperCase())) {
-        alert(`Vendor Product Code "${code}" is already in use. Each product must have a unique VPC.`);
-        return;
-      }
-    }
-
     const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
     if (isEditMode && editProductId) {
+      // In edit mode the product already has a VPC — keep it as-is.
       const row = selectedRows[0];
       updateVendorProduct(vendorId, editProductId, {
         price: row.price,
@@ -197,7 +168,10 @@ export default function AddVendorProductsPage() {
         vendorProductCode: row.vendorProductCode,
       });
     } else {
-      const products: VendorProduct[] = selectedRows.map((r) => ({
+      // Reserve sequential VPC codes for every product being added RIGHT NOW,
+      // only at the moment the user confirms. Cancelling the page wastes nothing.
+      const vpcs = reserveVendorProductCodes(selectedRows.length);
+      const products: VendorProduct[] = selectedRows.map((r, i) => ({
         id: r.catalogProduct.id,
         vendorId,
         masterProductCode: r.catalogProduct.masterProductCode,
@@ -210,7 +184,7 @@ export default function AddVendorProductsPage() {
         moq: r.moq,
         leadTime: r.leadTime,
         stock: r.stock,
-        vendorProductCode: r.vendorProductCode,
+        vendorProductCode: vpcs[i],
         addedAt: now,
         status: "Active",
       }));
@@ -477,9 +451,15 @@ export default function AddVendorProductsPage() {
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md select-all">
-                            {row.vendorProductCode}
-                          </span>
+                          {row.vendorProductCode ? (
+                            <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md">
+                              {row.vendorProductCode}
+                            </span>
+                          ) : (
+                            <span className="inline-block min-w-[110px] px-2 py-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md italic">
+                              Auto-assigned on save
+                            </span>
+                          )}
                         </td>
                         {!isEditMode && (
                           <td className="px-3 py-3">
