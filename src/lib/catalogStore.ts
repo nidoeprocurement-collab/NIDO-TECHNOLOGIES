@@ -152,6 +152,47 @@ export function deleteCatalogProduct(id: string): void {
   window.dispatchEvent(new Event('catalogUpdated'));
 }
 
+/**
+ * Removes a master-catalog product from all downstream stores
+ * (vendor product lists + client catalogs) when it is archived.
+ * Matched by catalog product id in vendor store, and by masterProductCode in client store.
+ */
+export function removeArchivedProductFromDownstream(id: string, masterProductCode: string): void {
+  // 1. Vendor products — remove entries whose id matches the catalog product id
+  try {
+    const VENDOR_KEY = 'nido_vendor_products';
+    const vendorStore: Record<string, Record<string, unknown>[]> =
+      JSON.parse(localStorage.getItem(VENDOR_KEY) || '{}');
+    let vendorChanged = false;
+    for (const vendorId of Object.keys(vendorStore)) {
+      const before = vendorStore[vendorId].length;
+      vendorStore[vendorId] = vendorStore[vendorId].filter((p) => p.id !== id);
+      if (vendorStore[vendorId].length !== before) vendorChanged = true;
+    }
+    if (vendorChanged) {
+      localStorage.setItem(VENDOR_KEY, JSON.stringify(vendorStore));
+      window.dispatchEvent(new Event('vendorProductsUpdated'));
+    }
+  } catch { /* never block */ }
+
+  // 2. Client catalogs — remove entries whose productCode matches masterProductCode
+  try {
+    const CLIENT_KEY = 'nido_client_catalogs';
+    const clientStore: Record<string, Record<string, unknown>[]> =
+      JSON.parse(localStorage.getItem(CLIENT_KEY) || '{}');
+    let clientChanged = false;
+    for (const clientId of Object.keys(clientStore)) {
+      const before = clientStore[clientId].length;
+      clientStore[clientId] = clientStore[clientId].filter((e) => e.productCode !== masterProductCode);
+      if (clientStore[clientId].length !== before) clientChanged = true;
+    }
+    if (clientChanged) {
+      localStorage.setItem(CLIENT_KEY, JSON.stringify(clientStore));
+      window.dispatchEvent(new Event('clientCatalogUpdated'));
+    }
+  } catch { /* never block */ }
+}
+
 export function generateMasterProductCode(): string {
   const year = new Date().getFullYear();
   const counter = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) + 1;

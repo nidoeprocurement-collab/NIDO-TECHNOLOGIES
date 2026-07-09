@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode } from '@/lib/catalogStore';
+import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode, removeArchivedProductFromDownstream } from '@/lib/catalogStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -537,8 +537,9 @@ export default function CatalogUpdatesTab() {
     const product = products.find(p => p.id === archiveConfirmItem.id);
     if (!product) return;
     saveCatalogProduct({ ...product, publishStatus: 'archived' });
+    removeArchivedProductFromDownstream(product.id, product.masterProductCode);
     setItems(prev => prev.map(i => i.id === archiveConfirmItem.id ? { ...i, publishStatus: 'archived' as const } : i));
-    toast.success(`"${archiveConfirmItem.name}" archived`);
+    toast.success(`"${archiveConfirmItem.name}" archived and removed from vendor & client lists`);
     setArchiveConfirmItem(null);
   };
 
@@ -575,10 +576,13 @@ export default function CatalogUpdatesTab() {
     const products = getCatalogProducts();
     selectedIds.forEach(id => {
       const product = products.find(p => p.id === id);
-      if (product) saveCatalogProduct({ ...product, publishStatus: 'archived' });
+      if (product) {
+        saveCatalogProduct({ ...product, publishStatus: 'archived' });
+        removeArchivedProductFromDownstream(product.id, product.masterProductCode);
+      }
     });
     setItems(prev => prev.map(i => selectedIds.includes(i.id) ? { ...i, publishStatus: 'archived' as const } : i));
-    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} archived`);
+    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} archived and removed from vendor & client lists`);
     setSelectedIds([]);
     setBulkArchiveConfirmOpen(false);
   };
