@@ -34,6 +34,15 @@ src/
 └── App.tsx          # Root component + routing
 ```
 
+## Design system
+
+The full font/color/spacing/component spec lives in **STYLE_GUIDE.md**, sourced
+from `attached_assets/Font_and_styles_for_Nido_Tech_1783617058230.docx`. All new
+UI (current and future) must follow it — use the `.text-*` typography utilities
+and Tailwind color tokens defined in `src/index.css` / `tailwind.config.js`
+rather than hardcoding fonts, sizes, or hex colors.
+
 ## User preferences
 
 - Keep the existing project structure and dark-themed UI.
+- Follow STYLE_GUIDE.md (Inter/Poppins fonts, enterprise blue palette, 8pt spacing) for all UI work, now and in future.

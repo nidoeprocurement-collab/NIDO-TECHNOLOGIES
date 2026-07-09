@@ -30,6 +30,8 @@ const config = {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "#1D4ED8",
+          light: "#DBEAFE",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -55,16 +57,15 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        /* Enterprise palette (strict) */
-        primary: {
-          DEFAULT: "#2563EB",
-          hover: "#1D4ED8",
-          light: "#DBEAFE",
-          foreground: "#FFFFFF",
-        },
-        background: "#F8FAFC",
-        card: "#FFFFFF",
-        border: "#E5E7EB",
+        /*
+         * Enterprise palette additions (STYLE_GUIDE.md). These extend — not
+         * replace — the var-driven tokens above. `primary`/`background`/
+         * `card`/`border` stay var-driven so theming (.dark/.comfort) keeps
+         * working; their CSS variables in src/index.css are set to these
+         * exact enterprise hex values. Do NOT redefine `primary`, `background`,
+         * `card`, or `border` as fixed hex here — that silently overrides the
+         * var-driven entries above (duplicate object keys, last one wins).
+         */
         divider: "#F1F5F9",
         "text-primary": "#111827",
         "text-secondary": "#6B7280",
