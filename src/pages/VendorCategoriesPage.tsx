@@ -56,7 +56,7 @@ const MOCK_CATEGORIES = [
 export default function VendorCategoriesPage() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b sticky top-0 z-40">
+      <div className="bg-transparent border-b border-gray-200/70">
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Configuration / Vendor Categories</p>

@@ -81,9 +81,9 @@ export default function TopBar() {
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-20 lg:ml-64">
+    <div className="relative z-20 bg-transparent">
       {/* Top section - Search bar and actions */}
-      <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4 border-b border-gray-100">
+      <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4 border-b border-gray-200/70">
         {/* Left: Back & Search */}
         <div className="flex items-center gap-4 flex-1">
           <button
@@ -162,7 +162,7 @@ export default function TopBar() {
       </div>
 
       {/* Breadcrumb section */}
-      <div className="h-10 px-4 md:px-6 flex items-center gap-2 bg-gray-50">
+      <div className="h-10 px-4 md:px-6 flex items-center gap-2 bg-transparent">
         {breadcrumbs.map((crumb, index) => (
           <div key={`${crumb.path}-${index}`} className="flex items-center gap-2">
             {index === 0 ? (

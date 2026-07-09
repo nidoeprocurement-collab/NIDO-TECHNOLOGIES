@@ -11,11 +11,10 @@ export default function AppLayout() {
       {/* Main Content — takes the remaining width next to the fixed sidebar,
           so the header and page body always span exactly the same width. */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
-        {/* Top Bar */}
-        <TopBar />
-
-        {/* Page Content */}
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden pt-[104px]">
+        {/* Top Bar + Page Content share one scroll container, so the header
+            scrolls away with the rest of the page instead of staying fixed. */}
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+          <TopBar />
           <div className="p-3 sm:p-4 md:p-6 lg:p-8 w-full max-w-full min-w-0">
             <Outlet />
           </div>

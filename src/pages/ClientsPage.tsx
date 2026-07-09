@@ -215,7 +215,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-40">
+      <div className="bg-transparent border-b border-gray-200/70">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between">
           <div>
             <p className="text-xs text-gray-500">Clients / Client List</p>
