@@ -370,6 +370,19 @@ body,
   box-sizing: border-box;
 }
 
+/* Global responsive safety net: keep media and tables from forcing
+   horizontal overflow on narrow/odd-sized screens. */
+img,
+video,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+table {
+  max-width: 100%;
+}
+
 body {
   overscroll-behavior: none;
   text-rendering: optimizeLegibility;
