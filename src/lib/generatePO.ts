@@ -134,13 +134,13 @@ export function generatePOPdf(po: StoredPO): jsPDF {
     po.items && po.items.length > 0
       ? po.items.map((li, i) => [
           String(i + 1),
-          li.item,
+          li.referenceNumber ? `${li.item}\nRef/Model No: ${li.referenceNumber}` : li.item,
           li.hsnCode || "",
           `${li.qty.toFixed(2)}\nNos`,
           fmt(li.unitPrice),
           fmt(li.lineSubtotal),
         ])
-      : [["1", po.item, po.hsnCode || "", `${po.qty.toFixed(2)}\nNos`, fmt(po.unitPrice), fmt(po.subtotal)]];
+      : [["1", po.referenceNumber ? `${po.item}\nRef/Model No: ${po.referenceNumber}` : po.item, po.hsnCode || "", `${po.qty.toFixed(2)}\nNos`, fmt(po.unitPrice), fmt(po.subtotal)]];
 
   autoTable(doc, {
     startY: y,

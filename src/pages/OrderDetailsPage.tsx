@@ -286,7 +286,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
                 <div style={{ width: 38, height: 38, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>📦</div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
-                  <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
+                  {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Ref/Model No: {sub.referenceNumber}</div>}
                 </div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty} Nos</div>
@@ -352,7 +352,7 @@ function ViewItemsModal({ group, onClose }) {
                 <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
-                  <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
+                  {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Ref/Model No: {sub.referenceNumber}</div>}
                   {sub.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
                 </div>
               </div>
@@ -995,6 +995,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     category: item.category || "General",
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
     productCode: item.productCode || "",
+    referenceNumber: "",
     vendorName: "Pending Assignment",
     vendorInitial: "P",
     vendorColor: "#6b7280",
@@ -1037,6 +1038,11 @@ export default function MyOrderPage() {
   const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
   });
+  // Reference/model number entered per sub-order — required before a vendor can be selected
+  const [refNumbers, setRefNumbers] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem(`nido_refnumbers_${orderId}`) || "{}"); } catch { return {}; }
+  });
+  const [refRequiredFor, setRefRequiredFor] = useState<any>(null);
   // Rich vendor info (unit price, address, etc.) — not persisted, set when user picks a vendor
   const [selectedVendorMeta, setSelectedVendorMeta] = useState<Record<string, {
     vendorId: string; vendorName: string; unitPrice: number; location: string;
@@ -1048,6 +1054,7 @@ export default function MyOrderPage() {
   useEffect(() => {
     try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
     try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
+    try { setRefNumbers(JSON.parse(localStorage.getItem(`nido_refnumbers_${orderId}`) || "{}")); } catch { setRefNumbers({}); }
     setSelectedVendorMeta({});
   }, [orderId]);
   const [vendorModalSub, setVendorModalSub] = useState<any>(null);
@@ -1089,6 +1096,18 @@ export default function MyOrderPage() {
     localStorage.setItem(`nido_vendors_${orderId}`, JSON.stringify(selectedVendors));
   }, [selectedVendors, orderId]);
 
+  useEffect(() => {
+    localStorage.setItem(`nido_refnumbers_${orderId}`, JSON.stringify(refNumbers));
+  }, [refNumbers, orderId]);
+
+  const handleOpenVendorModal = (sub: any) => {
+    if (!refNumbers[sub.id]?.trim()) {
+      setRefRequiredFor(sub);
+      return;
+    }
+    setVendorModalSub(sub);
+  };
+
   const isReturnAllowed = sub => sub.itemStatus === "Delivered" && sub.deliveredAt && Date.now() - sub.deliveredAt.getTime() <= 3 * 24 * 60 * 60 * 1000;
   const updateStatus = (id, status) => setSubOrders(prev => prev.map(s => s.id === id ? { ...s, itemStatus: status, deliveredAt: status === "Delivered" ? new Date() : s.deliveredAt, updatedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) } : s));
   const filtered = subOrders.filter(s => !subSearch || s.itemName.toLowerCase().includes(subSearch.toLowerCase()) || s.id.toLowerCase().includes(subSearch.toLowerCase()));
@@ -1106,6 +1125,13 @@ export default function MyOrderPage() {
     const yyyy = now.getFullYear();
     const displayDate = `${dd}/${mm}/${yyyy}`;
 
+    // ── Hard guard: never let a PO get created for a sub-order missing its reference/model number ──
+    const missingRef = subOrders.find(sub => !createdPOs[sub.id] && selectedVendors[sub.id] && !refNumbers[sub.id]?.trim());
+    if (missingRef) {
+      setRefRequiredFor(missingRef);
+      return;
+    }
+
     // ── Group pending sub-orders by vendor so one PO is created per vendor ──
     type GroupEntry = { vendorId: string; meta: any; subs: typeof subOrders };
     const vendorGroups = new Map<string, GroupEntry>();
@@ -1116,6 +1142,7 @@ export default function MyOrderPage() {
       if (!vendorId) continue;
       const meta = selectedVendorMeta[sub.id];
       if (!meta) continue;
+      if (!refNumbers[sub.id]?.trim()) continue;
 
       if (!vendorGroups.has(vendorId)) {
         vendorGroups.set(vendorId, { vendorId, meta, subs: [] });
@@ -1140,6 +1167,7 @@ export default function MyOrderPage() {
           category:   sub.category,
           hsnCode:    "",
           specs:      sub.specs,
+          referenceNumber: refNumbers[sub.id] || "",
           qty:        sub.qty,
           unitPrice,
           lineSubtotal,
@@ -1179,6 +1207,7 @@ export default function MyOrderPage() {
         category:  primarySub.category,
         hsnCode:   "",
         specs:     primarySub.specs,
+        referenceNumber: refNumbers[primarySub.id] || "",
         qty:       primaryLine.qty,
         unitPrice: primaryLine.unitPrice,
         subtotal,
@@ -1396,11 +1425,20 @@ export default function MyOrderPage() {
                     <div>
                       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                         <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 600, fontSize: 13.5 }}>{sub.itemName}</div>
-                          <div style={{ fontSize: 11.5, color: "#6b7280" }}>SKU: {sub.sku}</div>
-                          {sub.specs.slice(0, expanded ? undefined : 1).map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
-                          {sub.specs.length > 1 && <button onClick={() => setExpandedItems(s => { const n = new Set(s); n.has(sub.id) ? n.delete(sub.id) : n.add(sub.id); return n; })} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 2 }}>{expanded ? "View less" : "View more"}</button>}
+                          <div style={{ marginTop: 4 }}>
+                            <input
+                              value={refNumbers[sub.id] || ""}
+                              onChange={e => setRefNumbers(prev => ({ ...prev, [sub.id]: e.target.value }))}
+                              disabled={!!createdPOs[sub.id]}
+                              placeholder="Enter reference/model number *"
+                              style={{ width: "100%", maxWidth: 220, padding: "5px 8px", border: `1px solid ${!refNumbers[sub.id]?.trim() ? "#fca5a5" : "#d1d5db"}`, borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                            />
+                            {!refNumbers[sub.id]?.trim() && (
+                              <div style={{ fontSize: 10.5, color: "#dc2626", marginTop: 2 }}>Required before selecting a vendor</div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1428,11 +1466,11 @@ export default function MyOrderPage() {
                             </div>
                             <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{selVendor.name}</span>
                           </div>
-                          <button onClick={() => setVendorModalSub(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                          <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
                         </div>
                       ) : (
                         <button
-                          onClick={() => setVendorModalSub(sub)}
+                          onClick={() => handleOpenVendorModal(sub)}
                           style={{ padding: "5px 12px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
                         >
                           Select Vendor
@@ -1506,6 +1544,26 @@ export default function MyOrderPage() {
           onSelect={handleSelectVendor}
           onClose={() => setVendorModalSub(null)}
         />
+      )}
+
+      {refRequiredFor && (
+        <Overlay onClose={() => setRefRequiredFor(null)}>
+          <ModalBox title="Reference/Model Number Required" onClose={() => setRefRequiredFor(null)} width={420}>
+            <div style={{ padding: "18px 22px" }}>
+              <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>
+                Please enter a reference/model number for <b>{refRequiredFor.itemName}</b> before selecting a vendor.
+              </div>
+            </div>
+            <div style={{ display: "flex", padding: "0 22px 20px" }}>
+              <button
+                onClick={() => setRefRequiredFor(null)}
+                style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+              >
+                Got it
+              </button>
+            </div>
+          </ModalBox>
+        </Overlay>
       )}
 
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}

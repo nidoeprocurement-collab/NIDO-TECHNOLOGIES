@@ -40,7 +40,7 @@ const PO_DATA: Record<string, any> = {
     items: [
       {
         id: "i1", num: 1, name: "Mechanical Keyboard", image: "⌨️",
-        sku: "SKU: SKU/SHOP-10",
+        referenceNumber: "",
         specs: ["USB Wired", "Black | Ergonomic Design"],
         qty: 8, unitPrice: "$149.00", total: "$1,192.00",
         status: "Shipped", expectedDelivery: "Apr 28, 2026",
@@ -48,7 +48,7 @@ const PO_DATA: Record<string, any> = {
       },
       {
         id: "i2", num: 2, name: "Filing Cabinet", image: "🗄️",
-        sku: "SKU: SKU/SHOP-3",
+        referenceNumber: "",
         specs: ["3 Drawers", "Metal | Lockable"],
         qty: 2, unitPrice: "$299.00", total: "$598.00",
         status: "Confirmed", expectedDelivery: "Apr 28, 2026",
@@ -557,7 +557,7 @@ function storedPOToDetail(po: StoredPO) {
             num: i + 1,
             name: li.item,
             image: "📦",
-            sku: `SKU: ${li.sku}`,
+            referenceNumber: li.referenceNumber || "",
             specs: li.specs || [],
             qty: li.qty,
             unitPrice: fmtINR(li.unitPrice),
@@ -572,7 +572,7 @@ function storedPOToDetail(po: StoredPO) {
               num: 1,
               name: po.item,
               image: "📦",
-              sku: `SKU: ${po.sku}`,
+              referenceNumber: po.referenceNumber || "",
               specs: po.specs || [],
               qty: po.qty,
               unitPrice: fmtINR(po.unitPrice),
@@ -643,7 +643,7 @@ export default function VendorOrderDetailPage() {
 
   const filteredItems = items.filter(it =>
     it.name.toLowerCase().includes(search.toLowerCase()) ||
-    it.sku.toLowerCase().includes(search.toLowerCase())
+    (it.referenceNumber || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const handleItemStatusChange = (id: string, status: string) => {
@@ -811,7 +811,7 @@ export default function VendorOrderDetailPage() {
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 500 }}>{item.sku}</div>
+                {item.referenceNumber && <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 500 }}>Ref/Model No: {item.referenceNumber}</div>}
                 {item.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
               </div>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{item.qty}</div>
