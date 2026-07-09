@@ -4,6 +4,8 @@ import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import {
   getClientCatalog,
   saveClientCatalog,
+  peekCpcCounter,
+  reserveClientProductCodes,
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
 import { syncClientPrices, getClientCategoryRules } from "@/lib/priceEngineStore";
@@ -31,6 +33,7 @@ interface SelectedRow {
   product: CatalogProduct;
   roles: string[];
   preference: string;
+  cpc: string;
 }
 
 function PreferenceDropdown({
@@ -376,6 +379,12 @@ function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClos
                       : "text-red-500"
                     }`}>{product.availability || "—"}</span>
                   </div>
+                  {product.cpc && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="text-xs text-gray-400 uppercase tracking-wide shrink-0">CPC</span>
+                      <span className="font-mono text-xs text-gray-700 bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded">{product.cpc}</span>
+                    </div>
+                  )}
                 </div>
                 {(product.roles.length > 0 || product.preference) && (
                   <div className="border-t border-gray-100 pt-4 space-y-3">
@@ -499,6 +508,12 @@ function EditProductScreen({
                     <span className="text-gray-400">Code</span>
                     <span className="font-mono">{product.productCode}</span>
                   </div>
+                  {product.cpc && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">CPC</span>
+                      <span className="font-mono">{product.cpc}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-400">Price</span>
                     <span className="font-semibold text-gray-900">{product.price || "—"}</span>
@@ -655,7 +670,16 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
         setRows((r) => r.filter((row) => row.product.id !== product.id));
       } else {
         next.add(product.id);
-        setRows((r) => [...r, { product, roles: [], preference: "" }]);
+        // Compute a *preview* CPC for display — peekCpcCounter() is a pure
+        // localStorage read with no side-effects, so it is safe to call inside
+        // a React state updater (even under Strict Mode's double-invocation).
+        // The persistent counter is NOT incremented here; codes are only
+        // reserved when the user confirms with "Add Products", so cancelling
+        // the modal wastes no sequence numbers.
+        setRows((r) => {
+          const preview = `CPC-${String(peekCpcCounter() + r.length + 1).padStart(5, '0')}`;
+          return [...r, { product, roles: [], preference: "", cpc: preview }];
+        });
       }
       return next;
     });
@@ -854,6 +878,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Client Product Code</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">Remove</th>
                     </tr>
                   </thead>
@@ -892,6 +917,11 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                           />
                         </td>
                         <td className="px-4 py-3.5">
+                          <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md">
+                            {row.cpc}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
                           <button
                             onClick={() => removeProduct(row.product.id)}
                             className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -918,12 +948,17 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
           <button
             disabled={rows.length === 0}
             onClick={() => {
-              const entries: CatalogEntry[] = rows.map((row) => ({
+              // Reserve sequential CPC codes for every product being added RIGHT NOW,
+              // only at the moment the user confirms. Cancelling the modal wastes nothing.
+              const cpcs = reserveClientProductCodes(rows.length);
+              const entries: CatalogEntry[] = rows.map((row, i) => ({
                 productCode: row.product.masterProductCode,
                 sku: row.product.skuCode,
                 name: row.product.productName,
                 category: row.product.category,
                 roles: row.roles,
+                preference: row.preference,
+                cpc: cpcs[i],
                 price: row.product.price > 0
                   ? "₹" + row.product.price.toLocaleString("en-IN")
                   : "Price on request",
@@ -1122,6 +1157,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-32 whitespace-nowrap">Client Product Code</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
@@ -1153,6 +1189,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       ))}
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.cpc || "—"}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{product.price}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full border ${

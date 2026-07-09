@@ -8,6 +8,7 @@ export interface ClientCatalogEntry {
   category: string;
   roles: string[];
   preference?: string;
+  cpc?: string;
   price: string;
   availability: string;
   img: string;
@@ -58,6 +59,72 @@ export function removeFromClientCatalog(clientId: string, productCode: string): 
   const entries = getClientCatalog(clientId).filter(e => e.productCode !== productCode);
   saveClientCatalog(clientId, entries);
 }
+
+// ─── Global CPC sequence counter ─────────────────────────────────────────────
+// Mirrors the vendor-side VPC counter: a dedicated localStorage key stores the
+// highest CPC number ever issued. Monotonic — never reused, even when entries
+// are removed or edited. Bootstrapped from existing entries on first use.
+
+const CPC_COUNTER_KEY = 'nido_cpc_counter';
+const CPC_RE = /^CPC-(\d+)$/i;
+
+function readCpcCounter(): number {
+  try {
+    const raw = localStorage.getItem(CPC_COUNTER_KEY);
+    if (raw !== null) return Math.max(0, parseInt(raw, 10) || 0);
+  } catch { /* ignore */ }
+  // First run: bootstrap from existing entries
+  const store = read();
+  let max = 0;
+  for (const entries of Object.values(store)) {
+    for (const e of entries) {
+      const m = CPC_RE.exec(e.cpc?.trim() ?? '');
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n > max) max = n;
+      }
+    }
+  }
+  return max;
+}
+
+function writeCpcCounter(value: number): void {
+  try { localStorage.setItem(CPC_COUNTER_KEY, String(value)); } catch { /* ignore */ }
+}
+
+/**
+ * Peek at the current counter value without incrementing it.
+ * Use this to compute preview CPC codes for display only —
+ * the counter is not advanced, so cancelling wastes nothing.
+ */
+export function peekCpcCounter(): number {
+  return readCpcCounter();
+}
+
+/**
+ * Reserve `count` sequential CPC codes atomically.
+ * The counter is incremented before returning so the same codes
+ * are never issued twice, even across separate sessions.
+ *
+ * Returns an array of strings: ['CPC-00001', 'CPC-00002', …]
+ */
+export function reserveClientProductCodes(count: number): string[] {
+  if (count <= 0) return [];
+  const current = readCpcCounter();
+  const codes = Array.from({ length: count }, (_, i) =>
+    `CPC-${String(current + 1 + i).padStart(5, '0')}`
+  );
+  writeCpcCounter(current + count);
+  return codes;
+}
+
+/** Convenience wrapper for a single CPC code. */
+export function reserveClientProductCode(): string {
+  return reserveClientProductCodes(1)[0];
+}
+
+/** CPC format regex — exported so the UI can validate user-edited codes. */
+export const CPC_FORMAT_RE = CPC_RE;
 
 export function updateClientCatalogProductPrice(
   clientId: string,
