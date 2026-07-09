@@ -1274,65 +1274,79 @@ export default function CatalogUpdatesTab() {
 
       {/* Archived Products Dialog */}
       <Dialog open={archivedOpen} onOpenChange={setArchivedOpen}>
-        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-5 pb-3 border-b border-gray-200">
-            <DialogTitle className="flex items-center gap-2 text-gray-800">
-              <Archive size={18} className="text-gray-500" /> Archived Products
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[92vh] max-h-[92vh] flex flex-col p-0">
+          <DialogHeader className="px-8 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-lg text-gray-800">
+              <Archive size={20} className="text-gray-500" /> Archived Products
               <span className="ml-2 text-sm font-normal text-gray-500">({stats.archived} product{stats.archived !== 1 ? 's' : ''})</span>
             </DialogTitle>
+            <p className="text-xs text-gray-400 mt-0.5">These products are hidden from the active catalogue. Use "Restore" to move them back to Draft.</p>
           </DialogHeader>
-          <ScrollArea className="flex-1 px-6 py-4">
+          <ScrollArea className="flex-1 px-8 py-5">
             {stats.archived === 0 ? (
-              <div className="py-16 text-center text-gray-400">
-                <Archive size={40} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No archived products yet.</p>
+              <div className="py-24 text-center text-gray-400">
+                <Archive size={48} className="mx-auto mb-4 opacity-30" />
+                <p className="text-base font-medium">No archived products yet.</p>
+                <p className="text-sm mt-1">Archived products will appear here.</p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="text-xs font-semibold text-gray-600">Product Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600">Master Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600">SKU</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600">Category</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600">Brand</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600">Price</TableHead>
-                    <TableHead className="text-xs font-semibold text-gray-600">Action</TableHead>
+                  <TableRow className="bg-gray-50 border-b border-gray-200">
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Product</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Master Code</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">SKU</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Category</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Sub-Category</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Brand</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Price</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Tags</TableHead>
+                    <TableHead className="text-sm font-semibold text-gray-600 py-3">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {items.filter(i => i.publishStatus === 'archived').map(item => (
-                    <TableRow key={item.id} className="hover:bg-gray-50">
-                      <TableCell>
-                        <div className="flex items-center gap-2">
+                    <TableRow key={item.id} className="hover:bg-gray-50 border-b border-gray-100">
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-3">
                           {item.images?.[0] ? (
-                            <img src={item.images[0]} alt={item.name} className="w-8 h-8 rounded object-cover border border-gray-200 flex-shrink-0" />
+                            <img src={item.images[0]} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0" />
                           ) : (
-                            <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                              <ImageIcon size={14} className="text-gray-300" />
+                            <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <ImageIcon size={20} className="text-gray-300" />
                             </div>
                           )}
                           <div>
-                            <p className="text-sm font-medium text-gray-800 leading-tight">{item.name}</p>
-                            {item.tags?.length > 0 && (
-                              <p className="text-[10px] text-gray-400 truncate max-w-[160px]">{item.tags.slice(0, 2).join(', ')}</p>
+                            <p className="text-sm font-semibold text-gray-800 leading-snug">{item.name}</p>
+                            {item.description && (
+                              <p className="text-xs text-gray-400 truncate max-w-[220px] mt-0.5">{item.description}</p>
                             )}
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
-                      <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
-                      <TableCell className="text-xs text-gray-700">{item.category || '—'}</TableCell>
-                      <TableCell className="text-xs text-gray-700">{item.brand || '—'}</TableCell>
-                      <TableCell className="text-xs text-gray-700">₹{(item.price || 0).toLocaleString()}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-4 text-sm font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
+                      <TableCell className="py-4 text-sm text-gray-600">{item.sku || '—'}</TableCell>
+                      <TableCell className="py-4 text-sm text-gray-700">{item.category || '—'}</TableCell>
+                      <TableCell className="py-4 text-sm text-gray-700">{item.subCategory || '—'}</TableCell>
+                      <TableCell className="py-4 text-sm text-gray-700">{item.brand || '—'}</TableCell>
+                      <TableCell className="py-4 text-sm font-medium text-gray-800">₹{(item.price || 0).toLocaleString()}</TableCell>
+                      <TableCell className="py-4">
+                        {item.tags?.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 max-w-[160px]">
+                            {item.tags.slice(0, 3).map(tag => (
+                              <span key={tag} className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">{tag}</span>
+                            ))}
+                          </div>
+                        ) : <span className="text-sm text-gray-400">—</span>}
+                      </TableCell>
+                      <TableCell className="py-4">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5 text-xs h-7 border-gray-300 text-gray-600 hover:bg-gray-50"
+                          className="gap-1.5 text-xs h-8 border-gray-300 text-gray-600 hover:bg-gray-50"
                           onClick={() => unarchiveItem(item.id)}
                         >
-                          <ArchiveRestore size={12} /> Restore
+                          <ArchiveRestore size={13} /> Restore
                         </Button>
                       </TableCell>
                     </TableRow>
