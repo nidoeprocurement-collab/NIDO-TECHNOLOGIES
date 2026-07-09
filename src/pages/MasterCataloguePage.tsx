@@ -527,12 +527,19 @@ export default function CatalogUpdatesTab() {
   };
 
   const archiveItem = (id: string) => {
+    const item = items.find(i => i.id === id);
+    if (item) setArchiveConfirmItem(item);
+  };
+
+  const confirmArchiveItem = () => {
+    if (!archiveConfirmItem) return;
     const products = getCatalogProducts();
-    const product = products.find(p => p.id === id);
+    const product = products.find(p => p.id === archiveConfirmItem.id);
     if (!product) return;
     saveCatalogProduct({ ...product, publishStatus: 'archived' });
-    setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: 'archived' as const } : i));
-    toast.success('Product archived');
+    setItems(prev => prev.map(i => i.id === archiveConfirmItem.id ? { ...i, publishStatus: 'archived' as const } : i));
+    toast.success(`"${archiveConfirmItem.name}" archived`);
+    setArchiveConfirmItem(null);
   };
 
   const updateItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
@@ -561,6 +568,7 @@ export default function CatalogUpdatesTab() {
 
   const [bulkArchiveConfirmOpen, setBulkArchiveConfirmOpen] = useState(false);
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const [archiveConfirmItem, setArchiveConfirmItem] = useState<CatalogItem | null>(null);
 
   const bulkArchiveItems = () => {
     if (selectedIds.length === 0) return;
@@ -1257,6 +1265,31 @@ export default function CatalogUpdatesTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Single Archive Confirmation Dialog */}
+      <Dialog open={!!archiveConfirmItem} onOpenChange={(open) => { if (!open) setArchiveConfirmItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive size={18} className="text-gray-500" /> Archive Product?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-1">
+            <p className="text-sm text-gray-700">
+              Are you sure you want to archive <span className="font-semibold">"{archiveConfirmItem?.name}"</span>?
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              This product will be hidden from the active catalogue. You can restore it anytime from <span className="font-medium text-gray-500">Archived Products</span>.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveConfirmItem(null)}>Cancel</Button>
+            <Button className="bg-gray-700 hover:bg-gray-800 text-white" onClick={confirmArchiveItem}>
+              <Archive size={14} className="mr-2" /> Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Bulk Archive Confirmation Dialog */}
       <Dialog open={bulkArchiveConfirmOpen} onOpenChange={setBulkArchiveConfirmOpen}>
