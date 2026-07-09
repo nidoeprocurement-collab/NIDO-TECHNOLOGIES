@@ -28,7 +28,7 @@ export interface CatalogProduct {
   productNotes: string;
   videoUrl: string;
   images: string[];
-  publishStatus: 'draft' | 'published' | 'pending';
+  publishStatus: 'draft' | 'published' | 'pending' | 'archived';
   price: number;
   moq: number;
   leadTime: string;

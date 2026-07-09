@@ -16,9 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import {
-  Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Trash2,
+  Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Archive,
   Settings, ShoppingCart, X, Star, Image as ImageIcon, Download, MoreVertical,
-  LayoutGrid, LayoutList, CheckCircle, Clock, FileEdit
+  LayoutGrid, LayoutList, CheckCircle, Clock, FileEdit, ArchiveRestore
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,7 +33,7 @@ interface CatalogItem {
   masterProductCode?: string;
   name: string;
   sku: string;
-  publishStatus?: 'draft' | 'published' | 'pending';
+  publishStatus?: 'draft' | 'published' | 'pending' | 'archived';
   category: string;
   subCategory: string;
   brand: string;
@@ -83,23 +83,24 @@ const defaultTags = ['CoreEssentials', 'New Arrival', 'High-End', 'Budget', 'Eco
 
 // ─── Helper Components ────────────────────────────────────────────────────────
 
-function PublishStatusBadge({ status }: { status?: 'draft' | 'published' | 'pending' }) {
+function PublishStatusBadge({ status }: { status?: 'draft' | 'published' | 'pending' | 'archived' }) {
   if (!status) return null;
-  const cfg = {
+  const cfg: Record<string, string> = {
     published: 'bg-green-100 text-green-700',
     draft: 'bg-yellow-100 text-yellow-700',
     pending: 'bg-blue-100 text-blue-700',
-  }[status];
+    archived: 'bg-gray-100 text-gray-500',
+  };
   const label = status.charAt(0).toUpperCase() + status.slice(1);
-  return <Badge className={`border-none text-xs ${cfg}`}>{label}</Badge>;
+  return <Badge className={`border-none text-xs ${cfg[status] || 'bg-gray-100 text-gray-500'}`}>{label}</Badge>;
 }
 
 function ProductActionsMenu({
-  item, onEdit, onDelete, onStatusChange,
+  item, onEdit, onArchive, onStatusChange,
 }: {
   item: CatalogItem;
   onEdit: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
   onStatusChange: (s: 'draft' | 'published' | 'pending') => void;
 }) {
   return (
@@ -134,8 +135,8 @@ function ProductActionsMenu({
           <FileEdit size={14} className="mr-2 text-yellow-600" /> Draft
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="cursor-pointer text-red-600">
-          <Trash2 size={14} className="mr-2" /> Delete Product
+        <DropdownMenuItem onClick={onArchive} className="cursor-pointer text-gray-600">
+          <Archive size={14} className="mr-2" /> Archive Product
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -143,12 +144,12 @@ function ProductActionsMenu({
 }
 
 function ProductThumbnailCard({
-  item, onView, onEdit, onDelete, onStatusChange,
+  item, onView, onEdit, onArchive, onStatusChange,
 }: {
   item: CatalogItem;
   onView: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
   onStatusChange: (s: 'draft' | 'published' | 'pending') => void;
 }) {
   const specs = item.specifications || [];
@@ -186,7 +187,7 @@ function ProductThumbnailCard({
         <div className="flex items-start justify-between gap-1 mb-1">
           <p className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 flex-1">{item.name}</p>
           <div className="flex-shrink-0 -mt-1 -mr-1">
-            <ProductActionsMenu item={item} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
+            <ProductActionsMenu item={item} onEdit={onEdit} onArchive={onArchive} onStatusChange={onStatusChange} />
           </div>
         </div>
 
@@ -444,6 +445,7 @@ export default function CatalogUpdatesTab() {
   };
 
   const filtered = items.filter(i => {
+    if (i.publishStatus === 'archived') return false;
     if (search && !i.name.toLowerCase().includes(search.toLowerCase()) && !i.sku.toLowerCase().includes(search.toLowerCase())) return false;
     if (categoryFilter !== 'all' && i.category !== categoryFilter) return false;
     if (statusFilter !== 'all' && (i.publishStatus || 'draft') !== statusFilter) return false;
@@ -461,10 +463,11 @@ export default function CatalogUpdatesTab() {
   const thumbItems = filtered.slice((thumbSafePage - 1) * PAGE_SIZE, thumbSafePage * PAGE_SIZE);
 
   const stats = {
-    total: items.length,
+    total: items.filter(i => i.publishStatus !== 'archived').length,
     published: items.filter(i => i.publishStatus === 'published').length,
     drafts: items.filter(i => i.publishStatus === 'draft').length,
     pending: items.filter(i => i.publishStatus === 'pending').length,
+    archived: items.filter(i => i.publishStatus === 'archived').length,
   };
 
   const toggleSelect = (id: string) => {
@@ -523,10 +526,13 @@ export default function CatalogUpdatesTab() {
     setAddDialogOpen(false);
   };
 
-  const deleteItem = (id: string) => {
-    deleteCatalogProduct(id);
-    setItems(prev => prev.filter(i => i.id !== id));
-    toast.success('Item deleted');
+  const archiveItem = (id: string) => {
+    const products = getCatalogProducts();
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    saveCatalogProduct({ ...product, publishStatus: 'archived' });
+    setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: 'archived' as const } : i));
+    toast.success('Product archived');
   };
 
   const updateItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
@@ -553,15 +559,29 @@ export default function CatalogUpdatesTab() {
     setSelectedIds([]);
   };
 
-  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [bulkArchiveConfirmOpen, setBulkArchiveConfirmOpen] = useState(false);
+  const [archivedOpen, setArchivedOpen] = useState(false);
 
-  const bulkDeleteItems = () => {
+  const bulkArchiveItems = () => {
     if (selectedIds.length === 0) return;
-    selectedIds.forEach(id => deleteCatalogProduct(id));
-    setItems(prev => prev.filter(i => !selectedIds.includes(i.id)));
-    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} deleted`);
+    const products = getCatalogProducts();
+    selectedIds.forEach(id => {
+      const product = products.find(p => p.id === id);
+      if (product) saveCatalogProduct({ ...product, publishStatus: 'archived' });
+    });
+    setItems(prev => prev.map(i => selectedIds.includes(i.id) ? { ...i, publishStatus: 'archived' as const } : i));
+    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} archived`);
     setSelectedIds([]);
-    setBulkDeleteConfirmOpen(false);
+    setBulkArchiveConfirmOpen(false);
+  };
+
+  const unarchiveItem = (id: string) => {
+    const products = getCatalogProducts();
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    saveCatalogProduct({ ...product, publishStatus: 'draft' });
+    setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: 'draft' as const } : i));
+    toast.success('Product restored to Draft');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -927,6 +947,11 @@ export default function CatalogUpdatesTab() {
               <Download size={14} className="mr-2" />
               Download Template
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setArchivedOpen(true)} className="cursor-pointer text-gray-600">
+              <Archive size={14} className="mr-2" />
+              Archived Products {stats.archived > 0 && <span className="ml-auto text-xs bg-gray-200 text-gray-600 rounded-full px-1.5">{stats.archived}</span>}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -960,10 +985,10 @@ export default function CatalogUpdatesTab() {
               variant="outline"
               size="sm"
               className="gap-2 bg-white border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
-              onClick={() => setBulkDeleteConfirmOpen(true)}
-              data-testid="button-bulk-delete"
+              onClick={() => setBulkArchiveConfirmOpen(true)}
+              data-testid="button-bulk-archive"
             >
-              <Trash2 size={14} /> Delete
+              <Archive size={14} /> Archive
             </Button>
             <Button
               variant="ghost"
@@ -1054,7 +1079,7 @@ export default function CatalogUpdatesTab() {
                         <ProductActionsMenu
                           item={item}
                           onEdit={() => navigate(`/configuration/master-catalogue/edit/${item.id}`)}
-                          onDelete={() => deleteItem(item.id)}
+                          onArchive={() => archiveItem(item.id)}
                           onStatusChange={(s) => updateItemStatus(item.id, s)}
                         />
                       </TableCell>
@@ -1115,7 +1140,7 @@ export default function CatalogUpdatesTab() {
                   item={item}
                   onView={() => openPreview(item.id)}
                   onEdit={() => navigate(`/configuration/master-catalogue/edit/${item.id}`)}
-                  onDelete={() => deleteItem(item.id)}
+                  onArchive={() => archiveItem(item.id)}
                   onStatusChange={(s) => updateItemStatus(item.id, s)}
                 />
               ))}
@@ -1233,17 +1258,89 @@ export default function CatalogUpdatesTab() {
         </Card>
       </div>
 
-      {/* Bulk Delete Confirmation Dialog */}
-      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+      {/* Bulk Archive Confirmation Dialog */}
+      <Dialog open={bulkArchiveConfirmOpen} onOpenChange={setBulkArchiveConfirmOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Delete {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''}?</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Archive {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''}?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
-            This will permanently remove the selected product{selectedIds.length > 1 ? 's' : ''} from the master catalogue. This action cannot be undone.
+            The selected product{selectedIds.length > 1 ? 's' : ''} will be archived and hidden from the main catalogue. You can restore them from the Archived Products view.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)} data-testid="button-cancel-bulk-delete">Cancel</Button>
-            <Button variant="destructive" onClick={bulkDeleteItems} data-testid="button-confirm-bulk-delete">Delete</Button>
+            <Button variant="outline" onClick={() => setBulkArchiveConfirmOpen(false)}>Cancel</Button>
+            <Button className="bg-gray-700 hover:bg-gray-800 text-white" onClick={bulkArchiveItems}><Archive size={14} className="mr-2" />Archive</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archived Products Dialog */}
+      <Dialog open={archivedOpen} onOpenChange={setArchivedOpen}>
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b border-gray-200">
+            <DialogTitle className="flex items-center gap-2 text-gray-800">
+              <Archive size={18} className="text-gray-500" /> Archived Products
+              <span className="ml-2 text-sm font-normal text-gray-500">({stats.archived} product{stats.archived !== 1 ? 's' : ''})</span>
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-1 px-6 py-4">
+            {stats.archived === 0 ? (
+              <div className="py-16 text-center text-gray-400">
+                <Archive size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">No archived products yet.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="text-xs font-semibold text-gray-600">Product Name</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">Master Code</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">SKU</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">Category</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">Brand</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">Price</TableHead>
+                    <TableHead className="text-xs font-semibold text-gray-600">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.filter(i => i.publishStatus === 'archived').map(item => (
+                    <TableRow key={item.id} className="hover:bg-gray-50">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {item.images?.[0] ? (
+                            <img src={item.images[0]} alt={item.name} className="w-8 h-8 rounded object-cover border border-gray-200 flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <ImageIcon size={14} className="text-gray-300" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-gray-800 leading-tight">{item.name}</p>
+                            {item.tags?.length > 0 && (
+                              <p className="text-[10px] text-gray-400 truncate max-w-[160px]">{item.tags.slice(0, 2).join(', ')}</p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
+                      <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
+                      <TableCell className="text-xs text-gray-700">{item.category || '—'}</TableCell>
+                      <TableCell className="text-xs text-gray-700">{item.brand || '—'}</TableCell>
+                      <TableCell className="text-xs text-gray-700">₹{(item.price || 0).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 text-xs h-7 border-gray-300 text-gray-600 hover:bg-gray-50"
+                          onClick={() => unarchiveItem(item.id)}
+                        >
+                          <ArchiveRestore size={12} /> Restore
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
