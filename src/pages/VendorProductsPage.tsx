@@ -493,6 +493,7 @@ export default function VendorProductsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
+                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">VPC</th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">MPI</th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Product Name</th>
                   <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Category</th>
@@ -513,6 +514,9 @@ export default function VendorProductsPage() {
                   const initials = product.productName.slice(0, 2).toUpperCase();
                   return (
                     <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="text-gray-600 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{product.vendorProductCode || "—"}</span>
+                      </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <span className="text-gray-600 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{product.masterProductCode}</span>
                       </td>
