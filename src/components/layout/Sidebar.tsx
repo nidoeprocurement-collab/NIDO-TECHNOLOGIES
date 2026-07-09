@@ -58,7 +58,6 @@ const navigationItems: NavItem[] = [
       { label: 'Vendor Orders', path: '/vendors/orders' },
       { label: 'Vendor Dashboard', path: '/vendors/dashboard' },
       { label: 'Categories', path: '/vendors/categories' },
-      { label: 'Onboarding', path: '/vendors/onboarding' },
     ],
   },
   {
