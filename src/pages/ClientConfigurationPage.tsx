@@ -3,7 +3,6 @@ import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
 import { StatusBadge, usersData } from "./ClientUsersPage";
 import ClientPricingSettingsPanel from "./ClientPricingSettingsPanel";
 import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
-import ClientCategoryPricingPanel from "./ClientCategoryPricingPanel";
 
 export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { clientId?: string }) {
   const [configTab, setConfigTab] = useState("General");
@@ -132,7 +131,10 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
         <div className="flex flex-col">
           <ClientPricingSettingsPanel clientId={clientId} />
           <ClientPriceSlabsPanel clientId={clientId} />
-          <ClientCategoryPricingPanel clientId={clientId} />
+          <div className="mt-6 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-gray-700">
+            Category Pricing Rules are now configured globally for all clients in{" "}
+            <span className="font-semibold text-gray-900">Configuration → Price Engine → Client Price Engine</span>.
+          </div>
         </div>
       )}
 

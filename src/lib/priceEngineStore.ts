@@ -166,13 +166,14 @@ export function applySlabDiscount(finalPrice: number, clientId: string, category
   return finalPrice * (1 - discountPct / 100);
 }
 
-// ─── Client category pricing rules ─────────────────────────────────────────
-// Per-client margin % and buffer % overrides by product category.
-// When a category rule exists, its marginPct overrides the client's global
-// profitPct for products in that category. bufferPct is an additional markup
-// stacked on top of the margin (e.g. logistics buffer, shrinkage).
+// ─── Global category pricing rules ─────────────────────────────────────────
+// Configured once in the Price Engine (Client Price Engine tab) and applied
+// to every client — there is no per-client override anymore. When a category
+// rule exists, its marginPct overrides each client's global profitPct for
+// products in that category. bufferPct is an additional markup stacked on
+// top of the margin (e.g. logistics buffer, shrinkage).
 
-const CLIENT_CATEGORY_RULES_KEY = 'nido_price_engine_client_category_rules';
+const GLOBAL_CATEGORY_RULES_KEY = 'nido_price_engine_global_category_rules';
 
 export interface CategoryPricingRule {
   id: string;
@@ -181,33 +182,28 @@ export interface CategoryPricingRule {
   bufferPct: number;   // additional % stacked on top of margin
 }
 
-function getAllClientCategoryRules(): Record<string, CategoryPricingRule[]> {
+export function getGlobalCategoryRules(): CategoryPricingRule[] {
   try {
-    const raw = localStorage.getItem(CLIENT_CATEGORY_RULES_KEY);
+    const raw = localStorage.getItem(GLOBAL_CATEGORY_RULES_KEY);
     if (raw) return JSON.parse(raw);
   } catch {
     // ignore malformed storage
   }
-  return {};
+  return [];
 }
 
-export function getClientCategoryRules(clientId: string): CategoryPricingRule[] {
-  const all = getAllClientCategoryRules();
-  return all[clientId] || [];
-}
-
-export function saveClientCategoryRules(clientId: string, rules: CategoryPricingRule[]): void {
-  const all = getAllClientCategoryRules();
-  all[clientId] = rules;
-  localStorage.setItem(CLIENT_CATEGORY_RULES_KEY, JSON.stringify(all));
-  syncClientPrices(clientId);
+export function saveGlobalCategoryRules(rules: CategoryPricingRule[]): void {
+  localStorage.setItem(GLOBAL_CATEGORY_RULES_KEY, JSON.stringify(rules));
+  // Rules apply to every client, so resync every client's catalog prices.
+  getClients().forEach(c => syncClientPrices(c.id));
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
 // Return the effective margin % for a given category, falling back to the
-// client's global profitPct when no category-specific rule is configured.
-export function getCategoryMarginPct(clientId: string, category: string, globalProfitPct: number): number {
-  const rules = getClientCategoryRules(clientId);
+// client's own global profitPct when no category-specific rule is configured.
+// Category rules are global (apply to all clients equally).
+export function getCategoryMarginPct(category: string, globalProfitPct: number): number {
+  const rules = getGlobalCategoryRules();
   const rule = rules.find(r => r.category.toLowerCase() === (category || '').toLowerCase());
   return rule ? rule.marginPct + rule.bufferPct : globalProfitPct;
 }
@@ -394,7 +390,7 @@ export function getAllClientPricing(): ClientPricingRow[] {
         ? computeClientFinalPrice(
             pp.landedCostPerUnit,
             settings,
-            getCategoryMarginPct(c.id, pp.category, settings.profitPct),
+            getCategoryMarginPct(pp.category, settings.profitPct),
           )
         : null;
       rows.push({
@@ -455,7 +451,7 @@ export function syncClientPrices(clientId: string): number {
     const calc = computeClientFinalPrice(
       pp.landedCostPerUnit,
       settings,
-      getCategoryMarginPct(clientId, pp.category, settings.profitPct),
+      getCategoryMarginPct(pp.category, settings.profitPct),
     );
     if (entry.priceNum === calc.finalPrice) return entry;
     updated++;

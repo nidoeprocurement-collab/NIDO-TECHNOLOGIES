@@ -8,7 +8,7 @@ import {
   reserveClientProductCodes,
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
-import { syncClientPrices, getClientCategoryRules } from "@/lib/priceEngineStore";
+import { syncClientPrices } from "@/lib/priceEngineStore";
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
 
 function ProductThumb({ images, name }: { images: string[]; name: string }) {

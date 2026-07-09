@@ -3,20 +3,18 @@ import { Plus, X, Pencil, Trash2, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
-  getClientCategoryRules,
-  saveClientCategoryRules,
+  getGlobalCategoryRules,
+  saveGlobalCategoryRules,
   type CategoryPricingRule,
 } from '@/lib/priceEngineStore';
 import { getCatalogProducts } from '@/lib/catalogStore';
-import { getClientCatalog } from '@/lib/clientCatalogStore';
 
 /** Pull the unique category names that actually exist in the master catalog
- *  and/or this client's catalog, so rules always match real product categories. */
-function loadCatalogCategories(clientId: string): string[] {
-  const masterCats = getCatalogProducts().map(p => p.category).filter(Boolean);
-  const clientCats = getClientCatalog(clientId).map(p => p.category).filter(Boolean);
-  const all = Array.from(new Set([...masterCats, ...clientCats])).sort();
-  return all.length > 0 ? all : ['Office Supplies', 'Electronics', 'Furniture', 'Services'];
+ *  so rules always match real product categories. */
+function loadCatalogCategories(): string[] {
+  const cats = getCatalogProducts().map(p => p.category).filter(Boolean);
+  const unique = Array.from(new Set(cats)).sort();
+  return unique.length > 0 ? unique : ['Office Supplies', 'Electronics', 'Furniture', 'Services'];
 }
 
 const ADD_NEW_SENTINEL = '__ADD_NEW__';
@@ -118,43 +116,31 @@ function CategorySelect({
   );
 }
 
-export default function ClientCategoryPricingPanel({ clientId }: { clientId: string }) {
-  const [rules, setRules] = useState<CategoryPricingRule[]>(() => getClientCategoryRules(clientId));
-  // catalogCategories: live category names from the master catalog + this client's catalog.
-  // These are the exact strings stored on products, so rules will always match.
-  const [catalogCategories, setCatalogCategories] = useState<string[]>(() =>
-    loadCatalogCategories(clientId)
-  );
+/**
+ * Category Pricing Rules — configured ONCE, globally, in the Price Engine.
+ * These rules apply to every client (no per-client overrides). A category
+ * rule's marginPct + bufferPct replaces a client's global Profit Margin for
+ * matching products, for all clients.
+ */
+export default function GlobalCategoryPricingPanel() {
+  const [rules, setRules] = useState<CategoryPricingRule[]>(() => getGlobalCategoryRules());
+  const [catalogCategories, setCatalogCategories] = useState<string[]>(() => loadCatalogCategories());
   // User-typed custom categories not present in the catalog
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CategoryPricingRule | null>(null);
   const [isNew, setIsNew] = useState(false);
 
+  // Refresh catalog categories whenever the master catalog changes
   useEffect(() => {
-    const saved = getClientCategoryRules(clientId);
-    setRules(saved);
-    setCatalogCategories(loadCatalogCategories(clientId));
-    setCustomCategories([]);
-    setEditingId(null);
-    setDraft(null);
-    setIsNew(false);
-  }, [clientId]);
-
-  // Refresh catalog categories whenever the master catalog or client catalog changes
-  useEffect(() => {
-    const refresh = () => setCatalogCategories(loadCatalogCategories(clientId));
+    const refresh = () => setCatalogCategories(loadCatalogCategories());
     window.addEventListener('catalogUpdated', refresh);
-    window.addEventListener('clientCatalogUpdated', refresh);
-    return () => {
-      window.removeEventListener('catalogUpdated', refresh);
-      window.removeEventListener('clientCatalogUpdated', refresh);
-    };
-  }, [clientId]);
+    return () => window.removeEventListener('catalogUpdated', refresh);
+  }, []);
 
   const persist = (next: CategoryPricingRule[]) => {
     setRules(next);
-    saveClientCategoryRules(clientId, next);
+    saveGlobalCategoryRules(next);
   };
 
   const addCustomCategory = (cat: string) => {
@@ -203,12 +189,14 @@ export default function ClientCategoryPricingPanel({ clientId }: { clientId: str
   const hasAvailable = true; // always allow — user can type a new category
 
   return (
-    <div className="mt-6">
+    <div className="border border-gray-300 rounded-lg p-4">
+      <h2 className="text-xs font-bold text-blue-700 uppercase mb-3">Category Pricing Rules</h2>
+
       <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 mb-4">
         <p className="text-sm text-gray-700">
-          <span className="font-semibold text-gray-900">Category Pricing Rules:</span> Override the
-          global margin with category-specific margin and buffer percentages. These rules apply only
-          to this client and take priority over the global Profit Margin setting for matching products.
+          Override the global margin with category-specific margin and buffer percentages. These
+          rules apply to <span className="font-semibold text-gray-900">every client</span> and take
+          priority over each client's Profit Margin setting for matching products.
         </p>
       </div>
 
