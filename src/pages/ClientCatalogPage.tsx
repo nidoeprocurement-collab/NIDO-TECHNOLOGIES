@@ -1152,12 +1152,11 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
+                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-32 whitespace-nowrap">Client Product Code</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Product ID</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-24">SKU Code</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-32 whitespace-nowrap">Client Product Code</th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
@@ -1166,8 +1165,8 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
             <tbody>
               {filtered.map((product, i) => (
                 <tr key={product.sku} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
+                  <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.cpc || "—"}</td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.productCode}</td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.sku}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       {product.img ? (
@@ -1189,7 +1188,6 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.cpc || "—"}</td>
                   <td className="px-4 py-3 font-semibold text-gray-900">{product.price}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full border ${
