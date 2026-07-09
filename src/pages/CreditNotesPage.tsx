@@ -8,28 +8,27 @@ import {
 
 export default function CreditNotesDashboard() {
   return (
-    <div className="min-h-screen bg-slate-100 p-4">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="max-w-[1280px] mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-gray-500">
               Sales &gt; Credit Notes
             </p>
-            <h1 className="text-4xl font-bold">Credit Notes</h1>
-            <p className="text-slate-500 mt-2">
+            <h1 className="text-2xl font-bold text-gray-900">Credit Notes</h1>
+            <p className="text-gray-500 mt-1 text-sm">
               Create, manage and track customer credit notes.
             </p>
           </div>
 
           <div className="flex gap-3">
-            <button className="border rounded-lg px-4 py-2 flex items-center gap-2">
+            <button className="border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
               <Download size={16} />
               Export
             </button>
 
-            <button className="bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center gap-2">
+            <button className="bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center gap-2 text-sm">
               <Plus size={16} />
               New Credit Note
             </button>
@@ -68,14 +67,14 @@ export default function CreditNotesDashboard() {
         <div className="grid grid-cols-12 gap-6">
 
           {/* Table */}
-          <div className="col-span-7 bg-white rounded-xl border">
+          <div className="col-span-7 bg-white rounded-xl border border-gray-200">
 
             {/* Filters */}
             <div className="p-4 border-b flex gap-3">
               <div className="relative flex-1">
                 <Search
                   size={18}
-                  className="absolute left-3 top-3 text-slate-400"
+                  className="absolute left-3 top-3 text-gray-400"
                 />
 
                 <input
@@ -100,7 +99,7 @@ export default function CreditNotesDashboard() {
             {/* Table */}
             <table className="w-full">
               <thead>
-                <tr className="bg-slate-50 text-left">
+                <tr className="bg-gray-50 text-left">
                   <th className="p-4">Date</th>
                   <th>Credit Note #</th>
                   <th>Reference #</th>
@@ -116,7 +115,7 @@ export default function CreditNotesDashboard() {
                 {[1, 2, 3, 4, 5].map((row) => (
                   <tr
                     key={row}
-                    className="border-t hover:bg-slate-50"
+                    className="border-t hover:bg-gray-50"
                   >
                     <td className="p-4">07-Nov-2019</td>
                     <td className="text-blue-600">
@@ -144,7 +143,7 @@ export default function CreditNotesDashboard() {
           </div>
 
           {/* Preview Panel */}
-          <div className="col-span-5 bg-white rounded-xl border p-5">
+          <div className="col-span-5 bg-white rounded-xl border border-gray-200 p-5">
 
             <h2 className="font-semibold text-xl mb-5">
               Credit Note Preview
@@ -158,11 +157,11 @@ export default function CreditNotesDashboard() {
                     nido
                   </h3>
 
-                  <p className="text-sm text-slate-600 mt-2">
+                  <p className="text-sm text-gray-600 mt-2">
                     Nido Technologies Pvt. Ltd.
                   </p>
 
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-gray-500">
                     Bengaluru, India
                   </p>
                 </div>
@@ -187,7 +186,7 @@ export default function CreditNotesDashboard() {
                   Godrej & Boyce Mfg. Co. Ltd.
                 </p>
 
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-gray-500">
                   Goa, India
                 </p>
               </div>
@@ -195,7 +194,7 @@ export default function CreditNotesDashboard() {
               <div className="mt-6 border rounded">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50">
+                    <tr className="bg-gray-50">
                       <th className="p-2">Item</th>
                       <th>Qty</th>
                       <th>Rate</th>
@@ -232,7 +231,6 @@ export default function CreditNotesDashboard() {
           </div>
 
         </div>
-      </div>
     </div>
   );
 }
@@ -245,8 +243,8 @@ function SummaryCard({
   value: string;
 }) {
   return (
-    <div className="bg-white border rounded-xl p-5">
-      <p className="text-sm text-slate-500">
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      <p className="text-sm text-gray-500">
         {title}
       </p>
 

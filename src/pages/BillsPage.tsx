@@ -16,14 +16,14 @@ import { MoreHorizontal, Download, Plus } from "lucide-react"
 
 export default function BillsPage() {
   return (
-    <div className="bg-gray-100 min-h-screen p-4">
+    <div className="max-w-[1280px] mx-auto">
 
       {/* Main Container */}
-      <div className="bg-white border rounded-lg p-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-lg font-semibold">All Bills</h1>
+          <h1 className="text-2xl font-bold text-gray-900">All Bills</h1>
 
           <div className="flex items-center gap-2">
 
@@ -57,7 +57,7 @@ export default function BillsPage() {
         </div>
 
         {/* Table */}
-        <div className="border rounded-md overflow-hidden">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
 
           <Table>
             <TableHeader className="bg-gray-50">

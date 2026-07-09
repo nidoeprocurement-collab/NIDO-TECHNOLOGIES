@@ -23,14 +23,14 @@ import { MoreHorizontal, Plus } from "lucide-react"
 
 export default function ProfilesPage() {
   return (
-    <div className="bg-gray-100 min-h-screen p-4 space-y-4">
+    <div className="max-w-[1280px] mx-auto space-y-4">
 
       {/* ================= TOP TABLE ================= */}
-      <div className="bg-white border rounded-lg p-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
 
         {/* Header */}
         <div className="flex justify-between items-center mb-3">
-          <h1 className="text-lg font-semibold">All Profiles</h1>
+          <h1 className="text-2xl font-bold text-gray-900">All Profiles</h1>
 
           <div className="flex gap-2">
             <Button size="sm" className="flex items-center gap-1">
@@ -45,7 +45,7 @@ export default function ProfilesPage() {
         </div>
 
         {/* Table */}
-        <div className="border rounded-md overflow-hidden">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
@@ -103,7 +103,7 @@ export default function ProfilesPage() {
       </div>
 
       {/* ================= DETAILS ================= */}
-      <div className="bg-white border rounded-lg p-4 space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
 
         {/* Title */}
         <div className="flex justify-between items-start">

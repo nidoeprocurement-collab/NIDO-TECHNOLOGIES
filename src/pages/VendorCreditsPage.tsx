@@ -5,11 +5,11 @@ import { Plus, MoreHorizontal } from "lucide-react"
 
 export default function VendorCreditsPage() {
   return (
-    <div className="min-h-screen bg-[#f6f7fb] p-3">
+    <div className="max-w-[1280px] mx-auto">
       {/* Header */}
       <Card className="rounded-xl border border-gray-200 bg-white shadow-none">
         <div className="flex items-center justify-between px-4 py-4">
-          <h1 className="text-[20px] font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-gray-900">
             All Vendor Credits
           </h1>
 
@@ -33,36 +33,36 @@ export default function VendorCreditsPage() {
       {/* Table Section */}
       <Card className="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-none">
         {/* Header Row */}
-        <div className="grid h-12 grid-cols-[40px_1fr_1.8fr_2fr_2fr_1.5fr_1fr_1fr] items-center rounded-lg border border-gray-200 bg-white px-2">
+        <div className="grid h-12 grid-cols-[40px_1fr_1.8fr_2fr_2fr_1.5fr_1fr_1fr] items-center rounded-lg border border-gray-200 bg-gray-50 px-2">
           <div className="flex justify-center">
             <Checkbox />
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             DATE
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             CREDIT NOTE#
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             REFERENCE NUMBER
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             VENDOR NAME
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             STATUS
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             AMOUNT
           </div>
 
-          <div className="text-[10px] font-semibold tracking-[2px] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             BALANCE
           </div>
         </div>

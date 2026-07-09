@@ -1,2 +1,3 @@
 - [Purchase Order Flow Architecture](po-flow-architecture.md) — full PO creation flow: price-engine vendor selection, PDF via jsPDF, shared localStorage store, VendorOrdersPage merge strategy.
 - [Nido Tech design system](nido-design-system.md) — brand spec lives in STYLE_GUIDE.md; avoid duplicate Tailwind color keys, theme via CSS vars instead.
+- [Transaction page shell style](transactions-page-style.md) — canonical Orders-page-matching shell/card pattern for Transactions pages; avoid slate-*/dark: classes.

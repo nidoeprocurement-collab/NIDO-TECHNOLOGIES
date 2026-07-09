@@ -15,14 +15,14 @@ import { Download, Plus } from "lucide-react"
 
 export default function PurchaseOrdersPage() {
   return (
-    <div className="p-4 bg-gray-100 min-h-screen">
+    <div className="max-w-[1280px] mx-auto">
 
       {/* Top Container */}
-      <div className="bg-white border rounded-lg p-4 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-lg font-semibold">
+          <h1 className="text-2xl font-bold text-gray-900">
             All Purchase Orders
           </h1>
 
@@ -48,7 +48,7 @@ export default function PurchaseOrdersPage() {
         </div>
 
         {/* Table Container */}
-        <div className="border rounded-md overflow-hidden bg-white">
+        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
 
           <Table>
             <TableHeader className="bg-gray-50">

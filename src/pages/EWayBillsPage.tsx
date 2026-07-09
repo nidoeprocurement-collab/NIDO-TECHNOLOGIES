@@ -7,19 +7,18 @@ import {
 
 export default function EWayBillsPage() {
   return (
-    <div className="min-h-screen bg-slate-100 p-4">
-      <div className="space-y-4">
+    <div className="max-w-[1280px] mx-auto space-y-4">
 
         {/* Header Card */}
-        <div className="bg-white border rounded-xl shadow-sm p-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
 
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-semibold text-slate-800">
+            <h1 className="text-2xl font-bold text-gray-900">
               e-Way Bills
             </h1>
 
             <div className="flex gap-2">
-              <button className="flex items-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-slate-50">
+              <button className="flex items-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-gray-50">
                 <Settings size={16} />
                 Change e-Way Bill Portal Settings
               </button>
@@ -37,11 +36,11 @@ export default function EWayBillsPage() {
 
               {/* Transaction Period */}
               <div className="flex items-center gap-2 border rounded-lg px-3 py-2 min-w-[220px]">
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-gray-500">
                   Transaction Period:
                 </span>
 
-                <Calendar size={16} className="text-slate-500" />
+                <Calendar size={16} className="text-gray-500" />
 
                 <span className="text-sm font-medium">
                   This Month
@@ -52,7 +51,7 @@ export default function EWayBillsPage() {
 
               {/* Transaction Type */}
               <div className="flex items-center justify-between border rounded-lg px-3 py-2 min-w-[220px]">
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-gray-500">
                   Transaction Type:
                 </span>
 
@@ -66,7 +65,7 @@ export default function EWayBillsPage() {
 
               {/* Status */}
               <div className="flex items-center justify-between border rounded-lg px-3 py-2 min-w-[250px]">
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-gray-500">
                   e-Way Bill Status:
                 </span>
 
@@ -83,40 +82,40 @@ export default function EWayBillsPage() {
         </div>
 
         {/* Table Card */}
-        <div className="bg-white border rounded-xl shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl">
 
           <div className="p-4">
-            <div className="border rounded-xl overflow-hidden">
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
 
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50 border-b">
+                  <tr className="bg-gray-50 border-b">
 
                     <th className="w-12 p-4">
                       <input type="checkbox" />
                     </th>
 
-                    <th className="text-left text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                    <th className="text-left text-xs uppercase tracking-wider text-gray-500 font-semibold">
                       Date
                     </th>
 
-                    <th className="text-left text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                    <th className="text-left text-xs uppercase tracking-wider text-gray-500 font-semibold">
                       Transaction#
                     </th>
 
-                    <th className="text-left text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                    <th className="text-left text-xs uppercase tracking-wider text-gray-500 font-semibold">
                       Customer Name
                     </th>
 
-                    <th className="text-left text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                    <th className="text-left text-xs uppercase tracking-wider text-gray-500 font-semibold">
                       Customer GSTIN
                     </th>
 
-                    <th className="text-left text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                    <th className="text-left text-xs uppercase tracking-wider text-gray-500 font-semibold">
                       Expiry Date
                     </th>
 
-                    <th className="text-right pr-6 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+                    <th className="text-right pr-6 text-xs uppercase tracking-wider text-gray-500 font-semibold">
                       Total
                     </th>
                   </tr>
@@ -126,7 +125,7 @@ export default function EWayBillsPage() {
                   <tr>
                     <td
                       colSpan={7}
-                      className="text-center py-16 text-slate-500"
+                      className="text-center py-16 text-gray-500"
                     >
                       Yay! You do not have any pending invoices for
                       which e-way bills have to be generated.
@@ -139,7 +138,6 @@ export default function EWayBillsPage() {
           </div>
 
         </div>
-      </div>
     </div>
   );
 }

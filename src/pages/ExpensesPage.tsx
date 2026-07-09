@@ -8,18 +8,18 @@ import {
 
 export default function ExpensesInbox() {
   return (
-    <div className="min-h-screen bg-slate-50 p-4">
-      <div className="bg-white border rounded-xl overflow-hidden">
+    <div className="max-w-[1280px] mx-auto">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
 
           <div className="flex items-center gap-4">
-            <button className="text-sm text-slate-500">
+            <button className="text-sm text-gray-500">
               Receipt Inbox
             </button>
 
-            <h1 className="text-xl font-semibold">
+            <h1 className="text-2xl font-bold text-gray-900">
               All Expenses
             </h1>
           </div>
@@ -43,10 +43,10 @@ export default function ExpensesInbox() {
 
         {/* Expense List */}
         <div className="p-3 border-b">
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
 
             <table className="w-full text-sm">
-              <thead className="bg-slate-50">
+              <thead className="bg-gray-50">
                 <tr>
                   <th className="p-3"></th>
                   <th className="text-left">DATE</th>
@@ -82,7 +82,7 @@ export default function ExpensesInbox() {
                 ].map((item, index) => (
                   <tr
                     key={index}
-                    className="border-t hover:bg-slate-50"
+                    className="border-t hover:bg-gray-50"
                   >
                     <td className="p-3">
                       <input type="checkbox" />
@@ -152,7 +152,7 @@ export default function ExpensesInbox() {
             {/* Left Info */}
             <div className="col-span-5">
 
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-gray-500">
                 Expense Amount
               </p>
 
@@ -160,7 +160,7 @@ export default function ExpensesInbox() {
                 ₹44,835.00
               </h2>
 
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-gray-500">
                 2020-08-28
               </p>
 
@@ -237,14 +237,14 @@ export default function ExpensesInbox() {
               <div className="border-2 border-dashed rounded-xl p-6 text-center">
                 <UploadCloud
                   size={40}
-                  className="mx-auto text-slate-400"
+                  className="mx-auto text-gray-400"
                 />
 
                 <h3 className="font-medium mt-3">
                   Drag or Drop your Receipts
                 </h3>
 
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-gray-500 mt-1">
                   Maximum size 10 MB
                 </p>
 
@@ -259,9 +259,9 @@ export default function ExpensesInbox() {
 
           {/* Journal Table */}
 
-          <div className="mt-8 border rounded-xl overflow-hidden">
+          <div className="mt-8 border border-gray-200 rounded-xl overflow-hidden">
 
-            <div className="bg-slate-50 p-3 font-medium">
+            <div className="bg-gray-50 p-3 font-medium">
               Journal
             </div>
 
@@ -335,7 +335,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between">
-      <span className="text-slate-500">
+      <span className="text-gray-500">
         {label}
       </span>
 
