@@ -649,6 +649,23 @@ export default function VendorOrderDetailPage() {
   const handleItemStatusChange = (id: string, status: string) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, status } : it));
   };
+  const handleReferenceNumberChange = (id: string, referenceNumber: string) => {
+    setItems(prev => {
+      const updated = prev.map(it => it.id === id ? { ...it, referenceNumber } : it);
+      const currentRealPO = getPOByNumber(poKey);
+      if (currentRealPO) {
+        const updatedItems = currentRealPO.items.map((li, i) =>
+          updated[i]?.id === id || li.subOrderId === id ? { ...li, referenceNumber } : li
+        );
+        const changes: Partial<StoredPO> = { items: updatedItems };
+        if (currentRealPO.subOrderId === id || (!currentRealPO.items.length && currentRealPO.item)) {
+          changes.referenceNumber = referenceNumber;
+        }
+        updatePO(poKey, changes);
+      }
+      return updated;
+    });
+  };
   const handleDeleteItem = (id: string) => {
     setItems(prev => prev.filter(it => it.id !== id));
   };
@@ -806,12 +823,19 @@ export default function VendorOrderDetailPage() {
                   <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
-                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit" }}>View more</button>
+                    <div style={{ marginTop: 4 }}>
+                      <input
+                        value={item.referenceNumber || ""}
+                        onChange={e => handleReferenceNumberChange(item.id, e.target.value)}
+                        placeholder="Enter reference/model number"
+                        style={{ width: "100%", maxWidth: 200, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                      />
+                    </div>
+                    <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 4 }}>View more</button>
                   </div>
                 </div>
               </div>
               <div>
-                {item.referenceNumber && <div style={{ fontSize: 12.5, color: "#374151", fontWeight: 500 }}>Ref/Model No: {item.referenceNumber}</div>}
                 {item.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
               </div>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{item.qty}</div>
