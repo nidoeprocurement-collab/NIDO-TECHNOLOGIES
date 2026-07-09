@@ -52,13 +52,31 @@ export interface MyOrder {
 // ─── Context ──────────────────────────────────────────────────────────────────
 interface MyOrdersContextType {
   orders: MyOrder[];
-  addOrder: (order: MyOrder) => void;
+  addOrder: (order: Omit<MyOrder, "id"> & { id?: string }) => string;
   setOrders: React.Dispatch<React.SetStateAction<MyOrder[]>>;
 }
 
 const MyOrdersContext = createContext<MyOrdersContextType | undefined>(undefined);
 
 const ORDERS_KEY = "nido_my_orders";
+const SEQ_KEY = "nido_order_seq";
+
+// Serial, zero-padded order numbers: ORD-000001, ORD-000002, ...
+function nextOrderId(): string {
+  let seq = 0;
+  try {
+    seq = parseInt(localStorage.getItem(SEQ_KEY) || "0", 10) || 0;
+  } catch {
+    seq = 0;
+  }
+  seq += 1;
+  try {
+    localStorage.setItem(SEQ_KEY, String(seq));
+  } catch {
+    /* ignore */
+  }
+  return `ORD-${String(seq).padStart(6, "0")}`;
+}
 
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<MyOrder[]>(() => {
@@ -74,8 +92,10 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
   }, [orders]);
 
-  const addOrder = (order: MyOrder) => {
-    setOrders((prev) => [order, ...prev]);
+  const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
+    const id = nextOrderId();
+    setOrders((prev) => [{ ...order, id } as MyOrder, ...prev]);
+    return id;
   };
 
   return (

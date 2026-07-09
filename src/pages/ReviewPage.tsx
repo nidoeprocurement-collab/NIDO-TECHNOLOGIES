@@ -29,8 +29,6 @@ export default function ReviewPage() {
   const handlePlaceOrder = () => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
-    const nextNum = Date.now().toString().slice(-6);
-    const orderNumber = `ORD-${nextNum}`;
     // Snapshot cart items before clearing
     const itemsSnapshot = cart.map(i => ({ ...i }));
     const totalAmount = subtotal + gst + SHIPPING_FEE;
@@ -38,12 +36,12 @@ export default function ReviewPage() {
     const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
-    addOrder({
-      id: orderNumber,
+    const poRef = Date.now().toString().slice(-6);
+    const orderNumber = addOrder({
       client: "Nido Tech CorpEssentials",
       clientColor: "#2563eb",
       clientInitial: "N",
-      poNumber: `PO-${nextNum}`,
+      poNumber: `PO-${poRef}`,
       requester: "Owner",
       requesterRole: "System Owner",
       requesterInitial: "O",
