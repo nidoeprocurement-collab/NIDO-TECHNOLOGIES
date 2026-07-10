@@ -266,15 +266,16 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Sidebar */}
+      {/* Sidebar — flex column so the nav can scroll independently while the
+          profile/sign-out block always stays pinned to the very bottom. */}
       <aside
-        className={`fixed left-0 top-0 h-full bg-white overflow-y-auto overflow-x-hidden transition-all duration-300 z-30 w-64 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 h-full bg-white flex flex-col overflow-hidden transition-all duration-300 z-30 w-64 lg:translate-x-0 ${
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Sidebar Header — same h-16 row height as the TopBar's search row
             so the two line up. Kept plain white with no divider line. */}
-        <div className="sticky top-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2">
+        <div className="shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
               <Zap size={20} className="text-white" />
@@ -299,22 +300,22 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           </button>
         </div>
 
-        {/* Navigation Items */}
-        <nav className={`space-y-1 ${effectiveCollapsed ? 'p-2' : 'p-4'}`}>
+        {/* Navigation Items — scrolls on its own, leaving the bottom block fixed */}
+        <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1 ${effectiveCollapsed ? 'p-2' : 'p-4'}`}>
           {navigationItems.map((item, idx) => (
             <NavItemComponent key={idx} item={item} collapsed={effectiveCollapsed} />
           ))}
         </nav>
 
-        {/* Bottom Section */}
-        <div className="mt-4">
+        {/* Bottom Section — always pinned to the bottom of the sidebar */}
+        <div className="shrink-0">
           {effectiveCollapsed ? (
             <div className="p-2 flex flex-col items-center gap-2">
               <div
-                className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
+                className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center"
                 title="Nido Owner"
               >
-                <span className="text-xs font-bold text-blue-600">N</span>
+                <Zap size={16} className="text-white" />
               </div>
               <button
                 title="Sign Out"
@@ -326,8 +327,8 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           ) : (
             <div className="p-4">
               <div className="flex items-center gap-3 px-3 py-2.5">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-blue-600">N</span>
+                <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
+                  <Zap size={16} className="text-white" />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-900">Nido Owner</p>

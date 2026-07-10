@@ -97,7 +97,7 @@ export default function TopBar() {
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+          <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2.5">
             <Search size={18} className="text-gray-400" />
             <input
               type="text"
