@@ -689,7 +689,7 @@ export default function VendorOrderDetailPage() {
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 20px" };
 
   return (
-    <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f9fafb", minHeight: "100vh", color: "#111827" }}>
+    <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", color: "#111827" }}>
       <div style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 24px 60px" }}>
 
         {/* Back */}

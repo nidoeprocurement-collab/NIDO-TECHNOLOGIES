@@ -5,7 +5,7 @@ import { Plus, MoreHorizontal } from "lucide-react"
 
 export default function PaymentsPage() {
   return (
-    <div className="min-h-screen bg-[#f6f7fb] p-3">
+    <div className="min-h-screen bg-white p-3">
       {/* Header Card */}
       <Card className="rounded-xl border border-[#e5e7eb] bg-white shadow-none">
         <div className="flex items-center justify-between px-4 py-4">

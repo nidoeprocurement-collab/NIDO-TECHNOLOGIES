@@ -1265,7 +1265,7 @@ export default function MyOrderPage() {
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
     return (
-      <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f9fafb", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ textAlign: "center", padding: 40 }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}>📋</div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>Order Not Found</h2>
@@ -1284,7 +1284,7 @@ export default function MyOrderPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f9fafb", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
+    <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
       <div style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 24px 48px" }}>
 
         {/* Header */}

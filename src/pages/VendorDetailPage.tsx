@@ -399,7 +399,7 @@ export default function VendorDetailPage() {
   }[vendor.status] || "bg-gray-100 text-gray-500";
 
   return (
-    <div className="min-h-screen bg-[#f5f6fa] font-[Inter,sans-serif] flex flex-col">
+    <div className="min-h-screen bg-white font-[Inter,sans-serif] flex flex-col">
       {/* Sticky Header */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-100 shadow-sm">
         {/* Vendor identity row */}

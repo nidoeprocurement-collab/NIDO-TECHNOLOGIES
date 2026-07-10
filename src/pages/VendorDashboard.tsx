@@ -219,7 +219,7 @@ export default function App() {
   return (
     <div
       className="min-h-screen p-2 space-y-1.5"
-      style={{ backgroundColor: "#F4F6F9", fontFamily: "'Inter', sans-serif" }}
+      style={{ backgroundColor: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
     >
 
       {/* ═══ ROW 1: KPI Cards ═══════════════════════════════════════ */}

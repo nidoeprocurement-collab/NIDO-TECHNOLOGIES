@@ -881,7 +881,7 @@ export default function CatalogUpdatesTab() {
   );
 
   return (
-    <div className="space-y-6 bg-gray-50 p-6">
+    <div className="space-y-6 bg-white p-6">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-semibold text-gray-900">Master Catalogue</h2>

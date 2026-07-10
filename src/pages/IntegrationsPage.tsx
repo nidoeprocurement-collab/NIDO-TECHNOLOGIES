@@ -287,7 +287,7 @@ export default function IntegrationsPage() {
   const configIntegration = integrations.find((i) => i.id === showConfig);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
         {/* Header */}
         <div className="mb-10">

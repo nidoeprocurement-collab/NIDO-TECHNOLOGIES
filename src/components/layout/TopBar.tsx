@@ -56,10 +56,15 @@ function generateBreadcrumbs(pathname: string) {
     cumulativePath += `/${segment}`;
     const isActive = index === segments.length - 1;
     const label = routeLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
-    
+
+    // `vendor-orders/:id` is the vendor PO detail route, but there is no
+    // `/vendor-orders` list route — the actual list page lives at
+    // `/vendors/orders`. Point the breadcrumb there instead of a 404.
+    const linkPath = segment === 'vendor-orders' ? '/vendors/orders' : cumulativePath;
+
     breadcrumbs.push({
       label,
-      path: cumulativePath,
+      path: linkPath,
       isActive,
     });
   });

@@ -407,7 +407,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-white">
       {/* Sticky Header */}
       <div className="bg-transparent border-b border-gray-200/70">
         <div className="w-full px-4 py-3 flex justify-between items-center">

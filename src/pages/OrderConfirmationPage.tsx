@@ -77,7 +77,7 @@ export default function OrderConfirmationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-white">
       <FloatingCartButton />
 
       {/* ── Hero banner ── */}

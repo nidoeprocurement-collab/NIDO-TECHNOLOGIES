@@ -189,7 +189,7 @@ function AddContractPage({ onCancel, contract, onSave }: {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-white font-sans">
       {/* Page header */}
       <div className="bg-white border-b border-gray-100 px-6 py-4">
         <h1 className="text-xl font-bold text-gray-900">{isEdit ? "Edit Contract" : "Add Contract"}</h1>
@@ -668,7 +668,7 @@ export default function VendorContractsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans" onClick={() => setOpenRowMenu(null)}>
+    <div className="min-h-screen bg-white font-sans" onClick={() => setOpenRowMenu(null)}>
       <div className="flex min-h-screen">
         {selectedContract && <div className="fixed inset-0 bg-black/20 z-20 lg:hidden" onClick={() => setSelectedContract(null)} />}
         <div className="flex-1 min-w-0 overflow-y-auto">

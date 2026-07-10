@@ -2,7 +2,7 @@ import { Plus } from "lucide-react";
 
 export default function PaymentsPage() {
   return (
-    <div className="min-h-screen bg-slate-100 p-4">
+    <div className="min-h-screen bg-white p-4">
       {/* Summary Card */}
       <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
         <div className="flex items-start justify-between">

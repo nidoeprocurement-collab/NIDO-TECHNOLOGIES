@@ -105,7 +105,7 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
   const th: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: "1px solid #eef0f5", textAlign: "left" };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#f8f9fb", zIndex: 500, overflowY: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#FFFFFF", zIndex: 500, overflowY: "auto" }}>
       <div style={{ padding: "28px 36px" }}>
         {/* Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
@@ -331,7 +331,7 @@ export default function VendorOrderList() {
 
   // ── Styles ─────────────────────────────────────────────────────────────────
   const s = {
-    page:      { padding: "28px 36px", background: "#f8f9fb", minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: "#1a1a2e" } as React.CSSProperties,
+    page:      { padding: "28px 36px", background: "#FFFFFF", minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: "#1a1a2e" } as React.CSSProperties,
     card:      { background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, overflow: "hidden" } as React.CSSProperties,
     th:        { fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase" as const, letterSpacing: ".05em", padding: "11px 14px", borderBottom: "1px solid #eef0f5", textAlign: "left" as const, background: "#fafbff", whiteSpace: "nowrap" as const },
     td:        { padding: "13px 14px", borderBottom: "1px solid #f3f4f8", fontSize: 13, verticalAlign: "middle" as const, color: "#2d2d3a" },

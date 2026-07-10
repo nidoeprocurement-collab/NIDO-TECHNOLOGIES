@@ -141,7 +141,7 @@ export default function CartPage() {
   const maxScroll = Math.max(0, SUGGESTED.length - visibleCount);
 
   return (
-    <div className="min-h-screen bg-gray-50 px-6 py-6">
+    <div className="min-h-screen bg-white px-6 py-6">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">

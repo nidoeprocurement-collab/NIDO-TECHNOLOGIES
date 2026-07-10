@@ -194,7 +194,7 @@ export default function VendorPerformancePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-white font-sans">
       <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-4">
 
         {/* ── Stat cards ── */}

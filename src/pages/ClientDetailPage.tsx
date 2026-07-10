@@ -338,7 +338,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen bg-white font-sans">
       {/* Page header */}
       <div className="px-6 pt-5 pb-0 flex items-center gap-2">
         <button

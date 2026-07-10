@@ -193,7 +193,7 @@ export default function VendorPaymentsPage() {
   })();
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans" onClick={() => setOpenRowMenu(null)}>
+    <div className="min-h-screen bg-white font-sans" onClick={() => setOpenRowMenu(null)}>
       <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-4">
 
         {/* Stats */}

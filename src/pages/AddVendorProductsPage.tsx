@@ -221,7 +221,7 @@ export default function AddVendorProductsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-[#f5f6fa] font-[Inter,sans-serif]">
+    <div className="min-h-screen flex flex-col bg-white font-[Inter,sans-serif]">
 
       {/* ── Sticky header ── */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">

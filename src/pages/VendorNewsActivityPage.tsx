@@ -194,7 +194,7 @@ export default function VendorNewsActivityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans" onClick={() => setOpenMenu(null)}>
+    <div className="min-h-screen bg-white font-sans" onClick={() => setOpenMenu(null)}>
       <div className="max-w-[1280px] mx-auto px-6 py-5">
         <div className="flex gap-5">
 

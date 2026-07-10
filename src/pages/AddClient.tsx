@@ -465,7 +465,7 @@ export default function AddClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white border-b p-6">
         <div className="max-w-6xl mx-auto flex items-start justify-between">
