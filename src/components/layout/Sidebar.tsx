@@ -272,9 +272,10 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        {/* Sidebar Header — matches TopBar's h-16 row + border so the two
-            header lines sit flush with each other across the layout. */}
-        <div className="sticky top-0 bg-white border-b border-gray-200/70 h-16 px-4 z-10 flex items-center justify-between gap-2">
+        {/* Sidebar Header — same h-16 row height as the TopBar's search row
+            so the two line up, but separated with a soft tint instead of a
+            hard rule for a cleaner look. */}
+        <div className="sticky top-0 bg-gray-50/70 h-16 px-4 z-10 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
               <Zap size={20} className="text-white" />

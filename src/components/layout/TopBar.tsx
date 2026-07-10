@@ -87,8 +87,9 @@ export default function TopBar() {
 
   return (
     <div className="relative z-20 bg-transparent">
-      {/* Top section - Search bar and actions */}
-      <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4 border-b border-gray-200/70">
+      {/* Top section - Search bar and actions — tinted instead of a hard
+          border rule to keep the header separation subtle. */}
+      <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4 bg-gray-50/70">
         {/* Left: Back & Search */}
         <div className="flex items-center gap-4 flex-1">
           <button
