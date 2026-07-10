@@ -87,8 +87,9 @@ export default function TopBar() {
 
   return (
     <div className="relative z-20 bg-transparent">
-      {/* Top section - Search bar and actions — plain white, no divider line. */}
-      <div className="h-16 px-4 md:px-6 flex items-center justify-between gap-4 bg-white">
+      {/* Top section - Search bar and actions — plain white, separated from
+          the breadcrumb row below with a soft shadow instead of a line. */}
+      <div className="relative z-10 h-16 px-4 md:px-6 flex items-center justify-between gap-4 bg-white shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
         {/* Left: Back & Search */}
         <div className="flex items-center gap-4 flex-1">
           <button

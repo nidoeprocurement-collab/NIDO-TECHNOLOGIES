@@ -156,12 +156,14 @@ function NavItemComponent({ item, level = 0, collapsed = false }: NavItemProps) 
         onMouseLeave={() => setFlyoutOpen(false)}
       >
         <button
-          className={`w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
+          className={`relative w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
             hasActiveChild ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
           }`}
           title={item.label}
         >
           {item.icon}
+          {/* Small dropdown indicator so collapsed icons still hint they expand */}
+          <ChevronRight size={10} className="absolute right-0.5 bottom-0.5 text-gray-400" />
         </button>
         {flyoutOpen && (
           <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
@@ -269,13 +271,14 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       {/* Sidebar — flex column so the nav can scroll independently while the
           profile/sign-out block always stays pinned to the very bottom. */}
       <aside
-        className={`fixed left-0 top-0 h-full bg-white flex flex-col overflow-hidden transition-all duration-300 z-30 w-64 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 h-full bg-white flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 ${
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Sidebar Header — same h-16 row height as the TopBar's search row
-            so the two line up. Kept plain white with no divider line. */}
-        <div className="shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2">
+            so the two line up. Separated from the nav below with a soft
+            shadow instead of a hard divider line. */}
+        <div className="relative shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2 shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
               <Zap size={20} className="text-white" />
@@ -307,8 +310,9 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           ))}
         </nav>
 
-        {/* Bottom Section — always pinned to the bottom of the sidebar */}
-        <div className="shrink-0">
+        {/* Bottom Section — always pinned to the bottom of the sidebar,
+            separated from the nav above with a soft shadow instead of a line */}
+        <div className="shrink-0 shadow-[0_-2px_6px_-2px_rgba(15,23,42,0.10)]">
           {effectiveCollapsed ? (
             <div className="p-2 flex flex-col items-center gap-2">
               <div
