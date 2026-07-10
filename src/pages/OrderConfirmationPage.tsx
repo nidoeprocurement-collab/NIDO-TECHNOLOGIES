@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, Copy, Check, ShoppingBag, Mail, Phone, MapPin } from "lucide-react";
+import { ChevronRight, Copy, Check, Mail, Phone, MapPin, CreditCard } from "lucide-react";
 import FloatingCartButton from "@/components/FloatingCartButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -15,12 +15,13 @@ type ConfirmationState = {
     priceNum: number;
     quantity: number;
     category?: string;
+    specs?: string[];
   }[];
   subtotal: number;
   gst: number;
   shipping: number;
   total: number;
-  address: { label: string; line1: string; line2: string; line3: string; phone: string };
+  address: { label: string; line1: string; line2: string; line3?: string; phone: string } | null;
   paymentMethod: string;
   cardLast4: string;
   paymentTerms: string;
@@ -54,19 +55,13 @@ export default function OrderConfirmationPage() {
   const orderNumber = state?.orderNumber ?? orderId ?? "—";
   const items = state?.items ?? [];
   const subtotal = state?.subtotal ?? 0;
+  const gst = state?.gst ?? 0;
   const shipping = state?.shipping ?? 0;
   const total = state?.total ?? 0;
-  const address = state?.address ?? {
-    label: "Office (Default)",
-    line1: "No. 45, 3rd Floor, Embassy Tech Village,",
-    line2: "Outer Ring Road, Bangalore - 560103,",
-    line3: "Karnataka, India",
-    phone: "+91 98765 43210",
-  };
+  const address = state?.address ?? null;
   const clientEmail = state?.clientEmail ?? "owner@nidotech.com";
   const clientName = state?.clientName ?? "Nido Tech CorpEssentials";
   const paymentMethod = state?.paymentMethod ?? "Credit Card";
-  const cardLast4 = state?.cardLast4 ?? "****";
   const paymentTerms = state?.paymentTerms ?? "Net 30 (Payment due in 30 days)";
   const orderDate = state?.orderDate ?? new Date().toISOString().split("T")[0];
 
@@ -88,7 +83,6 @@ export default function OrderConfirmationPage() {
           minHeight: 140,
         }}
       >
-        {/* decorative blurred circles to mimic blurred office image */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -left-10 top-0 w-64 h-64 rounded-full bg-blue-300/30 blur-3xl" />
           <div className="absolute right-20 -top-10 w-80 h-80 rounded-full bg-indigo-200/40 blur-3xl" />
@@ -96,10 +90,8 @@ export default function OrderConfirmationPage() {
         </div>
 
         <div className="relative max-w-5xl mx-auto px-8 pt-8 pb-8">
-          {/* Thank you heading */}
           <div className="flex items-center justify-center flex-col gap-3">
             <div className="flex items-center gap-4">
-              {/* Green check circle */}
               <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center shadow-md shrink-0">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -116,14 +108,13 @@ export default function OrderConfirmationPage() {
 
       {/* ── Body ── */}
       <div className="max-w-5xl mx-auto px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
           {/* ── Left column ── */}
           <div className="space-y-4">
 
             {/* Confirmation card */}
             <div className="bg-white rounded-2xl border border-gray-200 p-8">
-              {/* Order ID */}
               <div className="mb-4">
                 <p className="text-base font-semibold text-gray-900">
                   Order ID:{" "}
@@ -139,7 +130,6 @@ export default function OrderConfirmationPage() {
                 </a>
               </p>
 
-              {/* Track Order button */}
               <button
                 onClick={() => navigate("/orders")}
                 className="w-full max-w-xs bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg py-3 text-sm transition-colors mb-6"
@@ -147,7 +137,6 @@ export default function OrderConfirmationPage() {
                 Track Order
               </button>
 
-              {/* Bullet info */}
               <ul className="space-y-3 text-sm text-gray-600 mb-8">
                 <li className="flex items-start gap-2">
                   <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
@@ -179,7 +168,6 @@ export default function OrderConfirmationPage() {
                 </li>
               </ul>
 
-              {/* Back to Catalog */}
               <button
                 onClick={() => navigate("/shop")}
                 className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 font-medium transition-colors"
@@ -195,7 +183,7 @@ export default function OrderConfirmationPage() {
             <div className="bg-white rounded-2xl border border-gray-200 p-6">
               <h3 className="text-base font-semibold text-gray-900 mb-2">Need Help?</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Need help? Contact our support team for assistance:
+                Contact our support team for assistance:
               </p>
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-sm text-gray-700">
@@ -214,81 +202,93 @@ export default function OrderConfirmationPage() {
 
           {/* ── Right column: Order Details panel ── */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">Order Details</h3>
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                title="Copy order ID"
+              >
+                {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
+                <span>{copied ? "Copied!" : `#${orderNumber}`}</span>
+              </button>
             </div>
 
-            <div className="px-6 py-4 border-b border-gray-100">
-              {/* Order ID with copy */}
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-500">Order ID: <span className="font-semibold text-gray-800">#{orderNumber}</span></span>
-                <button
-                  onClick={handleCopy}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
-                  title="Copy order ID"
-                >
-                  {copied ? <Check size={13} className="text-green-500" /> : <Copy size={13} />}
-                </button>
+            {/* Order date */}
+            <div className="px-6 pt-4 pb-2">
+              <p className="text-xs text-gray-400">Order Date: <span className="text-gray-600 font-medium">{formatDate(orderDate)}</span></p>
+            </div>
+
+            {/* Line items */}
+            <div className="px-6 pb-3 space-y-2">
+              {items.length > 0 ? (
+                items.map((item, i) => (
+                  <div key={i} className="flex justify-between text-sm gap-3">
+                    <span className="text-gray-700 flex-1 min-w-0">
+                      <span className="truncate block">{item.name}</span>
+                      {item.quantity > 1 && (
+                        <span className="text-xs text-gray-400">Qty: {item.quantity}</span>
+                      )}
+                    </span>
+                    <span className="text-gray-800 font-medium shrink-0">
+                      {formatPrice(item.priceNum * item.quantity)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-gray-400 italic">No items</div>
+              )}
+            </div>
+
+            {/* Subtotal / GST / Shipping / Total */}
+            <div className="px-6 py-3 border-t border-gray-100 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Subtotal</span>
+                <span className="text-gray-700 font-medium">{formatPrice(subtotal)}</span>
               </div>
-
-              {/* Line items */}
-              <div className="space-y-2 mb-3">
-                {items.length > 0 ? (
-                  items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-gray-700 truncate mr-3 flex-1">
-                        {item.name}
-                        {item.quantity > 1 && (
-                          <span className="text-gray-400 ml-1">×{item.quantity}</span>
-                        )}
-                      </span>
-                      <span className="text-gray-800 font-medium shrink-0">
-                        {formatPrice(item.priceNum * item.quantity)}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-sm text-gray-400 italic">No items</div>
-                )}
-
-                {/* Shipping */}
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Standard Shipping</span>
-                  <span className="text-gray-800 font-medium">{formatPrice(shipping)}</span>
-                </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">GST (18%)</span>
+                <span className="text-gray-700 font-medium">{formatPrice(gst)}</span>
               </div>
-
-              {/* Total */}
-              <div className="flex justify-between items-center border-t border-gray-100 pt-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Standard Shipping</span>
+                <span className="text-gray-700 font-medium">{formatPrice(shipping)}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-gray-100 pt-2 mt-1">
                 <span className="text-sm font-bold text-gray-900">Total</span>
                 <span className="text-sm font-bold text-gray-900">{formatPrice(total)}</span>
               </div>
             </div>
 
-            {/* Shipping to */}
-            <div className="px-6 py-4 border-b border-gray-100">
+            {/* Delivery Address */}
+            <div className="px-6 py-4 border-t border-gray-100">
               <div className="flex items-center gap-1.5 mb-2">
                 <MapPin size={14} className="text-gray-400" />
-                <span className="text-sm font-semibold text-gray-800">Shipping to:</span>
+                <span className="text-sm font-semibold text-gray-800">Delivery Address</span>
               </div>
-              <div className="text-sm text-gray-600 space-y-0.5 pl-5">
-                <p className="font-medium text-gray-800">{clientName}</p>
-                <p>{address.line1}</p>
-                {address.line2 && <p>{address.line2}</p>}
-                {address.line3 && <p>{address.line3}</p>}
-                <p className="text-gray-400 text-xs mt-1">{address.phone}</p>
-              </div>
+              {address ? (
+                <div className="text-sm text-gray-600 space-y-0.5 pl-5">
+                  <p className="font-medium text-gray-800">{address.label}</p>
+                  <p>{address.line1}</p>
+                  {address.line2 && <p>{address.line2}</p>}
+                  {address.line3 && <p>{address.line3}</p>}
+                  <p className="text-gray-400 text-xs mt-1">{address.phone}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 pl-5">No address provided</p>
+              )}
             </div>
 
-            {/* Payment Terms */}
-            <div className="px-6 py-4">
-              <p className="text-sm font-semibold text-gray-800 mb-2">Payment Terms</p>
-              <p className="text-sm text-gray-600 mb-1">{paymentTerms}</p>
-              <p className="text-sm text-gray-600">
-                {paymentMethod}{" "}
-                <span className="tracking-widest text-gray-400">••••</span>{" "}
-                {cardLast4}
-              </p>
+            {/* Payment */}
+            <div className="px-6 py-4 border-t border-gray-100">
+              <div className="flex items-center gap-1.5 mb-2">
+                <CreditCard size={14} className="text-gray-400" />
+                <span className="text-sm font-semibold text-gray-800">Payment</span>
+              </div>
+              <div className="pl-5 space-y-1">
+                <p className="text-sm text-gray-700">{paymentMethod}</p>
+                <p className="text-xs text-gray-400">{paymentTerms}</p>
+              </div>
             </div>
           </div>
 

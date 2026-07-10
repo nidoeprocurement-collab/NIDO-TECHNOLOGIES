@@ -1,15 +1,29 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ArrowLeft, Pencil, MapPin, Lock, Info } from "lucide-react";
+import { ChevronRight, ArrowLeft, Pencil, MapPin, Building2, Lock } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
 import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 
-const ADDRESSES: Record<number, { label: string; line1: string; line2: string; line3: string; phone: string }> = {
-  1: { label: "Office (Default)", line1: "No. 45, 3rd Floor, Embassy Tech Village,", line2: "Outer Ring Road, Bangalore - 560103,", line3: "Karnataka, India", phone: "+91 98765 43210" },
-  2: { label: "Warehouse", line1: "Plot No. 12, KIADB Industrial Area,", line2: "Hoskote, Bangalore - 562114,", line3: "Karnataka, India", phone: "+91 99887 66556" },
-  3: { label: "Home", line1: "No. 24, 2nd Floor, MG Road,", line2: "Bangalore - 560001, Karnataka, India", line3: "", phone: "+91 91234 56789" },
-};
+// ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
+
+interface DeliveryAddress {
+  id: number;
+  label: string;
+  line1: string;
+  line2: string;
+  phone: string;
+  isDefault: boolean;
+}
+
+function loadAddresses(clientId: string): DeliveryAddress[] {
+  try {
+    const raw = localStorage.getItem(`nido_delivery_addresses_${clientId}`);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -19,24 +33,30 @@ export default function ReviewPage() {
   const navigate = useNavigate();
   const { items: cart, clearCart } = useCart();
   const { addOrder } = useMyOrders();
-  const addr = ADDRESSES[1];
+
+  const clientId = localStorage.getItem("nido_shop_selected_client") || "";
+  const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
+
+  useEffect(() => {
+    setAddresses(loadAddresses(clientId));
+  }, [clientId]);
+
+  const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
-  const rewardPoints = Math.floor((subtotal + gst) / 1000);
-
   const SHIPPING_FEE = 500;
 
   const handlePlaceOrder = () => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
-    // Snapshot cart items before clearing
-    const itemsSnapshot = cart.map(i => ({ ...i }));
+    const itemsSnapshot = cart.map((i) => ({ ...i }));
     const totalAmount = subtotal + gst + SHIPPING_FEE;
-    // Format date/time as MyOrderPage displays them
     const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
     const poRef = Date.now().toString().slice(-6);
+
     const orderNumber = addOrder({
       client: "Nido Tech CorpEssentials",
       clientColor: "#2563eb",
@@ -57,19 +77,20 @@ export default function ReviewPage() {
       slaAlert: false,
       totalAmount: formattedTotal,
       totalAmountNum: totalAmount,
-      cartItems: itemsSnapshot.map(i => ({
+      cartItems: itemsSnapshot.map((i) => ({
         id: i.id,
         name: i.name,
         image: i.image,
         priceNum: i.priceNum,
         quantity: i.quantity,
         category: i.category,
-        specs: Array.isArray(i.specs) ? i.specs : (i.specs ? [i.specs] : []),
+        specs: Array.isArray(i.specs) ? i.specs : i.specs ? [i.specs] : [],
         moq: i.moq,
         clientId: i.clientId,
         productCode: i.productCode,
       })) satisfies OrderCartItem[],
     });
+
     clearCart();
     navigate(`/shop/order-confirmation/${orderNumber}`, {
       state: {
@@ -79,8 +100,10 @@ export default function ReviewPage() {
         subtotal,
         gst,
         shipping: SHIPPING_FEE,
-        total: subtotal + gst + SHIPPING_FEE,
-        address: addr,
+        total: totalAmount,
+        address: selectedAddr
+          ? { label: selectedAddr.label, line1: selectedAddr.line1, line2: selectedAddr.line2, phone: selectedAddr.phone }
+          : null,
         paymentMethod: "Credit Card",
         cardLast4: "5432",
         paymentTerms: "Net 30 (Payment due in 30 days)",
@@ -116,6 +139,7 @@ export default function ReviewPage() {
         <div className="flex gap-5 items-start">
           {/* Left */}
           <div className="flex-1 min-w-0 space-y-4">
+
             {/* Delivery Details */}
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
@@ -124,42 +148,55 @@ export default function ReviewPage() {
                   <Pencil size={11} /> Edit
                 </button>
               </div>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-                  <MapPin size={18} className="text-blue-500" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm text-gray-900">{addr.label}</span>
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Default</span>
+              {selectedAddr ? (
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                    <MapPin size={18} className="text-blue-500" />
                   </div>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    {addr.line1}<br />{addr.line2}
-                    {addr.line3 && <><br />{addr.line3}</>}<br />{addr.phone}
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm text-gray-900">{selectedAddr.label}</span>
+                      {selectedAddr.isDefault && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Default</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {selectedAddr.line1}
+                      {selectedAddr.line2 && <><br />{selectedAddr.line2}</>}
+                      <br />{selectedAddr.phone}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-sm text-gray-400">No delivery address selected. <button onClick={() => navigate("/shop/checkout")} className="text-blue-600 hover:underline">Add one</button></p>
+              )}
             </div>
 
-            {/* Billing + Payment row */}
+            {/* Delivery Address + Payment row */}
             <div className="grid grid-cols-2 gap-4">
+              {/* Delivery Address summary */}
               <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-gray-900 text-sm">Billing Address</h2>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Same as delivery</span>
-                  </div>
+                  <h2 className="font-semibold text-gray-900 text-sm">Delivery Address</h2>
                   <button onClick={() => navigate("/shop/checkout")} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                     <Pencil size={11} /> Edit
                   </button>
                 </div>
-                <p className="font-medium text-sm text-gray-900 mb-1">{addr.label}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  {addr.line1}<br />{addr.line2}
-                  {addr.line3 && <><br />{addr.line3}</>}<br />{addr.phone}
-                </p>
+                {selectedAddr ? (
+                  <>
+                    <p className="font-medium text-sm text-gray-900 mb-1">{selectedAddr.label}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      {selectedAddr.line1}
+                      {selectedAddr.line2 && <><br />{selectedAddr.line2}</>}
+                      <br />{selectedAddr.phone}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400">No address set</p>
+                )}
               </div>
 
+              {/* Payment Method */}
               <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-semibold text-gray-900 text-sm">Payment Method</h2>
@@ -169,7 +206,7 @@ export default function ReviewPage() {
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-7 bg-blue-600 rounded flex items-center justify-center shrink-0">
-                    <span className="text-white text-xs font-bold">VISA</span>
+                    <Building2 size={14} className="text-white" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">Credit / Debit Card</p>
@@ -219,12 +256,6 @@ export default function ReviewPage() {
                     ))}
                   </tbody>
                 </table>
-              )}
-              {rewardPoints > 0 && (
-                <div className="mx-6 mb-5 mt-1 flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-xs text-gray-700">
-                  <Info size={14} className="text-blue-500 shrink-0" />
-                  You will earn <strong className="ml-1">{rewardPoints.toLocaleString("en-IN")}</strong>&nbsp;reward points on this order
-                </div>
               )}
             </div>
 
