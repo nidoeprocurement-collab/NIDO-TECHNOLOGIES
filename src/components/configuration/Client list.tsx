@@ -26,7 +26,7 @@ export default function ClientListPage() {
   }, []);
 
   return (
-    <div className="p-6 bg-[#f6f8fb] min-h-screen">
+    <div className="p-6 bg-white min-h-screen">
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-[#1e293b]">
