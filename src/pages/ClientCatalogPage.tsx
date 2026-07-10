@@ -105,9 +105,9 @@ function PreferenceDropdown({
       </button>
       {open && createPortal(
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[51]" onClick={() => setOpen(false)} />
           <div
-            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 max-h-72 overflow-y-auto"
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-[52] py-1 max-h-72 overflow-y-auto"
             style={{ top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
           >
             {preferences.map((p) => (
@@ -241,9 +241,9 @@ function RoleDropdown({
       {open && createPortal(
         <>
           {/* Backdrop to close */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[51]" onClick={() => setOpen(false)} />
           <div
-            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 max-h-72 overflow-y-auto"
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-[52] py-1 max-h-72 overflow-y-auto"
             style={{ top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
           >
             {roles.map((r) => {
@@ -1138,6 +1138,16 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   // Reload from store when clientId changes
   useEffect(() => {
     setProducts(getClientCatalog(clientId));
+  }, [clientId]);
+
+  // Keep the shop page in sync: whenever this catalog is opened for a client,
+  // pre-select that same client in the shop so products appear immediately.
+  useEffect(() => {
+    if (clientId && clientId !== "CLI-DEFAULT") {
+      localStorage.setItem("nido_shop_selected_client", clientId);
+    } else {
+      localStorage.removeItem("nido_shop_selected_client");
+    }
   }, [clientId]);
 
   // Listen for price-engine updates (category rules, slabs, margin changes) and
