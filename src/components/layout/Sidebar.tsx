@@ -16,11 +16,29 @@ import {
   Menu,
   X,
   Zap,
+  List,
+  ClipboardList,
+  Tags,
+  ShoppingBag,
+  Gauge,
+  FileText,
+  Receipt,
+  Repeat,
+  Truck,
+  FileMinus,
+  FileCheck,
+  Wallet,
+  CreditCard,
+  Banknote,
+  ShieldCheck,
+  Building2,
+  Mail,
+  History,
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   path?: string;
   children?: NavItem[];
 }
@@ -55,19 +73,19 @@ const navigationItems: NavItem[] = [
     label: 'Vendors',
     icon: <Package size={20} />,
     children: [
-      { label: 'Vendor List', path: '/vendors' },
-      { label: 'Vendor Orders', path: '/vendors/orders' },
-      { label: 'Vendor Dashboard', path: '/vendors/dashboard' },
-      { label: 'Categories', path: '/vendors/categories' },
+      { label: 'Vendor List', icon: <List size={16} />, path: '/vendors' },
+      { label: 'Vendor Orders', icon: <ClipboardList size={16} />, path: '/vendors/orders' },
+      { label: 'Vendor Dashboard', icon: <LayoutDashboard size={16} />, path: '/vendors/dashboard' },
+      { label: 'Categories', icon: <Tags size={16} />, path: '/vendors/categories' },
     ],
   },
   {
     label: 'MY Requests',
     icon: <TrendingUp size={20} />,
     children: [
-      { label: 'My Orders', path: '/orders' },
-      { label: 'My Services', path: '/services' },
-      { label: 'SLA Overview', path: '/sla-overview' },
+      { label: 'My Orders', icon: <ShoppingBag size={16} />, path: '/orders' },
+      { label: 'My Services', icon: <Wrench size={16} />, path: '/services' },
+      { label: 'SLA Overview', icon: <Gauge size={16} />, path: '/sla-overview' },
     ],
   },
   {
@@ -81,26 +99,28 @@ const navigationItems: NavItem[] = [
     children: [
       {
         label: 'Sales',
+        icon: <TrendingUp size={16} />,
         children: [
-          { label: 'Quotes', path: '/sales/quotes' },
-          { label: 'Sales Orders', path: '/sales/orders' },
-          { label: 'Invoices', path: '/invoices' },
-          { label: 'Recurring Invoices', path: '/recurring-invoices' },
-          { label: 'Delivery Challans', path: '/delivery-challans' },
-          { label: 'Payment Receipts', path: '/payment-receipts' },
-          { label: 'Credit Notes', path: '/credit-notes' },
-          { label: 'e-Way Bills', path: '/eway-bills' },
+          { label: 'Quotes', icon: <FileText size={16} />, path: '/sales/quotes' },
+          { label: 'Sales Orders', icon: <ClipboardList size={16} />, path: '/sales/orders' },
+          { label: 'Invoices', icon: <Receipt size={16} />, path: '/invoices' },
+          { label: 'Recurring Invoices', icon: <Repeat size={16} />, path: '/recurring-invoices' },
+          { label: 'Delivery Challans', icon: <Truck size={16} />, path: '/delivery-challans' },
+          { label: 'Payment Receipts', icon: <Receipt size={16} />, path: '/payment-receipts' },
+          { label: 'Credit Notes', icon: <FileMinus size={16} />, path: '/credit-notes' },
+          { label: 'e-Way Bills', icon: <FileCheck size={16} />, path: '/eway-bills' },
         ],
       },
       {
         label: 'Purchases',
+        icon: <ShoppingCart size={16} />,
         children: [
-          { label: 'Expenses', path: '/expenses' },
-          { label: 'Recurring Expenses', path: '/recurring-expenses' },
-          { label: 'Purchase Orders', path: '/purchase-orders' },
-          { label: 'Bills', path: '/bills' },
-          { label: 'Payments Made', path: '/payments-made' },
-          { label: 'Vendor Credits', path: '/vendor-credits' },
+          { label: 'Expenses', icon: <Wallet size={16} />, path: '/expenses' },
+          { label: 'Recurring Expenses', icon: <Repeat size={16} />, path: '/recurring-expenses' },
+          { label: 'Purchase Orders', icon: <ClipboardList size={16} />, path: '/purchase-orders' },
+          { label: 'Bills', icon: <FileText size={16} />, path: '/bills' },
+          { label: 'Payments Made', icon: <CreditCard size={16} />, path: '/payments-made' },
+          { label: 'Vendor Credits', icon: <Banknote size={16} />, path: '/vendor-credits' },
         ],
       },
     ],
@@ -109,11 +129,11 @@ const navigationItems: NavItem[] = [
     label: 'User Management',
     icon: <Users size={20} />,
     children: [
-      { label: 'Users', path: '/users/management' },
-      { label: 'Roles', path: '/roles' },
-      { label: 'Departments', path: '/departments' },
-      { label: 'Invitations', path: '/user-invitations' },
-      { label: 'Audit Trail', path: '/audit-logs' },
+      { label: 'Users', icon: <Users size={16} />, path: '/users/management' },
+      { label: 'Roles', icon: <ShieldCheck size={16} />, path: '/roles' },
+      { label: 'Departments', icon: <Building2 size={16} />, path: '/departments' },
+      { label: 'Invitations', icon: <Mail size={16} />, path: '/user-invitations' },
+      { label: 'Audit Trail', icon: <History size={16} />, path: '/audit-logs' },
     ],
   },
   {
