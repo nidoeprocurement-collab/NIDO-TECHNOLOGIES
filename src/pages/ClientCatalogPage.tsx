@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil } from "lucide-react";
+import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import {
   getClientCatalog,
@@ -769,6 +769,58 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
     });
   }, [rows, preferences]);
 
+  // ── Validation modal ─────────────────────────────────────────────────────
+  type MissingField = { productName: string; missing: string[] };
+  const [validationErrors, setValidationErrors] = useState<MissingField[]>([]);
+
+  const handleAddProducts = () => {
+    if (rows.length === 0) return;
+
+    // Require a role and a preference to be set for every selected product
+    // before it can be added to the client catalog.
+    const errors: MissingField[] = [];
+    for (const row of rows) {
+      const missing: string[] = [];
+      if (!row.roles || row.roles.length === 0) missing.push("Role");
+      if (!row.preference || row.preference.trim() === "") missing.push("Preference");
+      if (missing.length > 0) errors.push({ productName: row.product.productName, missing });
+    }
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    // Reserve sequential CPC codes for every product being added RIGHT NOW,
+    // only at the moment the user confirms. Cancelling the modal wastes nothing.
+    const cpcs = reserveClientProductCodes(rows.length);
+    const entries: CatalogEntry[] = rows.map((row, i) => ({
+      productCode: row.product.masterProductCode,
+      sku: row.product.skuCode,
+      name: row.product.productName,
+      category: row.product.category,
+      roles: row.roles,
+      preference: row.preference,
+      cpc: cpcs[i],
+      price: row.product.price > 0
+        ? "₹" + row.product.price.toLocaleString("en-IN")
+        : "Price on request",
+      availability: "In Stock",
+      img: row.product.images[0] || "",
+      description: row.product.description,
+      specs: row.product.specifications
+        .map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== '-' ? ' ' + s.unit : ''}`)
+        .filter(Boolean),
+      leadTime: row.product.leadTime,
+      moq: row.product.moq || 0,
+      priceNum: row.product.price || 0,
+      generalSpecs: row.product.generalSpecs
+        .filter(g => g.category || g.attributeValue)
+        .map(g => ({ label: g.category, value: g.attributeValue })),
+    }));
+    onAdd(entries);
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
 
@@ -996,43 +1048,50 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
           <button onClick={onClose} className="px-5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
           <button
             disabled={rows.length === 0}
-            onClick={() => {
-              // Reserve sequential CPC codes for every product being added RIGHT NOW,
-              // only at the moment the user confirms. Cancelling the modal wastes nothing.
-              const cpcs = reserveClientProductCodes(rows.length);
-              const entries: CatalogEntry[] = rows.map((row, i) => ({
-                productCode: row.product.masterProductCode,
-                sku: row.product.skuCode,
-                name: row.product.productName,
-                category: row.product.category,
-                roles: row.roles,
-                preference: row.preference,
-                cpc: cpcs[i],
-                price: row.product.price > 0
-                  ? "₹" + row.product.price.toLocaleString("en-IN")
-                  : "Price on request",
-                availability: "In Stock",
-                img: row.product.images[0] || "",
-                description: row.product.description,
-                specs: row.product.specifications
-                  .map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== '-' ? ' ' + s.unit : ''}`)
-                  .filter(Boolean),
-                leadTime: row.product.leadTime,
-                moq: row.product.moq || 0,
-                priceNum: row.product.price || 0,
-                generalSpecs: row.product.generalSpecs
-                  .filter(g => g.category || g.attributeValue)
-                  .map(g => ({ label: g.category, value: g.attributeValue })),
-              }));
-              onAdd(entries);
-              onClose();
-            }}
+            onClick={handleAddProducts}
             className="px-5 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add Product{rows.length > 1 ? "s" : ""}
           </button>
         </div>
       </div>
+
+      {/* Validation warning modal — require role & preference before adding */}
+      {validationErrors.length > 0 && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Missing Required Details</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Please set a role and preference for every selected product before adding them.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+              {validationErrors.map((err, i) => (
+                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5">
+                  <p className="text-sm font-medium text-gray-800 leading-tight truncate">{err.productName}</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Missing: {err.missing.join(", ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setValidationErrors([])}
+              className="w-full py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Go Back &amp; Fill Details
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
