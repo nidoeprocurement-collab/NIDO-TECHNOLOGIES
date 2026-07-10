@@ -143,29 +143,51 @@ const navigationItems: NavItem[] = [
   },
 ];
 
+// Flatten all nav paths and pick the single most specific (longest) match for the
+// current pathname, so sibling routes that share a prefix (e.g. '/vendors' and
+// '/vendors/orders') never both light up — only the item that's actually open does.
+function collectPaths(items: NavItem[], acc: string[] = []): string[] {
+  for (const item of items) {
+    if (item.path) acc.push(item.path);
+    if (item.children) collectPaths(item.children, acc);
+  }
+  return acc;
+}
+
+function findActivePath(pathname: string): string | null {
+  const allPaths = collectPaths(navigationItems);
+  let best: string | null = null;
+  for (const p of allPaths) {
+    const matches = pathname === p || pathname.startsWith(p + '/');
+    if (!matches) continue;
+    if (!best || p.length > best.length) best = p;
+  }
+  return best;
+}
+
+function containsPath(item: NavItem, targetPath: string): boolean {
+  if (item.path === targetPath) return true;
+  return !!item.children?.some(child => containsPath(child, targetPath));
+}
+
 interface NavItemProps {
   item: NavItem;
   level?: number;
   collapsed?: boolean;
+  activePath: string | null;
 }
 
-function NavItemComponent({ item, level = 0, collapsed = false }: NavItemProps) {
+function NavItemComponent({ item, level = 0, collapsed = false, activePath }: NavItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
-  const location = useLocation();
   const hasChildren = item.children && item.children.length > 0;
   const isTopLevel = level === 0;
 
-  // Check if current path matches
-  const isActive = item.path && location.pathname.startsWith(item.path);
+  // Only the single most specific matching item is "active"
+  const isActive = !!item.path && item.path === activePath;
 
-  // Check if any child is active
-  const hasActiveChild = hasChildren && item.children.some(child => {
-    if (child.children) {
-      return child.children.some(subchild => subchild.path && location.pathname.startsWith(subchild.path));
-    }
-    return child.path && location.pathname.startsWith(child.path);
-  });
+  // Check if the active path lives somewhere inside this item's children
+  const hasActiveChild = !!hasChildren && !!activePath && item.children.some(child => containsPath(child, activePath));
 
   // Collapsed top-level item with children: icon-only trigger + hover flyout
   if (hasChildren && isTopLevel && collapsed) {
@@ -189,7 +211,7 @@ function NavItemComponent({ item, level = 0, collapsed = false }: NavItemProps) 
           <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
             <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">{item.label}</p>
             {item.children.map((child, idx) => (
-              <NavItemComponent key={idx} item={child} level={1} />
+              <NavItemComponent key={idx} item={child} level={1} activePath={activePath} />
             ))}
           </div>
         )}
@@ -217,7 +239,7 @@ function NavItemComponent({ item, level = 0, collapsed = false }: NavItemProps) 
         {isOpen && (
           <div className={`space-y-0.5 ${isTopLevel ? 'pl-2' : 'pl-4'}`}>
             {item.children.map((child, idx) => (
-              <NavItemComponent key={idx} item={child} level={level + 1} />
+              <NavItemComponent key={idx} item={child} level={level + 1} activePath={activePath} />
             ))}
           </div>
         )}
@@ -262,6 +284,8 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const location = useLocation();
+  const activePath = findActivePath(location.pathname);
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 1024
   );
@@ -326,7 +350,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         {/* Navigation Items — scrolls on its own, leaving the bottom block fixed */}
         <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1 ${effectiveCollapsed ? 'p-2' : 'p-4'}`}>
           {navigationItems.map((item, idx) => (
-            <NavItemComponent key={idx} item={item} collapsed={effectiveCollapsed} />
+            <NavItemComponent key={idx} item={item} collapsed={effectiveCollapsed} activePath={activePath} />
           ))}
         </nav>
 
