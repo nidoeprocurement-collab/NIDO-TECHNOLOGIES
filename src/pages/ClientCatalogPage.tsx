@@ -68,7 +68,20 @@ function PreferenceDropdown({
     if (!open || !triggerRef.current) return;
     const updatePosition = () => {
       const rect = triggerRef.current!.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 150) });
+      const estimatedHeight = Math.min(288, 40 + preferences.length * 28);
+      const margin = 8;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUpward = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+      const rawTop = openUpward ? rect.top - 4 - estimatedHeight : rect.bottom + 4;
+      const clampedTop = Math.min(
+        Math.max(rawTop, margin),
+        Math.max(window.innerHeight - estimatedHeight - margin, margin)
+      );
+      setMenuPos({
+        top: clampedTop,
+        left: rect.left,
+        width: Math.max(rect.width, 150),
+      });
     };
     updatePosition();
     window.addEventListener("scroll", updatePosition, true);
@@ -77,7 +90,7 @@ function PreferenceDropdown({
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [open]);
+  }, [open, preferences.length]);
 
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -94,7 +107,7 @@ function PreferenceDropdown({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1"
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 max-h-72 overflow-y-auto"
             style={{ top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
           >
             {preferences.map((p) => (
@@ -174,7 +187,20 @@ function RoleDropdown({
     if (!open || !triggerRef.current) return;
     const updatePosition = () => {
       const rect = triggerRef.current!.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 180) });
+      const estimatedHeight = Math.min(288, 40 + roles.length * 28);
+      const margin = 8;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUpward = spaceBelow < estimatedHeight && rect.top > spaceBelow;
+      const rawTop = openUpward ? rect.top - 4 - estimatedHeight : rect.bottom + 4;
+      const clampedTop = Math.min(
+        Math.max(rawTop, margin),
+        Math.max(window.innerHeight - estimatedHeight - margin, margin)
+      );
+      setMenuPos({
+        top: clampedTop,
+        left: rect.left,
+        width: Math.max(rect.width, 180),
+      });
     };
     updatePosition();
     window.addEventListener("scroll", updatePosition, true);
@@ -183,7 +209,7 @@ function RoleDropdown({
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [open]);
+  }, [open, roles.length]);
 
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -217,7 +243,7 @@ function RoleDropdown({
           {/* Backdrop to close */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
-            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1"
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 max-h-72 overflow-y-auto"
             style={{ top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
           >
             {roles.map((r) => {
