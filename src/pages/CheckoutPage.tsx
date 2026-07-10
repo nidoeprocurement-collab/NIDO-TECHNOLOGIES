@@ -1,56 +1,196 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, MapPin, Building2, Home, Pencil, Plus, ChevronDown } from "lucide-react";
+import {
+  ChevronRight, MapPin, Building2, Home, Pencil, Plus,
+  ChevronDown, X, Check,
+} from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
+import { getClients } from "@/lib/clientStore";
 
-const ADDRESSES = [
-  {
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface DeliveryAddress {
+  id: number;
+  label: string;
+  line1: string;
+  line2: string;
+  phone: string;
+  isDefault: boolean;
+}
+
+type AddressForm = Omit<DeliveryAddress, "id" | "isDefault">;
+const EMPTY_FORM: AddressForm = { label: "", line1: "", line2: "", phone: "" };
+
+// ── Persistence ────────────────────────────────────────────────────────────────
+
+function storageKey(clientId: string) {
+  return `nido_delivery_addresses_${clientId}`;
+}
+
+function loadAddresses(clientId: string): DeliveryAddress[] {
+  try {
+    const raw = localStorage.getItem(storageKey(clientId));
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function persistAddresses(clientId: string, addresses: DeliveryAddress[]) {
+  localStorage.setItem(storageKey(clientId), JSON.stringify(addresses));
+}
+
+/** Build a first address from the client's stored profile data. */
+function buildDefaultAddress(clientId: string): DeliveryAddress | null {
+  const client = getClients().find((c) => c.id === clientId);
+  if (!client) return null;
+  const cityLine = [client.billingCity, client.billingState, client.billingPincode]
+    .filter(Boolean)
+    .join(", ");
+  return {
     id: 1,
     label: "Office",
+    line1: client.billingAddress || "",
+    line2: cityLine,
+    phone: client.phone || client.mobile || "",
     isDefault: true,
-    icon: "map",
-    line1: "No. 45, 3rd Floor, Embassy Tech Village,",
-    line2: "Outer Ring Road, Bangalore - 560103,",
-    line3: "Karnataka, India",
-    phone: "+91 98765 43210",
-  },
-  {
-    id: 2,
-    label: "Warehouse",
-    isDefault: false,
-    icon: "building",
-    line1: "Plot No. 12, KIADB Industrial Area,",
-    line2: "Hoskote, Bangalore - 562114,",
-    line3: "Karnataka, India",
-    phone: "+91 99887 66556",
-  },
-  {
-    id: 3,
-    label: "Home",
-    isDefault: false,
-    icon: "home",
-    line1: "No. 24, 2nd Floor, MG Road,",
-    line2: "Bangalore - 560001, Karnataka, India",
-    line3: "",
-    phone: "+91 91234 56789",
-  },
-];
+  };
+}
 
-function AddressIcon({ type }: { type: string }) {
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function AddressIcon({ label }: { label: string }) {
   const cls = "text-blue-500";
-  if (type === "building") return <Building2 size={20} className={cls} />;
-  if (type === "home") return <Home size={20} className={cls} />;
+  const l = label.toLowerCase();
+  if (l.includes("warehouse") || l.includes("office")) return <Building2 size={20} className={cls} />;
+  if (l.includes("home")) return <Home size={20} className={cls} />;
   return <MapPin size={20} className={cls} />;
 }
+
+// ── Inline address form ────────────────────────────────────────────────────────
+
+function AddressFormBlock({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: AddressForm;
+  onSave: (f: AddressForm) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<AddressForm>(initial);
+  const set = (k: keyof AddressForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const valid = form.label.trim() && form.line1.trim() && form.phone.trim();
+
+  return (
+    <div className="border border-blue-300 bg-blue-50 rounded-xl p-4 space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Label</label>
+          <input
+            value={form.label}
+            onChange={set("label")}
+            placeholder="e.g. Office, Warehouse"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+          <input
+            value={form.phone}
+            onChange={set("phone")}
+            placeholder="+91 98765 43210"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 1</label>
+        <input
+          value={form.line1}
+          onChange={set("line1")}
+          placeholder="Street, building, floor..."
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 2</label>
+        <input
+          value={form.line2}
+          onChange={set("line2")}
+          placeholder="City, state, pincode..."
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+        />
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          <X size={12} /> Cancel
+        </button>
+        <button
+          disabled={!valid}
+          onClick={() => valid && onSave(form)}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Check size={12} /> Save Address
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const [notesOpen, setNotesOpen] = useState(false);
-  const [selectedAddressId, setSelectedAddressId] = useState(1);
+  const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
-  const [billingSameAsDelivery, setBillingSameAsDelivery] = useState(true);
   const [orderNotes, setOrderNotes] = useState("");
+
+  const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [addingNew, setAddingNew] = useState(false);
+
+  // Load client ID and resolve addresses on mount
+  const clientId = localStorage.getItem("nido_shop_selected_client") || "";
+
+  useEffect(() => {
+    let stored = loadAddresses(clientId);
+    if (stored.length === 0 && clientId) {
+      const def = buildDefaultAddress(clientId);
+      stored = def ? [def] : [];
+      if (stored.length) persistAddresses(clientId, stored);
+    }
+    setAddresses(stored);
+    if (stored.length) setSelectedAddressId(stored.find((a) => a.isDefault)?.id ?? stored[0].id);
+  }, [clientId]);
+
+  // ── Handlers ──
+
+  const saveEdit = (id: number, form: AddressForm) => {
+    const updated = addresses.map((a) =>
+      a.id === id ? { ...a, ...form } : a
+    );
+    setAddresses(updated);
+    persistAddresses(clientId, updated);
+    setEditingId(null);
+  };
+
+  const saveNew = (form: AddressForm) => {
+    const newId = Math.max(0, ...addresses.map((a) => a.id)) + 1;
+    const newAddr: DeliveryAddress = { id: newId, isDefault: false, ...form };
+    const updated = [...addresses, newAddr];
+    setAddresses(updated);
+    persistAddresses(clientId, updated);
+    setAddingNew(false);
+  };
+
+  const canAddMore = addresses.length < 2;
 
   return (
     <div className="min-h-screen bg-white px-6 py-6">
@@ -78,58 +218,92 @@ export default function CheckoutPage() {
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <h2 className="font-semibold text-gray-900 text-base mb-4">Delivery Details</h2>
 
-              {/* Delivery Address */}
+              {/* Delivery Address header */}
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium text-gray-800">Delivery Address</p>
-                <button className="flex items-center gap-1 text-sm text-blue-600 hover:underline">
-                  <Plus size={14} />
-                  Add New Address
-                </button>
+                {canAddMore && !addingNew && (
+                  <button
+                    onClick={() => setAddingNew(true)}
+                    className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                  >
+                    <Plus size={14} />
+                    Add New Address
+                  </button>
+                )}
+                {!canAddMore && (
+                  <span className="text-xs text-gray-400">Max 2 addresses</span>
+                )}
               </div>
 
+              {/* Address list */}
               <div className="space-y-3 mb-5">
-                {ADDRESSES.map((addr) => (
-                  <label
-                    key={addr.id}
-                    className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
-                      selectedAddressId === addr.id
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="address"
-                      className="mt-1 accent-blue-600"
-                      checked={selectedAddressId === addr.id}
-                      onChange={() => setSelectedAddressId(addr.id)}
+                {addresses.map((addr) =>
+                  editingId === addr.id ? (
+                    <AddressFormBlock
+                      key={addr.id}
+                      initial={{ label: addr.label, line1: addr.line1, line2: addr.line2, phone: addr.phone }}
+                      onSave={(f) => saveEdit(addr.id, f)}
+                      onCancel={() => setEditingId(null)}
                     />
-                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                      <AddressIcon type={addr.icon} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm text-gray-900">{addr.label}</span>
-                        {addr.isDefault && (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
-                            Default
-                          </span>
-                        )}
+                  ) : (
+                    <label
+                      key={addr.id}
+                      className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                        selectedAddressId === addr.id
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="address"
+                        className="mt-1 accent-blue-600"
+                        checked={selectedAddressId === addr.id}
+                        onChange={() => setSelectedAddressId(addr.id)}
+                      />
+                      <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <AddressIcon label={addr.label} />
                       </div>
-                      <p className="text-xs text-gray-500 leading-relaxed">
-                        {addr.line1}<br />
-                        {addr.line2}
-                        {addr.line3 && <><br />{addr.line3}</>}
-                        <br />
-                        {addr.phone}
-                      </p>
-                    </div>
-                    <button className="flex items-center gap-1 text-xs text-blue-600 hover:underline shrink-0">
-                      <Pencil size={11} />
-                      Edit
-                    </button>
-                  </label>
-                ))}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm text-gray-900">{addr.label}</span>
+                          {addr.isDefault && (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                          {addr.line1}
+                          {addr.line2 && <><br />{addr.line2}</>}
+                          <br />{addr.phone}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.preventDefault(); setEditingId(addr.id); setAddingNew(false); }}
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:underline shrink-0"
+                      >
+                        <Pencil size={11} />
+                        Edit
+                      </button>
+                    </label>
+                  )
+                )}
+
+                {/* Add new address form */}
+                {addingNew && (
+                  <AddressFormBlock
+                    initial={EMPTY_FORM}
+                    onSave={saveNew}
+                    onCancel={() => setAddingNew(false)}
+                  />
+                )}
+
+                {addresses.length === 0 && !addingNew && (
+                  <p className="text-sm text-gray-400 text-center py-4">
+                    No address found. Add one to continue.
+                  </p>
+                )}
               </div>
 
               {/* Delivery Instructions */}
@@ -147,20 +321,6 @@ export default function CheckoutPage() {
                   <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>
                 </div>
               </div>
-            </div>
-
-            {/* Billing Address */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6">
-              <h2 className="font-semibold text-gray-900 text-base mb-4">Billing Address</h2>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={billingSameAsDelivery}
-                  onChange={(e) => setBillingSameAsDelivery(e.target.checked)}
-                  className="w-4 h-4 accent-blue-600"
-                />
-                <span className="text-sm text-gray-700">Same as delivery address</span>
-              </label>
             </div>
 
             {/* Order Notes */}

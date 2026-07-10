@@ -8,12 +8,6 @@ import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
 
-const ADDRESSES: Record<number, { label: string; line1: string; line2: string; line3: string; phone: string }> = {
-  1: { label: "Office (Default)", line1: "No. 45, 3rd Floor, Embassy Tech Village,", line2: "Outer Ring Road, Bangalore - 560103,", line3: "Karnataka, India", phone: "+91 98765 43210" },
-  2: { label: "Warehouse", line1: "Plot No. 12, KIADB Industrial Area,", line2: "Hoskote, Bangalore - 562114,", line3: "Karnataka, India", phone: "+91 99887 66556" },
-  3: { label: "Home", line1: "No. 24, 2nd Floor, MG Road,", line2: "Bangalore - 560001, Karnataka, India", line3: "", phone: "+91 91234 56789" },
-};
-
 const PAYMENT_METHODS = [
   { id: "card",       label: "Credit / Debit Card",  sub: "Visa, Mastercard, Rupay",       icon: CreditCard, badge: null    },
   { id: "netbanking", label: "Net Banking",           sub: "All major banks",               icon: Landmark,   badge: null    },
@@ -314,8 +308,6 @@ export default function PaymentPage() {
   });
 
   const onChange = (d: Partial<PaymentState>) => setState((prev) => ({ ...prev, ...d }));
-  const addr = ADDRESSES[1];
-
   function renderDetailsPanel() {
     switch (state.paymentMethod) {
       case "card":       return <CardPanel state={state} onChange={onChange} />;
@@ -388,22 +380,6 @@ export default function PaymentPage() {
                   <h3 className="font-semibold text-gray-900 text-sm mb-4">{panelTitle[state.paymentMethod] ?? "Payment Details"}</h3>
                   {renderDetailsPanel()}
                 </div>
-              </div>
-            </div>
-
-            {/* Billing Address */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <div className="flex items-center gap-3">
-                <h2 className="font-semibold text-gray-900 text-sm">Billing Address</h2>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Same as delivery address</span>
-                <button onClick={() => navigate("/shop/checkout")} className="ml-auto text-xs text-blue-600 hover:underline">Change</button>
-              </div>
-              <div className="mt-2">
-                <p className="font-medium text-sm text-gray-900 mb-0.5">{addr.label}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  {addr.line1}<br />{addr.line2}
-                  {addr.line3 && <><br />{addr.line3}</>}<br />{addr.phone}
-                </p>
               </div>
             </div>
 
