@@ -644,10 +644,11 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
   const [roles, setRoles] = useState([...catalogRoleOptions]);
 
   useEffect(() => {
-    setCatalog(getCatalogProducts());
-    const h = () => setCatalog(getCatalogProducts());
-    window.addEventListener("catalogUpdated", h);
-    return () => window.removeEventListener("catalogUpdated", h);
+    const loadPublished = () =>
+      setCatalog(getCatalogProducts().filter((p) => p.publishStatus === "published"));
+    loadPublished();
+    window.addEventListener("catalogUpdated", loadPublished);
+    return () => window.removeEventListener("catalogUpdated", loadPublished);
   }, []);
 
   const filtered = useMemo(() => {
