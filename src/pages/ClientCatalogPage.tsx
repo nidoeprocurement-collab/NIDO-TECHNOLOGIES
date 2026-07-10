@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import {
@@ -50,6 +51,8 @@ function PreferenceDropdown({
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 150 });
 
   const commit = () => {
     const name = newName.trim();
@@ -61,9 +64,25 @@ function PreferenceDropdown({
     setOpen(false);
   };
 
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const updatePosition = () => {
+      const rect = triggerRef.current!.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 150) });
+    };
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open]);
+
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => { setOpen((v) => !v); setAdding(false); }}
         className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[120px] w-full"
@@ -71,42 +90,49 @@ function PreferenceDropdown({
         <span className={value ? "text-gray-700" : "text-gray-400"}>{value || "Select…"}</span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-gray-400"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[150px]">
-          {preferences.map((p) => (
-            <button
-              key={p}
-              onClick={() => { onSelect(p); setOpen(false); }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === p ? "text-blue-600 font-medium" : "text-gray-700"}`}
-            >
-              {p}
-            </button>
-          ))}
-          <div className="border-t border-gray-100 mt-1 pt-1">
-            {adding ? (
-              <div className="px-2 py-1.5 flex items-center gap-1.5">
-                <input
-                  autoFocus
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && commit()}
-                  placeholder="Preference name…"
-                  className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                />
-                <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
-                <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
-              </div>
-            ) : (
+      {open && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1"
+            style={{ top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
+          >
+            {preferences.map((p) => (
               <button
-                onClick={() => setAdding(true)}
-                className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+                key={p}
+                onClick={() => { onSelect(p); setOpen(false); }}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === p ? "text-blue-600 font-medium" : "text-gray-700"}`}
               >
-                <span className="text-sm leading-none">+</span> Add new
+                {p}
               </button>
-            )}
+            ))}
+            <div className="border-t border-gray-100 mt-1 pt-1">
+              {adding ? (
+                <div className="px-2 py-1.5 flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && commit()}
+                    placeholder="Preference name…"
+                    className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  />
+                  <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
+                  <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAdding(true)}
+                  className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+                >
+                  <span className="text-sm leading-none">+</span> Add new
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        </>,
+        document.body
       )}
     </div>
   );
@@ -126,6 +152,8 @@ function RoleDropdown({
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 180 });
 
   const commit = () => {
     const name = newName.trim();
@@ -142,9 +170,25 @@ function RoleDropdown({
       ? values[0]
       : `${values.length} roles selected`;
 
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const updatePosition = () => {
+      const rect = triggerRef.current!.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 180) });
+    };
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open]);
+
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div onClick={(e) => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => { setOpen((v) => !v); setAdding(false); }}
         className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[140px] w-full"
@@ -168,11 +212,14 @@ function RoleDropdown({
         </div>
       )}
 
-      {open && (
+      {open && createPortal(
         <>
           {/* Backdrop to close */}
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[180px]">
+          <div
+            className="fixed bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1"
+            style={{ top: menuPos.top, left: menuPos.left, minWidth: menuPos.width }}
+          >
             {roles.map((r) => {
               const checked = values.includes(r);
               return (
@@ -213,7 +260,8 @@ function RoleDropdown({
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
