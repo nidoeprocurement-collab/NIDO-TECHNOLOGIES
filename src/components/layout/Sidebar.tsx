@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   Zap,
@@ -125,18 +126,19 @@ const navigationItems: NavItem[] = [
 interface NavItemProps {
   item: NavItem;
   level?: number;
-  isActive?: boolean;
+  collapsed?: boolean;
 }
 
-function NavItemComponent({ item, level = 0 }: NavItemProps) {
+function NavItemComponent({ item, level = 0, collapsed = false }: NavItemProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
   const location = useLocation();
   const hasChildren = item.children && item.children.length > 0;
   const isTopLevel = level === 0;
 
   // Check if current path matches
   const isActive = item.path && location.pathname.startsWith(item.path);
-  
+
   // Check if any child is active
   const hasActiveChild = hasChildren && item.children.some(child => {
     if (child.children) {
@@ -144,6 +146,34 @@ function NavItemComponent({ item, level = 0 }: NavItemProps) {
     }
     return child.path && location.pathname.startsWith(child.path);
   });
+
+  // Collapsed top-level item with children: icon-only trigger + hover flyout
+  if (hasChildren && isTopLevel && collapsed) {
+    return (
+      <div
+        className="relative"
+        onMouseEnter={() => setFlyoutOpen(true)}
+        onMouseLeave={() => setFlyoutOpen(false)}
+      >
+        <button
+          className={`w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
+            hasActiveChild ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
+          }`}
+          title={item.label}
+        >
+          {item.icon}
+        </button>
+        {flyoutOpen && (
+          <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
+            <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">{item.label}</p>
+            {item.children.map((child, idx) => (
+              <NavItemComponent key={idx} item={child} level={1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (hasChildren) {
     return (
@@ -173,6 +203,21 @@ function NavItemComponent({ item, level = 0 }: NavItemProps) {
     );
   }
 
+  // Collapsed top-level leaf item: icon-only link
+  if (isTopLevel && collapsed) {
+    return (
+      <Link
+        to={item.path || '#'}
+        title={item.label}
+        className={`flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
+          isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
+        }`}
+      >
+        {item.icon}
+      </Link>
+    );
+  }
+
   return (
     <Link
       to={item.path || '#'}
@@ -188,8 +233,28 @@ function NavItemComponent({ item, level = 0 }: NavItemProps) {
   );
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}
+
+export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  // The collapse-to-icon-rail treatment is a desktop-only affordance — on
+  // mobile the sidebar is a full-width overlay, so ignore the persisted
+  // collapsed flag there to avoid a narrow icon rail with no way to expand.
+  const effectiveCollapsed = collapsed && isDesktop;
 
   return (
     <>
@@ -203,44 +268,77 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 w-64 overflow-y-auto transition-transform duration-300 z-30 lg:translate-x-0 ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 overflow-y-auto overflow-x-hidden transition-all duration-300 z-30 w-64 lg:translate-x-0 ${
+          effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
+        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        {/* Sidebar Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+        {/* Sidebar Header — matches TopBar's h-16 row + border so the two
+            header lines sit flush with each other across the layout. */}
+        <div className="sticky top-0 bg-white border-b border-gray-200/70 h-16 px-4 z-10 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
               <Zap size={20} className="text-white" />
             </div>
-            <div>
-              <h1 className="text-sm font-bold text-gray-900">NIDO</h1>
-              <p className="text-xs text-gray-500">Procurement</p>
-            </div>
+            {!effectiveCollapsed && (
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold text-gray-900 truncate">NIDO</h1>
+                <p className="text-xs text-gray-500 truncate">Procurement</p>
+              </div>
+            )}
           </div>
+
+          {/* Hide/unhide toggle — small arrow tab pinned to the top-right
+              corner of the sidebar, echoed on the outer edge so it stays
+              reachable even when collapsed to icon width. */}
+          <button
+            onClick={onToggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="hidden lg:flex absolute -right-3 top-5 w-6 h-6 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm hover:text-blue-600 hover:border-blue-300 hover:shadow-md transition-all"
+          >
+            {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
         </div>
 
         {/* Navigation Items */}
-        <nav className="p-4 space-y-1">
+        <nav className={`space-y-1 ${effectiveCollapsed ? 'p-2' : 'p-4'}`}>
           {navigationItems.map((item, idx) => (
-            <NavItemComponent key={idx} item={item} />
+            <NavItemComponent key={idx} item={item} collapsed={effectiveCollapsed} />
           ))}
         </nav>
 
         {/* Bottom Section */}
-        <div className="border-t border-gray-200 p-4 mt-4">
-          <div className="flex items-center gap-3 px-3 py-2.5">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-blue-600">N</span>
+        <div className="border-t border-gray-200 mt-4">
+          {effectiveCollapsed ? (
+            <div className="p-2 flex flex-col items-center gap-2">
+              <div
+                className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
+                title="Nido Owner"
+              >
+                <span className="text-xs font-bold text-blue-600">N</span>
+              </div>
+              <button
+                title="Sign Out"
+                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-900">Nido Owner</p>
-              <p className="text-xs text-gray-500">Owner</p>
+          ) : (
+            <div className="p-4">
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-blue-600">N</span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-900">Nido Owner</p>
+                  <p className="text-xs text-gray-500">Owner</p>
+                </div>
+              </div>
+              <button className="w-full mt-3 px-3 py-2 text-xs text-gray-600 hover:text-red-600 text-left rounded-lg hover:bg-red-50 transition-all">
+                Sign Out
+              </button>
             </div>
-          </div>
-          <button className="w-full mt-3 px-3 py-2 text-xs text-gray-600 hover:text-red-600 text-left rounded-lg hover:bg-red-50 transition-all">
-            Sign Out
-          </button>
+          )}
         </div>
       </aside>
 
