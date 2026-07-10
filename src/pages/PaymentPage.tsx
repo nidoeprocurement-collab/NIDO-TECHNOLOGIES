@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
-  Banknote, Clock, Info, CheckCircle2, Smartphone, QrCode, AlertCircle
+  Banknote, Building2, Info, Smartphone, QrCode, AlertCircle
 } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
@@ -14,7 +14,7 @@ const PAYMENT_METHODS = [
   { id: "upi",        label: "UPI",                   sub: "Pay using any UPI app",         icon: null,       badge: "UPI"   },
   { id: "wallets",    label: "Wallets",               sub: "PhonePe, Paytm, Amazon Pay",    icon: Wallet,     badge: null    },
   { id: "neft",       label: "NEFT / RTGS",           sub: "Direct bank transfer",          icon: Banknote,   badge: null    },
-  { id: "bnpl",       label: "Buy Now, Pay Later",    sub: "Easy EMI & credit options",     icon: Clock,      badge: "Zest"  },
+  { id: "ban",        label: "Company BAN",           sub: "Billed to company account",     icon: Building2,  badge: null    },
 ];
 
 const NET_BANKS = [
@@ -29,13 +29,6 @@ const WALLETS = [
   { id: "amazonpay", label: "Amazon Pay", color: "bg-orange-500" },
   { id: "googlepay", label: "Google Pay", color: "bg-green-500"  },
   { id: "mobikwik",  label: "MobiKwik",   color: "bg-sky-500"    },
-];
-
-const BNPL_TENURES = [
-  { months: "3",  label: "3 Months"  },
-  { months: "6",  label: "6 Months"  },
-  { months: "9",  label: "9 Months"  },
-  { months: "12", label: "12 Months" },
 ];
 
 function formatCardNumber(raw: string) {
@@ -74,8 +67,6 @@ type PaymentState = {
   upiId: string;
   selectedWallet: string; walletMobile: string;
   neftAccountName: string; neftAccountNumber: string; neftIfscCode: string; neftBankName: string;
-  bnplTenure: string;
-  promoCode: string;
 };
 
 function CardPanel({ state, onChange }: { state: PaymentState; onChange: (d: Partial<PaymentState>) => void }) {
@@ -250,46 +241,22 @@ function NeftPanel({ state, onChange }: { state: PaymentState; onChange: (d: Par
   );
 }
 
-function BnplPanel({ state, onChange }: { state: PaymentState; onChange: (d: Partial<PaymentState>) => void }) {
-  const { items } = useCart();
-  const subtotal = items.reduce((s, i) => s + i.priceNum * i.quantity, 0);
-  const total = subtotal + Math.round(subtotal * 0.18);
-
-  const emiAmount = (months: string) => {
-    const interest = parseInt(months) <= 3 ? 0 : parseInt(months) <= 6 ? 0.12 : 0.15;
-    return Math.ceil((total * (1 + interest)) / parseInt(months));
-  };
-
+function CompanyBanPanel() {
   return (
-    <div className="space-y-4">
-      <p className="text-xs font-medium text-gray-700">Select EMI Tenure</p>
-      <div className="grid grid-cols-2 gap-3">
-        {BNPL_TENURES.map(({ months, label }) => {
-          const emi = emiAmount(months);
-          const isNoInterest = parseInt(months) <= 3;
-          return (
-            <button key={months} onClick={() => onChange({ bnplTenure: months })}
-              className={`border rounded-xl p-4 text-left transition-colors ${state.bnplTenure === months ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-sm font-semibold text-gray-900">{label}</p>
-                {isNoInterest && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">0% Interest</span>}
-              </div>
-              <p className="text-base font-bold text-blue-600">{formatPrice(emi)}<span className="text-xs text-gray-500 font-normal">/mo</span></p>
-              {!isNoInterest && <p className="text-xs text-gray-400 mt-0.5">Includes processing fee</p>}
-            </button>
-          );
-        })}
+    <div className="flex flex-col items-center justify-center h-full min-h-[180px] gap-4 text-center py-6">
+      <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
+        <Building2 size={26} className="text-blue-600" />
       </div>
-      <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 text-xs text-gray-600 space-y-1">
-        <p className="font-medium text-gray-800">Selected plan: {state.bnplTenure} months</p>
-        <p>Monthly EMI: <strong>{formatPrice(emiAmount(state.bnplTenure))}</strong></p>
-        <p>Total payable: <strong>{formatPrice(emiAmount(state.bnplTenure) * parseInt(state.bnplTenure))}</strong></p>
+      <div>
+        <p className="text-sm font-semibold text-gray-900 mb-1">Company BAN</p>
+        <p className="text-sm text-gray-500 max-w-[220px] leading-relaxed">
+          This order will be billed directly to your company account.
+        </p>
       </div>
-      <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-lg px-3 py-2.5 text-xs text-green-700">
-        <CheckCircle2 size={13} className="shrink-0 mt-0.5" />
-        Instant approval with no credit card needed. Powered by Zest Money.
+      <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-4 py-2.5 w-full justify-center">
+        <Lock size={12} className="text-gray-400 shrink-0" />
+        Billing is managed by your company's IT / Finance team
       </div>
-      <SecurityNote />
     </div>
   );
 }
@@ -303,8 +270,6 @@ export default function PaymentPage() {
     upiId: "",
     selectedWallet: "", walletMobile: "",
     neftAccountName: "", neftAccountNumber: "", neftIfscCode: "", neftBankName: "",
-    bnplTenure: "3",
-    promoCode: "",
   });
 
   const onChange = (d: Partial<PaymentState>) => setState((prev) => ({ ...prev, ...d }));
@@ -315,7 +280,7 @@ export default function PaymentPage() {
       case "upi":        return <UpiPanel state={state} onChange={onChange} />;
       case "wallets":    return <WalletsPanel state={state} onChange={onChange} />;
       case "neft":       return <NeftPanel state={state} onChange={onChange} />;
-      case "bnpl":       return <BnplPanel state={state} onChange={onChange} />;
+      case "ban":        return <CompanyBanPanel />;
       default:
         return (
           <div className="flex-1 border border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 text-sm h-40">
@@ -327,7 +292,7 @@ export default function PaymentPage() {
 
   const panelTitle: Record<string, string> = {
     card: "Card Details", netbanking: "Net Banking", upi: "UPI Payment",
-    wallets: "Wallet Payment", neft: "NEFT / RTGS Details", bnpl: "EMI Options",
+    wallets: "Wallet Payment", neft: "NEFT / RTGS Details", ban: "Company BAN",
   };
 
   return (
@@ -380,17 +345,6 @@ export default function PaymentPage() {
                   <h3 className="font-semibold text-gray-900 text-sm mb-4">{panelTitle[state.paymentMethod] ?? "Payment Details"}</h3>
                   {renderDetailsPanel()}
                 </div>
-              </div>
-            </div>
-
-            {/* Promo Code */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h2 className="font-semibold text-gray-900 text-sm mb-3">Promo Code (Optional)</h2>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Enter promo code" value={state.promoCode}
-                  onChange={(e) => onChange({ promoCode: e.target.value })}
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
-                <button className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Apply</button>
               </div>
             </div>
 

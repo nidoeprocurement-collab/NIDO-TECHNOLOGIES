@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Shield, Truck, RotateCcw, Mail, Phone, Star, Pencil } from "lucide-react";
+import { Shield, Truck, RotateCcw, Mail, Phone, Pencil } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 
 function formatPrice(n: number) {
@@ -19,8 +19,6 @@ export default function OrderSummaryPanel({
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
-  const rewardPoints = Math.floor(total / 1000);
-
   return (
     <div className="w-72 shrink-0 space-y-4">
       {/* Order Summary card */}
@@ -110,14 +108,6 @@ export default function OrderSummaryPanel({
           </>
         )}
 
-        {rewardPoints > 0 && (
-          <div className="mt-3 flex items-start gap-2">
-            <Star size={14} className="text-blue-500 shrink-0 mt-0.5" />
-            <p className="text-xs text-gray-600">
-              You will earn <strong>{rewardPoints.toLocaleString("en-IN")}</strong> reward points on this order
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Trust badges */}
