@@ -271,7 +271,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       {/* Sidebar — flex column so the nav can scroll independently while the
           profile/sign-out block always stays pinned to the very bottom. */}
       <aside
-        className={`fixed left-0 top-0 h-full bg-white flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 ${
+        className={`fixed left-0 top-0 h-full bg-white flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
