@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Trash2, Minus, Plus, Bookmark, ChevronLeft, ChevronRight,
@@ -20,6 +20,56 @@ const SUGGESTED: {
   { id: 103, name: "APC Back-UPS 1100VA", image: "/products/ups.png", priceNum: 7499, moq: 1, specs: ["1100VA", "Power Backup"] },
   { id: 104, name: 'Samsung 24" Monitor', image: "/products/monitor.png", priceNum: 8999, moq: 1, specs: ["Full HD", "IPS Panel"] },
 ];
+
+function QtyInput({
+  value,
+  moq,
+  onChange,
+  size = "md",
+}: {
+  value: number;
+  moq: number;
+  onChange: (qty: number) => void;
+  size?: "sm" | "md";
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  const min = Math.max(1, moq);
+  const commit = () => {
+    const parsed = parseInt(draft, 10);
+    const clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    setDraft(String(clamped));
+    onChange(clamped);
+  };
+
+  const btnCls = size === "sm"
+    ? "w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
+    : "w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0";
+  const inputCls = size === "sm"
+    ? "w-10 text-center text-sm font-medium text-gray-900 border border-gray-200 rounded-md py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+    : "w-10 text-center text-sm font-medium text-gray-900 border border-gray-200 rounded-md py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => onChange(Math.max(min, value - 1))} className={btnCls}>
+        <Minus size={12} />
+      </button>
+      <input
+        type="number"
+        value={draft}
+        min={min}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => e.key === "Enter" && commit()}
+        className={inputCls}
+      />
+      <button onClick={() => onChange(value + 1)} className={btnCls}>
+        <Plus size={12} />
+      </button>
+    </div>
+  );
+}
 
 function CartItemRow({
   item,
@@ -60,21 +110,7 @@ function CartItemRow({
         <p className="text-xs text-gray-400 mt-0.5">Unit Price</p>
       </td>
       <td className="py-5 pr-4 align-top">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onUpdate(item.id, Math.max(item.moq, item.quantity - 1))}
-            className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
-          >
-            <Minus size={12} />
-          </button>
-          <span className="w-8 text-center text-sm font-medium text-gray-900">{item.quantity}</span>
-          <button
-            onClick={() => onUpdate(item.id, item.quantity + 1)}
-            className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
-          >
-            <Plus size={12} />
-          </button>
-        </div>
+        <QtyInput value={item.quantity} moq={item.moq} onChange={qty => onUpdate(item.id, qty)} />
       </td>
       <td className="py-5 align-top">
         <div className="flex items-start justify-between">
@@ -240,15 +276,7 @@ export default function CartPage() {
                           )}
                         </td>
                         <td className="py-5 pr-4 align-top">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => onUpdateQuantity(item.id, Math.max(item.moq, item.quantity - 1))} className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors">
-                              <Minus size={12} />
-                            </button>
-                            <span className="w-8 text-center text-sm font-medium text-gray-900">{item.quantity}</span>
-                            <button onClick={() => onUpdateQuantity(item.id, item.quantity + 1)} className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors">
-                              <Plus size={12} />
-                            </button>
-                          </div>
+                          <QtyInput value={item.quantity} moq={item.moq} onChange={qty => onUpdateQuantity(item.id, qty)} />
                         </td>
                         <td className="py-5 pr-5 align-top">
                           <div className="flex items-start justify-between">

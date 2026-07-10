@@ -162,12 +162,21 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, allProducts, onSelectProduct }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string; allProducts: Product[]; onSelectProduct: (p: Product) => void }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(product?.moq ?? 1);
+  const [qtyDraft, setQtyDraft] = useState(String(product?.moq ?? 1));
   const [added, setAdded] = useState(false);
   const [editingMoq, setEditingMoq] = useState(false);
   const [moqDraft, setMoqDraft] = useState(String(product?.moq ?? 0));
 
-  useEffect(() => { if (product) setQty(Math.max(1, product.moq)); }, [product]);
+  useEffect(() => { if (product) { const v = Math.max(1, product.moq); setQty(v); setQtyDraft(String(v)); } }, [product]);
   useEffect(() => { if (product) setMoqDraft(String(product.moq)); }, [product?.moq]);
+
+  const commitDialogQty = () => {
+    const min = Math.max(1, product?.moq ?? 1);
+    const parsed = parseInt(qtyDraft, 10);
+    const clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    setQty(clamped);
+    setQtyDraft(String(clamped));
+  };
 
   if (!product) return null;
 
@@ -300,12 +309,20 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
                 <div className="flex items-center gap-3 mt-5">
                   <button
-                    onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))}
+                    onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }}
                     className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
                   >−</button>
-                  <span className="flex-1 text-center font-bold text-base">{qty}</span>
+                  <input
+                    type="number"
+                    value={qtyDraft}
+                    min={Math.max(1, product.moq)}
+                    onChange={e => setQtyDraft(e.target.value)}
+                    onBlur={commitDialogQty}
+                    onKeyDown={e => e.key === "Enter" && commitDialogQty()}
+                    className="flex-1 text-center font-bold text-base border border-gray-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <button
-                    onClick={() => setQty(q => q + 1)}
+                    onClick={() => { const v = qty + 1; setQty(v); setQtyDraft(String(v)); }}
                     className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
                   >+</button>
                   <span className="text-xs text-gray-400 whitespace-nowrap">(Min: {formatMoq(product.moq)})</span>
@@ -433,7 +450,16 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(Math.max(1, product.moq));
+  const [qtyDraft, setQtyDraft] = useState(String(Math.max(1, product.moq)));
   const [adding, setAdding] = useState(false);
+
+  const commitCardQty = () => {
+    const min = Math.max(1, product.moq);
+    const parsed = parseInt(qtyDraft, 10);
+    const clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    setQty(clamped);
+    setQtyDraft(String(clamped));
+  };
 
   const cardDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const cardEffectivePrice = cardDiscountPct > 0 ? product.priceNum * (1 - cardDiscountPct / 100) : product.priceNum;
@@ -517,9 +543,17 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             {adding ? "Added!" : "Add to Cart"}
           </button>
           <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
-            <button onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
-            <span className="px-2 text-xs font-semibold text-gray-800 min-w-[28px] text-center">{qty}</span>
-            <button onClick={() => setQty(q => q + 1)} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">+</button>
+            <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
+            <input
+              type="number"
+              value={qtyDraft}
+              min={Math.max(1, product.moq)}
+              onChange={e => setQtyDraft(e.target.value)}
+              onBlur={commitCardQty}
+              onKeyDown={e => e.key === "Enter" && commitCardQty()}
+              className="w-10 text-center text-xs font-semibold text-gray-800 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <button onClick={() => { const v = qty + 1; setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">+</button>
           </div>
         </div>
       </div>
