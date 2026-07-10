@@ -24,6 +24,7 @@ type Product = {
   inStock: boolean;
   description?: string;
   generalSpecs?: { label: string; value: string }[];
+  preference?: string;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -90,6 +91,17 @@ function getVendorMatchMap(): Map<string, VendorMatch> {
   return map;
 }
 
+/** Returns a numeric sort key for a preference string.
+ *  "Preference 1" → 1, "Preference 2" → 2, custom names → large number (alphabetical tiebreak),
+ *  empty/undefined → Infinity (always last).
+ */
+function prefOrder(pref?: string): number {
+  if (!pref || pref.trim() === "") return Infinity;
+  const m = pref.match(/(\d+)/);
+  if (m) return parseInt(m[1], 10);
+  return 10000 + pref.charCodeAt(0);
+}
+
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
   return {
@@ -105,6 +117,7 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     inStock: e.availability !== "Out of Stock",
     description: e.description,
     generalSpecs: e.generalSpecs,
+    preference: e.preference,
   };
 }
 
@@ -561,13 +574,15 @@ export default function ShopPage() {
   const selectedClient = clients.find(c => c.id === selectedClientId);
   const allCats = ["All Categories", ...Array.from(new Set(catalogProducts.map(p => p.category)))];
 
-  const filtered = catalogProducts.filter(p => {
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
-    if (category !== "All Categories" && p.category !== category) return false;
-    if (availability === "In Stock" && !p.inStock) return false;
-    if (availability === "Out of Stock" && p.inStock) return false;
-    return true;
-  });
+  const filtered = catalogProducts
+    .filter(p => {
+      if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
+      if (category !== "All Categories" && p.category !== category) return false;
+      if (availability === "In Stock" && !p.inStock) return false;
+      if (availability === "Out of Stock" && p.inStock) return false;
+      return true;
+    })
+    .sort((a, b) => prefOrder(a.preference) - prefOrder(b.preference));
 
   const totalProducts = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));

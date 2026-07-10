@@ -12,6 +12,18 @@ import {
 import { syncClientPrices } from "@/lib/priceEngineStore";
 const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
 
+/** Returns a numeric sort key for a preference string.
+ *  "Preference 1" → 1, "Preference 2" → 2, custom names → large number (alphabetical tiebreak),
+ *  empty/undefined → Infinity (always last).
+ */
+function prefOrder(pref?: string): number {
+  if (!pref || pref.trim() === "") return Infinity;
+  const m = pref.match(/(\d+)/);
+  if (m) return parseInt(m[1], 10);
+  // Non-numeric custom preference: sort after numbered ones, alphabetically
+  return 10000 + pref.charCodeAt(0);
+}
+
 function ProductThumb({ images, name }: { images: string[]; name: string }) {
   if (images && images.length > 0) {
     return (
@@ -1177,11 +1189,13 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
     saveClientCatalog(clientId, products);
   }, [products, clientId]);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = products
+    .filter((p) =>
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.sku || "").toLowerCase().includes(search.toLowerCase()) ||
+      p.category.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => prefOrder(a.preference) - prefOrder(b.preference));
 
   const totalItems = products.length;
   const inStock = products.filter((p) => p.availability === "In Stock").length;
