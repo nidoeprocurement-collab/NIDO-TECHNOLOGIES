@@ -2,11 +2,16 @@
 
 import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 
-interface User {
+export type UserType = 'nido_admin' | 'client_admin' | 'client_user';
+
+export interface User {
   id: string;
   email: string;
   name: string;
   role?: string;
+  userType: UserType;
+  clientId?: string;
+  clientName?: string;
 }
 
 interface AuthContextType {
@@ -15,6 +20,8 @@ interface AuthContextType {
   login: (user: User) => void;
   logout: () => void;
   isLoading: boolean;
+  isNidoAdmin: boolean;
+  isClientPortalUser: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,17 +31,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for stored authentication on mount
   useEffect(() => {
     const storedUser = localStorage.getItem('nido_user');
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
+        // Back-compat: old sessions without userType default to nido_admin
+        if (!parsedUser.userType) parsedUser.userType = 'nido_admin';
         setUser(parsedUser);
         setIsAuthenticated(true);
-        console.log('[v0] User restored from localStorage:', parsedUser.email);
-      } catch (err) {
-        console.log('[v0] Failed to parse stored user');
+      } catch {
         localStorage.removeItem('nido_user');
       }
     }
@@ -45,15 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
     setIsAuthenticated(true);
     localStorage.setItem('nido_user', JSON.stringify(userData));
-    console.log('[v0] User logged in:', userData.email);
   };
 
   const logout = () => {
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('nido_user');
-    console.log('[v0] User logged out');
   };
+
+  const isNidoAdmin = user?.userType === 'nido_admin';
+  const isClientPortalUser = user?.userType === 'client_admin' || user?.userType === 'client_user';
 
   const value: AuthContextType = {
     isAuthenticated,
@@ -61,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     isLoading,
+    isNidoAdmin,
+    isClientPortalUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

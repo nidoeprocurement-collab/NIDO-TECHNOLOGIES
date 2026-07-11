@@ -125,7 +125,27 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Guards admin-only routes: redirects client portal users to /portal/dashboard */
+function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isClientPortalUser } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (isClientPortalUser) return <Navigate to="/portal/dashboard" replace />;
+  return <>{children}</>;
+}
+
+/** Guards client portal routes: redirects NIDO admins to /dashboard */
+function ClientPortalRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isNidoAdmin } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (isNidoAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
+const ClientPortalUsersPage = lazy(() => import("@/pages/ClientPortalUsersPage"));
+const ClientPortalRolesPage = lazy(() => import("@/pages/ClientPortalRolesPage"));
+const ClientPortalAddressesPage = lazy(() => import("@/pages/ClientPortalAddressesPage"));
 const MainDashboard = lazy(() => import("@/pages/MainDashboard"));
 const VendorDashboard = lazy(() => import("@/pages/VendorDashboard"));
 const SLAOverview = lazy(() => import("@/pages/SLAOverview"));
@@ -219,6 +239,11 @@ const OrderConfirmationPage = lazy(
 const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
 const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
 
+function RootRedirect() {
+  const { isClientPortalUser } = useAuth();
+  return <Navigate to={isClientPortalUser ? "/portal/dashboard" : "/dashboard"} replace />;
+}
+
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
@@ -275,7 +300,7 @@ function AppRoutes() {
             )
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<RootRedirect />} />
           <Route path="home" element={<HomePage />} />
           <Route path="categories" element={<Navigate to="/shop" replace />} />
           <Route path="dashboard" element={<MainDashboard />} />
@@ -832,6 +857,154 @@ function AppRoutes() {
           <Route path="eway-bills" element={<EWayBillsPage />} />
           <Route path="invoices" element={<InvoicePage />} />
           <Route path="reports" element={<AuditTrailPage />} />
+
+          {/* ── Client Portal Routes ────────────────────────────────────── */}
+          <Route
+            path="portal/dashboard"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal dashboard failed to load" resetKey={location.pathname}>
+                  <ClientPortalDashboard />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/catalog"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Catalog failed to load" resetKey={location.pathname}>
+                  <ShopPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/orders"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Orders failed to load" resetKey={location.pathname}>
+                  <MyOrderPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/orders/:id"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Order details failed to load" resetKey={location.pathname}>
+                  <OrderDetailsPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/services"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Services failed to load" resetKey={location.pathname}>
+                  <ServicesPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/invoices"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Invoices failed to load" resetKey={location.pathname}>
+                  <InvoicePage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/contracts"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Contracts failed to load" resetKey={location.pathname}>
+                  <ClientContractsPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/reports"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Reports failed to load" resetKey={location.pathname}>
+                  <AuditTrailPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/users"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal users failed to load" resetKey={location.pathname}>
+                  <ClientPortalUsersPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/roles"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal roles failed to load" resetKey={location.pathname}>
+                  <ClientPortalRolesPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/addresses"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal addresses failed to load" resetKey={location.pathname}>
+                  <ClientPortalAddressesPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/notifications"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Notifications failed to load" resetKey={location.pathname}>
+                  <NotificationsPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/support"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Support failed to load" resetKey={location.pathname}>
+                  <SupportPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/profile"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Profile failed to load" resetKey={location.pathname}>
+                  <UserProfilePage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          {/* Portal shopping flow (reuses admin pages, no guard needed — /shop already works) */}
+          <Route path="portal/shop/cart" element={<ClientPortalRoute><CartPage /></ClientPortalRoute>} />
+          <Route path="portal/shop/checkout" element={<ClientPortalRoute><CheckoutPage /></ClientPortalRoute>} />
+          <Route path="portal/shop/checkout/payment" element={<ClientPortalRoute><PaymentPage /></ClientPortalRoute>} />
+          <Route path="portal/shop/checkout/review" element={<ClientPortalRoute><ReviewPage /></ClientPortalRoute>} />
+          <Route path="portal/shop/order-confirmation/:orderId" element={<ClientPortalRoute><OrderConfirmationPage /></ClientPortalRoute>} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

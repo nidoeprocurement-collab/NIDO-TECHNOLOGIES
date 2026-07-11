@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { findPortalUser } from '@/lib/portalUserStore';
 import { Mail, Lock, Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
 export default function LoginPage() {
@@ -18,26 +19,40 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
-      // Validate credentials
+      // ── NIDO Owner (hardcoded) ─────────────────────────────────────────────
       if (email === 'owner@nidotech.com' && password === 'Owner@123') {
-        console.log('[v0] Login successful with credentials:', email);
         login({
           id: 'owner-1',
-          email: email,
+          email,
           name: 'System Owner',
           role: 'admin',
+          userType: 'nido_admin',
         });
         navigate('/dashboard', { replace: true });
-      } else {
-        setError('Invalid email or password');
-        console.log('[v0] Login failed: invalid credentials');
+        return;
       }
-    } catch (err) {
+
+      // ── Client Portal users (localStorage registry) ───────────────────────
+      const portalUser = findPortalUser(email, password);
+      if (portalUser) {
+        login({
+          id: portalUser.id,
+          email: portalUser.email,
+          name: portalUser.name,
+          role: portalUser.role,
+          userType: portalUser.userType,
+          clientId: portalUser.clientId,
+          clientName: portalUser.clientName,
+        });
+        navigate('/portal/dashboard', { replace: true });
+        return;
+      }
+
+      setError('Invalid email or password');
+    } catch {
       setError('An error occurred during login');
-      console.log('[v0] Login error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -46,50 +61,46 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center" style={{ fontFamily: 'Roboto, Lato, system-ui, sans-serif', fontWeight: '800', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)', borderRadius: '15px' }}>
-          {/* Left Section - Features */}
+        <div
+          className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center"
+          style={{
+            fontFamily: 'Roboto, Lato, system-ui, sans-serif',
+            fontWeight: '800',
+            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+            borderRadius: '15px',
+          }}
+        >
+          {/* Left — Feature panel */}
           <div className="hidden lg:block bg-black" style={{ marginLeft: '20px' }}>
-            <p className="text-xs font-semibold text-white uppercase tracking-wider mb-8">
-            </p>
-            
             <h1 className="text-4xl font-bold text-white mb-6">
               Real-time spend insights
             </h1>
-            
             <div className="space-y-6">
               <p className="text-sm font-semibold text-white uppercase tracking-wider">
                 Enterprise Features
               </p>
-              
               <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-white">Automated purchase orders</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-gray-100">Multi-location support</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-white">Role-based access control</p>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="text-gray-400 mt-1">✓</div>
-                  <p className="text-white">Enterprise-grade security</p>
-                </div>
+                {[
+                  'Automated purchase orders',
+                  'Multi-location support',
+                  'Role-based access control',
+                  'Multi-tenant client portal',
+                  'Enterprise-grade security',
+                ].map((f) => (
+                  <div key={f} className="flex items-start gap-3">
+                    <div className="text-gray-400 mt-1">✓</div>
+                    <p className="text-white">{f}</p>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <p className="text-xs text-white mt-12">
-              © 2024 Nido Tech CorpEssentials
-            </p>
+            <p className="text-xs text-white mt-12">© 2024 Nido Tech CorpEssentials</p>
           </div>
 
-          {/* Right Section - Login Form */}
+          {/* Right — Login form */}
           <div className="w-full max-w-sm" style={{ marginLeft: '50px', marginRight: '-50px' }}>
             <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
-              {/* Header */}
+              {/* Logo */}
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
@@ -109,51 +120,42 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              {/* Welcome Message */}
               <div className="mb-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  Welcome back
-                </h3>
-                <p className="text-gray-600 text-sm">
-                  Sign in to your account to continue
-                </p>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h3>
+                <p className="text-gray-600 text-sm">Sign in to your account to continue</p>
               </div>
 
-              {/* Error Message */}
               {error && (
                 <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}
 
-              {/* Login Form */}
               <form onSubmit={handleLogin} className="space-y-5">
-                {/* Email Field */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
-                    placeholder="owner@nidotech.com"
-                    disabled={isLoading}
-                  />
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
+                  <div className="relative">
+                    <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                      placeholder="your@email.com"
+                      disabled={isLoading}
+                    />
+                  </div>
                 </div>
 
-                {/* Password Field */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Password
-                  </label>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">Password</label>
                   <div className="relative">
+                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                      className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
                       placeholder="••••••••••"
                       disabled={isLoading}
                     />
@@ -168,7 +170,6 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Sign In Button */}
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -177,20 +178,17 @@ export default function LoginPage() {
                   {isLoading ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Signing in...
+                      Signing in…
                     </>
                   ) : (
-                    <>
-                      Sign In
-                      <span>→</span>
-                    </>
+                    <>Sign In <span>→</span></>
                   )}
                 </button>
               </form>
 
-              {/* Footer Note */}
-              <p className="text-xs text-gray-600 mt-6 pt-6 border-t border-gray-200">
-                <span className="font-medium">User creation is owner-only.</span> Log in with the owner account to create client admin and client user accounts.
+              <p className="text-xs text-gray-500 mt-6 pt-6 border-t border-gray-200">
+                <span className="font-medium">NIDO Admin</span> — use owner@nidotech.com / Owner@123.{' '}
+                <span className="font-medium">Client Portal</span> — use credentials provided by your NIDO admin after portal provisioning.
               </p>
             </div>
           </div>

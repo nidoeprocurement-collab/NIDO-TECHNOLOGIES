@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { getClients as getStoredClients, saveClients as saveStoredClients, addClient as addStoredClient, type StoredClient } from "@/lib/clientStore"
-import { MoreVertical, Users, Plus, Download, Upload, FileDown, Archive } from "lucide-react"
+import { provisionClientPortal, isClientProvisioned, type ProvisionResult } from "@/lib/portalUserStore"
+import { MoreVertical, Users, Plus, Download, Upload, FileDown, Archive, Zap, Copy, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -61,10 +62,24 @@ export default function ClientsPageUI() {
   const [importedClients, setImportedClients] = useState<any[]>([])
   const [allClients, setAllClientsState] = useState<any[]>(() => getStoredClients())
   const [archivedClientsList, setArchivedClientsList] = useState<any[]>(archivedClientsData)
+  // Portal provisioning
+  const [provisionResult, setProvisionResult] = useState<(ProvisionResult & { clientName: string }) | null>(null)
+  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null)
 
   const setAllClients = (clients: any[]) => {
     setAllClientsState(clients)
     saveStoredClients(clients)
+  }
+
+  const handleProvision = (c: any) => {
+    const result = provisionClientPortal(c.id, c.name)
+    setProvisionResult({ ...result, clientName: c.name })
+  }
+
+  const copyToClipboard = (text: string, field: 'email' | 'password') => {
+    navigator.clipboard.writeText(text).catch(() => {})
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
   }
 
   useEffect(() => {
@@ -394,6 +409,13 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                           <DropdownMenuItem onClick={() => navigate(`/clients/${c.id}/edit`)}>
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            onClick={() => handleProvision(c)}
+                          >
+                            <Zap className="h-4 w-4 mr-2 text-purple-600" />
+                            {isClientProvisioned(c.id) ? 'Re-provision Portal' : 'Provision Client Portal'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="text-red-600 cursor-pointer"
                             onClick={() => {
@@ -585,6 +607,72 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Provision Portal — Credentials Dialog */}
+      {provisionResult && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-start mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Zap size={20} className="text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Portal Provisioned</h2>
+                  <p className="text-xs text-gray-500">{provisionResult.clientName}</p>
+                </div>
+              </div>
+              <button onClick={() => setProvisionResult(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-5">
+              <p className="text-sm text-green-800 font-medium">Client portal is ready!</p>
+              <p className="text-xs text-green-700 mt-1">
+                Share the credentials below with the client admin. They can log in at the same login page.
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              <div className="border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500 mb-1">Login Email</p>
+                <div className="flex items-center justify-between gap-3">
+                  <code className="text-sm font-mono text-gray-900 break-all">{provisionResult.email}</code>
+                  <button
+                    onClick={() => copyToClipboard(provisionResult.email, 'email')}
+                    className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    {copiedField === 'email' ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
+                  </button>
+                </div>
+              </div>
+              <div className="border border-gray-200 rounded-xl p-4">
+                <p className="text-xs text-gray-500 mb-1">Temporary Password</p>
+                <div className="flex items-center justify-between gap-3">
+                  <code className="text-sm font-mono text-gray-900">{provisionResult.password}</code>
+                  <button
+                    onClick={() => copyToClipboard(provisionResult.password, 'password')}
+                    className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
+                  >
+                    {copiedField === 'password' ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5">
+              <p className="text-xs text-amber-800">
+                <strong>Important:</strong> Save these credentials now — the password cannot be recovered later (only reset from the client's Users page).
+              </p>
+            </div>
+
+            <Button className="w-full" onClick={() => setProvisionResult(null)}>
+              Done
+            </Button>
           </div>
         </div>
       )}

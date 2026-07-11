@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -34,6 +35,10 @@ import {
   Building2,
   Mail,
   History,
+  MapPin,
+  LogOut,
+  Bell,
+  User,
 } from 'lucide-react';
 
 interface NavItem {
@@ -43,32 +48,13 @@ interface NavItem {
   children?: NavItem[];
 }
 
-const navigationItems: NavItem[] = [
-  {
-    label: 'Dashboard',
-    icon: <LayoutDashboard size={20} />,
-    path: '/dashboard',
-  },
-  {
-    label: 'Shop',
-    icon: <ShoppingCart size={20} />,
-    path: '/shop',
-  },
-  {
-    label: 'Services',
-    icon: <Wrench size={20} />,
-    path: '/services',
-  },
-  {
-    label: 'Support',
-    icon: <Headphones size={20} />,
-    path: '/support',
-  },
-  {
-    label: 'Clients',
-    icon: <Users size={20} />,
-    path: '/clients',
-  },
+// ── Admin (NIDO) navigation ───────────────────────────────────────────────────
+const adminNavigationItems: NavItem[] = [
+  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
+  { label: 'Shop', icon: <ShoppingCart size={20} />, path: '/shop' },
+  { label: 'Services', icon: <Wrench size={20} />, path: '/services' },
+  { label: 'Support', icon: <Headphones size={20} />, path: '/support' },
+  { label: 'Clients', icon: <Users size={20} />, path: '/clients' },
   {
     label: 'Vendors',
     icon: <Package size={20} />,
@@ -88,11 +74,7 @@ const navigationItems: NavItem[] = [
       { label: 'SLA Overview', icon: <Gauge size={16} />, path: '/sla-overview' },
     ],
   },
-  {
-    label: 'Reports',
-    icon: <TrendingUp size={20} />,
-    path: '/reports',
-  },
+  { label: 'Reports', icon: <TrendingUp size={20} />, path: '/reports' },
   {
     label: 'Transactions',
     icon: <DollarSign size={20} />,
@@ -136,16 +118,33 @@ const navigationItems: NavItem[] = [
       { label: 'Audit Trail', icon: <History size={16} />, path: '/audit-logs' },
     ],
   },
-  {
-    label: 'Configuration',
-    icon: <Settings size={20} />,
-    path: '/configuration',
-  },
+  { label: 'Configuration', icon: <Settings size={20} />, path: '/configuration' },
 ];
 
-// Flatten all nav paths and pick the single most specific (longest) match for the
-// current pathname, so sibling routes that share a prefix (e.g. '/vendors' and
-// '/vendors/orders') never both light up — only the item that's actually open does.
+// ── Client Portal navigation ──────────────────────────────────────────────────
+const clientNavigationItems: NavItem[] = [
+  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/portal/dashboard' },
+  { label: 'Catalog', icon: <Package size={20} />, path: '/portal/catalog' },
+  { label: 'Orders', icon: <ShoppingBag size={20} />, path: '/portal/orders' },
+  { label: 'Services', icon: <Wrench size={20} />, path: '/portal/services' },
+  { label: 'Invoices', icon: <Receipt size={20} />, path: '/portal/invoices' },
+  { label: 'Contracts', icon: <FileText size={20} />, path: '/portal/contracts' },
+  { label: 'Reports', icon: <TrendingUp size={20} />, path: '/portal/reports' },
+  {
+    label: 'My Workspace',
+    icon: <Users size={20} />,
+    children: [
+      { label: 'Users', icon: <Users size={16} />, path: '/portal/users' },
+      { label: 'Roles', icon: <ShieldCheck size={16} />, path: '/portal/roles' },
+      { label: 'Addresses', icon: <MapPin size={16} />, path: '/portal/addresses' },
+    ],
+  },
+  { label: 'Notifications', icon: <Bell size={20} />, path: '/portal/notifications' },
+  { label: 'Profile', icon: <User size={20} />, path: '/portal/profile' },
+  { label: 'Support', icon: <Headphones size={20} />, path: '/portal/support' },
+];
+
+// ── Path helpers ──────────────────────────────────────────────────────────────
 function collectPaths(items: NavItem[], acc: string[] = []): string[] {
   for (const item of items) {
     if (item.path) acc.push(item.path);
@@ -154,8 +153,8 @@ function collectPaths(items: NavItem[], acc: string[] = []): string[] {
   return acc;
 }
 
-function findActivePath(pathname: string): string | null {
-  const allPaths = collectPaths(navigationItems);
+function findActivePath(pathname: string, items: NavItem[]): string | null {
+  const allPaths = collectPaths(items);
   let best: string | null = null;
   for (const p of allPaths) {
     const matches = pathname === p || pathname.startsWith(p + '/');
@@ -170,6 +169,7 @@ function containsPath(item: NavItem, targetPath: string): boolean {
   return !!item.children?.some(child => containsPath(child, targetPath));
 }
 
+// ── NavItem component ─────────────────────────────────────────────────────────
 interface NavItemProps {
   item: NavItem;
   level?: number;
@@ -182,14 +182,9 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const hasChildren = item.children && item.children.length > 0;
   const isTopLevel = level === 0;
-
-  // Only the single most specific matching item is "active"
   const isActive = !!item.path && item.path === activePath;
+  const hasActiveChild = !!hasChildren && !!activePath && item.children!.some(child => containsPath(child, activePath));
 
-  // Check if the active path lives somewhere inside this item's children
-  const hasActiveChild = !!hasChildren && !!activePath && item.children.some(child => containsPath(child, activePath));
-
-  // Collapsed top-level item with children: icon-only trigger + hover flyout
   if (hasChildren && isTopLevel && collapsed) {
     return (
       <div
@@ -204,13 +199,12 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
           title={item.label}
         >
           {item.icon}
-          {/* Small dropdown indicator so collapsed icons still hint they expand */}
           <ChevronRight size={10} className="absolute right-0.5 bottom-0.5 text-gray-400" />
         </button>
         {flyoutOpen && (
           <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
             <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">{item.label}</p>
-            {item.children.map((child, idx) => (
+            {item.children!.map((child, idx) => (
               <NavItemComponent key={idx} item={child} level={1} activePath={activePath} />
             ))}
           </div>
@@ -225,9 +219,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            hasActiveChild
-              ? 'text-blue-600 bg-blue-50'
-              : 'text-gray-700 hover:bg-gray-100'
+            hasActiveChild ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
           }`}
         >
           <span className="flex items-center gap-3">
@@ -238,7 +230,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
         </button>
         {isOpen && (
           <div className={`space-y-0.5 ${isTopLevel ? 'pl-2' : 'pl-4'}`}>
-            {item.children.map((child, idx) => (
+            {item.children!.map((child, idx) => (
               <NavItemComponent key={idx} item={child} level={level + 1} activePath={activePath} />
             ))}
           </div>
@@ -247,7 +239,6 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
     );
   }
 
-  // Collapsed top-level leaf item: icon-only link
   if (isTopLevel && collapsed) {
     return (
       <Link
@@ -266,9 +257,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
     <Link
       to={item.path || '#'}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-        isActive
-          ? 'text-blue-600 bg-blue-50'
-          : 'text-gray-700 hover:bg-gray-100'
+        isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
       {item.icon}
@@ -277,15 +266,21 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
   );
 }
 
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 interface SidebarProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }
 
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
+  const { user, logout, isClientPortalUser } = useAuth();
+  const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
-  const activePath = findActivePath(location.pathname);
+
+  const navItems = isClientPortalUser ? clientNavigationItems : adminNavigationItems;
+  const activePath = findActivePath(location.pathname, navItems);
+
   const [isDesktop, setIsDesktop] = useState(
     () => typeof window !== 'undefined' && window.innerWidth >= 1024
   );
@@ -297,10 +292,19 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
     return () => mql.removeEventListener('change', handler);
   }, []);
 
-  // The collapse-to-icon-rail treatment is a desktop-only affordance — on
-  // mobile the sidebar is a full-width overlay, so ignore the persisted
-  // collapsed flag there to avoid a narrow icon rail with no way to expand.
   const effectiveCollapsed = collapsed && isDesktop;
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const displayName = user?.name ?? 'Unknown User';
+  const displayRole = isClientPortalUser
+    ? `${user?.clientName ?? 'Client'} — ${user?.role ?? 'User'}`
+    : user?.role ?? 'Owner';
+
+  const avatarInitial = displayName.charAt(0).toUpperCase();
 
   return (
     <>
@@ -312,32 +316,31 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Sidebar — flex column so the nav can scroll independently while the
-          profile/sign-out block always stays pinned to the very bottom. */}
       <aside
         className={`fixed left-0 top-0 h-full bg-white flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
-        {/* Sidebar Header — same h-16 row height as the TopBar's search row
-            so the two line up. Separated from the nav below with a soft
-            shadow instead of a hard divider line. */}
+        {/* Header */}
         <div className="relative shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2 shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+            <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${
+              isClientPortalUser
+                ? 'bg-gradient-to-br from-purple-500 to-purple-700'
+                : 'bg-gradient-to-br from-blue-600 to-blue-700'
+            }`}>
               <Zap size={20} className="text-white" />
             </div>
             {!effectiveCollapsed && (
               <div className="min-w-0">
                 <h1 className="text-sm font-bold text-gray-900 truncate">NIDO</h1>
-                <p className="text-xs text-gray-500 truncate">Procurement</p>
+                <p className="text-xs text-gray-500 truncate">
+                  {isClientPortalUser ? 'Client Portal' : 'Procurement'}
+                </p>
               </div>
             )}
           </div>
 
-          {/* Hide/unhide toggle — small arrow tab pinned to the top-right
-              corner of the sidebar, echoed on the outer edge so it stays
-              reachable even when collapsed to icon width. */}
           <button
             onClick={onToggleCollapsed}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -347,43 +350,63 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           </button>
         </div>
 
-        {/* Navigation Items — scrolls on its own, leaving the bottom block fixed */}
+        {/* Client badge (client portal only) */}
+        {isClientPortalUser && !effectiveCollapsed && (
+          <div className="px-4 py-2 bg-purple-50 border-b border-purple-100">
+            <p className="text-xs text-purple-700 font-medium truncate">{user?.clientName}</p>
+            <p className="text-[10px] text-purple-500 truncate">Client ID: {user?.clientId}</p>
+          </div>
+        )}
+
+        {/* Nav */}
         <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1 ${effectiveCollapsed ? 'p-2' : 'p-4'}`}>
-          {navigationItems.map((item, idx) => (
+          {navItems.map((item, idx) => (
             <NavItemComponent key={idx} item={item} collapsed={effectiveCollapsed} activePath={activePath} />
           ))}
         </nav>
 
-        {/* Bottom Section — always pinned to the bottom of the sidebar,
-            separated from the nav above with a soft shadow instead of a line */}
+        {/* Bottom — user + sign-out */}
         <div className="shrink-0 shadow-[0_-2px_6px_-2px_rgba(15,23,42,0.10)]">
           {effectiveCollapsed ? (
             <div className="p-2 flex flex-col items-center gap-2">
               <div
-                className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center"
-                title="Nido Owner"
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                  isClientPortalUser
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-700'
+                    : 'bg-gradient-to-br from-blue-600 to-blue-700'
+                }`}
+                title={displayName}
               >
-                <Zap size={16} className="text-white" />
+                {avatarInitial}
               </div>
               <button
                 title="Sign Out"
+                onClick={handleSignOut}
                 className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
               >
-                <X size={16} />
+                <LogOut size={15} />
               </button>
             </div>
           ) : (
             <div className="p-4">
               <div className="flex items-center gap-3 px-3 py-2.5">
-                <div className="w-8 h-8 shrink-0 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                  <Zap size={16} className="text-white" />
+                <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                  isClientPortalUser
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-700'
+                    : 'bg-gradient-to-br from-blue-600 to-blue-700'
+                }`}>
+                  {avatarInitial}
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-900">Nido Owner</p>
-                  <p className="text-xs text-gray-500">Owner</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-900 truncate">{displayName}</p>
+                  <p className="text-xs text-gray-500 truncate">{displayRole}</p>
                 </div>
               </div>
-              <button className="w-full mt-3 px-3 py-2 text-xs text-gray-600 hover:text-red-600 text-left rounded-lg hover:bg-red-50 transition-all">
+              <button
+                onClick={handleSignOut}
+                className="w-full mt-2 px-3 py-2 text-xs text-gray-600 hover:text-red-600 text-left rounded-lg hover:bg-red-50 transition-all flex items-center gap-2"
+              >
+                <LogOut size={14} />
                 Sign Out
               </button>
             </div>
