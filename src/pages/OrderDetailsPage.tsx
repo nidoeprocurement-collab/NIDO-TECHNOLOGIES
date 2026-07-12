@@ -1083,7 +1083,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orders, setOrders } = useMyOrders();
+  const { orders, updateOrderStatus } = useMyOrders();
   const { user, isClientPortalUser } = useAuth();
   const orderId = id || "";
 
@@ -1098,9 +1098,13 @@ export default function MyOrderPage() {
   // truth) so a change made on the owner platform is visible immediately on
   // the client portal, and vice versa, without any separate local copy.
   const masterStatus = order?.status || "Processing";
+  const isOrderInactive = masterStatus === "Cancelled" || masterStatus === "Draft";
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as typeof o.status } : o));
+    // Centralized in MyOrdersContext so a Cancelled/Draft transition always
+    // cascades to sub-orders and clears vendor selection, whether triggered
+    // here or from the order list's bulk status update.
+    updateOrderStatus(orderId, status as any);
   };
   const [showStatusDd, setShowStatusDd] = useState(false);
   // Per-item overrides (status, tracking) are persisted separately from the
@@ -1208,7 +1212,26 @@ export default function MyOrderPage() {
     return () => window.removeEventListener("storage", onStorage);
   }, [itemStateKey]);
 
+  // Same-tab equivalent of the "storage" listener above: a Cancelled/Draft
+  // master status change (from this page or the order list) cascades to
+  // sub-order state and clears vendor selection via MyOrdersContext, which
+  // fires this event so this page picks up the change immediately without
+  // needing a reload (the browser "storage" event only fires cross-tab).
+  useEffect(() => {
+    const onSubItemsUpdated = (e: Event) => {
+      const detailOrderId = (e as CustomEvent).detail?.orderId;
+      if (detailOrderId && detailOrderId !== orderId) return;
+      setSubOrders(prev => applyItemState(prev, loadItemState()));
+      try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
+      setSelectedVendorMeta({});
+    };
+    window.addEventListener("orderSubItemsUpdated", onSubItemsUpdated);
+    return () => window.removeEventListener("orderSubItemsUpdated", onSubItemsUpdated);
+  }, [orderId]);
+
   const handleOpenVendorModal = (sub: any) => {
+    // Vendor sourcing is not applicable once the order is Cancelled/Draft.
+    if (isOrderInactive) return;
     setVendorModalSub(sub);
   };
 
@@ -1458,7 +1481,7 @@ export default function MyOrderPage() {
                   <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid #2563eb", borderRadius: 8, background: "#fff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
                   {showStatusDd && (
                     <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                      {["Processing","Partially Shipped","Partially Delivered","Delivered"].map(opt => (
+                      {["Processing","Partially Shipped","Partially Delivered","Delivered","Cancelled","Draft"].map(opt => (
                         <button key={opt} onClick={() => { setMasterStatus(opt); setShowStatusDd(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
                           {opt} {opt === masterStatus && <span>✓</span>}
                         </button>
@@ -1571,7 +1594,9 @@ export default function MyOrderPage() {
                     </div>
                     {!isClientPortalUser && (
                       <div>
-                        {selVendor ? (
+                        {isOrderInactive ? (
+                          <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                        ) : selVendor ? (
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                               <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
@@ -1591,7 +1616,9 @@ export default function MyOrderPage() {
                         )}
                       </div>
                     )}
-                    {isClientPortalUser ? (
+                    {isOrderInactive ? (
+                      <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                    ) : isClientPortalUser ? (
                       <div>
                         {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
                           <button

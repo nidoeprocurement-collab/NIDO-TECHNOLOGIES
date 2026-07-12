@@ -54,12 +54,53 @@ interface MyOrdersContextType {
   orders: MyOrder[];
   addOrder: (order: Omit<MyOrder, "id"> & { id?: string }) => string;
   setOrders: React.Dispatch<React.SetStateAction<MyOrder[]>>;
+  updateOrderStatus: (orderId: string, status: MyOrderStatus) => void;
+  updateOrdersStatus: (orderIds: string[], status: MyOrderStatus) => void;
 }
 
 const MyOrdersContext = createContext<MyOrdersContextType | undefined>(undefined);
 
 const ORDERS_KEY = "nido_my_orders";
 const SEQ_KEY = "nido_order_seq";
+// Sub-order-level state (per master order) mirrors the keys OrderDetailsPage
+// reads/writes, so status cascades stay consistent no matter which screen
+// (order list or order detail) triggered the change.
+const subItemsKey = (orderId: string) => `nido_subitems_${orderId}`;
+const vendorsKey = (orderId: string) => `nido_vendors_${orderId}`;
+
+// A master order moving to Cancelled/Draft always cascades to every sub-order
+// (all items get the same status) and clears any in-progress vendor sourcing,
+// since vendor selection should not be happening for an order that is no
+// longer active. This mirrors the logic OrderDetailsPage uses to derive
+// sub-order IDs from cartItems.
+function cascadeStatusToSubOrders(order: MyOrder, status: MyOrderStatus) {
+  if (status !== "Cancelled" && status !== "Draft") return;
+  const itemCount = order.cartItems?.length || 0;
+  if (itemCount === 0) return;
+  try {
+    const key = subItemsKey(order.id);
+    let saved: Record<string, any> = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(key) || "{}");
+    } catch {
+      saved = {};
+    }
+    const updatedOn = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    for (let i = 0; i < itemCount; i++) {
+      const subId = `SO-${order.id}-${String(i + 1).padStart(3, "0")}`;
+      saved[subId] = { ...(saved[subId] || {}), itemStatus: status, updatedOn };
+    }
+    localStorage.setItem(key, JSON.stringify(saved));
+    // Vendor sourcing should not be in-flight for a cancelled/draft order.
+    localStorage.removeItem(vendorsKey(order.id));
+  } catch {
+    /* never block the status update on a localStorage failure */
+  }
+  // Notify any currently-mounted OrderDetailsPage (same tab) to reload its
+  // sub-order/vendor state immediately — the "storage" event only fires
+  // across tabs, not within the tab that made the change.
+  window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: order.id } }));
+}
 
 // Serial, zero-padded order numbers: ORD-000001, ORD-000002, ...
 function nextOrderId(): string {
@@ -114,8 +155,30 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     return id;
   };
 
+  // Single source of truth for changing a master order's status. Used by both
+  // the order list (bulk update) and the order detail page ("Update Master
+  // Status") so a Cancelled/Draft transition always cascades to sub-orders
+  // and clears vendor selection consistently, regardless of entry point.
+  const updateOrderStatus = (orderId: string, status: MyOrderStatus) => {
+    setOrders((prev) => {
+      const target = prev.find((o) => o.id === orderId);
+      if (target) cascadeStatusToSubOrders(target, status);
+      return prev.map((o) => (o.id === orderId ? { ...o, status } : o));
+    });
+  };
+
+  const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus) => {
+    const idSet = new Set(orderIds);
+    setOrders((prev) => {
+      prev.forEach((o) => {
+        if (idSet.has(o.id)) cascadeStatusToSubOrders(o, status);
+      });
+      return prev.map((o) => (idSet.has(o.id) ? { ...o, status } : o));
+    });
+  };
+
   return (
-    <MyOrdersContext.Provider value={{ orders, addOrder, setOrders }}>
+    <MyOrdersContext.Provider value={{ orders, addOrder, setOrders, updateOrderStatus, updateOrdersStatus }}>
       {children}
     </MyOrdersContext.Provider>
   );

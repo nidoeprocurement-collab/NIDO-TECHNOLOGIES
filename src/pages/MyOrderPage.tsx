@@ -352,7 +352,7 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
   const navigate = useNavigate();
-  const { orders, setOrders } = useMyOrders();
+  const { orders, updateOrdersStatus } = useMyOrders();
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
@@ -439,7 +439,10 @@ export default function MyOrderPage() {
 
   // ── Bulk update status ──────────────────────────────────────────────────────
   const handleBulkStatusApply = (status: OrderStatus) => {
-    setOrders(prev => prev.map(o => selected.has(o.id) ? { ...o, status } : o));
+    // Cascades to sub-orders (and clears vendor selection) when moving to
+    // Cancelled/Draft, and stays in sync with the order detail page since
+    // both read/write the same shared order + sub-order state.
+    updateOrdersStatus([...selected], status);
     showToast(`Updated ${totalSelected} order${totalSelected !== 1 ? "s" : ""} to "${status}"`);
   };
 
