@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Search } from 'lucide-react';
 import {
   getAllProductPricing,
   type ProductPricing,
@@ -27,8 +27,27 @@ function Stars({ r }: { r: number }) {
 export default function VendorPriceEngine() {
   const [products, setProducts] = useState<ProductPricing[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState('');
 
   const refresh = () => setProducts(getAllProductPricing());
+
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(p => {
+      const haystack = [
+        p.productName,
+        p.masterProductCode,
+        p.sku,
+        p.winningVendor?.vendorName,
+        ...p.vendorComparisons.map(v => v.vendorName),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [products, search]);
 
   useEffect(() => {
     refresh();
@@ -57,13 +76,28 @@ export default function VendorPriceEngine() {
       {/* ── Automatic Vendor Comparison for every product ── */}
       <div className="border border-gray-300 rounded-lg p-4">
         <h2 className="text-xs font-bold text-blue-700 uppercase mb-3">
-          Winning Vendor by Product ({products.length} product{products.length !== 1 ? 's' : ''} in Master Catalog)
+          Winning Vendor by Product ({filteredProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''} in Master Catalog)
         </h2>
+
+        <div className="relative mb-3 max-w-sm">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by product, code, SKU or vendor..."
+            className="w-full text-xs pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
 
         {products.length === 0 ? (
           <p className="text-xs text-gray-500 py-6 text-center">
             No products found in the Master Catalog yet. Add products there and to vendors' listings to see
             automatic vendor comparisons here.
+          </p>
+        ) : filteredProducts.length === 0 ? (
+          <p className="text-xs text-gray-500 py-6 text-center">
+            No products match "{search}".
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -84,7 +118,7 @@ export default function VendorPriceEngine() {
                 </tr>
               </thead>
               <tbody>
-                {products.map(p => (
+                {filteredProducts.map(p => (
                   <React.Fragment key={p.masterProductCode}>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-2 px-3 text-center">

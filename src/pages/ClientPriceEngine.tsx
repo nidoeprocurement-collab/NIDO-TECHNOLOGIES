@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, CheckCircle2, Search } from 'lucide-react';
 import {
   getAllClientPricing,
   syncAllPricesToClientCatalogs,
@@ -24,9 +24,28 @@ export default function ClientPriceEngine() {
   const [rows, setRows] = useState<ClientPricingRow[]>([]);
   const [lastSyncCount, setLastSyncCount] = useState<number | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = () => setRows(getAllClientPricing());
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(r => {
+      const haystack = [
+        r.clientName,
+        r.productName,
+        r.masterProductCode,
+        r.sku,
+        r.winningVendor?.vendorName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [rows, search]);
 
   const syncNow = () => {
     const updated = syncAllPricesToClientCatalogs();
@@ -85,13 +104,28 @@ export default function ClientPriceEngine() {
       {/* ── Final price per client per product (settings are per-client, configured on Client Catalog page) ── */}
       <div className="border border-gray-300 rounded-lg p-4">
         <h2 className="text-xs font-bold text-blue-700 uppercase mb-3">
-          Final Client Price by Client &amp; Product ({rows.length} entr{rows.length !== 1 ? 'ies' : 'y'} · {syncedCount} priced)
+          Final Client Price by Client &amp; Product ({filteredRows.length} of {rows.length} entr{rows.length !== 1 ? 'ies' : 'y'} · {syncedCount} priced)
         </h2>
+
+        <div className="relative mb-3 max-w-sm">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by client, product, code, SKU or vendor..."
+            className="w-full text-xs pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
 
         {rows.length === 0 ? (
           <p className="text-xs text-gray-500 py-6 text-center">
             No client catalog entries found yet. Once clients have products in their catalog and vendor listings
             exist, the final client price is computed and pushed here automatically.
+          </p>
+        ) : filteredRows.length === 0 ? (
+          <p className="text-xs text-gray-500 py-6 text-center">
+            No entries match "{search}".
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -110,7 +144,7 @@ export default function ClientPriceEngine() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => (
+                {filteredRows.map((r, i) => (
                   <tr key={`${r.clientId}-${r.masterProductCode}-${i}`} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-2 px-3 font-medium text-gray-700">{r.clientName}</td>
                     <td className="py-2 px-3">
