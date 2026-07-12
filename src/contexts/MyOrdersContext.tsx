@@ -159,10 +159,16 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // the order list (bulk update) and the order detail page ("Update Master
   // Status") so a Cancelled/Draft transition always cascades to sub-orders
   // and clears vendor selection consistently, regardless of entry point.
+  // Cancelled is a terminal state: once an order is Cancelled it can no
+  // longer be edited, have its status changed, or be processed further —
+  // guarding here (the single source of truth) protects every entry point
+  // (order detail page, list bulk update) without relying on each caller
+  // to re-check.
   const updateOrderStatus = (orderId: string, status: MyOrderStatus) => {
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
-      if (target) cascadeStatusToSubOrders(target, status);
+      if (!target || target.status === "Cancelled") return prev;
+      cascadeStatusToSubOrders(target, status);
       return prev.map((o) => (o.id === orderId ? { ...o, status } : o));
     });
   };
@@ -171,9 +177,9 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     const idSet = new Set(orderIds);
     setOrders((prev) => {
       prev.forEach((o) => {
-        if (idSet.has(o.id)) cascadeStatusToSubOrders(o, status);
+        if (idSet.has(o.id) && o.status !== "Cancelled") cascadeStatusToSubOrders(o, status);
       });
-      return prev.map((o) => (idSet.has(o.id) ? { ...o, status } : o));
+      return prev.map((o) => (idSet.has(o.id) && o.status !== "Cancelled" ? { ...o, status } : o));
     });
   };
 

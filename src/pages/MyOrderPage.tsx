@@ -363,6 +363,7 @@ export default function MyOrderPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showBulkStatus, setShowBulkStatus] = useState(false);
   const [showBulkNotes, setShowBulkNotes] = useState(false);
+  const [pendingBulkCancel, setPendingBulkCancel] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
 
@@ -439,11 +440,30 @@ export default function MyOrderPage() {
 
   // ── Bulk update status ──────────────────────────────────────────────────────
   const handleBulkStatusApply = (status: OrderStatus) => {
+    if (status === "Cancelled") {
+      // Cancelling is a terminal, hard-to-undo action — confirm first.
+      setPendingBulkCancel(true);
+      return;
+    }
+    applyBulkStatus(status);
+  };
+
+  const applyBulkStatus = (status: OrderStatus) => {
     // Cascades to sub-orders (and clears vendor selection) when moving to
     // Cancelled/Draft, and stays in sync with the order detail page since
-    // both read/write the same shared order + sub-order state.
-    updateOrdersStatus([...selected], status);
-    showToast(`Updated ${totalSelected} order${totalSelected !== 1 ? "s" : ""} to "${status}"`);
+    // both read/write the same shared order + sub-order state. Orders that
+    // are already Cancelled are a terminal state and are skipped by the
+    // context itself, so they can't be edited or processed further.
+    const ids = [...selected];
+    const skipped = ids.filter(id => orders.find(o => o.id === id)?.status === "Cancelled").length;
+    updateOrdersStatus(ids, status);
+    const applied = ids.length - skipped;
+    showToast(
+      skipped > 0
+        ? `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}". ${skipped} already-cancelled order(s) were skipped.`
+        : `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}"`
+    );
+    setPendingBulkCancel(false);
   };
 
   // ── Bulk update notes (acknowledged via toast) ──────────────────────────────
@@ -692,6 +712,29 @@ export default function MyOrderPage() {
           onApply={handleBulkStatusApply}
           onClose={() => setShowBulkStatus(false)}
         />
+      )}
+
+      {/* Bulk cancel confirmation */}
+      {pendingBulkCancel && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={() => setPendingBulkCancel(false)} />
+          <div style={{ position: "relative", background: "#fff", borderRadius: 14, padding: "28px 32px", width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "inherit" }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 700, color: "#dc2626" }}>
+              Cancel {totalSelected} order{totalSelected !== 1 ? "s" : ""}?
+            </h2>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 22 }}>
+              ⚠️ This action cannot be undone. Once cancelled, an order can no longer be edited, have its status changed, or be processed further.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setPendingBulkCancel(false)} style={{ flex: 1, padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
+                Keep Orders
+              </button>
+              <button onClick={() => applyBulkStatus("Cancelled")} style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
+                Yes, Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Bulk notes modal */}
