@@ -92,6 +92,22 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
   }, [orders]);
 
+  // Cross-tab / cross-session sync: if another tab (e.g. the owner platform or
+  // the client portal open side-by-side) writes to the shared orders key,
+  // pick up the change immediately instead of waiting for a manual refresh.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== ORDERS_KEY) return;
+      try {
+        setOrders(JSON.parse(e.newValue || "[]"));
+      } catch {
+        /* ignore malformed payloads */
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
     const id = nextOrderId();
     setOrders((prev) => [{ ...order, id } as MyOrder, ...prev]);

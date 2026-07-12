@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { savePO, generatePoNumber, type StoredPO } from "@/lib/purchaseOrderStore";
@@ -675,13 +676,37 @@ function DocRowMenu({ onDownload, onRemove }) {
   );
 }
 
-function DocumentsNotesTab() {
+function DocumentsNotesTab({ orderId }: { orderId: string }) {
+  const notesKey = `nido_notes_${orderId}`;
   const [docs, setDocs] = useState(INITIAL_DOCS);
-  const [notes, setNotes] = useState(INITIAL_NOTES);
+  const [notes, setNotes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(notesKey) || "null") || INITIAL_NOTES; } catch { return INITIAL_NOTES; }
+  });
   const [noteText, setNoteText] = useState("");
   const [visibility, setVisibility] = useState("Internal Note");
   const [showUpload, setShowUpload] = useState(false);
   const [docSearch, setDocSearch] = useState("");
+
+  // Reload notes when the order changes, and persist on every change so
+  // notes stay in sync between the owner platform and the client portal.
+  useEffect(() => {
+    try { setNotes(JSON.parse(localStorage.getItem(notesKey) || "null") || INITIAL_NOTES); } catch { setNotes(INITIAL_NOTES); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
+  useEffect(() => {
+    localStorage.setItem(notesKey, JSON.stringify(notes));
+  }, [notes, notesKey]);
+
+  // Cross-tab sync: pick up notes added from another open tab immediately
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== notesKey) return;
+      try { setNotes(JSON.parse(e.newValue || "null") || INITIAL_NOTES); } catch { /* ignore */ }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [notesKey]);
 
   const filteredDocs = docs.filter(d => !docSearch || d.name.toLowerCase().includes(docSearch.toLowerCase()) || d.type.toLowerCase().includes(docSearch.toLowerCase()));
 
@@ -1015,19 +1040,39 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orders } = useMyOrders();
+  const { orders, setOrders } = useMyOrders();
+  const { user, isClientPortalUser } = useAuth();
   const orderId = id || "";
 
   // Find the real order from context
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
-  const TABS = ["Sub Orders / Items", "Vendor Selected Summary"];
+  // Client portal users only ever see the read-only Sub Orders / Items tab —
+  // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
+  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Vendor Selected Summary"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
-  const [masterStatus, setMasterStatus] = useState(() => order?.status || "Processing");
+  // Master status lives on the shared order record itself (single source of
+  // truth) so a change made on the owner platform is visible immediately on
+  // the client portal, and vice versa, without any separate local copy.
+  const masterStatus = order?.status || "Processing";
+  const setMasterStatus = (status: string) => {
+    if (isClientPortalUser) return; // portal is read-only for order status
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: status as typeof o.status } : o));
+  };
   const [showStatusDd, setShowStatusDd] = useState(false);
+  // Per-item overrides (status, tracking) are persisted separately from the
+  // base cart-item snapshot so a cancel/status/tracking change made on one
+  // platform (owner or client portal) is picked up by the other immediately.
+  const itemStateKey = `nido_subitems_${orderId}`;
+  const loadItemState = (): Record<string, any> => {
+    try { return JSON.parse(localStorage.getItem(itemStateKey) || "{}"); } catch { return {}; }
+  };
+  const applyItemState = (base: any[], saved: Record<string, any>) =>
+    base.map(s => saved[s.id] ? { ...s, ...saved[s.id], deliveredAt: saved[s.id].deliveredAt ? new Date(saved[s.id].deliveredAt) : s.deliveredAt } : s);
+
   const [subOrders, setSubOrders] = useState(() =>
     order?.cartItems?.length
-      ? cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber)
+      ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
       : []
   );
   const [subSearch, setSubSearch] = useState("");
@@ -1073,10 +1118,9 @@ export default function MyOrderPage() {
     if (!order) return;
     setSubOrders(
       order.cartItems?.length
-        ? cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber)
+        ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
         : []
     );
-    setMasterStatus(order.status);
     setAssignment({
       assignedTo: order.assigned,
       role: order.assignedRole,
@@ -1098,6 +1142,28 @@ export default function MyOrderPage() {
   useEffect(() => {
     localStorage.setItem(`nido_refnumbers_${orderId}`, JSON.stringify(refNumbers));
   }, [refNumbers, orderId]);
+
+  // Persist per-item status/tracking changes (cancel, status update, add
+  // tracking) so they are visible immediately to the other platform (owner
+  // vs. client portal) on next render/reload, and pick up remote changes
+  // made in another open tab in real time.
+  useEffect(() => {
+    if (!subOrders.length) return;
+    const state: Record<string, any> = {};
+    subOrders.forEach(s => { state[s.id] = { itemStatus: s.itemStatus, tracking: s.tracking, updatedOn: s.updatedOn, deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null }; });
+    localStorage.setItem(itemStateKey, JSON.stringify(state));
+  }, [subOrders, itemStateKey]);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== itemStateKey) return;
+      let saved: Record<string, any> = {};
+      try { saved = JSON.parse(e.newValue || "{}"); } catch { return; }
+      setSubOrders(prev => prev.map(s => saved[s.id] ? { ...s, ...saved[s.id], deliveredAt: saved[s.id].deliveredAt ? new Date(saved[s.id].deliveredAt) : s.deliveredAt } : s));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [itemStateKey]);
 
   const handleOpenVendorModal = (sub: any) => {
     setVendorModalSub(sub);
@@ -1262,6 +1328,15 @@ export default function MyOrderPage() {
 
   const selectedSummaryCount = Object.keys(selectedVendors).length;
 
+  // Client portal: no PO number or vendor-selection columns — it's a
+  // read-only, vendor-agnostic view of the sub-orders.
+  const subOrdersColumns = isClientPortalUser
+    ? ["#","SUB ORDER ID","ITEM DETAILS","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","ACTIONS"]
+    : ["#","SUB ORDER ID","ITEM DETAILS","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"];
+  const subOrdersColTemplate = isClientPortalUser
+    ? "36px 130px 1fr 52px 90px 80px 130px 180px 90px"
+    : "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px";
+
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
     return (
@@ -1310,7 +1385,11 @@ export default function MyOrderPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div><Field label="Client" value={order?.client || "—"} /><Field label="Payment Method" value="Credit Card" /><Field label="Payment Terms" value="Net 30 (Payment due in 30 days)" /></div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div><Field label="Shipping Address" value="No. 45, 3rd Floor, Embassy Tech Village, Outer Ring Road, Bangalore - 560103" /><Field label="Delivery Method" value="Standard Shipping" /><Field label="Requested Delivery" value="Within 30 days" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div><Field label="Name" value={order?.requester || "—"} /><Field label="Role" value={order?.requesterRole || "—"} /><Field label="Organization" value={order?.client || "—"} /></div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
+            <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
+          ) : (
+            <><Field label="Name" value={order?.requester || "—"} /><Field label="Role" value={order?.requesterRole || "—"} /><Field label="Organization" value={order?.client || "—"} /></>
+          )}</div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[
             ["Master Order ID", orderId],
             ["Sub Orders", String(subOrders.length)],
@@ -1321,7 +1400,7 @@ export default function MyOrderPage() {
         </div>
 
         {/* Stepper + Assignment */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isClientPortalUser ? "1fr" : "1fr 300px", gap: 16, marginBottom: 20 }}>
           <div style={card}>
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexShrink: 0 }}>
@@ -1330,21 +1409,24 @@ export default function MyOrderPage() {
               </div>
               <Stepper currentStatus={masterStatus} />
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-              <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid #2563eb", borderRadius: 8, background: "#fff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
-                {showStatusDd && (
-                  <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                    {["Processing","Partially Shipped","Partially Delivered","Delivered"].map(opt => (
-                      <button key={opt} onClick={() => { setMasterStatus(opt); setShowStatusDd(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
-                        {opt} {opt === masterStatus && <span>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {!isClientPortalUser && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid #2563eb", borderRadius: 8, background: "#fff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
+                  {showStatusDd && (
+                    <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
+                      {["Processing","Partially Shipped","Partially Delivered","Delivered"].map(opt => (
+                        <button key={opt} onClick={() => { setMasterStatus(opt); setShowStatusDd(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
+                          {opt} {opt === masterStatus && <span>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
+          {!isClientPortalUser && (
           <div style={card}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <span style={{ fontWeight: 700, fontSize: 13.5 }}>Assignment</span>
@@ -1360,6 +1442,7 @@ export default function MyOrderPage() {
             <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Notes</div>
             <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.55 }}>{assignment.notes}</div>
           </div>
+          )}
         </div>
 
         {/* Tabs section */}
@@ -1392,8 +1475,8 @@ export default function MyOrderPage() {
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                {["#","SUB ORDER ID","ITEM DETAILS","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"].map(h => <div key={h}>{h}</div>)}
+              <div style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+                {subOrdersColumns.map(h => <div key={h}>{h}</div>)}
               </div>
               {filtered.map((sub, idx) => {
                 const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
@@ -1401,13 +1484,13 @@ export default function MyOrderPage() {
                 const selMeta = selectedVendorMeta[sub.id] || null;
                 const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
                 return (
-                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                     <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
                       <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                      {hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>PO Created</span></div>}
-                      {selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>Vendor Selected</span></div>}
+                      {!isClientPortalUser && hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>PO Created</span></div>}
+                      {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>Vendor Selected</span></div>}
                     </div>
                     <div>
                       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -1418,7 +1501,7 @@ export default function MyOrderPage() {
                             <input
                               value={refNumbers[sub.id] || ""}
                               onChange={e => setRefNumbers(prev => ({ ...prev, [sub.id]: e.target.value }))}
-                              disabled={!!createdPOs[sub.id]}
+                              disabled={isClientPortalUser || !!createdPOs[sub.id]}
                               placeholder="Enter reference/model number"
                               style={{ width: "100%", maxWidth: 220, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                             />
@@ -1426,14 +1509,16 @@ export default function MyOrderPage() {
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <button
-                        onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
-                        style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
-                      >
-                        {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
-                      </button>
-                    </div>
+                    {!isClientPortalUser && (
+                      <div>
+                        <button
+                          onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
+                          style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
+                        >
+                          {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
+                        </button>
+                      </div>
+                    )}
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
                     <div style={{ fontSize: 13 }}>{sub.unitPrice}</div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{sub.total}</div>
@@ -1441,27 +1526,44 @@ export default function MyOrderPage() {
                     <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
                       {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12.5 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
                     </div>
-                    <div>
-                      {selVendor ? (
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                              {(selVendor.name?.[0] || "V").toUpperCase()}
+                    {!isClientPortalUser && (
+                      <div>
+                        {selVendor ? (
+                          <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                {(selVendor.name?.[0] || "V").toUpperCase()}
+                              </div>
+                              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{selVendor.name}</span>
                             </div>
-                            <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{selVendor.name}</span>
+                            <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
                           </div>
-                          <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleOpenVendorModal(sub)}
-                          style={{ padding: "5px 12px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                        >
-                          Select Vendor
-                        </button>
-                      )}
-                    </div>
-                    <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                        ) : (
+                          <button
+                            onClick={() => handleOpenVendorModal(sub)}
+                            style={{ padding: "5px 12px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                          >
+                            Select Vendor
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {isClientPortalUser ? (
+                      <div>
+                        {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
+                          <button
+                            onClick={() => setCancelTarget(sub.id)}
+                            style={{ padding: "5px 12px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                          >
+                            Cancel Item
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                        )}
+                      </div>
+                    ) : (
+                      <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                    )}
                   </div>
                 );
               })}
@@ -1514,14 +1616,16 @@ export default function MyOrderPage() {
 
         </div>
 
-        {/* Documents & Notes — standalone section */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
-          <DocumentsNotesTab />
-        </div>
+        {/* Documents & Notes — standalone section (owner platform only) */}
+        {!isClientPortalUser && (
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
+            <DocumentsNotesTab orderId={orderId} />
+          </div>
+        )}
       </div>
 
-      {/* Vendor Selection Popup Modal */}
-      {vendorModalSub && (
+      {/* Vendor Selection Popup Modal — owner platform only */}
+      {!isClientPortalUser && vendorModalSub && (
         <VendorSelectionModal
           sub={vendorModalSub}
           selectedVendorId={selectedVendors[vendorModalSub.id] || null}

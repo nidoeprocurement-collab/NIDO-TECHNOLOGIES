@@ -68,3 +68,11 @@ Client portal roles stored in localStorage: `nido_portal_roles_{clientId}`.
 ## Why
 
 Spec requires single codebase, unlimited clients, full isolation. localStorage is the prototype backend — swap for real DB (Task #2) once MongoDB is connected. All client-scoped data flows through `user.clientId` from the session; never from the frontend directly.
+
+## Order Details page: portal vs owner view
+
+`src/pages/OrderDetailsPage.tsx` is shared by both `/orders/:id` (owner) and `/portal/orders/:id` (portal) — gate portal-only restrictions with `isClientPortalUser` from `useAuth()`, not a route prop. Portal view: no PO Number/Select Vendor columns, no Vendor Selected Summary tab, no Assignment card, no Update-Master-Status control, no Documents & Notes section, Sub Orders/Items action menu collapsed to a single "Cancel Item" button, Requestor/Client card shows the logged-in portal user (`useAuth().user`) instead of `order.requester`.
+
+**Why:** any derived state that should be visible on both platforms must live on the shared `MyOrder` record (via `MyOrdersContext`) or a localStorage key read by both, not component-local `useState` — a prior bug had "Update Master Status" write only to local state, so portal never saw owner status changes. Fixed by writing status directly onto the order via `setOrders`.
+
+**How to apply:** for any new field that both owner and portal must see change "immediately," persist it to localStorage under a key both views read (per-order keys already exist: `nido_pos_`, `nido_vendors_`, `nido_refnumbers_`, `nido_subitems_`, `nido_notes_`) and add a `window.addEventListener('storage', ...)` listener so open tabs pick up changes without reload — `MyOrdersContext` already does this for the main orders array.
