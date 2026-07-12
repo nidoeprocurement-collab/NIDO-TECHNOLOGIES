@@ -677,8 +677,13 @@ function DocRowMenu({ onDownload, onRemove }) {
 }
 
 function DocumentsNotesTab({ orderId }: { orderId: string }) {
+  const { user, isClientPortalUser } = useAuth();
   const notesKey = `nido_notes_${orderId}`;
-  const [docs, setDocs] = useState(INITIAL_DOCS);
+  const docsKey = `nido_docs_${orderId}`;
+
+  const [docs, setDocs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(docsKey) || "null") || INITIAL_DOCS; } catch { return INITIAL_DOCS; }
+  });
   const [notes, setNotes] = useState(() => {
     try { return JSON.parse(localStorage.getItem(notesKey) || "null") || INITIAL_NOTES; } catch { return INITIAL_NOTES; }
   });
@@ -687,10 +692,11 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
   const [showUpload, setShowUpload] = useState(false);
   const [docSearch, setDocSearch] = useState("");
 
-  // Reload notes when the order changes, and persist on every change so
-  // notes stay in sync between the owner platform and the client portal.
+  // Reload docs/notes when the order changes, and persist on every change so
+  // both stay in sync between the owner platform and the client portal.
   useEffect(() => {
     try { setNotes(JSON.parse(localStorage.getItem(notesKey) || "null") || INITIAL_NOTES); } catch { setNotes(INITIAL_NOTES); }
+    try { setDocs(JSON.parse(localStorage.getItem(docsKey) || "null") || INITIAL_DOCS); } catch { setDocs(INITIAL_DOCS); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
@@ -698,23 +704,40 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
     localStorage.setItem(notesKey, JSON.stringify(notes));
   }, [notes, notesKey]);
 
-  // Cross-tab sync: pick up notes added from another open tab immediately
+  useEffect(() => {
+    localStorage.setItem(docsKey, JSON.stringify(docs));
+  }, [docs, docsKey]);
+
+  // Cross-tab sync: pick up notes/documents added from another open tab
+  // (e.g. the owner platform and the client portal open side by side)
+  // immediately, without needing a reload.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== notesKey) return;
-      try { setNotes(JSON.parse(e.newValue || "null") || INITIAL_NOTES); } catch { /* ignore */ }
+      if (e.key === notesKey) {
+        try { setNotes(JSON.parse(e.newValue || "null") || INITIAL_NOTES); } catch { /* ignore */ }
+      } else if (e.key === docsKey) {
+        try { setDocs(JSON.parse(e.newValue || "null") || INITIAL_DOCS); } catch { /* ignore */ }
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [notesKey]);
+  }, [notesKey, docsKey]);
 
   const filteredDocs = docs.filter(d => !docSearch || d.name.toLowerCase().includes(docSearch.toLowerCase()) || d.type.toLowerCase().includes(docSearch.toLowerCase()));
+
+  // Client portal users are on the "external" side of the conversation —
+  // Internal Notes are staff-only and never leave the owner platform.
+  const visibleNotes = isClientPortalUser ? notes.filter(n => n.visibility !== "Internal Note") : notes;
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    setNotes(prev => [{ id: "n" + Date.now(), author: "System Owner", date: dateStr, text: noteText.trim(), visibility }, ...prev]);
+    const author = user?.name || (isClientPortalUser ? "Client" : "System Owner");
+    // Portal notes are always external (visible to the owner platform) —
+    // there's no "internal" concept on the client side.
+    const noteVisibility = isClientPortalUser ? "External Note" : visibility;
+    setNotes(prev => [{ id: "n" + Date.now(), author, date: dateStr, text: noteText.trim(), visibility: noteVisibility }, ...prev]);
     setNoteText("");
   };
 
@@ -732,10 +755,12 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
               <input value={docSearch} onChange={e => setDocSearch(e.target.value)} placeholder="Search documents..."
                 style={{ padding: "7px 12px 7px 28px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
-            <button onClick={() => setShowUpload(true)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
-              ⬆ Upload Document
-            </button>
+            {!isClientPortalUser && (
+              <button onClick={() => setShowUpload(true)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
+                ⬆ Upload Document
+              </button>
+            )}
           </div>
         </div>
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
@@ -760,7 +785,11 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
               </div>
               <div style={{ fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5 }}>{doc.uploadedOn}</div>
               <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.45 }}>{doc.description}</div>
-              <DocRowMenu onDownload={() => alert(`Downloading ${doc.name}...`)} onRemove={() => setDocs(prev => prev.filter(d => d.id !== doc.id))} />
+              {isClientPortalUser ? (
+                <button onClick={() => alert(`Downloading ${doc.name}...`)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
+              ) : (
+                <DocRowMenu onDownload={() => alert(`Downloading ${doc.name}...`)} onRemove={() => setDocs(prev => prev.filter(d => d.id !== doc.id))} />
+              )}
             </div>
           ))}
         </div>
@@ -768,52 +797,66 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
 
       <div>
         <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827", marginBottom: 1 }}>Notes</div>
-        <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
-        {notes.map((note, i) => (
-          <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-            <Avatar initial="S" color="#2563eb" size={32} />
+        <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>
+          {visibleNotes.length} note{visibleNotes.length !== 1 ? "s" : ""}{isClientPortalUser ? " \u2014 messages between you and the NIDO team" : ""}
+        </div>
+        {visibleNotes.map((note, i) => (
+          <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < visibleNotes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+            <Avatar initial={(note.author?.[0] || "S").toUpperCase()} color="#2563eb" size={32} />
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                 <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
-                <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
-                  {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
-                </span>
+                {!isClientPortalUser && (
+                  <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                    {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 Visible to client"}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
             </div>
           </div>
         ))}
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
-            <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
-              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
+          <div style={{ display: "grid", gridTemplateColumns: isClientPortalUser ? "1fr" : "1fr 220px" }}>
+            <div style={{ padding: "14px 16px", borderRight: isClientPortalUser ? "none" : "1px solid #e5e7eb" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>{isClientPortalUser ? "Message the NIDO team" : "Add Note"}</div>
               <textarea value={noteText} onChange={e => { if (e.target.value.length <= 500) setNoteText(e.target.value); }} placeholder="Write your note here..."
                 rows={4} style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }} />
-              <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "right", marginTop: 4 }}>{noteText.length} / 500</div>
-            </div>
-            <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
-                {[["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to vendors and other external users"]].map(([label, icon, sub]) => (
-                  <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
-                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
-                      {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
-                      <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <button onClick={handleAddNote} disabled={!noteText.trim()}
-                  style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
-                  Add
-                </button>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "#9ca3af" }}>{noteText.length} / 500</div>
+                {isClientPortalUser && (
+                  <button onClick={handleAddNote} disabled={!noteText.trim()}
+                    style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
+                    Send
+                  </button>
+                )}
               </div>
             </div>
+            {!isClientPortalUser && (
+              <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                  {[["Internal Note", "🔒", "Only visible to internal users"], ["External Note", "🌐", "Visible to the client on the portal"]].map(([label, icon, sub]) => (
+                    <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                      <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                        {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                        <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button onClick={handleAddNote} disabled={!noteText.trim()}
+                    style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1616,12 +1659,13 @@ export default function MyOrderPage() {
 
         </div>
 
-        {/* Documents & Notes — standalone section (owner platform only) */}
-        {!isClientPortalUser && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
-            <DocumentsNotesTab orderId={orderId} />
-          </div>
-        )}
+        {/* Documents & Notes — standalone section, visible to both owner and
+            client portal. Notes act as a messenger between the two; documents
+            are visible to the client but only the owner platform can upload
+            or remove them. */}
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
+          <DocumentsNotesTab orderId={orderId} />
+        </div>
       </div>
 
       {/* Vendor Selection Popup Modal — owner platform only */}
