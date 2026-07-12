@@ -40,7 +40,9 @@ const routeLabels: Record<string, string> = {
 };
 
 function generateBreadcrumbs(pathname: string) {
-  const segments = pathname.split('/').filter(s => s && s !== 'app');
+  // Drop generic wrapper segments ('app' for admin routes, 'portal' for
+  // client portal routes) so breadcrumbs read as plain page names.
+  const segments = pathname.split('/').filter(s => s && s !== 'app' && s !== 'portal');
   const breadcrumbs: Array<{ label: string; path: string; isActive: boolean }> = [];
 
   // Add home
@@ -75,9 +77,12 @@ function generateBreadcrumbs(pathname: string) {
 export default function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isClientPortalUser } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const breadcrumbs = generateBreadcrumbs(location.pathname);
+  const allBreadcrumbs = generateBreadcrumbs(location.pathname);
+  // Client portal users should never see a link back to the owner/admin
+  // dashboard, so the leading "Home" crumb is dropped entirely for them.
+  const breadcrumbs = isClientPortalUser ? allBreadcrumbs.slice(1) : allBreadcrumbs;
 
   const handleLogout = () => {
     console.log('[v0] User logging out');
@@ -171,13 +176,24 @@ export default function TopBar() {
       <div className="h-10 px-4 md:px-6 flex items-center gap-2 bg-transparent">
         {breadcrumbs.map((crumb, index) => (
           <div key={`${crumb.path}-${index}`} className="flex items-center gap-2">
-            {index === 0 ? (
+            {index === 0 && !isClientPortalUser ? (
               <button
                 onClick={() => navigate(crumb.path)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
                 title="Go to Dashboard"
               >
                 <Home size={16} />
+              </button>
+            ) : index === 0 ? (
+              <button
+                onClick={() => navigate(crumb.path)}
+                className={`text-sm px-2 py-1 rounded transition-colors ${
+                  crumb.isActive
+                    ? 'text-blue-600 font-medium bg-blue-50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                }`}
+              >
+                {crumb.label}
               </button>
             ) : (
               <>

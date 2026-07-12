@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
@@ -565,10 +566,19 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
 export default function ShopPage() {
   const navigate = useNavigate();
+  const { user, isClientPortalUser } = useAuth();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>(
-    () => localStorage.getItem("nido_shop_selected_client") ?? ""
+    () => (isClientPortalUser ? user?.clientId ?? "" : localStorage.getItem("nido_shop_selected_client") ?? "")
   );
+
+  // Portal users only ever see their own assigned catalog — keep the
+  // selected client pinned to their account even if it changes after mount.
+  useEffect(() => {
+    if (isClientPortalUser && user?.clientId && selectedClientId !== user.clientId) {
+      setSelectedClientId(user.clientId);
+    }
+  }, [isClientPortalUser, user?.clientId]);
   const [category, setCategory] = useState("All Categories");
   const [availability, setAvailability] = useState("All");
   const [catOpen, setCatOpen] = useState(false);
@@ -679,31 +689,34 @@ export default function ShopPage() {
       {/* Filters row */}
       <div className="flex items-center gap-3 mb-5 flex-wrap">
 
-        {/* ── Client dropdown ── */}
-        <div className="relative">
-          <button
-            onClick={() => { setClientOpen(o => !o); setCatOpen(false); setAvailOpen(false); }}
-            className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-2 transition-colors min-w-[180px] ${clientOpen ? "border-blue-500 text-blue-600 bg-blue-50" : selectedClientId ? "border-blue-500 text-blue-700 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
-          >
-            <Building2 size={14} className="shrink-0" />
-            <span className="flex-1 text-left truncate">
-              {selectedClient ? selectedClient.name : "Select Client"}
-            </span>
-            <ChevronDown size={14} className={`transition-transform shrink-0 ${clientOpen ? "rotate-180" : ""}`} />
-          </button>
-          {clientOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[220px] max-h-64 overflow-y-auto">
-              {clients.map(c => (
-                <button key={c.id} onClick={() => handleClientChange(c.id)}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedClientId === c.id ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
-                  <span className="block font-medium">{c.name}</span>
-                  <span className="block text-xs text-gray-400">{c.id}</span>
-                </button>
-              ))}
-              {clients.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No clients found</div>}
-            </div>
-          )}
-        </div>
+        {/* ── Client dropdown — hidden in the client portal, where the
+            catalog is always scoped to the logged-in client's own account ── */}
+        {!isClientPortalUser && (
+          <div className="relative">
+            <button
+              onClick={() => { setClientOpen(o => !o); setCatOpen(false); setAvailOpen(false); }}
+              className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-2 transition-colors min-w-[180px] ${clientOpen ? "border-blue-500 text-blue-600 bg-blue-50" : selectedClientId ? "border-blue-500 text-blue-700 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
+            >
+              <Building2 size={14} className="shrink-0" />
+              <span className="flex-1 text-left truncate">
+                {selectedClient ? selectedClient.name : "Select Client"}
+              </span>
+              <ChevronDown size={14} className={`transition-transform shrink-0 ${clientOpen ? "rotate-180" : ""}`} />
+            </button>
+            {clientOpen && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[220px] max-h-64 overflow-y-auto">
+                {clients.map(c => (
+                  <button key={c.id} onClick={() => handleClientChange(c.id)}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedClientId === c.id ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
+                    <span className="block font-medium">{c.name}</span>
+                    <span className="block text-xs text-gray-400">{c.id}</span>
+                  </button>
+                ))}
+                {clients.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No clients found</div>}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Category dropdown — only when client selected */}
         {selectedClientId && (
