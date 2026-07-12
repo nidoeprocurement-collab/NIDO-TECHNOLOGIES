@@ -1080,6 +1080,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     num: idx + 1,
     id: `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
     itemName: item.name,
+    image: item.image || "",
     sku: `SKU/SHOP-${item.id}`,
     category: item.category || "General",
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
@@ -1425,9 +1426,14 @@ export default function MyOrderPage() {
   const subOrdersColumns = isClientPortalUser
     ? ["#","SUB ORDER ID","ITEM DETAILS","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","ACTIONS"]
     : ["#","SUB ORDER ID","ITEM DETAILS","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"];
+  // Explicit min widths (via minmax) on every column plus a real column gap
+  // prevent long values (prices, badges, buttons) from visually overlapping
+  // into the neighboring column — a plain "1fr"/px template with no gap lets
+  // wide content bleed past its track.
   const subOrdersColTemplate = isClientPortalUser
-    ? "36px 130px 1fr 52px 90px 80px 130px 180px 90px"
-    : "36px 130px 1fr 110px 52px 90px 80px 130px 180px 130px 48px";
+    ? "36px 124px minmax(240px,1.3fr) 56px 92px 96px 138px 190px 118px"
+    : "36px 124px minmax(240px,1.3fr) 128px 56px 92px 96px 138px 190px 154px 56px";
+  const subOrdersColGap = 14;
 
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
@@ -1577,8 +1583,8 @@ export default function MyOrderPage() {
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-                {subOrdersColumns.map(h => <div key={h}>{h}</div>)}
+              <div style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+                {subOrdersColumns.map(h => <div key={h} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{h}</div>)}
               </div>
               {filtered.map((sub, idx) => {
                 const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
@@ -1586,66 +1592,70 @@ export default function MyOrderPage() {
                 const selMeta = selectedVendorMeta[sub.id] || null;
                 const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
                 return (
-                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                    <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
+                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                    <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
                       <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                      {!isClientPortalUser && hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>PO Created</span></div>}
-                      {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>Vendor Selected</span></div>}
+                      {!isClientPortalUser && hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
+                      {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
                     </div>
-                    <div>
+                    <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                        <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13.5 }}>{sub.itemName}</div>
+                        <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, overflow: "hidden" }}>
+                          {sub.image ? (
+                            <img src={sub.image} alt={sub.itemName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : "📦"}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, overflowWrap: "break-word" }}>{sub.itemName}</div>
                           <div style={{ marginTop: 4 }}>
                             <input
                               value={refNumbers[sub.id] || ""}
                               onChange={e => setRefNumbers(prev => ({ ...prev, [sub.id]: e.target.value }))}
                               disabled={isClientPortalUser || !!createdPOs[sub.id]}
                               placeholder="Enter reference/model number"
-                              style={{ width: "100%", maxWidth: 220, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                              style={{ width: "100%", padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 11.5, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                             />
                           </div>
                         </div>
                       </div>
                     </div>
                     {!isClientPortalUser && (
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         <button
                           onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
-                          style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "inherit" }}
+                          style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
                         >
                           {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
                         </button>
                       </div>
                     )}
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
-                    <div style={{ fontSize: 13 }}>{sub.unitPrice}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{sub.total}</div>
-                    <div><StatusPill status={sub.itemStatus} /><div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div></div>
-                    <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
-                      {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12.5 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
+                    <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
+                    <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>{sub.unitPrice}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
+                    <div style={{ minWidth: 0 }}><StatusPill status={sub.itemStatus} /><div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div></div>
+                    <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
+                      {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
                     </div>
                     {!isClientPortalUser && (
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         {isOrderInactive ? (
                           <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                         ) : selVendor ? (
                           <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                                 {(selVendor.name?.[0] || "V").toUpperCase()}
                               </div>
-                              <span style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{selVendor.name}</span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
                             </div>
-                            <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                            <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
                           </div>
                         ) : (
                           <button
                             onClick={() => handleOpenVendorModal(sub)}
-                            style={{ padding: "5px 12px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                            style={{ padding: "5px 10px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
                           >
                             Select Vendor
                           </button>
@@ -1653,13 +1663,13 @@ export default function MyOrderPage() {
                       </div>
                     )}
                     {isOrderInactive ? (
-                      <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                      <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                     ) : isClientPortalUser ? (
-                      <div>
+                      <div style={{ minWidth: 0 }}>
                         {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
                           <button
                             onClick={() => setCancelTarget(sub.id)}
-                            style={{ padding: "5px 12px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                            style={{ padding: "5px 10px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
                           >
                             Cancel Item
                           </button>
@@ -1668,7 +1678,9 @@ export default function MyOrderPage() {
                         )}
                       </div>
                     ) : (
-                      <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                      <div style={{ minWidth: 0 }}>
+                        <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                      </div>
                     )}
                   </div>
                 );
