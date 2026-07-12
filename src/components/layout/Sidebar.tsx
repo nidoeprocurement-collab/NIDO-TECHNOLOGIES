@@ -123,25 +123,16 @@ const adminNavigationItems: NavItem[] = [
 
 // ── Client Portal navigation ──────────────────────────────────────────────────
 const clientNavigationItems: NavItem[] = [
-  { label: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/portal/dashboard' },
-  { label: 'Catalog', icon: <Package size={20} />, path: '/portal/catalog' },
-  { label: 'Orders', icon: <ShoppingBag size={20} />, path: '/portal/orders' },
-  { label: 'Services', icon: <Wrench size={20} />, path: '/portal/services' },
-  { label: 'Invoices', icon: <Receipt size={20} />, path: '/portal/invoices' },
-  { label: 'Contracts', icon: <FileText size={20} />, path: '/portal/contracts' },
-  { label: 'Reports', icon: <TrendingUp size={20} />, path: '/portal/reports' },
-  {
-    label: 'My Workspace',
-    icon: <Users size={20} />,
-    children: [
-      { label: 'Users', icon: <Users size={16} />, path: '/portal/users' },
-      { label: 'Roles', icon: <ShieldCheck size={16} />, path: '/portal/roles' },
-      { label: 'Addresses', icon: <MapPin size={16} />, path: '/portal/addresses' },
-    ],
-  },
-  { label: 'Notifications', icon: <Bell size={20} />, path: '/portal/notifications' },
-  { label: 'Profile', icon: <User size={20} />, path: '/portal/profile' },
-  { label: 'Support', icon: <Headphones size={20} />, path: '/portal/support' },
+  { label: 'Dashboard',    icon: <LayoutDashboard size={20} />, path: '/portal/dashboard' },
+  { label: 'Shop',         icon: <ShoppingCart size={20} />,    path: '/portal/catalog' },
+  { label: 'My Requests',  icon: <ClipboardList size={20} />,   path: '/portal/orders' },
+  { label: 'My Invoices',  icon: <Receipt size={20} />,         path: '/portal/invoices' },
+  { label: 'Services',     icon: <Wrench size={20} />,          path: '/portal/services' },
+  { label: 'Support',      icon: <Headphones size={20} />,      path: '/portal/support' },
+  { label: 'Contracts',    icon: <FileText size={20} />,        path: '/portal/contracts' },
+  { label: 'Approvals',    icon: <FileCheck size={20} />,       path: '/portal/approvals' },
+  { label: 'Reports',      icon: <TrendingUp size={20} />,      path: '/portal/reports' },
+  { label: 'My Profile',   icon: <User size={20} />,            path: '/portal/profile' },
 ];
 
 // ── Path helpers ──────────────────────────────────────────────────────────────

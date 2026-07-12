@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
 import {
   BarChart,
@@ -37,7 +38,8 @@ import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
 import { getClients } from "@/lib/clientStore";
 
-const tabs = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration", "Documents"];
+const ADMIN_TABS = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration", "Documents"];
+const PORTAL_TABS = ["Overview"];
 
 const spendCategories = [
   { name: "Hardware", value: 45, amount: "$200,250", color: "#3b82f6" },
@@ -122,11 +124,23 @@ function NotFoundPage({ id }: { id: string }) {
   );
 }
 
-export default function App() {
-  const { id: clientId } = useParams<{ id: string }>();
+interface ClientDetailProps {
+  /** When true, renders the portal-mode view: injects clientId from auth,
+   *  shows only the Overview tab, and hides admin-only controls. */
+  portalMode?: boolean;
+}
+
+export default function App({ portalMode = false }: ClientDetailProps) {
+  const params = useParams<{ id: string }>();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarVisible, setSidebarVisible] = useState(true);
+
+  // In portal mode use the authenticated user's clientId; otherwise use the route param.
+  const clientId = portalMode ? (user?.clientId ?? "") : (params.id ?? "");
+
+  const tabs = portalMode ? PORTAL_TABS : ADMIN_TABS;
 
   const clients = getClients();
   const client = clients.find(c => c.id === clientId);
@@ -341,13 +355,18 @@ export default function App() {
     <div className="min-h-screen bg-white font-sans">
       {/* Page header */}
       <div className="px-6 pt-5 pb-0 flex items-center gap-2">
-        <button
-          onClick={() => navigate("/clients")}
-          className="p-1 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
-        >
-          <ChevronLeft size={16} />
-        </button>
+        {!portalMode && (
+          <button
+            onClick={() => navigate("/clients")}
+            className="p-1 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
         <h1 className="text-lg font-semibold text-gray-900">{client.name}</h1>
+        {portalMode && (
+          <span className="ml-2 text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">My Company</span>
+        )}
       </div>
 
       <div className="flex gap-0 p-4 pt-3 min-h-[calc(100vh-48px)]">
@@ -402,33 +421,35 @@ export default function App() {
               </div>
             </div>
 
-            {/* Action buttons */}
-            <div className="flex gap-2">
-              {client.email ? (
-                <a
-                  href={`mailto:${client.email}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <Mail size={12} /> Email
-                </a>
-              ) : (
-                <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Mail size={12} /> Email
-                </button>
-              )}
-              {client.phone ? (
-                <a
-                  href={`tel:${client.phone}`}
-                  className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <Phone size={12} /> Call
-                </a>
-              ) : (
-                <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
-                  <Phone size={12} /> Call
-                </button>
-              )}
-            </div>
+            {/* Action buttons — admin-facing only */}
+            {!portalMode && (
+              <div className="flex gap-2">
+                {client.email ? (
+                  <a
+                    href={`mailto:${client.email}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Mail size={12} /> Email
+                  </a>
+                ) : (
+                  <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                    <Mail size={12} /> Email
+                  </button>
+                )}
+                {client.phone ? (
+                  <a
+                    href={`tel:${client.phone}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Phone size={12} /> Call
+                  </a>
+                ) : (
+                  <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                    <Phone size={12} /> Call
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Contract Progress */}
             <div>
@@ -453,14 +474,16 @@ export default function App() {
               </div>
             </div>
 
-            {/* Download button */}
-            <button
-              onClick={handleDownloadProfile}
-              className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-lg py-2 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors"
-            >
-              <Download size={13} />
-              Download Profile
-            </button>
+            {/* Download button — admin-facing only */}
+            {!portalMode && (
+              <button
+                onClick={handleDownloadProfile}
+                className="w-full flex items-center justify-center gap-2 border border-gray-200 rounded-lg py-2 text-xs text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors"
+              >
+                <Download size={13} />
+                Download Profile
+              </button>
+            )}
           </aside>
         )}
 

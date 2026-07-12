@@ -859,31 +859,34 @@ function AppRoutes() {
           <Route path="reports" element={<AuditTrailPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
+          {/* Dashboard: reuses ClientDetailPage in portal mode — single source of truth */}
           <Route
             path="portal/dashboard"
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Portal dashboard failed to load" resetKey={location.pathname}>
-                  <ClientPortalDashboard />
+                  <ClientDetailPage portalMode />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
           />
+          {/* Shop */}
           <Route
             path="portal/catalog"
             element={
               <ClientPortalRoute>
-                <PageErrorBoundary title="Catalog failed to load" resetKey={location.pathname}>
+                <PageErrorBoundary title="Shop failed to load" resetKey={location.pathname}>
                   <ShopPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
           />
+          {/* My Requests */}
           <Route
             path="portal/orders"
             element={
               <ClientPortalRoute>
-                <PageErrorBoundary title="Orders failed to load" resetKey={location.pathname}>
+                <PageErrorBoundary title="My Requests failed to load" resetKey={location.pathname}>
                   <MyOrderPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
@@ -893,12 +896,24 @@ function AppRoutes() {
             path="portal/orders/:id"
             element={
               <ClientPortalRoute>
-                <PageErrorBoundary title="Order details failed to load" resetKey={location.pathname}>
+                <PageErrorBoundary title="Request details failed to load" resetKey={location.pathname}>
                   <OrderDetailsPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
           />
+          {/* My Invoices */}
+          <Route
+            path="portal/invoices"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="My Invoices failed to load" resetKey={location.pathname}>
+                  <InvoicePage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          {/* Services */}
           <Route
             path="portal/services"
             element={
@@ -909,76 +924,7 @@ function AppRoutes() {
               </ClientPortalRoute>
             }
           />
-          <Route
-            path="portal/invoices"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Invoices failed to load" resetKey={location.pathname}>
-                  <InvoicePage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/contracts"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Contracts failed to load" resetKey={location.pathname}>
-                  <ClientContractsPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/reports"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Reports failed to load" resetKey={location.pathname}>
-                  <AuditTrailPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/users"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Portal users failed to load" resetKey={location.pathname}>
-                  <ClientPortalUsersPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/roles"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Portal roles failed to load" resetKey={location.pathname}>
-                  <ClientPortalRolesPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/addresses"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Portal addresses failed to load" resetKey={location.pathname}>
-                  <ClientPortalAddressesPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/notifications"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Notifications failed to load" resetKey={location.pathname}>
-                  <NotificationsPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
+          {/* Support */}
           <Route
             path="portal/support"
             element={
@@ -989,17 +935,51 @@ function AppRoutes() {
               </ClientPortalRoute>
             }
           />
+          {/* Contracts */}
+          <Route
+            path="portal/contracts"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Contracts failed to load" resetKey={location.pathname}>
+                  <ClientContractsPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          {/* Approvals */}
+          <Route
+            path="portal/approvals"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Approvals failed to load" resetKey={location.pathname}>
+                  <ApprovalWorkflowsPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          {/* Reports */}
+          <Route
+            path="portal/reports"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Reports failed to load" resetKey={location.pathname}>
+                  <AuditTrailPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          {/* My Profile */}
           <Route
             path="portal/profile"
             element={
               <ClientPortalRoute>
-                <PageErrorBoundary title="Profile failed to load" resetKey={location.pathname}>
+                <PageErrorBoundary title="My Profile failed to load" resetKey={location.pathname}>
                   <UserProfilePage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
           />
-          {/* Portal shopping flow (reuses admin pages, no guard needed — /shop already works) */}
+          {/* Portal shopping flow */}
           <Route path="portal/shop/cart" element={<ClientPortalRoute><CartPage /></ClientPortalRoute>} />
           <Route path="portal/shop/checkout" element={<ClientPortalRoute><CheckoutPage /></ClientPortalRoute>} />
           <Route path="portal/shop/checkout/payment" element={<ClientPortalRoute><PaymentPage /></ClientPortalRoute>} />
