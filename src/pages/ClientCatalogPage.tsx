@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
+import { getAllVendorProducts } from "@/lib/vendorStore";
 import {
   getClientCatalog,
   saveClientCatalog,
@@ -730,11 +731,34 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
   const [roles, setRoles] = useState([...catalogRoleOptions]);
 
   useEffect(() => {
-    const loadPublished = () =>
-      setCatalog(getCatalogProducts().filter((p) => p.publishStatus === "published"));
-    loadPublished();
-    window.addEventListener("catalogUpdated", loadPublished);
-    return () => window.removeEventListener("catalogUpdated", loadPublished);
+    // Only products that at least one vendor has actually added (and marked
+    // Active) should be assignable to a client. If the same master product
+    // has been added by multiple vendors, it must still appear only once.
+    const loadAssignable = () => {
+      const vendorProductStore = getAllVendorProducts();
+      const activeMasterCodes = new Set<string>();
+      for (const products of Object.values(vendorProductStore)) {
+        for (const p of products) {
+          if (p.status === "Active") activeMasterCodes.add(p.masterProductCode);
+        }
+      }
+      const published = getCatalogProducts().filter((p) => p.publishStatus === "published");
+      const seen = new Set<string>();
+      const deduped = published.filter((p) => {
+        if (!activeMasterCodes.has(p.masterProductCode)) return false;
+        if (seen.has(p.masterProductCode)) return false;
+        seen.add(p.masterProductCode);
+        return true;
+      });
+      setCatalog(deduped);
+    };
+    loadAssignable();
+    window.addEventListener("catalogUpdated", loadAssignable);
+    window.addEventListener("vendorProductsUpdated", loadAssignable);
+    return () => {
+      window.removeEventListener("catalogUpdated", loadAssignable);
+      window.removeEventListener("vendorProductsUpdated", loadAssignable);
+    };
   }, []);
 
   const filtered = useMemo(() => {
