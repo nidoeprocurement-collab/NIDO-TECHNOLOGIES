@@ -1034,9 +1034,13 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onCancel, onRaiseRet
       {open && (
         <div style={{ position: "absolute", top: 30, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", zIndex: 200, minWidth: 200 }}>
           <div style={{ position: "relative" }} onMouseEnter={() => setStatusSub(true)} onMouseLeave={() => setStatusSub(false)}>
-            <button style={menuItemSt}><span>🔄</span> Update Status <span style={{ marginLeft: "auto", color: "#9ca3af" }}>›</span></button>
+            <button style={{ ...menuItemSt, background: statusSub ? "#f9fafb" : "none" }}><span>🔄</span> Update Status <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span></button>
             {statusSub && (
-              <div style={{ position: "absolute", top: 0, left: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", minWidth: 160, overflow: "hidden", zIndex: 201 }}>
+              // Opens to the LEFT of the parent menu (not right) so it stays
+              // within the table/container bounds — the 3-dot menu sits at
+              // the far-right column, so a right-opening flyout would run
+              // past the row's edge and get clipped.
+              <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", minWidth: 160, overflow: "hidden", zIndex: 201 }}>
                 {statuses.map(s => (
                   <button key={s} onClick={() => { onUpdateStatus(s); setOpen(false); setStatusSub(false); }}
                     style={{ ...menuItemSt, background: sub.itemStatus === s ? "#f0f7ff" : "none", color: sub.itemStatus === s ? "#2563eb" : "#374151", fontWeight: sub.itemStatus === s ? 600 : 400 }}>
@@ -1448,7 +1452,7 @@ export default function MyOrderPage() {
 
   return (
     <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
-      <div style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 24px 48px" }}>
+      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "28px 24px 48px" }}>
 
         {/* Header */}
         <div style={{ marginBottom: 22 }}>
@@ -1542,7 +1546,9 @@ export default function MyOrderPage() {
         </div>
 
         {/* Tabs section */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+        {/* overflow left as "visible" (not "hidden") so the per-row Actions
+            menu and its "Update Status" flyout are never clipped */}
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "visible", marginBottom: 20 }}>
           {/* Tab bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
             <div style={{ display: "flex" }}>
