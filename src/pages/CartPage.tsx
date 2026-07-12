@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Trash2, Minus, Plus, Bookmark, ChevronLeft, ChevronRight,
-  Shield, Truck, RotateCcw, Star, ArrowRight, Mail, Phone, ShoppingCart
+  Shield, Truck, RotateCcw, ArrowRight, Mail, Phone, ShoppingCart
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
@@ -171,7 +171,6 @@ export default function CartPage() {
   }, 0);
   const gst = Math.round(subtotal * 0.18);
   const total = subtotal + gst;
-  const rewardPoints = Math.floor(total / 1000);
 
   const visibleCount = 4;
   const maxScroll = Math.max(0, SUGGESTED.length - visibleCount);
@@ -342,15 +341,6 @@ export default function CartPage() {
                   <span className="font-bold text-gray-900 text-base">{formatPrice(total)}</span>
                 </div>
               </div>
-
-              {rewardPoints > 0 && (
-                <div className="mt-4 bg-green-50 border border-green-100 rounded-lg p-3 flex items-start gap-2">
-                  <Star size={15} className="text-green-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-green-700">
-                    You will earn <strong>{rewardPoints.toLocaleString("en-IN")}</strong> reward points on this order
-                  </p>
-                </div>
-              )}
 
               <button
                 onClick={() => navigate("/shop/checkout")}
