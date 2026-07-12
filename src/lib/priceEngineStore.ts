@@ -169,16 +169,17 @@ export function applySlabDiscount(finalPrice: number, clientId: string, category
 // ─── Global category pricing rules ─────────────────────────────────────────
 // Configured once in the Price Engine (Client Price Engine tab) and applied
 // to every client — there is no per-client override anymore. When a category
-// rule exists, its marginPct overrides each client's global profitPct for
-// products in that category. bufferPct is an additional markup stacked on
-// top of the margin (e.g. logistics buffer, shrinkage).
+// rule exists, its marginPct + bufferPct are ADDED on top of each client's
+// own global profitPct for products in that category — the rule increases
+// the margin for that category, it does not replace/reduce the client's
+// existing margin.
 
 const GLOBAL_CATEGORY_RULES_KEY = 'nido_price_engine_global_category_rules';
 
 export interface CategoryPricingRule {
   id: string;
   category: string;
-  marginPct: number;   // overrides global profitPct for this category
+  marginPct: number;   // added on top of the client's global profitPct for this category
   bufferPct: number;   // additional % stacked on top of margin
 }
 
@@ -199,13 +200,16 @@ export function saveGlobalCategoryRules(rules: CategoryPricingRule[]): void {
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
-// Return the effective margin % for a given category, falling back to the
-// client's own global profitPct when no category-specific rule is configured.
+// Return the effective margin % for a given category: the client's own
+// global profit % PLUS the category rule's margin/buffer % on top of it (a
+// category rule is an additional markup for that category, not a
+// replacement for the client's own margin). Falls back to the client's
+// global profitPct unchanged when no category-specific rule is configured.
 // Category rules are global (apply to all clients equally).
 export function getCategoryMarginPct(category: string, globalProfitPct: number): number {
   const rules = getGlobalCategoryRules();
   const rule = rules.find(r => r.category.toLowerCase() === (category || '').toLowerCase());
-  return rule ? rule.marginPct + rule.bufferPct : globalProfitPct;
+  return rule ? globalProfitPct + rule.marginPct + rule.bufferPct : globalProfitPct;
 }
 
 // ─── Vendor-side computation ────────────────────────────────────────────────

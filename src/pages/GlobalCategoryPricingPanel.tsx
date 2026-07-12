@@ -119,8 +119,8 @@ function CategorySelect({
 /**
  * Category Pricing Rules — configured ONCE, globally, in the Price Engine.
  * These rules apply to every client (no per-client overrides). A category
- * rule's marginPct + bufferPct replaces a client's global Profit Margin for
- * matching products, for all clients.
+ * rule's marginPct + bufferPct is ADDED on top of each client's own global
+ * Profit Margin for matching products, for all clients.
  */
 export default function GlobalCategoryPricingPanel() {
   const [rules, setRules] = useState<CategoryPricingRule[]>(() => getGlobalCategoryRules());
@@ -194,9 +194,9 @@ export default function GlobalCategoryPricingPanel() {
 
       <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 mb-4">
         <p className="text-sm text-gray-700">
-          Override the global margin with category-specific margin and buffer percentages. These
-          rules apply to <span className="font-semibold text-gray-900">every client</span> and take
-          priority over each client's Profit Margin setting for matching products.
+          Add extra margin and buffer percentages on top of each client's Profit Margin, for products
+          in this category. These rules apply to <span className="font-semibold text-gray-900">every
+          client</span> and stack on top of — not replace — each client's own Profit Margin setting.
         </p>
       </div>
 
