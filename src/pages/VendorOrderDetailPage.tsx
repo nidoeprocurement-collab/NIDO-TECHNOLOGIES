@@ -320,7 +320,7 @@ function UploadDocumentModal({ onSave, onClose }: { onSave: (doc: any) => void; 
 }
 
 // ── Status Dropdown ───────────────────────────────────────────────────────────
-function StatusDropdown({ status, onChange }: { status: string; onChange: (s: string) => void }) {
+function StatusDropdown({ status, onChange, disabled }: { status: string; onChange: (s: string) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const s = STATUS_STYLE[status] || STATUS_STYLE["Pending"];
@@ -330,6 +330,14 @@ function StatusDropdown({ status, onChange }: { status: string; onChange: (s: st
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  if (disabled) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, opacity: 0.7 }}>
+        {status}
+      </span>
+    );
+  }
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
@@ -379,6 +387,29 @@ function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d:
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
           <button onClick={() => { onSave(form); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Cancel Item Status Modal ──────────────────────────────────────────────────
+function CancelItemStatusModal({ itemName, onConfirm, onClose }: { itemName: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 420, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#dc2626" }}>Cancel Item</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+        </div>
+        <div style={{ padding: "20px 22px" }}>
+          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>
+            Are you sure you want to mark <strong>{itemName}</strong> as cancelled? Once cancelled, this item's status cannot be changed further.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Item</button>
+          <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Yes, Cancel Item</button>
         </div>
       </div>
     </div>
@@ -620,6 +651,14 @@ export default function VendorOrderDetailPage() {
   const [cancelled, setCancelled] = useState(false);
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
+  const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
+
+  // A cancelled PO is a terminal state: no further status changes, item
+  // edits, vendor/reference updates, or tracking changes are allowed. Derive
+  // from orderStatus (single source of truth) rather than only the local
+  // `cancelled` flag, so a PO cancelled elsewhere (e.g. bulk status update
+  // on the orders list) is also locked here.
+  const isCancelled = orderStatus === "Cancelled" || cancelled;
 
   // Reset all state when navigating between different PO detail pages
   useEffect(() => {
@@ -647,9 +686,20 @@ export default function VendorOrderDetailPage() {
   );
 
   const handleItemStatusChange = (id: string, status: string) => {
+    if (isCancelled) return; // PO is cancelled — no further status changes allowed
+    if (status === "Cancelled") {
+      const it = items.find(i => i.id === id);
+      setPendingItemCancel({ id, name: it?.name || "this item" });
+      return;
+    }
     setItems(prev => prev.map(it => it.id === id ? { ...it, status } : it));
   };
+  const confirmItemCancel = () => {
+    if (!pendingItemCancel) return;
+    setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled" } : it));
+  };
   const handleReferenceNumberChange = (id: string, referenceNumber: string) => {
+    if (isCancelled) return;
     setItems(prev => {
       const updated = prev.map(it => it.id === id ? { ...it, referenceNumber } : it);
       const currentRealPO = getPOByNumber(poKey);
@@ -667,9 +717,11 @@ export default function VendorOrderDetailPage() {
     });
   };
   const handleDeleteItem = (id: string) => {
+    if (isCancelled) return;
     setItems(prev => prev.filter(it => it.id !== id));
   };
   const handleUpdateTracking = (id: string, tracking: any) => {
+    if (isCancelled) return;
     setItems(prev => prev.map(it => it.id === id ? { ...it, tracking } : it));
   };
   const handleDeleteDoc = (id: string) => {
@@ -705,7 +757,7 @@ export default function VendorOrderDetailPage() {
                 Vendor Order Details / <span style={{ color: "#374151" }}>{initialData.poNumber}</span>
               </h1>
               <StatusPill status={orderStatus} />
-              {cancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>PO Cancelled</span>}
+              {isCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>PO Cancelled</span>}
             </div>
             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <span>Vendor Order</span>
@@ -715,7 +767,7 @@ export default function VendorOrderDetailPage() {
               <span>From <b style={{ color: "#374151" }}>{initialData.vendorName}</b></span>
             </div>
           </div>
-          {!cancelled && (
+          {!isCancelled && (
             <button
               onClick={() => setShowCancelPO(true)}
               style={{ padding: "9px 20px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit", flexShrink: 0 }}
@@ -774,7 +826,11 @@ export default function VendorOrderDetailPage() {
             </div>
             <Stepper currentStatus={orderStatus} />
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-              <UpdateStatusDropdown current={orderStatus} onChange={setOrderStatus} />
+              {isCancelled ? (
+                <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
+              ) : (
+                <UpdateStatusDropdown current={orderStatus} onChange={setOrderStatus} />
+              )}
             </div>
           </div>
 
@@ -827,8 +883,9 @@ export default function VendorOrderDetailPage() {
                       <input
                         value={item.referenceNumber || ""}
                         onChange={e => handleReferenceNumberChange(item.id, e.target.value)}
+                        disabled={isCancelled}
                         placeholder="Enter reference/model number"
-                        style={{ width: "100%", maxWidth: 200, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+                        style={{ width: "100%", maxWidth: 200, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: isCancelled ? "#f9fafb" : "#fff" }}
                       />
                     </div>
                     <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 4 }}>View more</button>
@@ -842,7 +899,7 @@ export default function VendorOrderDetailPage() {
               <div style={{ fontSize: 13 }}>{item.unitPrice}</div>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
               <div>
-                <StatusDropdown status={item.status} onChange={s => handleItemStatusChange(item.id, s)} />
+                <StatusDropdown status={item.status} onChange={s => handleItemStatusChange(item.id, s)} disabled={isCancelled || item.status === "Cancelled"} />
               </div>
               <div style={{ fontSize: 12.5, color: "#374151" }}>{item.expectedDelivery}</div>
               <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
@@ -854,14 +911,16 @@ export default function VendorOrderDetailPage() {
                     <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
                   </>
                 ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                <div style={{ marginTop: 7 }}>
-                  <button
-                    onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
-                    style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
-                  >
-                    Update
-                  </button>
-                </div>
+                {!isCancelled && (
+                  <div style={{ marginTop: 7 }}>
+                    <button
+                      onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
+                      style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                    >
+                      Update
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -1026,6 +1085,13 @@ export default function VendorOrderDetailPage() {
           poNumber={initialData.poNumber}
           onConfirm={() => { setCancelled(true); setOrderStatus("Cancelled"); }}
           onClose={() => setShowCancelPO(false)}
+        />
+      )}
+      {pendingItemCancel && (
+        <CancelItemStatusModal
+          itemName={pendingItemCancel.name}
+          onConfirm={confirmItemCancel}
+          onClose={() => setPendingItemCancel(null)}
         />
       )}
       {showEditAssignment && (

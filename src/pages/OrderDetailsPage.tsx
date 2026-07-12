@@ -953,6 +953,23 @@ function RaiseReturnModal({ itemName, onClose }) {
   );
 }
 
+function CancelOrderStatusModal({ onConfirm, onClose }) {
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title="Cancel Order" onClose={onClose}>
+        <div style={{ padding: "20px 22px 8px" }}>
+          <div style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>Are you sure you want to cancel this order?</div>
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b" }}>⚠️ Once cancelled, this order cannot be edited, its status cannot be changed, and it cannot be processed further.</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Order</button>
+          <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Yes, Cancel Order</button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  );
+}
+
 function CancelItemModal({ itemName, onConfirm, onClose }) {
   return (
     <Overlay onClose={onClose}>
@@ -1099,14 +1116,19 @@ export default function MyOrderPage() {
   // the client portal, and vice versa, without any separate local copy.
   const masterStatus = order?.status || "Processing";
   const isOrderInactive = masterStatus === "Cancelled" || masterStatus === "Draft";
+  // Once an order is Cancelled it is a terminal state — no further status
+  // changes or processing are allowed on it.
+  const isOrderCancelled = masterStatus === "Cancelled";
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
+    if (isOrderCancelled) return; // cancelled orders can no longer be updated
     // Centralized in MyOrdersContext so a Cancelled/Draft transition always
     // cascades to sub-orders and clears vendor selection, whether triggered
     // here or from the order list's bulk status update.
     updateOrderStatus(orderId, status as any);
   };
   const [showStatusDd, setShowStatusDd] = useState(false);
+  const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   // Per-item overrides (status, tracking) are persisted separately from the
   // base cart-item snapshot so a cancel/status/tracking change made on one
   // platform (owner or client portal) is picked up by the other immediately.
@@ -1477,18 +1499,26 @@ export default function MyOrderPage() {
             </div>
             {!isClientPortalUser && (
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid #2563eb", borderRadius: 8, background: "#fff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
-                  {showStatusDd && (
-                    <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                      {["Processing","Partially Shipped","Partially Delivered","Delivered","Cancelled","Draft"].map(opt => (
-                        <button key={opt} onClick={() => { setMasterStatus(opt); setShowStatusDd(false); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
-                          {opt} {opt === masterStatus && <span>✓</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {isOrderCancelled ? (
+                  <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This order is cancelled and can no longer be updated.</span>
+                ) : (
+                  <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid #2563eb", borderRadius: 8, background: "#fff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
+                    {showStatusDd && (
+                      <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
+                        {["Processing","Partially Shipped","Partially Delivered","Delivered","Cancelled","Draft"].map(opt => (
+                          <button key={opt} onClick={() => {
+                            setShowStatusDd(false);
+                            if (opt === "Cancelled") { setPendingCancelStatus(true); return; }
+                            setMasterStatus(opt);
+                          }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
+                            {opt} {opt === masterStatus && <span>✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1708,6 +1738,7 @@ export default function MyOrderPage() {
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={() => setSubOrders(prev => prev.map(s => s.id === cancelTarget ? { ...s, itemStatus: "Pending" } : s))} onClose={() => setCancelTarget(null)} />}
+      {pendingCancelStatus && <CancelOrderStatusModal onConfirm={() => setMasterStatus("Cancelled")} onClose={() => setPendingCancelStatus(false)} />}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
     </div>
   );

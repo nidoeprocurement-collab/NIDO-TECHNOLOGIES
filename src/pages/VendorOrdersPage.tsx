@@ -253,6 +253,7 @@ export default function VendorOrderList() {
   const [notesModal, setNotesModal] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | "">("");
   const [bulkNote, setBulkNote] = useState("");
+  const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
   const toast = useToast();
 
   // Close dropdowns on outside click
@@ -306,9 +307,27 @@ export default function VendorOrderList() {
   const applyBulkStatus = () => {
     if (!bulkStatus) { toast.show("Please select a status"); return; }
     if (selected.size === 0) { toast.show("Select at least one order first"); return; }
-    setOrders(prev => prev.map(r => selected.has(r.id) ? { ...r, status: bulkStatus as OrderStatus } : r));
-    toast.show(`Status updated to "${bulkStatus}" for ${selected.size} order(s)`);
-    setStatusModal(false); setBulkStatus("");
+    if (bulkStatus === "Cancelled") {
+      // Cancelling is a terminal action — confirm before applying.
+      setStatusModal(false);
+      setConfirmBulkCancel(true);
+      return;
+    }
+    performBulkStatusUpdate(bulkStatus as OrderStatus);
+  };
+
+  const performBulkStatusUpdate = (status: OrderStatus) => {
+    // Orders already Cancelled are a terminal state and are skipped — they
+    // can no longer be edited or processed further.
+    const eligible = [...selected].filter(id => orders.find(o => o.id === id)?.status !== "Cancelled");
+    setOrders(prev => prev.map(r => eligible.includes(r.id) ? { ...r, status } : r));
+    const skipped = selected.size - eligible.length;
+    toast.show(
+      skipped > 0
+        ? `Status updated to "${status}" for ${eligible.length} order(s). ${skipped} already-cancelled order(s) were skipped.`
+        : `Status updated to "${status}" for ${eligible.length} order(s)`
+    );
+    setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false);
   };
 
   const applyBulkNotes = () => {
@@ -406,6 +425,21 @@ export default function VendorOrderList() {
       <Modal open={notesModal} title="Bulk update notes" onClose={() => setNotesModal(false)} onApply={applyBulkNotes}>
         <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Enter notes for selected orders..." style={{ width: "100%", padding: "9px 12px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", resize: "vertical", minHeight: 80 }} />
       </Modal>
+
+      {confirmBulkCancel && (
+        <div onClick={e => { if (e.target === e.currentTarget) setConfirmBulkCancel(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 24, width: 380, boxShadow: "0 16px 48px rgba(0,0,0,.15)" }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, color: "#a32d2d" }}>Cancel {selected.size} order{selected.size !== 1 ? "s" : ""}?</h3>
+            <p style={{ fontSize: 13, color: "#555", marginBottom: 18, lineHeight: 1.5 }}>
+              This action cannot be undone. Once cancelled, these orders can no longer be edited, have their status changed, or be processed further.
+            </p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setConfirmBulkCancel(false)} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #e2e4e9", background: "#fff", color: "#444" }}>Keep Orders</button>
+              <button onClick={() => performBulkStatusUpdate("Cancelled")} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #dc2626", background: "#dc2626", color: "#fff" }}>Yes, Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <h1 style={{ fontSize: 24, fontWeight: 600, color: "#0f1035", marginBottom: 4 }}>Orders</h1>
       <p style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>Manage and track all purchase orders across your organization</p>
