@@ -1450,11 +1450,17 @@ export default function MyOrderPage() {
   // own horizontally-scrolling container (see subOrdersMinWidth below) so on
   // narrow viewports the columns scroll *within the tab* instead of being
   // clipped by the page's outer overflow.
+  // Columns use minmax(min, fr) instead of fixed px so the table stretches
+  // to fill whatever width the tab actually has (no dead space on wide
+  // monitors) while still guaranteeing a readable minimum per column.
   const subOrdersColTemplate = isClientPortalUser
-    ? "34px 110px minmax(210px,1.3fr) 52px 84px 88px 128px 176px 108px"
-    : "34px 110px minmax(210px,1.3fr) 116px 52px 84px 88px 128px 176px 140px 50px";
+    ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
+    : "36px 130px minmax(220px,2fr) minmax(110px,1fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) minmax(130px,1fr) 44px";
   const subOrdersColGap = 12;
-  const subOrdersMinWidth = isClientPortalUser ? 1020 : 1150;
+  // Sum of the column minimums above (plus gaps) — the smallest width the
+  // grid will ever collapse to. Below this the wrapper scrolls horizontally
+  // instead of clipping; above it the fr tracks grow to fill the tab.
+  const subOrdersMinWidth = isClientPortalUser ? 1056 : 1320;
 
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
@@ -1479,7 +1485,10 @@ export default function MyOrderPage() {
 
   return (
     <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
-      <div style={{ maxWidth: 1600, margin: "0 auto", padding: "28px 24px 48px" }}>
+      {/* No maxWidth cap here — on wide monitors a fixed cap left visible
+          empty gutters on both sides of the page. The content now stretches
+          to fill whatever width AppLayout's <main> actually gives it. */}
+      <div style={{ width: "100%", margin: "0 auto", padding: "28px 24px 48px", boxSizing: "border-box" }}>
 
         {/* Header */}
         <div style={{ marginBottom: 22 }}>
