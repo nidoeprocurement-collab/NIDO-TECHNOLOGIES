@@ -318,10 +318,16 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         <div className="relative shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2 shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
           <div className="flex items-center min-w-0 flex-1 h-full py-2">
             {org.logoUrl ? (
-              <div className="h-full w-full flex items-center justify-start gap-2.5 overflow-hidden">
-                <div className="h-full shrink-0 flex items-center overflow-hidden">
-                  <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full max-w-full object-contain" />
-                </div>
+              <div className={`h-full w-full flex items-center gap-2.5 overflow-hidden ${effectiveCollapsed ? 'justify-center' : 'justify-start'}`}>
+                {effectiveCollapsed ? (
+                  <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-white border border-gray-200 flex items-center justify-center shadow-sm">
+                    <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="h-full shrink-0 flex items-center overflow-hidden">
+                    <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full max-w-full object-contain" />
+                  </div>
+                )}
                 {!effectiveCollapsed && (() => {
                   const raw = org.displayName || 'NIDO';
                   const match = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
