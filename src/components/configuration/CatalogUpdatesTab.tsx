@@ -474,7 +474,7 @@ export default function CatalogUpdatesTab() {
                 <TabsTrigger value="pdf">Export Catalog (PDF)</TabsTrigger>
               </TabsList>
               <TabsContent value="upload" className="mt-3">
-                <div className="text-center p-6 border-2 border-dashed border-border rounded-lg">
+                <div className="text-center p-2 border-2 border-dashed border-border rounded-lg">
                   <Upload size={24} className="mx-auto text-primary mb-2" />
                   <p className="text-sm font-medium">Upload</p>
                   <p className="text-xs text-muted-foreground">Bulk upload new products or catalog using CSV template.</p>
@@ -483,7 +483,7 @@ export default function CatalogUpdatesTab() {
                 </div>
               </TabsContent>
               <TabsContent value="excel" className="mt-3">
-                <div className="text-center p-6 border-2 border-dashed border-border rounded-lg">
+                <div className="text-center p-2 border-2 border-dashed border-border rounded-lg">
                   <FileDown size={24} className="mx-auto text-success mb-2" />
                   <p className="text-sm font-medium">Export</p>
                   <p className="text-xs text-muted-foreground">Export the entire product catalog as Excel file.</p>
@@ -491,7 +491,7 @@ export default function CatalogUpdatesTab() {
                 </div>
               </TabsContent>
               <TabsContent value="pdf" className="mt-3">
-                <div className="text-center p-6 border-2 border-dashed border-border rounded-lg">
+                <div className="text-center p-2 border-2 border-dashed border-border rounded-lg">
                   <FileText size={24} className="mx-auto text-destructive mb-2" />
                   <p className="text-sm font-medium">Export Catalog</p>
                   <p className="text-xs text-muted-foreground">Export as PDF file.</p>
@@ -726,7 +726,7 @@ export default function CatalogUpdatesTab() {
                   <div>
                     <Label>Add Image</Label>
                     <div
-                      className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="border-2 border-dashed border-border rounded-lg p-2 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => imageInputRef.current?.click()}
                     >
                       <ImageIcon size={24} className="mx-auto text-muted-foreground mb-2" />

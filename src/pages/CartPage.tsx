@@ -84,7 +84,7 @@ function CartItemRow({
 
   return (
     <tr className="border-b border-gray-100 last:border-0">
-      <td className="py-5 pr-4">
+      <td className="py-2 pr-4">
         <div className="flex items-start gap-3">
           <img
             src={item.image}
@@ -105,14 +105,14 @@ function CartItemRow({
           </div>
         </div>
       </td>
-      <td className="py-5 pr-4 align-top">
+      <td className="py-2 pr-4 align-top">
         <p className="font-semibold text-gray-900 text-sm">{formatPrice(item.priceNum)}</p>
         <p className="text-xs text-gray-400 mt-0.5">Unit Price</p>
       </td>
-      <td className="py-5 pr-4 align-top">
+      <td className="py-2 pr-4 align-top">
         <QtyInput value={item.quantity} moq={item.moq} onChange={qty => onUpdate(item.id, qty)} />
       </td>
-      <td className="py-5 align-top">
+      <td className="py-2 align-top">
         <div className="flex items-start justify-between">
           <p className="font-semibold text-gray-900 text-sm">{formatPrice(lineTotal)}</p>
           <button
@@ -176,8 +176,8 @@ export default function CartPage() {
   const maxScroll = Math.max(0, SUGGESTED.length - visibleCount);
 
   return (
-    <div className="min-h-screen bg-white px-6 py-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-white px-2 py-2">
+      <div className=" ">
         {/* Header */}
         <div className="flex items-start justify-between mb-5">
           <div>
@@ -187,7 +187,7 @@ export default function CartPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={onClear}
-              className="flex items-center gap-1.5 border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 border border-gray-300 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <Trash2 size={14} />
               Clear Cart
@@ -195,14 +195,14 @@ export default function CartPage() {
           </div>
         </div>
 
-        <div className="flex gap-5 items-start">
+        <div className="flex gap-2 items-start">
           {/* Left column */}
           <div className="flex-1 min-w-0">
             {/* Items table */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
               {cart.length === 0 ? (
                 <div className="py-16 text-center text-gray-400">
-                  <ShoppingCart size={48} className="mx-auto mb-3 opacity-30" />
+                  <ShoppingCart size={48} className=" mb-3 opacity-30" />
                   <p className="font-medium">Your cart is empty</p>
                   <button
                     onClick={() => navigate("/shop")}
@@ -215,13 +215,13 @@ export default function CartPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Item</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3">Item</th>
                       <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 pr-4">Price</th>
                       <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 pr-4">Quantity</th>
                       <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 pr-5">Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="px-5">
+                  <tbody className="px-2">
                     {cart.map((item) => {
                       const discountPct = item.clientId
                         ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity)
@@ -230,7 +230,7 @@ export default function CartPage() {
                       const lineTotal = effectivePrice * item.quantity;
                       return (
                       <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                        <td className="py-5 px-5">
+                        <td className="py-2 px-2">
                           <div className="flex items-start gap-3">
                             <img src={item.image} alt={item.name} className="w-20 h-20 object-cover rounded-lg border border-gray-200 shrink-0" />
                             <div>
@@ -247,7 +247,7 @@ export default function CartPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-5 pr-4 align-top">
+                        <td className="py-2 pr-4 align-top">
                           {discountPct > 0 ? (
                             <>
                               <p className="text-xs text-gray-400 line-through">{formatPrice(item.priceNum)}</p>
@@ -261,10 +261,10 @@ export default function CartPage() {
                             </>
                           )}
                         </td>
-                        <td className="py-5 pr-4 align-top">
+                        <td className="py-2 pr-4 align-top">
                           <QtyInput value={item.quantity} moq={item.moq} onChange={qty => onUpdateQuantity(item.id, qty)} />
                         </td>
-                        <td className="py-5 pr-5 align-top">
+                        <td className="py-2 pr-5 align-top">
                           <div className="flex items-start justify-between">
                             <p className="font-semibold text-gray-900 text-sm">{formatPrice(lineTotal)}</p>
                             <button onClick={() => onRemove(item.id)} className="ml-6 text-gray-400 hover:text-red-500 transition-colors">
@@ -281,7 +281,7 @@ export default function CartPage() {
             </div>
 
             {/* You may also like */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="bg-white border border-gray-200 rounded-xl p-2">
               <h2 className="font-semibold text-gray-900 mb-4">You may also like</h2>
               <div className="relative">
                 {scrollIdx > 0 && (
@@ -317,7 +317,7 @@ export default function CartPage() {
           {/* Right sidebar */}
           <div className="w-72 shrink-0 space-y-4">
             {/* Cart Summary */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="bg-white border border-gray-200 rounded-xl p-2">
               <h2 className="font-semibold text-gray-900 mb-4">Cart Summary</h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
@@ -352,7 +352,7 @@ export default function CartPage() {
             </div>
 
             {/* Why shop with NIDO */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="bg-white border border-gray-200 rounded-xl p-2">
               <h2 className="font-semibold text-gray-900 mb-4">Why shop with NIDO?</h2>
               <div className="space-y-4">
                 {[
@@ -375,7 +375,7 @@ export default function CartPage() {
             </div>
 
             {/* Support */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="bg-white border border-gray-200 rounded-xl p-2">
               <p className="font-semibold text-blue-600 text-sm mb-1">Need help with your order?</p>
               <p className="text-xs text-gray-500 mb-3">Contact our support team</p>
               <div className="space-y-2">

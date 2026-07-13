@@ -51,7 +51,7 @@ export default function VendorConfigurationTab({ vendorId }: { vendorId: string 
         calculation in the Price Engine.
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-xl">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-w-xl">
         <div>
           <Label className="text-xs text-gray-600">Logistics Cost (% of Base Price)</Label>
           <div className="flex items-center gap-1 mt-1">

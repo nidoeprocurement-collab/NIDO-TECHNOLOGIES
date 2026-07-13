@@ -92,7 +92,7 @@ export default function SalesQuoteDetailPage() {
   return (
     <div className="space-y-6 pb-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+      <div className="flex items-start justify-between gap-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-2 sm:p-6">
         <div className="flex items-start gap-4">
           <button
             onClick={() => navigate('/sales/quotes')}
@@ -138,7 +138,7 @@ export default function SalesQuoteDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-6 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
         <button
           onClick={() => setActiveTab('details')}
           className={`pb-3 px-1 font-medium transition-colors ${
@@ -241,27 +241,27 @@ export default function SalesQuoteDetailPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-900 dark:bg-gray-950">
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Item Name</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Description</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">HSN/SAC</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Qty</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Rate</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Discount</th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-white uppercase tracking-wider">Tax %</th>
-                    <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-white uppercase tracking-wider">Amount</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Item Name</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Description</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">HSN/SAC</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Qty</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Rate</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Discount</th>
+                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Tax %</th>
+                    <th className="px-4 sm:px-6 py-2 text-right text-xs font-semibold text-white uppercase tracking-wider">Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {quote.lineItems.map((item) => (
                     <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{item.itemName}</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{item.description}</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{item.hsn}</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 dark:text-white">{item.qty}</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 dark:text-white">{item.rate}</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 dark:text-white">{item.discount}</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 dark:text-white">{item.tax}%</td>
-                      <td className="px-4 sm:px-6 py-4 text-sm text-gray-900 dark:text-white text-right font-medium">{item.amount}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white font-medium">{item.itemName}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-600 dark:text-gray-400">{item.description}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-600 dark:text-gray-400">{item.hsn}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.qty}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.rate}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.discount}</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.tax}%</td>
+                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white text-right font-medium">{item.amount}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -318,7 +318,7 @@ export default function SalesQuoteDetailPage() {
       {activeTab === 'activity' && (
         <div className="space-y-4">
           {activities.map((activity) => (
-            <div key={activity.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+            <div key={activity.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-2 sm:p-6">
               <p className="text-xs uppercase font-semibold text-gray-700 dark:text-gray-300 tracking-wide mb-2">{activity.type}</p>
               <p className="text-sm sm:text-base text-gray-900 dark:text-white font-medium mb-2">{activity.description}</p>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{activity.timestamp} by {activity.user}</p>

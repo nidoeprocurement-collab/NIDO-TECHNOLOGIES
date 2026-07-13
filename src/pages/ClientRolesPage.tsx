@@ -255,7 +255,7 @@ export function CircleCheck({ checked, onChange }: { checked: boolean; onChange:
     <button
       type="button"
       onClick={onChange}
-      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors mx-auto ${
+      className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors${
         checked ? "border-blue-500 bg-blue-500" : "border-gray-300 bg-white hover:border-blue-300"
       }`}
     >
@@ -355,7 +355,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
                 value={form.name}
                 onChange={setField("name")}
                 placeholder="e.g. Procurement Manager"
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+                className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
               />
             </div>
             <div>
@@ -365,7 +365,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
                 value={form.code}
                 onChange={setField("code")}
                 placeholder="e.g. PM"
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+                className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
               />
             </div>
           </div>
@@ -386,7 +386,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
               onChange={setField("description")}
               placeholder="Describe the purpose and responsibilities of this role"
               rows={2}
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 resize-none"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 resize-none"
             />
           </div>
 
@@ -433,7 +433,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
         </div>
 
         {showAddModule && (
-          <div className="px-4 py-3 border-b border-gray-100 bg-blue-50/40 flex items-center gap-2">
+          <div className="px-4 py-2 border-b border-gray-100 bg-blue-50/40 flex items-center gap-2">
             <input
               type="text"
               value={newModuleName}
@@ -441,7 +441,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
               onKeyDown={(e) => e.key === "Enter" && addModule()}
               placeholder="Enter module name..."
               autoFocus
-              className="flex-1 px-3 py-1.5 text-xs border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 bg-white"
+              className="flex-1 px-2 py-1.5 text-xs border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 bg-white"
             />
             <button
               onClick={addModule}
@@ -461,9 +461,9 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-200">
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">MODULE</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">MODULE</th>
               {permissionCols.map((col) => (
-                <th key={col} className="text-center px-3 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">{col}</th>
+                <th key={col} className="text-center px-2 py-2.5 font-semibold text-gray-500 text-[11px] uppercase tracking-wide">{col}</th>
               ))}
             </tr>
           </thead>
@@ -501,7 +501,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
               <select
                 value={form.dataVisibility}
                 onChange={setField("dataVisibility")}
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white appearance-none text-gray-700"
+                className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white appearance-none text-gray-700"
               >
                 <option>All Data</option>
                 <option>Department Only</option>
@@ -513,7 +513,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
               <select
                 value={form.locationAccess}
                 onChange={setField("locationAccess")}
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white appearance-none text-gray-700"
+                className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white appearance-none text-gray-700"
               >
                 <option>All Locations</option>
                 <option>Home Location Only</option>
@@ -670,7 +670,7 @@ export default function ClientRolesPage() {
       </div>
 
       {/* RBAC explanation */}
-      <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5 text-xs text-blue-700">
+      <div className="bg-blue-50 border border-blue-100 rounded-lg px-2 py-2.5 text-xs text-blue-700">
         <span className="font-semibold">Role-Based Access Control (RBAC)</span> — Roles determine what users in this client can access and do in the system. Each role has specific permissions across modules. Users can only perform actions their role allows.
       </div>
 
@@ -682,7 +682,7 @@ export default function ClientRolesPage() {
             <div
               key={role.name}
               onClick={() => setSelectedRole(isSelected ? null : role)}
-              className={`border rounded-xl p-4 cursor-pointer transition-all ${
+              className={`border rounded-xl p-2 cursor-pointer transition-all ${
                 isSelected
                   ? "border-blue-500 bg-blue-50 shadow-md ring-1 ring-blue-400"
                   : "border-gray-200 bg-white hover:shadow-sm hover:border-gray-300"
@@ -737,9 +737,9 @@ export default function ClientRolesPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-blue-50 border-b border-blue-100">
-                  <th className="text-left px-4 py-2.5 font-semibold text-gray-600 text-[11px] w-44">MODULE</th>
+                  <th className="text-left px-2 py-2.5 font-semibold text-gray-600 text-[11px] w-44">MODULE</th>
                   {matrixColumns.map((col) => (
-                    <th key={col} className="text-center px-3 py-2.5 font-semibold text-gray-600 text-[11px]">{col}</th>
+                    <th key={col} className="text-center px-2 py-2.5 font-semibold text-gray-600 text-[11px]">{col}</th>
                   ))}
                 </tr>
               </thead>
@@ -748,7 +748,7 @@ export default function ClientRolesPage() {
                   <tr key={mod} className={i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}>
                     <td className="px-4 py-2 text-gray-700 font-medium text-[11px]">{mod}</td>
                     {matrixData[mod].map((access, j) => (
-                      <td key={j} className="text-center px-3 py-2">
+                      <td key={j} className="text-center px-2 py-2">
                         <AccessDot type={access} />
                       </td>
                     ))}
@@ -762,7 +762,7 @@ export default function ClientRolesPage() {
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Permission Summary — {selectedRole.name}</h3>
             <div className="grid grid-cols-3 gap-3">
               {permissionSummary.map((item) => (
-                <div key={item.module} className="border border-gray-200 rounded-lg px-3 py-2.5 bg-white">
+                <div key={item.module} className="border border-gray-200 rounded-lg px-2 py-2.5 bg-white">
                   <p className="text-[11px] font-semibold text-gray-700 mb-1.5">{item.module}</p>
                   <div className="flex flex-wrap gap-1">
                     {item.permissions.map((p) => (
@@ -785,9 +785,9 @@ export default function ClientRolesPage() {
           <table className="w-full text-[10px] min-w-max">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-3 py-2.5 font-semibold text-gray-600 uppercase tracking-wide w-32">Attribute</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-600 uppercase tracking-wide w-32">Attribute</th>
                 {comparisonRoles.map((r) => (
-                  <th key={r} className="text-left px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap">{r}</th>
+                  <th key={r} className="text-left px-2 py-2.5 font-semibold text-gray-600 whitespace-nowrap">{r}</th>
                 ))}
               </tr>
             </thead>

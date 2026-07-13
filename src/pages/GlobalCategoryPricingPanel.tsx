@@ -192,7 +192,7 @@ export default function GlobalCategoryPricingPanel() {
     <div className="border border-gray-300 rounded-lg p-4">
       <h2 className="text-xs font-bold text-blue-700 uppercase mb-3">Category Pricing Rules</h2>
 
-      <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 mb-4">
+      <div className="bg-amber-50 border border-amber-100 rounded-lg px-2 py-2 mb-4">
         <p className="text-sm text-gray-700">
           Add extra margin and buffer percentages on top of each client's Profit Margin, for products
           in this category. These rules apply to <span className="font-semibold text-gray-900">every
@@ -204,10 +204,10 @@ export default function GlobalCategoryPricingPanel() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Category</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Margin %</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Buffer</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Actions</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Category</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Margin %</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Buffer</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -266,9 +266,9 @@ export default function GlobalCategoryPricingPanel() {
 
               return (
                 <tr key={rule.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors">
-                  <td className="px-4 py-3 text-gray-800 font-medium">{rule.category}</td>
-                  <td className="px-4 py-3 text-gray-700">{rule.marginPct}%</td>
-                  <td className="px-4 py-3 text-gray-500">+{rule.bufferPct}%</td>
+                  <td className="px-4 py-2 text-gray-800 font-medium">{rule.category}</td>
+                  <td className="px-4 py-2 text-gray-700">{rule.marginPct}%</td>
+                  <td className="px-4 py-2 text-gray-500">+{rule.bufferPct}%</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3 text-xs">
                       <button onClick={() => startEdit(rule)} className="text-blue-600 hover:underline font-medium flex items-center gap-1">
@@ -334,7 +334,7 @@ export default function GlobalCategoryPricingPanel() {
 
             {rules.length === 0 && !isNew && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-xs text-gray-400">
+                <td colSpan={4} className="px-4 py-2 text-center text-xs text-gray-400">
                   No category pricing rules configured yet.
                 </td>
               </tr>

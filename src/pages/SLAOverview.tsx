@@ -11,7 +11,7 @@ export default function SLAOverview() {
   return (
     <div className="min-h-screen bg-white">
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4">
+        <div className="w-full px-2 md:px-4 lg:px-4 md:px-6 py-2 md:py-4">
           <div>
             <p className="text-xs text-gray-500">Operations / SLA</p>
             <h1 className="text-2xl font-bold">SLA Overview</h1>
@@ -19,13 +19,13 @@ export default function SLAOverview() {
         </div>
       </div>
 
-      <div className="w-full px-4 md:px-6 py-8">
+      <div className="w-full px-2 md:px-6 py-8">
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
           {SLA_METRICS.map((metric) => {
             const Icon = metric.icon;
             return (
-              <div key={metric.label} className="bg-white p-6 rounded-lg border">
+              <div key={metric.label} className="bg-white p-2 rounded-lg border">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <p className="text-gray-600 text-sm">{metric.label}</p>
@@ -46,8 +46,8 @@ export default function SLAOverview() {
         </div>
 
         {/* SLA Breaches */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
-          <div className="bg-white p-6 rounded-lg border">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
+          <div className="bg-white p-2 rounded-lg border">
             <h3 className="font-semibold mb-4">Current SLA Status</h3>
             <div className="space-y-3">
               {[
@@ -71,7 +71,7 @@ export default function SLAOverview() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border">
+          <div className="bg-white p-2 rounded-lg border">
             <h3 className="font-semibold mb-4">Recent Alerts</h3>
             <div className="space-y-3">
               {[
@@ -93,7 +93,7 @@ export default function SLAOverview() {
         </div>
 
         {/* Detailed SLA Table */}
-        <div className="bg-white p-6 rounded-lg border">
+        <div className="bg-white p-2 rounded-lg border">
           <h3 className="font-semibold mb-4">SLA Details by Vendor</h3>
           <div className="overflow-x-auto min-w-0">
             <table className="w-full text-sm">

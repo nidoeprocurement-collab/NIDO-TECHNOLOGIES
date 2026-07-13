@@ -71,18 +71,18 @@ export default function ClientPortalDashboard() {
     <div className="min-h-screen bg-white p-6">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70 mb-8">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xlpx-2 py-4">
           <p className="text-xs text-gray-500">Portal / Dashboard</p>
           <h1 className="text-2xl font-bold">Welcome, {user?.name}</h1>
           <p className="text-sm text-gray-500 mt-0.5">{clientName} — Client Portal</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xlpx-6">
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-8">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
+            <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-2 flex flex-col gap-2">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${s.bg}`}>
                 {s.icon}
               </div>
@@ -95,7 +95,7 @@ export default function ClientPortalDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Recent Activity */}
           <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl">
-            <div className="px-6 py-4 border-b border-gray-100">
+            <div className="px-6 py-2 border-b border-gray-100">
               <h2 className="text-sm font-semibold text-gray-900">Recent Activity</h2>
             </div>
             <div className="px-6 py-10 flex flex-col items-center justify-center text-center">
@@ -112,7 +112,7 @@ export default function ClientPortalDashboard() {
           {/* Quick Actions + Notifications */}
           <div className="flex flex-col gap-4">
             <div className="bg-white border border-gray-200 rounded-xl">
-              <div className="px-6 py-4 border-b border-gray-100">
+              <div className="px-6 py-2 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
               </div>
               <div className="p-4 space-y-2">
@@ -120,7 +120,7 @@ export default function ClientPortalDashboard() {
                   <Link
                     key={a.label}
                     to={a.path}
-                    className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
+                    className="flex items-center justify-between px-2 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors group"
                   >
                     <span className="flex items-center gap-2">
                       {a.icon}
@@ -133,10 +133,10 @@ export default function ClientPortalDashboard() {
             </div>
 
             <div className="bg-white border border-gray-200 rounded-xl">
-              <div className="px-6 py-4 border-b border-gray-100">
+              <div className="px-6 py-2 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-900">Notifications</h2>
               </div>
-              <div className="px-6 py-8 flex flex-col items-center text-center">
+              <div className="px-6 py-2 flex flex-col items-center text-center">
                 <Bell size={20} className="text-gray-300 mb-2" />
                 <p className="text-xs text-gray-400">No new notifications</p>
               </div>
@@ -145,7 +145,7 @@ export default function ClientPortalDashboard() {
         </div>
 
         {/* Portal Info Banner */}
-        <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl px-6 py-4 flex items-start gap-3">
+        <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl px-2 py-2 flex items-start gap-3">
           <div className="w-8 h-8 shrink-0 bg-blue-600 rounded-lg flex items-center justify-center mt-0.5">
             <Zap size={16} className="text-white" />
           </div>

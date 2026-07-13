@@ -57,7 +57,7 @@ function DropdownMenu({
         <button
           key={item.label}
           onClick={() => { item.onClick?.(); onClose(); }}
-          className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
+          className={`w-full flex items-center gap-2.5 px-2 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
             item.danger ? "text-red-500" : "text-gray-700"
           }`}
         >
@@ -112,7 +112,7 @@ function AddDocumentModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <FilePlus size={18} className="text-blue-500" />
             <h2 className="text-sm font-semibold text-gray-900">Add Document</h2>
@@ -128,7 +128,7 @@ function AddDocumentModal({
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-2 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-colors"
+            className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center gap-2 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition-colors"
           >
             <Upload size={22} className="text-gray-400" />
             {file ? (
@@ -150,7 +150,7 @@ function AddDocumentModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Service Agreement 2026"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
+              className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
             />
           </div>
 
@@ -160,7 +160,7 @@ function AddDocumentModal({
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
+                className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
               >
                 <option>PDF</option>
                 <option>DOCX</option>
@@ -173,7 +173,7 @@ function AddDocumentModal({
               <select
                 value={uploadedBy}
                 onChange={(e) => setUploadedBy(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
+                className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition bg-white"
               >
                 <option>Admin</option>
                 <option>Nitin Shetty</option>
@@ -260,11 +260,11 @@ function DocsTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Name</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Type</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Size</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Uploaded By</th>
-            <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Uploaded On</th>
+            <th className="text-left px-2 py-2 text-xs font-medium text-gray-500">Name</th>
+            <th className="text-left px-2 py-2 text-xs font-medium text-gray-500">Type</th>
+            <th className="text-left px-2 py-2 text-xs font-medium text-gray-500">Size</th>
+            <th className="text-left px-2 py-2 text-xs font-medium text-gray-500">Uploaded By</th>
+            <th className="text-left px-2 py-2 text-xs font-medium text-gray-500">Uploaded On</th>
             <th className="px-4 py-3" />
           </tr>
         </thead>
@@ -282,9 +282,9 @@ function DocsTable({
               <td className="px-4 py-3">
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${typeColor(doc.type)}`}>{doc.type}</span>
               </td>
-              <td className="px-4 py-3 text-xs text-gray-500">{doc.size}</td>
-              <td className="px-4 py-3 text-xs text-gray-500">{doc.uploadedBy}</td>
-              <td className="px-4 py-3 text-xs text-gray-500">{doc.uploadedOn}</td>
+              <td className="px-4 py-2 text-xs text-gray-500">{doc.size}</td>
+              <td className="px-4 py-2 text-xs text-gray-500">{doc.uploadedBy}</td>
+              <td className="px-4 py-2 text-xs text-gray-500">{doc.uploadedOn}</td>
               <td className="px-4 py-3">
                 <div className="relative flex justify-end">
                   {!readOnly && (
@@ -445,7 +445,7 @@ export default function ClientDocumentsPage() {
         </div>
 
         {view === "archived" && archivedDocs.length > 0 && (
-          <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="mb-4 flex items-center gap-2 px-2 py-2 bg-amber-50 border border-amber-200 rounded-lg">
             <Archive size={13} className="text-amber-500 shrink-0" />
             <p className="text-xs text-amber-700">Archived documents are read-only. Use the download icon to save a copy.</p>
           </div>

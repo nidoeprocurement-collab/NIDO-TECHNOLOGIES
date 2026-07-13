@@ -253,6 +253,27 @@
 }
 
 @layer utilities {
+  /* Minimal gap standard for all pages - consistent 2px (≈2-3mm) */
+  .page-container {
+    @apply w-full min-h-screen bg-white p-2;
+  }
+  
+  .page-header {
+    @apply bg-transparent border-b border-gray-200/70;
+  }
+  
+  .page-header-content {
+    @apply w-full px-2 py-4 flex justify-between;
+  }
+  
+  .page-content {
+    @apply w-full px-2 py-2;
+  }
+  
+  .content-grid {
+    @apply gap-2;
+  }
+  
   .scrollbar-thin {
     scrollbar-width: thin;
   }

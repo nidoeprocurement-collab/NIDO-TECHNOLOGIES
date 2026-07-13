@@ -468,7 +468,7 @@ export default function AddClient() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white border-b p-6">
-        <div className="max-w-6xl mx-auto flex items-start justify-between">
+        <div className="max-w-6xlflex items-start justify-between">
           <button
             onClick={() => navigate("/clients")}
             className="text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"
@@ -488,18 +488,18 @@ export default function AddClient() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-6xlp-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spin mx-auto mb-4" />
+              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spinmb-4" />
               <p className="text-gray-600">Loading client information...</p>
             </div>
           </div>
         ) : (
           <div>
             {/* Progress Indicator */}
-            <div className="bg-white rounded-lg p-6 mb-6">
+            <div className="bg-white rounded-lg p-2 mb-6">
               <div className="flex items-center justify-between">
                 {STEPS.map((s, idx) => (
                   <div key={idx} className="flex items-center flex-1">
@@ -539,7 +539,7 @@ export default function AddClient() {
 
         {/* Magic Upload Section */}
         <div
-          className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-6 mb-6 cursor-pointer hover:bg-blue-100 transition-colors"
+          className="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-2 mb-6 cursor-pointer hover:bg-blue-100 transition-colors"
           onClick={() => setShowMagicUpload(true)}
         >
           <div className="flex items-center gap-2 text-blue-600">
@@ -618,7 +618,7 @@ export default function AddClient() {
                       </SelectContent>
                     </Select>
                     {showAddCategory && (
-                      <div className="mt-3 p-3 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                      <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
                         <div className="flex gap-2">
                           <Input
                             placeholder="Enter new category name"
@@ -683,7 +683,7 @@ export default function AddClient() {
                       </SelectContent>
                     </Select>
                     {showAddTier && (
-                      <div className="mt-3 p-3 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                      <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
                         <div className="flex gap-2">
                           <Input
                             placeholder="Enter new tier name"
@@ -1016,7 +1016,7 @@ export default function AddClient() {
                       </SelectContent>
                     </Select>
                     {showAddCurrency && (
-                      <div className="mt-3 p-3 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
+                      <div className="mt-3 p-2 border border-[#E8ECF1] rounded-md bg-[#F8FAFD]">
                         <div className="flex gap-2">
                           <Input
                             placeholder="Enter new currency code (e.g., AUD)"
@@ -1388,7 +1388,7 @@ export default function AddClient() {
                     type="file"
                     multiple
                     onChange={(e) => handleFileSelect(e.target.files)}
-                    className="block w-full border border-gray-300 rounded-lg p-3 cursor-pointer"
+                    className="block w-full border border-gray-300 rounded-lg p-2 cursor-pointer"
                   />
                   {formData.documents.length > 0 && (
                     <div className="mt-3 space-y-2">

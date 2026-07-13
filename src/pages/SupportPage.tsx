@@ -104,7 +104,7 @@ export default function SupportPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="bg-transparent border-b border-border">
-        <div className="w-full px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="w-full px-2 md:px-6 py-2 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Support / Tickets</p>
             <h1 className="text-2xl font-bold text-foreground">Support Center</h1>
@@ -119,9 +119,9 @@ export default function SupportPage() {
         </div>
       </div>
 
-      <div className="w-full px-4 md:px-6 py-8">
+      <div className="w-full px-2 md:px-6 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6 mb-6 md:mb-8">
           {[
             { label: "Open",        value: stats.open,        color: "yellow", icon: AlertCircle },
             { label: "In Progress", value: stats.in_progress, color: "blue",   icon: Clock },
@@ -173,27 +173,27 @@ export default function SupportPage() {
           <table className="w-full table-auto">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Ticket</th>
-                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Subject</th>
-                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Priority</th>
-                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Created</th>
-                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Ticket</th>
+                <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Subject</th>
+                <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Priority</th>
+                <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Created</th>
+                <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Status</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((ticket) => (
                 <tr key={ticket.id} className="border-b border-border hover:bg-muted/30">
-                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-primary">
+                  <td className="px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-primary">
                     {ticket.number}
                   </td>
-                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-foreground">{ticket.subject}</td>
-                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm">
+                  <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-foreground">{ticket.subject}</td>
+                  <td className="px-4 md:px-6 py-2 md:py-4 text-sm">
                     <span className={`px-3 py-1 rounded text-xs font-semibold ${getPriorityColor(ticket.priority)}`}>
                       {ticket.priority}
                     </span>
                   </td>
-                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-foreground">{ticket.created}</td>
-                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm">
+                  <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-foreground">{ticket.created}</td>
+                  <td className="px-4 md:px-6 py-2 md:py-4 text-sm">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(ticket.status)}
                       <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(ticket.status)}`}>
@@ -211,7 +211,7 @@ export default function SupportPage() {
       {/* Create Ticket Modal */}
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card rounded-lg border border-border p-6 w-full max-w-md">
+          <div className="bg-card rounded-lg border border-border p-2 w-full max-w-md">
             <h2 className="text-lg font-bold mb-4 text-foreground">Create Support Ticket</h2>
             <div className="space-y-4">
               <div>
@@ -220,7 +220,7 @@ export default function SupportPage() {
                   type="text"
                   value={form.subject}
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-2 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div>
@@ -228,7 +228,7 @@ export default function SupportPage() {
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground h-24 focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-2 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground h-24 focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div>
@@ -236,7 +236,7 @@ export default function SupportPage() {
                 <select
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-2 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>

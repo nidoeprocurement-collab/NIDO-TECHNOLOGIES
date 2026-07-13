@@ -8,13 +8,13 @@ export default function PaymentsPage() {
     <div className="min-h-screen bg-white p-3">
       {/* Header Card */}
       <Card className="rounded-xl border border-[#e5e7eb] bg-white shadow-none">
-        <div className="flex items-center justify-between px-4 py-4">
+        <div className="flex items-center justify-between px-2 py-4">
           <h1 className="text-[20px] font-bold text-[#111827]">
             All Payments
           </h1>
 
           <div className="flex items-center gap-2">
-            <Button className="h-9 rounded-lg bg-[#2563eb] px-4 text-white hover:bg-[#1d4ed8]">
+            <Button className="h-9 rounded-lg bg-[#2563eb] px-2 text-white hover:bg-[#1d4ed8]">
               <Plus className="mr-2 h-4 w-4" />
               New
             </Button>
@@ -31,7 +31,7 @@ export default function PaymentsPage() {
       </Card>
 
       {/* Table Card */}
-      <Card className="mt-3 rounded-xl border border-[#e5e7eb] bg-white p-4 shadow-none">
+      <Card className="mt-3 rounded-xl border border-[#e5e7eb] bg-white p-2 shadow-none">
         {/* Header Row */}
         <div className="grid h-[42px] grid-cols-[40px_1fr_1.3fr_1.4fr_1.6fr_1fr_1fr_1fr_1.2fr_1.4fr] items-center rounded-lg border border-[#dfe3e8] bg-white px-2">
           <div className="flex justify-center">

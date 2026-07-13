@@ -67,7 +67,7 @@ export default function ClientPortalAddressesPage() {
     <div className="min-h-screen bg-white p-6">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70 mb-8">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-start">
+        <div className="max-w-7xlpx-2 py-2 flex justify-between items-start">
           <div>
             <p className="text-xs text-gray-500">Portal / Addresses</p>
             <h1 className="text-2xl font-bold">Delivery Addresses</h1>
@@ -79,7 +79,7 @@ export default function ClientPortalAddressesPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xlpx-6">
         {addresses.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mb-4">
@@ -126,7 +126,7 @@ export default function ClientPortalAddressesPage() {
             {addresses.length < 5 && (
               <button
                 onClick={openAdd}
-                className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors min-h-[120px]"
+                className="border-2 border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center justify-center gap-2 text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-colors min-h-[120px]"
               >
                 <Plus size={20} />
                 <span className="text-sm">Add Address</span>
@@ -150,7 +150,7 @@ export default function ClientPortalAddressesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.label}
                   onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
                   placeholder="e.g. Head Office, Warehouse A"
@@ -159,7 +159,7 @@ export default function ClientPortalAddressesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.line1}
                   onChange={e => setForm(f => ({ ...f, line1: e.target.value }))}
                   placeholder="Street, building"
@@ -168,7 +168,7 @@ export default function ClientPortalAddressesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.line2}
                   onChange={e => setForm(f => ({ ...f, line2: e.target.value }))}
                   placeholder="City, state, pincode"
@@ -177,7 +177,7 @@ export default function ClientPortalAddressesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.phone}
                   onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                   placeholder="+91 99999 99999"

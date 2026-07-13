@@ -92,7 +92,7 @@ export default function ApprovalWorkflowsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-2">
       {/* Header */}
 
       <div className="flex items-start justify-between">
@@ -119,31 +119,31 @@ export default function ApprovalWorkflowsPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-slate-50">
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase">
                   Workflow Name
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase">
                   Module
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase">
                   Steps
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase">
                   SLA
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase">
                   Escalation
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-left text-xs font-semibold uppercase">
                   Status
                 </th>
 
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase">
+                <th className="px-2 py-2 text-center text-xs font-semibold uppercase">
                   Actions
                 </th>
               </tr>
@@ -155,32 +155,32 @@ export default function ApprovalWorkflowsPage() {
                   key={workflow.id}
                   className="border-b"
                 >
-                  <td className="px-4 py-4 font-medium">
+                  <td className="px-2 py-2 font-medium">
                     {workflow.name}
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-2">
                     <Badge variant="outline">
                       {workflow.module}
                     </Badge>
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-2">
                     {workflow.steps} steps
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-2">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
                       {workflow.sla}
                     </div>
                   </td>
 
-                  <td className="px-4 py-4 text-muted-foreground">
+                  <td className="px-2 py-2 text-muted-foreground">
                     {workflow.escalation}
                   </td>
 
-                  <td className="px-4 py-4">
+                  <td className="px-2 py-2">
                     <Switch
                       checked={workflow.active}
                       onCheckedChange={() =>
@@ -189,7 +189,7 @@ export default function ApprovalWorkflowsPage() {
                     />
                   </td>
 
-                  <td className="px-4 py-4 text-center">
+                  <td className="px-2 py-2 text-center">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -210,13 +210,13 @@ export default function ApprovalWorkflowsPage() {
       {/* Flow 1 */}
 
       <Card>
-        <CardContent className="p-5">
+        <CardContent className="p-2">
           <h3 className="mb-4 font-semibold">
             Approver Flow: Standard Purchase
           </h3>
 
-          <div className="flex items-center gap-4">
-            <div className="rounded-xl border bg-blue-50 p-4 text-center">
+          <div className="flex items-center gap-2">
+            <div className="rounded-xl border bg-blue-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 STEP 1
               </p>
@@ -227,7 +227,7 @@ export default function ApprovalWorkflowsPage() {
 
             <ArrowRight />
 
-            <div className="rounded-xl border bg-blue-50 p-4 text-center">
+            <div className="rounded-xl border bg-blue-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 STEP 2
               </p>
@@ -236,7 +236,7 @@ export default function ApprovalWorkflowsPage() {
 
             <ArrowRight />
 
-            <div className="rounded-xl border bg-green-50 p-4 text-center">
+            <div className="rounded-xl border bg-green-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 FINAL
               </p>
@@ -246,7 +246,7 @@ export default function ApprovalWorkflowsPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex gap-6 text-sm text-muted-foreground">
+          <div className="mt-4 flex gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               SLA: 24 hours
@@ -263,13 +263,13 @@ export default function ApprovalWorkflowsPage() {
       {/* Flow 2 */}
 
       <Card>
-        <CardContent className="p-5">
+        <CardContent className="p-2">
           <h3 className="mb-4 font-semibold">
             Approver Flow: High Value Purchase
           </h3>
 
-          <div className="flex items-center gap-4">
-            <div className="rounded-xl border bg-blue-50 p-4 text-center">
+          <div className="flex items-center gap-2">
+            <div className="rounded-xl border bg-blue-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 STEP 1
               </p>
@@ -280,7 +280,7 @@ export default function ApprovalWorkflowsPage() {
 
             <ArrowRight />
 
-            <div className="rounded-xl border bg-blue-50 p-4 text-center">
+            <div className="rounded-xl border bg-blue-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 STEP 2
               </p>
@@ -289,7 +289,7 @@ export default function ApprovalWorkflowsPage() {
 
             <ArrowRight />
 
-            <div className="rounded-xl border bg-blue-50 p-4 text-center">
+            <div className="rounded-xl border bg-blue-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 STEP 3
               </p>
@@ -298,7 +298,7 @@ export default function ApprovalWorkflowsPage() {
 
             <ArrowRight />
 
-            <div className="rounded-xl border bg-green-50 p-4 text-center">
+            <div className="rounded-xl border bg-green-50 p-2 text-center">
               <p className="text-xs text-muted-foreground">
                 FINAL
               </p>
@@ -308,7 +308,7 @@ export default function ApprovalWorkflowsPage() {
             </div>
           </div>
 
-          <div className="mt-4 flex gap-6 text-sm text-muted-foreground">
+          <div className="mt-4 flex gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               SLA: 48 hours

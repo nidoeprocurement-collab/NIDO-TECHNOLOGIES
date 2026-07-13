@@ -58,7 +58,7 @@ export default function ClientUsersPage() {
 
   return (
     <div className="min-h-screen bg-white p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xlspace-y-6">
         {/* Breadcrumb */}
         <div className="text-sm text-muted-foreground">
           Clients / Veera Industries
@@ -114,7 +114,7 @@ export default function ClientUsersPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-3">
           <Card>
             <CardContent className="p-5 flex items-center gap-4">
               <div className="p-3 rounded-lg bg-blue-100">

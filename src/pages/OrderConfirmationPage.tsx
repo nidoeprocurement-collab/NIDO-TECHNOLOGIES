@@ -89,9 +89,9 @@ export default function OrderConfirmationPage() {
           <div className="absolute left-1/2 bottom-0 w-48 h-48 rounded-full bg-blue-200/30 blur-2xl" />
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-8 pt-8 pb-8">
+        <div className="relative   px-2 pt-8 pb-8">
           <div className="flex items-center justify-center flex-col gap-3">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center shadow-md shrink-0">
                 <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -107,14 +107,14 @@ export default function OrderConfirmationPage() {
       </div>
 
       {/* ── Body ── */}
-      <div className="max-w-5xl mx-auto px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
+      <div className="  px-2 py-2">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-2 items-start">
 
           {/* ── Left column ── */}
           <div className="space-y-4">
 
             {/* Confirmation card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-8">
+            <div className="bg-white rounded-2xl border border-gray-200 p-2">
               <div className="mb-4">
                 <p className="text-base font-semibold text-gray-900">
                   Order ID:{" "}
@@ -180,7 +180,7 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Need Help card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl border border-gray-200 p-2">
               <h3 className="text-base font-semibold text-gray-900 mb-2">Need Help?</h3>
               <p className="text-sm text-gray-500 mb-4">
                 Contact our support team for assistance:
@@ -202,7 +202,7 @@ export default function OrderConfirmationPage() {
 
           {/* ── Right column: Order Details panel ── */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-2 py-2 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-base font-bold text-gray-900">Order Details</h3>
               <button
                 onClick={handleCopy}
@@ -215,12 +215,12 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Order date */}
-            <div className="px-6 pt-4 pb-2">
+            <div className="px-2 pt-4 pb-2">
               <p className="text-xs text-gray-400">Order Date: <span className="text-gray-600 font-medium">{formatDate(orderDate)}</span></p>
             </div>
 
             {/* Line items */}
-            <div className="px-6 pb-3 space-y-2">
+            <div className="px-2 pb-3 space-y-2">
               {items.length > 0 ? (
                 items.map((item, i) => (
                   <div key={i} className="flex justify-between text-sm gap-3">
@@ -241,7 +241,7 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Subtotal / GST / Shipping / Total */}
-            <div className="px-6 py-3 border-t border-gray-100 space-y-2">
+            <div className="px-2 py-3 border-t border-gray-100 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Subtotal</span>
                 <span className="text-gray-700 font-medium">{formatPrice(subtotal)}</span>
@@ -261,7 +261,7 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Delivery Address */}
-            <div className="px-6 py-4 border-t border-gray-100">
+            <div className="px-2 py-2 border-t border-gray-100">
               <div className="flex items-center gap-1.5 mb-2">
                 <MapPin size={14} className="text-gray-400" />
                 <span className="text-sm font-semibold text-gray-800">Delivery Address</span>
@@ -280,7 +280,7 @@ export default function OrderConfirmationPage() {
             </div>
 
             {/* Payment */}
-            <div className="px-6 py-4 border-t border-gray-100">
+            <div className="px-2 py-2 border-t border-gray-100">
               <div className="flex items-center gap-1.5 mb-2">
                 <CreditCard size={14} className="text-gray-400" />
                 <span className="text-sm font-semibold text-gray-800">Payment</span>

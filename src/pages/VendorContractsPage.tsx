@@ -191,17 +191,17 @@ function AddContractPage({ onCancel, contract, onSave }: {
   return (
     <div className="min-h-screen bg-white font-sans">
       {/* Page header */}
-      <div className="bg-white border-b border-gray-100 px-6 py-4">
+      <div className="bg-white border-b border-gray-100 px-2 py-4">
         <h1 className="text-xl font-bold text-gray-900">{isEdit ? "Edit Contract" : "Add Contract"}</h1>
         <p className="text-sm text-gray-400 mt-0.5">{isEdit ? `Editing ${contract?.id} — Dell India Pvt. Ltd.` : "Create a new contract for Dell India Pvt. Ltd."}</p>
       </div>
 
-      <div className="px-6 py-5 max-w-[1280px] mx-auto space-y-5">
+      <div className="px-6 py-2 max-w-[1280px]space-y-5">
         {/* Vendor card */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-4">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-2 py-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">D</div>
-            <div className="flex-1 flex items-start gap-8 flex-wrap">
+            <div className="flex-1 flex items-start gap-2 flex-wrap">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-gray-900">Dell India Pvt. Ltd.</span>
@@ -219,7 +219,7 @@ function AddContractPage({ onCancel, contract, onSave }: {
         </div>
 
         {/* ── Two-column: left = vertical sections, right = sidebar ── */}
-        <div className="flex gap-6 items-start">
+        <div className="flex gap-2 items-start">
 
           {/* ── LEFT: all form sections stacked vertically ── */}
           <div className="flex-1 min-w-0 space-y-5">
@@ -242,12 +242,12 @@ function AddContractPage({ onCancel, contract, onSave }: {
                   <label className="text-sm font-medium text-gray-600">Contract Value<span className="text-red-400 ml-0.5">*</span></label>
                   <div className="flex h-[40px]">
                     <div className="relative flex-shrink-0">
-                      <select defaultValue="INR" className="appearance-none border border-gray-200 border-r-0 rounded-l-lg px-3 text-sm text-gray-600 bg-gray-50 pr-7 h-full focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select defaultValue="INR" className="appearance-none border border-gray-200 border-r-0 rounded-l-lg px-2 text-sm text-gray-600 bg-gray-50 pr-7 h-full focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option>INR</option><option>USD</option>
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                     </div>
-                    <input value={form.contractValue} onChange={e => set("contractValue", e.target.value)} placeholder="0.00" className="flex-1 border border-gray-200 rounded-r-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
+                    <input value={form.contractValue} onChange={e => set("contractValue", e.target.value)} placeholder="0.00" className="flex-1 border border-gray-200 rounded-r-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
                   </div>
                 </div>
                 <SelectField label="Payment Terms" options={PAYMENT_TERMS_LIST} value={form.paymentTerms} onChange={v => set("paymentTerms", v)} placeholder="Select payment terms" required />
@@ -302,12 +302,12 @@ function AddContractPage({ onCancel, contract, onSave }: {
                   <label className="text-sm font-medium text-gray-600">Credit Limit <span className="text-gray-400 font-normal text-xs">(Optional)</span></label>
                   <div className="flex h-[40px]">
                     <div className="relative flex-shrink-0">
-                      <select defaultValue="INR" className="appearance-none border border-gray-200 border-r-0 rounded-l-lg px-3 text-sm text-gray-600 bg-gray-50 pr-7 h-full focus:outline-none">
+                      <select defaultValue="INR" className="appearance-none border border-gray-200 border-r-0 rounded-l-lg px-2 text-sm text-gray-600 bg-gray-50 pr-7 h-full focus:outline-none">
                         <option>INR</option><option>USD</option>
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                     </div>
-                    <input value={form.creditLimit} onChange={e => set("creditLimit", e.target.value)} className="flex-1 border border-gray-200 rounded-r-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
+                    <input value={form.creditLimit} onChange={e => set("creditLimit", e.target.value)} className="flex-1 border border-gray-200 rounded-r-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
                   </div>
                 </div>
                 {/* Available Credit */}
@@ -315,15 +315,15 @@ function AddContractPage({ onCancel, contract, onSave }: {
                   <label className="text-sm font-medium text-gray-600">Available Credit <span className="text-gray-400 font-normal text-xs">(Optional)</span></label>
                   <div className="flex h-[40px]">
                     <div className="relative flex-shrink-0">
-                      <select defaultValue="INR" className="appearance-none border border-gray-200 border-r-0 rounded-l-lg px-3 text-sm text-gray-600 bg-gray-50 pr-7 h-full focus:outline-none">
+                      <select defaultValue="INR" className="appearance-none border border-gray-200 border-r-0 rounded-l-lg px-2 text-sm text-gray-600 bg-gray-50 pr-7 h-full focus:outline-none">
                         <option>INR</option><option>USD</option>
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                     </div>
-                    <input value={form.availableCredit} onChange={e => set("availableCredit", e.target.value)} className="flex-1 border border-gray-200 rounded-r-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
+                    <input value={form.availableCredit} onChange={e => set("availableCredit", e.target.value)} className="flex-1 border border-gray-200 rounded-r-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0" />
                   </div>
                 </div>
-                <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-3 flex items-start gap-2">
+                <div className="col-span-2 bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-start gap-2">
                   <span className="text-blue-500 flex-shrink-0 text-sm mt-0.5">ℹ</span>
                   <span className="text-sm text-blue-700">Credit limit will be validated against vendor's approved credit.</span>
                 </div>
@@ -409,15 +409,15 @@ function AddContractPage({ onCancel, contract, onSave }: {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-3 py-2.5 text-gray-500 font-semibold w-7">#</th>
-                      <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Name</th>
-                      <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Type</th>
-                      <th className="text-left px-3 py-2.5 text-gray-500 font-semibold">Req.</th>
+                      <th className="text-left px-2 py-2.5 text-gray-500 font-semibold w-7">#</th>
+                      <th className="text-left px-2 py-2.5 text-gray-500 font-semibold">Name</th>
+                      <th className="text-left px-2 py-2.5 text-gray-500 font-semibold">Type</th>
+                      <th className="text-left px-2 py-2.5 text-gray-500 font-semibold">Req.</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td colSpan={4} className="px-3 py-8 text-center">
+                      <td colSpan={4} className="px-3 py-2 text-center">
                         <div className="flex flex-col items-center gap-2">
                           <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center">
                             <FileText className="w-5 h-5 text-gray-300" />
@@ -437,7 +437,7 @@ function AddContractPage({ onCancel, contract, onSave }: {
         </div>
 
         {/* ── Bottom action bar ── */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-6 py-4 flex items-center justify-end gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-2 py-2 flex items-center justify-end gap-3">
           <button onClick={onCancel} className="px-6 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
             Cancel
           </button>
@@ -482,7 +482,7 @@ function ContractPanel({ contract, onClose, readOnly = false }: { contract: Cont
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-5">
         {tab === "Details" && (
           <>
             <div>
@@ -540,7 +540,7 @@ function ContractPanel({ contract, onClose, readOnly = false }: { contract: Cont
           <div className="space-y-3">
             <p className="text-xs text-gray-500 font-medium">6 Documents attached</p>
             {["IT Hardware Supply Agreement v2.pdf", "Annexure A - Pricing Schedule.xlsx", "Annexure B - SLA Terms.pdf", "NDA Signed Copy.pdf", "Purchase Order Copy.pdf", "Vendor Compliance Certificate.pdf"].map(doc => (
-              <div key={doc} className="flex items-center gap-3 p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+              <div key={doc} className="flex items-center gap-3 p-2 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                 <div className="w-8 h-8 bg-red-50 rounded-md flex items-center justify-center flex-shrink-0"><FileText className="w-4 h-4 text-red-500" /></div>
                 <div className="flex-1 min-w-0"><p className="text-xs font-medium text-gray-800 truncate">{doc}</p><p className="text-xs text-gray-400">Added Jan 01, 2025</p></div>
                 <Download className="w-4 h-4 text-gray-400 hover:text-blue-600 flex-shrink-0" />
@@ -579,8 +579,8 @@ function ArchivedContractsModal({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<Contract | null>(null);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-fullmax-h-[85vh] flex flex-col mx-4">
+        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <Archive className="w-5 h-5 text-gray-500" />
             <div><h2 className="text-base font-bold text-gray-900">Archived Contracts</h2><p className="text-xs text-gray-500">Read-only view of archived contracts</p></div>
@@ -591,18 +591,18 @@ function ArchivedContractsModal({ onClose }: { onClose: () => void }) {
           <div className="flex-1 overflow-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-gray-50/90 border-b border-gray-100">
-                <tr>{["Contract ID", "Contract Name", "Type", "Start Date", "End Date", "Value", "Status"].map(h => <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{["Contract ID", "Contract Name", "Type", "Start Date", "End Date", "Value", "Status"].map(h => <th key={h} className="text-left px-2 py-2 text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {ARCHIVED_CONTRACTS.map(c => (
                   <tr key={c.id} onClick={() => setSelected(c)} className="hover:bg-gray-50 cursor-pointer transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap"><span className="text-blue-600 font-semibold text-sm">{c.id}</span></td>
-                    <td className="px-4 py-3 text-gray-700 text-sm">{c.name}</td>
-                    <td className="px-4 py-3 whitespace-nowrap"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_STYLES[c.type]}`}>{c.type}</span></td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 text-sm">{c.startDate}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 text-sm">{c.endDate}</td>
-                    <td className="px-4 py-3 whitespace-nowrap font-semibold text-gray-700 text-sm">{c.value}</td>
-                    <td className="px-4 py-3 whitespace-nowrap"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLES[c.status]}`}>{c.status}</span></td>
+                    <td className="px-4 py-2 whitespace-nowrap"><span className="text-blue-600 font-semibold text-sm">{c.id}</span></td>
+                    <td className="px-4 py-2 text-gray-700 text-sm">{c.name}</td>
+                    <td className="px-4 py-2 whitespace-nowrap"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${TYPE_STYLES[c.type]}`}>{c.type}</span></td>
+                    <td className="px-4 py-2 whitespace-nowrap text-gray-500 text-sm">{c.startDate}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-gray-500 text-sm">{c.endDate}</td>
+                    <td className="px-4 py-2 whitespace-nowrap font-semibold text-gray-700 text-sm">{c.value}</td>
+                    <td className="px-4 py-2 whitespace-nowrap"><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLES[c.status]}`}>{c.status}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -672,11 +672,11 @@ export default function VendorContractsPage() {
       <div className="flex min-h-screen">
         {selectedContract && <div className="fixed inset-0 bg-black/20 z-20 lg:hidden" onClick={() => setSelectedContract(null)} />}
         <div className="flex-1 min-w-0 overflow-y-auto">
-          <div className="max-w-[1280px] mx-auto px-4 py-6 space-y-4">
+          <div className="max-w-[1280px]px-2 py-2 space-y-4">
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {stats.map(stat => (
-                <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+                <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm hover:shadow-md transition-shadow">
                   <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>{stat.icon}</div>
                   <p className="text-xs text-gray-500 font-medium mb-1 leading-tight">{stat.label}</p>
                   <p className="text-xl font-bold text-gray-900">{stat.value}</p>
@@ -687,7 +687,7 @@ export default function VendorContractsPage() {
 
             {/* Table */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+              <div className="px-4 py-2 flex items-center justify-between border-b border-gray-100">
                 <h3 className="text-sm font-semibold text-gray-800">All Contracts</h3>
                 <div className="relative" ref={topMenu.ref}>
                   <button onClick={() => topMenu.setOpen(o => !o)} className="p-2 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
@@ -719,7 +719,7 @@ export default function VendorContractsPage() {
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/60">
                         {["Contract ID", "Contract Name", "Type", "Start Date", "End Date", "Value", "Payment Terms", "Status", "Actions"].map(h => (
-                          <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                          <th key={h} className="text-left px-2 py-2 text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>

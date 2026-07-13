@@ -184,7 +184,7 @@ export default function AddVendorPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="border-b border-gray-200 sticky top-0 z-10 bg-white">
-        <div className="px-8 py-6 flex items-center justify-between">
+        <div className="px-8 py-2 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Add New Vendor</h1>
             <p className="text-sm text-gray-600 mt-1">Create a new vendor profile. All fields marked with <span className="text-red-600">*</span> are required.</p>
@@ -195,7 +195,7 @@ export default function AddVendorPage() {
       </div>
 
       {/* Form Content */}
-      <div className="px-8 py-8 space-y-12">
+      <div className="px-8 py-2 space-y-12">
         {/* Section 1: Vendor Information */}
         <FormSection number={1} title="Vendor Information">
           <div className="grid grid-cols-2 gap-6">
@@ -209,7 +209,7 @@ export default function AddVendorPage() {
                   name="vendorName"
                   value={formData.vendorName}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               }
             />
@@ -220,7 +220,7 @@ export default function AddVendorPage() {
                 placeholder="Auto-generated"
                 disabled
                 value={formData.vendorCode}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />} required={undefined}            />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -232,7 +232,7 @@ export default function AddVendorPage() {
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select category</option>
                   {categories.map(cat => (
@@ -247,7 +247,7 @@ export default function AddVendorPage() {
                 name="subCategory"
                 value={formData.subCategory}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={!formData.category}
               >
                 <option value="">Select sub category</option>
@@ -266,7 +266,7 @@ export default function AddVendorPage() {
                   name="vendorType"
                   value={formData.vendorType}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select vendor type</option>
                   {vendorTypes.map(type => (
@@ -283,7 +283,7 @@ export default function AddVendorPage() {
                 name="pan"
                 value={formData.pan}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -295,14 +295,14 @@ export default function AddVendorPage() {
                 name="legalEntityName"
                 value={formData.legalEntityName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
             <FormField
               label="Year of Establishment"
               input={<select
                 name="yearOfEstablishment"
                 value={formData.yearOfEstablishment}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select year</option>
                 {years.map(year => (
@@ -319,7 +319,7 @@ export default function AddVendorPage() {
               name="website"
               value={formData.website}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
         </FormSection>
 
         {/* Section 2: Primary Contact */}
@@ -333,7 +333,7 @@ export default function AddVendorPage() {
                   name="contactPerson"
                   value={formData.contactPerson}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select contact person</option>
                   {contacts.map((contact, idx) => {
@@ -351,7 +351,7 @@ export default function AddVendorPage() {
                 name="designation"
                 value={formData.designation}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select designation</option>
                 {designations.map(des => (
@@ -370,7 +370,7 @@ export default function AddVendorPage() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             }
           />
@@ -397,7 +397,7 @@ export default function AddVendorPage() {
                     name="phoneNumber"
                     value={formData.phoneNumber}
                     onChange={handleChange}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               }
@@ -421,7 +421,7 @@ export default function AddVendorPage() {
                   name="mobileNumber"
                   value={formData.mobileNumber}
                   onChange={handleChange}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>} required={undefined}            />
           </div>
 
@@ -433,7 +433,7 @@ export default function AddVendorPage() {
               name="alternateEmail"
               value={formData.alternateEmail}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
         </FormSection>
 
         {/* Section 3: Business & Address Details */}
@@ -448,7 +448,7 @@ export default function AddVendorPage() {
                 value={formData.registeredAddress}
                 onChange={handleChange}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             }
           />
@@ -462,7 +462,7 @@ export default function AddVendorPage() {
                   name="country"
                   value={formData.country}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select country</option>
                   {countries.map(country => (
@@ -479,7 +479,7 @@ export default function AddVendorPage() {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select state</option>
                   {states.map(state => (
@@ -499,7 +499,7 @@ export default function AddVendorPage() {
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select city</option>
                   {cities.map(city => (
@@ -518,7 +518,7 @@ export default function AddVendorPage() {
                   name="pincode"
                   value={formData.pincode}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               }
             />
@@ -543,7 +543,7 @@ export default function AddVendorPage() {
               value={formData.billingAddress}
               onChange={handleChange}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
         </FormSection>
 
         {/* Section 4: Financial Details */}
@@ -555,7 +555,7 @@ export default function AddVendorPage() {
                 name="paymentTerms"
                 value={formData.paymentTerms}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select payment terms</option>
                 {paymentTerms.map(term => (
@@ -570,7 +570,7 @@ export default function AddVendorPage() {
                   name="currency"
                   value={formData.currency}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {currencies.map(curr => (
                     <option key={curr} value={curr}>{curr}</option>
@@ -588,7 +588,7 @@ export default function AddVendorPage() {
               name="creditLimit"
               value={formData.creditLimit}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}          />
 
           <div className="grid grid-cols-2 gap-6">
             <FormField
@@ -599,7 +599,7 @@ export default function AddVendorPage() {
                 name="bankName"
                 value={formData.bankName}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
             <FormField
               label="Account Number"
               input={<input
@@ -608,7 +608,7 @@ export default function AddVendorPage() {
                 name="accountNumber"
                 value={formData.accountNumber}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -620,14 +620,14 @@ export default function AddVendorPage() {
                 name="ifscCode"
                 value={formData.ifscCode}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
             <FormField
               label="Account Type"
               input={<select
                 name="accountType"
                 value={formData.accountType}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select account type</option>
                 {accountTypes.map(type => (
@@ -646,7 +646,7 @@ export default function AddVendorPage() {
                 name="msmeStatus"
                 value={formData.msmeStatus}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select status</option>
                 {msmeStatuses.map(status => (
@@ -659,7 +659,7 @@ export default function AddVendorPage() {
                 name="isoStatus"
                 value={formData.isoStatus}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select certification</option>
                 {isoCertifications.map(cert => (
@@ -675,7 +675,7 @@ export default function AddVendorPage() {
                 name="qualityCertification"
                 value={formData.qualityCertification}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select certification</option>
                 {qualityCertifications.map(cert => (
@@ -688,7 +688,7 @@ export default function AddVendorPage() {
                 name="environmentalCertification"
                 value={formData.environmentalCertification}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select certification</option>
                 {environmentalCertifications.map(cert => (
@@ -711,7 +711,7 @@ export default function AddVendorPage() {
                 name="blacklisted"
                 value={formData.blacklisted}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select status</option>
                 {blacklistedOptions.map(opt => (
@@ -732,7 +732,7 @@ export default function AddVendorPage() {
                 name="contractStatus"
                 value={formData.contractStatus}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select status</option>
                 {contractStatuses.map(status => (
@@ -754,7 +754,7 @@ export default function AddVendorPage() {
                 name="onboardingDate"
                 value={formData.onboardingDate}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />} required={undefined}            />
           </div>
 
           <FormField
@@ -763,7 +763,7 @@ export default function AddVendorPage() {
               name="preferredVendor"
               value={formData.preferredVendor}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select status</option>
               {preferredOptions.map(opt => (
@@ -774,8 +774,8 @@ export default function AddVendorPage() {
 
         {/* Section 7: Documents */}
         <FormSection number={7} title="Documents">
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center mb-6">
-            <Cloud className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+          <div className="border-2 border-dashed border-blue-300 rounded-lg p-2 text-center mb-6">
+            <Cloud className="w-12 h-12 text-blue-400mb-3" />
             <p className="text-gray-700 font-medium mb-2">Drag and drop files here</p>
             <p className="text-gray-500 text-sm mb-4">or click to upload</p>
             <p className="text-gray-500 text-xs mb-2">Supported files: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG</p>
@@ -862,7 +862,7 @@ export default function AddVendorPage() {
                   const selectedTags = Array.from(e.target.selectedOptions, option => option.value);
                   setFormData(prev => ({ ...prev, tags: selectedTags }));
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 size={6}
               >
                 {tagOptions.map(tag => (
@@ -878,7 +878,7 @@ export default function AddVendorPage() {
                 name="visibility"
                 value={formData.visibility}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select visibility</option>
                 {visibilityOptions.map(opt => (
@@ -895,13 +895,13 @@ export default function AddVendorPage() {
               value={formData.internalNotes}
               onChange={handleChange}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               maxLength={1000} />} required={undefined}          />
           <p className="text-xs text-gray-500 text-right">{formData.internalNotes.length}/1000 characters</p>
         </FormSection>
 
         {/* Bottom Actions */}
-        <div className="flex gap-3 py-8 border-t border-gray-200">
+        <div className="flex gap-3 py-2 border-t border-gray-200">
           <button className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
             Cancel
           </button>

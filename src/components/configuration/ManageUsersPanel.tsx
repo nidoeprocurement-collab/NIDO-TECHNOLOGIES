@@ -114,7 +114,7 @@ export default function ManageUsersPanel() {
   return (
     <div className="space-y-6">
       {/* Description + Actions */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-muted-foreground">
           Add and manage client or vendor users.
         </p>
@@ -154,31 +154,31 @@ export default function ManageUsersPanel() {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/40">
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
                   Name
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
                   Email
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
                   Role
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
                   Job Title
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
                   Department
                 </th>
 
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider">
                   Status
                 </th>
 
-                <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider">
+                <th className="px-4 py-2 text-center text-xs font-semibold uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -190,11 +190,11 @@ export default function ManageUsersPanel() {
                   key={user.id}
                   className="border-b hover:bg-muted/20"
                 >
-                  <td className="px-4 py-4 font-medium">
+                  <td className="px-4 py-2 font-medium">
                     {user.name}
                   </td>
 
-                  <td className="px-4 py-4 text-muted-foreground">
+                  <td className="px-4 py-2 text-muted-foreground">
                     {user.email}
                   </td>
 

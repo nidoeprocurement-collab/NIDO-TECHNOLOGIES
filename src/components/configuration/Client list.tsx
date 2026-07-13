@@ -35,14 +35,14 @@ export default function ClientListPage() {
 
         <button
           onClick={() => navigate("/add-client")}
-          className="bg-[#204d83] text-white px-5 h-10 rounded-lg text-sm font-medium hover:bg-[#1c4371]"
+          className="bg-[#204d83] text-white px-2 h-10 rounded-lg text-sm font-medium hover:bg-[#1c4371]"
         >
           + Add Client
         </button>
       </div>
 
       {/* TABLE HEADER */}
-      <div className="grid grid-cols-6 bg-white px-6 py-3 text-sm font-semibold text-gray-600 border rounded-t-lg">
+      <div className="grid grid-cols-6 bg-white px-2 py-3 text-sm font-semibold text-gray-600 border rounded-t-lg">
         <div>Client ID</div>
         <div>Name</div>
         <div>Representative</div>
@@ -65,7 +65,7 @@ export default function ClientListPage() {
             <div
               key={client.id}
               onClick={() => navigate(`/clients/${client.id}`)}
-              className="grid grid-cols-6 px-6 py-4 border-b cursor-pointer hover:bg-gray-50 text-sm"
+              className="grid grid-cols-6 px-2 py-2 border-b cursor-pointer hover:bg-gray-50 text-sm"
             >
               <div className="text-blue-600 font-medium">
                 {client.id}

@@ -160,14 +160,14 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
   const removeDevice = (sku: string) =>
     setAssignedDevices((prev) => prev.filter((d) => d.sku !== sku));
 
-  const inputCls = "w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 bg-white";
+  const inputCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 bg-white";
   const labelCls = "block text-xs text-blue-600 mb-1";
-  const disabledCls = "w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
+  const disabledCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 flex flex-col max-h-[92vh]"
+        className="bg-white rounded-2xl shadow-2xl w-fullmx-4 flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
@@ -206,7 +206,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-6 py-5">
+        <div className="overflow-y-auto flex-1 px-2 py-5">
 
           {/* ── OVERVIEW ── */}
           {activeTab === "Overview" && (
@@ -358,9 +358,9 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">Module</th>
+                      <th className="text-left px-2 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">Module</th>
                       {addUserPermCols.map((col) => (
-                        <th key={col} className="text-center px-3 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">{col}</th>
+                        <th key={col} className="text-center px-2 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">{col}</th>
                       ))}
                     </tr>
                   </thead>
@@ -534,12 +534,12 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
                     {deviceDropOpen && deviceSearch && (
                       <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-48 overflow-y-auto">
                         {filteredDeviceOptions.length === 0 ? (
-                          <p className="px-4 py-3 text-xs text-gray-400">No devices found</p>
+                          <p className="px-4 py-2 text-xs text-gray-400">No devices found</p>
                         ) : filteredDeviceOptions.map((d) => (
                           <button
                             key={d.sku}
                             onClick={() => assignDevice(d)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
+                            className="w-full flex items-center gap-3 px-2 py-2.5 hover:bg-gray-50 transition-colors text-left"
                           >
                             <img src={d.img} alt={d.name} className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0" />
                             <div>
@@ -558,7 +558,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
               {assignedDevices.length > 0 ? (
                 <div className="grid grid-cols-2 gap-4">
                   {assignedDevices.map((device) => (
-                    <div key={device.sku} className="border border-gray-200 rounded-xl p-4 flex items-start gap-4 bg-white">
+                    <div key={device.sku} className="border border-gray-200 rounded-xl p-2 flex items-start gap-2 bg-white">
                       <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0">
                         <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
                       </div>
@@ -590,7 +590,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-between">
           <div className="flex gap-2">
             {modalTabs.map((tab, i) => (
               <button
@@ -671,7 +671,7 @@ function ResetPasswordModal({ userName, onClose }: { userName: string; onClose: 
     setDone(true);
   };
 
-  const inputCls = "w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 pr-9";
+  const inputCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 pr-9";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
@@ -683,7 +683,7 @@ function ResetPasswordModal({ userName, onClose }: { userName: string; onClose: 
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="px-6 py-2 flex flex-col gap-4">
           {!done ? (
             <>
               <div>
@@ -723,7 +723,7 @@ function ResetPasswordModal({ userName, onClose }: { userName: string; onClose: 
                 </div>
               </div>
               {error && <p className="text-[11px] text-red-500">{error}</p>}
-              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-[11px] text-blue-600">
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-2 py-2 text-[11px] text-blue-600">
                 Password must be at least 8 characters and contain a mix of letters and numbers.
               </div>
             </>
@@ -737,7 +737,7 @@ function ResetPasswordModal({ userName, onClose }: { userName: string; onClose: 
             </div>
           )}
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
             {done ? "Close" : "Cancel"}
           </button>
@@ -765,13 +765,13 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
       </div>
 
       {/* Read-only notice */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+      <div className="flex items-center gap-2 px-2 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         This is an archived user — the profile is read-only and cannot be edited.
       </div>
 
       {/* Profile header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-start justify-between">
+      <div className="bg-white rounded-xl border border-gray-200 p-2 flex items-start justify-between">
         <div className="flex items-center gap-4">
           <div className={`w-14 h-14 rounded-full ${user.color} flex items-center justify-center text-white text-lg font-bold shrink-0 opacity-70`}>
             {user.initials}
@@ -784,7 +784,7 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
               </span>
             </div>
             <p className="text-xs text-gray-500 mb-2">{user.role}</p>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
               <div className="flex items-center gap-1.5"><Mail size={11} className="text-gray-400" />{user.email}</div>
               <div className="flex items-center gap-1.5"><Phone size={11} className="text-gray-400" />{user.phone}</div>
               <div className="flex items-center gap-1.5"><Clock size={11} className="text-gray-400" />Last active {formattedDate}</div>
@@ -796,7 +796,7 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
       {/* Details card */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <p className="text-xs font-semibold text-gray-700 mb-4">Archive Details</p>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-xs">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
           {[
             { label: "Full Name", value: user.name },
             { label: "Role", value: user.role },
@@ -876,14 +876,14 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
     onBack();
   };
 
-  const inputCls = "w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 bg-white";
+  const inputCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 bg-white";
   const labelCls = "block text-xs text-blue-600 mb-1";
-  const disabledCls = "w-full px-3 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
+  const disabledCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
 
   return (
     <div className="flex flex-col gap-0">
       {/* Page header */}
-      <div className="bg-white rounded-xl border border-gray-200 px-6 pt-5 pb-0">
+      <div className="bg-white rounded-xl border border-gray-200 px-2 pt-5 pb-0">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
@@ -916,7 +916,7 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
       </div>
 
       {/* Tab content */}
-      <div className="mt-4 bg-white rounded-xl border border-gray-200 px-6 py-5">
+      <div className="mt-4 bg-white rounded-xl border border-gray-200 px-2 py-5">
 
         {activeTab === "Overview" && (
           <div className="flex flex-col gap-5">
@@ -1020,8 +1020,8 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">Module</th>
-                  {addUserPermCols.map((col) => <th key={col} className="text-center px-3 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">{col}</th>)}
+                  <th className="text-left px-2 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">Module</th>
+                  {addUserPermCols.map((col) => <th key={col} className="text-center px-2 py-2.5 font-semibold text-gray-500 text-[10px] uppercase tracking-wide">{col}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -1095,9 +1095,9 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
                   </div>
                   {deviceDropOpen && deviceSearch && (
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-48 overflow-y-auto">
-                      {filteredDeviceOptions.length === 0 ? <p className="px-4 py-3 text-xs text-gray-400">No devices found</p>
+                      {filteredDeviceOptions.length === 0 ? <p className="px-4 py-2 text-xs text-gray-400">No devices found</p>
                         : filteredDeviceOptions.map((d) => (
-                          <button key={d.sku} onClick={() => { setAssignedDevices((prev) => [...prev, d]); setDeviceSearch(""); setDeviceDropOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left">
+                          <button key={d.sku} onClick={() => { setAssignedDevices((prev) => [...prev, d]); setDeviceSearch(""); setDeviceDropOpen(false); }} className="w-full flex items-center gap-3 px-2 py-2.5 hover:bg-gray-50 transition-colors text-left">
                             <img src={d.img} alt={d.name} className="w-8 h-8 rounded object-cover bg-gray-100 shrink-0" />
                             <div><p className="text-xs font-medium text-gray-800">{d.name}</p><p className="text-[10px] text-gray-400">{d.sku} · {d.category}</p></div>
                           </button>
@@ -1110,7 +1110,7 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
             {assignedDevices.length > 0 && (
               <div className="grid grid-cols-2 gap-4">
                 {assignedDevices.map((device) => (
-                  <div key={device.sku} className="border border-gray-200 rounded-xl p-4 flex items-start gap-4 bg-white">
+                  <div key={device.sku} className="border border-gray-200 rounded-xl p-2 flex items-start gap-2 bg-white">
                     <div className="w-14 h-14 rounded-lg bg-gray-100 overflow-hidden shrink-0"><img src={device.img} alt={device.name} className="w-full h-full object-cover" /></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -1157,12 +1157,12 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Archived On <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Reason <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Archived On <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Reason <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -1179,9 +1179,9 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-gray-500"><div className="flex items-center gap-1"><Mail size={11} className="text-gray-400 shrink-0" />{user.email}</div></td>
-                <td className="px-4 py-3 text-gray-500"><div className="flex items-center gap-1"><Phone size={11} className="text-gray-400 shrink-0" />{user.phone}</div></td>
-                <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{user.archivedOn}</td>
+                <td className="px-4 py-2 text-gray-500"><div className="flex items-center gap-1"><Mail size={11} className="text-gray-400 shrink-0" />{user.email}</div></td>
+                <td className="px-4 py-2 text-gray-500"><div className="flex items-center gap-1"><Phone size={11} className="text-gray-400 shrink-0" />{user.phone}</div></td>
+                <td className="px-4 py-2 text-gray-500 font-mono text-[10px]">{user.archivedOn}</td>
                 <td className="px-4 py-3"><span className="inline-block text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{user.reason}</span></td>
                 <td className="px-4 py-3">
                   <button
@@ -1240,7 +1240,7 @@ function ImportUsersModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-fullmx-4 flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 pt-5 pb-4 flex items-center justify-between border-b border-gray-100">
           <div>
@@ -1250,14 +1250,14 @@ function ImportUsersModal({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={16} /></button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-5 flex flex-col gap-5">
+        <div className="overflow-y-auto flex-1 px-2 py-2 flex flex-col gap-5">
           {/* Upload area */}
           {!file && (
             <div
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
-              className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors ${dragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:border-gray-300"}`}
+              className={`border-2 border-dashed rounded-xl p-2 flex flex-col items-center gap-3 transition-colors ${dragging ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-gray-50/50 hover:border-gray-300"}`}
             >
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
               <p className="text-sm text-gray-600 font-medium">Drag & drop your CSV file here</p>
@@ -1289,7 +1289,7 @@ function ImportUsersModal({ onClose }: { onClose: () => void }) {
                       <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
                           {headers.map((h, i) => (
-                            <th key={i} className="text-left px-3 py-2 font-semibold text-gray-500 text-[10px] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            <th key={i} className="text-left px-2 py-2 font-semibold text-gray-500 text-[10px] uppercase tracking-wide whitespace-nowrap">{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -1324,7 +1324,7 @@ function ImportUsersModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-between">
           <button onClick={() => { downloadUserTemplate(); }} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors">
             <Download size={12} /> Download Template
           </button>
@@ -1482,21 +1482,21 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
               <div className="absolute right-0 top-9 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px]">
                 <button
                   onClick={() => { setDotMenuOpen(false); onResetPassword?.(); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-2 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                   Reset Password
                 </button>
                 <button
                   onClick={() => { setDotMenuOpen(false); onEdit?.(); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-2 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Edit User
                 </button>
                 <button
                   onClick={() => { setDotMenuOpen(false); onDeactivate?.(); }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs text-orange-600 hover:bg-orange-50 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-2 py-2.5 text-xs text-orange-600 hover:bg-orange-50 transition-colors text-left"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
                   {user.status === "Inactive" ? "Activate" : "Deactivate"}
@@ -1515,7 +1515,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
             <button
               key={tab}
               onClick={() => setDetailTab(tab)}
-              className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
+              className={`px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
                 detailTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
               }`}
             >
@@ -1531,7 +1531,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
         {detailTab === "Overview" && (
           <div className="grid grid-cols-[210px_1fr]">
             {/* Left sidebar */}
-            <div className="border-r border-gray-100 p-5 flex flex-col gap-3">
+            <div className="border-r border-gray-100 p-2 flex flex-col gap-3">
               {/* Avatar photo */}
               <div className="flex flex-col items-center gap-2 pb-3 border-b border-gray-100">
                 <div className="w-20 h-20 rounded-full overflow-hidden bg-blue-800 shrink-0 ring-2 ring-gray-100">
@@ -1577,7 +1577,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
               {/* Stats bar */}
               <div className="grid grid-cols-5 border-b border-gray-100">
                 {/* User ID */}
-                <div className="px-4 py-3 flex flex-col gap-1.5 border-r border-gray-100">
+                <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                       <Users size={11} className="text-blue-600" />
@@ -1587,7 +1587,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <p className="text-sm font-bold text-gray-900">{userId}</p>
                 </div>
                 {/* Status */}
-                <div className="px-4 py-3 flex flex-col gap-1.5 border-r border-gray-100">
+                <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                       <CheckCircle size={11} className="text-green-600" />
@@ -1597,7 +1597,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <p className="text-sm font-bold text-green-600">{user.status}</p>
                 </div>
                 {/* Cost Center */}
-                <div className="px-4 py-3 flex flex-col gap-1.5 border-r border-gray-100">
+                <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                       <Building2 size={11} className="text-indigo-600" />
@@ -1607,7 +1607,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <p className="text-sm font-bold text-gray-900">IT Operations</p>
                 </div>
                 {/* Total Orders */}
-                <div className="px-4 py-3 flex flex-col gap-1.5 border-r border-gray-100">
+                <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -1618,7 +1618,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <p className="text-[10px] text-gray-400">Year-to-Date</p>
                 </div>
                 {/* Expenses */}
-                <div className="px-4 py-3 flex flex-col gap-1.5">
+                <div className="px-4 py-2 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1.5">
                       <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center shrink-0">
@@ -1744,7 +1744,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     {["Service ID", "Requested Date", "Service Name", "Requested By", "Amount", "Status"].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide">
+                      <th key={h} className="text-left px-2 py-2.5 font-semibold text-gray-400 text-[10px] uppercase tracking-wide">
                         {h}{(h === "Status" || h === "Requested Date") && <Filter size={9} className="inline ml-0.5 text-gray-300" />}
                       </th>
                     ))}
@@ -1773,12 +1773,12 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
           <div className="p-5 flex flex-col gap-5">
             {/* Summary cards */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
+              <div className="border border-gray-100 rounded-xl px-2 py-2 bg-gray-50/60">
                 <p className="text-[10px] text-gray-400 mb-1">Total Expenses</p>
                 <p className="text-xl font-bold text-gray-900">$15,450</p>
                 <p className="text-[11px] text-gray-400 mt-0.5">Year to date</p>
               </div>
-              <div className="border border-blue-100 rounded-xl px-4 py-3 bg-blue-50/40">
+              <div className="border border-blue-100 rounded-xl px-2 py-2 bg-blue-50/40">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-[10px] text-gray-400">This Month</p>
                   <select
@@ -1802,7 +1802,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   {new Date(expMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                 </p>
               </div>
-              <div className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
+              <div className="border border-gray-100 rounded-xl px-2 py-2 bg-gray-50/60">
                 <p className="text-[10px] text-gray-400 mb-1">Pending Approval</p>
                 <p className="text-xl font-bold text-orange-500">$1,800</p>
                 <p className="text-[11px] text-gray-400 mt-0.5">2 requests</p>
@@ -1896,7 +1896,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                     { label: "Active", value: String(activeCount), sub: "In use", color: "text-green-600" },
                     { label: "In Repair", value: String(repairCount), sub: repairCount > 0 ? "Est. return Jun 28" : "None", color: "text-orange-500" },
                   ].map((card) => (
-                    <div key={card.label} className="border border-gray-100 rounded-xl px-4 py-3 bg-gray-50/60">
+                    <div key={card.label} className="border border-gray-100 rounded-xl px-2 py-2 bg-gray-50/60">
                       <p className="text-[10px] text-gray-400 mb-1">{card.label}</p>
                       <p className={`text-xl font-bold ${card.color ?? "text-gray-900"}`}>{card.value}</p>
                       <p className="text-[11px] text-gray-400 mt-0.5">{card.sub}</p>
@@ -1905,7 +1905,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 </div>
                 <button
                   onClick={() => onOpenAssignPage?.()}
-                  className="ml-4 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors shrink-0"
+                  className="ml-4 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-2 rounded-lg transition-colors shrink-0"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                   Assign Device
@@ -1918,7 +1918,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">Recently Assigned</p>
                   <div className="grid grid-cols-2 gap-4">
                     {assignedDevices.map((device) => (
-                      <div key={device.sku + device.assignedOn} className="border border-blue-200 bg-blue-50/30 rounded-xl p-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
+                      <div key={device.sku + device.assignedOn} className="border border-blue-200 bg-blue-50/30 rounded-xl p-2 flex items-start gap-2 hover:shadow-sm transition-shadow">
                         <div className="w-16 h-16 rounded-lg bg-white border border-blue-100 overflow-hidden shrink-0">
                           <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
                         </div>
@@ -1951,7 +1951,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 {assignedDevices.length > 0 && <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Previously Assigned</p>}
                 <div className="grid grid-cols-2 gap-4">
                   {staticDevices.map((device) => (
-                    <div key={device.sku} className="border border-gray-200 rounded-xl p-4 flex items-start gap-4 hover:shadow-sm transition-shadow bg-white">
+                    <div key={device.sku} className="border border-gray-200 rounded-xl p-2 flex items-start gap-2 hover:shadow-sm transition-shadow bg-white">
                       <div className="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden shrink-0">
                         <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
                       </div>
@@ -2038,10 +2038,10 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-gray-100">
-                        <th className="text-left px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Item</th>
-                        <th className="text-center px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
-                        <th className="text-right px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Unit Price</th>
-                        <th className="text-right px-4 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                        <th className="text-left px-2 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Item</th>
+                        <th className="text-center px-2 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
+                        <th className="text-right px-2 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Unit Price</th>
+                        <th className="text-right px-2 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Total</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2141,7 +2141,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <button
                     key={approval.id}
                     onClick={() => setSelectedApproval(approval)}
-                    className="w-full text-left border border-gray-200 rounded-xl p-4 bg-white hover:shadow-sm hover:border-blue-200 transition-all group"
+                    className="w-full text-left border border-gray-200 rounded-xl p-2 bg-white hover:shadow-sm hover:border-blue-200 transition-all group"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -2191,7 +2191,7 @@ function ArchiveConfirmModal({ user, onConfirm, onCancel }: { user: { name: stri
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 flex flex-col items-center gap-4 text-center">
+        <div className="px-6 py-2 flex flex-col items-center gap-2 text-center">
           <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
@@ -2203,7 +2203,7 @@ function ArchiveConfirmModal({ user, onConfirm, onCancel }: { user: { name: stri
               This user will be moved to Archived Users and will lose access to the system. This action can be reviewed in the archived users list.
             </p>
           </div>
-          <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 w-full">
+          <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-2 py-2 w-full">
             <div className={`w-8 h-8 rounded-full ${user.color} flex items-center justify-center text-white text-[11px] font-bold shrink-0`}>
               {user.initials}
             </div>
@@ -2215,7 +2215,7 @@ function ArchiveConfirmModal({ user, onConfirm, onCancel }: { user: { name: stri
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button
             onClick={onCancel}
             className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -2289,7 +2289,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
         </div>
 
         {/* Card body */}
-        <div className="px-6 py-5 flex flex-col gap-6 flex-1">
+        <div className="px-6 py-2 flex flex-col gap-2 flex-1">
 
           {/* Search bar */}
           <div>
@@ -2309,13 +2309,13 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
               {showDrop && search.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-60 overflow-y-auto">
                   {filtered.length === 0 ? (
-                    <p className="px-4 py-3 text-xs text-gray-400">No devices found</p>
+                    <p className="px-4 py-2 text-xs text-gray-400">No devices found</p>
                   ) : (
                     filtered.map((d) => (
                       <button
                         key={d.sku}
                         onClick={() => { setSelected(d); setSearch(""); setShowDrop(false); }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-left group"
+                        className="w-full flex items-center gap-3 px-2 py-2 hover:bg-blue-50 transition-colors text-left group"
                       >
                         <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden shrink-0">
                           <img src={d.img} alt={d.name} className="w-full h-full object-cover" />
@@ -2335,7 +2335,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
 
           {/* Selected product card */}
           {selected && (
-            <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4 flex items-center gap-4">
+            <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-2 flex items-center gap-4">
               <div className="w-16 h-16 rounded-xl bg-white border border-blue-100 overflow-hidden shrink-0 shadow-sm">
                 <img src={selected.img} alt={selected.name} className="w-full h-full object-cover" />
               </div>
@@ -2367,7 +2367,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
                     <button
                       key={field}
                       onClick={() => setActiveField(field)}
-                      className={`flex-1 px-4 py-3 text-xs font-medium transition-colors relative border-r last:border-r-0 border-gray-200 ${
+                      className={`flex-1 px-2 py-2 text-xs font-medium transition-colors relative border-r last:border-r-0 border-gray-200 ${
                         activeField === field
                           ? "text-blue-600 bg-white"
                           : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/60"
@@ -2395,7 +2395,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
                       onChange={(e) => setSerialNo(e.target.value)}
                       placeholder="e.g. C02XL0UKJHD5"
                       autoFocus
-                      className="w-full px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
+                      className="w-full px-2 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Located on the device label or packaging</p>
                   </div>
@@ -2409,7 +2409,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
                       onChange={(e) => setModelNo(e.target.value)}
                       placeholder="e.g. A2779"
                       autoFocus
-                      className="w-full px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
+                      className="w-full px-2 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Model identifier from the manufacturer</p>
                   </div>
@@ -2423,7 +2423,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
                       onChange={(e) => setReferenceNo(e.target.value)}
                       placeholder="e.g. REF-2024-00198"
                       autoFocus
-                      className="w-full px-3 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
+                      className="w-full px-2 py-2.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 font-mono"
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Internal reference or asset tag number</p>
                   </div>
@@ -2434,7 +2434,7 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
         </div>
 
         {/* Footer — Assign Device button at bottom right */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button
             onClick={onBack}
             className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -2569,7 +2569,7 @@ export default function ClientUsersPage() {
               ].map(({ icon, label, action, divider }) => (
                 <div key={label}>
                   {divider && <div className="my-1 border-t border-gray-100" />}
-                  <button onClick={action} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <button onClick={action} className="w-full flex items-center gap-2.5 px-2 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
                     <span className="text-gray-400">{icon}</span>{label}
                   </button>
                 </div>
@@ -2581,7 +2581,7 @@ export default function ClientUsersPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
             <Users size={16} className="text-gray-500" />
           </div>
@@ -2591,7 +2591,7 @@ export default function ClientUsersPage() {
             <p className="text-[11px] text-gray-400">{active} Active</p>
           </div>
         </div>
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center shrink-0">
             <Timer size={16} className="text-orange-400" />
           </div>
@@ -2600,7 +2600,7 @@ export default function ClientUsersPage() {
             <p className="text-xl font-bold text-gray-900 leading-tight">{pending}</p>
           </div>
         </div>
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white flex items-center gap-3">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
             <X size={16} className="text-red-400" />
           </div>
@@ -2616,16 +2616,16 @@ export default function ClientUsersPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-10 px-3 py-3">
+              <th className="w-10 px-2 py-3">
                 <input type="checkbox" checked={allChecked} onChange={toggleAll} className="rounded border-gray-300 text-blue-500 cursor-pointer" />
               </th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User ID</th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Last Active <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-3 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="w-10 px-3 py-3" />
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User ID</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Name / Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Phone</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Last Active <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="w-10 px-2 py-3" />
             </tr>
           </thead>
           <tbody>
@@ -2663,11 +2663,11 @@ export default function ClientUsersPage() {
                     {user.phone}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-gray-500 font-mono text-[10px]">{user.lastActive}</td>
+                <td className="px-3 py-2 text-gray-500 font-mono text-[10px]">{user.lastActive}</td>
                 <td className="px-3 py-3">
                   <StatusBadge status={user.status} />
                 </td>
-                <td className="px-3 py-3 relative">
+                <td className="px-3 py-2 relative">
                   <button
                     onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === user.id ? null : user.id); setHeaderMenuOpen(false); }}
                     className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
@@ -2676,13 +2676,13 @@ export default function ClientUsersPage() {
                   </button>
                   {rowMenu === user.id && (
                     <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-40" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => { setEditingUser(user); setRowMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit User</button>
-                      <button onClick={() => { setResetPasswordUser(user); setRowMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Reset Password</button>
-                      <button onClick={() => deactivateUser(user.id)} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">
+                      <button onClick={() => { setEditingUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit User</button>
+                      <button onClick={() => { setResetPasswordUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Reset Password</button>
+                      <button onClick={() => deactivateUser(user.id)} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">
                         {user.status === "Inactive" ? "Activate" : "Deactivate"}
                       </button>
                       <div className="my-1 border-t border-gray-100" />
-                      <button onClick={() => { setArchiveTarget(user); setRowMenu(null); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-orange-500">Archive User</button>
+                      <button onClick={() => { setArchiveTarget(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-orange-500">Archive User</button>
                     </div>
                   )}
                 </td>

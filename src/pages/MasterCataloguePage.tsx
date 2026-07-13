@@ -970,7 +970,7 @@ export default function CatalogUpdatesTab() {
 
       {/* Bulk Actions Bar */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5">
+        <div className="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-lg px-2 py-2.5">
           <span className="text-sm font-medium text-blue-900" data-testid="text-selected-count">
             {selectedIds.length} product{selectedIds.length > 1 ? 's' : ''} selected
           </span>
@@ -1043,7 +1043,7 @@ export default function CatalogUpdatesTab() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-600">
+                    <TableCell colSpan={8} className="text-center py-2 text-gray-600">
                       No items match the selected filters. Adjust search, category, or status to view catalog entries.
                     </TableCell>
                   </TableRow>
@@ -1209,7 +1209,7 @@ export default function CatalogUpdatesTab() {
                 <TabsTrigger value="pdf" className="text-xs">Export Catalog (PDF)</TabsTrigger>
               </TabsList>
               <TabsContent value="upload" className="mt-4">
-                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <div className="text-center p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <Upload size={32} className="mx-auto text-blue-500 mb-3" />
                   <p className="text-sm font-medium text-gray-800">Upload</p>
                   <p className="text-xs text-gray-600 mt-1">Bulk upload new products or catalog using CSV template.</p>
@@ -1218,7 +1218,7 @@ export default function CatalogUpdatesTab() {
                 </div>
               </TabsContent>
               <TabsContent value="excel" className="mt-4">
-                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <div className="text-center p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <FileDown size={32} className="mx-auto text-green-500 mb-3" />
                   <p className="text-sm font-medium text-gray-800">Export</p>
                   <p className="text-xs text-gray-600 mt-1">Export the entire product catalog as Excel file.</p>
@@ -1226,7 +1226,7 @@ export default function CatalogUpdatesTab() {
                 </div>
               </TabsContent>
               <TabsContent value="pdf" className="mt-4">
-                <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <div className="text-center p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
                   <FileText size={32} className="mx-auto text-red-500 mb-3" />
                   <p className="text-sm font-medium text-gray-800">Export Catalog</p>
                   <p className="text-xs text-gray-600 mt-1">Export as PDF file.</p>
@@ -1319,7 +1319,7 @@ export default function CatalogUpdatesTab() {
             </DialogTitle>
             <p className="text-xs text-gray-400 mt-0.5">These products are hidden from the active catalogue. Use "Restore" to move them back to Draft.</p>
           </DialogHeader>
-          <ScrollArea className="flex-1 px-8 py-5">
+          <ScrollArea className="flex-1 px-2 py-5">
             {stats.archived === 0 ? (
               <div className="py-24 text-center text-gray-400">
                 <Archive size={48} className="mx-auto mb-4 opacity-30" />
@@ -1399,7 +1399,7 @@ export default function CatalogUpdatesTab() {
       <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Bulk Import Items</DialogTitle></DialogHeader>
-          <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
+          <div className="text-center p-2 border-2 border-dashed border-border rounded-lg">
             <Upload size={32} className="mx-auto text-primary mb-3" />
             <p className="text-sm font-medium mb-1">Upload CSV File</p>
             <p className="text-xs text-muted-foreground mb-3">CSV must have headers: Item Name, SKU, Category, Brand, Price, Status</p>
@@ -1443,7 +1443,7 @@ export default function CatalogUpdatesTab() {
       {/* Add/Edit Item Dialog - Full Screen */}
       {addDialogOpen && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
-          <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between flex-shrink-0">
+          <div className="sticky top-0 bg-white border-b p-2 flex items-center justify-between flex-shrink-0">
             <h2 className="text-2xl font-bold">{editingItem ? 'Edit Item' : 'Add New Item'}</h2>
             <button onClick={() => setAddDialogOpen(false)} className="text-slate-500 hover:text-slate-700 flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1452,7 +1452,7 @@ export default function CatalogUpdatesTab() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <div className="max-w-6xl mx-auto px-6 py-6">
+            <div className="max-w-6xlpx-2 py-6">
               <div className="space-y-6 pb-32">
               {/* General Details + Category */}
               <div className="grid grid-cols-2 gap-6">
@@ -1589,7 +1589,7 @@ export default function CatalogUpdatesTab() {
                   <div>
                     <Label>Add Image</Label>
                     <div
-                      className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      className="border-2 border-dashed border-border rounded-lg p-2 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                       onClick={() => imageInputRef.current?.click()}
                     >
                       <ImageIcon size={24} className="mx-auto text-muted-foreground mb-2" />
@@ -1714,7 +1714,7 @@ export default function CatalogUpdatesTab() {
               </div>
             </div>
           </div>
-          <div className="bg-white border-t p-4 flex justify-end gap-2 flex-shrink-0">
+          <div className="bg-white border-t p-2 flex justify-end gap-2 flex-shrink-0">
             <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleAddItem}>Save Item</Button>
           </div>

@@ -237,8 +237,8 @@ export default function ProductDetailPage() {
       <FloatingCartButton />
 
       {/* ── Breadcrumb ── */}
-      <div className="border-b border-gray-200 bg-white px-8 py-4">
-        <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm">
+      <div className="border-b border-gray-200 bg-white px-2 py-4">
+        <div className="max-w-7xlflex items-center gap-2 text-sm">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline"
@@ -254,7 +254,7 @@ export default function ProductDetailPage() {
       </div>
 
       {/* ── Main content ── */}
-      <div className="max-w-7xl mx-auto px-8 py-8">
+      <div className="max-w-7xlpx-2 py-8">
 
         {/* Top section: image + details + price */}
         <div className="flex gap-8">
@@ -319,7 +319,7 @@ export default function ProductDetailPage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-gray-900">{product.name}</h1>
 
-            <span className={`inline-block mt-2 text-xs font-semibold px-3 py-1 rounded-full ${getCategoryColor(product.category)}`}>
+            <span className={`inline-block mt-2 text-xs font-semibold px-2 py-1 rounded-full ${getCategoryColor(product.category)}`}>
               {product.category}
             </span>
 
@@ -337,7 +337,7 @@ export default function ProductDetailPage() {
                   {specPairs.map((sp, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50"
+                      className="flex items-start gap-3 p-2 border border-gray-200 rounded-xl bg-gray-50"
                     >
                       <div className="mt-0.5 shrink-0">{getSpecIcon(sp.key)}</div>
                       <div className="min-w-0">
@@ -353,7 +353,7 @@ export default function ProductDetailPage() {
 
           {/* ── Price panel ── */}
           <div className="w-72 shrink-0">
-            <div className="border border-gray-200 rounded-2xl p-5 sticky top-4">
+            <div className="border border-gray-200 rounded-2xl p-2 sticky top-4">
               <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price (Excl. GST)</p>
 
               {discountPct > 0 ? (
@@ -427,7 +427,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* ── Bottom section ── */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-6 items-start">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-2 items-start">
 
           {/* General Specifications */}
           {product.generalSpecs && product.generalSpecs.length > 0 && (
@@ -467,7 +467,7 @@ export default function ProductDetailPage() {
                     <div
                       key={rp.id}
                       onClick={() => handleRelatedClick(rp)}
-                      className="border border-gray-200 rounded-xl p-3 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+                      className="border border-gray-200 rounded-xl p-2 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
                     >
                       <div className="w-full aspect-square rounded-lg bg-gray-50 overflow-hidden mb-2">
                         {rp.image ? (

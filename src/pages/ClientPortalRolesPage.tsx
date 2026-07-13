@@ -173,7 +173,7 @@ export default function ClientPortalRolesPage() {
     <div className="min-h-screen bg-white p-6">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70 mb-8">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-start">
+        <div className="max-w-7xlpx-2 py-2 flex justify-between items-start">
           <div>
             <p className="text-xs text-gray-500">Portal / Roles</p>
             <h1 className="text-2xl font-bold">Roles & Permissions</h1>
@@ -187,7 +187,7 @@ export default function ClientPortalRolesPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 flex gap-6">
+      <div className="max-w-7xlpx-2 flex gap-6">
         {/* Role List */}
         <div className="w-64 shrink-0">
           <div className="space-y-1">
@@ -195,7 +195,7 @@ export default function ClientPortalRolesPage() {
               <button
                 key={r.id}
                 onClick={() => setSelected(r)}
-                className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
+                className={`w-full text-left px-2 py-2 rounded-xl text-sm transition-all ${
                   selected?.id === r.id
                     ? 'bg-blue-50 text-blue-700 font-medium'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -218,7 +218,7 @@ export default function ClientPortalRolesPage() {
           <div className="flex-1">
             <Card>
               <CardContent className="p-0">
-                <div className="px-6 py-4 border-b border-gray-100">
+                <div className="px-6 py-2 border-b border-gray-100">
                   <h2 className="font-semibold text-gray-900">{selected.name}</h2>
                   {selected.description && (
                     <p className="text-xs text-gray-500 mt-0.5">{selected.description}</p>
@@ -227,21 +227,21 @@ export default function ClientPortalRolesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b text-xs text-gray-500">
-                      <th className="px-6 py-3 text-left">Module</th>
-                      <th className="px-6 py-3 text-center">View</th>
-                      <th className="px-6 py-3 text-center">Create</th>
-                      <th className="px-6 py-3 text-center">Edit</th>
-                      <th className="px-6 py-3 text-center">Delete</th>
+                      <th className="px-6 py-2 text-left">Module</th>
+                      <th className="px-6 py-2 text-center">View</th>
+                      <th className="px-6 py-2 text-center">Create</th>
+                      <th className="px-6 py-2 text-center">Edit</th>
+                      <th className="px-6 py-2 text-center">Delete</th>
                     </tr>
                   </thead>
                   <tbody>
                     {selected.permissions.map(p => (
                       <tr key={p.module} className="border-b last:border-b-0 hover:bg-gray-50">
-                        <td className="px-6 py-3 font-medium text-gray-800">{p.module}</td>
+                        <td className="px-6 py-2 font-medium text-gray-800">{p.module}</td>
                         {(['view', 'create', 'edit', 'delete'] as const).map(perm => (
                           <td
                             key={perm}
-                            className="px-6 py-3 text-center"
+                            className="px-6 py-2 text-center"
                             onClick={() => togglePerm(selected.id, p.module, perm)}
                           >
                             <span className={isAdmin ? 'cursor-pointer' : ''}>
@@ -254,7 +254,7 @@ export default function ClientPortalRolesPage() {
                   </tbody>
                 </table>
                 {isAdmin && (
-                  <div className="px-6 py-3 bg-gray-50 border-t rounded-b-xl">
+                  <div className="px-6 py-2 bg-gray-50 border-t rounded-b-xl">
                     <p className="text-xs text-gray-400">Click any permission cell to toggle it.</p>
                   </div>
                 )}
@@ -278,7 +278,7 @@ export default function ClientPortalRolesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role Name</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={newRoleName}
                   onChange={e => setNewRoleName(e.target.value)}
                   placeholder="e.g. Department Head"
@@ -287,7 +287,7 @@ export default function ClientPortalRolesPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={newRoleDesc}
                   onChange={e => setNewRoleDesc(e.target.value)}
                   placeholder="Brief description (optional)"

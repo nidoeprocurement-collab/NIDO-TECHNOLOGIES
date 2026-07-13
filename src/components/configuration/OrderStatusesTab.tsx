@@ -79,7 +79,7 @@ export default function AddOrderStatusModal() {
             </div>
           </DialogHeader>
 
-          <div className="grid gap-6 py-6">
+          <div className="grid gap-2 py-6">
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <Label className="mb-2 block">

@@ -78,7 +78,7 @@ export default function ContractDetailsPage() {
           <p className="text-gray-600 mb-6">The contract you&apos;re looking for doesn&apos;t exist.</p>
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             <ArrowLeft className="w-4 h-4" />
             Go Back
@@ -92,7 +92,7 @@ export default function ContractDetailsPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="px-6 py-4 flex items-center justify-between">
+        <div className="px-6 py-2 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
@@ -131,7 +131,7 @@ export default function ContractDetailsPage() {
                 <div>
                   <p className="text-sm text-gray-600 font-medium">Status</p>
                   <div className="mt-1">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[contract.status]}`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[contract.status]}`}>
                       {contract.status}
                     </span>
                   </div>
@@ -188,7 +188,7 @@ export default function ContractDetailsPage() {
               </div>
               <div className="space-y-3">
                 {contract.documents.map((doc, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
                     <div className="flex items-center gap-3">
                       <FileText className="w-4 h-4 text-gray-600" />
                       <div>
@@ -228,13 +228,13 @@ export default function ContractDetailsPage() {
             <div className="bg-white rounded-lg border p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="space-y-3">
-                <button className="w-full px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
+                <button className="w-full px-2 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors">
                   Edit Contract
                 </button>
-                <button className="w-full px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                <button className="w-full px-2 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                   Renew Contract
                 </button>
-                <button className="w-full px-4 py-2 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors">
+                <button className="w-full px-2 py-2 text-sm font-medium text-red-600 border border-red-600 rounded-lg hover:bg-red-50 transition-colors">
                   Terminate
                 </button>
               </div>

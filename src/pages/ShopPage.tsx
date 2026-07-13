@@ -207,7 +207,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
 
       {/* Breadcrumb header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white">
+      <div className="flex-shrink-0 flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white">
         <div className="flex items-center gap-2 text-sm min-w-0">
           <button
             onClick={onClose}
@@ -229,10 +229,10 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto bg-white">
-        <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className="  px-2 py-2">
 
           {/* Top section: image + details + price */}
-          <div className="flex gap-8">
+          <div className="flex gap-2">
 
             {/* Image column: thumbnail rail + main image */}
             <div className="w-[340px] shrink-0">
@@ -267,7 +267,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
               <span className={`inline-block mt-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 ${getCategoryColor(product.category)}`}>{product.category}</span>
 
               {product.description && (
-                <p className="mt-4 text-sm text-gray-500 leading-relaxed max-w-2xl">{product.description}</p>
+                <p className="mt-4 text-sm text-gray-500 leading-relaxed ">{product.description}</p>
               )}
 
               {specPairs.length > 0 && (
@@ -275,7 +275,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                   <h3 className="text-sm font-semibold text-gray-800 mb-3">Key Specifications</h3>
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                     {specPairs.map((sp, i) => (
-                      <div key={i} className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50">
+                      <div key={i} className="flex items-start gap-3 p-2 border border-gray-200 rounded-xl bg-gray-50">
                         <div className="mt-0.5 shrink-0">{getSpecIcon(sp.key)}</div>
                         <div className="min-w-0">
                           <p className="text-[11px] text-gray-500 uppercase tracking-wide">{sp.key}</p>
@@ -290,7 +290,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
             {/* Price panel */}
             <div className="w-72 shrink-0">
-              <div className="border border-gray-200 rounded-2xl p-5 sticky top-4">
+              <div className="border border-gray-200 rounded-2xl p-2 sticky top-4">
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price (Excl. GST)</p>
                 {dialogDiscountPct > 0 ? (
                   <>
@@ -376,11 +376,11 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
           </div>
 
           {/* Bottom section: General Specifications + Related Products */}
-          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6 items-start">
+          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-2 items-start">
 
             {/* General Specifications */}
             {product.generalSpecs && product.generalSpecs.length > 0 && (
-              <div className="border border-gray-200 rounded-2xl p-6">
+              <div className="border border-gray-200 rounded-2xl p-2">
                 <h3 className="text-base font-semibold text-gray-900 mb-4">General Specifications</h3>
                 <div className="flex flex-col">
                   {product.generalSpecs.map((gs, i) => (
@@ -399,7 +399,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-base font-semibold text-gray-900">Related Products</h3>
                 </div>
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                   {related.map(rp => {
                     const rpDiscountPct = clientId ? getSlabDiscountPct(clientId, rp.category, Math.max(1, rp.moq)) : 0;
                     const rpPrice = rpDiscountPct > 0 ? rp.priceNum * (1 - rpDiscountPct / 100) : rp.priceNum;
@@ -407,7 +407,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                       <div
                         key={rp.id}
                         onClick={() => onSelectProduct(rp)}
-                        className="border border-gray-200 rounded-xl p-3 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+                        className="border border-gray-200 rounded-xl p-2 flex flex-col cursor-pointer hover:shadow-md transition-shadow"
                       >
                         <div className="w-full aspect-square rounded-lg bg-gray-50 overflow-hidden mb-2">
                           {rp.image ? (
@@ -491,7 +491,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-3 flex flex-col min-w-0">
+        <div className="flex-1 p-2 flex flex-col min-w-0">
           <h3 className="font-semibold text-gray-900 text-sm leading-snug">{product.name}</h3>
           <span className={`text-xs font-medium mt-0.5 ${getCategoryColor(product.category)}`}>{product.category}</span>
 
@@ -656,11 +656,11 @@ export default function ShopPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white px-6 py-6">
+    <div className="min-h-screen bg-white px-2 py-2">
       <FloatingCartButton />
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-5 gap-4">
+      <div className="flex items-start justify-between mb-5 gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Products</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -669,7 +669,7 @@ export default function ShopPage() {
               : "Select a client to view their catalog"}
           </p>
         </div>
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 w-72 bg-white shadow-sm">
+        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2 py-2 w-72 bg-white shadow-sm">
           <Search size={15} className="text-gray-400 shrink-0" />
           <input
             type="text"
@@ -695,7 +695,7 @@ export default function ShopPage() {
           <div className="relative">
             <button
               onClick={() => { setClientOpen(o => !o); setCatOpen(false); setAvailOpen(false); }}
-              className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-2 transition-colors min-w-[180px] ${clientOpen ? "border-blue-500 text-blue-600 bg-blue-50" : selectedClientId ? "border-blue-500 text-blue-700 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
+              className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors min-w-[180px] ${clientOpen ? "border-blue-500 text-blue-600 bg-blue-50" : selectedClientId ? "border-blue-500 text-blue-700 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
             >
               <Building2 size={14} className="shrink-0" />
               <span className="flex-1 text-left truncate">
@@ -707,12 +707,12 @@ export default function ShopPage() {
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[220px] max-h-64 overflow-y-auto">
                 {clients.map(c => (
                   <button key={c.id} onClick={() => handleClientChange(c.id)}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedClientId === c.id ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
+                    className={`w-full text-left px-2 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedClientId === c.id ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
                     <span className="block font-medium">{c.name}</span>
                     <span className="block text-xs text-gray-400">{c.id}</span>
                   </button>
                 ))}
-                {clients.length === 0 && <div className="px-4 py-3 text-sm text-gray-400">No clients found</div>}
+                {clients.length === 0 && <div className="px-2 py-2 text-sm text-gray-400">No clients found</div>}
               </div>
             )}
           </div>
@@ -723,7 +723,7 @@ export default function ShopPage() {
           <div className="relative">
             <button
               onClick={() => { setCatOpen(o => !o); setAvailOpen(false); setClientOpen(false); }}
-              className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-2 transition-colors ${catOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
+              className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors ${catOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
             >
               {category}
               <ChevronDown size={14} className={`transition-transform ${catOpen ? "rotate-180" : ""}`} />
@@ -732,7 +732,7 @@ export default function ShopPage() {
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[200px]">
                 {allCats.map(opt => (
                   <button key={opt} onClick={() => { setCategory(opt); setCatOpen(false); resetPage(); }}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${category === opt ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
+                    className={`w-full text-left px-2 py-2 text-sm hover:bg-gray-50 transition-colors ${category === opt ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
                     {opt}
                   </button>
                 ))}
@@ -746,7 +746,7 @@ export default function ShopPage() {
           <div className="relative">
             <button
               onClick={() => { setAvailOpen(o => !o); setCatOpen(false); setClientOpen(false); }}
-              className={`flex items-center gap-2 text-sm border rounded-lg px-3 py-2 transition-colors ${availOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
+              className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors ${availOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
             >
               Availability: {availability}
               <ChevronDown size={14} className={`transition-transform ${availOpen ? "rotate-180" : ""}`} />
@@ -755,7 +755,7 @@ export default function ShopPage() {
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[180px]">
                 {["All", "In Stock", "Out of Stock"].map(opt => (
                   <button key={opt} onClick={() => { setAvailability(opt); setAvailOpen(false); resetPage(); }}
-                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${availability === opt ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
+                    className={`w-full text-left px-2 py-2 text-sm hover:bg-gray-50 transition-colors ${availability === opt ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
                     {opt}
                   </button>
                 ))}
@@ -766,7 +766,7 @@ export default function ShopPage() {
 
         {/* More Filters */}
         {selectedClientId && (
-          <button className="flex items-center gap-2 text-sm border border-gray-200 rounded-lg px-3 py-2 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+          <button className="flex items-center gap-2 text-sm border border-gray-200 rounded-lg px-2 py-2 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             <Filter size={14} />
             More Filters
           </button>
@@ -777,14 +777,14 @@ export default function ShopPage() {
       {!selectedClientId ? (
         /* No client selected — empty state */
         <div className="text-center py-32 text-gray-400">
-          <Building2 size={56} className="mx-auto mb-4 opacity-20" />
+          <Building2 size={56} className=" mb-4 opacity-20" />
           <p className="font-semibold text-lg text-gray-500">Select a client to view their catalog</p>
           <p className="text-sm mt-2">Use the dropdown above to choose a client. Only products added to that client's catalog will appear here.</p>
         </div>
       ) : paginated.length === 0 ? (
         /* Client selected but no products */
         <div className="text-center py-24 text-gray-400">
-          <ShoppingCart size={48} className="mx-auto mb-3 opacity-30" />
+          <ShoppingCart size={48} className=" mb-3 opacity-30" />
           <p className="font-medium text-gray-500">
             {catalogProducts.length === 0
               ? `No products have been added to ${selectedClient?.name}'s catalog yet`
@@ -798,7 +798,7 @@ export default function ShopPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {paginated.map(product => (
               <ProductCard
                 key={product.id}

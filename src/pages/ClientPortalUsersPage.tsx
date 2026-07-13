@@ -140,7 +140,7 @@ export default function ClientPortalUsersPage() {
     <div className="min-h-screen bg-white p-6">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70 mb-8">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-start">
+        <div className="max-w-7xlpx-2 py-2 flex justify-between items-start">
           <div>
             <p className="text-xs text-gray-500">Portal / Users</p>
             <h1 className="text-2xl font-bold">Users</h1>
@@ -154,9 +154,9 @@ export default function ClientPortalUsersPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xlpx-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-2 mb-8">
           <Card>
             <CardContent className="p-6 flex justify-between items-start">
               <div>
@@ -196,13 +196,13 @@ export default function ClientPortalUsersPage() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
-                  <th className="px-6 py-4 text-left">Name</th>
-                  <th className="px-6 py-4 text-left">Email</th>
-                  <th className="px-6 py-4 text-left">Role</th>
-                  <th className="px-6 py-4 text-left">Type</th>
-                  <th className="px-6 py-4 text-left">Status</th>
-                  <th className="px-6 py-4 text-left">Created</th>
-                  {isAdmin && <th className="px-6 py-4 text-center">Actions</th>}
+                  <th className="px-6 py-2 text-left">Name</th>
+                  <th className="px-6 py-2 text-left">Email</th>
+                  <th className="px-6 py-2 text-left">Role</th>
+                  <th className="px-6 py-2 text-left">Type</th>
+                  <th className="px-6 py-2 text-left">Status</th>
+                  <th className="px-6 py-2 text-left">Created</th>
+                  {isAdmin && <th className="px-6 py-2 text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -215,8 +215,8 @@ export default function ClientPortalUsersPage() {
                 ) : (
                   users.map(u => (
                     <tr key={u.id} className="border-b hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">{u.name}</td>
-                      <td className="px-6 py-4 text-gray-600">{u.email}</td>
+                      <td className="px-6 py-2 font-medium text-gray-900">{u.name}</td>
+                      <td className="px-6 py-2 text-gray-600">{u.email}</td>
                       <td className="px-6 py-4">
                         <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">{u.role}</span>
                       </td>
@@ -236,11 +236,11 @@ export default function ClientPortalUsersPage() {
                           {u.status}
                         </Badge>
                       </td>
-                      <td className="px-6 py-4 text-xs text-gray-400">
+                      <td className="px-6 py-2 text-xs text-gray-400">
                         {new Date(u.createdAt).toLocaleDateString()}
                       </td>
                       {isAdmin && (
-                        <td className="px-6 py-4 text-center">
+                        <td className="px-6 py-2 text-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon">
@@ -293,7 +293,7 @@ export default function ClientPortalUsersPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Jane Doe"
@@ -303,7 +303,7 @@ export default function ClientPortalUsersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="jane@company.com"
@@ -313,7 +313,7 @@ export default function ClientPortalUsersPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                 <input
                   type="text"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="Temporary password"
@@ -322,7 +322,7 @@ export default function ClientPortalUsersPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                 <select
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.role}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 >
@@ -332,7 +332,7 @@ export default function ClientPortalUsersPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
                 <select
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={form.userType}
                   onChange={e => setForm(f => ({ ...f, userType: e.target.value as 'client_admin' | 'client_user' }))}
                 >
@@ -366,7 +366,7 @@ export default function ClientPortalUsersPage() {
             </p>
             <input
               type="text"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
               value={newPwd}
               onChange={e => setNewPwd(e.target.value)}
               placeholder="New password"

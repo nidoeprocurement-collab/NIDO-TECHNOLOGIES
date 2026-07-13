@@ -102,7 +102,7 @@ function FilterSelect({ label, value, options, onChange }: {
       <label className="text-xs font-medium text-gray-500">{label}</label>
       <div className="relative">
         <select value={value} onChange={e => onChange(e.target.value)}
-          className="appearance-none border border-gray-200 rounded-lg px-3 py-2 pr-8 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[140px]">
+          className="appearance-none border border-gray-200 rounded-lg px-2 py-2 pr-8 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[140px]">
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
         <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -194,7 +194,7 @@ export default function VendorPaymentsPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans" onClick={() => setOpenRowMenu(null)}>
-      <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-4">
+      <div className="max-w-[1280px]px-2 py-2 space-y-4">
 
         {/* Stats */}
         <div className="grid grid-cols-5 gap-4">
@@ -219,7 +219,7 @@ export default function VendorPaymentsPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
           {/* Filters row */}
-          <div className="px-5 py-4 border-b border-gray-100 flex items-end gap-4 flex-wrap">
+          <div className="px-5 py-2 border-b border-gray-100 flex items-end gap-2 flex-wrap">
             <FilterSelect label="Payment Status" value={statusFilter} options={STATUS_OPTIONS} onChange={v => { setStatusFilter(v); setPage(1); }} />
             <FilterSelect label="Payment Method" value={methodFilter} options={METHOD_OPTIONS} onChange={v => { setMethodFilter(v); setPage(1); }} />
             <div className="flex flex-col gap-1">
@@ -249,7 +249,7 @@ export default function VendorPaymentsPage() {
               )}
             </div>
 
-            <button className="ml-auto flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex-shrink-0">
+            <button className="ml-auto flex items-center gap-1.5 px-2 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex-shrink-0">
               <Download className="w-4 h-4" /> Export
             </button>
           </div>
@@ -259,12 +259,12 @@ export default function VendorPaymentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="px-4 py-3 w-10">
+                  <th className="px-4 py-2 w-10">
                     <input type="checkbox" checked={allOnPage && paginated.length > 0} onChange={toggleAll}
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer accent-blue-600" />
                   </th>
                   {["Invoice No.", "PO / Ref No.", "Invoice Date", "Due Date", "Payment Date", "Payment Method", "Amount", "Status", "Actions"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-2 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>

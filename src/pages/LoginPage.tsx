@@ -64,7 +64,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <div className="w-full max-w-7xl">
         <div
-          className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-12 items-center"
           style={{
             fontFamily: 'Roboto, Lato, system-ui, sans-serif',
             fontWeight: '800',
@@ -101,7 +101,7 @@ export default function LoginPage() {
 
           {/* Right — Login form */}
           <div className="w-full max-w-sm" style={{ marginLeft: '50px', marginRight: '-50px' }}>
-            <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
+            <div className="bg-white rounded-3xl shadow-2xl p-2 md:p-10">
               {/* Logo */}
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
               {/* Tabs */}
               <div className="mb-6 border-b border-gray-200">
-                <button className="pb-3 px-4 text-gray-900 font-medium border-b-2 border-gray-900">
+                <button className="pb-3 px-2 text-gray-900 font-medium border-b-2 border-gray-900">
                   Sign In
                 </button>
               </div>
@@ -134,7 +134,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}

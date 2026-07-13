@@ -79,7 +79,7 @@ const menuItems = [
 export default function ConfigurationHubPage() {
   return (
     <div className="min-h-screen bg-white">
-      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
+      <div className="w-full px-2 sm:px-4 md:px-6 py-2 md:py-6">
         <h1 className="text-3xl font-bold text-slate-800 mb-8">
           Configuration
         </h1>
@@ -94,7 +94,7 @@ export default function ConfigurationHubPage() {
                 to={item.href}
                 className="block"
               >
-                <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-300 cursor-pointer h-full">
+                <div className="bg-white border border-slate-200 rounded-xl p-2 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-300 cursor-pointer h-full">
                   <div className="flex justify-center mb-5">
                     <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center">
                       <Icon className="w-7 h-7 text-blue-600" />

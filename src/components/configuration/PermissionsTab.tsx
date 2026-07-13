@@ -140,7 +140,7 @@ export default function PermissionsTab() {
 
       <Card>
         <CardContent className="pt-4">
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             <span className="font-medium">Key</span>
             {accessTypes.map((t, i) => (
               <span key={t} className="flex items-center gap-1">

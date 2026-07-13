@@ -85,7 +85,7 @@ function AddressFormBlock({
   const valid = form.label.trim() && form.line1.trim() && form.phone.trim();
 
   return (
-    <div className="border border-blue-300 bg-blue-50 rounded-xl p-4 space-y-3">
+    <div className="border border-blue-300 bg-blue-50 rounded-xl p-2 space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Label</label>
@@ -93,7 +93,7 @@ function AddressFormBlock({
             value={form.label}
             onChange={set("label")}
             placeholder="e.g. Office, Warehouse"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
           />
         </div>
         <div>
@@ -102,7 +102,7 @@ function AddressFormBlock({
             value={form.phone}
             onChange={set("phone")}
             placeholder="+91 98765 43210"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
           />
         </div>
       </div>
@@ -112,7 +112,7 @@ function AddressFormBlock({
           value={form.line1}
           onChange={set("line1")}
           placeholder="Street, building, floor..."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
         />
       </div>
       <div>
@@ -121,20 +121,20 @@ function AddressFormBlock({
           value={form.line2}
           onChange={set("line2")}
           placeholder="City, state, pincode..."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
         />
       </div>
       <div className="flex gap-2 justify-end">
         <button
           onClick={onCancel}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+          className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
         >
           <X size={12} /> Cancel
         </button>
         <button
           disabled={!valid}
           onClick={() => valid && onSave(form)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 px-2 py-1.5 text-xs text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Check size={12} /> Save Address
         </button>
@@ -193,7 +193,7 @@ export default function CheckoutPage() {
   const canAddMore = addresses.length < 2;
 
   return (
-    <div className="min-h-screen bg-white px-6 py-6">
+    <div className="min-h-screen bg-white px-2 py-6">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
@@ -211,7 +211,7 @@ export default function CheckoutPage() {
 
         <CheckoutStepper current={1} />
 
-        <div className="flex gap-5 items-start">
+        <div className="flex gap-2 items-start">
           {/* Left */}
           <div className="flex-1 min-w-0 space-y-4">
             {/* Delivery Details card */}
@@ -248,7 +248,7 @@ export default function CheckoutPage() {
                   ) : (
                     <label
                       key={addr.id}
-                      className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                      className={`flex items-start gap-3 p-2 border rounded-xl cursor-pointer transition-colors ${
                         selectedAddressId === addr.id
                           ? "border-blue-500 bg-blue-50"
                           : "border-gray-200 hover:border-gray-300"
@@ -316,7 +316,7 @@ export default function CheckoutPage() {
                     placeholder="Add delivery instructions, gate entry details, timing preferences, etc."
                     value={deliveryInstructions}
                     onChange={(e) => setDeliveryInstructions(e.target.value)}
-                    className="w-full px-4 py-3 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
+                    className="w-full px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
                   <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>
                 </div>
@@ -327,7 +327,7 @@ export default function CheckoutPage() {
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <button
                 onClick={() => setNotesOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-6 py-4 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center justify-between px-2 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 transition-colors"
               >
                 Order Notes (Optional)
                 <ChevronDown
@@ -342,7 +342,7 @@ export default function CheckoutPage() {
                     placeholder="Add any special notes for this order..."
                     value={orderNotes}
                     onChange={(e) => setOrderNotes(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
+                    className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
                 </div>
               )}
@@ -352,7 +352,7 @@ export default function CheckoutPage() {
             <div className="flex justify-center pt-2">
               <button
                 onClick={() => navigate("/shop/checkout/payment")}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-8 py-3 text-sm transition-colors"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
               >
                 Continue to Payment
                 <ChevronRight size={16} />
