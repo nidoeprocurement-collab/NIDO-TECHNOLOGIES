@@ -316,26 +316,28 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       >
         {/* Header */}
         <div className="relative shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2 shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center min-w-0 flex-1 h-full py-2">
             {org.logoUrl ? (
-              <div className="w-8 h-8 shrink-0 rounded-lg overflow-hidden bg-white border border-gray-200 flex items-center justify-center">
-                <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full w-full object-contain" />
+              <div className="h-full w-full flex items-center justify-start overflow-hidden">
+                <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full max-w-full object-contain" />
               </div>
             ) : (
-              <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${
-                isClientPortalUser
-                  ? 'bg-gradient-to-br from-purple-500 to-purple-700'
-                  : 'bg-gradient-to-br from-blue-600 to-blue-700'
-              }`}>
-                <Zap size={20} className="text-white" />
-              </div>
-            )}
-            {!effectiveCollapsed && (
-              <div className="min-w-0">
-                <h1 className="text-sm font-bold text-gray-900 truncate">{org.displayName || 'NIDO'}</h1>
-                <p className="text-xs text-gray-500 truncate">
-                  {isClientPortalUser ? 'Client Portal' : 'Procurement'}
-                </p>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${
+                  isClientPortalUser
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-700'
+                    : 'bg-gradient-to-br from-blue-600 to-blue-700'
+                }`}>
+                  <Zap size={20} className="text-white" />
+                </div>
+                {!effectiveCollapsed && (
+                  <div className="min-w-0">
+                    <h1 className="text-sm font-bold text-gray-900 truncate">{org.displayName || 'NIDO'}</h1>
+                    <p className="text-xs text-gray-500 truncate">
+                      {isClientPortalUser ? 'Client Portal' : 'Procurement'}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
