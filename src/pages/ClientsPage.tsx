@@ -361,6 +361,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                   </th>
                   <th className="px-6 py-4 text-left">Client ID</th>
                   <th className="px-6 py-4 text-left">Client Name</th>
+                  <th className="px-6 py-4 text-left">Categories</th>
                   <th className="px-6 py-4 text-left">Representative</th>
                   <th className="px-6 py-4 text-left">Email</th>
                   <th className="px-6 py-4 text-left">Total Spend (USD)</th>
@@ -387,6 +388,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                     </td>
 
                     <td className="px-6 py-4">{c.name}</td>
+                    <td className="px-6 py-4">{c.category || '-'}</td>
                     <td className="px-6 py-4">{c.rep}</td>
                     <td className="px-6 py-4">{c.email}</td>
                     <td className="px-6 py-4">$0</td>
@@ -461,6 +463,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                     <tr className="border-b">
                       <th className="text-left py-3 px-4 font-semibold text-sm">Client ID</th>
                       <th className="text-left py-3 px-4 font-semibold text-sm">Company Name</th>
+                      <th className="text-left py-3 px-4 font-semibold text-sm">Categories</th>
                       <th className="text-left py-3 px-4 font-semibold text-sm">Representative</th>
                       <th className="text-left py-3 px-4 font-semibold text-sm">Email</th>
                       <th className="text-left py-3 px-4 font-semibold text-sm">Archived On</th>
@@ -476,6 +479,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                           {client.id}
                         </td>
                         <td className="py-3 px-4 text-sm font-medium">{client.name}</td>
+                        <td className="py-3 px-4 text-sm">{client.category || '-'}</td>
                         <td className="py-3 px-4 text-sm">{client.rep}</td>
                         <td className="py-3 px-4 text-sm">{client.email}</td>
                         <td className="py-3 px-4 text-sm">{client.archivedOn}</td>
