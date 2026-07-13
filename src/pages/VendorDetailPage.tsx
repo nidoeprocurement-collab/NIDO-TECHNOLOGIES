@@ -351,7 +351,7 @@ export default function VendorDetailPage() {
 
   if (!vendor) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center">
+      <div className="flex flex-col items-center justify-center min-h-screen gap-2 text-center">
         <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
           <Building2 className="w-7 h-7 text-red-400" />
         </div>
@@ -361,7 +361,7 @@ export default function VendorDetailPage() {
         </div>
         <button
           onClick={() => navigate("/vendors")}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-1.5 px-2 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Vendors
         </button>
@@ -434,7 +434,7 @@ export default function VendorDetailPage() {
           </div>
 
           {/* Primary contact + action */}
-          <div className="flex items-start gap-6 flex-shrink-0">
+          <div className="flex items-start gap-2 flex-shrink-0">
             <div className="text-right">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Primary Contact</p>
               <p className="text-sm font-semibold text-gray-800">{vendor.primaryContact}</p>
@@ -447,7 +447,7 @@ export default function VendorDetailPage() {
                 <a href={`mailto:${vendor.email}`} className="text-xs text-blue-500 hover:underline">{vendor.email}</a>
               </div>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-1">
+            <button className="flex items-center gap-2 px-2 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm mt-1">
               <MessageSquare className="w-3.5 h-3.5" />
               Message Vendor
             </button>
@@ -458,7 +458,7 @@ export default function VendorDetailPage() {
         <div className="px-6 pb-3">
           <div className="grid grid-cols-6 divide-x divide-gray-100 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
             {stats.map((s, i) => (
-              <div key={i} className="flex flex-col items-center py-3 px-2 text-center">
+              <div key={i} className="flex flex-col items-center py-2 px-2 text-center">
                 <p className={`text-base font-bold ${s.accent}`}>{s.value}</p>
                 <p className="text-xs text-gray-500 font-medium leading-tight mt-0.5">{s.label}</p>
                 <p className="text-xs text-gray-400 leading-tight">{s.sub}</p>
@@ -469,12 +469,12 @@ export default function VendorDetailPage() {
 
         {/* Tabs */}
         <div className="relative">
-          <div className="flex items-center px-6 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
+          <div className="flex items-center px-2 gap-0 overflow-x-auto no-scrollbar border-t border-gray-100">
             {TABS.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+                className={`flex items-center gap-1.5 px-2 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
                   activeTab === tab.key
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-200"

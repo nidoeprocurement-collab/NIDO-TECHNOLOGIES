@@ -254,7 +254,7 @@ export default function AddMasterCatalogueItemWrapper() {
   );
 
   return (
-    <div className="w-full min-h-screen bg-white px-3 sm:px-6 md:px-10 xl:px-16 py-4 sm:py-6">
+    <div className="w-full min-h-screen bg-white px-2 sm:px-6 md:px-10 xl:px-16 py-2 sm:py-6">
       <div className="w-full space-y-6">
 
         {/* Back button */}
@@ -267,7 +267,7 @@ export default function AddMasterCatalogueItemWrapper() {
         )}
 
         {/* Section 1: Product Information */}
-        <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
+        <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
           <h2 className="text-base sm:text-lg font-bold text-gray-900">1. Product Information</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Capture core catalog identity for enterprise procurement mapping.</p>
 
@@ -357,7 +357,7 @@ export default function AddMasterCatalogueItemWrapper() {
         </div>
 
         {/* Section 2: Key Specifications */}
-        <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
+        <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
           <h2 className="text-base sm:text-lg font-bold text-gray-900">2. Key Specifications</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Reusable specification engine with dynamic categories and unit support.</p>
 
@@ -406,7 +406,7 @@ export default function AddMasterCatalogueItemWrapper() {
               </tbody>
             </table>
 
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+            <div className="mt-4 p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <Label className="text-xs font-medium text-gray-700">Specification Name</Label>
@@ -437,7 +437,7 @@ export default function AddMasterCatalogueItemWrapper() {
         </div>
 
         {/* Section 3: Product Notes & Alerts */}
-        <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
+        <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
           <h2 className="text-base sm:text-lg font-bold text-gray-900">3. Product Notes & Alerts</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Enter manual note points, warnings, explanations, stock notices, or product-specific remarks.</p>
           <div className="mt-4">
@@ -448,7 +448,7 @@ export default function AddMasterCatalogueItemWrapper() {
         </div>
 
         {/* Section 4: General Specifications */}
-        <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
+        <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
           <h2 className="text-base sm:text-lg font-bold text-gray-900">4. General Specifications</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Categorized product attributes for structured catalog metadata.</p>
 
@@ -493,7 +493,7 @@ export default function AddMasterCatalogueItemWrapper() {
         </div>
 
         {/* Section 5: Product Images & Media */}
-        <div className="border border-gray-300 rounded-lg p-4 sm:p-6">
+        <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
           <h2 className="text-base sm:text-lg font-bold text-gray-900">5. Product Images & Media</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Upload product images for display in the catalog and shop.</p>
 
@@ -501,7 +501,7 @@ export default function AddMasterCatalogueItemWrapper() {
             <div>
               <Label className="text-xs sm:text-sm font-medium text-gray-700">Product Images</Label>
               <div
-                className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center bg-gray-50 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-2 sm:p-8 text-center bg-gray-50 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
                 onClick={() => imageInputRef.current?.click()}
               >
                 <Upload size={32} className="mx-auto text-gray-400 mb-2" />

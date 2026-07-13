@@ -56,7 +56,7 @@ export default function ProductPreviewPage() {
           <Package size={48} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500 font-medium">No preview data found.</p>
           <p className="text-sm text-gray-400 mt-1">Go back and click "Preview Product" from the Add New Item page.</p>
-          <button onClick={() => navigate(-1)} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
+          <button onClick={() => navigate(-1)} className="mt-4 px-2 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
             Go Back
           </button>
         </div>
@@ -66,10 +66,10 @@ export default function ProductPreviewPage() {
 
   return (
     <div className="h-screen overflow-y-auto bg-white">
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-0">
+      <div className="max-w-5xlpx-2 py-2 space-y-0">
 
         {/* Section 1: Product Header */}
-        <div className="border border-gray-200 rounded-xl p-6 mb-0">
+        <div className="border border-gray-200 rounded-xl p-2 mb-0">
           <div className="flex gap-6">
             {/* Left: Product Info */}
             <div className="flex-1 min-w-0">
@@ -132,7 +132,7 @@ export default function ProductPreviewPage() {
 
         {/* Section 2: Key Specifications (Icon Grid) */}
         {data.specifications.length > 0 && (
-          <div className="border-x border-b border-gray-200 px-6 py-5">
+          <div className="border-x border-b border-gray-200 px-2 py-5">
             <h2 className="text-base font-bold text-gray-900 mb-4">Key Specifications</h2>
             <div className="grid grid-cols-3 gap-x-12 gap-y-4">
               {data.specifications.slice(0, 6).map(spec => (
@@ -152,7 +152,7 @@ export default function ProductPreviewPage() {
 
         {/* Section 3: Description */}
         {data.description && (
-          <div className="border-x border-b border-gray-200 px-6 py-5">
+          <div className="border-x border-b border-gray-200 px-2 py-5">
             <h2 className="text-base font-bold text-gray-900 mb-2">Description</h2>
             <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{data.description}</p>
           </div>
@@ -160,7 +160,7 @@ export default function ProductPreviewPage() {
 
         {/* Section 4: Key Specifications Table */}
         {data.specifications.length > 0 && (
-          <div className="border-x border-b border-gray-200 px-6 py-5">
+          <div className="border-x border-b border-gray-200 px-2 py-5">
             <h2 className="text-base font-bold text-gray-900 mb-3">Key Specifications</h2>
             <table className="w-full text-sm">
               <thead>
@@ -185,7 +185,7 @@ export default function ProductPreviewPage() {
 
         {/* Section 5: Product Notes & Alerts */}
         {data.productNotes && (
-          <div className="border-x border-b border-gray-200 px-6 py-5">
+          <div className="border-x border-b border-gray-200 px-2 py-5">
             <h2 className="text-base font-bold text-gray-900 mb-2">Product Notes & Alerts</h2>
             <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{data.productNotes}</p>
           </div>
@@ -193,7 +193,7 @@ export default function ProductPreviewPage() {
 
         {/* Section 6: General Specifications */}
         {data.generalSpecs.filter(g => g.category || g.attributeValue).length > 0 && (
-          <div className="border-x border-b border-gray-200 px-6 py-5">
+          <div className="border-x border-b border-gray-200 px-2 py-5">
             <h2 className="text-base font-bold text-gray-900 mb-3">General Specifications</h2>
             <table className="w-full text-sm">
               <thead>
@@ -216,7 +216,7 @@ export default function ProductPreviewPage() {
 
         {/* Section 7: Product Images & Media */}
         {data.images.length > 0 && (
-          <div className="border-x border-b border-gray-200 px-6 py-5">
+          <div className="border-x border-b border-gray-200 px-2 py-5">
             <h2 className="text-base font-bold text-gray-900 mb-4">Product Images & Media</h2>
             <div className="flex gap-3 flex-wrap">
               {data.images.map((img, i) => (

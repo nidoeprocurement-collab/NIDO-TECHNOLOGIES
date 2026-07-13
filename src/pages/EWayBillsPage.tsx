@@ -7,7 +7,7 @@ import {
 
 export default function EWayBillsPage() {
   return (
-    <div className="max-w-[1280px] mx-auto space-y-4">
+    <div className="max-w-[1280px]space-y-4">
 
         {/* Header Card */}
         <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -18,12 +18,12 @@ export default function EWayBillsPage() {
             </h1>
 
             <div className="flex gap-2">
-              <button className="flex items-center gap-2 border rounded-lg px-4 py-2 text-sm hover:bg-gray-50">
+              <button className="flex items-center gap-2 border rounded-lg px-2 py-2 text-sm hover:bg-gray-50">
                 <Settings size={16} />
                 Change e-Way Bill Portal Settings
               </button>
 
-              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+              <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg text-sm">
                 <Plus size={16} />
                 New
               </button>
@@ -35,7 +35,7 @@ export default function EWayBillsPage() {
             <div className="flex flex-wrap gap-3">
 
               {/* Transaction Period */}
-              <div className="flex items-center gap-2 border rounded-lg px-3 py-2 min-w-[220px]">
+              <div className="flex items-center gap-2 border rounded-lg px-2 py-2 min-w-[220px]">
                 <span className="text-sm text-gray-500">
                   Transaction Period:
                 </span>
@@ -50,7 +50,7 @@ export default function EWayBillsPage() {
               </div>
 
               {/* Transaction Type */}
-              <div className="flex items-center justify-between border rounded-lg px-3 py-2 min-w-[220px]">
+              <div className="flex items-center justify-between border rounded-lg px-2 py-2 min-w-[220px]">
                 <span className="text-sm text-gray-500">
                   Transaction Type:
                 </span>
@@ -64,7 +64,7 @@ export default function EWayBillsPage() {
               </div>
 
               {/* Status */}
-              <div className="flex items-center justify-between border rounded-lg px-3 py-2 min-w-[250px]">
+              <div className="flex items-center justify-between border rounded-lg px-2 py-2 min-w-[250px]">
                 <span className="text-sm text-gray-500">
                   e-Way Bill Status:
                 </span>

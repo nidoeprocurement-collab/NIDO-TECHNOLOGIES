@@ -93,9 +93,9 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
             <input
               type="password"
               defaultValue="supersecretapikey1234"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono tracking-widest text-gray-700"
+              className="w-full px-2 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono tracking-widest text-gray-700"
             />
-            <button className="mt-3 px-3 py-1.5 text-xs border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
+            <button className="mt-3 px-2 py-1.5 text-xs border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">
               Regenerate API Key
             </button>
           </div>
@@ -131,7 +131,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
         <div className="flex flex-col">
           <ClientPricingSettingsPanel clientId={clientId} />
           <ClientPriceSlabsPanel clientId={clientId} />
-          <div className="mt-6 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-sm text-gray-700">
+          <div className="mt-6 bg-blue-50 border border-blue-100 rounded-lg px-2 py-2 text-sm text-gray-700">
             Category Pricing Rules are now configured globally for all clients in{" "}
             <span className="font-semibold text-gray-900">Configuration → Price Engine → Client Price Engine</span>.
           </div>
@@ -150,13 +150,13 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
                     <X size={15} />
                   </button>
                 </div>
-                <div className="px-6 py-5 flex flex-col gap-4">
+                <div className="px-6 py-2 flex flex-col gap-4">
                   <p className="text-xs text-gray-500">
                     You are about to send invitations to <span className="font-semibold text-gray-800">{selectedInvites.size} user{selectedInvites.size > 1 ? "s" : ""}</span>. They will receive an email with access instructions.
                   </p>
                   <div className="border border-gray-100 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
                     {usersData.filter((u) => selectedInvites.has(u.id)).map((user, i) => (
-                      <div key={user.id} className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}>
+                      <div key={user.id} className={`flex items-center gap-3 px-2 py-2.5 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}>
                         <div className={`w-6 h-6 rounded-full ${user.color} flex items-center justify-center text-white text-[9px] font-bold shrink-0`}>{user.initials}</div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-gray-800 truncate">{user.name}</p>
@@ -167,7 +167,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
                     ))}
                   </div>
                 </div>
-                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
                   <button onClick={() => setShowInviteConfirm(false)} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
                     Cancel
                   </button>
@@ -201,7 +201,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setInviteRoleOpen((v) => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
               Filter by Role: <span className="text-blue-600 font-medium">{inviteRoleFilter}</span>
@@ -213,7 +213,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
                   <button
                     key={role}
                     onClick={() => { setInviteRoleFilter(role); setInviteRoleOpen(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${inviteRoleFilter === role ? "text-blue-600 font-medium" : "text-gray-700"}`}
+                    className={`w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${inviteRoleFilter === role ? "text-blue-600 font-medium" : "text-gray-700"}`}
                   >
                     {role}
                   </button>
@@ -230,7 +230,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="w-10 px-3 py-2.5">
+                    <th className="w-10 px-2 py-2.5">
                       <input
                         type="checkbox"
                         checked={allSelected}
@@ -239,10 +239,10 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
                         title="Select all"
                       />
                     </th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                    <th className="text-left px-3 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                    <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">User</th>
+                    <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Email</th>
+                    <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Role <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                    <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                   </tr>
                 </thead>
                 <tbody>

@@ -1465,11 +1465,11 @@ export default function MyOrderPage() {
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
     return (
-      <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="bg-background text-foreground min-h-screen flex items-center justify-center" style={{ fontFamily: "'Inter','Segoe UI',sans-serif" }}>
         <div style={{ textAlign: "center", padding: 40 }}>
           <div style={{ fontSize: 52, marginBottom: 16 }}>📋</div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>Order Not Found</h2>
-          <p style={{ fontSize: 14, color: "#6b7280", margin: "0 0 24px" }}>
+          <h2 className="text-foreground text-xl font-bold mb-2">Order Not Found</h2>
+          <p className="text-muted-foreground text-sm mb-6">
             {orderId ? `Order "${orderId}" doesn't exist or hasn't been placed yet.` : "No order ID provided."}
           </p>
           <button
@@ -1484,7 +1484,7 @@ export default function MyOrderPage() {
   }
 
   return (
-    <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", color: "#111827" }} onClick={() => setShowStatusDd(false)}>
+    <div className="bg-background text-foreground min-h-screen" style={{ fontFamily: "'Inter','Segoe UI',sans-serif", minHeight: "100vh" }} onClick={() => setShowStatusDd(false)}>
       {/* No maxWidth cap here — on wide monitors a fixed cap left visible
           empty gutters on both sides of the page. The content now stretches
           to fill whatever width AppLayout's <main> actually gives it. */}

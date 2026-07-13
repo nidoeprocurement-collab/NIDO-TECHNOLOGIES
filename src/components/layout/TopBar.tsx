@@ -93,9 +93,9 @@ export default function TopBar() {
   return (
     <div className="relative z-20 bg-transparent">
       {/* Top section - Search bar and actions */}
-      <div className="relative z-10 h-16 px-4 md:px-6 flex items-center justify-between gap-4 bg-background border-b border-border shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
+      <div className="relative z-10 h-16 px-2 md:px-2 flex items-center justify-between gap-2 bg-background border-b border-border shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
         {/* Left: Back & Search */}
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex items-center gap-2 flex-1">
           <button
             onClick={() => navigate(-1)}
             className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors lg:hidden"
@@ -146,7 +146,7 @@ export default function TopBar() {
                   onClick={() => {
                     setShowUserMenu(false);
                   }}
-                  className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-muted flex items-center gap-2"
+                  className="w-full px-2 py-2 text-left text-sm text-foreground hover:bg-muted flex items-center gap-2"
                 >
                   <User size={16} />
                   Profile
@@ -159,7 +159,7 @@ export default function TopBar() {
                     setShowUserMenu(false);
                     handleLogout();
                   }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2"
+                  className="w-full px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2"
                 >
                   <LogOut size={16} />
                   Sign Out
@@ -171,7 +171,7 @@ export default function TopBar() {
       </div>
 
       {/* Breadcrumb section */}
-      <div className="h-10 px-4 md:px-6 flex items-center gap-2 bg-transparent">
+      <div className="h-10 px-2 md:px-2 flex items-center gap-2 bg-transparent">
         {breadcrumbs.map((crumb, index) => (
           <div key={`${crumb.path}-${index}`} className="flex items-center gap-2">
             {index === 0 && !isClientPortalUser ? (

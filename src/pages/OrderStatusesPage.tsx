@@ -175,13 +175,13 @@ export default function OrderStatusesPage() {
             <thead>
               <tr className="border-b bg-slate-50">
                 <th className="w-12"></th>
-                <th className="px-4 py-4 text-left">Color</th>
-                <th className="px-4 py-4 text-left">Status</th>
-                <th className="px-4 py-4 text-left">Description</th>
-                <th className="px-4 py-4 text-left">Sort</th>
-                <th className="px-4 py-4 text-left">Visible</th>
-                <th className="px-4 py-4 text-left">Default</th>
-                <th className="px-4 py-4 text-center">Actions</th>
+                <th className="px-4 py-2 text-left">Color</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2 text-left">Description</th>
+                <th className="px-4 py-2 text-left">Sort</th>
+                <th className="px-4 py-2 text-left">Visible</th>
+                <th className="px-4 py-2 text-left">Default</th>
+                <th className="px-4 py-2 text-center">Actions</th>
               </tr>
             </thead>
 
@@ -201,7 +201,7 @@ export default function OrderStatusesPage() {
                     />
                   </td>
 
-                  <td className="px-4 py-4 font-medium">
+                  <td className="px-4 py-2 font-medium">
                     {status.name}
                   </td>
 

@@ -195,7 +195,7 @@ export default function VendorPerformancePage() {
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-4">
+      <div className="max-w-[1280px]px-2 py-2 space-y-4">
 
         {/* ── Stat cards ── */}
         <div className="grid grid-cols-5 gap-4">
@@ -220,7 +220,7 @@ export default function VendorPerformancePage() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">Spend Trend</h3>
-                <div className="flex items-center gap-4 mt-1.5">
+                <div className="flex items-center gap-2 mt-1.5">
                   <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-5 border-t-2 border-blue-500 inline-block" />This Year (2026)</span>
                   <span className="flex items-center gap-1.5 text-xs text-gray-400"><span className="w-5 border-t-2 border-dashed border-gray-400 inline-block" />Last Year (2025)</span>
                 </div>
@@ -245,7 +245,7 @@ export default function VendorPerformancePage() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">Performance Trend</h3>
-                <div className="flex items-center gap-4 mt-1.5">
+                <div className="flex items-center gap-2 mt-1.5">
                   <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-5 border-t-2 border-blue-500 inline-block" />On-time Delivery (%)</span>
                   <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="w-5 border-t-2 border-green-500 inline-block" />Quality Score (/5)</span>
                 </div>
@@ -341,14 +341,14 @@ export default function VendorPerformancePage() {
 
         {/* ── Category table ── */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
+          <div className="px-5 py-2 border-b border-gray-100">
             <h3 className="text-sm font-bold text-gray-800">Performance by Category</h3>
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50/60 border-b border-gray-100">
                 {["Category", "Total Spend", "Orders", "On-time Delivery", "Quality Score", "Returns Rate", "vs Last Year"].map(h => (
-                  <th key={h} className="text-left px-5 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left px-2 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -371,7 +371,7 @@ export default function VendorPerformancePage() {
               ))}
             </tbody>
           </table>
-          <div className="px-5 py-3 border-t border-gray-100 text-right">
+          <div className="px-5 py-2 border-t border-gray-100 text-right">
             <p className="text-xs text-gray-400">Showing 1 to {CATEGORIES.length} of {CATEGORIES.length} categories</p>
           </div>
         </div>

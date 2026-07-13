@@ -68,20 +68,20 @@ const menuItems = [
 
 export default function Configuration() {
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-foreground mb-8">
+    <div className="min-h-screen bg-background p-2">
+      <div className="w-full">
+        <h1 className="text-4xl font-bold text-foreground mb-8 tracking-tight">
           Configuration
         </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
 
             return (
               <div
                 key={item.title}
-                className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                className="bg-card dark:bg-secondary border border-border dark:border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
               >
                 <div className="flex justify-center mb-5">
                   <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -95,7 +95,7 @@ export default function Configuration() {
                     <span className="text-muted-foreground">›</span>
                   </h3>
 
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed opacity-100">
                     {item.description}
                   </p>
                 </div>

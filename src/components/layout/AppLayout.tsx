@@ -44,7 +44,7 @@ export default function AppLayout() {
             scrolls away with the rest of the page instead of staying fixed. */}
         <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
           <TopBar />
-          <div className="p-3 sm:p-4 md:p-6 lg:p-8 w-full max-w-full min-w-0">
+          <div className="p-2 sm:p-2 md:p-2 lg:p-2 w-full max-w-full min-w-0">
             <Outlet />
           </div>
         </main>

@@ -41,7 +41,7 @@ function formatPrice(n: number) {
 
 function SecurityNote() {
   return (
-    <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
+    <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-2 py-2.5">
       <Lock size={12} className="text-gray-400 shrink-0" />
       Your payment information is secure and encrypted
     </div>
@@ -54,7 +54,7 @@ function FieldInput({ label, ...props }: React.InputHTMLAttributes<HTMLInputElem
       <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
       <input
         {...props}
-        className={`w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors ${props.className ?? ""}`}
+        className={`w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400 transition-colors ${props.className ?? ""}`}
       />
     </div>
   );
@@ -80,7 +80,7 @@ function CardPanel({ state, onChange }: { state: PaymentState; onChange: (d: Par
             placeholder="1234 5678 9012 3456"
             value={state.cardNumber}
             onChange={(e) => onChange({ cardNumber: formatCardNumber(e.target.value) })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 pr-10"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400 pr-10"
           />
           <CreditCard size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
         </div>
@@ -96,7 +96,7 @@ function CardPanel({ state, onChange }: { state: PaymentState; onChange: (d: Par
               if (val.length >= 3) val = val.slice(0, 2) + " / " + val.slice(2, 4);
               onChange({ expiryDate: val });
             }}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400"
           />
         </div>
         <div className="flex-1">
@@ -105,7 +105,7 @@ function CardPanel({ state, onChange }: { state: PaymentState; onChange: (d: Par
             <input
               type="password" placeholder="123" value={state.cvv} maxLength={4}
               onChange={(e) => onChange({ cvv: e.target.value.replace(/\D/g, "") })}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 pr-10"
+              className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400 pr-10"
             />
             <Info size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
           </div>
@@ -125,7 +125,7 @@ function NetBankingPanel({ state, onChange }: { state: PaymentState; onChange: (
     <div className="space-y-4">
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Select Your Bank</label>
-        <select value={state.netBankingBank} onChange={(e) => onChange({ netBankingBank: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 bg-white">
+        <select value={state.netBankingBank} onChange={(e) => onChange({ netBankingBank: e.target.value })} className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400 bg-white">
           <option value="">-- Choose a bank --</option>
           {NET_BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
         </select>
@@ -139,7 +139,7 @@ function NetBankingPanel({ state, onChange }: { state: PaymentState; onChange: (
           </button>
         ))}
       </div>
-      <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2.5 text-xs text-amber-700">
+      <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-lg px-2 py-2.5 text-xs text-amber-700">
         <AlertCircle size={13} className="shrink-0 mt-0.5" />
         You will be redirected to your bank's secure login page to complete the payment.
       </div>
@@ -156,13 +156,13 @@ function UpiPanel({ state, onChange }: { state: PaymentState; onChange: (d: Part
         <label className="block text-xs font-medium text-gray-700 mb-1">UPI ID</label>
         <div className="relative">
           <input type="text" placeholder="yourname@upi" value={state.upiId} onChange={(e) => onChange({ upiId: e.target.value })}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 pr-10" />
+            className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400 pr-10" />
           {state.upiId && <CheckCircle2 size={15} className={`absolute right-3 top-1/2 -translate-y-1/2 ${valid ? "text-green-500" : "text-gray-300"}`} />}
         </div>
         <p className="text-xs text-gray-400 mt-1">e.g. 9876543210@okaxis, name@paytm, name@ybl</p>
       </div>
       <div className="text-center text-xs text-gray-400 font-medium">— OR —</div>
-      <div className="border border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center gap-3">
+      <div className="border border-dashed border-gray-200 rounded-xl p-2 flex flex-col items-center gap-3">
         <QrCode size={56} className="text-gray-300" />
         <p className="text-sm font-medium text-gray-700">Scan QR Code</p>
         <p className="text-xs text-gray-400 text-center">Open any UPI app and scan the QR code to pay</p>
@@ -185,7 +185,7 @@ function WalletsPanel({ state, onChange }: { state: PaymentState; onChange: (d: 
         <div className="grid grid-cols-2 gap-2">
           {WALLETS.map((w) => (
             <button key={w.id} onClick={() => onChange({ selectedWallet: w.id })}
-              className={`flex items-center gap-3 border rounded-xl p-3 transition-colors ${state.selectedWallet === w.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+              className={`flex items-center gap-3 border rounded-xl p-2 transition-colors ${state.selectedWallet === w.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
               <div className={`w-8 h-8 rounded-lg ${w.color} flex items-center justify-center shrink-0`}>
                 <Wallet size={14} className="text-white" />
               </div>
@@ -226,13 +226,13 @@ function NeftPanel({ state, onChange }: { state: PaymentState; onChange: (d: Par
         </div>
         <div className="flex-1">
           <label className="block text-xs font-medium text-gray-700 mb-1">Bank Name</label>
-          <select value={state.neftBankName} onChange={(e) => onChange({ neftBankName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 bg-white">
+          <select value={state.neftBankName} onChange={(e) => onChange({ neftBankName: e.target.value })} className="w-full border border-gray-200 rounded-lg px-2 py-2.5 text-sm outline-none focus:border-blue-400 bg-white">
             <option value="">-- Select bank --</option>
             {NET_BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
       </div>
-      <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-700">
+      <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-2 py-2.5 text-xs text-blue-700">
         <Info size={13} className="shrink-0 mt-0.5" />
         NEFT transfers are processed within 2–4 hours on working days. RTGS is processed in real-time for amounts above ₹2 lakh.
       </div>
@@ -243,7 +243,7 @@ function NeftPanel({ state, onChange }: { state: PaymentState; onChange: (d: Par
 
 function CompanyBanPanel() {
   return (
-    <div className="flex flex-col items-center justify-center h-full min-h-[180px] gap-4 text-center py-6">
+    <div className="flex flex-col items-center justify-center h-full min-h-[180px] gap-2 text-center py-6">
       <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center">
         <Building2 size={26} className="text-blue-600" />
       </div>
@@ -253,7 +253,7 @@ function CompanyBanPanel() {
           This order will be billed directly to your company account.
         </p>
       </div>
-      <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-4 py-2.5 w-full justify-center">
+      <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-lg px-2 py-2.5 w-full justify-center">
         <Lock size={12} className="text-gray-400 shrink-0" />
         Billing is managed by your company's IT / Finance team
       </div>
@@ -296,7 +296,7 @@ export default function PaymentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white px-6 py-6">
+    <div className="min-h-screen bg-white px-2 py-6">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
@@ -316,7 +316,7 @@ export default function PaymentPage() {
 
         <CheckoutStepper current={2} />
 
-        <div className="flex gap-5 items-start">
+        <div className="flex gap-2 items-start">
           {/* Left */}
           <div className="flex-1 min-w-0 space-y-4">
             {/* Payment methods + details */}
@@ -327,7 +327,7 @@ export default function PaymentPage() {
                 <div className="space-y-2.5 w-60 shrink-0">
                   {PAYMENT_METHODS.map((m) => (
                     <label key={m.id}
-                      className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${state.paymentMethod === m.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                      className={`flex items-center gap-3 p-2 border rounded-xl cursor-pointer transition-colors ${state.paymentMethod === m.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
                       <input type="radio" name="payment" className="accent-blue-600 shrink-0"
                         checked={state.paymentMethod === m.id}
                         onChange={() => onChange({ paymentMethod: m.id })} />
@@ -349,14 +349,14 @@ export default function PaymentPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-center gap-4 pt-2">
+            <div className="flex items-center justify-center gap-2 pt-2">
               <button onClick={() => navigate("/shop/checkout")}
-                className="flex items-center gap-2 border border-gray-300 rounded-lg px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                className="flex items-center gap-2 border border-gray-300 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 <ArrowLeft size={15} />
                 Back to Delivery
               </button>
               <button onClick={() => navigate("/shop/checkout/review")}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-8 py-3 text-sm transition-colors">
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors">
                 Review Order
                 <ChevronRight size={16} />
               </button>

@@ -127,7 +127,7 @@ function PreferenceDropdown({
               <button
                 key={p}
                 onClick={() => { onSelect(p); setOpen(false); }}
-                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === p ? "text-blue-600 font-medium" : "text-gray-700"}`}
+                className={`w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${value === p ? "text-blue-600 font-medium" : "text-gray-700"}`}
               >
                 {p}
               </button>
@@ -150,7 +150,7 @@ function PreferenceDropdown({
               ) : (
                 <button
                   onClick={() => setAdding(true)}
-                  className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+                  className="w-full text-left px-2 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
                 >
                   <span className="text-sm leading-none">+</span> Add new
                 </button>
@@ -265,7 +265,7 @@ function RoleDropdown({
                 <button
                   key={r}
                   onClick={() => onToggle(r)}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${checked ? "text-blue-600" : "text-gray-700"}`}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${checked ? "text-blue-600" : "text-gray-700"}`}
                 >
                   <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-blue-600 border-blue-600" : "border-gray-300"}`}>
                     {checked && <svg width="8" height="8" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -292,7 +292,7 @@ function RoleDropdown({
               ) : (
                 <button
                   onClick={() => setAdding(true)}
-                  className="w-full text-left px-3 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
+                  className="w-full text-left px-2 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
                 >
                   <span className="text-sm leading-none">+</span> Add new
                 </button>
@@ -348,7 +348,7 @@ function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClos
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+      <div className="flex-shrink-0 flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onClose}
@@ -371,7 +371,7 @@ function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClos
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className="max-w-7xlpx-2 py-8">
           <div className="flex gap-8">
             {/* Image */}
             <div className="w-80 shrink-0">
@@ -429,7 +429,7 @@ function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClos
                   <h3 className="text-sm font-semibold text-gray-800 mb-3">Key Specifications</h3>
                   <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                     {specPairs.filter(s => s.key).map((sp, i) => (
-                      <div key={i} className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl bg-gray-50">
+                      <div key={i} className="flex items-start gap-3 p-2 border border-gray-200 rounded-xl bg-gray-50">
                         <div className="mt-0.5 shrink-0">{getSpecIcon(sp.key)}</div>
                         <div className="min-w-0">
                           <p className="text-[11px] text-gray-500 uppercase tracking-wide">{sp.key}</p>
@@ -444,7 +444,7 @@ function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClos
 
             {/* Info panel */}
             <div className="w-60 shrink-0">
-              <div className="border border-gray-200 rounded-2xl p-5 space-y-4">
+              <div className="border border-gray-200 rounded-2xl p-2 space-y-4">
                 <div>
                   <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">{product.price || "—"}</p>
@@ -546,7 +546,7 @@ function EditProductScreen({
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+      <div className="flex-shrink-0 flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onClose}
@@ -569,7 +569,7 @@ function EditProductScreen({
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-8 py-8 flex gap-8">
+        <div className="max-w-6xlpx-2 py-2 flex gap-8">
 
           {/* Left: Product details (read-only) */}
           <div className="w-72 shrink-0">
@@ -704,7 +704,7 @@ function EditProductScreen({
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
+      <div className="flex-shrink-0 px-2 py-2 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
         <button
           onClick={onClose}
           className="px-5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -887,7 +887,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
 
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+      <div className="flex-shrink-0 flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
@@ -914,21 +914,21 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
           {/* ── Section 1: Search & Select ── */}
           <div className="flex flex-col border-b border-gray-200">
             {/* Section header */}
-            <div className="flex-shrink-0 px-8 py-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
+            <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
               <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
               <div>
                 <h3 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Check the boxes next to the products you want to add</p>
               </div>
               {selectedIds.size > 0 && (
-                <span className="ml-auto text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                <span className="ml-auto text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
                   {selectedIds.size} selected
                 </span>
               )}
             </div>
 
             {/* Search bar */}
-            <div className="flex-shrink-0 px-8 py-4 border-b border-gray-100">
+            <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100">
               <div className="relative max-w-xl">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -960,12 +960,12 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                      <th className="px-8 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14"></th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
+                      <th className="px-8 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14"></th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Name</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -995,12 +995,12 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-2 whitespace-nowrap">
                             <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">{product.masterProductCode || "—"}</span>
                           </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-700 text-sm">{product.category || "—"}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-gray-700 text-sm">{product.brand || "—"}</td>
-                          <td className="px-4 py-3 max-w-xs">
+                          <td className="px-4 py-2 whitespace-nowrap text-gray-700 text-sm">{product.category || "—"}</td>
+                          <td className="px-4 py-2 whitespace-nowrap text-gray-700 text-sm">{product.brand || "—"}</td>
+                          <td className="px-4 py-2 max-w-xs">
                             <span className="text-gray-500 text-sm line-clamp-2">{product.description || "—"}</span>
                           </td>
                         </tr>
@@ -1014,7 +1014,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
 
           {/* ── Section 2: Assign Roles & Preferences ── */}
           <div className="flex flex-col">
-            <div className="flex-shrink-0 px-8 py-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
+            <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100 flex items-center gap-3 bg-gray-50">
               <span className="w-7 h-7 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
               <div>
                 <h3 className="text-sm font-semibold text-gray-800">
@@ -1034,15 +1034,15 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-8 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">#</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Client Product Code</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">Remove</th>
+                      <th className="px-8 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">#</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Preference</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Client Product Code</th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-14">Remove</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1102,7 +1102,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
         </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-between gap-3">
+      <div className="flex-shrink-0 px-2 py-2 border-t border-gray-200 bg-white flex items-center justify-between gap-3">
         <span className="text-sm text-gray-500">
           {rows.length === 0 ? "No products selected yet" : `${rows.length} product${rows.length !== 1 ? "s" : ""} selected`}
         </span>
@@ -1121,7 +1121,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
       {/* Validation warning modal — require role & preference before adding */}
       {validationErrors.length > 0 && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-2 flex flex-col gap-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -1136,7 +1136,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
 
             <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
               {validationErrors.map((err, i) => (
-                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5">
+                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-2 py-2.5">
                   <p className="text-sm font-medium text-gray-800 leading-tight truncate">{err.productName}</p>
                   <p className="text-xs text-amber-700 mt-0.5">
                     Missing: {err.missing.join(", ")}
@@ -1269,19 +1269,19 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
       )}
       {/* Stat cards */}
       <div className="grid grid-cols-4 gap-3">
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white">
           <p className="text-xs text-gray-500 mb-1">Total Items</p>
           <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
         </div>
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white">
           <p className="text-xs text-gray-500 mb-1">In Stock</p>
           <p className="text-2xl font-bold text-green-500">{inStock}</p>
         </div>
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white">
           <p className="text-xs text-gray-500 mb-1">Low Stock</p>
           <p className="text-2xl font-bold text-orange-400">{lowStock}</p>
         </div>
-        <div className="border border-gray-200 rounded-xl px-4 py-3 bg-white">
+        <div className="border border-gray-200 rounded-xl px-2 py-2 bg-white">
           <p className="text-xs text-gray-500 mb-1">Out of Stock</p>
           <p className="text-2xl font-bold text-red-500">{outOfStock}</p>
         </div>
@@ -1290,7 +1290,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
       {/* Catalog table card */}
       <div className="border border-gray-200 rounded-xl bg-white flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-900">Client Catalog</h2>
           <div className="relative">
             <button
@@ -1301,11 +1301,11 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
             </button>
             {headerMenu && (
               <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-44" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => { setShowAddProduct(true); setHeaderMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                <button onClick={() => { setShowAddProduct(true); setHeaderMenu(false); }} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
                   <span className="text-gray-400"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
                   Add New Product
                 </button>
-                <button onClick={() => setHeaderMenu(false)} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                <button onClick={() => setHeaderMenu(false)} className="w-full flex items-center gap-2 px-2 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
                   <Download size={13} className="text-gray-400" /> Export
                 </button>
               </div>
@@ -1314,7 +1314,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
         </div>
 
         {/* Search */}
-        <div className="px-4 py-3 border-b border-gray-100">
+        <div className="px-4 py-2 border-b border-gray-100">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -1334,21 +1334,21 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50/60">
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-32 whitespace-nowrap">Client Product Code</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Product ID</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-4 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-32 whitespace-nowrap">Client Product Code</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Product ID</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((product, i) => (
                 <tr key={product.sku} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.cpc || "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-[10px]">{product.productCode}</td>
+                  <td className="px-4 py-2 text-gray-500 font-mono text-[10px]">{product.cpc || "—"}</td>
+                  <td className="px-4 py-2 text-gray-500 font-mono text-[10px]">{product.productCode}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       {product.img ? (
@@ -1359,7 +1359,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       <span className="font-medium text-gray-800 text-[11px]">{product.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{product.category}</td>
+                  <td className="px-4 py-2 text-gray-600">{product.category}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {product.roles.map((role) => (
@@ -1370,7 +1370,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-gray-900">{product.price}</td>
+                  <td className="px-4 py-2 font-semibold text-gray-900">{product.price}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full border ${
                       product.availability === "In Stock" ? "bg-green-50 text-green-700 border-green-200"
@@ -1380,7 +1380,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       {product.availability}
                     </span>
                   </td>
-                  <td className="px-4 py-3 relative">
+                  <td className="px-4 py-2 relative">
                     <button
                       onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === product.sku ? null : product.sku); }}
                       className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
@@ -1391,20 +1391,20 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => { setViewProduct(product); setRowMenu(null); }}
-                          className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700"
+                          className="w-full flex items-center gap-2 text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700"
                         >
                           <Eye size={12} className="text-gray-400" /> View Product
                         </button>
                         <button
                           onClick={() => { setEditProduct(product); setRowMenu(null); }}
-                          className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700"
+                          className="w-full flex items-center gap-2 text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700"
                         >
                           <Pencil size={12} className="text-gray-400" /> Edit Roles &amp; Preferences
                         </button>
                         <div className="my-1 border-t border-gray-100" />
                         <button
                           onClick={() => { setProducts((prev) => prev.filter((p) => p.sku !== product.sku)); setRowMenu(null); }}
-                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500"
+                          className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-red-500"
                         >
                           Remove Product
                         </button>
@@ -1423,7 +1423,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
         </div>
 
         {/* Footer pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+        <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100">
           <p className="text-[11px] text-gray-500">Showing 1 to {filtered.length} of {filtered.length} products</p>
           <div className="flex items-center gap-2">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="w-6 h-6 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs transition-colors disabled:opacity-40">–</button>

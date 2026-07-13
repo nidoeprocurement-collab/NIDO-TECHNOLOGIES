@@ -12,7 +12,7 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'
 const CATEGORY_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#6b7280', '#ec4899'];
 
 const KPICard = ({ title, value, icon: Icon, bgColor }: { title: string; value: string; icon: any; bgColor: string }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow duration-200 h-full flex flex-col justify-between">
+  <div className="bg-white rounded-lg border border-gray-200 p-2 sm:p-5 md:p-6 hover:shadow-md transition-shadow duration-200 h-full flex flex-col justify-between">
     <div className="flex items-start justify-between gap-2">
       <div className="flex-1 min-w-0">
         <p className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2 truncate">{title}</p>
@@ -26,7 +26,7 @@ const KPICard = ({ title, value, icon: Icon, bgColor }: { title: string; value: 
 );
 
 const MetricCard = ({ title, value, icon: Icon, bgColor, href }: { title: string; value: string | number; icon: any; bgColor: string; href: string }) => (
-  <Link to={href} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer block">
+  <Link to={href} className="bg-white rounded-lg border border-gray-200 p-2 hover:shadow-lg transition-shadow cursor-pointer block">
     <div className="flex items-start justify-between">
       <div>
         <p className="text-sm text-gray-600 mb-1">{title}</p>
@@ -58,12 +58,12 @@ function RecentOrdersTable({ orders, poByOrderId }: { orders: MyOrder[]; poByOrd
           <table className="w-full table-auto">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Order ID</th>
-                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Client</th>
-                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor</th>
-                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Amount</th>
-                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                <th className="px-4 md:px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
+                <th className="px-4 md:px-6 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Order ID</th>
+                <th className="px-4 md:px-6 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Client</th>
+                <th className="px-4 md:px-6 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Vendor</th>
+                <th className="px-4 md:px-6 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Amount</th>
+                <th className="px-4 md:px-6 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                <th className="px-4 md:px-6 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -71,18 +71,18 @@ function RecentOrdersTable({ orders, poByOrderId }: { orders: MyOrder[]; poByOrd
                 const po = poByOrderId.get(order.id);
                 return (
                   <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-sm font-medium">
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm font-medium">
                       <Link to={`/orders/${order.id}`} className="text-blue-600 hover:underline cursor-pointer">{order.id}</Link>
                     </td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600">{order.client}</td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600">{po ? po.vendorName : '—'}</td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-gray-900">{order.totalAmount}</td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-sm">
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-gray-600">{order.client}</td>
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-gray-600">{po ? po.vendorName : '—'}</td>
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-gray-900">{order.totalAmount}</td>
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         {order.status}
                       </span>
                     </td>
-                    <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-gray-600">{order.orderDate}</td>
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-gray-600">{order.orderDate}</td>
                   </tr>
                 );
               })}
@@ -152,7 +152,7 @@ function RecentActivities({ activities }: { activities: Activity[] }) {
       ) : (
         <div className="space-y-4">
           {activities.slice(0, 5).map((activity, i) => (
-            <div key={i} className="flex items-start gap-4 pb-4 border-b border-gray-200 last:border-0">
+            <div key={i} className="flex items-start gap-2 pb-4 border-b border-gray-200 last:border-0">
               <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                 <activity.icon size={18} className="text-gray-600" />
               </div>
@@ -287,19 +287,19 @@ export default function MainDashboard() {
   const cancelledPOs = pos.filter(po => po.status === 'Cancelled').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* Welcome Section */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 md:p-6 lg:p-8">
+      <div className="bg-white rounded-lg border border-gray-200 p-3">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome back, System Owner! 👋</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-1">Welcome back, System Owner! 👋</h1>
             <p className="text-gray-600">Here&apos;s what&apos;s happening with your organization today.</p>
           </div>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-4 lg:gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 mb-2">
         <KPICard title="Total Clients" value={String(clients.length)} icon={Eye} bgColor="bg-blue-600" />
         <KPICard title="Total Vendors" value={String(vendors.length)} icon={Package} bgColor="bg-green-600" />
         <KPICard title="Total Orders" value={String(orders.length)} icon={ShoppingCart} bgColor="bg-purple-600" />
@@ -309,7 +309,7 @@ export default function MainDashboard() {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6 mt-6 md:mt-8">
         {/* Expenses Overview */}
         <div className="lg:col-span-1 bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Expenses Overview</h3>
@@ -405,7 +405,7 @@ export default function MainDashboard() {
       </div>
 
       {/* Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-4 mt-6 md:mt-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
         <MetricCard title="Pending Approvals" value={pendingApprovals} icon={AlertCircle} bgColor="bg-yellow-500" href="/my-orders" />
         <MetricCard title="Active Vendors" value={activeContracts} icon={CheckCircle} bgColor="bg-green-500" href="/vendors" />
         <MetricCard title="Open Purchase Orders" value={openPOs} icon={DollarSign} bgColor="bg-blue-500" href="/vendors/orders" />
@@ -416,7 +416,7 @@ export default function MainDashboard() {
       <RecentOrdersTable orders={orders} poByOrderId={poByOrderId} />
 
       {/* Bottom Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mt-6 md:mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
         {/* Top Vendors */}
         <div className="lg:col-span-1">
           <TopVendors vendorSpend={vendorSpend} />

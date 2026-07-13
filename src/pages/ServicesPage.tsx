@@ -49,12 +49,12 @@ export default function ServicesPage() {
   return (
     <div className="space-y-8 p-6">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[32px] border border-blue-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-4 md:p-6 lg:p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden rounded-[32px] border border-blue-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-2 md:p-6 lg:p-8 text-white shadow-2xl">
         <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-500/25 blur-3xl" />
         <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-cyan-400/15 blur-3xl" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl space-y-4">
-            <div className="w-fit rounded-full border border-white/15 bg-white/10 px-4 py-2 text-white text-sm">
+            <div className="w-fit rounded-full border border-white/15 bg-white/10 px-2 py-2 text-white text-sm">
               Services Hub
             </div>
             <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
@@ -69,13 +69,13 @@ export default function ServicesPage() {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => navigate("/services/amc/new")}
-              className="gap-2 rounded-full bg-white px-5 py-2 text-slate-950 hover:bg-slate-100 flex items-center font-medium"
+              className="gap-2 rounded-full bg-white px-2 py-2 text-slate-950 hover:bg-slate-100 flex items-center font-medium"
             >
               New AMC <ArrowRight className="h-4 w-4" />
             </button>
             <button
               onClick={() => navigate("/support")}
-              className="gap-2 rounded-full border border-white/20 bg-transparent px-5 py-2 text-white hover:bg-white/10 flex items-center font-medium"
+              className="gap-2 rounded-full border border-white/20 bg-transparent px-2 py-2 text-white hover:bg-white/10 flex items-center font-medium"
             >
               Open Service Desk
             </button>
@@ -84,19 +84,19 @@ export default function ServicesPage() {
       </div>
 
       {/* Service Cards */}
-      <div className="grid gap-5 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-3">
         {SERVICE_CARDS.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className={`overflow-hidden border bg-gradient-to-br ${card.tone} rounded-lg shadow-sm p-6 space-y-4`}
+              className={`overflow-hidden border bg-gradient-to-br ${card.tone} rounded-lg shadow-sm p-2 space-y-4`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-slate-900 shadow-sm">
                   <Icon className="h-6 w-6" />
                 </div>
-                <div className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                <div className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
                   {card.badge}
                 </div>
               </div>
@@ -108,7 +108,7 @@ export default function ServicesPage() {
               </div>
               <button
                 onClick={() => navigate(card.href)}
-                className="gap-2 rounded-full px-4 py-2 text-sm font-medium flex items-center border border-slate-300 hover:bg-white/50"
+                className="gap-2 rounded-full px-2 py-2 text-sm font-medium flex items-center border border-slate-300 hover:bg-white/50"
               >
                 Open <ArrowRight className="h-4 w-4" />
               </button>
@@ -119,7 +119,7 @@ export default function ServicesPage() {
 
       {/* Info Section */}
       <div className="border border-slate-200 rounded-lg shadow-sm p-6">
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+        <div className="grid gap-2 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
           <div className="space-y-3">
             <p className="text-sm font-medium text-slate-500">
               Guided workflow
@@ -139,16 +139,16 @@ export default function ServicesPage() {
               Mandatory fields enforced
             </div>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-600">
-              <div className="rounded-2xl bg-white p-3 shadow-sm">
+              <div className="rounded-2xl bg-white p-2 shadow-sm">
                 Company dropdown
               </div>
-              <div className="rounded-2xl bg-white p-3 shadow-sm">
+              <div className="rounded-2xl bg-white p-2 shadow-sm">
                 Client authorization
               </div>
-              <div className="rounded-2xl bg-white p-3 shadow-sm">
+              <div className="rounded-2xl bg-white p-2 shadow-sm">
                 AMC duration
               </div>
-              <div className="rounded-2xl bg-white p-3 shadow-sm">
+              <div className="rounded-2xl bg-white p-2 shadow-sm">
                 Scope & category
               </div>
             </div>

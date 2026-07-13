@@ -12,7 +12,7 @@ export default function ExpensesInbox() {
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-2 border-b border-gray-200">
 
           <div className="flex items-center gap-4">
             <button className="text-sm text-gray-500">
@@ -25,12 +25,12 @@ export default function ExpensesInbox() {
           </div>
 
           <div className="flex gap-2">
-            <button className="border rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+            <button className="border rounded-lg px-2 py-2 text-sm flex items-center gap-2">
               <Download size={16} />
               Export
             </button>
 
-            <button className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+            <button className="bg-blue-600 text-white rounded-lg px-2 py-2 text-sm flex items-center gap-2">
               <Plus size={16} />
               New
             </button>
@@ -127,15 +127,15 @@ export default function ExpensesInbox() {
             </h2>
 
             <div className="flex gap-2">
-              <button className="border rounded px-3 py-1 text-sm">
+              <button className="border rounded px-2 py-1 text-sm">
                 Edit
               </button>
 
-              <button className="border rounded px-3 py-1 text-sm">
+              <button className="border rounded px-2 py-1 text-sm">
                 Make Recurring
               </button>
 
-              <button className="border rounded px-3 py-1 text-sm flex items-center gap-1">
+              <button className="border rounded px-2 py-1 text-sm flex items-center gap-1">
                 <Printer size={14} />
                 Print
               </button>
@@ -234,7 +234,7 @@ export default function ExpensesInbox() {
             {/* Receipt Upload */}
             <div className="col-span-3">
 
-              <div className="border-2 border-dashed rounded-xl p-6 text-center">
+              <div className="border-2 border-dashed rounded-xl p-2 text-center">
                 <UploadCloud
                   size={40}
                   className="mx-auto text-gray-400"
@@ -248,7 +248,7 @@ export default function ExpensesInbox() {
                   Maximum size 10 MB
                 </p>
 
-                <button className="mt-4 border rounded-lg px-4 py-2 text-sm">
+                <button className="mt-4 border rounded-lg px-2 py-2 text-sm">
                   Upload your File
                 </button>
               </div>
@@ -261,7 +261,7 @@ export default function ExpensesInbox() {
 
           <div className="mt-8 border border-gray-200 rounded-xl overflow-hidden">
 
-            <div className="bg-gray-50 p-3 font-medium">
+            <div className="bg-gray-50 p-2 font-medium">
               Journal
             </div>
 

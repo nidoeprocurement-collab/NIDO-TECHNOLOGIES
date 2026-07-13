@@ -225,7 +225,7 @@ export default function AddVendorProductsPage() {
     <div className="min-h-screen flex flex-col bg-white font-[Inter,sans-serif]">
 
       {/* ── Sticky header ── */}
-      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+      <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-2 py-2 shadow-sm">
         <div className="flex items-center gap-2 mb-0.5">
           <button onClick={goBack} className="p-1 rounded-md hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0">
             <ChevronLeft className="w-4 h-4" />
@@ -242,14 +242,14 @@ export default function AddVendorProductsPage() {
       </div>
 
       {/* ── Body ── */}
-      <div className="flex-1 px-6 py-4 flex flex-col gap-4">
+      <div className="flex-1 px-2 py-2 flex flex-col gap-4">
 
         {/* ── Section 1: Search & Select ── */}
         {!isEditMode && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
 
             {/* Header */}
-            <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+            <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100 flex items-center gap-3">
               <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
               <h2 className="text-sm font-semibold text-gray-800">Search &amp; Select Products</h2>
               {selectedIds.size > 0 && (
@@ -260,7 +260,7 @@ export default function AddVendorProductsPage() {
             </div>
 
             {/* Search bar */}
-            <div className="flex-shrink-0 px-5 py-2.5 border-b border-gray-100">
+            <div className="flex-shrink-0 px-2 py-2.5 border-b border-gray-100">
               <div className="relative max-w-lg">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
@@ -285,7 +285,7 @@ export default function AddVendorProductsPage() {
                   No products in master catalog yet. Add products via Master Catalog first.
                 </div>
               ) : filtered.length === 0 ? (
-                <div className="px-5 py-8 text-center text-gray-400 text-sm">
+                <div className="px-5 py-2 text-center text-gray-400 text-sm">
                   No products match "<span className="font-medium text-gray-600">{query}</span>"
                 </div>
               ) : (
@@ -345,7 +345,7 @@ export default function AddVendorProductsPage() {
 
             {/* Pagination — always visible at bottom of section 1 */}
             {filtered.length > 0 && (
-              <div className="flex-shrink-0 px-5 py-2.5 flex items-center justify-between border-t border-gray-100 bg-white">
+              <div className="flex-shrink-0 px-2 py-2.5 flex items-center justify-between border-t border-gray-100 bg-white">
                 <span className="text-xs text-gray-500">
                   Showing {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
                 </span>
@@ -379,7 +379,7 @@ export default function AddVendorProductsPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
 
           {/* Header */}
-          <div className="flex-shrink-0 px-5 py-3 border-b border-gray-100 flex items-center gap-3">
+          <div className="flex-shrink-0 px-2 py-2 border-b border-gray-100 flex items-center gap-3">
             {!isEditMode && (
               <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
             )}
@@ -425,7 +425,7 @@ export default function AddVendorProductsPage() {
                     {selectedRows.map((row, idx) => (
                       <tr key={row.catalogProduct.id} className="hover:bg-gray-50/40 transition-colors">
                         {!isEditMode && (
-                          <td className="px-3 py-3 text-gray-500 text-sm font-medium">{idx + 1}</td>
+                          <td className="px-3 py-2 text-gray-500 text-sm font-medium">{idx + 1}</td>
                         )}
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
@@ -436,7 +436,7 @@ export default function AddVendorProductsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
+                        <td className="px-3 py-2 whitespace-nowrap">
                           <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{row.catalogProduct.masterProductCode || "—"}</span>
                         </td>
                         <td className="px-3 py-3">
@@ -497,7 +497,7 @@ export default function AddVendorProductsPage() {
               </div>
 
               {!isEditMode && (
-                <div className="flex-shrink-0 px-5 py-2 border-t border-gray-100 bg-white">
+                <div className="flex-shrink-0 px-2 py-2 border-t border-gray-100 bg-white">
                   <span className="text-xs text-gray-500">
                     {selectedRows.length} product{selectedRows.length !== 1 ? "s" : ""} selected
                   </span>
@@ -511,7 +511,7 @@ export default function AddVendorProductsPage() {
       {/* ── Validation warning modal ── */}
       {validationErrors.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-2 flex flex-col gap-4">
             {/* Header */}
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
@@ -528,7 +528,7 @@ export default function AddVendorProductsPage() {
             {/* Error list */}
             <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
               {validationErrors.map((err, i) => (
-                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5">
+                <div key={i} className="rounded-lg border border-amber-100 bg-amber-50 px-2 py-2.5">
                   <p className="text-sm font-medium text-gray-800 leading-tight truncate">{err.productName}</p>
                   <p className="text-xs text-amber-700 mt-0.5">
                     Missing: {err.missing.join(", ")}
@@ -549,7 +549,7 @@ export default function AddVendorProductsPage() {
       )}
 
       {/* ── Sticky footer ── */}
-      <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3 shadow-[0_-1px_4px_rgba(0,0,0,0.06)]">
+      <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 px-2 py-2 flex items-center justify-end gap-3 shadow-[0_-1px_4px_rgba(0,0,0,0.06)]">
         <button
           onClick={goBack}
           className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -559,7 +559,7 @@ export default function AddVendorProductsPage() {
         <button
           onClick={handleSubmit}
           disabled={selectedRows.length === 0}
-          className="flex items-center gap-2 px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className="flex items-center gap-2 px-2 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
         >
           {isEditMode ? (
             <><Save className="w-4 h-4" /> Save Changes</>

@@ -111,7 +111,7 @@ export default function OrderSummaryPanel({
       </div>
 
       {/* Trust badges */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-2 space-y-4">
         {[
           { icon: Shield, label: "100% Secure Transactions", sub: "Your data is always protected" },
           { icon: Shield, label: "GST Compliant Invoices", sub: "Automatically generated" },

@@ -83,7 +83,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
 
   return (
     <div className="mt-6">
-      <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-4">
+      <div className="bg-blue-50 border border-blue-100 rounded-lg px-2 py-2 mb-4">
         <p className="text-sm text-gray-700">
           <span className="font-semibold text-gray-900">Price Slabs:</span> Define volume-based pricing tiers that
           apply discounts based on order quantity across all products or specific categories.
@@ -94,13 +94,13 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Slab Name</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Min Qty</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Max Qty</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Discount %</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Apply To</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Status</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-gray-600">Actions</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Slab Name</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Min Qty</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Max Qty</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Discount %</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Apply To</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Status</th>
+              <th className="text-left px-2 py-2.5 font-semibold text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -169,15 +169,15 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
 
               return (
                 <tr key={slab.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors">
-                  <td className="px-4 py-3 text-gray-800 font-medium">{slab.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{slab.minQty}</td>
-                  <td className="px-4 py-3 text-gray-600">{slab.maxQty}</td>
+                  <td className="px-4 py-2 text-gray-800 font-medium">{slab.name}</td>
+                  <td className="px-4 py-2 text-gray-600">{slab.minQty}</td>
+                  <td className="px-4 py-2 text-gray-600">{slab.maxQty}</td>
                   <td className="px-4 py-3">
                     <span className={slab.discountPct > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}>
                       {slab.discountPct}%
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{slab.applyTo}</td>
+                  <td className="px-4 py-2 text-gray-500">{slab.applyTo}</td>
                   <td className="px-4 py-3">
                     <button
                       onClick={() => toggleStatus(slab.id)}
@@ -262,7 +262,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
 
             {slabs.length === 0 && !isNew && (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-xs text-gray-400">
+                <td colSpan={7} className="px-4 py-2 text-center text-xs text-gray-400">
                   No price slabs configured yet.
                 </td>
               </tr>

@@ -55,7 +55,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               value={form.items}
               onChange={set("items")}
               placeholder="e.g. Laptop, Monitor, Keyboard"
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
           </div>
           <div>
@@ -65,7 +65,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               value={form.quantity}
               onChange={set("quantity")}
               placeholder="e.g. 5"
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
           </div>
           <div>
@@ -75,7 +75,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               value={form.amount}
               onChange={set("amount")}
               placeholder="e.g. 50000"
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
           </div>
           <div>
@@ -84,7 +84,7 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               type="date"
               value={form.deliveryDate}
               onChange={set("deliveryDate")}
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-600"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-600"
             />
           </div>
           <div>
@@ -94,13 +94,13 @@ function CreateOrderModal({ onClose }: { onClose: () => void }) {
               onChange={set("notes")}
               placeholder="Additional notes for this order"
               rows={3}
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 resize-none"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 resize-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
             className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -134,7 +134,7 @@ export default function ClientOrdersPage() {
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); setShowCreateOrder(true); }}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-2 rounded-lg transition-colors"
         >
           <span className="text-base leading-none">+</span> New Order
         </button>
@@ -145,13 +145,13 @@ export default function ClientOrdersPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-200 bg-white">
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Order ID</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Items</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Client <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Order ID</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Items</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Client <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -163,14 +163,14 @@ export default function ClientOrdersPage() {
                     onClick={() => navigate(`/orders/${order.id}`)}
                   >{order.id}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-700">{order.date}</td>
-                <td className="px-4 py-3 text-gray-700">{order.items} Items</td>
-                <td className="px-4 py-3 font-semibold text-gray-900">{order.amount}</td>
-                <td className="px-4 py-3 text-gray-700">{order.client}</td>
+                <td className="px-4 py-2 text-gray-700">{order.date}</td>
+                <td className="px-4 py-2 text-gray-700">{order.items} Items</td>
+                <td className="px-4 py-2 font-semibold text-gray-900">{order.amount}</td>
+                <td className="px-4 py-2 text-gray-700">{order.client}</td>
                 <td className="px-4 py-3">
                   <OrderStatusBadge status={order.status} />
                 </td>
-                <td className="px-4 py-3 relative">
+                <td className="px-4 py-2 relative">
                   <button
                     onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === order.id ? null : order.id); }}
                     className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
@@ -180,7 +180,7 @@ export default function ClientOrdersPage() {
                   {rowMenu === order.id && (
                     <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-36" onClick={(e) => e.stopPropagation()}>
                       {["View Details", "Edit Order", "Download Invoice", "Cancel Order"].map((action) => (
-                        <button key={action} onClick={() => setRowMenu(null)} className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${action === "Cancel Order" ? "text-red-500" : "text-gray-700"}`}>
+                        <button key={action} onClick={() => setRowMenu(null)} className={`w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${action === "Cancel Order" ? "text-red-500" : "text-gray-700"}`}>
                           {action}
                         </button>
                       ))}
@@ -193,7 +193,7 @@ export default function ClientOrdersPage() {
         </table>
 
         {/* Footer pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-white">
+        <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100 bg-white">
           <p className="text-[11px] text-orange-500 font-medium">Showing 1 to {total} of {total} orders</p>
           <div className="flex items-center gap-2">
             <button

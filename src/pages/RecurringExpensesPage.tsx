@@ -23,7 +23,7 @@ import { MoreHorizontal, Plus } from "lucide-react"
 
 export default function ProfilesPage() {
   return (
-    <div className="max-w-[1280px] mx-auto space-y-4">
+    <div className="max-w-[1280px]space-y-4">
 
       {/* ================= TOP TABLE ================= */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -103,7 +103,7 @@ export default function ProfilesPage() {
       </div>
 
       {/* ================= DETAILS ================= */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+      <div className="bg-white border border-gray-200 rounded-xl p-2 space-y-4">
 
         {/* Title */}
         <div className="flex justify-between items-start">
@@ -188,7 +188,7 @@ export default function ProfilesPage() {
         <div>
           <h3 className="font-medium mb-3">Other Details</h3>
 
-          <div className="grid md:grid-cols-2 gap-6 text-sm">
+          <div className="grid md:grid-cols-2 gap-2 text-sm">
             <div>
               <p className="text-muted-foreground">Customer</p>
               <p className="text-blue-600">Nido Technologies</p>
@@ -208,7 +208,7 @@ export default function ProfilesPage() {
         <div>
           <h3 className="font-medium mb-2">History</h3>
 
-          <div className="border rounded-md p-4 text-sm text-muted-foreground space-y-2">
+          <div className="border rounded-md p-2 text-sm text-muted-foreground space-y-2">
             <p>
               4/8/2026 4:29:00 AM — Recurring expense created for Rs.500.00
             </p>

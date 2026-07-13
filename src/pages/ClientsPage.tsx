@@ -228,10 +228,10 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
   ]
 
   return (
-    <div className="min-h-screen bg-white p-6">
+    <div className="min-h-screen bg-white p-2">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between">
+        <div className="w-full px-2 py-2 flex justify-between">
           <div>
             <p className="text-xs text-gray-500">Clients / Client List</p>
             <h1 className="text-2xl font-bold">Clients</h1>
@@ -294,12 +294,12 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-2 py-2">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-4 gap-2 mb-2">
           {/* Premium */}
           <Card>
-            <CardContent className="p-6 flex justify-between">
+              <CardContent className="p-3 flex justify-between">
               <div>
                 <p className="text-sm text-gray-600">Premium Clients</p>
                 <p className="text-3xl font-bold mt-2">
@@ -312,7 +312,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
 
           {/* Active */}
           <Card>
-            <CardContent className="p-6 flex justify-between">
+            <CardContent className="p-3 flex justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Clients</p>
                 <p className="text-3xl font-bold text-green-600 mt-2">
@@ -325,7 +325,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
 
           {/* Pending */}
           <Card>
-            <CardContent className="p-6 flex justify-between">
+            <CardContent className="p-3 flex justify-between">
               <div>
                 <p className="text-sm text-gray-600">Pending</p>
                 <p className="text-3xl font-bold text-orange-600 mt-2">
@@ -338,7 +338,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
 
           {/* Inactive */}
           <Card>
-            <CardContent className="p-6 flex justify-between">
+            <CardContent className="p-3 flex justify-between">
               <div>
                 <p className="text-sm text-gray-600">Inactive</p>
                 <p className="text-3xl font-bold text-red-600 mt-2">
@@ -356,16 +356,17 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-6 py-2 text-left">
                     <input type="checkbox" />
                   </th>
-                  <th className="px-6 py-4 text-left">Client ID</th>
-                  <th className="px-6 py-4 text-left">Client Name</th>
-                  <th className="px-6 py-4 text-left">Representative</th>
-                  <th className="px-6 py-4 text-left">Email</th>
-                  <th className="px-6 py-4 text-left">Total Spend (USD)</th>
-                  <th className="px-6 py-4 text-left">Status</th>
-                  <th className="px-6 py-4 text-center">Actions</th>
+                  <th className="px-6 py-2 text-left">Client ID</th>
+                  <th className="px-6 py-2 text-left">Client Name</th>
+                  <th className="px-6 py-2 text-left">Categories</th>
+                  <th className="px-6 py-2 text-left">Representative</th>
+                  <th className="px-6 py-2 text-left">Email</th>
+                  <th className="px-6 py-2 text-left">Total Spend (USD)</th>
+                  <th className="px-6 py-2 text-left">Status</th>
+                  <th className="px-6 py-2 text-center">Actions</th>
                 </tr>
               </thead>
 
@@ -380,13 +381,14 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                     </td>
 
                     <td 
-                      className="px-6 py-4 text-blue-600 font-medium cursor-pointer hover:underline"
+                      className="px-6 py-2 text-blue-600 font-medium cursor-pointer hover:underline"
                       onClick={() => navigate(`/clients/${c.id}`)}
                     >
                       {c.id}
                     </td>
 
                     <td className="px-6 py-4">{c.name}</td>
+                    <td className="px-6 py-4">{c.category || '-'}</td>
                     <td className="px-6 py-4">{c.rep}</td>
                     <td className="px-6 py-4">{c.email}</td>
                     <td className="px-6 py-4">$0</td>
@@ -397,7 +399,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                       </Badge>
                     </td>
 
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-2 text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
@@ -434,7 +436,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             </table>
 
             {/* Pagination */}
-            <div className="px-6 py-4 flex justify-between text-sm text-gray-600 border-t">
+            <div className="px-6 py-2 flex justify-between text-sm text-gray-600 border-t">
               <span>1-10 of 03 clients</span>
               <div className="flex gap-2">
                 <button className="p-2 hover:bg-gray-100 rounded">←</button>
@@ -449,8 +451,8 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
       {/* Archived Clients Modal */}
       {showArchivedClients && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
+          <div className="bg-white rounded-2xlw-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-2 border-b bg-white">
               <h2 className="text-lg font-semibold">Archived Clients</h2>
               <button onClick={() => setShowArchivedClients(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
@@ -459,36 +461,38 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Client ID</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Company Name</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Representative</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Email</th>
-                      <th className="text-left py-3 px-4 font-semibold text-sm">Archived On</th>
+                      <th className="text-left py-2 px-2 font-semibold text-sm">Client ID</th>
+                      <th className="text-left py-2 px-2 font-semibold text-sm">Company Name</th>
+                      <th className="text-left py-2 px-2 font-semibold text-sm">Categories</th>
+                      <th className="text-left py-2 px-2 font-semibold text-sm">Representative</th>
+                      <th className="text-left py-2 px-2 font-semibold text-sm">Email</th>
+                      <th className="text-left py-2 px-2 font-semibold text-sm">Archived On</th>
                     </tr>
                   </thead>
                   <tbody>
                     {archivedClientsList.map((client) => (
                       <tr key={client.id} className="border-b hover:bg-gray-50">
                         <td 
-                          className="py-3 px-4 text-sm text-blue-600 font-medium cursor-pointer hover:underline"
+                          className="py-3 px-2 text-sm text-blue-600 font-medium cursor-pointer hover:underline"
                           onClick={() => setSelectedArchivedClient(client)}
                         >
                           {client.id}
                         </td>
-                        <td className="py-3 px-4 text-sm font-medium">{client.name}</td>
-                        <td className="py-3 px-4 text-sm">{client.rep}</td>
-                        <td className="py-3 px-4 text-sm">{client.email}</td>
-                        <td className="py-3 px-4 text-sm">{client.archivedOn}</td>
+                        <td className="py-3 px-2 text-sm font-medium">{client.name}</td>
+                        <td className="py-3 px-2 text-sm">{client.category || '-'}</td>
+                        <td className="py-3 px-2 text-sm">{client.rep}</td>
+                        <td className="py-3 px-2 text-sm">{client.email}</td>
+                        <td className="py-3 px-2 text-sm">{client.archivedOn}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               {archivedClientsList.length === 0 && (
-                <div className="text-center py-8 text-gray-500">No archived clients found</div>
+                <div className="text-center py-2 text-gray-500">No archived clients found</div>
               )}
             </div>
-            <div className="flex justify-end gap-2 p-6 border-t">
+            <div className="flex justify-end gap-2 p-2 border-t">
               <button onClick={() => setShowArchivedClients(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Close</button>
             </div>
           </div>
@@ -498,8 +502,8 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
       {/* Archived Client Detail Modal */}
       {selectedArchivedClient && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between p-6 border-b bg-white">
+          <div className="bg-white rounded-2xlw-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 flex items-center justify-between p-2 border-b bg-white">
               <h2 className="text-lg font-semibold">Client Details - {selectedArchivedClient.id}</h2>
               <button 
                 onClick={() => setSelectedArchivedClient(null)} 
@@ -594,12 +598,12 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
               </div>
 
               {/* Status Badge */}
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-gray-50 p-2 rounded-lg">
                 <p className="text-xs text-gray-500 font-medium mb-2">Status</p>
                 <Badge className="bg-red-100 text-red-800 capitalize">{selectedArchivedClient.status}</Badge>
               </div>
             </div>
-            <div className="flex justify-end gap-2 p-6 border-t">
+            <div className="flex justify-end gap-2 p-2 border-t">
               <button 
                 onClick={() => setSelectedArchivedClient(null)} 
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
@@ -630,7 +634,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
               </button>
             </div>
 
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-5">
+            <div className="bg-green-50 border border-green-200 rounded-xl p-2 mb-5">
               <p className="text-sm text-green-800 font-medium">Client portal is ready!</p>
               <p className="text-xs text-green-700 mt-1">
                 Share the credentials below with the client admin. They can log in at the same login page.
@@ -664,7 +668,7 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-2 mb-5">
               <p className="text-xs text-amber-800">
                 <strong>Important:</strong> Save these credentials now — the password cannot be recovered later (only reset from the client's Users page).
               </p>
@@ -681,14 +685,14 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
       {showBulkImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center justify-between p-2 border-b">
               <h2 className="text-lg font-semibold">Bulk Import Clients</h2>
               <button onClick={() => setShowBulkImport(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Upload CSV File</label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 cursor-pointer hover:border-gray-400 transition-colors">
+                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-2 cursor-pointer hover:border-gray-400 transition-colors">
                   <Upload className="h-8 w-8 text-gray-400 mb-2" />
                   <span className="text-sm text-gray-600">Click to upload or drag and drop</span>
                   <span className="text-xs text-gray-500 mt-1">CSV file</span>
@@ -700,13 +704,13 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
                   />
                 </label>
               </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="bg-blue-50 p-2 rounded-lg">
                 <p className="text-xs text-blue-700">
                   <strong>Note:</strong> Use the template downloaded from "Download Template" option. Client IDs will be auto-generated if not provided. Blank fields will be kept as empty.
                 </p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 p-6 border-t">
+            <div className="flex justify-end gap-2 p-2 border-t">
               <button onClick={() => setShowBulkImport(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
             </div>
           </div>

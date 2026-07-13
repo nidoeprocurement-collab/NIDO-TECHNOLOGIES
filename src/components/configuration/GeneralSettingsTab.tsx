@@ -13,7 +13,7 @@ import type { GeneralSettings } from "@/lib/configService"
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border p-6 space-y-4">
+    <div className="rounded-lg border p-2 space-y-4">
       <div>
         <h3 className="font-semibold">{title}</h3>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
@@ -29,7 +29,7 @@ function ToggleRow({
   label: string; description?: string; checked: boolean; onCheckedChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 py-2">
+    <div className="flex items-center justify-between gap-2 py-2">
       <div>
         <div className="text-sm font-medium">{label}</div>
         {description && <div className="text-sm text-muted-foreground">{description}</div>}

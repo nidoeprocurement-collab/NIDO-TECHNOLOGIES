@@ -4,7 +4,7 @@ export default function PaymentsPage() {
   return (
     <div className="min-h-screen bg-white p-4">
       {/* Summary Card */}
-      <div className="bg-white border rounded-xl shadow-sm p-4 mb-4">
+      <div className="bg-white border rounded-xl shadow-sm p-2 mb-4">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm text-slate-500">
@@ -16,7 +16,7 @@ export default function PaymentsPage() {
             </h2>
           </div>
 
-          <button className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium transition">
+          <button className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-2 py-2 rounded-lg font-medium transition">
             <Plus size={18} />
             New
           </button>
@@ -29,31 +29,31 @@ export default function PaymentsPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-slate-50">
-                <th className="text-left px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-left px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Date
                 </th>
 
-                <th className="text-left px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-left px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Payment #
                 </th>
 
-                <th className="text-left px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-left px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Customer
                 </th>
 
-                <th className="text-left px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-left px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Invoice #
                 </th>
 
-                <th className="text-left px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-left px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Mode
                 </th>
 
-                <th className="text-left px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-left px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Status
                 </th>
 
-                <th className="text-right px-4 py-4 text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                <th className="text-right px-2 py-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
                   Amount
                 </th>
               </tr>

@@ -56,13 +56,13 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
         className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-5 py-2 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={18} />
           </button>
         </div>
-        <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
+        <div className="px-5 py-2 overflow-y-auto flex-1 space-y-4">
           {fields.map((field) => (
             <div key={field.key} className="space-y-1">
               <label className="block text-xs font-medium text-gray-700">{field.label}</label>
@@ -71,7 +71,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
                   type="text"
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               )}
               {field.type === "textarea" && (
@@ -79,14 +79,14 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
                   rows={3}
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               )}
               {field.type === "select" && field.options && (
                 <select
                   value={values[field.key] ?? ""}
                   onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                  className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {field.options.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -96,7 +96,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
             </div>
           ))}
         </div>
-        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-5 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">
             Cancel
           </button>
@@ -111,7 +111,7 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
 
 function MetaCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2 px-4 py-3 border-r border-gray-200 last:border-0">
+    <div className="flex items-start gap-2 px-2 py-2 border-r border-gray-200 last:border-0">
       <div className="text-gray-400 mt-0.5 shrink-0">{icon}</div>
       <div>
         <p className="text-[10px] text-gray-400 leading-tight">{label}</p>
@@ -124,7 +124,7 @@ function MetaCell({ icon, label, value }: { icon: React.ReactNode; label: string
 function SectionCard({ title, children, onEdit }: { title: string; children: React.ReactNode; onEdit: () => void }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden relative">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+      <div className="px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
         <h3 className="text-xs font-bold text-gray-800">{title}</h3>
         <button
           onClick={onEdit}
@@ -620,7 +620,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
             <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
               <button
                 onClick={() => setDropdownOpen(false)}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                className="w-full px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Download size={14} className="text-gray-400" />
                 Download Contract
@@ -661,22 +661,22 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
 
             {/* Center */}
             <div className="flex-1 flex flex-col items-center text-center">
-              <span className="text-[10px] border border-blue-300 text-blue-600 px-3 py-0.5 rounded tracking-widest font-semibold mb-2 bg-blue-50">CONTRACT</span>
+              <span className="text-[10px] border border-blue-300 text-blue-600 px-2 py-0.5 rounded tracking-widest font-semibold mb-2 bg-blue-50">CONTRACT</span>
               <h2 className="text-lg font-bold text-gray-900 mb-3">{contractTitle || "SaaS & Services Agreement"}</h2>
               <p className="text-[11px] text-gray-400 mb-2">Between</p>
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[11px] font-medium px-3 py-1 rounded">
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[11px] font-medium px-2 py-1 rounded">
                   Nido-Tech<br /><span className="text-[10px] text-yellow-600">(Service Provider)</span>
                 </div>
                 <div className="flex items-center gap-0.5 text-gray-300">
                   <div className="w-8 h-px bg-gray-300" />
                   <ChevronRight size={12} className="text-gray-400" />
                 </div>
-                <div className="bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-medium px-3 py-1 rounded">
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-medium px-2 py-1 rounded">
                   Apex Tech Solutions<br /><span className="text-[10px] text-blue-600">(Client)</span>
                 </div>
               </div>
-              <div className="flex gap-8 text-center">
+              <div className="flex gap-2 text-center">
                 <div>
                   <p className="text-[10px] text-gray-400">Contract No.</p>
                   <p className="text-xs font-semibold text-gray-800">{contractId || "CT-2025-001"}</p>
@@ -730,8 +730,8 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
       </div>
 
       {/* Main Content Grid */}
-      <div className="flex-1 p-5 overflow-auto">
-        <div className="grid grid-cols-[1fr_2fr_1fr] gap-4 max-w-[1600px] mx-auto">
+      <div className="flex-1 p-2 overflow-auto">
+        <div className="grid grid-cols-[1fr_2fr_1fr] gap-2 max-w-[1600px] mx-auto">
 
           {/* LEFT COLUMN */}
           <div className="space-y-4">
@@ -796,7 +796,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                           <Phone size={12} />
                         </button>
                         {phonePopup === "nido-owner" && (
-                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
                             {relationshipOwners.nidoTech.phone}
                             <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
                           </div>
@@ -836,7 +836,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                           <Phone size={12} />
                         </button>
                         {phonePopup === "apex-owner" && (
-                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
                             {relationshipOwners.apex.phone}
                             <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
                           </div>
@@ -947,7 +947,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
             <SectionCard title="5. Data Security & Compliance" onEdit={openDataSecurityEdit}>
               <div className="grid grid-cols-6 gap-2">
                 {dataSecurity.map((item, i) => (
-                  <div key={i} className="flex flex-col items-center justify-center p-3 bg-gray-50 rounded-lg border border-gray-100 text-center gap-2">
+                  <div key={i} className="flex flex-col items-center justify-center p-2 bg-gray-50 rounded-lg border border-gray-100 text-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center">
                       {getDataSecurityIcon(item.type)}
                     </div>
@@ -965,7 +965,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                 </div>
                 <div className="flex-1 space-y-3">
                   <p className="text-[11px] text-gray-600 leading-relaxed">{confidentiality.text}</p>
-                  <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                     <p className="text-[11px] font-medium text-gray-800">
                       Effective Until: <span className="text-gray-500 font-normal">{confidentiality.effective}</span>
                     </p>
@@ -1010,7 +1010,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
             <SectionCard title="8. Renewal & Termination" onEdit={openRenewalTermEdit}>
               <div className="grid grid-cols-3 gap-3">
                 {renewalTerm.map((item, i) => (
-                  <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-100">
                     <div className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0">
                       {getRenewalIcon(item.type)}
                     </div>
@@ -1116,7 +1116,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                   <span className="text-[11px] text-gray-800 font-medium">{supportInfo.responseSLA}</span>
                 </div>
               </div>
-              <button className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg border border-blue-600 text-blue-600 text-[11px] font-medium hover:bg-blue-50 transition-colors">
+              <button className="w-full flex items-center justify-center gap-2 py-2 px-2 rounded-lg border border-blue-600 text-blue-600 text-[11px] font-medium hover:bg-blue-50 transition-colors">
                 <Headphones size={14} />
                 Create Support Ticket
               </button>
@@ -1154,7 +1154,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                           <Phone size={12} />
                         </button>
                         {phonePopup === "apex-key" && (
-                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
                             {keyContacts.apex.phone}
                             <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
                           </div>
@@ -1194,7 +1194,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                           <Phone size={12} />
                         </button>
                         {phonePopup === "nido-key" && (
-                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
+                          <div className="absolute right-0 bottom-8 bg-gray-900 text-white text-[11px] font-medium px-2 py-1.5 rounded-lg shadow-lg whitespace-nowrap z-20">
                             {keyContacts.nidoTech.phone}
                             <div className="absolute right-2.5 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
                           </div>

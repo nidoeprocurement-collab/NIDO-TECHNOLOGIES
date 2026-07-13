@@ -161,12 +161,12 @@ export default function VendorServicesPage() {
 
   return (
     <div className="min-h-screen bg-background font-sans">
-      <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-4">
+      <div className="max-w-[1280px]px-2 py-2 space-y-4">
 
         {/* Stat cards */}
         <div className="grid grid-cols-6 gap-4">
           {stats.map(s => (
-            <button key={s.label} onClick={s.onClick} className="bg-card rounded-xl border border-border shadow-sm p-4 text-left hover:border-primary/40 hover:shadow-md transition-all group">
+            <button key={s.label} onClick={s.onClick} className="bg-card rounded-xl border border-border shadow-sm p-2 text-left hover:border-primary/40 hover:shadow-md transition-all group">
               <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center mb-3`}>{s.icon}</div>
               <p className="text-xs text-muted-foreground font-medium mb-0.5 leading-tight">{s.label}</p>
               <p className="text-2xl font-bold text-foreground mb-0.5">{s.value}</p>
@@ -179,7 +179,7 @@ export default function VendorServicesPage() {
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
 
           {/* Filters */}
-          <div className="px-5 py-4 border-b border-border flex items-end gap-3 flex-wrap">
+          <div className="px-5 py-2 border-b border-border flex items-end gap-3 flex-wrap">
             <FilterSelect label="Service Type" value={typeFilter}     options={SERVICE_TYPES} onChange={v => { setTypeFilter(v);     reset(); }} />
             <FilterSelect label="Status"       value={statusFilter}   options={STATUSES}      onChange={v => { setStatusFilter(v);   reset(); }} />
             <FilterSelect label="Client"       value={clientFilter}   options={CLIENTS}       onChange={v => { setClientFilter(v);   reset(); }} />
@@ -211,7 +211,7 @@ export default function VendorServicesPage() {
               <thead>
                 <tr className="bg-muted/40 border-b border-border">
                   {["Service ID", "Service Type", "Client", "Asset / Equipment", "Contract / PO", "Assigned Engineer", "Next Due Date", "SLA", "Status"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-2 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>

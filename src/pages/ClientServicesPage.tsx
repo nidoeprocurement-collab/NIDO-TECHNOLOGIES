@@ -30,7 +30,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4">
+        <div className="flex items-center justify-between px-2 pt-5 pb-4">
           <h2 className="text-base font-semibold text-gray-900">Add New Service</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={16} />
@@ -49,7 +49,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
               value={form.name}
               onChange={set("name")}
               placeholder="e.g. Cloud Hosting Premium"
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
           </div>
 
@@ -63,7 +63,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
               value={form.provider}
               onChange={set("provider")}
               placeholder="e.g. CloudServe Inc"
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
           </div>
 
@@ -77,7 +77,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
                 type="date"
                 value={form.startDate}
                 onChange={set("startDate")}
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-500"
+                className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-500"
               />
             </div>
             <div>
@@ -88,7 +88,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
                 type="date"
                 value={form.endDate}
                 onChange={set("endDate")}
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-500"
+                className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 text-gray-500"
               />
             </div>
           </div>
@@ -103,7 +103,7 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
               value={form.amount}
               onChange={set("amount")}
               placeholder="e.g. 12000"
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300"
             />
           </div>
 
@@ -115,13 +115,13 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
               onChange={set("description")}
               placeholder="Short description of the service"
               rows={3}
-              className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 resize-none"
+              className="w-full px-2 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder-gray-300 resize-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
             className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -156,7 +156,7 @@ export default function ClientServicesPage() {
         <h2 className="text-base font-semibold text-gray-900">Service History</h2>
         <button
           onClick={(e) => { e.stopPropagation(); setShowAddService(true); }}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-2 rounded-lg transition-colors"
         >
           <span className="text-base leading-none">+</span> Add Service
         </button>
@@ -182,7 +182,7 @@ export default function ClientServicesPage() {
                 <button
                   key={cat}
                   onClick={() => { setSelectedCategory(cat === "All" ? "Category" : cat); setCategoryOpen(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${selectedCategory === cat || (cat === "All" && selectedCategory === "Category") ? "text-blue-600 font-medium" : "text-gray-700"}`}
+                  className={`w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors ${selectedCategory === cat || (cat === "All" && selectedCategory === "Category") ? "text-blue-600 font-medium" : "text-gray-700"}`}
                 >
                   {cat}
                 </button>
@@ -197,12 +197,12 @@ export default function ClientServicesPage() {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-200 bg-white">
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service ID</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service Name <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested By</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service ID</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested Date <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Service Name <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Requested By</th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Amount <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+              <th className="text-left px-2 py-2 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Status <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
             </tr>
           </thead>
           <tbody>
@@ -211,12 +211,12 @@ export default function ClientServicesPage() {
                 <td className="px-4 py-3">
                   <span className="text-blue-500 hover:underline cursor-pointer font-medium">{svc.id}</span>
                 </td>
-                <td className="px-4 py-3 text-gray-700">{svc.startDate}</td>
-                <td className="px-4 py-3 font-medium text-gray-800">{svc.name}</td>
+                <td className="px-4 py-2 text-gray-700">{svc.startDate}</td>
+                <td className="px-4 py-2 font-medium text-gray-800">{svc.name}</td>
                 <td className="px-4 py-3">
                   <span className="text-blue-500 hover:underline cursor-pointer">{svc.provider}</span>
                 </td>
-                <td className="px-4 py-3 font-semibold text-gray-900">{svc.amount}</td>
+                <td className="px-4 py-2 font-semibold text-gray-900">{svc.amount}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
                     Active
@@ -233,7 +233,7 @@ export default function ClientServicesPage() {
         </table>
 
         {/* Footer pagination */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-white">
+        <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100 bg-white">
           <p className="text-[11px] text-orange-500 font-medium">
             Showing 1 to {filtered.length} of {filtered.length} services
           </p>

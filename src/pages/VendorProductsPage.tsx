@@ -126,7 +126,7 @@ function EditProductScreen({
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-gray-200 bg-white shadow-sm">
+      <div className="flex-shrink-0 flex items-center justify-between px-2 py-2 border-b border-gray-200 bg-white shadow-sm">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onClose}
@@ -149,7 +149,7 @@ function EditProductScreen({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-8 py-8 flex gap-8">
+        <div className="max-w-4xlpx-2 py-2 flex gap-8">
 
           {/* Left: Product card (read-only) */}
           <div className="w-64 shrink-0">
@@ -287,7 +287,7 @@ function EditProductScreen({
       </div>
 
       {/* Footer */}
-      <div className="flex-shrink-0 px-8 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
+      <div className="flex-shrink-0 px-2 py-2 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
         <button
           onClick={onClose}
           className="px-5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -320,7 +320,7 @@ function ConfirmRemoveDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center shrink-0">
               <Trash2 className="w-4 h-4 text-red-500" />
@@ -337,7 +337,7 @@ function ConfirmRemoveDialog({
 
         {/* Body */}
         <div className="px-6 py-5">
-          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl mb-4">
+          <div className="flex items-center gap-3 p-2 bg-gray-50 rounded-xl mb-4">
             {product.images && product.images.length > 0 ? (
               <img src={product.images[0]} alt={product.productName} className="w-10 h-10 rounded-lg object-cover border border-gray-200 shrink-0" />
             ) : (
@@ -356,7 +356,7 @@ function ConfirmRemoveDialog({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+        <div className="px-6 py-2 border-t border-gray-100 flex items-center justify-end gap-3">
           <button
             onClick={onCancel}
             className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -434,11 +434,11 @@ export default function VendorProductsPage() {
           onConfirm={() => handleConfirmRemove(removeProduct.id)}
         />
       )}
-      <div className="max-w-[1200px] mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-[1200px]px-2 py-2 space-y-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {STATS.map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm hover:shadow-md transition-shadow">
               <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>{stat.icon}</div>
               <p className="text-xs text-gray-500 font-medium mb-1">{stat.label}</p>
               <p className="text-xl font-bold text-gray-900">{stat.value}</p>
@@ -450,7 +450,7 @@ export default function VendorProductsPage() {
         {/* Table Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           {/* Actions Bar */}
-          <div className="px-4 py-3 flex items-center justify-end border-b border-gray-100">
+          <div className="px-4 py-2 flex items-center justify-end border-b border-gray-100">
             <div className="relative" ref={menuRef}>
               <button onClick={() => setMenuOpen((o) => !o)} className="p-2 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
                 <MoreVertical className="w-4 h-4" />
@@ -493,20 +493,20 @@ export default function VendorProductsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">VPC</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">MPI</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Product Name</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Category</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Purchase Price</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">MOQ</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Lead Time</th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">VPC</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">MPI</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">Product Name</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">Category</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Purchase Price</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">MOQ</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Lead Time</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">
                     <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Stock <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
                     <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Added On <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
                   </th>
-                  <th className="text-left px-4 py-3 text-sm font-bold text-gray-700 uppercase tracking-wide">Actions</th>
+                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

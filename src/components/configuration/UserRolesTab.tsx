@@ -116,7 +116,7 @@ export default function NidoUsersPage() {
 
   return (
    <div className="min-h-screen bg-background">
-      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6 space-y-4">
+      <div className="w-full px-3 sm:px-4 md:px-6 py-2 md:py-6 space-y-4">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -156,7 +156,7 @@ export default function NidoUsersPage() {
           <>
             <Card>
               <CardContent className="p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                   <div className="relative w-full max-w-md">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
@@ -205,23 +205,23 @@ export default function NidoUsersPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                      <th className="px-6 py-2 text-left text-xs font-semibold uppercase">
                         Role Name
                       </th>
 
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                      <th className="px-6 py-2 text-left text-xs font-semibold uppercase">
                         Description
                       </th>
 
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                      <th className="px-6 py-2 text-left text-xs font-semibold uppercase">
                         Status
                       </th>
 
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                      <th className="px-6 py-2 text-left text-xs font-semibold uppercase">
                         Assigned Users
                       </th>
 
-                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
+                      <th className="px-6 py-2 text-left text-xs font-semibold uppercase">
                         Actions
                       </th>
                     </tr>
@@ -242,7 +242,7 @@ export default function NidoUsersPage() {
                           </button>
                         </td>
 
-                        <td className="px-6 py-4 text-sm">
+                        <td className="px-6 py-2 text-sm">
                           {role.description}
                         </td>
 
@@ -289,7 +289,7 @@ export default function NidoUsersPage() {
                   </tbody>
                 </table>
 
-                <div className="border-t px-6 py-4 text-sm text-muted-foreground">
+                <div className="border-t px-2 py-2 text-sm text-muted-foreground">
                   Showing 1 to {filteredRoles.length} of{" "}
                   {roles.length} entries
                 </div>

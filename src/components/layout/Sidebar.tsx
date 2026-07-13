@@ -314,7 +314,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Header */}
-        <div className="relative shrink-0 bg-sidebar h-16 px-4 z-10 flex items-center justify-between gap-2 border-b border-sidebar-border">
+        <div className="relative shrink-0 bg-sidebar h-16 px-2 z-10 flex items-center justify-between gap-2 border-b border-sidebar-border">
           <div className="flex items-center min-w-0 flex-1 h-full py-2">
             {org.logoUrl ? (
               <div className={`h-full w-full flex items-center gap-2.5 overflow-hidden ${effectiveCollapsed ? 'justify-center' : 'justify-start'}`}>

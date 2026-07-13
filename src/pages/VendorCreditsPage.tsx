@@ -8,13 +8,13 @@ export default function VendorCreditsPage() {
     <div className="max-w-[1280px] mx-auto">
       {/* Header */}
       <Card className="rounded-xl border border-gray-200 bg-white shadow-none">
-        <div className="flex items-center justify-between px-4 py-4">
+        <div className="flex items-center justify-between px-2 py-4">
           <h1 className="text-2xl font-bold text-gray-900">
             All Vendor Credits
           </h1>
 
           <div className="flex items-center gap-2">
-            <Button className="h-9 rounded-lg bg-blue-600 px-4 hover:bg-blue-700">
+            <Button className="h-9 rounded-lg bg-blue-600 px-2 hover:bg-blue-700">
               <Plus className="mr-2 h-4 w-4" />
               New
             </Button>
@@ -31,7 +31,7 @@ export default function VendorCreditsPage() {
       </Card>
 
       {/* Table Section */}
-      <Card className="mt-3 rounded-xl border border-gray-200 bg-white p-4 shadow-none">
+      <Card className="mt-3 rounded-xl border border-gray-200 bg-white p-2 shadow-none">
         {/* Header Row */}
         <div className="grid h-12 grid-cols-[40px_1fr_1.8fr_2fr_2fr_1.5fr_1fr_1fr] items-center rounded-lg border border-gray-200 bg-gray-50 px-2">
           <div className="flex justify-center">

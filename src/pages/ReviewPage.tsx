@@ -114,7 +114,7 @@ export default function ReviewPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white px-6 py-6">
+    <div className="min-h-screen bg-white px-2 py-6">
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
@@ -136,7 +136,7 @@ export default function ReviewPage() {
 
         <CheckoutStepper current={3} />
 
-        <div className="flex gap-5 items-start">
+        <div className="flex gap-2 items-start">
           {/* Left */}
           <div className="flex-1 min-w-0 space-y-4">
 
@@ -218,7 +218,7 @@ export default function ReviewPage() {
 
             {/* Order Items */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Order Items ({cart.length})</h2>
                 <button onClick={() => navigate("/shop/cart")} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                   <Pencil size={11} /> Edit Cart
@@ -230,10 +230,10 @@ export default function ReviewPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-6 py-3">Item</th>
-                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 pr-4">Price</th>
-                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 pr-4">Qty</th>
-                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-3 pr-6">Amount</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-2 py-3">Item</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Price</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-4">Qty</th>
+                      <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide py-2 pr-6">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -260,17 +260,17 @@ export default function ReviewPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-center gap-4 pt-2">
+            <div className="flex items-center justify-center gap-2 pt-2">
               <button
                 onClick={() => navigate("/shop/checkout/payment")}
-                className="flex items-center gap-2 border border-gray-300 rounded-lg px-6 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 border border-gray-300 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <ArrowLeft size={15} />
                 Back to Payment
               </button>
               <button
                 onClick={handlePlaceOrder}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-8 py-3 text-sm transition-colors"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
               >
                 <Lock size={15} />
                 Place Order

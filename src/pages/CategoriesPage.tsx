@@ -46,7 +46,7 @@ export default function CategoriesPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="w-full px-2 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Settings / Categories</p>
             <h1 className="text-2xl font-bold">Product Categories</h1>
@@ -64,7 +64,7 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      <div className="w-full px-4 md:px-6 py-8">
+      <div className="w-full px-2 md:px-6 py-8">
         <div className="mb-6 relative">
           <Search className="absolute left-3 top-3 text-gray-400" size={20} />
           <input
@@ -80,7 +80,7 @@ export default function CategoriesPage() {
           {filteredCategories.map((cat) => (
             <div
               key={cat.id}
-              className="bg-white p-4 border rounded-lg hover:shadow-md transition-shadow flex items-center justify-between"
+              className="bg-white p-2 border rounded-lg hover:shadow-md transition-shadow flex items-center justify-between"
             >
               <div className="flex-1">
                 <h3 className="font-semibold">{cat.name}</h3>
@@ -99,7 +99,7 @@ export default function CategoriesPage() {
 
       {showCreate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white rounded-lg p-2 w-full max-w-md">
             <h2 className="text-lg font-bold mb-4">Add Category</h2>
             <div className="space-y-4">
               <div>
@@ -108,7 +108,7 @@ export default function CategoriesPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
               <div>
@@ -118,7 +118,7 @@ export default function CategoriesPage() {
                   onChange={(e) =>
                     setForm({ ...form, description: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-2 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
             </div>

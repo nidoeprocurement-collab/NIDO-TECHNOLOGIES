@@ -50,7 +50,7 @@ export default function ClientPricingSettingsPanel({ clientId }: { clientId: str
         only to this client and are used to compute the Selling Price shown in the catalog below.
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2mb-4">
         <div>
           <Label className="text-xs text-gray-600">Overhead (% of Landed Cost)</Label>
           <div className="flex items-center gap-1 mt-1">

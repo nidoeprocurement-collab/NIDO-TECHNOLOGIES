@@ -180,7 +180,7 @@ export default function ClientActivityPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-6 gap-3">
         {STATS.map((s) => (
-          <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col gap-1.5">
+          <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-2 flex flex-col gap-1.5">
             <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>{s.icon}</div>
             <p className="text-sm font-bold text-gray-900 leading-tight">{s.value}</p>
             <p className="text-[10px] font-medium text-gray-700">{s.label}</p>
@@ -189,7 +189,7 @@ export default function ClientActivityPage() {
         ))}
       </div>
 
-      <div className="flex gap-4 items-start">
+      <div className="flex gap-2 items-start">
         {/* LEFT: note editor + timeline */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           {/* Add Note */}
@@ -199,7 +199,7 @@ export default function ClientActivityPage() {
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Write a note or add comments..."
-              className="w-full text-xs text-gray-600 border border-gray-100 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 placeholder:text-gray-300"
+              className="w-full text-xs text-gray-600 border border-gray-100 rounded-lg p-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 placeholder:text-gray-300"
             />
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-3 text-gray-400">
@@ -221,7 +221,7 @@ export default function ClientActivityPage() {
                   <select
                     value={visibility}
                     onChange={(e) => setVisibility(e.target.value)}
-                    className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 pr-7 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 bg-white"
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 pr-7 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-600 bg-white"
                   >
                     <option>Select Visibility</option>
                     <option>Visible to All</option>
@@ -233,7 +233,7 @@ export default function ClientActivityPage() {
                 <button
                   onClick={handleAddNote}
                   disabled={!noteText.trim()}
-                  className="text-xs bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="text-xs bg-blue-600 text-white px-2 py-1.5 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Add Note
                 </button>
@@ -247,7 +247,7 @@ export default function ClientActivityPage() {
               <button
                 key={tab}
                 onClick={() => { setActiveTab(tab); setVisibleCount(9); }}
-                className={`relative text-xs px-4 py-2.5 font-medium transition-colors ${activeTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
+                className={`relative text-xs px-2 py-2.5 font-medium transition-colors ${activeTab === tab ? "text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
               >
                 {tab}
                 {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />}
@@ -316,7 +316,7 @@ export default function ClientActivityPage() {
             <div className="flex justify-center mt-2">
               <button
                 onClick={() => setVisibleCount((v) => v + 5)}
-                className="flex items-center gap-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg px-2 py-2 hover:bg-gray-50 transition-colors"
               >
                 Load More Activities <Download size={12} />
               </button>

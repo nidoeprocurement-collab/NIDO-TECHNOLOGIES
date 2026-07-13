@@ -258,7 +258,7 @@ export default function VendorEditPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="border-b border-gray-200 sticky top-0 z-10 bg-white">
-        <div className="px-8 py-6 flex items-center justify-between">
+        <div className="px-8 py-2 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -280,25 +280,25 @@ export default function VendorEditPage() {
       </div>
 
       {/* Form Content */}
-      <div className="px-8 py-8 space-y-12">
+      <div className="px-8 py-2 space-y-12">
 
         {/* Section 1: Vendor Information */}
         <FormSection number={1} title="Vendor Information">
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Vendor Name" required input={
               <input type="text" placeholder="Enter vendor name" name="vendorName" value={formData.vendorName} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
             <FormField label="Vendor Code" input={
               <input type="text" disabled value={formData.vendorCode}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600" />
             } />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Category" required input={
               <select name="category" value={formData.category} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select category</option>
                 {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
@@ -306,7 +306,7 @@ export default function VendorEditPage() {
             <FormField label="Sub Category" input={
               <select name="subCategory" value={formData.subCategory} onChange={handleChange}
                 disabled={!formData.category || subCategoryOptions.length === 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50">
                 <option value="">Select sub category</option>
                 {subCategoryOptions.map(sub => <option key={sub} value={sub}>{sub}</option>)}
               </select>
@@ -316,25 +316,25 @@ export default function VendorEditPage() {
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Vendor Type" required input={
               <select name="vendorType" value={formData.vendorType} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select vendor type</option>
                 {vendorTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             } />
             <FormField label="PAN" input={
               <input type="text" placeholder="Enter PAN" name="pan" value={formData.pan} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Legal Entity Name" input={
               <input type="text" placeholder="Enter legal entity name" name="legalEntityName" value={formData.legalEntityName} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
             <FormField label="Year of Establishment" input={
               <select name="yearOfEstablishment" value={formData.yearOfEstablishment} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select year</option>
                 {years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
@@ -343,7 +343,7 @@ export default function VendorEditPage() {
 
           <FormField label="Website" input={
             <input type="text" placeholder="Enter website URL" name="website" value={formData.website} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
         </FormSection>
 
@@ -352,7 +352,7 @@ export default function VendorEditPage() {
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Contact Person" required input={
               <select name="contactPerson" value={formData.contactPerson} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select contact person</option>
                 {/* Show stored contact as first option if not in default list */}
                 {formData.contactPerson && !contacts.find(c => c.name === formData.contactPerson) && (
@@ -365,7 +365,7 @@ export default function VendorEditPage() {
             } />
             <FormField label="Designation" input={
               <select name="designation" value={formData.designation} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select designation</option>
                 {designations.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
@@ -374,7 +374,7 @@ export default function VendorEditPage() {
 
           <FormField label="Email" required input={
             <input type="email" placeholder="name@company.com" name="email" value={formData.email} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
 
           <div className="grid grid-cols-2 gap-6">
@@ -385,7 +385,7 @@ export default function VendorEditPage() {
                   {phoneCodes.map(code => <option key={code} value={code}>{code}</option>)}
                 </select>
                 <input type="text" placeholder="Enter phone number" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             } />
             <FormField label="Mobile" input={
@@ -395,14 +395,14 @@ export default function VendorEditPage() {
                   {phoneCodes.map(code => <option key={code} value={code}>{code}</option>)}
                 </select>
                 <input type="text" placeholder="Enter mobile number" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             } />
           </div>
 
           <FormField label="Alternate Email" input={
             <input type="email" placeholder="Enter alternate email" name="alternateEmail" value={formData.alternateEmail} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
         </FormSection>
 
@@ -410,20 +410,20 @@ export default function VendorEditPage() {
         <FormSection number={3} title="Business & Address Details">
           <FormField label="Registered Address" required input={
             <textarea placeholder="Enter registered address" name="registeredAddress" value={formData.registeredAddress} onChange={handleChange}
-              rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              rows={2} className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Country" required input={
               <select name="country" value={formData.country} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select country</option>
                 {countries.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             } />
             <FormField label="State" required input={
               <select name="state" value={formData.state} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select state</option>
                 {states.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -433,14 +433,14 @@ export default function VendorEditPage() {
           <div className="grid grid-cols-2 gap-6">
             <FormField label="City" required input={
               <select name="city" value={formData.city} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select city</option>
                 {cities.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             } />
             <FormField label="Pincode" required input={
               <input type="text" placeholder="Enter pincode" name="pincode" value={formData.pincode} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
           </div>
 
@@ -452,7 +452,7 @@ export default function VendorEditPage() {
 
           <FormField label="Billing Address" input={
             <textarea placeholder="Enter billing address" name="billingAddress" value={formData.billingAddress} onChange={handleChange}
-              rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              rows={2} className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
         </FormSection>
 
@@ -461,14 +461,14 @@ export default function VendorEditPage() {
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Payment Terms" input={
               <select name="paymentTerms" value={formData.paymentTerms} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select payment terms</option>
                 {paymentTerms.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             } />
             <FormField label="Currency" required input={
               <select name="currency" value={formData.currency} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 {currencies.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             } />
@@ -476,28 +476,28 @@ export default function VendorEditPage() {
 
           <FormField label="Credit Limit (INR)" input={
             <input type="text" placeholder="Enter amount" name="creditLimit" value={formData.creditLimit} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Bank Name" input={
               <input type="text" placeholder="Enter bank name" name="bankName" value={formData.bankName} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
             <FormField label="Account Number" input={
               <input type="text" placeholder="Enter account number" name="accountNumber" value={formData.accountNumber} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="IFSC Code" input={
               <input type="text" placeholder="Enter IFSC code" name="ifscCode" value={formData.ifscCode} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
             <FormField label="Account Type" input={
               <select name="accountType" value={formData.accountType} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select account type</option>
                 {accountTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
@@ -510,14 +510,14 @@ export default function VendorEditPage() {
           <div className="grid grid-cols-2 gap-6">
             <FormField label="MSME Status" input={
               <select name="msmeStatus" value={formData.msmeStatus} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select status</option>
                 {msmeStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             } />
             <FormField label="ISO Certification" input={
               <select name="isoStatus" value={formData.isoStatus} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select certification</option>
                 {isoCertifications.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -527,14 +527,14 @@ export default function VendorEditPage() {
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Quality Certification" input={
               <select name="qualityCertification" value={formData.qualityCertification} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select certification</option>
                 {qualityCertifications.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             } />
             <FormField label="Environmental Certification" input={
               <select name="environmentalCertification" value={formData.environmentalCertification} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select certification</option>
                 {environmentalCertifications.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -552,7 +552,7 @@ export default function VendorEditPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Blacklisted</label>
               <select name="blacklisted" value={formData.blacklisted} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select status</option>
                 {blacklistedOptions.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
@@ -567,7 +567,7 @@ export default function VendorEditPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Contract Status</label>
               <select name="contractStatus" value={formData.contractStatus} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select status</option>
                 {contractStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -581,13 +581,13 @@ export default function VendorEditPage() {
             </div>
             <FormField label="Onboarding Date" input={
               <input type="date" name="onboardingDate" value={formData.onboardingDate} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
           </div>
 
           <FormField label="Preferred Vendor" input={
             <select name="preferredVendor" value={formData.preferredVendor} onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">Select status</option>
               {preferredOptions.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
@@ -596,8 +596,8 @@ export default function VendorEditPage() {
 
         {/* Section 7: Documents */}
         <FormSection number={7} title="Documents">
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center mb-6">
-            <Cloud className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+          <div className="border-2 border-dashed border-blue-300 rounded-lg p-2 text-center mb-6">
+            <Cloud className="w-12 h-12 text-blue-400mb-3" />
             <p className="text-gray-700 font-medium mb-2">Drag and drop files here</p>
             <p className="text-gray-500 text-sm mb-4">or click to upload</p>
             <p className="text-gray-500 text-xs mb-2">Supported files: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG</p>
@@ -635,7 +635,7 @@ export default function VendorEditPage() {
                   const selected = Array.from(e.target.selectedOptions, o => o.value);
                   setFormData(prev => ({ ...prev, tags: selected }));
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 size={6}>
                 {tagOptions.map(tag => <option key={tag} value={tag}>{tag}</option>)}
               </select>
@@ -644,7 +644,7 @@ export default function VendorEditPage() {
 
             <FormField label="Visibility" input={
               <select name="visibility" value={formData.visibility} onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Select visibility</option>
                 {visibilityOptions.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
@@ -654,13 +654,13 @@ export default function VendorEditPage() {
           <FormField label="Internal Notes" input={
             <textarea placeholder="Add any internal notes" name="internalNotes" value={formData.internalNotes} onChange={handleChange}
               rows={4} maxLength={1000}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           } />
           <p className="text-xs text-gray-500 text-right">{formData.internalNotes.length}/1000 characters</p>
         </FormSection>
 
         {/* Bottom Actions */}
-        <div className="flex gap-3 py-8 border-t border-gray-200">
+        <div className="flex gap-3 py-2 border-t border-gray-200">
           <button type="button" onClick={() => navigate('/vendors')}
             className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
             Cancel

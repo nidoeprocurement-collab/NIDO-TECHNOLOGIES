@@ -76,7 +76,7 @@ export default function SalesOrdersPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <div className="w-full px-2 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500">Sales / Orders</p>
             <h1 className="text-2xl font-bold">Sales Orders</h1>
@@ -88,8 +88,8 @@ export default function SalesOrdersPage() {
         </div>
       </div>
 
-      <div className="w-full px-4 md:px-6 py-8">
-        <div className="grid grid-cols-5 gap-4 mb-8">
+      <div className="w-full px-2 md:px-6 py-8">
+        <div className="grid grid-cols-5 gap-2 mb-8">
           {[
             { label: "Total", value: stats.total, color: "blue" },
             { label: "Pending", value: stats.pending, color: "yellow" },
@@ -133,29 +133,29 @@ export default function SalesOrdersPage() {
           <table className="w-full table-auto">
             <thead>
               <tr className="border-b bg-gray-50">
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Order #</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Client</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Items</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Amount</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Date</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Status</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center text-xs font-semibold">Actions</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Order #</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Client</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Items</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Amount</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Date</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Status</th>
+                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-center text-xs font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((o) => (
                 <tr key={o.id} className="border-b hover:bg-gray-50">
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600">{o.number}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{o.client}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{o.items}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium">${o.amount.toLocaleString()}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{o.date}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-blue-600">{o.number}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{o.client}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{o.items}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm font-medium">${o.amount.toLocaleString()}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{o.date}</td>
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">
                     <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(o.status)}`}>
                       {o.status}
                     </span>
                   </td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-center">
+                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-center">
                     <button onClick={() => handleDelete(o.id)} className="text-red-600 hover:text-red-700">
                       <Trash2 size={16} />
                     </button>

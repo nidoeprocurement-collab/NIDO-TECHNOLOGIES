@@ -195,7 +195,7 @@ export default function VendorNewsActivityPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans" onClick={() => setOpenMenu(null)}>
-      <div className="max-w-[1280px] mx-auto px-6 py-5">
+      <div className="max-w-[1280px]px-2 py-5">
         <div className="flex gap-5">
 
           {/* ── Left: Notes ── */}
@@ -215,7 +215,7 @@ export default function VendorNewsActivityPage() {
                   onChange={e => e.target.value.length <= MAX_CHARS && setNoteText(e.target.value)}
                   placeholder="Add a note... Use @ to mention someone"
                   rows={3}
-                  className="w-full resize-none text-sm text-gray-700 placeholder-gray-400 border border-gray-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full resize-none text-sm text-gray-700 placeholder-gray-400 border border-gray-200 rounded-lg px-2 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
                 <div className="text-right text-xs text-gray-400 mt-1 mb-3">{noteText.length}/{MAX_CHARS}</div>
 
@@ -290,7 +290,7 @@ export default function VendorNewsActivityPage() {
                   <p className="text-sm text-gray-400">No notes found.</p>
                 </div>
               ) : displayedNotes.map(note => (
-                <div key={note.id} className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4"
+                <div key={note.id} className="bg-white rounded-xl border border-gray-200 shadow-sm px-2 py-4"
                   onClick={e => e.stopPropagation()}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -336,7 +336,7 @@ export default function VendorNewsActivityPage() {
             {visibleNotes.length > 4 && (
               <div className="flex justify-center">
                 <button onClick={() => setShowAll(v => !v)}
-                  className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 shadow-sm transition-colors">
+                  className="flex items-center gap-2 px-2 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 shadow-sm transition-colors">
                   <ChevronDown className={`w-4 h-4 transition-transform ${showAll ? "rotate-180" : ""}`} />
                   {showAll ? "Show Less" : `Load More Notes (${visibleNotes.length - 4} more)`}
                 </button>

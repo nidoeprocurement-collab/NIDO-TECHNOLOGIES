@@ -149,7 +149,7 @@ function TopMenu({ onArchived, onOnboarding }: { onArchived: () => void; onOnboa
             { label: "Export Vendors", icon: <IndianRupee className="w-4 h-4" />, onClick: () => {} },
             { label: "Archived Vendors", icon: <Archive className="w-4 h-4" />, onClick: onArchived },
           ].map((o, i) => (
-            <button key={i} onClick={() => { o.onClick(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left">
+            <button key={i} onClick={() => { o.onClick(); setOpen(false); }} className="w-full flex items-center gap-2.5 px-2 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left">
               <span className="text-gray-400">{o.icon}</span>{o.label}
             </button>
           ))}
@@ -162,9 +162,9 @@ function TopMenu({ onArchived, onOnboarding }: { onArchived: () => void; onOnboa
 // ----- Vendor Overview Popup -----
 function VendorOverviewPopup({ vendor, onClose }: { vendor: Vendor; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-start justify-between">
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-2 py-2 flex items-start justify-between">
           <div>
             <p className="text-blue-200 text-xs font-medium mb-1">{vendor.id}</p>
             <h2 className="text-white text-xl font-semibold">{vendor.name}</h2>
@@ -178,14 +178,14 @@ function VendorOverviewPopup({ vendor, onClose }: { vendor: Vendor; onClose: () 
             { label: "Score", value: `${vendor.score}/5`, icon: <Award className="w-4 h-4 text-blue-500" /> },
             { label: "Issues", value: vendor.complianceIssues, icon: <AlertTriangle className="w-4 h-4 text-red-400" /> },
           ].map(s => (
-            <div key={s.label} className="flex flex-col items-center py-4 gap-1">
+            <div key={s.label} className="flex flex-col items-center py-2 gap-1">
               {s.icon}
               <p className="text-lg font-bold text-gray-800">{s.value}</p>
               <p className="text-xs text-gray-400">{s.label}</p>
             </div>
           ))}
         </div>
-        <div className="p-5 grid grid-cols-2 gap-5">
+        <div className="p-2 grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-3">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact</h3>
             {[
@@ -230,9 +230,9 @@ function VendorOverviewPopup({ vendor, onClose }: { vendor: Vendor; onClose: () 
 // ----- Archived Vendors Modal -----
 function ArchivedModal({ vendors, onClose, onVendorClick }: { vendors: Vendor[]; onClose: () => void; onVendorClick: (v: Vendor) => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full  max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100 flex-shrink-0">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Archived Vendors</h2>
             <p className="text-xs text-gray-400 mt-0.5">{vendors.length} {vendors.length === 1 ? "vendor" : "vendors"} · Read only</p>
@@ -249,39 +249,39 @@ function ArchivedModal({ vendors, onClose, onVendorClick }: { vendors: Vendor[];
             <table className="w-full table-fixed text-xs">
               <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[10%]">Vendor ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[20%]">Vendor Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[14%]">Category</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[16%]">Primary Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[9%]">Rating</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[9%]">Region</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[9%]">Status</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[10%]">Vendor ID</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[20%]">Vendor Name</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[14%]">Category</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[16%]">Primary Contact</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[9%]">Rating</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[9%]">Region</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-[9%]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {vendors.map(v => (
                   <tr key={v.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-3">
                       <button onClick={() => onVendorClick(v)} className="text-blue-600 font-bold hover:underline text-xs">{v.id}</button>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">{v.name[0]}</div>
                         <span className="font-medium text-gray-800 truncate">{v.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 truncate">{v.category}</td>
-                    <td className="px-4 py-3 text-gray-500 truncate">{v.primaryContact}</td>
-                    <td className="px-4 py-3"><StarRating rating={v.rating} /></td>
-                    <td className="px-4 py-3 text-gray-500">{v.region}</td>
-                    <td className="px-4 py-3"><Badge className="bg-gray-100 text-gray-500">Archived</Badge></td>
+                    <td className="px-2 py-3 text-gray-500 truncate">{v.category}</td>
+                    <td className="px-2 py-3 text-gray-500 truncate">{v.primaryContact}</td>
+                    <td className="px-2 py-3"><StarRating rating={v.rating} /></td>
+                    <td className="px-2 py-3 text-gray-500">{v.region}</td>
+                    <td className="px-2 py-3"><Badge className="bg-gray-100 text-gray-500">Archived</Badge></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
-        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+        <div className="px-2 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
           <p className="text-xs text-gray-400">This list is read-only. No actions can be performed on archived vendors.</p>
         </div>
       </div>
@@ -410,7 +410,7 @@ export default function App() {
     <div className="min-h-screen bg-white">
       {/* Sticky Header */}
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-4 py-3 flex justify-between items-center">
+        <div className="w-full px-2 py-3 flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-500">Vendors / Vendor List</p>
             <h1 className="text-2xl font-bold">Vendors</h1>
@@ -444,12 +444,12 @@ export default function App() {
         </div>
       </div>
 
-      <div className="w-full px-4 py-4">
+      <div className="w-full px-2 py-2">
         {/* Stats tiles */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
           {stats.map(s => (
             <Card key={s.label}>
-              <CardContent className="p-4 flex justify-between items-start">
+              <CardContent className="p-2 flex justify-between items-start">
                 <div>
                   <p className="text-xs text-gray-500">{s.label}</p>
                   <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
@@ -464,7 +464,7 @@ export default function App() {
         <Card>
           <CardContent className="p-0">
             {/* Filters */}
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b flex-wrap">
+            <div className="flex items-center gap-2 px-2 py-2.5 border-b flex-wrap">
               <span className="text-xs font-semibold text-gray-400 mr-1">Filters:</span>
               <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilter(setFilterCategory)} />
               <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilter(setFilterStatus)} />
@@ -504,7 +504,7 @@ export default function App() {
                 {pagedVendors.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="text-center py-16 text-gray-400">
-                      <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <Building2 className="w-8 h-8  mb-2 opacity-30" />
                       <p className="text-sm">No vendors match the current filters</p>
                     </td>
                   </tr>
@@ -549,7 +549,7 @@ export default function App() {
             </table>
 
             {/* Pagination */}
-            <div className="px-4 py-3 flex items-center justify-between text-sm text-gray-600 border-t">
+            <div className="px-2 py-3 flex items-center justify-between text-sm text-gray-600 border-t">
               <span>
                 {filteredVendors.length === 0 ? "0 vendors" : `${(safePage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(safePage * ITEMS_PER_PAGE, filteredVendors.length)} of ${filteredVendors.length} vendors`}
               </span>

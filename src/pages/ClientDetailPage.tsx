@@ -106,7 +106,7 @@ function PlaceholderPage({ tab }: { tab: string }) {
 function NotFoundPage({ id }: { id: string }) {
   const navigate = useNavigate();
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen gap-2 text-center">
       <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
         <Building2 size={28} className="text-red-400" />
       </div>
@@ -116,7 +116,7 @@ function NotFoundPage({ id }: { id: string }) {
       </div>
       <button
         onClick={() => navigate("/clients")}
-        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+        className="flex items-center gap-1.5 px-2 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
       >
         <ChevronLeft size={14} /> Back to Clients
       </button>
@@ -369,10 +369,10 @@ export default function App({ portalMode = false }: ClientDetailProps) {
         )}
       </div>
 
-      <div className="flex gap-0 p-4 pt-3 min-h-[calc(100vh-48px)]">
+      <div className="flex gap-0 p-2 pt-3 min-h-[calc(100vh-48px)]">
         {/* LEFT SIDEBAR — only on Overview */}
         {isOverview && sidebarVisible && (
-          <aside className="w-64 shrink-0 bg-white rounded-xl border border-gray-200 p-5 flex flex-col gap-4 mr-4 h-fit relative">
+          <aside className="w-64 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex flex-col gap-2 mr-4 h-fit relative">
             {/* Hide button */}
             <button
               onClick={() => setSidebarVisible(false)}
@@ -499,7 +499,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
         )}
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div className="flex-1 flex flex-col gap-2 min-w-0">
           {/* Stats row — only on Overview */}
           {isOverview && (
             <div className="grid grid-cols-3 gap-4">
@@ -551,7 +551,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap ${
+                  className={`px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
                     activeTab === tab
                       ? "text-blue-600"
                       : "text-gray-500 hover:text-gray-700"

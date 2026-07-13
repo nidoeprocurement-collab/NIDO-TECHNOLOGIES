@@ -288,7 +288,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
+      <div className="w-full px-2 sm:px-4 md:px-6 py-2 md:py-6">
         {/* Header */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold text-slate-900 mb-2">Integrations Marketplace</h1>
@@ -308,7 +308,7 @@ export default function IntegrationsPage() {
           </div>
           <Button
             onClick={() => setShowAdd(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 rounded-lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-2 rounded-lg"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Integration
@@ -377,7 +377,7 @@ export default function IntegrationsPage() {
             >
               <CardContent className="p-6 flex items-center justify-center h-full min-h-[200px]">
                 <div className="text-center">
-                  <Plus className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                  <Plus className="h-8 w-8 text-slate-400mb-2" />
                   <p className="text-sm text-slate-600 font-medium">Add Integration</p>
                 </div>
               </CardContent>

@@ -8,7 +8,7 @@ import {
 
 export default function CreditNotesDashboard() {
   return (
-    <div className="max-w-[1280px] mx-auto space-y-6">
+    <div className="max-w-[1280px]space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -23,12 +23,12 @@ export default function CreditNotesDashboard() {
           </div>
 
           <div className="flex gap-3">
-            <button className="border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-2 text-sm">
+            <button className="border border-gray-200 rounded-lg px-2 py-2 flex items-center gap-2 text-sm">
               <Download size={16} />
               Export
             </button>
 
-            <button className="bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center gap-2 text-sm">
+            <button className="bg-blue-600 text-white px-2 py-2 rounded-lg flex items-center gap-2 text-sm">
               <Plus size={16} />
               New Credit Note
             </button>
@@ -83,7 +83,7 @@ export default function CreditNotesDashboard() {
                 />
               </div>
 
-              <button className="border px-4 rounded-lg flex items-center gap-2">
+              <button className="border px-2 rounded-lg flex items-center gap-2">
                 <Filter size={16} />
                 Filter
               </button>

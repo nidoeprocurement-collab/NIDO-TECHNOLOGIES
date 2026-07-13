@@ -91,7 +91,7 @@ export default function ClientPriceEngine() {
       </div>
 
       {lastSyncAt && (
-        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-2">
           <CheckCircle2 size={14} />
           Last synced at {lastSyncAt} — {lastSyncCount} catalog price{lastSyncCount === 1 ? '' : 's'} updated. Auto-syncs whenever
           Master Catalog, Vendor Listings, or Client Catalogs change.
@@ -119,12 +119,12 @@ export default function ClientPriceEngine() {
         </div>
 
         {rows.length === 0 ? (
-          <p className="text-xs text-gray-500 py-6 text-center">
+          <p className="text-xs text-gray-500 py-2 text-center">
             No client catalog entries found yet. Once clients have products in their catalog and vendor listings
             exist, the final client price is computed and pushed here automatically.
           </p>
         ) : filteredRows.length === 0 ? (
-          <p className="text-xs text-gray-500 py-6 text-center">
+          <p className="text-xs text-gray-500 py-2 text-center">
             No entries match "{search}".
           </p>
         ) : (
@@ -132,37 +132,37 @@ export default function ClientPriceEngine() {
             <table className="text-xs border-collapse min-w-full">
               <thead>
                 <tr className="bg-blue-600 text-white">
-                  <th className="py-2 px-3 text-left font-semibold">Client</th>
-                  <th className="py-2 px-3 text-left font-semibold">Product</th>
-                  <th className="py-2 px-3 text-left font-semibold">Winning Vendor</th>
-                  <th className="py-2 px-3 text-right font-semibold">Landed Cost</th>
-                  <th className="py-2 px-3 text-right font-semibold">Charges + Overhead</th>
-                  <th className="py-2 px-3 text-right font-semibold">Profit</th>
-                  <th className="py-2 px-3 text-right font-semibold">Discount</th>
-                  <th className="py-2 px-3 text-right font-semibold">Tax</th>
-                  <th className="py-2 px-3 text-right font-semibold">Final Selling Price</th>
+                  <th className="py-2 px-2 text-left font-semibold">Client</th>
+                  <th className="py-2 px-2 text-left font-semibold">Product</th>
+                  <th className="py-2 px-2 text-left font-semibold">Winning Vendor</th>
+                  <th className="py-2 px-2 text-right font-semibold">Landed Cost</th>
+                  <th className="py-2 px-2 text-right font-semibold">Charges + Overhead</th>
+                  <th className="py-2 px-2 text-right font-semibold">Profit</th>
+                  <th className="py-2 px-2 text-right font-semibold">Discount</th>
+                  <th className="py-2 px-2 text-right font-semibold">Tax</th>
+                  <th className="py-2 px-2 text-right font-semibold">Final Selling Price</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((r, i) => (
                   <tr key={`${r.clientId}-${r.masterProductCode}-${i}`} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2 px-3 font-medium text-gray-700">{r.clientName}</td>
+                    <td className="py-2 px-2 font-medium text-gray-700">{r.clientName}</td>
                     <td className="py-2 px-3">
                       <div className="font-semibold text-gray-800">{r.productName}</div>
                       <div className="text-gray-400">{r.masterProductCode}{r.sku ? ` · ${r.sku}` : ''}</div>
                     </td>
                     {r.winningVendor && r.calc ? (
                       <>
-                        <td className="py-2 px-3 text-green-700 font-medium">{r.winningVendor.vendorName}</td>
-                        <td className="py-2 px-3 text-right">{fmt(r.landedCostPerUnit)}</td>
-                        <td className="py-2 px-3 text-right">{fmt(r.calc.perUnitTotal)}</td>
-                        <td className="py-2 px-3 text-right">{fmt(r.calc.profit)}</td>
-                        <td className="py-2 px-3 text-right text-red-600">-{fmt(r.calc.discount)}</td>
-                        <td className="py-2 px-3 text-right">{fmt(r.calc.tax)}</td>
-                        <td className="py-2 px-3 text-right font-bold text-blue-800">{fmt(r.calc.finalPrice)}</td>
+                        <td className="py-2 px-2 text-green-700 font-medium">{r.winningVendor.vendorName}</td>
+                        <td className="py-2 px-2 text-right">{fmt(r.landedCostPerUnit)}</td>
+                        <td className="py-2 px-2 text-right">{fmt(r.calc.perUnitTotal)}</td>
+                        <td className="py-2 px-2 text-right">{fmt(r.calc.profit)}</td>
+                        <td className="py-2 px-2 text-right text-red-600">-{fmt(r.calc.discount)}</td>
+                        <td className="py-2 px-2 text-right">{fmt(r.calc.tax)}</td>
+                        <td className="py-2 px-2 text-right font-bold text-blue-800">{fmt(r.calc.finalPrice)}</td>
                       </>
                     ) : (
-                      <td colSpan={6} className="py-2 px-3 text-amber-600">No active vendor — final price pending</td>
+                      <td colSpan={6} className="py-2 px-2 text-amber-600">No active vendor — final price pending</td>
                     )}
                   </tr>
                 ))}
