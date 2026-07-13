@@ -322,11 +322,27 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
                 <div className="h-full shrink-0 flex items-center overflow-hidden">
                   <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full max-w-full object-contain" />
                 </div>
-                {!effectiveCollapsed && (
-                  <span className="text-base font-extrabold text-gray-900 tracking-tight truncate bg-clip-text">
-                    {org.displayName || 'NIDO'}
-                  </span>
-                )}
+                {!effectiveCollapsed && (() => {
+                  const raw = org.displayName || 'NIDO';
+                  const match = raw.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+                  const mainName = match ? match[1].trim() : raw;
+                  const subName = match ? match[2].trim() : null;
+                  return (
+                    <div className="min-w-0 flex flex-col justify-center leading-none">
+                      <span
+                        className="font-extrabold text-gray-900 tracking-tight truncate leading-none"
+                        style={{ fontSize: 'clamp(1.1rem, 1.6vw, 1.375rem)' }}
+                      >
+                        {mainName}
+                      </span>
+                      {subName && (
+                        <span className="text-[11px] font-medium text-gray-500 truncate mt-1">
+                          {subName}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             ) : (
               <div className="flex items-center gap-2 min-w-0">
