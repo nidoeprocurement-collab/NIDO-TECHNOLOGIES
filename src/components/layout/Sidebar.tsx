@@ -36,7 +36,6 @@ import {
   Building2,
   Mail,
   History,
-  MapPin,
   LogOut,
   Bell,
   User,
@@ -186,16 +185,16 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
       >
         <button
           className={`relative w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
-            hasActiveChild ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
+            hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
           }`}
           title={item.label}
         >
           {item.icon}
-          <ChevronRight size={10} className="absolute right-0.5 bottom-0.5 text-gray-400" />
+          <ChevronRight size={10} className="absolute right-0.5 bottom-0.5 text-sidebar-foreground/50" />
         </button>
         {flyoutOpen && (
-          <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
-            <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide">{item.label}</p>
+          <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-background border border-border rounded-lg shadow-lg py-2 z-50">
+            <p className="px-3 pb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{item.label}</p>
             {item.children!.map((child, idx) => (
               <NavItemComponent key={idx} item={child} level={1} activePath={activePath} />
             ))}
@@ -211,7 +210,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            hasActiveChild ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
+            hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
           }`}
         >
           <span className="flex items-center gap-3">
@@ -237,7 +236,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
         to={item.path || '#'}
         title={item.label}
         className={`flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
-          isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
+          isActive ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
         }`}
       >
         {item.icon}
@@ -249,7 +248,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
     <Link
       to={item.path || '#'}
       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-        isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-700 hover:bg-gray-100'
+        isActive ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
       }`}
     >
       {item.icon}
@@ -304,18 +303,18 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       {/* Mobile Toggle */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="fixed top-4 left-4 z-40 lg:hidden p-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 shadow-sm"
+        className="fixed top-4 left-4 z-40 lg:hidden p-2 rounded-lg bg-background text-foreground hover:bg-muted border border-border shadow-sm"
       >
         {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       <aside
-        className={`fixed left-0 top-0 h-full bg-white flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${
+        className={`fixed left-0 top-0 h-full bg-sidebar flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Header */}
-        <div className="relative shrink-0 bg-white h-16 px-4 z-10 flex items-center justify-between gap-2 shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
+        <div className="relative shrink-0 bg-sidebar h-16 px-4 z-10 flex items-center justify-between gap-2 border-b border-sidebar-border">
           <div className="flex items-center min-w-0 flex-1 h-full py-2">
             {org.logoUrl ? (
               <div className={`h-full w-full flex items-center gap-2.5 overflow-hidden ${effectiveCollapsed ? 'justify-center' : 'justify-start'}`}>
@@ -336,13 +335,13 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
                   return (
                     <div className="min-w-0 flex flex-col justify-center leading-none">
                       <span
-                        className="font-extrabold text-gray-900 tracking-tight truncate leading-none"
+                        className="font-extrabold text-sidebar-foreground tracking-tight truncate leading-none"
                         style={{ fontSize: 'clamp(1.1rem, 1.6vw, 1.375rem)' }}
                       >
                         {mainName}
                       </span>
                       {subName && (
-                        <span className="text-[11px] font-medium text-gray-500 truncate mt-1">
+                        <span className="text-[11px] font-medium text-sidebar-foreground/60 truncate mt-1">
                           {subName}
                         </span>
                       )}
@@ -361,8 +360,8 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
                 </div>
                 {!effectiveCollapsed && (
                   <div className="min-w-0">
-                    <h1 className="text-sm font-bold text-gray-900 truncate">{org.displayName || 'NIDO'}</h1>
-                    <p className="text-xs text-gray-500 truncate">
+                    <h1 className="text-sm font-bold text-sidebar-foreground truncate">{org.displayName || 'NIDO'}</h1>
+                    <p className="text-xs text-sidebar-foreground/60 truncate">
                       {isClientPortalUser ? 'Client Portal' : 'Procurement'}
                     </p>
                   </div>
@@ -374,7 +373,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           <button
             onClick={onToggleCollapsed}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="hidden lg:flex absolute -right-3 top-5 w-6 h-6 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 shadow-sm hover:text-blue-600 hover:border-blue-300 hover:shadow-md transition-all"
+            className="hidden lg:flex absolute -right-3 top-5 w-6 h-6 items-center justify-center rounded-full bg-background border border-border text-muted-foreground shadow-sm hover:text-primary hover:border-primary/50 hover:shadow-md transition-all"
           >
             {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
@@ -382,9 +381,9 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
 
         {/* Client badge (client portal only) */}
         {isClientPortalUser && !effectiveCollapsed && (
-          <div className="px-4 py-2 bg-purple-50 border-b border-purple-100">
-            <p className="text-xs text-purple-700 font-medium truncate">{user?.clientName}</p>
-            <p className="text-[10px] text-purple-500 truncate">Client ID: {user?.clientId}</p>
+          <div className="px-4 py-2 bg-purple-500/10 border-b border-purple-500/20">
+            <p className="text-xs text-purple-400 font-medium truncate">{user?.clientName}</p>
+            <p className="text-[10px] text-purple-400/70 truncate">Client ID: {user?.clientId}</p>
           </div>
         )}
 
@@ -396,7 +395,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
         </nav>
 
         {/* Bottom — user + sign-out */}
-        <div className="shrink-0 shadow-[0_-2px_6px_-2px_rgba(15,23,42,0.10)]">
+        <div className="shrink-0 border-t border-sidebar-border">
           {effectiveCollapsed ? (
             <div className="p-2 flex flex-col items-center gap-2">
               <div
@@ -412,7 +411,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               <button
                 title="Sign Out"
                 onClick={handleSignOut}
-                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
+                className="w-8 h-8 flex items-center justify-center text-sidebar-foreground/60 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"
               >
                 <LogOut size={15} />
               </button>
@@ -428,13 +427,13 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
                   {avatarInitial}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-900 truncate">{displayName}</p>
-                  <p className="text-xs text-gray-500 truncate">{displayRole}</p>
+                  <p className="text-xs font-medium text-sidebar-foreground truncate">{displayName}</p>
+                  <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
                 </div>
               </div>
               <button
                 onClick={handleSignOut}
-                className="w-full mt-2 px-3 py-2 text-xs text-gray-600 hover:text-red-600 text-left rounded-lg hover:bg-red-50 transition-all flex items-center gap-2"
+                className="w-full mt-2 px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-red-400 text-left rounded-lg hover:bg-red-500/10 transition-all flex items-center gap-2"
               >
                 <LogOut size={14} />
                 Sign Out

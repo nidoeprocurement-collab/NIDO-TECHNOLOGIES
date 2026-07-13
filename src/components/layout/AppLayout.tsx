@@ -27,7 +27,7 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="flex h-screen w-screen max-w-full overflow-hidden bg-white">
+    <div className="flex h-screen w-screen max-w-full overflow-hidden bg-background">
       {/* Sidebar */}
       <Sidebar collapsed={collapsed} onToggleCollapsed={toggleCollapsed} />
 

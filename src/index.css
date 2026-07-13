@@ -157,7 +157,7 @@
     font-family: "Inter", system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.45;
-    color: var(--text-primary-hex);
+    color: hsl(var(--foreground));
   }
 
   h1 {

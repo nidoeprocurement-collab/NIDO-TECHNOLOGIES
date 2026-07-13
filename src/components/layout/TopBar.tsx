@@ -92,23 +92,22 @@ export default function TopBar() {
 
   return (
     <div className="relative z-20 bg-transparent">
-      {/* Top section - Search bar and actions — plain white, separated from
-          the breadcrumb row below with a soft shadow instead of a line. */}
-      <div className="relative z-10 h-16 px-4 md:px-6 flex items-center justify-between gap-4 bg-white shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
+      {/* Top section - Search bar and actions */}
+      <div className="relative z-10 h-16 px-4 md:px-6 flex items-center justify-between gap-4 bg-background border-b border-border shadow-[0_2px_6px_-2px_rgba(15,23,42,0.10)]">
         {/* Left: Back & Search */}
         <div className="flex items-center gap-4 flex-1">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors lg:hidden"
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2.5">
-            <Search size={18} className="text-gray-400" />
+          <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-muted border border-border rounded-lg px-3 py-2.5">
+            <Search size={18} className="text-muted-foreground" />
             <input
               type="text"
               placeholder="Search users, orders, vendors, clients, invoices..."
-              className="bg-transparent text-sm text-gray-700 placeholder-gray-500 outline-none flex-1"
+              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
             />
           </div>
         </div>
@@ -116,18 +115,18 @@ export default function TopBar() {
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
           {/* Notifications */}
-          <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+          <button className="relative p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors">
             <Bell size={20} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
 
           {/* User Menu */}
-          <div className="relative flex items-center gap-3 pl-4 border-l border-gray-200">
+          <div className="relative flex items-center gap-3 pl-4 border-l border-border">
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-gray-900">{user?.name || 'System Owner'}</p>
-              <p className="text-xs text-gray-500">{user?.role || 'Administrator'}</p>
+              <p className="text-sm font-medium text-foreground">{user?.name || 'System Owner'}</p>
+              <p className="text-xs text-muted-foreground">{user?.role || 'Administrator'}</p>
             </div>
-            <button 
+            <button
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="w-9 h-9 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm hover:bg-blue-700 transition-colors"
               title={user?.email}
@@ -137,31 +136,30 @@ export default function TopBar() {
 
             {/* User Dropdown Menu */}
             {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-2 w-48 z-50">
-                <div className="px-4 py-2 border-b border-gray-200">
-                  <p className="text-sm font-semibold text-gray-900">{user?.name || 'System Owner'}</p>
-                  <p className="text-xs text-gray-500">{user?.email}</p>
+              <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-lg shadow-lg py-2 w-48 z-50">
+                <div className="px-4 py-2 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground">{user?.name || 'System Owner'}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
-                
+
                 <button
                   onClick={() => {
                     setShowUserMenu(false);
-                    // Profile navigation can be added here
                   }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-muted flex items-center gap-2"
                 >
                   <User size={16} />
                   Profile
                 </button>
 
-                <div className="border-t border-gray-200 my-1"></div>
+                <div className="border-t border-border my-1"></div>
 
                 <button
                   onClick={() => {
                     setShowUserMenu(false);
                     handleLogout();
                   }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2"
                 >
                   <LogOut size={16} />
                   Sign Out
@@ -179,7 +177,7 @@ export default function TopBar() {
             {index === 0 && !isClientPortalUser ? (
               <button
                 onClick={() => navigate(crumb.path)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded transition-colors"
+                className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                 title="Go to Dashboard"
               >
                 <Home size={16} />
@@ -189,21 +187,21 @@ export default function TopBar() {
                 onClick={() => navigate(crumb.path)}
                 className={`text-sm px-2 py-1 rounded transition-colors ${
                   crumb.isActive
-                    ? 'text-blue-600 font-medium bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                    ? 'text-primary font-medium bg-primary/10'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
               >
                 {crumb.label}
               </button>
             ) : (
               <>
-                <ChevronRight size={16} className="text-gray-400" />
+                <ChevronRight size={16} className="text-muted-foreground" />
                 <button
                   onClick={() => navigate(crumb.path)}
                   className={`text-sm px-2 py-1 rounded transition-colors ${
                     crumb.isActive
-                      ? 'text-blue-600 font-medium bg-blue-50'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                      ? 'text-primary font-medium bg-primary/10'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
                 >
                   {crumb.label}
