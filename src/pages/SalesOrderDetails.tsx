@@ -1,9 +1,9 @@
 export default function SalesOrderDetails() {
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">SalesOrderDetails</h1>
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <p className="text-gray-600 dark:text-gray-400">Content coming soon...</p>
+    <div className="space-y-2 min-h-screen bg-background p-2">
+      <h1 className="text-4xl font-bold text-foreground mb-8">Sales Order Details</h1>
+      <div className="bg-card dark:bg-secondary rounded-lg border border-border p-4">
+        <p className="text-muted-foreground">Content coming soon...</p>
       </div>
     </div>
   );

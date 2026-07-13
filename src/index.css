@@ -676,6 +676,67 @@
   color: hsl(var(--primary)) !important;
 }
 
+/* Dark mode for pages with inline styles (OrderDetailsPage, etc.) */
+.dark div[style*="background: #ffffff"],
+.dark div[style*="background: \"#ffffff\""] {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Fix text colors in pages with hardcoded colors */
+.dark div[style*="color: #111827"],
+.dark div[style*="color: \"#111827\""],
+.dark span[style*="color: #111827"],
+.dark span[style*="color: \"#111827\""] {
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark div[style*="color: #6b7280"],
+.dark div[style*="color: \"#6b7280\""],
+.dark span[style*="color: #6b7280"],
+.dark span[style*="color: \"#6b7280\""],
+.dark p[style*="color: #6b7280"],
+.dark p[style*="color: \"#6b7280\""] {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark div[style*="color: #374151"],
+.dark div[style*="color: \"#374151\""],
+.dark span[style*="color: #374151"],
+.dark span[style*="color: \"#374151\""] {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Fix modal and card backgrounds */
+.dark div[style*="background: #fff"],
+.dark div[style*="background: \"#fff\""] {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Fix button styles */
+.dark button[style*="background: #fff"],
+.dark button[style*="background: \"#fff\""] {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Fix input and field backgrounds */
+.dark input[style*="background"],
+.dark textarea[style*="background"],
+.dark select[style*="background"] {
+  background-color: hsl(var(--secondary)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Fix border colors */
+.dark div[style*="border: 1px solid #e5e7eb"],
+.dark div[style*="border: 1px solid #f3f4f6"],
+.dark div[style*="border: 1px solid #d1d5db"] {
+  border-color: hsl(var(--border)) !important;
+}
+
 html,
 body,
 #root {
