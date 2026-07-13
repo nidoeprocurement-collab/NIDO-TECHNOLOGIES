@@ -1456,7 +1456,7 @@ export default function MyOrderPage() {
   const subOrdersColTemplate = isClientPortalUser
     ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
     : "36px 130px minmax(220px,2fr) minmax(110px,1fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) minmax(130px,1fr) 44px";
-  const subOrdersColGap = 12;
+  const subOrdersColGap = 6;
   // Sum of the column minimums above (plus gaps) — the smallest width the
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
   // instead of clipping; above it the fr tracks grow to fill the tab.
@@ -1645,8 +1645,8 @@ export default function MyOrderPage() {
                           ) : "📦"}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, overflowWrap: "break-word" }}>{sub.itemName}</div>
-                          {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, overflowWrap: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                          <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
+                          {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
                         </div>
                       </div>
                     </div>
