@@ -79,7 +79,7 @@
     --secondary: 215 25% 18%;
     --secondary-foreground: 210 20% 90%;
     --muted: 215 25% 18%;
-    --muted-foreground: 215 15% 60%;
+    --muted-foreground: 210 20% 75%; /* Increased from 60% to 75% for better readability */
     --accent: 215 25% 18%;
     --accent-foreground: 210 20% 90%;
     --destructive: 0 62% 40%;
@@ -508,6 +508,46 @@
   /* Ensure configuration page is readable */
   .dark .min-h-screen {
     @apply bg-background text-foreground;
+  }
+  
+  /* Configuration tiles dark mode enhancement */
+  .dark [class*="bg-card"] {
+    @apply bg-card text-foreground;
+  }
+  
+  .dark [class*="bg-card"] h3 {
+    @apply text-foreground font-semibold;
+  }
+  
+  .dark [class*="bg-card"] p {
+    @apply text-muted-foreground opacity-95;
+  }
+  
+  /* Enhanced text visibility in dark mode cards */
+  .dark .rounded-xl {
+    @apply bg-card border-border text-foreground;
+  }
+  
+  .dark .rounded-xl h3 {
+    @apply text-foreground font-semibold text-lg;
+  }
+  
+  .dark .rounded-xl p {
+    @apply text-muted-foreground opacity-100;
+  }
+  
+  /* Specific tile enhancements */
+  .dark div[class*="rounded-xl"][class*="border"] {
+    @apply bg-card border border-border;
+  }
+  
+  .dark div[class*="rounded-xl"][class*="border"] h3,
+  .dark div[class*="rounded-xl"][class*="border"] h2 {
+    @apply text-foreground font-semibold;
+  }
+  
+  .dark div[class*="rounded-xl"][class*="border"] p {
+    @apply text-muted-foreground opacity-100 font-normal;
   }
 }
 
