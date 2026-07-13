@@ -101,7 +101,7 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
         type="button"
         onClick={handleClick}
         disabled={context.disabled}
-        className={`flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${className || ""}`}
+        className={`flex h-10 w-full items-center justify-between rounded-md border border-border bg-background text-foreground px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${className || ""}`}
         {...props}
       >
         {children}
@@ -122,8 +122,8 @@ const SelectValue = React.forwardRef<
     : "";
 
   return (
-    <div ref={ref} className={`text-gray-700 flex-1 text-left truncate ${className || ""}`} {...props}>
-      {label || <span className="text-gray-400">{placeholder || children}</span>}
+    <div ref={ref} className={`text-foreground flex-1 text-left truncate ${className || ""}`} {...props}>
+      {label || <span className="text-muted-foreground">{placeholder || children}</span>}
     </div>
   );
 });
@@ -165,7 +165,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
           else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
         }}
         style={fixedStyle}
-        className={`rounded-md border border-gray-300 bg-white shadow-xl overflow-y-auto ${className || ""}`}
+        className={`rounded-md border border-border bg-background text-foreground shadow-xl overflow-y-auto ${className || ""}`}
         {...props}
       >
         {children}
@@ -203,7 +203,7 @@ const SelectItem = React.forwardRef<
     <div
       ref={ref}
       onClick={handleSelect}
-      className={`px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm ${isSelected ? "bg-blue-100 font-semibold" : ""} ${className || ""}`}
+      className={`px-3 py-2 cursor-pointer text-foreground text-sm hover:bg-accent hover:text-accent-foreground ${isSelected ? "bg-primary/10 font-semibold text-primary" : ""} ${className || ""}`}
       data-value={value}
       {...props}
     >

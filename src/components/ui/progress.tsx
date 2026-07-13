@@ -8,9 +8,9 @@ interface ProgressProps {
 
 export function Progress({ value = 0 }: ProgressProps) {
   return (
-    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+    <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
       <div
-        className="h-full bg-blue-600 transition-all"
+        className="h-full bg-primary transition-all"
         style={{ width: `${value}%` }}
       />
     </div>
