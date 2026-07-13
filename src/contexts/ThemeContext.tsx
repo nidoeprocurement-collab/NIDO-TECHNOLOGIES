@@ -55,11 +55,8 @@ const FONT_SIZES: Record<ThemeSettings["fontSize"], string> = {
 function applyTheme(theme: ThemeSettings) {
   const root = document.documentElement;
 
-  // ── Dark / Light / System ────────────────────────────────────────────────────
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const useDark =
-    theme.mode === "dark" || (theme.mode === "system" && prefersDark);
-  root.classList.toggle("dark", useDark);
+  // ── Dark / Light ─────────────────────────────────────────────────────────────
+  root.classList.toggle("dark", theme.mode === "dark");
 
   // ── Accent color ─────────────────────────────────────────────────────────────
   const palette = ACCENT_PRESETS[theme.accentColor] ?? ACCENT_PRESETS.blue;
@@ -92,16 +89,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Apply whenever the in-memory theme config changes (live preview before save)
   useEffect(() => {
     applyTheme(config.theme);
-  }, [config.theme]);
-
-  // Also react to system preference changes when mode === "system"
-  useEffect(() => {
-    const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => {
-      if (config.theme.mode === "system") applyTheme(config.theme);
-    };
-    mql.addEventListener("change", handler);
-    return () => mql.removeEventListener("change", handler);
   }, [config.theme]);
 
   return (

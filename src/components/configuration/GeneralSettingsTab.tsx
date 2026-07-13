@@ -226,29 +226,6 @@ export default function GeneralSettingsPage() {
                   <SelectContent>
                     <SelectItem value="light">Light</SelectItem>
                     <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">Match System</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Accent Color</Label>
-                <Select value={theme.accentColor} onValueChange={v => update("theme", { accentColor: v as typeof theme.accentColor })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="blue">Blue</SelectItem>
-                    <SelectItem value="purple">Purple</SelectItem>
-                    <SelectItem value="green">Green</SelectItem>
-                    <SelectItem value="orange">Orange</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Layout Density</Label>
-                <Select value={theme.density} onValueChange={v => update("theme", { density: v as typeof theme.density })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="comfortable">Comfortable</SelectItem>
-                    <SelectItem value="compact">Compact</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -263,20 +240,6 @@ export default function GeneralSettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="flex items-center gap-3 pt-2 flex-wrap">
-              <span className="text-sm text-muted-foreground">Live preview:</span>
-              <span className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white ${
-                theme.accentColor === "purple" ? "bg-purple-600" :
-                theme.accentColor === "green" ? "bg-green-600" :
-                theme.accentColor === "orange" ? "bg-orange-500" : "bg-blue-600"
-              }`}>
-                Sample Button
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {theme.mode === "dark" ? "Dark" : theme.mode === "system" ? "System" : "Light"} mode
-                · {theme.density} density · {theme.fontSize} text
-              </span>
             </div>
             <p className="text-xs text-muted-foreground">
               Theme changes apply immediately. Save to make them permanent.

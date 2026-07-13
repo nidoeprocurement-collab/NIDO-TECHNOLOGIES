@@ -29,7 +29,7 @@ export interface OrgSettings {
 }
 
 export interface ThemeSettings {
-  mode: "light" | "dark" | "system";
+  mode: "light" | "dark";
   accentColor: "blue" | "purple" | "green" | "orange";
   density: "comfortable" | "compact";
   fontSize: "small" | "medium" | "large";
