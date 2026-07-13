@@ -6,16 +6,10 @@ import { useMyOrders, type MyOrder } from '@/contexts/MyOrdersContext';
 import { getVendors } from '@/lib/vendorDataStore';
 import { getClients } from '@/lib/clientStore';
 import { getAllPOs, type StoredPO } from '@/lib/purchaseOrderStore';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'];
 const CATEGORY_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#6b7280', '#ec4899'];
-
-function formatRupees(value: number): string {
-  if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)}Cr`;
-  if (value >= 100000) return `₹${(value / 100000).toFixed(2)}L`;
-  if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
-  return `₹${Math.round(value).toLocaleString('en-IN')}`;
-}
 
 const KPICard = ({ title, value, icon: Icon, bgColor }: { title: string; value: string; icon: any; bgColor: string }) => (
   <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow duration-200 h-full flex flex-col justify-between">
@@ -101,6 +95,8 @@ function RecentOrdersTable({ orders, poByOrderId }: { orders: MyOrder[]; poByOrd
 }
 
 function TopVendors({ vendorSpend }: { vendorSpend: { name: string; amount: number; percentage: number }[] }) {
+  const { fmt } = useI18n();
+  const formatRupees = (v: number) => fmt(v, true);
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-6">
@@ -185,6 +181,8 @@ function timeAgo(timestamp: number): string {
 }
 
 export default function MainDashboard() {
+  const { fmt } = useI18n();
+  const formatRupees = (v: number) => fmt(v, true);
   const { orders } = useMyOrders();
   const vendors = useMemo(() => getVendors().filter(v => !v.archived), []);
   const clients = useMemo(() => getClients(), []);

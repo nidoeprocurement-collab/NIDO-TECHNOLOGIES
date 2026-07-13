@@ -6,15 +6,24 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { StoredPO } from "./purchaseOrderStore";
 
-// ── Company constants (buyer) ─────────────────────────────────────────────────
-const CO = {
-  name: "Nido Technologies",
-  addr1: "No. 41/1, 2nd Floor, 10th Cross,",
-  addr2: "11th Main, Wilsongarden",
-  city:  "Bangalore Karnataka 560027",
-  country: "India",
-  gstin: "29BPAPP1867G1ZN",
-};
+// ── Company constants (buyer) — read live from config ─────────────────────────
+import { getConfig } from "./configService";
+
+function getCO() {
+  const cfg = getConfig();
+  const org = cfg.organization;
+  const addr = org.registeredAddress || "No address configured";
+  // Split address into lines for the PDF
+  const parts = addr.split(",").map(s => s.trim());
+  return {
+    name: org.companyName || "Nido Technologies",
+    addr1: parts[0] ?? "",
+    addr2: parts.slice(1, 3).join(", "),
+    city:  parts.slice(3).join(", "),
+    country: "India",
+    gstin: org.gstNumber || "",
+  };
+}
 
 // ── Standard Terms & Conditions ───────────────────────────────────────────────
 const TERMS = [
@@ -54,6 +63,7 @@ export function generatePOPdf(po: StoredPO): jsPDF {
   // ── 1. Company header — right-aligned ──────────────────────────────────────
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
+  const CO = getCO();
   doc.text(CO.name, R, y, { align: "right" });
   y += 5.5;
 

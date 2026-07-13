@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrgConfig } from '@/contexts/ConfigContext';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -265,6 +266,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const { user, logout, isClientPortalUser } = useAuth();
+  const org = useOrgConfig();
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const location = useLocation();
@@ -324,7 +326,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
             </div>
             {!effectiveCollapsed && (
               <div className="min-w-0">
-                <h1 className="text-sm font-bold text-gray-900 truncate">NIDO</h1>
+                <h1 className="text-sm font-bold text-gray-900 truncate">{org.displayName || 'NIDO'}</h1>
                 <p className="text-xs text-gray-500 truncate">
                   {isClientPortalUser ? 'Client Portal' : 'Procurement'}
                 </p>

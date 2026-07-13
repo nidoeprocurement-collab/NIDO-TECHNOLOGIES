@@ -86,6 +86,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { OrdersProvider } from "@/contexts/OrdersContext";
 import { MyOrdersProvider } from "@/contexts/MyOrdersContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ConfigProvider } from "@/contexts/ConfigContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -998,6 +999,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ConfigProvider>
         <ThemeProvider>
           <I18nProvider>
             <PreferencesProvider>
@@ -1021,6 +1023,7 @@ const App = () => (
             </PreferencesProvider>
           </I18nProvider>
         </ThemeProvider>
+        </ConfigProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

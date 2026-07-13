@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { findPortalUser } from '@/lib/portalUserStore';
+import { useOrgConfig } from '@/contexts/ConfigContext';
 import { Mail, Lock, Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const org = useOrgConfig();
   const [email, setEmail] = useState('owner@nidotech.com');
   const [password, setPassword] = useState('Owner@123');
   const [showPassword, setShowPassword] = useState(false);
@@ -94,7 +96,7 @@ export default function LoginPage() {
                 ))}
               </div>
             </div>
-            <p className="text-xs text-white mt-12">© 2024 Nido Tech CorpEssentials</p>
+            <p className="text-xs text-white mt-12">© {new Date().getFullYear()} {org.companyName}</p>
           </div>
 
           {/* Right — Login form */}
@@ -107,8 +109,8 @@ export default function LoginPage() {
                     <Zap size={20} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Nido Tech</h2>
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">CORPESSENTIALS</p>
+                    <h2 className="text-xl font-bold text-gray-900">{org.displayName}</h2>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">{org.industry}</p>
                   </div>
                 </div>
               </div>
