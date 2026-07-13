@@ -915,6 +915,24 @@ function AddTrackingModal({ current, onSave, onClose }) {
   );
 }
 
+function ReferenceNumberModal({ itemName, current, onSave, onClose }) {
+  const [value, setValue] = useState(current || "");
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title="Reference/Model No." onClose={onClose}>
+        <div style={{ padding: "20px 22px 8px" }}>
+          <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>{itemName}</div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbSt}>Reference/Model Number</label>
+            <input value={value} onChange={e => setValue(e.target.value)} placeholder="Enter reference/model number" style={inSt} autoFocus />
+          </div>
+        </div>
+        <ModalFooter onCancel={onClose} onSave={() => { onSave(value.trim()); onClose(); }} saveLabel="Save" />
+      </ModalBox>
+    </Overlay>
+  );
+}
+
 function RaiseReturnModal({ itemName, onClose }) {
   const [reason, setReason] = useState(""), [details, setDetails] = useState(""), [submitted, setSubmitted] = useState(false);
   if (submitted) return (
@@ -1019,7 +1037,7 @@ function Stepper({ currentStatus }) {
 const menuItemSt: any = { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" };
 const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "#92400e" }, Processing: { color: "#6b21a8" }, Shipped: { color: "#1e40af" }, Delivered: { color: "#166534" } };
 
-function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onCancel, onRaiseReturn, returnAllowed }) {
+function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, referenceLocked, onCancel, onRaiseReturn, returnAllowed }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const ref = useRef<any>(null);
   useEffect(() => {
@@ -1052,6 +1070,13 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onCancel, onRaiseRet
             )}
           </div>
           <button style={menuItemSt} onClick={() => { onAddTracking(); setOpen(false); }}><span>📦</span> {sub.tracking ? "Update Tracking Info" : "Add Tracking Info"}</button>
+          <button
+            style={{ ...menuItemSt, color: referenceLocked ? "#d1d5db" : "#374151", cursor: referenceLocked ? "not-allowed" : "pointer" }}
+            onClick={() => { if (!referenceLocked) { onSetReference(); setOpen(false); } }}
+          >
+            <span>🏷️</span> {sub.referenceNumber ? "Edit Reference/Model No." : "Reference/Model No."}
+            {referenceLocked && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>Locked</span>}
+          </button>
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button style={{ ...menuItemSt, color: "#dc2626" }} onClick={() => { onCancel(); setOpen(false); }}><span>✕</span> Cancel Item</button>
           <button style={{ ...menuItemSt, color: returnAllowed ? "#7c3aed" : "#d1d5db", cursor: returnAllowed ? "pointer" : "not-allowed" }}
@@ -1157,10 +1182,6 @@ export default function MyOrderPage() {
   const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
   });
-  // Reference/model number entered per sub-order — required before a vendor can be selected
-  const [refNumbers, setRefNumbers] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(localStorage.getItem(`nido_refnumbers_${orderId}`) || "{}"); } catch { return {}; }
-  });
   // Rich vendor info (unit price, address, etc.) — not persisted, set when user picks a vendor
   const [selectedVendorMeta, setSelectedVendorMeta] = useState<Record<string, {
     vendorId: string; vendorName: string; unitPrice: number; location: string;
@@ -1172,12 +1193,12 @@ export default function MyOrderPage() {
   useEffect(() => {
     try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
     try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
-    try { setRefNumbers(JSON.parse(localStorage.getItem(`nido_refnumbers_${orderId}`) || "{}")); } catch { setRefNumbers({}); }
     setSelectedVendorMeta({});
   }, [orderId]);
   const [vendorModalSub, setVendorModalSub] = useState<any>(null);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
+  const [referenceTarget, setReferenceTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [returnTarget, setReturnTarget] = useState(null);
   const [assignment, setAssignment] = useState({
@@ -1213,10 +1234,6 @@ export default function MyOrderPage() {
     localStorage.setItem(`nido_vendors_${orderId}`, JSON.stringify(selectedVendors));
   }, [selectedVendors, orderId]);
 
-  useEffect(() => {
-    localStorage.setItem(`nido_refnumbers_${orderId}`, JSON.stringify(refNumbers));
-  }, [refNumbers, orderId]);
-
   // Persist per-item status/tracking changes (cancel, status update, add
   // tracking) so they are visible immediately to the other platform (owner
   // vs. client portal) on next render/reload, and pick up remote changes
@@ -1224,7 +1241,7 @@ export default function MyOrderPage() {
   useEffect(() => {
     if (!subOrders.length) return;
     const state: Record<string, any> = {};
-    subOrders.forEach(s => { state[s.id] = { itemStatus: s.itemStatus, tracking: s.tracking, updatedOn: s.updatedOn, deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null }; });
+    subOrders.forEach(s => { state[s.id] = { itemStatus: s.itemStatus, tracking: s.tracking, updatedOn: s.updatedOn, deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null, referenceNumber: s.referenceNumber }; });
     localStorage.setItem(itemStateKey, JSON.stringify(state));
   }, [subOrders, itemStateKey]);
 
@@ -1313,7 +1330,7 @@ export default function MyOrderPage() {
           category:   sub.category,
           hsnCode:    "",
           specs:      sub.specs,
-          referenceNumber: refNumbers[sub.id] || "",
+          referenceNumber: sub.referenceNumber || "",
           qty:        sub.qty,
           unitPrice,
           lineSubtotal,
@@ -1353,7 +1370,7 @@ export default function MyOrderPage() {
         category:  primarySub.category,
         hsnCode:   "",
         specs:     primarySub.specs,
-        referenceNumber: refNumbers[primarySub.id] || "",
+        referenceNumber: primarySub.referenceNumber || "",
         qty:       primaryLine.qty,
         unitPrice: primaryLine.unitPrice,
         subtotal,
@@ -1429,11 +1446,15 @@ export default function MyOrderPage() {
   // Explicit min widths (via minmax) on every column plus a real column gap
   // prevent long values (prices, badges, buttons) from visually overlapping
   // into the neighboring column — a plain "1fr"/px template with no gap lets
-  // wide content bleed past its track.
+  // wide content bleed past its track. The whole row is also wrapped in its
+  // own horizontally-scrolling container (see subOrdersMinWidth below) so on
+  // narrow viewports the columns scroll *within the tab* instead of being
+  // clipped by the page's outer overflow.
   const subOrdersColTemplate = isClientPortalUser
-    ? "36px 124px minmax(240px,1.3fr) 56px 92px 96px 138px 190px 118px"
-    : "36px 124px minmax(240px,1.3fr) 128px 56px 92px 96px 138px 190px 154px 56px";
-  const subOrdersColGap = 14;
+    ? "34px 110px minmax(210px,1.3fr) 52px 84px 88px 128px 176px 108px"
+    : "34px 110px minmax(210px,1.3fr) 116px 52px 84px 88px 128px 176px 140px 50px";
+  const subOrdersColGap = 12;
+  const subOrdersMinWidth = isClientPortalUser ? 1020 : 1150;
 
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
@@ -1583,7 +1604,14 @@ export default function MyOrderPage() {
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+              {/* Own horizontal scroll container, distinct from the outer
+                  tabs-section (which stays overflow:visible for the Actions
+                  flyout). This is the safety net against AppLayout's
+                  overflow-x-hidden silently clipping columns on narrow
+                  screens: if the row is ever wider than the tab, it scrolls
+                  *inside the tab* rather than being cut off. */}
+              <div style={{ overflowX: "auto", overflowY: "visible" }}>
+              <div style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
                 {subOrdersColumns.map(h => <div key={h} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{h}</div>)}
               </div>
               {filtered.map((sub, idx) => {
@@ -1592,7 +1620,7 @@ export default function MyOrderPage() {
                 const selMeta = selectedVendorMeta[sub.id] || null;
                 const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
                 return (
-                  <div key={sub.id} style={{ display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div key={sub.id} style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                     <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
@@ -1609,15 +1637,7 @@ export default function MyOrderPage() {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 13, overflowWrap: "break-word" }}>{sub.itemName}</div>
-                          <div style={{ marginTop: 4 }}>
-                            <input
-                              value={refNumbers[sub.id] || ""}
-                              onChange={e => setRefNumbers(prev => ({ ...prev, [sub.id]: e.target.value }))}
-                              disabled={isClientPortalUser || !!createdPOs[sub.id]}
-                              placeholder="Enter reference/model number"
-                              style={{ width: "100%", padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 11.5, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
-                            />
-                          </div>
+                          {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, overflowWrap: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
                         </div>
                       </div>
                     </div>
@@ -1679,12 +1699,13 @@ export default function MyOrderPage() {
                       </div>
                     ) : (
                       <div style={{ minWidth: 0 }}>
-                        <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                        <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onSetReference={() => setReferenceTarget(sub.id)} referenceLocked={hasPO} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
                       </div>
                     )}
                   </div>
                 );
               })}
+              </div>
               {(() => {
                 const itemsSubtotal = subOrders.reduce((s, o) => {
                   const raw = o.total.replace(/[₹,]/g, "");
@@ -1755,6 +1776,7 @@ export default function MyOrderPage() {
 
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}
+      {referenceTarget && <ReferenceNumberModal itemName={subOrders.find(s => s.id === referenceTarget)?.itemName || ""} current={subOrders.find(s => s.id === referenceTarget)?.referenceNumber || ""} onSave={v => setSubOrders(prev => prev.map(s => s.id === referenceTarget ? { ...s, referenceNumber: v } : s))} onClose={() => setReferenceTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={() => setSubOrders(prev => prev.map(s => s.id === cancelTarget ? { ...s, itemStatus: "Pending" } : s))} onClose={() => setCancelTarget(null)} />}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={() => setMasterStatus("Cancelled")} onClose={() => setPendingCancelStatus(false)} />}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
