@@ -320,8 +320,8 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
             {org.logoUrl ? (
               <div className={`h-full w-full flex items-center gap-2.5 overflow-hidden ${effectiveCollapsed ? 'justify-center' : 'justify-start'}`}>
                 {effectiveCollapsed ? (
-                  <div className="w-9 h-9 shrink-0 rounded-full overflow-hidden bg-white border border-gray-200 flex items-center justify-center shadow-sm">
-                    <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full w-full object-cover" />
+                  <div className="w-full h-full shrink-0 flex items-center justify-center overflow-hidden">
+                    <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="max-h-full max-w-full object-contain" />
                   </div>
                 ) : (
                   <div className="h-full shrink-0 flex items-center overflow-hidden">
