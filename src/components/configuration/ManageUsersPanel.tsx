@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Plus, Pencil, Trash2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
+import { Search, Plus, Pencil, Trash2, Download, FileText } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,60 +11,43 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card"
-
-const users = [
-  {
-    name: "System Owner",
-    email: "owner@nidotech.com",
-    role: "1",
-    jobTitle: "CEO",
-    department: "Management",
-    status: "Active",
-  },
-  {
-    name: "Mark Adams",
-    email: "admin@nidotech.com",
-    role: "1",
-    jobTitle: "System Admin",
-    department: "IT",
-    status: "Active",
-  },
-  {
-    name: "Jane Smith",
-    email: "procurement@nidotech.com",
-    role: "2",
-    jobTitle: "Procurement Manager",
-    department: "Procurement",
-    status: "Active",
-  },
-  {
-    name: "David Chen",
-    email: "ap@nidotech.com",
-    role: "2",
-    jobTitle: "Accounts Payable",
-    department: "Finance",
-    status: "Active",
-  },
-  {
-    name: "Vendor User",
-    email: "vendor@apex.com",
-    role: "4",
-    jobTitle: "Vendor Manager",
-    department: "Sales",
-    status: "Active",
-  },
-  {
-    name: "Client Admin",
-    email: "clientadmin@corp.com",
-    role: "4",
-    jobTitle: "Admin",
-    department: "Operations",
-    status: "Active",
-  },
-]
+import AddEditUserDialog from "./AddEditUserDialog"
+import {
+  type NidoUser,
+  type NidoRole,
+  getUsers,
+  getRoles,
+  addUser,
+  updateUser,
+  deleteUser,
+  exportUsersCsv,
+  exportUsersPdf,
+  NIDO_ROLES_EVENT,
+  NIDO_USERS_EVENT,
+} from "@/lib/nidoUsersStore"
 
 export default function ManageUsersPanel() {
   const [search, setSearch] = useState("")
+  const [users, setUsers] = useState<NidoUser[]>([])
+  const [roles, setRoles] = useState<NidoRole[]>([])
+  const [userDialogOpen, setUserDialogOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<NidoUser | null>(null)
+
+  const refresh = () => {
+    setUsers(getUsers())
+    setRoles(getRoles())
+  }
+
+  useEffect(() => {
+    refresh()
+    const handler = () => refresh()
+    window.addEventListener(NIDO_ROLES_EVENT, handler)
+    window.addEventListener(NIDO_USERS_EVENT, handler)
+    return () => {
+      window.removeEventListener(NIDO_ROLES_EVENT, handler)
+      window.removeEventListener(NIDO_USERS_EVENT, handler)
+    }
+  }, [])
 
   const filteredUsers = users.filter(
     (user) =>
@@ -71,18 +55,86 @@ export default function ManageUsersPanel() {
       user.email.toLowerCase().includes(search.toLowerCase())
   )
 
+  const handleAddUser = () => {
+    setEditingUser(null)
+    setUserDialogOpen(true)
+  }
+
+  const handleEditUser = (user: NidoUser) => {
+    setEditingUser(user)
+    setUserDialogOpen(true)
+  }
+
+  const handleSaveUser = (values: Omit<NidoUser, "id">) => {
+    if (editingUser) {
+      const duplicate = users.some((u) => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
+      if (duplicate) {
+        toast.error("Email already in use", { description: "Another user already has this email address." })
+        return
+      }
+      updateUser(editingUser.id, values)
+      toast.success("User updated", { description: `${values.name}'s details have been saved.` })
+    } else {
+      const duplicate = users.some((u) => u.email.toLowerCase() === values.email.toLowerCase())
+      if (duplicate) {
+        toast.error("Email already in use", { description: "A user with this email address already exists." })
+        return
+      }
+      addUser(values)
+      toast.success("User added", { description: `${values.name} can now access the platform.` })
+    }
+    refresh()
+  }
+
+  const handleDeleteUser = (user: NidoUser) => {
+    if (!window.confirm(`Remove ${user.name} (${user.email})? This cannot be undone.`)) return
+    deleteUser(user.id)
+    toast.success("User removed")
+    refresh()
+  }
+
+  const handleExportCsv = () => {
+    if (filteredUsers.length === 0) {
+      toast.info("Nothing to export")
+      return
+    }
+    exportUsersCsv(filteredUsers)
+    toast.success("CSV exported", { description: `${filteredUsers.length} user(s) exported.` })
+  }
+
+  const handleExportPdf = () => {
+    if (filteredUsers.length === 0) {
+      toast.info("Nothing to export")
+      return
+    }
+    exportUsersPdf(filteredUsers)
+    toast.success("PDF exported", { description: `${filteredUsers.length} user(s) exported.` })
+  }
+
   return (
     <div className="space-y-6">
-      {/* Description + Add User */}
-      <div className="flex items-center justify-between">
+      {/* Description + Actions */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-muted-foreground">
           Add and manage client or vendor users.
         </p>
 
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExportCsv}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+
+          <Button variant="outline" onClick={handleExportPdf}>
+            <FileText className="mr-2 h-4 w-4" />
+            Export PDF
+          </Button>
+
+          <Button onClick={handleAddUser}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -135,7 +187,7 @@ export default function ManageUsersPanel() {
             <tbody>
               {filteredUsers.map((user) => (
                 <tr
-                  key={user.email}
+                  key={user.id}
                   className="border-b hover:bg-muted/20"
                 >
                   <td className="px-4 py-4 font-medium">
@@ -159,7 +211,7 @@ export default function ManageUsersPanel() {
                   </td>
 
                   <td className="px-4 py-4">
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                    <Badge className={user.status === "Active" ? "bg-green-100 text-green-700 hover:bg-green-100" : "bg-slate-200 text-slate-600 hover:bg-slate-200"}>
                       {user.status}
                     </Badge>
                   </td>
@@ -169,6 +221,7 @@ export default function ManageUsersPanel() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleEditUser(user)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -176,6 +229,7 @@ export default function ManageUsersPanel() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => handleDeleteUser(user)}
                       >
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
@@ -183,10 +237,26 @@ export default function ManageUsersPanel() {
                   </td>
                 </tr>
               ))}
+
+              {filteredUsers.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    No users match your search.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </CardContent>
       </Card>
+
+      <AddEditUserDialog
+        open={userDialogOpen}
+        onOpenChange={setUserDialogOpen}
+        user={editingUser}
+        roles={roles}
+        onSave={handleSaveUser}
+      />
     </div>
   )
 }

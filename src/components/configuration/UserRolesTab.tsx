@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import {
   Search,
   Plus,
   Download,
   Pencil,
   Trash2,
+  FileText,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -19,87 +21,102 @@ import {
 } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import ManageUsersPanel from "./ManageUsersPanel"
-
-const roles = [
-  {
-    name: "System Owner",
-    description: "Full system access with all permissions",
-    status: "Active",
-    users: 1,
-  },
-  {
-    name: "Procurement Manager",
-    description: "Manages purchase orders and procurement",
-    status: "Active",
-    users: 2,
-  },
-  {
-    name: "Accounts Payable",
-    description: "Manages invoices and payments",
-    status: "Active",
-    users: 1,
-  },
-  {
-    name: "Vendor Admin",
-    description: "Manages vendor information",
-    status: "Active",
-    users: 1,
-  },
-]
-
-const users = [
-  {
-    name: "System Owner",
-    email: "owner@nidotech.com",
-    role: "System Owner",
-    jobTitle: "CEO",
-    department: "Management",
-    status: "Active",
-  },
-  {
-    name: "Mark Adams",
-    email: "admin@nidotech.com",
-    role: "System Admin",
-    jobTitle: "System Admin",
-    department: "IT",
-    status: "Active",
-  },
-  {
-    name: "Jane Smith",
-    email: "procurement@nidotech.com",
-    role: "Procurement Manager",
-    jobTitle: "Procurement Manager",
-    department: "Procurement",
-    status: "Active",
-  },
-  {
-    name: "David Chen",
-    email: "ap@nidotech.com",
-    role: "Accounts Payable",
-    jobTitle: "Accounts Payable",
-    department: "Finance",
-    status: "Active",
-  },
-]
+import AddEditRoleDialog from "./AddEditRoleDialog"
+import {
+  type NidoRole,
+  getRoles,
+  addRole,
+  updateRole,
+  deleteRole,
+  getRoleUserCount,
+  exportRolesCsv,
+  exportRolesPdf,
+  NIDO_ROLES_EVENT,
+  NIDO_USERS_EVENT,
+} from "@/lib/nidoUsersStore"
 
 export default function NidoUsersPage() {
   const [activeTab, setActiveTab] = useState("roles")
   const [searchRole, setSearchRole] = useState("")
-  const [searchUser, setSearchUser] = useState("")
+  const [roles, setRoles] = useState<NidoRole[]>([])
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
+  const [editingRole, setEditingRole] = useState<NidoRole | null>(null)
+  const [, forceRefresh] = useState(0)
+
+  const refreshRoles = () => {
+    setRoles(getRoles())
+    forceRefresh((n) => n + 1)
+  }
+
+  useEffect(() => {
+    refreshRoles()
+    const handler = () => refreshRoles()
+    window.addEventListener(NIDO_ROLES_EVENT, handler)
+    window.addEventListener(NIDO_USERS_EVENT, handler)
+    return () => {
+      window.removeEventListener(NIDO_ROLES_EVENT, handler)
+      window.removeEventListener(NIDO_USERS_EVENT, handler)
+    }
+  }, [])
 
   const filteredRoles = roles.filter((role) =>
     role.name.toLowerCase().includes(searchRole.toLowerCase())
   )
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchUser.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchUser.toLowerCase())
-  )
+  const handleAddRole = () => {
+    setEditingRole(null)
+    setRoleDialogOpen(true)
+  }
+
+  const handleEditRole = (role: NidoRole) => {
+    setEditingRole(role)
+    setRoleDialogOpen(true)
+  }
+
+  const handleSaveRole = (values: { name: string; description: string; status: "Active" | "Inactive" }) => {
+    if (editingRole) {
+      updateRole(editingRole.id, values)
+      toast.success("Role updated", { description: `"${values.name}" has been saved.` })
+    } else {
+      addRole(values)
+      toast.success("Role added", { description: `"${values.name}" is now available to assign to users.` })
+    }
+    refreshRoles()
+  }
+
+  const handleDeleteRole = (role: NidoRole) => {
+    const assigned = getRoleUserCount(role.name)
+    if (assigned > 0) {
+      toast.error("Can't delete role", { description: `${assigned} user(s) still have this role. Reassign them first.` })
+      return
+    }
+    if (!window.confirm(`Delete the role "${role.name}"? This cannot be undone.`)) return
+    deleteRole(role.id)
+    toast.success("Role deleted")
+    refreshRoles()
+  }
+
+  const handleExportCsv = () => {
+    if (filteredRoles.length === 0) {
+      toast.info("Nothing to export")
+      return
+    }
+    exportRolesCsv(filteredRoles)
+    toast.success("CSV exported", { description: `${filteredRoles.length} role(s) exported.` })
+  }
+
+  const handleExportPdf = () => {
+    if (filteredRoles.length === 0) {
+      toast.info("Nothing to export")
+      return
+    }
+    exportRolesPdf(filteredRoles)
+    toast.success("PDF exported", { description: `${filteredRoles.length} role(s) exported.` })
+  }
 
   return (
    <div className="min-h-screen bg-white">
-      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6">
+      <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6 space-y-4">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -154,17 +171,17 @@ export default function NidoUsersPage() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button variant="outline">
+                    <Button variant="outline" onClick={handleExportCsv}>
                       <Download className="mr-2 h-4 w-4" />
                       Export CSV
                     </Button>
 
-                    <Button variant="outline">
-                      <Download className="mr-2 h-4 w-4" />
+                    <Button variant="outline" onClick={handleExportPdf}>
+                      <FileText className="mr-2 h-4 w-4" />
                       Export PDF
                     </Button>
 
-                    <Button>
+                    <Button onClick={handleAddRole}>
                       <Plus className="mr-2 h-4 w-4" />
                       Add Role
                     </Button>
@@ -213,11 +230,14 @@ export default function NidoUsersPage() {
                   <tbody>
                     {filteredRoles.map((role) => (
                       <tr
-                        key={role.name}
+                        key={role.id}
                         className="border-b hover:bg-slate-50"
                       >
                         <td className="px-6 py-4">
-                          <button className="font-medium text-blue-600">
+                          <button
+                            className="font-medium text-blue-600"
+                            onClick={() => handleEditRole(role)}
+                          >
                             {role.name}
                           </button>
                         </td>
@@ -227,25 +247,45 @@ export default function NidoUsersPage() {
                         </td>
 
                         <td className="px-6 py-4">
-                          <Badge className="bg-green-100 text-green-700">
+                          <Badge className={role.status === "Active" ? "bg-green-100 text-green-700" : "bg-slate-200 text-slate-600"}>
                             {role.status}
                           </Badge>
                         </td>
 
                         <td className="px-6 py-4">
-                          {role.users} Users
+                          {getRoleUserCount(role.name)} Users
                         </td>
 
                         <td className="px-6 py-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                          >
-                            Edit
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditRole(role)}
+                            >
+                              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                              Edit
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteRole(role)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
+
+                    {filteredRoles.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                          No roles match your search.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
 
@@ -263,6 +303,13 @@ export default function NidoUsersPage() {
           <ManageUsersPanel />
         )}
       </div>
+
+      <AddEditRoleDialog
+        open={roleDialogOpen}
+        onOpenChange={setRoleDialogOpen}
+        role={editingRole}
+        onSave={handleSaveRole}
+      />
     </div>
   )
 }
