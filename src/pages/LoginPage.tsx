@@ -105,9 +105,15 @@ export default function LoginPage() {
               {/* Logo */}
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
-                    <Zap size={20} />
-                  </div>
+                  {org.logoUrl ? (
+                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                      <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full w-full object-contain" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white shrink-0">
+                      <Zap size={20} />
+                    </div>
+                  )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{org.displayName}</h2>
                     <p className="text-xs text-gray-500 uppercase tracking-wider">{org.industry}</p>
