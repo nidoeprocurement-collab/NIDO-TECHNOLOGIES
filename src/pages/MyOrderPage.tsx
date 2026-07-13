@@ -61,10 +61,10 @@ const EMPTY_FILTERS: FilterState = {
   vendorStatus: "", priority: "", paymentStatus: "", attachments: "", tags: "",
 };
 
-const labelSt: React.CSSProperties = { display: "block", fontSize: 12, color: "#6b7280", marginBottom: 4, fontWeight: 500 };
+const labelSt: React.CSSProperties = { display: "block", fontSize: 12, color: "hsl(var(--muted-foreground))", marginBottom: 4, fontWeight: 500 };
 const inputSt: React.CSSProperties = {
-  width: "100%", padding: "7px 10px", border: "1px solid #d1d5db",
-  borderRadius: 6, fontSize: 13, color: "#374151", background: "#fff",
+  width: "100%", padding: "7px 10px", border: "1px solid hsl(var(--border))",
+  borderRadius: 6, fontSize: 13, color: "hsl(var(--foreground))", background: "hsl(var(--background))",
   boxSizing: "border-box" as const, outline: "none", fontFamily: "inherit",
 };
 
@@ -102,22 +102,23 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
   onClose: () => void; onApply: () => void; onClear: () => void;
 }) {
   const p = { filters, setFilters };
+  const _bg = "hsl(var(--card))"; const _bdr = "hsl(var(--border))"; const _fg = "hsl(var(--foreground))"; const _m = "hsl(var(--muted-foreground))";
   return (
     <div style={{
       position: "fixed", top: 0, right: 0, height: "100vh", width: 320,
-      background: "#fff", boxShadow: "-2px 0 20px rgba(0,0,0,0.10)",
+      background: _bg, boxShadow: "-2px 0 24px rgba(0,0,0,0.18)", border: `1px solid ${_bdr}`,
       zIndex: 300, display: "flex", flexDirection: "column", fontFamily: "inherit",
     }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid #f3f4f6" }}>
-        <span style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>Filters</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: `1px solid ${_bdr}` }}>
+        <span style={{ fontSize: 16, fontWeight: 700, color: _fg }}>Filters</span>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <button onClick={onClear} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>Clear All</button>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#9ca3af", lineHeight: 1, padding: 0 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: _m, lineHeight: 1, padding: 0 }}>×</button>
         </div>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>Order Information</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: _fg }}>Order Information</div>
         <div style={{ display: "flex", gap: 10 }}>
           <Inp label="Order ID" fkey="orderId" placeholder="Enter order ID" {...p} />
           <Inp label="Master Order ID" fkey="masterOrderId" placeholder="Enter master order ID" {...p} />
@@ -186,10 +187,10 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
         </div>
       </div>
 
-      <div style={{ padding: "14px 20px", borderTop: "1px solid #f3f4f6", display: "flex", gap: 10 }}>
+      <div style={{ padding: "14px 20px", borderTop: `1px solid ${_bdr}`, display: "flex", gap: 10 }}>
         <button onClick={onClear} style={{
-          flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7,
-          background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit",
+          flex: 1, padding: "9px 0", border: `1px solid ${_bdr}`, borderRadius: 7,
+          background: _bg, color: _fg, cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit",
         }}>Clear All</button>
         <button onClick={onApply} style={{
           flex: 1, padding: "9px 0", border: "none", borderRadius: 7,
@@ -214,19 +215,20 @@ function ActionDropdown({ onExport, onCreateOrder, onBulkStatus, onBulkNotes, on
     { icon: "⟳",  label: "Bulk Update Status",  action: () => { onBulkStatus();  onClose(); } },
     { icon: "✎",  label: "Bulk Update Notes",   action: () => { onBulkNotes();   onClose(); } },
   ];
+  const _c = "hsl(var(--card))"; const _b = "hsl(var(--border))"; const _f = "hsl(var(--foreground))"; const _mu = "hsl(var(--muted))";
   return (
     <div style={{
-      position: "absolute", top: 40, right: 0, background: "#fff",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.13)", borderRadius: 10, zIndex: 200,
-      minWidth: 210, border: "1px solid #e5e7eb", overflow: "hidden",
+      position: "absolute", top: 40, right: 0, background: _c,
+      boxShadow: "0 4px 20px rgba(0,0,0,0.18)", borderRadius: 10, zIndex: 200,
+      minWidth: 210, border: `1px solid ${_b}`, overflow: "hidden",
     }}>
       {items.map(item => (
         <button key={item.label} onClick={item.action} style={{
           display: "flex", alignItems: "center", gap: 12, width: "100%",
           padding: "11px 18px", border: "none", background: "none",
-          cursor: "pointer", fontSize: 14, color: "#374151", textAlign: "left", fontFamily: "inherit",
+          cursor: "pointer", fontSize: 14, color: _f, textAlign: "left", fontFamily: "inherit",
         }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+          onMouseEnter={e => (e.currentTarget.style.background = _mu)}
           onMouseLeave={e => (e.currentTarget.style.background = "none")}>
           <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>{item.icon}</span>
           {item.label}
@@ -247,12 +249,13 @@ function BulkStatusModal({ selectedCount, onApply, onClose }: {
     <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
       <div style={{
-        position: "relative", background: "#fff", borderRadius: 14, padding: "28px 32px",
-        width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "inherit",
+        position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
+        width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
+        border: "1px solid hsl(var(--border))",
       }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#111827" }}>Bulk Update Status</h2>
-        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "#6b7280" }}>
-          Apply new status to <strong style={{ color: "#111827" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
+        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Status</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
+          Apply new status to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
         </p>
         <label style={labelSt}>New Status</label>
         <select
@@ -264,8 +267,8 @@ function BulkStatusModal({ selectedCount, onApply, onClose }: {
         </select>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{
-            flex: 1, padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8,
-            background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+            flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
+            background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
           }}>Cancel</button>
           <button onClick={() => { onApply(status); onClose(); }} style={{
             flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
@@ -288,12 +291,13 @@ function BulkNotesModal({ selectedCount, onApply, onClose }: {
     <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
       <div style={{
-        position: "relative", background: "#fff", borderRadius: 14, padding: "28px 32px",
-        width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "inherit",
+        position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
+        width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
+        border: "1px solid hsl(var(--border))",
       }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#111827" }}>Bulk Update Notes</h2>
-        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "#6b7280" }}>
-          Add a note to <strong style={{ color: "#111827" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
+        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Notes</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
+          Add a note to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
         </p>
         <label style={labelSt}>Note</label>
         <textarea
@@ -305,8 +309,8 @@ function BulkNotesModal({ selectedCount, onApply, onClose }: {
         />
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{
-            flex: 1, padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8,
-            background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+            flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
+            background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
           }}>Cancel</button>
           <button
             onClick={() => { if (note.trim()) { onApply(note.trim()); onClose(); } }}
@@ -478,7 +482,7 @@ export default function MyOrderPage() {
 
   return (
     <div
-      style={{ fontFamily: "'Inter','Segoe UI',sans-serif", minHeight: "100vh", background: "#fff", color: "#111827" }}
+      style={{ fontFamily: "'Inter','Segoe UI',sans-serif", minHeight: "100vh", background: "hsl(var(--background))", color: "hsl(var(--foreground))" }}
       onClick={e => {
         if (showActions && actionsRef.current && !actionsRef.current.contains(e.target as Node))
           setShowActions(false);
@@ -489,16 +493,16 @@ export default function MyOrderPage() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#111827" }}>Orders</h1>
-            <p style={{ margin: "5px 0 0", color: "#6b7280", fontSize: 13.5 }}>Manage and track all purchase orders</p>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "hsl(var(--foreground))" }}>Orders</h1>
+            <p style={{ margin: "5px 0 0", color: "hsl(var(--muted-foreground))", fontSize: 13.5 }}>Manage and track all purchase orders</p>
           </div>
           <div ref={actionsRef} style={{ position: "relative" }}>
             <button
               onClick={e => { e.stopPropagation(); setShowActions(v => !v); }}
               style={{
-                border: "1px solid #e5e7eb", background: "#fff", borderRadius: 8,
+                border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", borderRadius: 8,
                 width: 36, height: 36, cursor: "pointer", fontSize: 20,
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#374151",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "hsl(var(--foreground))",
               }}
             >⋮</button>
             {showActions && (
@@ -523,9 +527,9 @@ export default function MyOrderPage() {
               value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search by order ID, client name, or requester..."
               style={{
-                width: "100%", padding: "10px 14px 10px 38px", border: "1px solid #e5e7eb",
-                borderRadius: 8, fontSize: 13.5, color: "#374151", boxSizing: "border-box",
-                outline: "none", fontFamily: "inherit", background: "#fff",
+                width: "100%", padding: "10px 14px 10px 38px", border: "1px solid hsl(var(--border))",
+                borderRadius: 8, fontSize: 13.5, color: "hsl(var(--foreground))", boxSizing: "border-box",
+                outline: "none", fontFamily: "inherit", background: "hsl(var(--background))",
               }}
             />
           </div>
@@ -533,10 +537,10 @@ export default function MyOrderPage() {
             onClick={() => setShowFilter(v => !v)}
             style={{
               display: "flex", alignItems: "center", gap: 8, padding: "10px 18px",
-              border: "1px solid #e5e7eb", borderRadius: 8,
-              background: showFilter ? "#eff6ff" : "#fff",
+              border: "1px solid hsl(var(--border))", borderRadius: 8,
+              background: showFilter ? "hsl(var(--primary)/0.1)" : "hsl(var(--card))",
               cursor: "pointer", fontSize: 14, fontWeight: 500,
-              color: showFilter ? "#2563eb" : "#374151", fontFamily: "inherit",
+              color: showFilter ? "#2563eb" : "hsl(var(--foreground))", fontFamily: "inherit",
               whiteSpace: "nowrap",
             }}
           >
@@ -550,7 +554,7 @@ export default function MyOrderPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", borderBottom: "2px solid #f3f4f6", marginBottom: 0, overflowX: "auto" }}>
+        <div style={{ display: "flex", borderBottom: "2px solid hsl(var(--border))", marginBottom: 0, overflowX: "auto" }}>
           {ALL_TABS.map(tab => {
             const active = activeTab === tab.key;
             return (
@@ -558,13 +562,13 @@ export default function MyOrderPage() {
                 style={{
                   padding: "11px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer",
                   fontSize: 14, fontWeight: active ? 700 : 400,
-                  color: active ? "#2563eb" : "#6b7280",
+                  color: active ? "#2563eb" : "hsl(var(--muted-foreground))",
                   borderBottom: active ? "2px solid #2563eb" : "2px solid transparent",
                   marginBottom: -2, whiteSpace: "nowrap", fontFamily: "inherit",
                   display: "flex", alignItems: "center", gap: 6,
                 }}>
                 {tab.label}
-                <span style={{ fontSize: 13, color: active ? "#2563eb" : "#9ca3af", fontWeight: 400 }}>
+                <span style={{ fontSize: 13, color: active ? "#2563eb" : "hsl(var(--muted-foreground))", fontWeight: 400 }}>
                   {tab.count}
                 </span>
               </button>
@@ -573,11 +577,11 @@ export default function MyOrderPage() {
         </div>
 
         {/* Table */}
-        <div style={{ border: "1px solid #e5e7eb", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden", background: "#fff" }}>
+        <div style={{ borderLeft: "1px solid hsl(var(--border))", borderRight: "1px solid hsl(var(--border))", borderBottom: "1px solid hsl(var(--border))", borderTop: "none", borderRadius: "0 0 10px 10px", overflow: "hidden", background: "hsl(var(--card))" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
               <thead>
-                <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                <tr style={{ background: "hsl(var(--muted))", borderBottom: "1px solid hsl(var(--border))" }}>
                   <th style={{ ...thSt, width: 44 }}>
                     <input
                       type="checkbox" checked={allChecked}
@@ -595,9 +599,9 @@ export default function MyOrderPage() {
                   const isSel = selected.has(order.id);
                   return (
                     <tr key={order.id}
-                      style={{ borderBottom: i < filteredOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#f0f7ff" : "#fff", transition: "background 0.1s" }}
-                      onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = "#fafafa"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = isSel ? "#f0f7ff" : "#fff"; }}>
+                      style={{ borderBottom: i < filteredOrders.length - 1 ? "1px solid hsl(var(--border))" : "none", background: isSel ? "hsl(var(--primary)/0.08)" : "transparent", transition: "background 0.1s" }}
+                      onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = "hsl(var(--muted))"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = isSel ? "hsl(var(--primary)/0.08)" : "transparent"; }}>
                       <td style={tdSt}>
                         <input type="checkbox" checked={isSel} onChange={() => toggleOne(order.id)} style={{ cursor: "pointer", width: 15, height: 15 }} />
                       </td>
@@ -612,15 +616,15 @@ export default function MyOrderPage() {
                       <td style={tdSt}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <Avatar initial={order.clientInitial} color={order.clientColor} size={28} />
-                          <span style={{ fontWeight: 500, color: "#111827" }}>{order.client}</span>
+                          <span style={{ fontWeight: 500, color: "hsl(var(--foreground))" }}>{order.client}</span>
                         </div>
                       </td>
                       <td style={tdSt}>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <Avatar initial={order.requesterInitial} color={order.requesterColor} size={28} />
                           <div>
-                            <div style={{ fontWeight: 500, color: "#111827" }}>{order.requester}</div>
-                            <div style={{ color: "#9ca3af", fontSize: 12 }}>{order.requesterRole}</div>
+                            <div style={{ fontWeight: 500, color: "hsl(var(--foreground))" }}>{order.requester}</div>
+                            <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>{order.requesterRole}</div>
                           </div>
                         </div>
                       </td>
@@ -628,26 +632,26 @@ export default function MyOrderPage() {
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <Avatar initial={order.assignedInitial} color={order.assignedColor} size={28} />
                           <div>
-                            <div style={{ fontWeight: 500, color: "#111827" }}>{order.assigned}</div>
-                            <div style={{ color: "#9ca3af", fontSize: 12 }}>{order.assignedRole}</div>
+                            <div style={{ fontWeight: 500, color: "hsl(var(--foreground))" }}>{order.assigned}</div>
+                            <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>{order.assignedRole}</div>
                           </div>
                         </div>
                       </td>
                       <td style={tdSt}>
-                        <div style={{ color: "#111827" }}>{order.orderDate}</div>
-                        <div style={{ color: "#9ca3af", fontSize: 12 }}>{order.orderTime}</div>
+                        <div style={{ color: "hsl(var(--foreground))" }}>{order.orderDate}</div>
+                        <div style={{ color: "hsl(var(--muted-foreground))", fontSize: 12 }}>{order.orderTime}</div>
                       </td>
                       <td style={tdSt}><StatusBadge status={order.status} /></td>
                       <td style={tdSt}>
                         {order.slaTime ? (
-                          <span style={{ color: order.slaAlert ? "#dc2626" : "#374151", fontWeight: order.slaAlert ? 700 : 400 }}>
+                          <span style={{ color: order.slaAlert ? "#dc2626" : "hsl(var(--foreground))", fontWeight: order.slaAlert ? 700 : 400 }}>
                             {order.slaTime}
                           </span>
                         ) : (
-                          <span style={{ color: "#d1d5db" }}>-</span>
+                          <span style={{ color: "hsl(var(--muted-foreground))" }}>-</span>
                         )}
                       </td>
-                      <td style={{ ...tdSt, fontWeight: 600, color: "#111827" }}>{order.totalAmount}</td>
+                      <td style={{ ...tdSt, fontWeight: 600, color: "hsl(var(--foreground))" }}>{order.totalAmount}</td>
                     </tr>
                   );
                 })}
@@ -663,11 +667,11 @@ export default function MyOrderPage() {
           </div>
 
           {/* Footer */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", borderTop: "1px solid #f3f4f6" }}>
-            <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 18px", borderTop: "1px solid hsl(var(--border))" }}>
+            <div style={{ fontSize: 13, color: "hsl(var(--muted-foreground))", display: "flex", alignItems: "center", gap: 10 }}>
               {selectedCount > 0 && (
                 <>
-                  <span style={{ color: "#111827", fontWeight: 500 }}>{selectedCount} rows selected</span>
+                  <span style={{ color: "hsl(var(--foreground))", fontWeight: 500 }}>{selectedCount} rows selected</span>
                   <button onClick={() => setSelected(new Set())}
                     style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0 }}>
                     Clear selection
@@ -678,20 +682,20 @@ export default function MyOrderPage() {
                 <span>Showing 1 to {filteredOrders.length} of {filteredOrders.length} orders</span>
               )}
               {selectedCount > 0 && (
-                <span style={{ color: "#9ca3af" }}>· Showing 1 to {filteredOrders.length} of {filteredOrders.length} orders</span>
+                <span style={{ color: "hsl(var(--muted-foreground))" }}>· Showing 1 to {filteredOrders.length} of {filteredOrders.length} orders</span>
               )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <button style={{ width: 30, height: 30, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: "#6b7280" }}>‹</button>
+              <button style={{ width: 30, height: 30, border: "1px solid hsl(var(--border))", borderRadius: 6, background: "hsl(var(--card))", cursor: "pointer", fontSize: 14, color: "hsl(var(--muted-foreground))" }}>‹</button>
               {[1, 2, 3, 4, 5].map(p => (
                 <button key={p} onClick={() => setCurrentPage(p)} style={{
-                  width: 30, height: 30, border: currentPage === p ? "1px solid #2563eb" : "1px solid #e5e7eb",
-                  borderRadius: 6, background: currentPage === p ? "#eff6ff" : "#fff",
-                  color: currentPage === p ? "#2563eb" : "#374151", cursor: "pointer",
+                  width: 30, height: 30, border: currentPage === p ? "1px solid #2563eb" : "1px solid hsl(var(--border))",
+                  borderRadius: 6, background: currentPage === p ? "hsl(var(--primary)/0.1)" : "hsl(var(--card))",
+                  color: currentPage === p ? "#2563eb" : "hsl(var(--foreground))", cursor: "pointer",
                   fontWeight: currentPage === p ? 700 : 400, fontSize: 13, fontFamily: "inherit",
                 }}>{p}</button>
               ))}
-              <button style={{ width: 30, height: 30, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontSize: 14, color: "#6b7280" }}>›</button>
+              <button style={{ width: 30, height: 30, border: "1px solid hsl(var(--border))", borderRadius: 6, background: "hsl(var(--card))", cursor: "pointer", fontSize: 14, color: "hsl(var(--muted-foreground))" }}>›</button>
             </div>
           </div>
         </div>
@@ -718,7 +722,7 @@ export default function MyOrderPage() {
       {pendingBulkCancel && (
         <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={() => setPendingBulkCancel(false)} />
-          <div style={{ position: "relative", background: "#fff", borderRadius: 14, padding: "28px 32px", width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "inherit" }}>
+          <div style={{ position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px", width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit", border: "1px solid hsl(var(--border))" }}>
             <h2 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 700, color: "#dc2626" }}>
               Cancel {totalSelected} order{totalSelected !== 1 ? "s" : ""}?
             </h2>
@@ -726,7 +730,7 @@ export default function MyOrderPage() {
               ⚠️ This action cannot be undone. Once cancelled, an order can no longer be edited, have its status changed, or be processed further.
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setPendingBulkCancel(false)} style={{ flex: 1, padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
+              <button onClick={() => setPendingBulkCancel(false)} style={{ flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
                 Keep Orders
               </button>
               <button onClick={() => applyBulkStatus("Cancelled")} style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>

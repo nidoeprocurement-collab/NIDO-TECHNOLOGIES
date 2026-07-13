@@ -101,30 +101,37 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
     { label: "Delivery scheduled", who: "System", when: order.delivery, icon: "🚚", color: "#888" },
   ];
 
-  const cell: React.CSSProperties = { padding: "9px 12px", fontSize: 13, borderBottom: "1px solid #f3f4f8", color: "#2d2d3a" };
-  const th: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: "1px solid #eef0f5", textAlign: "left" };
+  const _bg   = "hsl(var(--background))";
+  const _card = "hsl(var(--card))";
+  const _fg   = "hsl(var(--foreground))";
+  const _muted= "hsl(var(--muted-foreground))";
+  const _bdr  = "hsl(var(--border))";
+  const _mutedBg = "hsl(var(--muted))";
+
+  const cell: React.CSSProperties = { padding: "9px 12px", fontSize: 13, borderBottom: `1px solid ${_bdr}`, color: _fg };
+  const th: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: `1px solid ${_bdr}`, textAlign: "left", background: _mutedBg };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#FFFFFF", zIndex: 500, overflowY: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: _bg, zIndex: 500, overflowY: "auto" }}>
       <div style={{ padding: "28px 36px" }}>
         {/* Breadcrumb */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "1px solid #e2e4e9", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer", color: "#555" }}>
+          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: `1px solid ${_bdr}`, borderRadius: 8, background: _card, fontSize: 13, cursor: "pointer", color: _fg }}>
             ← Back to Orders
           </button>
-          <span style={{ color: "#bbb" }}>/</span>
+          <span style={{ color: _muted }}>/</span>
           <POLink id={order.id} style={{ fontSize: 13 }} />
-          <span style={{ color: "#bbb" }}>/</span>
+          <span style={{ color: _muted }}>/</span>
           <OrderLink id={order.orderId} style={{ fontSize: 13 }} />
         </div>
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 600, color: "#0f1035", marginBottom: 6 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 600, color: _fg, marginBottom: 6 }}>
               Order Detail — <OrderLink id={order.orderId} style={{ fontSize: 22 }} />
             </h1>
-            <p style={{ fontSize: 13, color: "#888" }}>Purchase Order: <POLink id={order.id} style={{ fontWeight: 700 }} /></p>
+            <p style={{ fontSize: 13, color: _muted }}>Purchase Order: <POLink id={order.id} style={{ fontWeight: 700 }} /></p>
           </div>
           <Badge status={order.status} />
         </div>
@@ -132,13 +139,13 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
         {/* Info cards */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
           {[{ title: "Order Information", rows: infoRows }, { title: "Financial Summary", rows: finRows }].map(({ title, rows }) => (
-            <div key={title} style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: 20 }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>{title}</p>
+            <div key={title} style={{ background: _card, border: `1px solid ${_bdr}`, borderRadius: 12, padding: 20 }}>
+              <p style={{ fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>{title}</p>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <tbody>
                   {rows.map(([label, val]) => (
                     <tr key={label}>
-                      <td style={{ ...cell, color: "#888", width: "45%" }}>{label}</td>
+                      <td style={{ ...cell, color: _muted, width: "45%" }}>{label}</td>
                       <td style={cell}>{val}</td>
                     </tr>
                   ))}
@@ -149,8 +156,8 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
         </div>
 
         {/* Line items */}
-        <div style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Line Items</p>
+        <div style={{ background: _card, border: `1px solid ${_bdr}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Line Items</p>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>{["Item", "SKU", "Qty", "Unit Price", "Total"].map(h => <th key={h} style={th}>{h}</th>)}</tr>
@@ -159,7 +166,7 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
               {LINE_ITEMS.map(item => (
                 <tr key={item.sku}>
                   <td style={cell}>{item.name}</td>
-                  <td style={{ ...cell, fontFamily: "monospace", fontSize: 12, color: "#888" }}>{item.sku}</td>
+                  <td style={{ ...cell, fontFamily: "monospace", fontSize: 12, color: _muted }}>{item.sku}</td>
                   <td style={cell}>{item.qty}</td>
                   <td style={cell}>{item.unit}</td>
                   <td style={{ ...cell, fontWeight: 500 }}>{item.total}</td>
@@ -170,14 +177,14 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
         </div>
 
         {/* Timeline */}
-        <div style={{ background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, padding: 20 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Activity Timeline</p>
+        <div style={{ background: _card, border: `1px solid ${_bdr}`, borderRadius: 12, padding: 20 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Activity Timeline</p>
           {timeline.map((t, i) => (
             <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#f0f4ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13 }}>{t.icon}</div>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", background: _mutedBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13 }}>{t.icon}</div>
               <div>
-                <p style={{ fontSize: 13, color: "#2d2d3a", fontWeight: 500 }}>{t.label}</p>
-                <p style={{ fontSize: 12, color: "#aaa" }}>{t.who} · {t.when}</p>
+                <p style={{ fontSize: 13, color: _fg, fontWeight: 500 }}>{t.label}</p>
+                <p style={{ fontSize: 12, color: _muted }}>{t.who} · {t.when}</p>
               </div>
             </div>
           ))}
@@ -349,21 +356,28 @@ export default function VendorOrderList() {
   };
 
   // ── Styles ─────────────────────────────────────────────────────────────────
+  const bg   = "hsl(var(--background))";
+  const card = "hsl(var(--card))";
+  const fg   = "hsl(var(--foreground))";
+  const muted= "hsl(var(--muted-foreground))";
+  const bdr  = "hsl(var(--border))";
+  const mutedBg = "hsl(var(--muted))";
+
   const s = {
-    page:      { padding: "28px 36px", background: "#FFFFFF", minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: "#1a1a2e" } as React.CSSProperties,
-    card:      { background: "#fff", border: "1px solid #e8eaf0", borderRadius: 12, overflow: "hidden" } as React.CSSProperties,
-    th:        { fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase" as const, letterSpacing: ".05em", padding: "11px 14px", borderBottom: "1px solid #eef0f5", textAlign: "left" as const, background: "#fafbff", whiteSpace: "nowrap" as const },
-    td:        { padding: "13px 14px", borderBottom: "1px solid #f3f4f8", fontSize: 13, verticalAlign: "middle" as const, color: "#2d2d3a" },
+    page:      { padding: "28px 36px", background: bg, minHeight: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", fontSize: 14, color: fg } as React.CSSProperties,
+    card:      { background: card, border: `1px solid ${bdr}`, borderRadius: 12, overflow: "hidden" } as React.CSSProperties,
+    th:        { fontSize: 11, fontWeight: 600, color: muted, textTransform: "uppercase" as const, letterSpacing: ".05em", padding: "11px 14px", borderBottom: `1px solid ${bdr}`, textAlign: "left" as const, background: mutedBg, whiteSpace: "nowrap" as const },
+    td:        { padding: "13px 14px", borderBottom: `1px solid ${bdr}`, fontSize: 13, verticalAlign: "middle" as const, color: fg },
     link:      { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" } as React.CSSProperties,
     orderLink: { color: "#4a6cf7", textDecoration: "none", fontWeight: 500, cursor: "pointer", fontFamily: "monospace", fontSize: 13, background: "none", border: "none", padding: 0 } as React.CSSProperties,
-    btn:       { display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, background: "#fff", color: "#444", cursor: "pointer", whiteSpace: "nowrap" as const },
-    ddItem:    { display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", fontSize: 13, color: "#333", cursor: "pointer", textDecoration: "none", background: "none", border: "none", width: "100%", textAlign: "left" as const },
-    pgBtn:     (active: boolean): React.CSSProperties => ({ minWidth: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid #e2e4e9", fontSize: 13, cursor: "pointer", background: active ? "#4a6cf7" : "#fff", color: active ? "#fff" : "#555" }),
-    cb:        (checked: boolean, indeterminate?: boolean): React.CSSProperties => ({ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked || indeterminate ? "#4a6cf7" : "#ccc"}`, background: checked || indeterminate ? "#4a6cf7" : "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }),
+    btn:       { display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, cursor: "pointer", whiteSpace: "nowrap" as const },
+    ddItem:    { display: "flex", alignItems: "center", gap: 8, padding: "9px 16px", fontSize: 13, color: fg, cursor: "pointer", textDecoration: "none", background: "none", border: "none", width: "100%", textAlign: "left" as const },
+    pgBtn:     (active: boolean): React.CSSProperties => ({ minWidth: 30, height: 30, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: `1px solid ${bdr}`, fontSize: 13, cursor: "pointer", background: active ? "#4a6cf7" : card, color: active ? "#fff" : fg }),
+    cb:        (checked: boolean, indeterminate?: boolean): React.CSSProperties => ({ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${checked || indeterminate ? "#4a6cf7" : bdr}`, background: checked || indeterminate ? "#4a6cf7" : card, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }),
   };
 
   const Dropdown = ({ id, children }: { id: string; children: React.ReactNode }) => (
-    <div style={{ display: openDropdown === id ? "block" : "none", position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#fff", border: "1px solid #e2e4e9", borderRadius: 10, minWidth: 180, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,.1)", overflow: "hidden" }}>
+    <div style={{ display: openDropdown === id ? "block" : "none", position: "absolute", right: 0, top: "calc(100% + 6px)", background: card, border: `1px solid ${bdr}`, borderRadius: 10, minWidth: 180, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,.15)", overflow: "hidden" }}>
       {children}
     </div>
   );
@@ -387,13 +401,14 @@ export default function VendorOrderList() {
 
   const Modal = ({ open, title, onClose, onApply, children }: { open: boolean; title: string; onClose: () => void; onApply: () => void; children: React.ReactNode }) => {
     if (!open) return null;
+    const _c = "hsl(var(--card))"; const _b = "hsl(var(--border))"; const _f = "hsl(var(--foreground))";
     return (
-      <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ background: "#fff", borderRadius: 14, padding: 24, width: 340, boxShadow: "0 16px 48px rgba(0,0,0,.15)" }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{title}</h3>
+      <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ background: _c, borderRadius: 14, padding: 24, width: 340, boxShadow: "0 16px 48px rgba(0,0,0,.2)", border: `1px solid ${_b}` }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, color: _f }}>{title}</h3>
           {children}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #e2e4e9", background: "#fff", color: "#444" }}>Cancel</button>
+            <button onClick={onClose} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${_b}`, background: _c, color: _f }}>Cancel</button>
             <button onClick={onApply} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #4a6cf7", background: "#4a6cf7", color: "#fff" }}>Apply</button>
           </div>
         </div>
@@ -417,40 +432,40 @@ export default function VendorOrderList() {
 
       {/* Modals */}
       <Modal open={statusModal} title="Bulk update status" onClose={() => setStatusModal(false)} onApply={applyBulkStatus}>
-        <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as OrderStatus)} style={{ width: "100%", padding: "9px 12px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none" }}>
+        <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as OrderStatus)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", background: card, color: fg }}>
           <option value="">Select a status...</option>
-          {(["Draft","Processing","Confirmed","Shipped","Delivered","Closed","Cancelled"] as OrderStatus[]).map(s => <option key={s}>{s}</option>)}
+          {(["Draft","Processing","Confirmed","Shipped","Delivered","Closed","Cancelled"] as OrderStatus[]).map(st => <option key={st}>{st}</option>)}
         </select>
       </Modal>
       <Modal open={notesModal} title="Bulk update notes" onClose={() => setNotesModal(false)} onApply={applyBulkNotes}>
-        <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Enter notes for selected orders..." style={{ width: "100%", padding: "9px 12px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", resize: "vertical", minHeight: 80 }} />
+        <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Enter notes for selected orders..." style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", resize: "vertical", minHeight: 80, background: card, color: fg }} />
       </Modal>
 
       {confirmBulkCancel && (
-        <div onClick={e => { if (e.target === e.currentTarget) setConfirmBulkCancel(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.35)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 24, width: 380, boxShadow: "0 16px 48px rgba(0,0,0,.15)" }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, color: "#a32d2d" }}>Cancel {selected.size} order{selected.size !== 1 ? "s" : ""}?</h3>
-            <p style={{ fontSize: 13, color: "#555", marginBottom: 18, lineHeight: 1.5 }}>
+        <div onClick={e => { if (e.target === e.currentTarget) setConfirmBulkCancel(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: card, borderRadius: 14, padding: 24, width: 380, boxShadow: "0 16px 48px rgba(0,0,0,.2)", border: `1px solid ${bdr}` }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, color: "#dc2626" }}>Cancel {selected.size} order{selected.size !== 1 ? "s" : ""}?</h3>
+            <p style={{ fontSize: 13, color: fg, marginBottom: 18, lineHeight: 1.5 }}>
               This action cannot be undone. Once cancelled, these orders can no longer be edited, have their status changed, or be processed further.
             </p>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmBulkCancel(false)} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #e2e4e9", background: "#fff", color: "#444" }}>Keep Orders</button>
+              <button onClick={() => setConfirmBulkCancel(false)} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${bdr}`, background: card, color: fg }}>Keep Orders</button>
               <button onClick={() => performBulkStatusUpdate("Cancelled")} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #dc2626", background: "#dc2626", color: "#fff" }}>Yes, Cancel</button>
             </div>
           </div>
         </div>
       )}
 
-      <h1 style={{ fontSize: 24, fontWeight: 600, color: "#0f1035", marginBottom: 4 }}>Orders</h1>
-      <p style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>Manage and track all purchase orders across your organization</p>
+      <h1 style={{ fontSize: 24, fontWeight: 600, color: fg, marginBottom: 4 }}>Orders</h1>
+      <p style={{ fontSize: 13, color: muted, marginBottom: 24 }}>Manage and track all purchase orders across your organization</p>
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
         <div style={{ position: "relative", flex: "0 0 300px" }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#aaa", fontSize: 15 }}>🔍</span>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: muted, fontSize: 15 }}>🔍</span>
           <input value={search} onChange={e => { setSearch(e.target.value.toLowerCase()); setCurrentPage(1); }}
             placeholder="Search by PO number, vendor, or items..."
-            style={{ width: "100%", padding: "8px 10px 8px 34px", border: "1px solid #e2e4e9", borderRadius: 8, fontSize: 13, background: "#fff", outline: "none" }} />
+            style={{ width: "100%", padding: "8px 10px 8px 34px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, outline: "none" }} />
         </div>
 
         {/* Status filter */}
@@ -484,7 +499,7 @@ export default function VendorOrderList() {
           <button style={{ ...s.btn, padding: "8px 11px" }} onClick={() => setOpenDropdown(openDropdown === "more" ? null : "more")}>⋯</button>
           <Dropdown id="more">
             <button style={s.ddItem} onClick={doExport}>📥 Export</button>
-            <hr style={{ border: "none", borderTop: "1px solid #f0f0f0", margin: "4px 0" }} />
+            <hr style={{ border: "none", borderTop: `1px solid ${bdr}`, margin: "4px 0" }} />
             <button style={s.ddItem} onClick={() => { setStatusModal(true); setOpenDropdown(null); }}>🔄 Bulk Update Status</button>
             <button style={s.ddItem} onClick={() => { setNotesModal(true); setOpenDropdown(null); }}>📝 Bulk Update Notes</button>
           </Dropdown>
@@ -492,10 +507,10 @@ export default function VendorOrderList() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: "flex", borderBottom: "1.5px solid #e8eaf0", gap: 0, overflowX: "auto" }}>
+      <div style={{ display: "flex", borderBottom: `1.5px solid ${bdr}`, gap: 0, overflowX: "auto" }}>
         {TABS.map(t => (
           <div key={t} onClick={() => { setActiveTab(t); setCurrentPage(1); }}
-            style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : "#888", cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
+            style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : muted, cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
             {t === "All" ? "All Orders" : t} ({tabCount(t)})
           </div>
         ))}
@@ -505,14 +520,14 @@ export default function VendorOrderList() {
       <div style={s.card}>
         {/* Selection bar */}
         {selected.size > 0 ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", fontSize: 13, color: "#555", borderBottom: "1px solid #f0f0f0", background: "#fafbff" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", fontSize: 13, color: fg, borderBottom: `1px solid ${bdr}`, background: mutedBg }}>
             <Checkbox checked={allSelected} indeterminate={someSelected} onClick={toggleAll} />
             <span>{selected.size} of {filtered.length} selected &nbsp;|&nbsp;
               <button onClick={() => setSelected(new Set())} style={{ color: "#4a6cf7", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, padding: 0 }}>Clear</button>
             </span>
           </div>
         ) : (
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid #f0f0f0", background: "#fafbff", display: "flex", alignItems: "center" }}>
+          <div style={{ padding: "10px 16px", borderBottom: `1px solid ${bdr}`, background: mutedBg, display: "flex", alignItems: "center" }}>
             <Checkbox checked={false} onClick={toggleAll} />
           </div>
         )}
@@ -533,14 +548,14 @@ export default function VendorOrderList() {
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <tr><td colSpan={9} style={{ ...s.td, textAlign: "center", color: "#aaa", padding: 32 }}>No orders found</td></tr>
+                <tr><td colSpan={9} style={{ ...s.td, textAlign: "center", color: muted, padding: 32 }}>No orders found</td></tr>
               ) : pageRows.map(row => (
                 <tr
                   key={row.id}
                   onClick={() => navigate(`/vendor-orders/${row.id}`)}
-                  style={{ background: selected.has(row.id) ? "#f5f7ff" : "transparent", cursor: "pointer" }}
-                  onMouseEnter={e => { if (!(e.target as HTMLElement).closest('button')) (e.currentTarget as HTMLElement).style.background = "#f0f4ff"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selected.has(row.id) ? "#f5f7ff" : "transparent"; }}
+                  style={{ background: selected.has(row.id) ? "hsl(var(--primary)/0.08)" : "transparent", cursor: "pointer" }}
+                  onMouseEnter={e => { if (!(e.target as HTMLElement).closest('button')) (e.currentTarget as HTMLElement).style.background = "hsl(var(--muted))"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selected.has(row.id) ? "hsl(var(--primary)/0.08)" : "transparent"; }}
                 >
                   <td style={{ ...s.td, paddingLeft: 16 }} onClick={e => e.stopPropagation()}><Checkbox checked={selected.has(row.id)} onClick={() => toggleRow(row.id)} /></td>
                   <td style={s.td}><POLink id={row.id} /></td>

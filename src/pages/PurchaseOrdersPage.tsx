@@ -18,11 +18,11 @@ export default function PurchaseOrdersPage() {
     <div className="max-w-[1280px] mx-auto">
 
       {/* Top Container */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-card border border-border rounded-xl p-4">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-foreground">
             All Purchase Orders
           </h1>
 
@@ -32,7 +32,7 @@ export default function PurchaseOrdersPage() {
             <Button
               variant="outline"
               size="sm"
-              className="flex items-center gap-2 bg-gray-50"
+              className="flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
               Export
@@ -48,10 +48,10 @@ export default function PurchaseOrdersPage() {
         </div>
 
         {/* Table Container */}
-        <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+        <div className="border border-border rounded-lg overflow-hidden bg-card">
 
           <Table>
-            <TableHeader className="bg-gray-50">
+            <TableHeader className="bg-muted/40">
               <TableRow>
 
                 {/* Checkbox */}

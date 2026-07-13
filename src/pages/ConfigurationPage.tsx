@@ -68,9 +68,9 @@ const menuItems = [
 
 export default function Configuration() {
   return (
-    <div className="min-h-screen bg-white p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-slate-800 mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-8">
           Configuration
         </h1>
 
@@ -81,21 +81,21 @@ export default function Configuration() {
             return (
               <div
                 key={item.title}
-                className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
+                className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer"
               >
                 <div className="flex justify-center mb-5">
-                  <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Icon className="w-7 h-7 text-blue-600" />
+                  <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Icon className="w-7 h-7 text-primary" />
                   </div>
                 </div>
 
                 <div className="text-center">
-                  <h3 className="font-semibold text-slate-800 text-lg flex items-center justify-center gap-1">
+                  <h3 className="font-semibold text-foreground text-lg flex items-center justify-center gap-1">
                     {item.title}
-                    <span className="text-slate-400">›</span>
+                    <span className="text-muted-foreground">›</span>
                   </h3>
 
-                  <p className="mt-2 text-sm text-slate-500 leading-relaxed">
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                     {item.description}
                   </p>
                 </div>

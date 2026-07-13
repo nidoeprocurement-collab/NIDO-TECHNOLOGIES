@@ -92,13 +92,13 @@ function FilterSelect({ label, value, options, onChange }: {
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-500">{label}</label>
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
       <div className="relative">
         <select value={value} onChange={e => onChange(e.target.value)}
-          className="appearance-none border border-gray-200 rounded-lg pl-3 pr-8 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-w-[120px]">
+          className="appearance-none border border-border rounded-lg pl-3 pr-8 py-2 text-sm text-foreground bg-background focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer min-w-[120px]">
           {options.map(o => <option key={o}>{o}</option>)}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       </div>
     </div>
   );
@@ -160,26 +160,26 @@ export default function VendorServicesPage() {
   })();
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-background font-sans">
       <div className="max-w-[1280px] mx-auto px-6 py-5 space-y-4">
 
         {/* Stat cards */}
         <div className="grid grid-cols-6 gap-4">
           {stats.map(s => (
-            <button key={s.label} onClick={s.onClick} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-left hover:border-blue-200 hover:shadow-md transition-all group">
+            <button key={s.label} onClick={s.onClick} className="bg-card rounded-xl border border-border shadow-sm p-4 text-left hover:border-primary/40 hover:shadow-md transition-all group">
               <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center mb-3`}>{s.icon}</div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5 leading-tight">{s.label}</p>
-              <p className="text-2xl font-bold text-gray-900 mb-0.5">{s.value}</p>
-              <p className="text-xs text-blue-500 font-medium group-hover:underline">{s.sub}</p>
+              <p className="text-xs text-muted-foreground font-medium mb-0.5 leading-tight">{s.label}</p>
+              <p className="text-2xl font-bold text-foreground mb-0.5">{s.value}</p>
+              <p className="text-xs text-primary font-medium group-hover:underline">{s.sub}</p>
             </button>
           ))}
         </div>
 
         {/* Table card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
 
           {/* Filters */}
-          <div className="px-5 py-4 border-b border-gray-100 flex items-end gap-3 flex-wrap">
+          <div className="px-5 py-4 border-b border-border flex items-end gap-3 flex-wrap">
             <FilterSelect label="Service Type" value={typeFilter}     options={SERVICE_TYPES} onChange={v => { setTypeFilter(v);     reset(); }} />
             <FilterSelect label="Status"       value={statusFilter}   options={STATUSES}      onChange={v => { setStatusFilter(v);   reset(); }} />
             <FilterSelect label="Client"       value={clientFilter}   options={CLIENTS}       onChange={v => { setClientFilter(v);   reset(); }} />
@@ -199,7 +199,7 @@ export default function VendorServicesPage() {
             {/* Reset filters */}
             {(typeFilter !== "All" || statusFilter !== "All" || clientFilter !== "All" || regionFilter !== "All" || engineerFilter !== "All") && (
               <button onClick={() => { setTypeFilter("All"); setStatusFilter("All"); setClientFilter("All"); setRegionFilter("All"); setEngineerFilter("All"); reset(); }}
-                className="self-end px-3.5 py-2 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                className="self-end px-3.5 py-2 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:bg-muted transition-colors">
                 Reset filters
               </button>
             )}
@@ -209,42 +209,42 @@ export default function VendorServicesPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50/60 border-b border-gray-100">
+                <tr className="bg-muted/40 border-b border-border">
                   {["Service ID", "Service Type", "Client", "Asset / Equipment", "Contract / PO", "Assigned Engineer", "Next Due Date", "SLA", "Status"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {paginated.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-16 text-center text-sm text-gray-400">No services match the selected filters.</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-16 text-center text-sm text-muted-foreground">No services match the selected filters.</td></tr>
                 ) : paginated.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50/80 transition-colors">
+                  <tr key={s.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className="text-blue-600 font-semibold cursor-pointer hover:underline">{s.id}</span>
+                      <span className="text-primary font-semibold cursor-pointer hover:underline">{s.id}</span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${SERVICE_TYPE_STYLE[s.type]}`}>{s.type}</span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-700 font-medium">{s.client}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600">{s.asset}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-foreground font-medium">{s.client}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-muted-foreground">{s.asset}</td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className="text-blue-600 font-medium cursor-pointer hover:underline">{s.contractPO}</span>
+                      <span className="text-primary font-medium cursor-pointer hover:underline">{s.contractPO}</span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div className={`w-7 h-7 rounded-full ${s.engineerColor} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
                           {s.engineerInitials}
                         </div>
-                        <span className="text-gray-700">{s.engineer}</span>
+                        <span className="text-foreground">{s.engineer}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       {s.nextDueDate === "–" ? (
-                        <span className="text-gray-300">–</span>
+                        <span className="text-muted-foreground">–</span>
                       ) : (
                         <div>
-                          <p className="text-gray-700 font-medium">{s.nextDueDate}</p>
+                          <p className="text-foreground font-medium">{s.nextDueDate}</p>
                           {s.daysLeft !== null && (
                             <p className={`text-xs font-medium ${s.daysLeft <= 20 ? "text-orange-500" : "text-green-600"}`}>
                               ({s.daysLeft} days left)
@@ -253,7 +253,7 @@ export default function VendorServicesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-700 font-medium">{s.sla}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-foreground font-medium">{s.sla}</td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${STATUS_STYLE[s.status]}`}>{s.status}</span>
                     </td>
@@ -264,39 +264,39 @@ export default function VendorServicesPage() {
           </div>
 
           {/* Pagination */}
-          <div className="px-5 py-3.5 border-t border-gray-100 flex items-center justify-between gap-4">
-            <p className="text-sm text-gray-500">
+          <div className="px-5 py-3.5 border-t border-border flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
               Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of{" "}
-              <span className="font-semibold text-gray-700">{filtered.length}</span> services
+              <span className="font-semibold text-foreground">{filtered.length}</span> services
             </p>
 
             <div className="flex items-center gap-1.5">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm">
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm">
                 ‹
               </button>
               {pageNums.map((n, i) =>
                 n === "…" ? (
-                  <span key={`e${i}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-sm">…</span>
+                  <span key={`e${i}`} className="w-8 h-8 flex items-center justify-center text-muted-foreground text-sm">…</span>
                 ) : (
                   <button key={n} onClick={() => setPage(n as number)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${page === n ? "bg-blue-600 text-white shadow-sm" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${page === n ? "bg-primary text-primary-foreground shadow-sm" : "border border-border text-foreground hover:bg-muted"}`}>
                     {n}
                   </button>
                 )
               )}
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm">
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm">
                 ›
               </button>
             </div>
 
             <div className="relative">
               <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                className="appearance-none border border-gray-200 rounded-lg pl-3 pr-8 py-1.5 text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                className="appearance-none border border-border rounded-lg pl-3 pr-8 py-1.5 text-sm text-foreground bg-background focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer">
                 {PAGE_SIZES.map(sz => <option key={sz} value={sz}>{sz} / page</option>)}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
             </div>
           </div>
         </div>

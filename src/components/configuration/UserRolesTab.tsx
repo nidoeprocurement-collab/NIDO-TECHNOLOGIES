@@ -115,7 +115,7 @@ export default function NidoUsersPage() {
   }
 
   return (
-   <div className="min-h-screen bg-white">
+   <div className="min-h-screen bg-background">
       <div className="w-full px-3 sm:px-4 md:px-6 py-4 md:py-6 space-y-4">
         {/* Header */}
         <div>
@@ -134,7 +134,7 @@ export default function NidoUsersPage() {
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <TabsList className="h-12 bg-white border rounded-lg p-1">
+          <TabsList className="h-12 bg-background border border-border rounded-lg p-1">
             <TabsTrigger
               value="roles"
               className="px-6 data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600"
@@ -204,7 +204,7 @@ export default function NidoUsersPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-slate-100">
+                    <tr className="border-b border-border bg-muted/50">
                       <th className="px-6 py-4 text-left text-xs font-semibold uppercase">
                         Role Name
                       </th>
@@ -231,7 +231,7 @@ export default function NidoUsersPage() {
                     {filteredRoles.map((role) => (
                       <tr
                         key={role.id}
-                        className="border-b hover:bg-slate-50"
+                        className="border-b border-border hover:bg-muted/30"
                       >
                         <td className="px-6 py-4">
                           <button
@@ -247,7 +247,7 @@ export default function NidoUsersPage() {
                         </td>
 
                         <td className="px-6 py-4">
-                          <Badge className={role.status === "Active" ? "bg-green-100 text-green-700" : "bg-slate-200 text-slate-600"}>
+                          <Badge className={role.status === "Active" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"}>
                             {role.status}
                           </Badge>
                         </td>

@@ -59,7 +59,7 @@ export default function AddOrderStatusModal() {
     colors.find((c) => c.value === color) || colors[0]
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white p-6">
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <Dialog open={true}>
         <DialogContent className="max-w-5xl rounded-3xl border-0 shadow-2xl">
           <DialogHeader className="pb-6 border-b">

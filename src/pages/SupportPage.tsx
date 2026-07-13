@@ -75,55 +75,43 @@ export default function SupportPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "resolved":
-        return <CheckCircle className="text-green-600" size={18} />;
-      case "in_progress":
-        return <Clock className="text-blue-600" size={18} />;
-      case "open":
-        return <AlertCircle className="text-yellow-600" size={18} />;
-      default:
-        return null;
+      case "resolved":   return <CheckCircle className="text-green-600" size={18} />;
+      case "in_progress":return <Clock className="text-blue-600" size={18} />;
+      case "open":       return <AlertCircle className="text-yellow-600" size={18} />;
+      default:           return null;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "resolved":
-        return "bg-green-100 text-green-800";
-      case "in_progress":
-        return "bg-blue-100 text-blue-800";
-      case "open":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case "resolved":    return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+      case "in_progress": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
+      case "open":        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      default:            return "bg-muted text-muted-foreground";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case "high":
-        return "bg-red-100 text-red-800";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800";
-      case "low":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case "high":   return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+      case "medium": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "low":    return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+      default:       return "bg-muted text-muted-foreground";
     }
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+      <div className="bg-transparent border-b border-border">
+        <div className="w-full px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-500">Support / Tickets</p>
-            <h1 className="text-2xl font-bold">Support Center</h1>
+            <p className="text-xs text-muted-foreground">Support / Tickets</p>
+            <h1 className="text-2xl font-bold text-foreground">Support Center</h1>
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2"
           >
             <Plus size={18} />
             New Ticket
@@ -133,18 +121,18 @@ export default function SupportPage() {
 
       <div className="w-full px-4 md:px-6 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-4 md:gap-6 mb-4 md:mb-6 md:mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {[
-            { label: "Open", value: stats.open, color: "yellow", icon: AlertCircle },
-            { label: "In Progress", value: stats.in_progress, color: "blue", icon: Clock },
-            { label: "Resolved", value: stats.resolved, color: "green", icon: CheckCircle },
+            { label: "Open",        value: stats.open,        color: "yellow", icon: AlertCircle },
+            { label: "In Progress", value: stats.in_progress, color: "blue",   icon: Clock },
+            { label: "Resolved",    value: stats.resolved,    color: "green",  icon: CheckCircle },
           ].map((stat) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.label} className="p-6 bg-white rounded-lg border">
+              <div key={stat.label} className="p-6 bg-card rounded-lg border border-border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-600 text-sm">{stat.label}</p>
+                    <p className="text-muted-foreground text-sm">{stat.label}</p>
                     <p className={`text-3xl font-bold mt-2 text-${stat.color}-600`}>
                       {stat.value}
                     </p>
@@ -159,19 +147,19 @@ export default function SupportPage() {
         {/* Search and Filter */}
         <div className="mb-6 flex gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+            <Search className="absolute left-3 top-3 text-muted-foreground" size={20} />
             <input
               type="text"
               placeholder="Search tickets..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
+            className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="all">All Status</option>
             <option value="open">Open</option>
@@ -181,31 +169,31 @@ export default function SupportPage() {
         </div>
 
         {/* Tickets Table */}
-        <div className="bg-white rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <table className="w-full table-auto">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Ticket</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Subject</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Priority</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Created</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold">Status</th>
+              <tr className="border-b border-border bg-muted/40">
+                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Ticket</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Subject</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Priority</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Created</th>
+                <th className="px-4 md:px-6 py-3 md:py-4 text-left text-xs font-semibold text-muted-foreground">Status</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((ticket) => (
-                <tr key={ticket.id} className="border-b hover:bg-gray-50">
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-blue-600">
+                <tr key={ticket.id} className="border-b border-border hover:bg-muted/30">
+                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm font-medium text-primary">
                     {ticket.number}
                   </td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{ticket.subject}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
+                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-foreground">{ticket.subject}</td>
+                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm">
                     <span className={`px-3 py-1 rounded text-xs font-semibold ${getPriorityColor(ticket.priority)}`}>
                       {ticket.priority}
                     </span>
                   </td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">{ticket.created}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-3 md:py-4 text-sm">
+                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm text-foreground">{ticket.created}</td>
+                  <td className="px-4 md:px-6 py-3 md:py-4 text-sm">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(ticket.status)}
                       <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(ticket.status)}`}>
@@ -222,33 +210,33 @@ export default function SupportPage() {
 
       {/* Create Ticket Modal */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-bold mb-4">Create Support Ticket</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card rounded-lg border border-border p-6 w-full max-w-md">
+            <h2 className="text-lg font-bold mb-4 text-foreground">Create Support Ticket</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Subject *</label>
+                <label className="block text-sm font-medium mb-1 text-foreground">Subject *</label>
                 <input
                   type="text"
                   value={form.subject}
                   onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Description</label>
+                <label className="block text-sm font-medium mb-1 text-foreground">Description</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg h-24"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground h-24 focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Priority</label>
+                <label className="block text-sm font-medium mb-1 text-foreground">Priority</label>
                 <select
                   value={form.priority}
                   onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -259,13 +247,13 @@ export default function SupportPage() {
             <div className="flex gap-3 justify-end mt-6">
               <button
                 onClick={() => setShowCreate(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100"
+                className="px-4 py-2 border border-border rounded-lg hover:bg-muted text-foreground"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
               >
                 Create Ticket
               </button>

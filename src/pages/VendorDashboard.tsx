@@ -173,7 +173,7 @@ function qColor(q: number) {
 // ─── Shared UI Primitives ────────────────────────────────────────
 function SCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden ${className}`}>
+    <div className={`bg-card rounded-lg border border-border shadow-sm overflow-hidden ${className}`}>
       {children}
     </div>
   );
@@ -181,10 +181,10 @@ function SCard({ children, className = "" }: { children: React.ReactNode; classN
 
 function SHead({ title, link }: { title: string; link?: string }) {
   return (
-    <div className="flex justify-between items-center px-3 py-1.5 border-b border-gray-100">
-      <span className="text-[11px] font-semibold text-gray-700">{title}</span>
+    <div className="flex justify-between items-center px-3 py-1.5 border-b border-border">
+      <span className="text-[11px] font-semibold text-foreground">{title}</span>
       {link && (
-        <span className="text-[10px] text-blue-500 cursor-pointer hover:text-blue-600">
+        <span className="text-[10px] text-primary cursor-pointer hover:text-primary/80">
           {link} →
         </span>
       )}
@@ -218,8 +218,8 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen p-2 space-y-1.5"
-      style={{ backgroundColor: "#FFFFFF", fontFamily: "'Inter', sans-serif" }}
+      className="min-h-screen p-2 space-y-1.5 bg-background"
+      style={{ fontFamily: "'Inter', sans-serif" }}
     >
 
       {/* ═══ ROW 1: KPI Cards ═══════════════════════════════════════ */}
