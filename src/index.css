@@ -658,6 +658,24 @@
   background-color: hsl(var(--background));
 }
 
+/* Configuration page headings in dark mode */
+.dark h1,
+.dark h2,
+.dark h3 {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Ensure all text in tabs is visible */
+.dark [role="tab"],
+.dark [role="tablist"] button {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark [role="tab"][aria-selected="true"],
+.dark [role="tablist"] button[aria-selected="true"] {
+  color: hsl(var(--primary)) !important;
+}
+
 html,
 body,
 #root {

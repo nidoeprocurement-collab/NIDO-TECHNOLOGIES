@@ -69,8 +69,8 @@ const menuItems = [
 export default function Configuration() {
   return (
     <div className="min-h-screen bg-background p-2">
-      <div className=" ">
-        <h1 className="text-3xl font-bold text-foreground mb-8">
+      <div className="w-full">
+        <h1 className="text-4xl font-bold text-foreground mb-8 tracking-tight">
           Configuration
         </h1>
 
