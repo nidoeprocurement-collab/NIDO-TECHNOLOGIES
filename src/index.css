@@ -356,6 +356,80 @@
     pointer-events: none;
   }
 }
+/* ── Dark-mode global overrides ───────────────────────────────────────────────
+   Pages and components that use hardcoded Tailwind gray/white classes are
+   overridden here so every surface respects dark mode without requiring
+   individual file edits across the entire codebase.
+   These rules only fire when the .dark class is on <html>.
+────────────────────────────────────────────────────────────────────────────── */
+.dark .bg-white,
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark .bg-gray-200,
+.dark .bg-gray-300 {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.dark [class*="border-gray-"],
+.dark [class*="border-slate-"] {
+  border-color: hsl(var(--border)) !important;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-black {
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark .text-gray-700,
+.dark .text-gray-600 {
+  color: hsl(var(--foreground) / 0.85) !important;
+}
+
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover,
+.dark .hover\:bg-gray-200:hover {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.dark .hover\:text-gray-900:hover,
+.dark .hover\:text-gray-800:hover {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Cards / panels that use bg-white explicitly */
+.dark [class~="bg-white"] {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+}
+
+/* Inputs that use bg-white */
+.dark input.bg-white,
+.dark textarea.bg-white,
+.dark select.bg-white {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Placeholder text */
+.dark ::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 1;
+}
+
+/* min-h-screen pages */
+.dark .min-h-screen {
+  background-color: hsl(var(--background));
+}
+
 html,
 body,
 #root {
