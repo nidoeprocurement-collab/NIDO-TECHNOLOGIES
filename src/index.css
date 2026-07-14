@@ -602,6 +602,19 @@
   background-color: hsl(var(--muted)) !important;
 }
 
+/* Same treatment for the Tailwind "slate" palette, used interchangeably with
+   "gray" across pages (Payment Receipts, Services, Shop) — previously
+   unhandled, which is why those surfaces stayed white/light in dark mode. */
+.dark .bg-slate-50,
+.dark .bg-slate-100 {
+  background-color: hsl(var(--background)) !important;
+}
+
+.dark .bg-slate-200,
+.dark .bg-slate-300 {
+  background-color: hsl(var(--muted)) !important;
+}
+
 .dark [class*="border-gray-"],
 .dark [class*="border-slate-"] {
   border-color: hsl(var(--border)) !important;
@@ -609,29 +622,47 @@
 
 .dark .text-gray-900,
 .dark .text-gray-800,
-.dark .text-black {
+.dark .text-black,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-950 {
   color: hsl(var(--foreground)) !important;
 }
 
 .dark .text-gray-700,
-.dark .text-gray-600 {
+.dark .text-gray-600,
+.dark .text-slate-700,
+.dark .text-slate-600 {
   color: hsl(var(--foreground) / 0.85) !important;
 }
 
 .dark .text-gray-500,
-.dark .text-gray-400 {
+.dark .text-gray-400,
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-slate-200 {
   color: hsl(var(--muted-foreground)) !important;
 }
 
 .dark .hover\:bg-gray-50:hover,
 .dark .hover\:bg-gray-100:hover,
-.dark .hover\:bg-gray-200:hover {
+.dark .hover\:bg-gray-200:hover,
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-100:hover {
   background-color: hsl(var(--muted)) !important;
 }
 
 .dark .hover\:text-gray-900:hover,
 .dark .hover\:text-gray-800:hover {
   color: hsl(var(--foreground)) !important;
+}
+
+/* Very light accent tints (blue-50, etc.) used for "selected" states —
+   these read as near-white patches on a dark background, so darken them
+   into a translucent primary tint that still communicates "selected". */
+.dark .bg-blue-50,
+.dark .hover\:bg-blue-50:hover {
+  background-color: hsl(var(--primary) / 0.15) !important;
 }
 
 /* Cards / panels that use bg-white explicitly */
