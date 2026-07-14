@@ -104,6 +104,32 @@ const DEFAULTS: Record<string, Record<string, ModulePermissions>> = {
     users:NONE, roles:NONE, departments:NONE,
     audit_logs:NONE, notifications:VIEW, configuration:NONE,
   },
+  'Finance': {
+    dashboard:VIEW, shop:VIEW, services:VIEW, support:VIEW,
+    clients:VIEW, vendors:VIEW, orders:VIEW, reports:READ_EXP,
+    sales:CRUD_APR, purchases:CRUD_APR, expenses:CRUD_APR,
+    purchase_orders:CRUD_APR, bills:CRUD_APR, invoices:CRUD_APR,
+    contracts:VIEW, approvals:CRUD_APR, master_catalogue:VIEW,
+    users:NONE, roles:NONE, departments:NONE,
+    audit_logs:READ_EXP, notifications:VIEW, configuration:NONE,
+  },
+  'Operations Manager': {
+    dashboard:VIEW, shop:CRUD, services:CRUD, support:CRUD,
+    clients:{ view:true, create:true, edit:true }, vendors:{ view:true, create:true, edit:true },
+    orders:CRUD_APR, reports:READ_EXP, sales:VIEW, purchases:VIEW,
+    expenses:VIEW, purchase_orders:VIEW, bills:VIEW, invoices:VIEW,
+    contracts:{ view:true, create:true, edit:true }, approvals:CRUD_APR, master_catalogue:VIEW,
+    users:VIEW, roles:NONE, departments:VIEW,
+    audit_logs:NONE, notifications:VIEW, configuration:VIEW,
+  },
+  'Viewer': {
+    dashboard:VIEW, shop:VIEW, services:VIEW, support:VIEW,
+    clients:VIEW, vendors:VIEW, orders:VIEW, reports:VIEW,
+    sales:VIEW, purchases:VIEW, expenses:VIEW, purchase_orders:VIEW,
+    bills:VIEW, invoices:VIEW, contracts:VIEW, approvals:VIEW,
+    master_catalogue:VIEW, users:NONE, roles:NONE, departments:VIEW,
+    audit_logs:NONE, notifications:VIEW, configuration:NONE,
+  },
 };
 
 // ── Core functions ────────────────────────────────────────────────────────────

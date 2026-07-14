@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
+import PermissionGate from './PermissionGate';
 
 const COLLAPSE_STORAGE_KEY = 'nido:sidebar-collapsed';
 
@@ -45,7 +46,9 @@ export default function AppLayout() {
         <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
           <TopBar />
           <div className="p-2 sm:p-2 md:p-2 lg:p-2 w-full max-w-full min-w-0">
-            <Outlet />
+            <PermissionGate>
+              <Outlet />
+            </PermissionGate>
           </div>
         </main>
       </div>

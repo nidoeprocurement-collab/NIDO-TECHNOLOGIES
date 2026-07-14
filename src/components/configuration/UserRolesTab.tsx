@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
 import {
   Search, Plus, Download, Pencil, Trash2, FileText, Shield,
@@ -23,7 +24,17 @@ import {
 import { isSuperAdmin } from "@/lib/permissionsStore"
 
 export default function NidoUsersPage() {
-  const [activeTab, setActiveTab]               = useState("roles")
+  const [searchParams, setSearchParams]         = useSearchParams()
+  const initialTab = searchParams.get("tab") === "users" ? "users" : "roles"
+  const [activeTab, setActiveTabState]          = useState(initialTab)
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set("tab", tab)
+      return next
+    }, { replace: true })
+  }
   const [searchRole, setSearchRole]             = useState("")
   const [roles, setRoles]                       = useState<NidoRole[]>([])
   const [roleDialogOpen, setRoleDialogOpen]     = useState(false)
@@ -33,6 +44,11 @@ export default function NidoUsersPage() {
   const [, forceRefresh]                        = useState(0)
 
   const refreshRoles = () => { setRoles(getRoles()); forceRefresh(n => n + 1); }
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") === "users" ? "users" : "roles"
+    setActiveTabState(tab)
+  }, [searchParams])
 
   useEffect(() => {
     refreshRoles()

@@ -46,3 +46,19 @@ rather than hardcoding fonts, sizes, or hex colors.
 
 - Keep the existing project structure and dark-themed UI.
 - Follow STYLE_GUIDE.md (Inter/Poppins fonts, enterprise blue palette, 8pt spacing) for all UI work, now and in future.
+
+## RBAC / NIDO Users & Roles
+
+There is a single, canonical Users & Roles module at `/configuration/nido-users`
+(tabs: Roles / Users, e.g. `?tab=users`). Sidebar "Users" and "Roles" links, and
+the legacy `/users/management`, `/users/roles`, `/roles`, `/permissions` routes
+all point here — do not add a second Users or Roles page; extend this one.
+
+- `src/lib/nidoUsersStore.ts` — users/roles CRUD, auth, login history, lock/unlock.
+- `src/lib/permissionsStore.ts` — module × action permission matrix (`MODULES`,
+  `ACTIONS`, `hasPermission`), keyed by role name, Super Admin (`System Owner`)
+  bypasses all checks. Every built-in role must have a `DEFAULTS` entry here —
+  a role with no permissions record is denied everything (including dashboard).
+- `src/lib/routePermissions.ts` + `src/components/layout/PermissionGate.tsx` —
+  every admin route (not `/portal/*`) is checked against `hasPermission(moduleKey, 'view')`
+  before rendering; unauthorized access shows `AccessDeniedPage`.

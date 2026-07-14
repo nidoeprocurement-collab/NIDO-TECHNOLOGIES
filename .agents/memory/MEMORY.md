@@ -3,3 +3,4 @@
 - [Nido Tech design system](nido-design-system.md) — brand spec lives in STYLE_GUIDE.md; avoid duplicate Tailwind color keys, theme via CSS vars instead.
 - [Transaction page shell style](transactions-page-style.md) — canonical Orders-page-matching shell/card pattern for Transactions pages; avoid slate-*/dark: classes.
 - [Multi-tenant Client Portal Architecture](portal-multitenancy.md) — userType in AuthContext, portalUserStore (localStorage), ClientPortalRoute guard, /portal/* routes, provisioning flow.
+- [RBAC single source of truth](rbac-single-source-of-truth.md) — NIDO Users/Roles/Permissions must stay one module at /configuration/nido-users; route-level PermissionGate enforces module permissions per navigation.

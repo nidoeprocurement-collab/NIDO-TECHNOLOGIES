@@ -85,8 +85,8 @@ const adminNavigationItems: NavItem[] = [
     label: 'User Management',
     icon: <Users size={20} />,
     children: [
-      { label: 'Users',      icon: <Users size={16} />,      path: '/users/management', moduleKey: 'users' },
-      { label: 'Roles',      icon: <ShieldCheck size={16} />,path: '/roles',             moduleKey: 'roles' },
+      { label: 'Users',      icon: <Users size={16} />,      path: '/configuration/nido-users?tab=users', moduleKey: 'users' },
+      { label: 'Roles',      icon: <ShieldCheck size={16} />,path: '/configuration/nido-users?tab=roles', moduleKey: 'roles' },
       { label: 'Departments',icon: <Building2 size={16} />,  path: '/departments',       moduleKey: 'departments' },
       { label: 'Invitations',icon: <Mail size={16} />,       path: '/user-invitations',  moduleKey: 'users' },
       { label: 'Audit Trail',icon: <History size={16} />,    path: '/audit-logs',        moduleKey: 'audit_logs' },
@@ -130,9 +130,14 @@ function filterNavItems(
 }
 
 // ── Path helpers ───────────────────────────────────────────────────────────────
+/** Strip any query string so route matching only compares the pathname portion. */
+function basePath(path: string): string {
+  return path.split('?')[0];
+}
+
 function collectPaths(items: NavItem[], acc: string[] = []): string[] {
   for (const item of items) {
-    if (item.path) acc.push(item.path);
+    if (item.path) acc.push(basePath(item.path));
     if (item.children) collectPaths(item.children, acc);
   }
   return acc;
@@ -150,7 +155,7 @@ function findActivePath(pathname: string, items: NavItem[]): string | null {
 }
 
 function containsPath(item: NavItem, targetPath: string): boolean {
-  if (item.path === targetPath) return true;
+  if (item.path && basePath(item.path) === targetPath) return true;
   return !!item.children?.some(child => containsPath(child, targetPath));
 }
 
@@ -167,7 +172,7 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const hasChildren = item.children && item.children.length > 0;
   const isTopLevel = level === 0;
-  const isActive = !!item.path && item.path === activePath;
+  const isActive = !!item.path && basePath(item.path) === activePath;
   const hasActiveChild = !!hasChildren && !!activePath && item.children!.some(child => containsPath(child, activePath));
 
   if (hasChildren && isTopLevel && collapsed) {

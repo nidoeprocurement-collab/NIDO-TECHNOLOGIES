@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import {
   Search, Plus, Download, FileText, MoreHorizontal,
   Pencil, Trash2, Key, UserCheck, UserX, PauseCircle,
-  MailPlus, AlertTriangle
+  MailPlus, AlertTriangle, Lock, Unlock, History,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import AddEditUserDialog from "./AddEditUserDialog"
 import {
   type NidoUser, type NidoRole,
-  getUsers, getRoles, addUser, updateUser, deleteUser,
+  getUsers, getRoles, addUser, updateUser, deleteUser, unlockUser,
   exportUsersCsv, exportUsersPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
 } from "@/lib/nidoUsersStore"
@@ -78,6 +78,54 @@ function ResetPasswordDialog({
   );
 }
 
+// ── View Login History dialog ──────────────────────────────────────────────────
+function LoginHistoryDialog({
+  user, open, onOpenChange,
+}: { user: NidoUser | null; open: boolean; onOpenChange: (v: boolean) => void }) {
+  const history = [...(user?.loginHistory ?? [])].reverse();
+  const resultLabel: Record<string, string> = {
+    success: "Signed in",
+    invalid_password: "Failed — wrong password",
+    inactive: "Blocked — account disabled",
+    suspended: "Blocked — account suspended",
+    locked: "Blocked — account locked",
+  };
+  const resultCls: Record<string, string> = {
+    success: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    invalid_password: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+    inactive: "bg-muted text-muted-foreground",
+    suspended: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    locked: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><History size={18} /> Login History</DialogTitle>
+          <DialogDescription>Recent sign-in attempts for <strong>{user?.name}</strong>.</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-80 overflow-y-auto space-y-2">
+          {history.length === 0 && (
+            <p className="text-sm text-muted-foreground py-6 text-center">No login history recorded yet.</p>
+          )}
+          {history.map((h, idx) => (
+            <div key={idx} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
+              <span className="text-sm text-muted-foreground">{new Date(h.timestamp).toLocaleString()}</span>
+              <Badge className={resultCls[h.result] ?? "bg-muted text-muted-foreground"}>
+                {resultLabel[h.result] ?? h.result}
+              </Badge>
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Per-row actions dropdown ───────────────────────────────────────────────────
 function ActionsMenu({
   user,
@@ -86,6 +134,7 @@ function ActionsMenu({
 }: { user: NidoUser; onEdit: () => void; onRefresh: () => void }) {
   const [open, setOpen] = useState(false);
   const [resetPwOpen, setResetPwOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -116,6 +165,12 @@ function ActionsMenu({
     toast.success("Invitation sent", { description: `An invitation email has been sent to ${user.email}.` });
   };
 
+  const handleUnlock = () => {
+    unlockUser(user.id);
+    onRefresh();
+    toast.success("Account unlocked", { description: `${user.name} can now sign in again.` });
+  };
+
   const handleDelete = () => {
     if (!window.confirm(`Remove ${user.name} (${user.email})? This cannot be undone.`)) return;
     deleteUser(user.id);
@@ -140,7 +195,15 @@ function ActionsMenu({
             <button className={itemCls} onClick={() => { setResetPwOpen(true); setOpen(false); }}>
               <Key size={14} className="text-muted-foreground" /> Reset Password
             </button>
+            <button className={itemCls} onClick={() => { setHistoryOpen(true); setOpen(false); }}>
+              <History size={14} className="text-muted-foreground" /> View Login History
+            </button>
             <div className="my-1 border-t border-border" />
+            {user.locked && (
+              <button className={itemCls} onClick={() => act(handleUnlock)}>
+                <Unlock size={14} className="text-green-600" /> Unlock Account
+              </button>
+            )}
             {user.status !== "Active" && (
               <button className={itemCls} onClick={() => act(() => handleStatus("Active"))}>
                 <UserCheck size={14} className="text-green-600" /> Enable Account
@@ -172,6 +235,7 @@ function ActionsMenu({
       </div>
 
       <ResetPasswordDialog user={user} open={resetPwOpen} onOpenChange={setResetPwOpen} />
+      <LoginHistoryDialog user={user} open={historyOpen} onOpenChange={setHistoryOpen} />
     </>
   );
 }
@@ -266,6 +330,11 @@ export default function ManageUsersPanel() {
                     {user.forcePasswordChange && (
                       <span className="inline-flex items-center gap-1 text-xs text-amber-600 mt-0.5">
                         <AlertTriangle size={10} /> Password change required
+                      </span>
+                    )}
+                    {user.locked && (
+                      <span className="inline-flex items-center gap-1 text-xs text-red-600 mt-0.5">
+                        <Lock size={10} /> Locked
                       </span>
                     )}
                   </td>

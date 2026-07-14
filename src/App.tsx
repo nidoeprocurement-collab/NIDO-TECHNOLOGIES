@@ -154,7 +154,6 @@ const SLAOverview = lazy(() => import("@/pages/SLAOverview"));
 const MyOrderPage = lazy(() => import("@/pages/MyOrderPage"));
 const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
 const VendorOrderDetailPage = lazy(() => import("@/pages/VendorOrderDetailPage"));
-const PermissionsPage = lazy(() => import("./pages/PermissionsPage"));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
 const AuditTrailPage = lazy(() => import("@/pages/AuditTrailPage"));
 const OrderStatusesPage = lazy(() => import("@/pages/OrderStatusesPage"));
@@ -223,8 +222,6 @@ const BillsPage = lazy(() => import("@/pages/BillsPage"));
 const RecurringBillsPage = lazy(() => import("@/pages/RecurringBillsPage"));
 const PaymentsMadePage = lazy(() => import("@/pages/PaymentsMadePage"));
 const VendorCreditsPage = lazy(() => import("@/pages/VendorCreditsPage"));
-const EnhancedUsersPage = lazy(() => import("@/pages/EnhancedUsersPage"));
-const RoleTemplatesPage = lazy(() => import("@/pages/RoleTemplatesPage"));
 const DepartmentsPage = lazy(() => import("@/pages/DepartmentsPage"));
 const UserInvitationPage = lazy(() => import("@/pages/UserInvitationPage"));
 const AuditLogPage = lazy(() => import("@/pages/AuditLogPage"));
@@ -406,7 +403,7 @@ function AppRoutes() {
             }
           />
           <Route path="clients/contracts" element={<ClientsPage />} />
-          <Route path="permissions" element={<PermissionsPage />} />
+          <Route path="permissions" element={<Navigate to="/configuration/nido-users?tab=roles" replace />} />
           <Route
             path="users"
             element={
@@ -420,14 +417,7 @@ function AppRoutes() {
           />
           <Route
             path="users/management"
-            element={
-              <PageErrorBoundary
-                title="User Management failed to load"
-                resetKey={location.pathname}
-              >
-                <EnhancedUsersPage />
-              </PageErrorBoundary>
-            }
+            element={<Navigate to="/configuration/nido-users?tab=users" replace />}
           />
           <Route
             path="configuration/nido-users/users/:userId/profile"
@@ -442,14 +432,7 @@ function AppRoutes() {
           />
           <Route
             path="users/roles"
-            element={
-              <PageErrorBoundary
-                title="Roles failed to load"
-                resetKey={location.pathname}
-              >
-                <RoleTemplatesPage />
-              </PageErrorBoundary>
-            }
+            element={<Navigate to="/configuration/nido-users?tab=roles" replace />}
           />
           <Route
             path="users/departments"
@@ -842,7 +825,7 @@ function AppRoutes() {
           {/* Simplified sidebar routes */}
           <Route path="sla-overview" element={<SLAOverview />} />
           <Route path="vendors/dashboard" element={<VendorDashboard />} />
-          <Route path="roles" element={<RoleTemplatesPage />} />
+          <Route path="roles" element={<Navigate to="/configuration/nido-users?tab=roles" replace />} />
           <Route path="departments" element={<DepartmentsPage />} />
           <Route path="user-invitations" element={<UserInvitationPage />} />
           <Route path="audit-logs" element={<AuditLogPage />} />

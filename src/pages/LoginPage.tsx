@@ -49,6 +49,10 @@ export default function LoginPage() {
           setError('This account is suspended. Contact your administrator.');
           return;
         }
+        if (result.error === 'locked') {
+          setError('This account has been locked after too many failed sign-in attempts. Contact your administrator to unlock it.');
+          return;
+        }
         // invalid_credentials — fall through to try client portal
       }
 

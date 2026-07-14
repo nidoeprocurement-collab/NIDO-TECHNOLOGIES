@@ -15,6 +15,11 @@ export interface NidoRole {
   status: "Active" | "Inactive";
 }
 
+export interface LoginHistoryEntry {
+  timestamp: string;
+  result: "success" | "invalid_password" | "inactive" | "suspended" | "locked";
+}
+
 export interface NidoUser {
   id: string;
   employeeId: string;
@@ -31,7 +36,13 @@ export interface NidoUser {
   createdAt: string;
   updatedAt: string;
   forcePasswordChange?: boolean;
+  locked?: boolean;
+  failedLoginAttempts?: number;
+  loginHistory?: LoginHistoryEntry[];
 }
+
+/** Number of consecutive failed logins before an account is auto-locked. */
+export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
@@ -120,6 +131,9 @@ function migrateUser(raw: any): NidoUser {
     createdAt:           raw.createdAt           ?? NOW,
     updatedAt:           raw.updatedAt           ?? NOW,
     forcePasswordChange: raw.forcePasswordChange ?? false,
+    locked:              raw.locked              ?? false,
+    failedLoginAttempts: raw.failedLoginAttempts ?? 0,
+    loginHistory:        raw.loginHistory         ?? [],
   };
 }
 
@@ -232,20 +246,55 @@ export function deleteUser(id: string): void {
 export function authenticateNidoUser(
   email: string,
   password: string
-): { user: NidoUser; error?: never } | { user?: never; error: "invalid_credentials" | "inactive" | "suspended" } {
+): { user: NidoUser; error?: never } | { user?: never; error: "invalid_credentials" | "inactive" | "suspended" | "locked" } {
   const users = getUsers();
   const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
 
-  if (!user || user.password !== password) {
+  if (!user) {
     return { error: "invalid_credentials" };
   }
-  if (user.status === "Inactive") return { error: "inactive" };
-  if (user.status === "Suspended") return { error: "suspended" };
 
-  // Update last login timestamp
-  updateUser(user.id, { lastLogin: new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) });
+  const logAttempt = (result: LoginHistoryEntry["result"], extra?: Partial<NidoUser>) => {
+    const entry: LoginHistoryEntry = { timestamp: new Date().toISOString(), result };
+    const history = [...(user.loginHistory ?? []), entry].slice(-50); // keep last 50
+    updateUser(user.id, { loginHistory: history, ...extra });
+  };
 
-  return { user };
+  if (user.locked) {
+    logAttempt("locked");
+    return { error: "locked" };
+  }
+  if (user.status === "Inactive") {
+    logAttempt("inactive");
+    return { error: "inactive" };
+  }
+  if (user.status === "Suspended") {
+    logAttempt("suspended");
+    return { error: "suspended" };
+  }
+
+  if (user.password !== password) {
+    const attempts = (user.failedLoginAttempts ?? 0) + 1;
+    const shouldLock = attempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+    logAttempt("invalid_password", {
+      failedLoginAttempts: attempts,
+      locked: shouldLock,
+    });
+    return { error: shouldLock ? "locked" : "invalid_credentials" };
+  }
+
+  // Successful login — reset failed attempts, update last login timestamp, log history
+  logAttempt("success", {
+    failedLoginAttempts: 0,
+    lastLogin: new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }),
+  });
+
+  return { user: { ...user, failedLoginAttempts: 0 } };
+}
+
+/** Unlock a user account and reset their failed-login counter. */
+export function unlockUser(id: string): void {
+  updateUser(id, { locked: false, failedLoginAttempts: 0 });
 }
 
 // ── Export helpers ────────────────────────────────────────────────────────────
