@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
@@ -170,14 +171,21 @@ interface NavItemProps {
 function NavItemComponent({ item, level = 0, collapsed = false, activePath }: NavItemProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLDivElement>(null);
   const hasChildren = item.children && item.children.length > 0;
   const isTopLevel = level === 0;
   const isActive = !!item.path && basePath(item.path) === activePath;
   const hasActiveChild = !!hasChildren && !!activePath && item.children!.some(child => containsPath(child, activePath));
 
   if (hasChildren && isTopLevel && collapsed) {
+    const openFlyout = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) setFlyoutPos({ top: rect.top, left: rect.right + 8 });
+      setFlyoutOpen(true);
+    };
     return (
-      <div className="relative" onMouseEnter={() => setFlyoutOpen(true)} onMouseLeave={() => setFlyoutOpen(false)}>
+      <div ref={triggerRef} className="relative" onMouseEnter={openFlyout} onMouseLeave={() => setFlyoutOpen(false)}>
         <button
           className={`relative w-full flex items-center justify-center px-2 py-2.5 rounded-lg transition-all ${
             hasActiveChild ? 'text-primary bg-primary/10' : 'text-sidebar-foreground hover:bg-sidebar-accent'
@@ -187,13 +195,19 @@ function NavItemComponent({ item, level = 0, collapsed = false, activePath }: Na
           {item.icon}
           <ChevronRight size={10} className="absolute right-0.5 bottom-0.5 text-sidebar-foreground/50" />
         </button>
-        {flyoutOpen && (
-          <div className="absolute left-full top-0 ml-2 min-w-[220px] bg-background border border-border rounded-lg shadow-lg py-2 z-50">
+        {flyoutOpen && createPortal(
+          <div
+            className="fixed min-w-[220px] bg-background border border-border rounded-lg shadow-lg py-2 z-[100]"
+            style={{ top: flyoutPos.top, left: flyoutPos.left }}
+            onMouseEnter={openFlyout}
+            onMouseLeave={() => setFlyoutOpen(false)}
+          >
             <p className="px-3 pb-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{item.label}</p>
             {item.children!.map((child, idx) => (
               <NavItemComponent key={idx} item={child} level={1} activePath={activePath} />
             ))}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     );
