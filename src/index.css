@@ -68,6 +68,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 215 25% 8%;
     --foreground: 210 20% 90%;
     --card: 215 25% 12%;
@@ -680,12 +681,18 @@
 /* Comprehensive Dark Mode Overrides for Inline Styled Elements */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
-/* All white/light backgrounds in dark mode */
+/* All white/light backgrounds in dark mode.
+   NOTE: browsers normalize inline hex/named colors set via the React `style`
+   prop into `rgb(...)` when they serialize the element's style attribute, so
+   the hex-string selectors below never actually match in a live DOM. The
+   rgb()-based selectors are the ones doing the real work here — keep both. */
 .dark [style*="background: #ffffff"],
 .dark [style*="background: #fff"],
 .dark [style*="background: white"],
 .dark [style*="background:#ffffff"],
-.dark [style*="background:#fff"] {
+.dark [style*="background:#fff"],
+.dark [style*="background: rgb(255, 255, 255)"],
+.dark [style*="background-color: rgb(255, 255, 255)"] {
   background-color: hsl(var(--card)) !important;
   color: hsl(var(--foreground)) !important;
 }
@@ -696,7 +703,12 @@
 .dark [style*="color: #374151"],
 .dark [style*="color: #475569"],
 .dark [style*="color: #000000"],
-.dark [style*="color: #000"] {
+.dark [style*="color: #000"],
+.dark [style*="color: rgb(17, 24, 39)"],
+.dark [style*="color: rgb(31, 41, 55)"],
+.dark [style*="color: rgb(55, 65, 81)"],
+.dark [style*="color: rgb(71, 85, 105)"],
+.dark [style*="color: rgb(0, 0, 0)"] {
   color: hsl(var(--foreground)) !important;
 }
 
@@ -709,7 +721,16 @@
 .dark [style*="color: #f9fafb"],
 .dark [style*="color: #666666"],
 .dark [style*="color: #999999"],
-.dark [style*="color: #aaaaaa"] {
+.dark [style*="color: #aaaaaa"],
+.dark [style*="color: rgb(107, 114, 128)"],
+.dark [style*="color: rgb(156, 163, 175)"],
+.dark [style*="color: rgb(209, 213, 219)"],
+.dark [style*="color: rgb(229, 231, 235)"],
+.dark [style*="color: rgb(243, 244, 246)"],
+.dark [style*="color: rgb(249, 250, 251)"],
+.dark [style*="color: rgb(102, 102, 102)"],
+.dark [style*="color: rgb(153, 153, 153)"],
+.dark [style*="color: rgb(170, 170, 170)"] {
   color: hsl(var(--muted-foreground)) !important;
 }
 
@@ -720,7 +741,18 @@
 .dark [style*="background: #f5f5f5"],
 .dark [style*="background: #fafafa"],
 .dark [style*="background: #e5e7eb"],
-.dark [style*="background: #d1d5db"] {
+.dark [style*="background: #d1d5db"],
+.dark [style*="background: rgb(249, 250, 251)"],
+.dark [style*="background: rgb(243, 244, 246)"],
+.dark [style*="background: rgb(238, 238, 238)"],
+.dark [style*="background: rgb(245, 245, 245)"],
+.dark [style*="background: rgb(250, 250, 250)"],
+.dark [style*="background: rgb(229, 231, 235)"],
+.dark [style*="background: rgb(209, 213, 219)"],
+.dark [style*="background-color: rgb(249, 250, 251)"],
+.dark [style*="background-color: rgb(243, 244, 246)"],
+.dark [style*="background-color: rgb(250, 250, 250)"],
+.dark [style*="background-color: rgb(229, 231, 235)"] {
   background-color: hsl(var(--secondary)) !important;
   color: hsl(var(--foreground)) !important;
 }
@@ -808,5 +840,31 @@ body {
 }
 
 .enterprise-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark .enterprise-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(215 25% 30%);
+}
+
+.dark .enterprise-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(215 25% 40%);
+}
+
+/* Any scrollable area without an explicit scrollbar utility class still
+   gets a dark-mode-appropriate scrollbar (Firefox + Chromium/WebKit). */
+.dark {
+  scrollbar-color: hsl(215 25% 30%) transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background-color: hsl(215 25% 30%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(215 25% 40%);
+}
+
+.dark ::-webkit-scrollbar-track {
   background: transparent;
 }
