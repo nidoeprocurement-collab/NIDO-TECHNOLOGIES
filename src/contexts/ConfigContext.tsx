@@ -27,6 +27,12 @@ interface ConfigContextType {
   ) => void;
   /** Persist current in-memory state to localStorage and notify the whole app. */
   saveSettings: () => void;
+  /**
+   * Atomically commit a complete settings snapshot — sets both in-memory config
+   * and the persisted baseline in one shot.  Used by GeneralSettingsTab so that
+   * draft changes are only published when the user explicitly clicks Save.
+   */
+  commitSettings: (newConfig: GeneralSettings) => void;
   /** True when in-memory config differs from what is persisted. */
   isDirty: boolean;
 }
@@ -65,10 +71,16 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     setSavedConfig(config);
   }, [config]);
 
+  const commitSettings = useCallback((newConfig: GeneralSettings) => {
+    setConfig(newConfig);
+    setSavedConfig(newConfig);
+    saveConfig(newConfig);
+  }, []);
+
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
 
   return (
-    <ConfigContext.Provider value={{ config, updateSection, saveSettings, isDirty }}>
+    <ConfigContext.Provider value={{ config, updateSection, saveSettings, commitSettings, isDirty }}>
       {children}
     </ConfigContext.Provider>
   );

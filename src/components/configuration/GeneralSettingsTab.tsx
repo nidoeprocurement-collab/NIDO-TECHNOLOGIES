@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Eye, Save, Upload, AlertCircle } from "lucide-react"
+import { Eye, Save, Upload, AlertCircle, RotateCcw } from "lucide-react"
 import { useConfig } from "@/contexts/ConfigContext"
 import type { GeneralSettings } from "@/lib/configService"
 
@@ -40,19 +40,38 @@ function ToggleRow({
 }
 
 export default function GeneralSettingsPage() {
-  const { config, updateSection, saveSettings, isDirty } = useConfig()
+  // `config` is the last-saved (committed) snapshot — what the rest of the
+  // app sees.  `draft` is the local working copy shown in this form only.
+  // Nothing propagates app-wide until the user clicks Save Changes.
+  const { config, commitSettings } = useConfig()
+
+  const [draft, setDraft] = useState<GeneralSettings>(() => config)
+
+  // Keep draft in sync when config changes from outside (e.g. cross-tab save).
+  useEffect(() => {
+    setDraft(config)
+  }, [config])
 
   useEffect(() => {
-    document.title = "General Settings — " + config.organization.displayName
-  }, [config.organization.displayName])
+    document.title = "General Settings — " + draft.organization.displayName
+  }, [draft.organization.displayName])
 
+  // Patch a section in the local draft only — nothing touches the real config.
   const update = <K extends keyof GeneralSettings>(section: K, patch: Partial<GeneralSettings[K]>) => {
-    updateSection(section, patch)
+    setDraft(prev => ({ ...prev, [section]: { ...prev[section], ...patch } }))
   }
 
+  // True when the local draft differs from what is saved.
+  const isDirty = JSON.stringify(draft) !== JSON.stringify(config)
+
   const handleSave = () => {
-    saveSettings()
+    commitSettings(draft)
     toast.success("Settings saved", { description: "Changes applied across the entire platform." })
+  }
+
+  const handleDiscard = () => {
+    setDraft(config)
+    toast.message("Changes discarded", { description: "Settings reverted to last saved values." })
   }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +86,7 @@ export default function GeneralSettingsPage() {
     reader.readAsDataURL(file)
   }
 
-  const { organization: org, theme, localization, procurement, notifications, security } = config
+  const { organization: org, theme, localization, procurement, notifications, security } = draft
 
   return (
     <div className="space-y-6 p-6">
@@ -79,7 +98,7 @@ export default function GeneralSettingsPage() {
             Global configuration engine — changes apply across the entire platform in real time.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {isDirty && (
             <div className="flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5">
               <AlertCircle size={14} />
@@ -90,7 +109,13 @@ export default function GeneralSettingsPage() {
             <Eye className="mr-2 h-4 w-4" />
             View Company Profile
           </Button>
-          <Button onClick={handleSave}>
+          {isDirty && (
+            <Button variant="outline" onClick={handleDiscard}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Discard
+            </Button>
+          )}
+          <Button onClick={handleSave} disabled={!isDirty}>
             <Save className="mr-2 h-4 w-4" />
             Save Changes
           </Button>
