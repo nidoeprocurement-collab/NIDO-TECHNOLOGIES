@@ -16,7 +16,7 @@ const SERVICE_CARDS = [
       "Create AMC requests with mandatory client, category, duration, and authorization details.",
     icon: Wrench,
     href: "/services/amc/new",
-    tone: "from-blue-50 to-cyan-50 border-blue-200",
+    tone: "from-blue-50 to-cyan-50 border-blue-200 dark:from-blue-950/40 dark:to-cyan-950/40 dark:border-blue-900/50",
     badge: "Primary workflow",
   },
   {
@@ -25,7 +25,7 @@ const SERVICE_CARDS = [
       "Capture equipment recycling and disposal requests in a guided service flow.",
     icon: Recycle,
     href: "/support",
-    tone: "from-emerald-50 to-teal-50 border-emerald-200",
+    tone: "from-emerald-50 to-teal-50 border-emerald-200 dark:from-emerald-950/40 dark:to-teal-950/40 dark:border-emerald-900/50",
     badge: "Service desk",
   },
   {
@@ -34,7 +34,7 @@ const SERVICE_CARDS = [
       "Raise supporting service tickets, track progress, and keep stakeholders aligned.",
     icon: ClipboardList,
     href: "/support",
-    tone: "from-slate-50 to-white border-slate-200",
+    tone: "from-slate-50 to-white border-slate-200 dark:from-slate-800/40 dark:to-slate-900/40 dark:border-slate-700",
     badge: "Ticketing",
   },
 ];
@@ -93,22 +93,22 @@ export default function ServicesPage() {
               className={`overflow-hidden border bg-gradient-to-br ${card.tone} rounded-lg shadow-sm p-2 space-y-4`}
             >
               <div className="flex items-start justify-between gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-slate-900 shadow-sm">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-slate-900 shadow-sm dark:bg-slate-900/60 dark:text-slate-100">
                   <Icon className="h-6 w-6" />
                 </div>
-                <div className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
+                <div className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                   {card.badge}
                 </div>
               </div>
               <div className="space-y-2">
-                <h2 className="text-xl font-semibold">{card.title}</h2>
+                <h2 className="text-xl font-semibold dark:text-slate-100">{card.title}</h2>
                 <p className="text-sm leading-6 text-slate-600">
                   {card.description}
                 </p>
               </div>
               <button
                 onClick={() => navigate(card.href)}
-                className="gap-2 rounded-full px-2 py-2 text-sm font-medium flex items-center border border-slate-300 hover:bg-white/50"
+                className="gap-2 rounded-full px-2 py-2 text-sm font-medium flex items-center border border-slate-300 hover:bg-white/50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800/50"
               >
                 Open <ArrowRight className="h-4 w-4" />
               </button>
