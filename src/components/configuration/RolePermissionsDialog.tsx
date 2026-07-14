@@ -96,7 +96,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none sm:rounded-none overflow-hidden flex flex-col p-6">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
