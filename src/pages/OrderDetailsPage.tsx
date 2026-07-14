@@ -10,9 +10,9 @@ import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
   { id: "VA", name: "Vendor A", location: "Bengaluru, Karnataka", color: "#e6a817", rating: 4.6, deliveryDays: "3 - 4 Days", pricePerUnit: 120, gstin: "29ABCDE1234F1Z5", onTimeDelivery: "95%", qualityRating: "4.5 / 5", totalOrders: 152 },
-  { id: "VB", name: "Vendor B", location: "Mumbai, Maharashtra",  color: "#2b6cb0", rating: 4.2, deliveryDays: "5 - 6 Days", pricePerUnit: 115, gstin: "27BCDFE5678G2Z1", onTimeDelivery: "89%", qualityRating: "4.2 / 5", totalOrders: 98  },
-  { id: "VC", name: "Vendor C", location: "Pune, Maharashtra",    color: "#276749", rating: 4.0, deliveryDays: "2 - 3 Days", pricePerUnit: 125, gstin: "27CDEFG9012H3Z4", onTimeDelivery: "82%", qualityRating: "4.0 / 5", totalOrders: 74  },
-  { id: "VD", name: "Vendor D", location: "Delhi, NCR",           color: "#6b21a8", rating: 3.8, deliveryDays: "4 - 5 Days", pricePerUnit: 110, gstin: "07DEFGH3456I4Z7", onTimeDelivery: "78%", qualityRating: "3.8 / 5", totalOrders: 61  },
+  { id: "VB", name: "Vendor B", location: "Mumbai, Maharashtra", color: "#2b6cb0", rating: 4.2, deliveryDays: "5 - 6 Days", pricePerUnit: 115, gstin: "27BCDFE5678G2Z1", onTimeDelivery: "89%", qualityRating: "4.2 / 5", totalOrders: 98 },
+  { id: "VC", name: "Vendor C", location: "Pune, Maharashtra", color: "#276749", rating: 4.0, deliveryDays: "2 - 3 Days", pricePerUnit: 125, gstin: "27CDEFG9012H3Z4", onTimeDelivery: "82%", qualityRating: "4.0 / 5", totalOrders: 74 },
+  { id: "VD", name: "Vendor D", location: "Delhi, NCR", color: "#6b21a8", rating: 3.8, deliveryDays: "4 - 5 Days", pricePerUnit: 110, gstin: "07DEFGH3456I4Z7", onTimeDelivery: "78%", qualityRating: "3.8 / 5", totalOrders: 61 },
 ];
 
 
@@ -21,21 +21,21 @@ const INITIAL_DOCS: { id: string; name: string; ext: string; size: string; type:
 const INITIAL_NOTES: { id: string; author: string; date: string; text: string; visibility: string }[] = [];
 
 const ALL_STATUS_MAP = {
-  Pending:             { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
-  Confirmed:           { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
-  Processing:          { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
-  Shipped:             { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
-  Delivered:           { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Pending: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
+  Confirmed: { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Processing: { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
+  Shipped: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  Delivered: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   "Partially Shipped": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
-  "Partially Delivered":{ bg: "#ecfdf5",color: "#065f46", border: "#6ee7b7" },
+  "Partially Delivered": { bg: "#ecfdf5", color: "#065f46", border: "#6ee7b7" },
 };
 
 const DOC_ICON = {
-  pdf:  { bg: "#fee2e2", color: "#dc2626", label: "PDF" },
+  pdf: { bg: "#fee2e2", color: "#dc2626", label: "PDF" },
   xlsx: { bg: "#d1fae5", color: "#059669", label: "XLS" },
   docx: { bg: "#dbeafe", color: "#2563eb", label: "DOC" },
-  png:  { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
-  jpg:  { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
+  png: { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
+  jpg: { bg: "#fef9c3", color: "#ca8a04", label: "IMG" },
 };
 const getDocIcon = ext => DOC_ICON[ext?.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280", label: ext?.toUpperCase() || "FILE" };
 
@@ -92,10 +92,10 @@ function Overlay({ children, onClose }) {
 }
 function ModalBox({ title, onClose, children, width = 440 }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 12, width, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
-        <span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span>
-        <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+    <div style={{ background: "hsl(var(--card))", borderRadius: 12, width, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid hsl(var(--border))" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "hsl(var(--foreground))" }}>{title}</span>
+        <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "hsl(var(--muted-foreground))" }}>×</button>
       </div>
       {children}
     </div>
@@ -104,8 +104,8 @@ function ModalBox({ title, onClose, children, width = 440 }) {
 function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
   return (
     <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
-      <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
-      <button onClick={onSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>{saveLabel}</button>
+      <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
+      <button onClick={onSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>{saveLabel}</button>
     </div>
   );
 }
@@ -131,33 +131,33 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     if (!picked) return;
     const v = getVendorById(picked.vendorId);
     onSelect(sub.id, picked.vendorId, {
-      vendorId:     picked.vendorId,
-      vendorName:   picked.vendorName,
-      unitPrice:    picked.landedCostPerUnit,
-      location:     v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : picked.vendorId,
-      gstin:        v?.taxId || v?.pan || "",
-      contact:      v?.primaryContact || "",
-      email:        v?.email || "",
-      phone:        v?.phone || "",
+      vendorId: picked.vendorId,
+      vendorName: picked.vendorName,
+      unitPrice: picked.landedCostPerUnit,
+      location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : picked.vendorId,
+      gstin: v?.taxId || v?.pan || "",
+      contact: v?.primaryContact || "",
+      email: v?.email || "",
+      phone: v?.phone || "",
       addressLine1: v?.addressLine1 || v?.address || "",
       addressLine2: v?.addressLine2 || "",
-      city:         v?.city || "",
-      state:        v?.state || "",
-      pincode:      v?.zipCode || "",
+      city: v?.city || "",
+      state: v?.state || "",
+      pincode: v?.zipCode || "",
     });
     onClose();
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 920, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "hsl(var(--card))", borderRadius: 14, width: 920, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #e5e7eb" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid hsl(var(--border))" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Vendor Selection — {sub.id} ({sub.itemName})</div>
-            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by score</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: "hsl(var(--foreground))" }}>Vendor Selection — {sub.id} ({sub.itemName})</div>
+            <div style={{ fontSize: 12.5, color: "hsl(var(--muted-foreground))", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by score</div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "hsl(var(--muted-foreground))", lineHeight: 1 }}>×</button>
         </div>
 
         {/* Req info */}
@@ -177,7 +177,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
             </div>
           ) : (
             <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "36px 30px 1fr 120px 120px 140px 120px 110px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "28px 24px 1fr 80px 70px 100px 90px 90px", gap: "1px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
                 {["", "#", "Vendor", "Score", "Rating", "Lead Time", "Unit Cost", "Total Cost"].map(h => <div key={h}>{h}</div>)}
               </div>
               {comparisons.map((c, i) => {
@@ -188,7 +188,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                   <div
                     key={c.vendorId}
                     onClick={() => setPickedId(c.vendorId)}
-                    style={{ display: "grid", gridTemplateColumns: "36px 30px 1fr 120px 120px 140px 120px 110px", padding: "13px 16px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#eff6ff" : "#fff", cursor: "pointer" }}
+                    style={{ display: "grid", gridTemplateColumns: "28px 24px 1fr 80px 70px 100px 90px 90px", gap: "1px", padding: "12px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#eff6ff" : "#fff", cursor: "pointer" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isSel ? "#2563eb" : "#d1d5db"}`, background: isSel ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -267,7 +267,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
       <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Click "Select Vendor" to open the Price Engine recommendation dialog and pick from top-4 vendors.</div>
 
       <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "25px 70px 1fr 38px 55px 90px 65px", gap: "2px", padding: "8px 10px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 10, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
           {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "SELECTED VENDOR", "ACTION"].map(h => <div key={h}>{h}</div>)}
         </div>
 
@@ -275,9 +275,9 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const meta = selectedVendorMeta[sub.id];
           const hasVendor = !!meta || !!selectedVendors[sub.id];
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
-          const displayLoc  = meta?.location || "";
+          const displayLoc = meta?.location || "";
           return (
-            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "16px 20px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "25px 70px 1fr 38px 55px 90px 65px", gap: "2px", padding: "10px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13 }}>{sub.num}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{sub.id}</div>
@@ -339,11 +339,11 @@ function ViewItemsModal({ group, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
         <div style={{ overflow: "auto", flex: 1 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "36px 120px 1fr 70px 130px 130px", padding: "10px 22px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "30px 100px 1fr 50px 110px 110px", gap: "2px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
             {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL"].map(h => <div key={h}>{h}</div>)}
           </div>
           {group.subOrders.map((sub, idx) => (
-            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 120px 1fr 70px 130px 130px", padding: "15px 22px", alignItems: "start", borderBottom: idx < group.subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "30px 100px 1fr 50px 110px 110px", gap: "2px", padding: "12px 16px", alignItems: "start", borderBottom: idx < group.subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
@@ -384,28 +384,28 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
     if (!vid || createdPOs[sub.id]) continue;
     const meta = selectedVendorMeta[sub.id];
     const vendorName = meta?.vendorName || vid;
-    const location   = meta?.location || "";
-    const unitPrice  = meta?.unitPrice || 0;
+    const location = meta?.location || "";
+    const unitPrice = meta?.unitPrice || 0;
     if (!pendingMap[vid]) pendingMap[vid] = { vendorId: vid, vendorName, location, unitPrice, subOrders: [] };
     pendingMap[vid].subOrders.push(sub);
   }
   const pendingGroups = Object.values(pendingMap);
   const pendingItems = pendingGroups.reduce((a, g) => a + g.subOrders.length, 0);
-  const pendingQty   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + o.qty, 0), 0);
-  const pendingAmt   = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + g.unitPrice * o.qty, 0), 0);
+  const pendingQty = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + o.qty, 0), 0);
+  const pendingAmt = pendingGroups.reduce((a, g) => a + g.subOrders.reduce((s, o) => s + g.unitPrice * o.qty, 0), 0);
 
   // --- Created POs ---
-  const poList  = Object.values(createdPOs) as any[];
-  const hasPOs  = poList.length > 0;
+  const poList = Object.values(createdPOs) as any[];
+  const hasPOs = poList.length > 0;
   const poTotal = poList.reduce((a, p) => a + p.total, 0);
   const poCreatedAt = hasPOs
     ? new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) +
-      " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+    " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
     : "";
 
   const nothingAtAll = !hasPOs && pendingGroups.length === 0;
 
-  const COL_PO  = "160px 180px 1fr 80px 140px 110px 90px";
+  const COL_PO = "160px 180px 1fr 80px 140px 110px 90px";
   const COL_PND = "200px 100px 1fr 130px 160px 100px";
 
   return (
@@ -441,7 +441,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
           <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 10 }}>Created Purchase Orders</div>
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: COL_PO, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-              {["PO NUMBER","VENDOR","ITEM","QTY","AMOUNT (INR)","STATUS","ACTION"].map(h => <div key={h}>{h}</div>)}
+              {["PO NUMBER", "VENDOR", "ITEM", "QTY", "AMOUNT (INR)", "STATUS", "ACTION"].map(h => <div key={h}>{h}</div>)}
             </div>
             {poList.map((po, i) => {
               return (
@@ -511,7 +511,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
 
           <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "11px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>
-              {["Vendor","Items Count","Sub Orders","Total Quantity","Total Amount (INR)","Action"].map(h => <div key={h}>{h}</div>)}
+              {["Vendor", "Items Count", "Sub Orders", "Total Quantity", "Total Amount (INR)", "Action"].map(h => <div key={h}>{h}</div>)}
             </div>
             {pendingGroups.map((g, i) => {
               const vQty = g.subOrders.reduce((a, s) => a + s.qty, 0);
@@ -624,7 +624,7 @@ function UploadDocModal({ onSave, onClose }) {
             <label style={lbSt}>Document Type</label>
             <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={{ ...inSt, appearance: "none" }}>
               <option value="">Select type</option>
-              {["Purchase Order","Quotation","Invoice","Contract","Shipping Document","Other"].map(t => <option key={t}>{t}</option>)}
+              {["Purchase Order", "Quotation", "Invoice", "Contract", "Shipping Document", "Other"].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: 6 }}>
@@ -633,8 +633,8 @@ function UploadDocModal({ onSave, onClose }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "0 22px 20px" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
-          <button onClick={handleSave} disabled={!file} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: file ? "#2563eb" : "#93c5fd", color: "#fff", cursor: file ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
+          <button onClick={handleSave} disabled={!file} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: file ? "hsl(var(--primary))" : "hsl(var(--primary)/0.5)", color: "hsl(var(--primary-foreground))", cursor: file ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
         </div>
       </div>
     </div>
@@ -764,13 +764,13 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
           </div>
         </div>
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 130px 160px 140px 1fr 48px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
-            {["DOCUMENT NAME","TYPE","UPLOADED BY","UPLOADED ON","DESCRIPTION","ACTIONS"].map(h => <div key={h}>{h}</div>)}
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 40px", gap: "2px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+            {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "DESCRIPTION", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
           </div>
           {filteredDocs.length === 0 ? (
             <div style={{ padding: "32px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13.5 }}>No documents found.</div>
           ) : filteredDocs.map((doc, i) => (
-            <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "2fr 130px 160px 140px 1fr 48px", padding: "14px 16px", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 40px", gap: "2px", padding: "12px", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <DocTypeIcon ext={doc.ext} />
                 <div>
@@ -872,7 +872,7 @@ function EditAssignmentModal({ data, onSave, onClose }) {
     <Overlay onClose={onClose}>
       <ModalBox title="Edit Assignment" onClose={onClose}>
         <div style={{ padding: "20px 22px 8px" }}>
-          {[["assignedTo","Assigned To"],["role","Role"],["assignedOn","Assigned On"]].map(([k, label]) => (
+          {[["assignedTo", "Assigned To"], ["role", "Role"], ["assignedOn", "Assigned On"]].map(([k, label]) => (
             <div key={k} style={{ marginBottom: 14 }}>
               <label style={lbSt}>{label}</label>
               <input value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} style={inSt} />
@@ -895,7 +895,7 @@ function AddTrackingModal({ current, onSave, onClose }) {
     <Overlay onClose={onClose}>
       <ModalBox title={current ? "Update Tracking Info" : "Add Tracking Info"} onClose={onClose}>
         <div style={{ padding: "20px 22px 8px" }}>
-          {[["trackingNumber","Tracking Number","e.g. 1Z999AA1234567890"],["note","Tracking Note","e.g. Shipped on Apr 17, 2026"],["linkLabel","Link Label","e.g. Track Package"]].map(([k, label, ph]) => (
+          {[["trackingNumber", "Tracking Number", "e.g. 1Z999AA1234567890"], ["note", "Tracking Note", "e.g. Shipped on Apr 17, 2026"], ["linkLabel", "Link Label", "e.g. Track Package"]].map(([k, label, ph]) => (
             <div key={k} style={{ marginBottom: 14 }}>
               <label style={lbSt}>{label}</label>
               <input value={form[k]} onChange={e => setForm({ ...form, [k]: e.target.value })} placeholder={ph} style={inSt} />
@@ -905,7 +905,7 @@ function AddTrackingModal({ current, onSave, onClose }) {
             <label style={lbSt}>Carrier</label>
             <select value={form.carrier} onChange={e => setForm({ ...form, carrier: e.target.value })} style={{ ...inSt, appearance: "none" }}>
               <option value="">Select carrier</option>
-              {["UPS","FedEx","DHL","USPS","BlueDart","Delhivery","Other"].map(c => <option key={c}>{c}</option>)}
+              {["UPS", "FedEx", "DHL", "USPS", "BlueDart", "Delhivery", "Other"].map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -956,7 +956,7 @@ function RaiseReturnModal({ itemName, onClose }) {
             <label style={lbSt}>Reason for Return</label>
             <select value={reason} onChange={e => setReason(e.target.value)} style={{ ...inSt, appearance: "none" }}>
               <option value="">Select a reason</option>
-              {["Damaged / Defective","Wrong Item Received","Item Not as Described","Changed Mind","Quantity Mismatch","Other"].map(r => <option key={r}>{r}</option>)}
+              {["Damaged / Defective", "Wrong Item Received", "Item Not as Described", "Changed Mind", "Quantity Mismatch", "Other"].map(r => <option key={r}>{r}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: 14 }}>
@@ -980,7 +980,7 @@ function CancelOrderStatusModal({ onConfirm, onClose }) {
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b" }}>⚠️ Once cancelled, this order cannot be edited, its status cannot be changed, and it cannot be processed further.</div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Order</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Order</button>
           <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Yes, Cancel Order</button>
         </div>
       </ModalBox>
@@ -997,7 +997,7 @@ function CancelItemModal({ itemName, onConfirm, onClose }) {
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b" }}>⚠️ Cancelling this item will notify the vendor and update the order status.</div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Item</button>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Item</button>
           <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Yes, Cancel Item</button>
         </div>
       </ModalBox>
@@ -1045,7 +1045,7 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, refe
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-  const statuses = ["Pending","Confirmed","Processing","Shipped","Delivered"];
+  const statuses = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered"];
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button onClick={e => { e.stopPropagation(); setOpen(v => !v); setStatusSub(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
@@ -1222,8 +1222,8 @@ export default function MyOrderPage() {
       assignedOn: `${order.orderDate} ${order.orderTime}`,
       notes: "Oversees end-to-end execution and vendor coordination for this order.",
     });
-  // Run whenever orderId changes (navigation between orders) or order first resolves
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Run whenever orderId changes (navigation between orders) or order first resolves
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, order?.id]);
 
   useEffect(() => {
@@ -1325,21 +1325,21 @@ export default function MyOrderPage() {
         const lineSubtotal = unitPrice * sub.qty;
         return {
           subOrderId: sub.id,
-          item:       sub.itemName,
-          sku:        sub.sku,
-          category:   sub.category,
-          hsnCode:    "",
-          specs:      sub.specs,
+          item: sub.itemName,
+          sku: sub.sku,
+          category: sub.category,
+          hsnCode: "",
+          specs: sub.specs,
           referenceNumber: sub.referenceNumber || "",
-          qty:        sub.qty,
+          qty: sub.qty,
           unitPrice,
           lineSubtotal,
         };
       });
 
-      const subtotal  = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-      const sgstAmt   = Math.round(subtotal * sgstPct) / 100;
-      const cgstAmt   = Math.round(subtotal * cgstPct) / 100;
+      const subtotal = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
+      const sgstAmt = Math.round(subtotal * sgstPct) / 100;
+      const cgstAmt = Math.round(subtotal * cgstPct) / 100;
       const grandTotal = subtotal + sgstAmt + cgstAmt;
 
       // Primary item (first) used for single-item compat fields
@@ -1349,29 +1349,29 @@ export default function MyOrderPage() {
       const po: StoredPO = {
         poNumber,
         orderId,
-        subOrderId:   primarySub.id,
-        subOrderIds:  subs.map(s => s.id),
-        items:        lineItems,
+        subOrderId: primarySub.id,
+        subOrderIds: subs.map(s => s.id),
+        items: lineItems,
         vendorId,
-        vendorName:        meta.vendorName,
-        vendorContact:     meta.contact,
-        vendorEmail:       meta.email,
-        vendorPhone:       meta.phone,
-        vendorGstin:       meta.gstin,
-        vendorAddress:     [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
+        vendorName: meta.vendorName,
+        vendorContact: meta.contact,
+        vendorEmail: meta.email,
+        vendorPhone: meta.phone,
+        vendorGstin: meta.gstin,
+        vendorAddress: [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
         vendorAddressLine1: meta.addressLine1,
         vendorAddressLine2: meta.addressLine2,
-        vendorCity:        meta.city,
-        vendorState:       meta.state,
-        vendorPincode:     meta.pincode,
+        vendorCity: meta.city,
+        vendorState: meta.state,
+        vendorPincode: meta.pincode,
         // Single-item compat fields — populated from the first line item
-        item:      primarySub.itemName,
-        sku:       primarySub.sku,
-        category:  primarySub.category,
-        hsnCode:   "",
-        specs:     primarySub.specs,
+        item: primarySub.itemName,
+        sku: primarySub.sku,
+        category: primarySub.category,
+        hsnCode: "",
+        specs: primarySub.specs,
         referenceNumber: primarySub.referenceNumber || "",
-        qty:       primaryLine.qty,
+        qty: primaryLine.qty,
         unitPrice: primaryLine.unitPrice,
         subtotal,
         sgstPct,
@@ -1379,10 +1379,10 @@ export default function MyOrderPage() {
         sgstAmt,
         cgstAmt,
         grandTotal,
-        paymentTerms:      "Net 30",
-        status:            "Processing",
-        createdOn:         now.toISOString(),
-        createdOnDisplay:  displayDate,
+        paymentTerms: "Net 30",
+        status: "Processing",
+        createdOn: now.toISOString(),
+        createdOnDisplay: displayDate,
         requestedDelivery: primarySub.requiredDate,
         documents: [],
         notes: [],
@@ -1392,13 +1392,13 @@ export default function MyOrderPage() {
       try {
         const dataUri = getPODataUri(po);
         po.documents = [{
-          id:         `doc-${poNumber}-pdf`,
-          name:       `${poNumber}.pdf`,
-          ext:        "pdf",
-          type:       "Purchase Order",
+          id: `doc-${poNumber}-pdf`,
+          name: `${poNumber}.pdf`,
+          ext: "pdf",
+          type: "Purchase Order",
           uploadedBy: "System",
           uploadedOn: displayDate,
-          dataUrl:    dataUri,
+          dataUrl: dataUri,
         }];
         downloadPOPdf(po);
       } catch (e) {
@@ -1414,10 +1414,10 @@ export default function MyOrderPage() {
           vendorId,
           vendorName: meta.vendorName,
           poNumber,
-          item:       sub.itemName,
-          qty:        sub.qty,
-          unitPrice:  lineItem.unitPrice,
-          total:      grandTotal,
+          item: sub.itemName,
+          qty: sub.qty,
+          unitPrice: lineItem.unitPrice,
+          total: grandTotal,
           subOrderId: sub.id,
         };
       }
@@ -1441,8 +1441,8 @@ export default function MyOrderPage() {
   // Client portal: no PO number or vendor-selection columns — it's a
   // read-only, vendor-agnostic view of the sub-orders.
   const subOrdersColumns = isClientPortalUser
-    ? ["#","SUB ORDER ID","ITEM DETAILS","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","ACTIONS"]
-    : ["#","SUB ORDER ID","ITEM DETAILS","PO NUMBER","QTY","UNIT PRICE","TOTAL","ITEM STATUS","TRACKING INFO","SELECT VENDOR","ACTIONS"];
+    ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
+    : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "SELECT VENDOR", "ACTIONS"];
   // Explicit min widths (via minmax) on every column plus a real column gap
   // prevent long values (prices, badges, buttons) from visually overlapping
   // into the neighboring column — a plain "1fr"/px template with no gap lets
@@ -1455,7 +1455,7 @@ export default function MyOrderPage() {
   // monitors) while still guaranteeing a readable minimum per column.
   const subOrdersColTemplate = isClientPortalUser
     ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
-    : "36px 130px minmax(220px,2fr) minmax(110px,1fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) minmax(130px,1fr) 44px";
+    : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) 100px";
   const subOrdersColGap = 6;
   // Sum of the column minimums above (plus gaps) — the smallest width the
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
@@ -1524,7 +1524,7 @@ export default function MyOrderPage() {
             ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
             ["Total Amount", order?.totalAmount || "—"],
             ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
-          ].map(([l,v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
+          ].map(([l, v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
         </div>
 
         {/* Stepper + Assignment */}
@@ -1543,10 +1543,10 @@ export default function MyOrderPage() {
                   <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This order is cancelled and can no longer be updated.</span>
                 ) : (
                   <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid #2563eb", borderRadius: 8, background: "#fff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
+                    <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid hsl(var(--primary))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--primary))", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
                     {showStatusDd && (
                       <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                        {["Processing","Partially Shipped","Partially Delivered","Delivered","Cancelled","Draft"].map(opt => (
+                        {["Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft"].map(opt => (
                           <button key={opt} onClick={() => {
                             setShowStatusDd(false);
                             if (opt === "Cancelled") { setPendingCancelStatus(true); return; }
@@ -1563,21 +1563,21 @@ export default function MyOrderPage() {
             )}
           </div>
           {!isClientPortalUser && (
-          <div style={card}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <span style={{ fontWeight: 700, fontSize: 13.5 }}>Assignment</span>
-              <button onClick={() => setShowEditAssignment(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>✎ Edit</button>
+            <div style={card}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <span style={{ fontWeight: 700, fontSize: 13.5 }}>Assignment</span>
+                <button onClick={() => setShowEditAssignment(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>✎ Edit</button>
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Assigned To</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <Avatar initial={assignment.assignedTo.split(" ").map(w => w[0]).join("").slice(0, 2)} color="#2563eb" size={36} />
+                <div><div style={{ fontWeight: 700, fontSize: 14 }}>{assignment.assignedTo}</div><div style={{ fontSize: 12, color: "#6b7280" }}>{assignment.role}</div></div>
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>Assigned On</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>{assignment.assignedOn}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Notes</div>
+              <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.55 }}>{assignment.notes}</div>
             </div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Assigned To</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <Avatar initial={assignment.assignedTo.split(" ").map(w => w[0]).join("").slice(0,2)} color="#2563eb" size={36} />
-              <div><div style={{ fontWeight: 700, fontSize: 14 }}>{assignment.assignedTo}</div><div style={{ fontSize: 12, color: "#6b7280" }}>{assignment.role}</div></div>
-            </div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 2 }}>Assigned On</div>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>{assignment.assignedOn}</div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Notes</div>
-            <div style={{ fontSize: 13, color: "#374151", lineHeight: 1.55 }}>{assignment.notes}</div>
-          </div>
           )}
         </div>
 
@@ -1594,7 +1594,7 @@ export default function MyOrderPage() {
                 if (tab === "Vendor Selected Summary") label = selectedSummaryCount > 0 ? `Vendor Selected Summary (${selectedSummaryCount})` : "Vendor Selected Summary";
                 return (
                   <button key={tab} onClick={() => setActiveTab(tab)}
-                    style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "#2563eb" : "#6b7280", borderBottom: activeTab === tab ? "2px solid #2563eb" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                    style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))", borderBottom: activeTab === tab ? "2px solid hsl(var(--primary))" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
                     {label}
                   </button>
                 );
@@ -1620,100 +1620,100 @@ export default function MyOrderPage() {
                   screens: if the row is ever wider than the tab, it scrolls
                   *inside the tab* rather than being cut off. */}
               <div style={{ overflowX: "auto", overflowY: "visible" }}>
-              <div style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
-                {subOrdersColumns.map(h => <div key={h} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{h}</div>)}
-              </div>
-              {filtered.map((sub, idx) => {
-                const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
-                const selVendorId = selectedVendors[sub.id];
-                const selMeta = selectedVendorMeta[sub.id] || null;
-                const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
-                return (
-                  <div key={sub.id} style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                    <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                      {!isClientPortalUser && hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
-                      {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                        <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, overflow: "hidden" }}>
-                          {sub.image ? (
-                            <img src={sub.image} alt={sub.itemName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          ) : "📦"}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
-                          {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
-                        </div>
-                      </div>
-                    </div>
-                    {!isClientPortalUser && (
+                <div style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+                  {subOrdersColumns.map(h => <div key={h} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{h}</div>)}
+                </div>
+                {filtered.map((sub, idx) => {
+                  const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
+                  const selVendorId = selectedVendors[sub.id];
+                  const selMeta = selectedVendorMeta[sub.id] || null;
+                  const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
+                  return (
+                    <div key={sub.id} style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                      <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
                       <div style={{ minWidth: 0 }}>
-                        <button
-                          onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
-                          style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                        >
-                          {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
-                        </button>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
+                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
+                        {!isClientPortalUser && hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
+                        {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
                       </div>
-                    )}
-                    <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
-                    <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>{sub.unitPrice}</div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
-                    <div style={{ minWidth: 0 }}><StatusPill status={sub.itemStatus} /><div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div></div>
-                    <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
-                      {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
-                    </div>
-                    {!isClientPortalUser && (
                       <div style={{ minWidth: 0 }}>
-                        {isOrderInactive ? (
-                          <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
-                        ) : selVendor ? (
-                          <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                {(selVendor.name?.[0] || "V").toUpperCase()}
-                              </div>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
-                            </div>
-                            <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                        <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                          <div style={{ width: 42, height: 42, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0, overflow: "hidden" }}>
+                            {sub.image ? (
+                              <img src={sub.image} alt={sub.itemName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            ) : "📦"}
                           </div>
-                        ) : (
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
+                            {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                          </div>
+                        </div>
+                      </div>
+                      {!isClientPortalUser && (
+                        <div style={{ minWidth: 0 }}>
                           <button
-                            onClick={() => handleOpenVendorModal(sub)}
-                            style={{ padding: "5px 10px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                            onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
+                            style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
                           >
-                            Select Vendor
+                            {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
                           </button>
-                        )}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
+                      <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>{sub.unitPrice}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
+                      <div style={{ minWidth: 0 }}><StatusPill status={sub.itemStatus} /><div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div></div>
+                      <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
+                        {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
                       </div>
-                    )}
-                    {isOrderInactive ? (
-                      <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
-                    ) : isClientPortalUser ? (
-                      <div style={{ minWidth: 0 }}>
-                        {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
-                          <button
-                            onClick={() => setCancelTarget(sub.id)}
-                            style={{ padding: "5px 10px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                          >
-                            Cancel Item
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ minWidth: 0 }}>
-                        <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onSetReference={() => setReferenceTarget(sub.id)} referenceLocked={hasPO} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {!isClientPortalUser && (
+                        <div style={{ minWidth: 0 }}>
+                          {isOrderInactive ? (
+                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                          ) : selVendor ? (
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                  {(selVendor.name?.[0] || "V").toUpperCase()}
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
+                              </div>
+                              <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleOpenVendorModal(sub)}
+                              style={{ padding: "5px 10px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                            >
+                              Select Vendor
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {isOrderInactive ? (
+                        <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
+                      ) : isClientPortalUser ? (
+                        <div style={{ minWidth: 0 }}>
+                          {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
+                            <button
+                              onClick={() => setCancelTarget(sub.id)}
+                              style={{ padding: "5px 10px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                            >
+                              Cancel Item
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ minWidth: 0 }}>
+                          <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onSetReference={() => setReferenceTarget(sub.id)} referenceLocked={hasPO} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               {(() => {
                 const itemsSubtotal = subOrders.reduce((s, o) => {

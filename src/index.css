@@ -676,65 +676,91 @@
   color: hsl(var(--primary)) !important;
 }
 
-/* Dark mode for pages with inline styles (OrderDetailsPage, etc.) */
-.dark div[style*="background: #ffffff"],
-.dark div[style*="background: \"#ffffff\""] {
-  background-color: hsl(var(--background)) !important;
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* Comprehensive Dark Mode Overrides for Inline Styled Elements */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* All white/light backgrounds in dark mode */
+.dark [style*="background: #ffffff"],
+.dark [style*="background: #fff"],
+.dark [style*="background: white"],
+.dark [style*="background:#ffffff"],
+.dark [style*="background:#fff"] {
+  background-color: hsl(var(--card)) !important;
   color: hsl(var(--foreground)) !important;
 }
 
-/* Fix text colors in pages with hardcoded colors */
-.dark div[style*="color: #111827"],
-.dark div[style*="color: \"#111827\""],
-.dark span[style*="color: #111827"],
-.dark span[style*="color: \"#111827\""] {
+/* Dark heading text colors */
+.dark [style*="color: #111827"],
+.dark [style*="color: #1f2937"],
+.dark [style*="color: #374151"],
+.dark [style*="color: #475569"],
+.dark [style*="color: #000000"],
+.dark [style*="color: #000"] {
   color: hsl(var(--foreground)) !important;
 }
 
-.dark div[style*="color: #6b7280"],
-.dark div[style*="color: \"#6b7280\""],
-.dark span[style*="color: #6b7280"],
-.dark span[style*="color: \"#6b7280\""],
-.dark p[style*="color: #6b7280"],
-.dark p[style*="color: \"#6b7280\""] {
+/* Muted/secondary text colors */
+.dark [style*="color: #6b7280"],
+.dark [style*="color: #9ca3af"],
+.dark [style*="color: #d1d5db"],
+.dark [style*="color: #e5e7eb"],
+.dark [style*="color: #f3f4f6"],
+.dark [style*="color: #f9fafb"],
+.dark [style*="color: #666666"],
+.dark [style*="color: #999999"],
+.dark [style*="color: #aaaaaa"] {
   color: hsl(var(--muted-foreground)) !important;
 }
 
-.dark div[style*="color: #374151"],
-.dark div[style*="color: \"#374151\""],
-.dark span[style*="color: #374151"],
-.dark span[style*="color: \"#374151\""] {
-  color: hsl(var(--foreground)) !important;
-}
-
-/* Fix modal and card backgrounds */
-.dark div[style*="background: #fff"],
-.dark div[style*="background: \"#fff\""] {
-  background-color: hsl(var(--card)) !important;
-  color: hsl(var(--foreground)) !important;
-}
-
-/* Fix button styles */
-.dark button[style*="background: #fff"],
-.dark button[style*="background: \"#fff\""] {
-  background-color: hsl(var(--card)) !important;
-  color: hsl(var(--foreground)) !important;
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Fix input and field backgrounds */
-.dark input[style*="background"],
-.dark textarea[style*="background"],
-.dark select[style*="background"] {
+/* Light gray backgrounds (convert to secondary) */
+.dark [style*="background: #f9fafb"],
+.dark [style*="background: #f3f4f6"],
+.dark [style*="background: #eeeeee"],
+.dark [style*="background: #f5f5f5"],
+.dark [style*="background: #fafafa"],
+.dark [style*="background: #e5e7eb"],
+.dark [style*="background: #d1d5db"] {
   background-color: hsl(var(--secondary)) !important;
   color: hsl(var(--foreground)) !important;
 }
 
-/* Fix border colors */
-.dark div[style*="border: 1px solid #e5e7eb"],
-.dark div[style*="border: 1px solid #f3f4f6"],
-.dark div[style*="border: 1px solid #d1d5db"] {
+/* Light borders (convert to border token) */
+.dark [style*="border:"] {
   border-color: hsl(var(--border)) !important;
+}
+
+.dark [style*="borderColor:"],
+.dark [style*="border-color:"] {
+  border-color: hsl(var(--border)) !important;
+}
+
+/* Blue accent colors - convert to primary */
+.dark [style*="color: #2563eb"],
+.dark [style*="color: #3b82f6"],
+.dark [style*="color: #60a5fa"],
+.dark [style*="color: #1e40af"],
+.dark [style*="color: #0066cc"],
+.dark [style*="color: #0052cc"],
+.dark [style*="color: #0052a3"] {
+  color: hsl(var(--primary)) !important;
+}
+
+.dark [style*="background: #2563eb"],
+.dark [style*="background: #3b82f6"],
+.dark [style*="background: #60a5fa"],
+.dark [style*="background: #dbeafe"],
+.dark [style*="background: #eff6ff"] {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Modal and overlay backgrounds */
+.dark [class*="modal"] [style*="background"],
+.dark [class*="dialog"] [style*="background"],
+.dark [class*="overlay"] [style*="background"] {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
 }
 
 html,
