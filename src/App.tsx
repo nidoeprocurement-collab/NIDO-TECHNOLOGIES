@@ -80,6 +80,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { EnhancedAuthProvider } from "@/contexts/EnhancedAuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
@@ -1005,6 +1006,7 @@ const App = () => (
             <PreferencesProvider>
               <NotificationProvider>
                 <AuthProvider>
+                  <PermissionsProvider>
                   <EnhancedAuthProvider>
                     <DataProvider>
                       <CartProvider>
@@ -1018,6 +1020,7 @@ const App = () => (
                       </CartProvider>
                     </DataProvider>
                   </EnhancedAuthProvider>
+                  </PermissionsProvider>
                 </AuthProvider>
               </NotificationProvider>
             </PreferencesProvider>

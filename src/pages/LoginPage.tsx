@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { findPortalUser } from '@/lib/portalUserStore';
+import { authenticateNidoUser } from '@/lib/nidoUsersStore';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { Mail, Lock, Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
@@ -23,21 +24,36 @@ export default function LoginPage() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
-      // ── NIDO Owner (hardcoded) ─────────────────────────────────────────────
-      if (email === 'owner@nidotech.com' && password === 'Owner@123') {
+      // ── 1. Try NIDO internal users (nidoUsersStore) ───────────────────────
+      const result = authenticateNidoUser(email.trim(), password);
+
+      if ('user' in result && result.user) {
+        const u = result.user;
         login({
-          id: 'owner-1',
-          email,
-          name: 'System Owner',
-          role: 'admin',
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
           userType: 'nido_admin',
         });
         navigate('/dashboard', { replace: true });
         return;
       }
 
-      // ── Client Portal users (localStorage registry) ───────────────────────
-      const portalUser = findPortalUser(email, password);
+      if ('error' in result) {
+        if (result.error === 'inactive') {
+          setError('This account has been deactivated. Contact your administrator.');
+          return;
+        }
+        if (result.error === 'suspended') {
+          setError('This account is suspended. Contact your administrator.');
+          return;
+        }
+        // invalid_credentials — fall through to try client portal
+      }
+
+      // ── 2. Try Client Portal users (portalUserStore) ──────────────────────
+      const portalUser = findPortalUser(email.trim(), password);
       if (portalUser) {
         login({
           id: portalUser.id,
@@ -52,9 +68,9 @@ export default function LoginPage() {
         return;
       }
 
-      setError('Invalid email or password');
+      setError('Invalid email or password.');
     } catch {
-      setError('An error occurred during login');
+      setError('An error occurred during sign in. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -74,13 +90,9 @@ export default function LoginPage() {
         >
           {/* Left — Feature panel */}
           <div className="hidden lg:block bg-black" style={{ marginLeft: '20px' }}>
-            <h1 className="text-4xl font-bold text-white mb-6">
-              Real-time spend insights
-            </h1>
+            <h1 className="text-4xl font-bold text-white mb-6">Real-time spend insights</h1>
             <div className="space-y-6">
-              <p className="text-sm font-semibold text-white uppercase tracking-wider">
-                Enterprise Features
-              </p>
+              <p className="text-sm font-semibold text-white uppercase tracking-wider">Enterprise Features</p>
               <div className="space-y-4">
                 {[
                   'Automated purchase orders',
@@ -123,9 +135,7 @@ export default function LoginPage() {
 
               {/* Tabs */}
               <div className="mb-6 border-b border-gray-200">
-                <button className="pb-3 px-2 text-gray-900 font-medium border-b-2 border-gray-900">
-                  Sign In
-                </button>
+                <button className="pb-3 px-2 text-gray-900 font-medium border-b-2 border-gray-900">Sign In</button>
               </div>
 
               <div className="mb-8">
@@ -134,7 +144,7 @@ export default function LoginPage() {
               </div>
 
               {error && (
-                <div className="mb-4 p-2 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-700 text-sm">{error}</p>
                 </div>
               )}
@@ -148,9 +158,10 @@ export default function LoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                      className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-gray-900"
                       placeholder="your@email.com"
                       disabled={isLoading}
+                      required
                     />
                   </div>
                 </div>
@@ -163,9 +174,10 @@ export default function LoginPage() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white"
+                      className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-gray-900"
                       placeholder="••••••••••"
                       disabled={isLoading}
+                      required
                     />
                     <button
                       type="button"
@@ -184,20 +196,19 @@ export default function LoginPage() {
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
                 >
                   {isLoading ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Signing in…
-                    </>
+                    <><Loader2 size={18} className="animate-spin" />Signing in…</>
                   ) : (
                     <>Sign In <span>→</span></>
                   )}
                 </button>
               </form>
 
-              <p className="text-xs text-gray-500 mt-6 pt-6 border-t border-gray-200">
-                <span className="font-medium">NIDO Admin</span> — use owner@nidotech.com / Owner@123.{' '}
-                <span className="font-medium">Client Portal</span> — use credentials provided by your NIDO admin after portal provisioning.
-              </p>
+              <div className="mt-6 pt-6 border-t border-gray-200 text-xs text-gray-500 space-y-1">
+                <p><span className="font-medium">NIDO Admin</span> — owner@nidotech.com / Owner@123</p>
+                <p><span className="font-medium">System Admin</span> — admin@nidotech.com / Admin@123</p>
+                <p><span className="font-medium">Procurement</span> — procurement@nidotech.com / Procure@123</p>
+                <p><span className="font-medium">Client Portal</span> — credentials provided by NIDO admin after portal provisioning.</p>
+              </div>
             </div>
           </div>
         </div>
