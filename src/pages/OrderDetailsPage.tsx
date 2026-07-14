@@ -267,7 +267,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
       <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Click "Select Vendor" to open the Price Engine recommendation dialog and pick from top-4 vendors.</div>
 
       <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "35px 100px 1fr 50px 80px 120px 100px", gap: "2px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "25px 70px 1fr 38px 55px 90px 65px", gap: "2px", padding: "8px 10px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 10, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
           {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "SELECTED VENDOR", "ACTION"].map(h => <div key={h}>{h}</div>)}
         </div>
 
@@ -277,7 +277,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc  = meta?.location || "";
           return (
-            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "35px 100px 1fr 50px 80px 120px 100px", gap: "2px", padding: "12px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "25px 70px 1fr 38px 55px 90px 65px", gap: "2px", padding: "10px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13 }}>{sub.num}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{sub.id}</div>
