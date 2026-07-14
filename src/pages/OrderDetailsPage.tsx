@@ -1455,7 +1455,7 @@ export default function MyOrderPage() {
   // monitors) while still guaranteeing a readable minimum per column.
   const subOrdersColTemplate = isClientPortalUser
     ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
-    : "25px 120px minmax(220px,2fr) minmax(110px,1fr) 45px minmax(100px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) minmax(130px,1fr) 44px";
+    : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) 100px";
   const subOrdersColGap = 6;
   // Sum of the column minimums above (plus gaps) — the smallest width the
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
