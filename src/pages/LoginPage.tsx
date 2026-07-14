@@ -10,8 +10,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const org = useOrgConfig();
-  const [email, setEmail] = useState('owner@nidotech.com');
-  const [password, setPassword] = useState('Owner@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -206,13 +206,6 @@ export default function LoginPage() {
                   )}
                 </button>
               </form>
-
-              <div className="mt-6 pt-6 border-t border-gray-200 text-xs text-gray-500 space-y-1">
-                <p><span className="font-medium">NIDO Admin</span> — owner@nidotech.com / Owner@123</p>
-                <p><span className="font-medium">System Admin</span> — admin@nidotech.com / Admin@123</p>
-                <p><span className="font-medium">Procurement</span> — procurement@nidotech.com / Procure@123</p>
-                <p><span className="font-medium">Client Portal</span> — credentials provided by NIDO admin after portal provisioning.</p>
-              </div>
             </div>
           </div>
         </div>
