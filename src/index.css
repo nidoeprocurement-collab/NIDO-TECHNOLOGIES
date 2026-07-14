@@ -758,7 +758,11 @@
 }
 
 /* Light borders (convert to border token) */
-.dark [style*="border:"] {
+.dark [style*="border:"],
+.dark [style*="border-top:"],
+.dark [style*="border-bottom:"],
+.dark [style*="border-left:"],
+.dark [style*="border-right:"] {
   border-color: hsl(var(--border)) !important;
 }
 
