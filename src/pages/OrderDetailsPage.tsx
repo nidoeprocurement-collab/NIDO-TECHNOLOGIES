@@ -177,7 +177,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
             </div>
           ) : (
             <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "36px 30px 1fr 120px 120px 140px 120px 110px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "28px 24px 1fr 80px 70px 100px 90px 90px", gap: "1px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
                 {["", "#", "Vendor", "Score", "Rating", "Lead Time", "Unit Cost", "Total Cost"].map(h => <div key={h}>{h}</div>)}
               </div>
               {comparisons.map((c, i) => {
@@ -188,7 +188,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                   <div
                     key={c.vendorId}
                     onClick={() => setPickedId(c.vendorId)}
-                    style={{ display: "grid", gridTemplateColumns: "36px 30px 1fr 120px 120px 140px 120px 110px", padding: "13px 16px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#eff6ff" : "#fff", cursor: "pointer" }}
+                    style={{ display: "grid", gridTemplateColumns: "28px 24px 1fr 80px 70px 100px 90px 90px", gap: "1px", padding: "12px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#eff6ff" : "#fff", cursor: "pointer" }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isSel ? "#2563eb" : "#d1d5db"}`, background: isSel ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -267,7 +267,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
       <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Click "Select Vendor" to open the Price Engine recommendation dialog and pick from top-4 vendors.</div>
 
       <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "35px 100px 1fr 50px 80px 120px 100px", gap: "2px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
           {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "SELECTED VENDOR", "ACTION"].map(h => <div key={h}>{h}</div>)}
         </div>
 
@@ -277,7 +277,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc  = meta?.location || "";
           return (
-            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "50px 120px 1fr 80px 100px 150px 140px", padding: "16px 20px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "35px 100px 1fr 50px 80px 120px 100px", gap: "2px", padding: "12px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13 }}>{sub.num}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{sub.id}</div>
@@ -339,11 +339,11 @@ function ViewItemsModal({ group, onClose }) {
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1 }}>×</button>
         </div>
         <div style={{ overflow: "auto", flex: 1 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "36px 120px 1fr 70px 130px 130px", padding: "10px 22px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "30px 100px 1fr 50px 110px 110px", gap: "2px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
             {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL"].map(h => <div key={h}>{h}</div>)}
           </div>
           {group.subOrders.map((sub, idx) => (
-            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "36px 120px 1fr 70px 130px 130px", padding: "15px 22px", alignItems: "start", borderBottom: idx < group.subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "30px 100px 1fr 50px 110px 110px", gap: "2px", padding: "12px 16px", alignItems: "start", borderBottom: idx < group.subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{sub.num}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{sub.id}</div>
@@ -764,13 +764,13 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
           </div>
         </div>
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 130px 160px 140px 1fr 48px", padding: "10px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 40px", gap: "2px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
             {["DOCUMENT NAME","TYPE","UPLOADED BY","UPLOADED ON","DESCRIPTION","ACTIONS"].map(h => <div key={h}>{h}</div>)}
           </div>
           {filteredDocs.length === 0 ? (
             <div style={{ padding: "32px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13.5 }}>No documents found.</div>
           ) : filteredDocs.map((doc, i) => (
-            <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "2fr 130px 160px 140px 1fr 48px", padding: "14px 16px", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 40px", gap: "2px", padding: "12px", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <DocTypeIcon ext={doc.ext} />
                 <div>
