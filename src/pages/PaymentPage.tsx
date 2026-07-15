@@ -355,7 +355,10 @@ export default function PaymentPage() {
                 <ArrowLeft size={15} />
                 Back to Delivery
               </button>
-              <button onClick={() => navigate("/shop/checkout/review")}
+              <button onClick={() => {
+                  localStorage.setItem("nido_payment_selection", JSON.stringify(state));
+                  navigate("/shop/checkout/review");
+                }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors">
                 Review Order
                 <ChevronRight size={16} />

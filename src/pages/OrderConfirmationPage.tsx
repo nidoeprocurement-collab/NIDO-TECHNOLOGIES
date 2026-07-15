@@ -64,6 +64,7 @@ export default function OrderConfirmationPage() {
   const clientEmail = state?.clientEmail ?? "owner@nidotech.com";
   const clientName = state?.clientName ?? "Nido Tech CorpEssentials";
   const paymentMethod = state?.paymentMethod ?? "Credit Card";
+  const paymentDetail = (state as any)?.paymentDetail ?? "";
   const paymentTerms = state?.paymentTerms ?? "Net 30 (Payment due in 30 days)";
   const orderDate = state?.orderDate ?? new Date().toISOString().split("T")[0];
 
@@ -261,10 +262,6 @@ export default function OrderConfirmationPage() {
                 <span className="text-gray-500">GST (18%)</span>
                 <span className="text-gray-700 font-medium">{formatPrice(gst)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Standard Shipping</span>
-                <span className="text-gray-700 font-medium">{formatPrice(shipping)}</span>
-              </div>
               <div className="flex justify-between items-center border-t border-gray-100 pt-2 mt-1">
                 <span className="text-sm font-bold text-gray-900">Total</span>
                 <span className="text-sm font-bold text-gray-900">{formatPrice(total)}</span>
@@ -298,6 +295,7 @@ export default function OrderConfirmationPage() {
               </div>
               <div className="pl-5 space-y-1">
                 <p className="text-sm text-gray-700">{paymentMethod}</p>
+                {paymentDetail && <p className="text-xs text-gray-500">{paymentDetail}</p>}
                 <p className="text-xs text-gray-400">{paymentTerms}</p>
               </div>
             </div>

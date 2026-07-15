@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { getPrefix } from "@/lib/configService";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, ArrowLeft, Pencil, MapPin, Building2, Lock } from "lucide-react";
+import { ChevronRight, ArrowLeft, Pencil, MapPin, CreditCard, Landmark, Wallet, Banknote, Building2, Lock } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
@@ -43,6 +43,64 @@ export default function ReviewPage() {
   }, [clientId]);
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+
+  // Read saved payment selection
+  const savedPayment: Record<string, string> = (() => {
+    try { return JSON.parse(localStorage.getItem("nido_payment_selection") || "{}"); } catch { return {}; }
+  })();
+  const paymentMethodId: string = savedPayment.paymentMethod || "card";
+
+  const PAYMENT_LABELS: Record<string, string> = {
+    card: "Credit / Debit Card",
+    netbanking: "Net Banking",
+    upi: "UPI",
+    wallets: "Wallet",
+    neft: "NEFT / RTGS",
+    ban: "Company BAN",
+  };
+  const WALLET_NAMES: Record<string, string> = {
+    phonepe: "PhonePe", paytm: "Paytm", amazonpay: "Amazon Pay",
+    googlepay: "Google Pay", mobikwik: "MobiKwik",
+  };
+
+  function getPaymentSummary() {
+    const label = PAYMENT_LABELS[paymentMethodId] ?? paymentMethodId;
+    switch (paymentMethodId) {
+      case "card": {
+        const last4 = savedPayment.cardNumber?.replace(/\s/g, "").slice(-4) || "";
+        const name = savedPayment.cardName || "";
+        return { label, detail: last4 ? `**** **** **** ${last4}${name ? ` • ${name}` : ""}` : "Card details entered" };
+      }
+      case "netbanking":
+        return { label, detail: savedPayment.netBankingBank || "Bank selected" };
+      case "upi":
+        return { label, detail: savedPayment.upiId || "UPI ID entered" };
+      case "wallets": {
+        const wName = WALLET_NAMES[savedPayment.selectedWallet] ?? savedPayment.selectedWallet ?? "Wallet selected";
+        const mob = savedPayment.walletMobile ? ` • +91 ${savedPayment.walletMobile}` : "";
+        return { label, detail: `${wName}${mob}` };
+      }
+      case "neft":
+        return { label, detail: savedPayment.neftAccountName ? `${savedPayment.neftAccountName} • ${savedPayment.neftBankName || ""}` : "Bank account entered" };
+      case "ban":
+        return { label, detail: "Billed to company account" };
+      default:
+        return { label, detail: "" };
+    }
+  }
+
+  function getPaymentIcon() {
+    switch (paymentMethodId) {
+      case "card":       return <CreditCard size={14} className="text-white" />;
+      case "netbanking": return <Landmark size={14} className="text-white" />;
+      case "wallets":    return <Wallet size={14} className="text-white" />;
+      case "neft":       return <Banknote size={14} className="text-white" />;
+      case "ban":        return <Building2 size={14} className="text-white" />;
+      default:           return <CreditCard size={14} className="text-white" />;
+    }
+  }
+
+  const paymentSummary = getPaymentSummary();
 
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
   const gst = Math.round(subtotal * 0.18);
@@ -105,8 +163,8 @@ export default function ReviewPage() {
         address: selectedAddr
           ? { label: selectedAddr.label, line1: selectedAddr.line1, line2: selectedAddr.line2, phone: selectedAddr.phone }
           : null,
-        paymentMethod: "Credit Card",
-        cardLast4: "5432",
+        paymentMethod: paymentSummary.label,
+        paymentDetail: paymentSummary.detail,
         paymentTerms: "Net 30 (Payment due in 30 days)",
         clientEmail: "owner@nidotech.com",
         clientName: "Nido Tech CorpEssentials",
@@ -173,46 +231,23 @@ export default function ReviewPage() {
               )}
             </div>
 
-            {/* Delivery Address + Payment row */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Delivery Address summary */}
-              <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-semibold text-gray-900 text-sm">Delivery Address</h2>
-                  <button onClick={() => navigate("/shop/checkout")} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                    <Pencil size={11} /> Edit
-                  </button>
-                </div>
-                {selectedAddr ? (
-                  <>
-                    <p className="font-medium text-sm text-gray-900 mb-1">{selectedAddr.label}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      {selectedAddr.line1}
-                      {selectedAddr.line2 && <><br />{selectedAddr.line2}</>}
-                      <br />{selectedAddr.phone}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs text-gray-400">No address set</p>
-                )}
+            {/* Payment Method */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-semibold text-gray-900 text-sm">Payment Method</h2>
+                <button onClick={() => navigate("/shop/checkout/payment")} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                  <Pencil size={11} /> Edit
+                </button>
               </div>
-
-              {/* Payment Method */}
-              <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="font-semibold text-gray-900 text-sm">Payment Method</h2>
-                  <button onClick={() => navigate("/shop/checkout/payment")} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                    <Pencil size={11} /> Edit
-                  </button>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-7 bg-blue-600 rounded flex items-center justify-center shrink-0">
+                  {getPaymentIcon()}
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-7 bg-blue-600 rounded flex items-center justify-center shrink-0">
-                    <Building2 size={14} className="text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Credit / Debit Card</p>
-                    <p className="text-xs text-gray-500">Visa ending with ****</p>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{paymentSummary.label}</p>
+                  {paymentSummary.detail && (
+                    <p className="text-xs text-gray-500">{paymentSummary.detail}</p>
+                  )}
                 </div>
               </div>
             </div>
