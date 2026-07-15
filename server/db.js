@@ -4,18 +4,16 @@ const { Pool } = pg;
 
 const connectionString = process.env.SUPABASE_DB_URL;
 
-if (!connectionString) {
-  throw new Error(
-    "SUPABASE_DB_URL is required. Add your Supabase Postgres connection string as a secret.",
-  );
-}
-
-export const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-  max: 10,
-});
-
-pool.on("error", (err) => {
-  console.error("[db] unexpected error on idle client", err);
-});
+export const pool = connectionString
+  ? (() => {
+      const p = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+        max: 10,
+      });
+      p.on("error", (err) => {
+        console.error("[db] unexpected error on idle client", err);
+      });
+      return p;
+    })()
+  : null;

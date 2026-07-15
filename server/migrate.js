@@ -5,6 +5,11 @@ let migrated = false;
 
 export async function migrate() {
   if (migrated) return;
+  if (!pool) {
+    throw new Error(
+      "SUPABASE_DB_URL is not set — email features are disabled.",
+    );
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS email_config (
