@@ -313,8 +313,6 @@ export default function GeneralSettingsPage() {
                   <SelectContent>
                     <SelectItem value="English (India)">English (India)</SelectItem>
                     <SelectItem value="English (US)">English (US)</SelectItem>
-                    <SelectItem value="Hindi">Hindi</SelectItem>
-                    <SelectItem value="Tamil">Tamil</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Bell, Search, LogOut, ArrowLeft, ChevronRight, Home, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, Search, ArrowLeft, ChevronRight, Home } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -79,6 +79,16 @@ export default function TopBar() {
   const location = useLocation();
   const { user, logout, isClientPortalUser } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedDate = now.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
   const allBreadcrumbs = generateBreadcrumbs(location.pathname);
   // Client portal users should never see a link back to the owner/admin
   // dashboard, so the leading "Home" crumb is dropped entirely for them.
@@ -120,52 +130,12 @@ export default function TopBar() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
           </button>
 
-          {/* User Menu */}
-          <div className="relative flex items-center gap-3 pl-4 border-l border-border">
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-medium text-foreground">{user?.name || 'System Owner'}</p>
-              <p className="text-xs text-muted-foreground">{user?.role || 'Administrator'}</p>
+          {/* Live Date & Time */}
+          <div className="flex items-center gap-3 pl-4 border-l border-border">
+            <div className="text-right">
+              <p className="text-sm font-medium text-foreground tabular-nums">{formattedTime}</p>
+              <p className="text-xs text-muted-foreground">{formattedDate}</p>
             </div>
-            <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="w-9 h-9 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm hover:bg-blue-700 transition-colors"
-              title={user?.email}
-            >
-              {user?.name?.charAt(0) || 'A'}
-            </button>
-
-            {/* User Dropdown Menu */}
-            {showUserMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-background border border-border rounded-lg shadow-lg py-2 w-48 z-50">
-                <div className="px-4 py-2 border-b border-border">
-                  <p className="text-sm font-semibold text-foreground">{user?.name || 'System Owner'}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-2 py-2 text-left text-sm text-foreground hover:bg-muted flex items-center gap-2"
-                >
-                  <User size={16} />
-                  Profile
-                </button>
-
-                <div className="border-t border-border my-1"></div>
-
-                <button
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    handleLogout();
-                  }}
-                  className="w-full px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-2"
-                >
-                  <LogOut size={16} />
-                  Sign Out
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
