@@ -133,8 +133,8 @@ export default function TopBar() {
           {/* Live Date & Time */}
           <div className="flex items-center gap-3 pl-4 border-l border-border">
             <div className="text-right">
-              <p className="text-sm font-medium text-foreground tabular-nums">{formattedTime}</p>
-              <p className="text-xs text-muted-foreground">{formattedDate}</p>
+              <p className="text-base font-bold text-foreground tabular-nums tracking-wide">{formattedTime}</p>
+              <p className="text-sm font-medium text-muted-foreground">{formattedDate}</p>
             </div>
           </div>
         </div>
