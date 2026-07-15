@@ -7,23 +7,27 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
-import { getCatalogProducts, type CatalogProduct } from "@/lib/catalogStore";
+import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
 
-/** Pick up to 6 published products relevant to what's in the cart. */
-function getSuggested(cartItems: CartItem[]): CatalogProduct[] {
-  const all = getCatalogProducts().filter(p => p.publishStatus === "published");
-  const cartIds = new Set(cartItems.map(i => String(i.id)));
-  const cartCategories = new Set(cartItems.map(i => (i as CartItem & { category?: string }).category).filter(Boolean));
+/** Pick up to 6 client-catalog products relevant to what's in the cart. */
+function getSuggested(cartItems: CartItem[]): ClientCatalogEntry[] {
+  // Derive the active client from the first cart item that carries one
+  const clientId = cartItems.find(i => i.clientId)?.clientId;
+  if (!clientId) return [];
 
-  const exclude = (p: CatalogProduct) => cartIds.has(p.id);
+  const all = getClientCatalog(clientId);
+  const cartCodes = new Set(cartItems.map(i => i.productCode).filter(Boolean));
+  const cartCategories = new Set(cartItems.map(i => i.category).filter(Boolean));
+
+  const notInCart = (p: ClientCatalogEntry) => !cartCodes.has(p.productCode);
 
   // Same-category products first, then others
-  const sameCategory = all.filter(p => !exclude(p) && cartCategories.has(p.category));
-  const others = all.filter(p => !exclude(p) && !cartCategories.has(p.category));
+  const sameCategory = all.filter(p => notInCart(p) && cartCategories.has(p.category));
+  const others      = all.filter(p => notInCart(p) && !cartCategories.has(p.category));
 
   return [...sameCategory, ...others].slice(0, 6);
 }
@@ -138,28 +142,39 @@ function SuggestedCard({
   product,
   onAdd,
 }: {
-  product: CatalogProduct;
+  product: ClientCatalogEntry;
   onAdd: (p: Omit<CartItem, "quantity">) => void;
 }) {
   const [added, setAdded] = useState(false);
-  const image = product.images?.[0] ?? "";
-  const specs = product.specifications?.slice(0, 2).map(s => `${s.specification}: ${s.value}${s.unit ? " " + s.unit : ""}`) ?? [];
+  const image = product.img ?? "";
+  const priceNum = product.priceNum ?? parseFloat(product.price) ?? 0;
+  const specs = product.specs?.slice(0, 2) ?? [];
 
   return (
     <div className="min-w-[170px] max-w-[170px] border border-gray-200 rounded-xl bg-white p-3 flex flex-col">
       {image ? (
-        <img src={image} alt={product.productName} className="w-full h-28 object-cover rounded-lg mb-2 bg-gray-100" />
+        <img src={image} alt={product.name} className="w-full h-28 object-cover rounded-lg mb-2 bg-gray-100" />
       ) : (
         <div className="w-full h-28 rounded-lg mb-2 bg-gray-100 flex items-center justify-center text-gray-300">
           <ShoppingCart size={28} />
         </div>
       )}
       <p className="text-xs text-gray-400 mb-0.5">{product.category}</p>
-      <p className="text-xs font-medium text-gray-800 mb-1 line-clamp-2">{product.productName}</p>
-      <p className="text-sm font-bold text-gray-900 mb-2">{formatPrice(product.price)}</p>
+      <p className="text-xs font-medium text-gray-800 mb-1 line-clamp-2">{product.name}</p>
+      <p className="text-sm font-bold text-gray-900 mb-2">{formatPrice(priceNum)}</p>
       <button
         onClick={() => {
-          onAdd({ id: Number(product.id) || Math.random(), name: product.productName, image, specs, moq: product.moq ?? 1, priceNum: product.price });
+          onAdd({
+            id: Math.abs(product.productCode.split("").reduce((a, c) => a + c.charCodeAt(0), 0)),
+            name: product.name,
+            image,
+            specs,
+            moq: product.moq ?? 1,
+            priceNum,
+            clientId: undefined,
+            category: product.category,
+            productCode: product.productCode,
+          });
           setAdded(true);
           setTimeout(() => setAdded(false), 1500);
         }}
@@ -176,14 +191,14 @@ export default function CartPage() {
   const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
   const navigate = useNavigate();
   const [scrollIdx, setScrollIdx] = useState(0);
-  const [suggested, setSuggested] = useState<CatalogProduct[]>(() => getSuggested(cart));
+  const [suggested, setSuggested] = useState<ClientCatalogEntry[]>(() => getSuggested(cart));
 
-  // Recompute suggestions whenever cart changes or catalog is updated
+  // Recompute suggestions whenever cart changes or the client catalog is updated
   useEffect(() => {
     setSuggested(getSuggested(cart));
     const handler = () => setSuggested(getSuggested(cart));
-    window.addEventListener("catalogUpdated", handler);
-    return () => window.removeEventListener("catalogUpdated", handler);
+    window.addEventListener("clientCatalogUpdated", handler);
+    return () => window.removeEventListener("clientCatalogUpdated", handler);
   }, [cart]);
 
   const onAddToCart = (p: Omit<CartItem, "quantity">) => addItem(p);
