@@ -74,7 +74,7 @@ function formatPrice(n: number) {
   if (!n || n === 0) return "Price on request";
   return "₹" + n.toLocaleString("en-IN");
 }
-function formatLeadTime(t: string) { return t ? `Within ${t}` : "—"; }
+function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number };

@@ -36,7 +36,7 @@ function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
 
-function formatLeadTime(t: string) { return t ? `Within ${t}` : "—"; }
+function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 function formatMoq(n: number) { return n > 0 ? `${n} Units` : "—"; }
 
 function getCategoryColor(cat: string): string {
