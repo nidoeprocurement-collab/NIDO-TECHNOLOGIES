@@ -1,25 +1,32 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Trash2, Minus, Plus, Bookmark, ChevronLeft, ChevronRight,
+  Trash2, Minus, Plus, ChevronLeft, ChevronRight,
   Shield, Truck, RotateCcw, ArrowRight, Mail, Phone, ShoppingCart
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { getCatalogProducts, type CatalogProduct } from "@/lib/catalogStore";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
 
-const SUGGESTED: {
-  id: number; name: string; image: string; priceNum: number; moq: number; specs: string[];
-}[] = [
-  { id: 101, name: "Logitech Wireless Mouse", image: "/products/mouse.png", priceNum: 1299, moq: 1, specs: ["Wireless", "Ergonomic"] },
-  { id: 102, name: "Canon PIXMA G3010 Printer", image: "/products/printer.png", priceNum: 11990, moq: 1, specs: ["All-in-One", "Ink Tank"] },
-  { id: 103, name: "APC Back-UPS 1100VA", image: "/products/ups.png", priceNum: 7499, moq: 1, specs: ["1100VA", "Power Backup"] },
-  { id: 104, name: 'Samsung 24" Monitor', image: "/products/monitor.png", priceNum: 8999, moq: 1, specs: ["Full HD", "IPS Panel"] },
-];
+/** Pick up to 6 published products relevant to what's in the cart. */
+function getSuggested(cartItems: CartItem[]): CatalogProduct[] {
+  const all = getCatalogProducts().filter(p => p.publishStatus === "published");
+  const cartIds = new Set(cartItems.map(i => String(i.id)));
+  const cartCategories = new Set(cartItems.map(i => (i as CartItem & { category?: string }).category).filter(Boolean));
+
+  const exclude = (p: CatalogProduct) => cartIds.has(p.id);
+
+  // Same-category products first, then others
+  const sameCategory = all.filter(p => !exclude(p) && cartCategories.has(p.category));
+  const others = all.filter(p => !exclude(p) && !cartCategories.has(p.category));
+
+  return [...sameCategory, ...others].slice(0, 6);
+}
 
 function QtyInput({
   value,
@@ -131,22 +138,32 @@ function SuggestedCard({
   product,
   onAdd,
 }: {
-  product: (typeof SUGGESTED)[number];
+  product: CatalogProduct;
   onAdd: (p: Omit<CartItem, "quantity">) => void;
 }) {
   const [added, setAdded] = useState(false);
+  const image = product.images?.[0] ?? "";
+  const specs = product.specifications?.slice(0, 2).map(s => `${s.specification}: ${s.value}${s.unit ? " " + s.unit : ""}`) ?? [];
+
   return (
     <div className="min-w-[170px] max-w-[170px] border border-gray-200 rounded-xl bg-white p-3 flex flex-col">
-      <img src={product.image} alt={product.name} className="w-full h-28 object-cover rounded-lg mb-2 bg-gray-100" />
-      <p className="text-xs font-medium text-gray-800 mb-1 line-clamp-2">{product.name}</p>
-      <p className="text-sm font-bold text-gray-900 mb-2">{formatPrice(product.priceNum)}</p>
+      {image ? (
+        <img src={image} alt={product.productName} className="w-full h-28 object-cover rounded-lg mb-2 bg-gray-100" />
+      ) : (
+        <div className="w-full h-28 rounded-lg mb-2 bg-gray-100 flex items-center justify-center text-gray-300">
+          <ShoppingCart size={28} />
+        </div>
+      )}
+      <p className="text-xs text-gray-400 mb-0.5">{product.category}</p>
+      <p className="text-xs font-medium text-gray-800 mb-1 line-clamp-2">{product.productName}</p>
+      <p className="text-sm font-bold text-gray-900 mb-2">{formatPrice(product.price)}</p>
       <button
         onClick={() => {
-          onAdd({ id: product.id, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum });
+          onAdd({ id: Number(product.id) || Math.random(), name: product.productName, image, specs, moq: product.moq ?? 1, priceNum: product.price });
           setAdded(true);
           setTimeout(() => setAdded(false), 1500);
         }}
-        className={`flex items-center justify-center gap-1 text-xs font-medium rounded-lg py-1.5 transition-colors ${added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+        className={`mt-auto flex items-center justify-center gap-1 text-xs font-medium rounded-lg py-1.5 transition-colors ${added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
       >
         <ShoppingCart size={12} />
         {added ? "Added!" : "Add to Cart"}
@@ -159,6 +176,15 @@ export default function CartPage() {
   const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
   const navigate = useNavigate();
   const [scrollIdx, setScrollIdx] = useState(0);
+  const [suggested, setSuggested] = useState<CatalogProduct[]>(() => getSuggested(cart));
+
+  // Recompute suggestions whenever cart changes or catalog is updated
+  useEffect(() => {
+    setSuggested(getSuggested(cart));
+    const handler = () => setSuggested(getSuggested(cart));
+    window.addEventListener("catalogUpdated", handler);
+    return () => window.removeEventListener("catalogUpdated", handler);
+  }, [cart]);
 
   const onAddToCart = (p: Omit<CartItem, "quantity">) => addItem(p);
 
@@ -173,7 +199,7 @@ export default function CartPage() {
   const total = subtotal + gst;
 
   const visibleCount = 4;
-  const maxScroll = Math.max(0, SUGGESTED.length - visibleCount);
+  const maxScroll = Math.max(0, suggested.length - visibleCount);
 
   return (
     <div className="min-h-screen bg-white px-2 py-2">
@@ -281,36 +307,42 @@ export default function CartPage() {
             </div>
 
             {/* You may also like */}
-            <div className="bg-white border border-gray-200 rounded-xl p-2">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
               <h2 className="font-semibold text-gray-900 mb-4">You may also like</h2>
-              <div className="relative">
-                {scrollIdx > 0 && (
-                  <button
-                    onClick={() => setScrollIdx((i) => Math.max(0, i - 1))}
-                    className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                )}
-                <div className="overflow-hidden">
-                  <div
-                    className="flex gap-3 transition-transform duration-300"
-                    style={{ transform: `translateX(-${scrollIdx * 186}px)` }}
-                  >
-                    {SUGGESTED.map((p) => (
-                      <SuggestedCard key={p.id} product={p} onAdd={onAddToCart} />
-                    ))}
+              {suggested.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4 text-center">
+                  No published products in the catalog yet. Add products via the Master Catalogue to see recommendations here.
+                </p>
+              ) : (
+                <div className="relative">
+                  {scrollIdx > 0 && (
+                    <button
+                      onClick={() => setScrollIdx((i) => Math.max(0, i - 1))}
+                      className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                  )}
+                  <div className="overflow-hidden">
+                    <div
+                      className="flex gap-3 transition-transform duration-300"
+                      style={{ transform: `translateX(-${scrollIdx * 186}px)` }}
+                    >
+                      {suggested.map((p) => (
+                        <SuggestedCard key={p.id} product={p} onAdd={onAddToCart} />
+                      ))}
+                    </div>
                   </div>
+                  {scrollIdx < maxScroll && (
+                    <button
+                      onClick={() => setScrollIdx((i) => Math.min(maxScroll, i + 1))}
+                      className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  )}
                 </div>
-                {scrollIdx < maxScroll && (
-                  <button
-                    onClick={() => setScrollIdx((i) => Math.min(maxScroll, i + 1))}
-                    className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors"
-                  >
-                    <ChevronRight size={14} />
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </div>
 
