@@ -36,7 +36,7 @@ function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
 
-function formatLeadTime(t: string) { return t || "—"; }
+function formatLeadTime(t: string) { return t ? `Within ${t}` : "—"; }
 function formatMoq(n: number) { return n > 0 ? `${n} Units` : "—"; }
 
 function getCategoryColor(cat: string): string {
@@ -118,8 +118,9 @@ function getVendorMatchMap(): Map<string, { leadTime: string; moq: number }> {
   getAllProductPricing().forEach(p => {
     if (!p.winningVendor) return;
     const days = p.winningVendor.leadTime;
+    const displayDays = days > 0 ? days * 2 : 0;
     map.set(p.masterProductCode, {
-      leadTime: days > 0 ? `${days} Day${days !== 1 ? "s" : ""}` : "",
+      leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
       moq: p.winningVendor.moq,
     });
   });

@@ -344,7 +344,7 @@ export default function CartPage() {
                       style={{ transform: `translateX(-${scrollIdx * 186}px)` }}
                     >
                       {suggested.map((p) => (
-                        <SuggestedCard key={p.id} product={p} onAdd={onAddToCart} />
+                        <SuggestedCard key={p.productCode} product={p} onAdd={onAddToCart} />
                       ))}
                     </div>
                   </div>

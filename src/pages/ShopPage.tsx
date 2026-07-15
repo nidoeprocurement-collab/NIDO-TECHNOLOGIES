@@ -74,7 +74,7 @@ function formatPrice(n: number) {
   if (!n || n === 0) return "Price on request";
   return "₹" + n.toLocaleString("en-IN");
 }
-function formatLeadTime(t: string) { return t || "—"; }
+function formatLeadTime(t: string) { return t ? `Within ${t}` : "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number };
@@ -84,8 +84,9 @@ function getVendorMatchMap(): Map<string, VendorMatch> {
   getAllProductPricing().forEach(p => {
     if (!p.winningVendor) return;
     const days = p.winningVendor.leadTime;
+    const displayDays = days > 0 ? days * 2 : 0;
     map.set(p.masterProductCode, {
-      leadTime: days > 0 ? `${days} Day${days !== 1 ? "s" : ""}` : "",
+      leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
       moq: p.winningVendor.moq,
     });
   });
