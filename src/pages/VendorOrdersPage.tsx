@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
 import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
@@ -229,6 +230,8 @@ function storedPOToOrder(po: StoredPO): Order {
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function VendorOrderList() {
   const navigate = useNavigate();
+  const { config } = useConfig();
+  const poPrefix = config.prefixes.find(p => p.key === "purchaseOrder")?.value || "PO-";
 
   // Build orders list: real POs from store (prepended) + static demo orders
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -270,8 +273,14 @@ export default function VendorOrderList() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
+  // Remap static "PO-" IDs to the configured prefix reactively
+  const displayedOrders = useMemo(
+    () => orders.map(o => ({ ...o, id: o.id.replace(/^PO-/, poPrefix) })),
+    [orders, poPrefix]
+  );
+
   const getFiltered = (): Order[] => {
-    let rows = [...orders];
+    let rows = [...displayedOrders];
     if (activeTab !== "All") rows = rows.filter(r => r.status === activeTab);
     if (statusFilter !== "All") rows = rows.filter(r => r.status === statusFilter);
     if (vendorFilter !== "All Vendors") rows = rows.filter(r => r.vendor === vendorFilter);

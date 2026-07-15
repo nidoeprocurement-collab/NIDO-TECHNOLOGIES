@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { getPrefix } from "@/lib/configService";
+import { useConfig } from "@/contexts/ConfigContext";
 import { toast } from "sonner";
 import { Plus, Search, MessageCircle, Clock, CheckCircle, AlertCircle } from "lucide-react";
 
@@ -34,13 +35,19 @@ const MOCK_TICKETS = [
 ];
 
 export default function SupportPage() {
+  const { config } = useConfig();
+  const tktPrefix = config.prefixes.find(p => p.key === "supportTicket")?.value || "TKT-";
   const [tickets, setTickets] = useState(MOCK_TICKETS);
+  const displayedTickets = useMemo(
+    () => tickets.map(t => ({ ...t, number: t.number.replace(/^TKT-/, tktPrefix) })),
+    [tickets, tktPrefix]
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ subject: "", description: "", priority: "medium" });
 
-  const filtered = tickets.filter((t) => {
+  const filtered = displayedTickets.filter((t) => {
     const match =
       t.number.includes(search) ||
       t.subject.toLowerCase().includes(search.toLowerCase());

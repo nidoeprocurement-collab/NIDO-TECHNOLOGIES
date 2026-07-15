@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useConfig } from "@/contexts/ConfigContext";
 import { POLink } from "@/components/shared/IdLinks";
 import {
   Wallet, CheckCircle, Clock, AlertTriangle, TrendingUp,
@@ -112,6 +113,20 @@ function FilterSelect({ label, value, options, onChange }: {
 }
 
 export default function VendorPaymentsPage() {
+  const { config } = useConfig();
+  const invPrefix = config.prefixes.find(p => p.key === "invoice")?.value || "INV-";
+  const poPrefix  = config.prefixes.find(p => p.key === "purchaseOrder")?.value || "PO-";
+
+  // Remap hardcoded prefixes to whatever is configured right now
+  const remappedPayments = useMemo(
+    () => ALL_PAYMENTS.map(p => ({
+      ...p,
+      id:    p.id.replace(/^INV-/, invPrefix),
+      poRef: p.poRef.replace(/^PO-/, poPrefix),
+    })),
+    [invPrefix, poPrefix]
+  );
+
   const [statusFilter, setStatusFilter] = useState("All");
   const [methodFilter, setMethodFilter] = useState("All");
   const [dateRange, setDateRange] = useState("This Year");
@@ -121,12 +136,12 @@ export default function VendorPaymentsPage() {
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    return ALL_PAYMENTS.filter(p => {
+    return remappedPayments.filter(p => {
       if (statusFilter !== "All" && p.status !== statusFilter) return false;
       if (methodFilter !== "All" && p.method !== methodFilter) return false;
       return true;
     });
-  }, [statusFilter, methodFilter, dateRange]);
+  }, [remappedPayments, statusFilter, methodFilter, dateRange]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);

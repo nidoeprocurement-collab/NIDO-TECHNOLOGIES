@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useConfig } from "@/contexts/ConfigContext";
 import { toast } from "sonner";
 import { Plus, Search, MoreVertical, Trash2, Eye } from "lucide-react";
 
@@ -33,11 +34,17 @@ const MOCK_SALES_ORDERS = [
 ];
 
 export default function SalesOrdersPage() {
+  const { config } = useConfig();
+  const soPrefix = config.prefixes.find(p => p.key === "salesOrder")?.value || "SO-";
   const [orders, setOrders] = useState(MOCK_SALES_ORDERS);
+  const displayedOrders = useMemo(
+    () => orders.map(o => ({ ...o, number: o.number.replace(/^SO-/, soPrefix) })),
+    [orders, soPrefix]
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filtered = orders.filter((o) => {
+  const filtered = displayedOrders.filter((o) => {
     const match =
       o.number.includes(search) ||
       o.client.toLowerCase().includes(search.toLowerCase());

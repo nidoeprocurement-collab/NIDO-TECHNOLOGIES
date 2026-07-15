@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Search, Download, MoreVertical, Eye, Trash2, Edit2 } from "lucide-react";
@@ -35,11 +36,17 @@ const MOCK_INVOICES = [
 
 export default function InvoicePage() {
   const navigate = useNavigate();
+  const { config } = useConfig();
+  const invPrefix = config.prefixes.find(p => p.key === "invoice")?.value || "INV-";
   const [invoices, setInvoices] = useState(MOCK_INVOICES);
+  const displayedInvoices = useMemo(
+    () => invoices.map(i => ({ ...i, invoice_number: i.invoice_number.replace(/^INV-/, invPrefix) })),
+    [invoices, invPrefix]
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const filteredInvoices = invoices.filter((inv) => {
+  const filteredInvoices = displayedInvoices.filter((inv) => {
     const matchSearch =
       inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
       inv.client_name.toLowerCase().includes(search.toLowerCase());
