@@ -9,6 +9,7 @@ import {
   FileText,
   Zap,
   DollarSign,
+  Mail,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -42,6 +43,12 @@ const menuItems = [
     description: "Email, SMS & in-app alert rules",
     icon: Bell,
     href: "/configuration/notifications",
+  },
+  {
+    title: "Email Configuration",
+    description: "Provider, sender identity, templates & logs",
+    icon: Mail,
+    href: "/configuration/email-settings",
   },
   {
     title: "Master Catalogue",

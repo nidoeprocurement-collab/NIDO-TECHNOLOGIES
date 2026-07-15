@@ -177,6 +177,9 @@ const UsersPage = lazy(() => import("@/pages/UsersPage"));
 const UserProfilePage = lazy(() => import("@/pages/UserProfilePage"));
 const ConfigurationPage = lazy(() => import("@/pages/ConfigurationPage"));
 const ConfigurationHubPage = lazy(() => import("@/pages/ConfigurationHubPage"));
+const EmailConfigurationPage = lazy(() => import("@/pages/EmailConfigurationPage"));
+const EmailTemplatesPage = lazy(() => import("@/pages/EmailTemplatesPage"));
+const EmailLogsPage = lazy(() => import("@/pages/EmailLogsPage"));
 const GeneralSettingsTab = lazy(
   () => import("@/components/configuration/GeneralSettingsTab"),
 );
@@ -477,6 +480,18 @@ function AppRoutes() {
             element={<GeneralSettingsTab />}
           />
           <Route path="configuration/nido-users" element={<UserRolesTab />} />
+          <Route
+            path="configuration/email-settings"
+            element={<EmailConfigurationPage />}
+          />
+          <Route
+            path="configuration/email-templates"
+            element={<EmailTemplatesPage />}
+          />
+          <Route
+            path="configuration/email-logs"
+            element={<EmailLogsPage />}
+          />
           <Route
             path="configuration/order-statuses"
             element={<OrderStatusesPage />}

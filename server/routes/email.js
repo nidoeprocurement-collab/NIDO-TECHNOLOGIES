@@ -3,6 +3,7 @@ import { pool } from "../db.js";
 import { encryptSecret } from "../lib/crypto.js";
 import { extractVariables, isValidEmail } from "../lib/render.js";
 import { SUPPORTED_PROVIDERS } from "../lib/providers/index.js";
+import { migrate } from "../migrate.js";
 import {
   getConfig,
   getTemplateByKey,
@@ -14,6 +15,29 @@ import {
 
 const router = Router();
 
+// Every request retries the (idempotent, cached-on-success) migration first,
+// so the Email Service comes online automatically as soon as the database
+// connection string is fixed -- no restart required.
+router.use(async (_req, res, next) => {
+  try {
+    await migrate();
+    next();
+  } catch (err) {
+    res.status(503).json({
+      success: false,
+      error:
+        "Email database is not reachable. Check the SUPABASE_DB_URL secret (use the pooled connection string, not the direct one).",
+      detail: err.message,
+    });
+  }
+});
+
+// Wraps an async route handler so DB/provider errors return JSON instead of
+// crashing the process or hanging the request.
+function ah(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
 function serializeConfig(config) {
   if (!config) return null;
   const { api_key_encrypted, ...rest } = config;
@@ -21,10 +45,10 @@ function serializeConfig(config) {
 }
 
 // ── Configuration ───────────────────────────────────────────────────────
-router.get("/config", async (_req, res) => {
+router.get("/config", ah(async (_req, res) => {
   const config = await getConfig();
   res.json({ success: true, data: serializeConfig(config), providers: SUPPORTED_PROVIDERS });
-});
+}));
 
 router.put("/config", async (req, res) => {
   try {
@@ -110,14 +134,14 @@ router.post("/test-send", async (req, res) => {
 });
 
 // ── Templates ────────────────────────────────────────────────────────────
-router.get("/templates", async (_req, res) => {
+router.get("/templates", ah(async (_req, res) => {
   const { rows } = await pool.query(
     "SELECT * FROM email_templates ORDER BY category, name",
   );
   res.json({ success: true, data: rows });
-});
+}));
 
-router.get("/templates/:key", async (req, res) => {
+router.get("/templates/:key", ah(async (req, res) => {
   const template = await getTemplateByKey(req.params.key);
   if (!template) return res.status(404).json({ success: false, error: "Template not found." });
   const { rows: versions } = await pool.query(
@@ -134,7 +158,7 @@ router.get("/templates/:key", async (req, res) => {
       versions,
     },
   });
-});
+}));
 
 router.post("/templates", async (req, res) => {
   try {
@@ -192,10 +216,10 @@ router.put("/templates/:key", async (req, res) => {
   }
 });
 
-router.delete("/templates/:key", async (req, res) => {
+router.delete("/templates/:key", ah(async (req, res) => {
   await pool.query("DELETE FROM email_templates WHERE key = $1", [req.params.key]);
   res.json({ success: true });
-});
+}));
 
 router.post("/templates/:key/test-send", async (req, res) => {
   try {
@@ -233,7 +257,7 @@ router.post("/send", async (req, res) => {
 });
 
 // ── Logs / Queue ─────────────────────────────────────────────────────────
-router.get("/logs", async (req, res) => {
+router.get("/logs", ah(async (req, res) => {
   const { status, templateKey, search, page = "1", limit = "25" } = req.query;
   const conditions = [];
   const params = [];
@@ -276,13 +300,13 @@ router.get("/logs", async (req, res) => {
       total: Number(countResult.rows[0].count),
     },
   });
-});
+}));
 
-router.get("/logs/:id", async (req, res) => {
+router.get("/logs/:id", ah(async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM email_queue WHERE id = $1", [req.params.id]);
   if (!rows[0]) return res.status(404).json({ success: false, error: "Log entry not found." });
   res.json({ success: true, data: rows[0] });
-});
+}));
 
 router.post("/logs/:id/resend", async (req, res) => {
   try {
@@ -293,13 +317,21 @@ router.post("/logs/:id/resend", async (req, res) => {
   }
 });
 
-router.get("/logs/:id/download", async (req, res) => {
+router.get("/logs/:id/download", ah(async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM email_queue WHERE id = $1", [req.params.id]);
   const log = rows[0];
   if (!log) return res.status(404).json({ success: false, error: "Log entry not found." });
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Content-Disposition", `attachment; filename="email-log-${log.id}.json"`);
   res.send(JSON.stringify(log, null, 2));
+}));
+
+// Fallback error handler for anything that slips past individual try/catch
+// blocks above -- always JSON, never an HTML stack trace. Must be registered
+// last so Express treats it as error-handling middleware.
+router.use((err, _req, res, _next) => {
+  console.error("[email routes] unhandled error:", err);
+  res.status(500).json({ success: false, error: err.message || "Unexpected error." });
 });
 
 export default router;
