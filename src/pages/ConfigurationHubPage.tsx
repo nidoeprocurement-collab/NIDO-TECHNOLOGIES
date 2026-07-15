@@ -10,6 +10,8 @@ import {
   Zap,
   DollarSign,
   Mail,
+  LayoutTemplate,
+  ScrollText,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -46,9 +48,21 @@ const menuItems = [
   },
   {
     title: "Email Configuration",
-    description: "Provider, sender identity, templates & logs",
+    description: "Provider, sender identity & delivery settings",
     icon: Mail,
     href: "/configuration/email-settings",
+  },
+  {
+    title: "Email Templates",
+    description: "Manage and preview reusable email templates",
+    icon: LayoutTemplate,
+    href: "/configuration/email-templates",
+  },
+  {
+    title: "Email Logs",
+    description: "Monitor sent emails, statuses & resend failures",
+    icon: ScrollText,
+    href: "/configuration/email-logs",
   },
   {
     title: "Master Catalogue",
