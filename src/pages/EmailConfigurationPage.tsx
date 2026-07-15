@@ -22,6 +22,30 @@ import {
   type EmailProviderOption,
 } from "@/lib/emailApi"
 
+const EMAIL_TYPES: { key: string; label: string }[] = [
+  { key: "welcome_email",              label: "Welcome Email" },
+  { key: "user_invitation",            label: "User Invitation" },
+  { key: "password_reset",             label: "Password Reset" },
+  { key: "account_activation",         label: "Account Activation" },
+  { key: "otp_verification",           label: "OTP Verification" },
+  { key: "purchase_request_created",   label: "Purchase Request Created" },
+  { key: "purchase_request_approved",  label: "Purchase Request Approved" },
+  { key: "purchase_order",             label: "Purchase Order" },
+  { key: "invoice_generated",          label: "Invoice Generated" },
+  { key: "payment_reminder",           label: "Payment Reminder" },
+  { key: "contract_assigned",          label: "Contract Assigned" },
+  { key: "contract_renewal_reminder",  label: "Contract Renewal Reminder" },
+  { key: "service_request_created",    label: "Service Request Created" },
+  { key: "service_request_updated",    label: "Service Request Updated" },
+  { key: "support_ticket_created",     label: "Support Ticket Created" },
+  { key: "support_ticket_updated",     label: "Support Ticket Updated" },
+  { key: "approval_request",           label: "Approval Request" },
+  { key: "approval_completed",         label: "Approval Completed" },
+  { key: "vendor_invitation",          label: "Vendor Invitation" },
+  { key: "client_invitation",          label: "Client Invitation" },
+  { key: "general_notification",       label: "General Notification" },
+]
+
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border p-2 space-y-4">
@@ -267,6 +291,33 @@ export default function EmailConfigurationPage() {
                 <Button variant="outline" onClick={handleTestSend} disabled={sendingTest}>
                   <Send className="w-4 h-4 mr-2" /> {sendingTest ? "Sending…" : "Send Test Email"}
                 </Button>
+              </div>
+            </Section>
+
+            <Section
+              title="Email type controls"
+              description="Disable specific email types platform-wide. Disabled types are silently dropped even when a module tries to send them."
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {EMAIL_TYPES.map(({ key, label }) => {
+                  const disabled = config.disabled_types.includes(key)
+                  return (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="text-sm">{label}</span>
+                      <Switch
+                        checked={!disabled}
+                        onCheckedChange={(enabled) =>
+                          update(
+                            "disabled_types",
+                            enabled
+                              ? config.disabled_types.filter((t) => t !== key)
+                              : [...config.disabled_types, key],
+                          )
+                        }
+                      />
+                    </div>
+                  )
+                })}
               </div>
             </Section>
 

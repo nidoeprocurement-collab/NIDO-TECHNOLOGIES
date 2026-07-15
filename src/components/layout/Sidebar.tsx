@@ -93,7 +93,17 @@ const adminNavigationItems: NavItem[] = [
       { label: 'Audit Trail',icon: <History size={16} />,    path: '/audit-logs',        moduleKey: 'audit_logs' },
     ],
   },
-  { label: 'Configuration', icon: <Settings size={20} />, path: '/configuration', moduleKey: 'configuration' },
+  {
+    label: 'Configuration',
+    icon: <Settings size={20} />,
+    moduleKey: 'configuration',
+    children: [
+      { label: 'Configuration Hub',  icon: <Settings size={16} />,     path: '/configuration',                      moduleKey: 'configuration' },
+      { label: 'Email Configuration',icon: <Mail size={16} />,          path: '/configuration/email-settings',       moduleKey: 'configuration' },
+      { label: 'Email Templates',    icon: <FileText size={16} />,      path: '/configuration/email-templates',      moduleKey: 'configuration' },
+      { label: 'Email Logs',         icon: <History size={16} />,       path: '/configuration/email-logs',           moduleKey: 'configuration' },
+    ],
+  },
 ];
 
 // ── Client Portal navigation ──────────────────────────────────────────────────

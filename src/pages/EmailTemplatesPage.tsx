@@ -36,6 +36,8 @@ export default function EmailTemplatesPage() {
   const [sampleVars, setSampleVars] = useState<Record<string, string>>({})
   const [sendingTest, setSendingTest] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyVersion, setHistoryVersion] = useState<import("@/lib/emailApi").EmailTemplateVersion | null>(null)
 
   const loadList = async () => {
     setLoading(true)
@@ -193,9 +195,12 @@ export default function EmailTemplatesPage() {
                 )}
 
                 {detail.versions.length > 0 && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <History className="w-3.5 h-3.5" /> {detail.versions.length} previous version(s) retained
-                  </div>
+                  <button
+                    onClick={() => setHistoryOpen(true)}
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <History className="w-3.5 h-3.5" /> View {detail.versions.length} previous version(s)
+                  </button>
                 )}
 
                 <div className="flex items-center gap-2 pt-2">
@@ -214,6 +219,76 @@ export default function EmailTemplatesPage() {
           </div>
         )}
       </div>
+
+      {/* Version history dialog */}
+      <Dialog open={historyOpen} onOpenChange={(o) => { setHistoryOpen(o); if (!o) setHistoryVersion(null) }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-4 h-4" /> Version history — {detail?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
+            {/* version list */}
+            <div className="border rounded-lg divide-y overflow-hidden">
+              {detail?.versions.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setHistoryVersion(v)}
+                  className={`w-full text-left p-2 hover:bg-slate-50 transition-colors text-sm ${historyVersion?.id === v.id ? "bg-blue-50" : ""}`}
+                >
+                  <div className="font-medium">v{v.version}</div>
+                  <div className="text-xs text-muted-foreground">{new Date(v.created_at).toLocaleString()}</div>
+                  {v.created_by && <div className="text-xs text-muted-foreground">by {v.created_by}</div>}
+                </button>
+              ))}
+            </div>
+            {/* version detail */}
+            {historyVersion ? (
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Subject</span>
+                  <div className="mt-1 font-medium">{historyVersion.subject}</div>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">HTML body</span>
+                  <pre className="mt-1 text-xs font-mono bg-slate-50 border rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap">{historyVersion.html_body}</pre>
+                </div>
+                {historyVersion.text_body && (
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide">Plain-text body</span>
+                    <pre className="mt-1 text-xs font-mono bg-slate-50 border rounded p-2 max-h-24 overflow-auto whitespace-pre-wrap">{historyVersion.text_body}</pre>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground flex items-center justify-center h-32">
+                Select a version to preview it
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            {historyVersion && detail && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDetail({
+                    ...detail,
+                    subject: historyVersion.subject,
+                    html_body: historyVersion.html_body,
+                    text_body: historyVersion.text_body,
+                  })
+                  setHistoryOpen(false)
+                  setHistoryVersion(null)
+                }}
+              >
+                Restore this version
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => { setHistoryOpen(false); setHistoryVersion(null) }}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
