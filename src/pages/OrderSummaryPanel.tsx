@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Shield, Truck, RotateCcw, Mail, Phone, Pencil } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useOrgConfig } from "@/contexts/ConfigContext";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -13,6 +14,7 @@ export default function OrderSummaryPanel({
 }) {
   const navigate = useNavigate();
   const { items: cart } = useCart();
+  const org = useOrgConfig();
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
@@ -135,14 +137,20 @@ export default function OrderSummaryPanel({
         <p className="font-semibold text-blue-700 text-sm mb-0.5">Need help with your order?</p>
         <p className="text-xs text-gray-500 mb-3">Contact our support team</p>
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <Mail size={12} className="text-gray-400" />
-            support@nido.com
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <Phone size={12} className="text-gray-400" />
-            +91 1800 123 4567
-          </div>
+          {(org.supportEmail || org.email) && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Mail size={12} className="text-gray-400" />
+              <a href={`mailto:${org.supportEmail || org.email}`} className="hover:text-blue-600">
+                {org.supportEmail || org.email}
+              </a>
+            </div>
+          )}
+          {(org.supportPhone || org.phone) && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Phone size={12} className="text-gray-400" />
+              {org.supportPhone || org.phone}
+            </div>
+          )}
         </div>
       </div>
     </div>

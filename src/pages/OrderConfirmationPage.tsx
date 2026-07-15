@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, Copy, Check, Mail, Phone, MapPin, CreditCard } from "lucide-react";
 import FloatingCartButton from "@/components/FloatingCartButton";
+import { useOrgConfig } from "@/contexts/ConfigContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ export default function OrderConfirmationPage() {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
   const [copied, setCopied] = useState(false);
+  const org = useOrgConfig();
 
   const state = location.state as ConfirmationState | null;
 
@@ -158,12 +160,17 @@ export default function OrderConfirmationPage() {
                 <li className="flex items-start gap-2">
                   <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
                   <span>
-                    If you need assistance, contact customer support at{" "}
-                    <a href="mailto:support@nidotech.com" className="text-blue-600 hover:underline">
-                      support@nidotech.com
-                    </a>{" "}
-                    or{" "}
-                    <strong className="text-gray-800">+91 98765 43210</strong>
+                    If you need assistance, contact customer support
+                    {(org.supportEmail || org.email) && (
+                      <> at{" "}
+                        <a href={`mailto:${org.supportEmail || org.email}`} className="text-blue-600 hover:underline">
+                          {org.supportEmail || org.email}
+                        </a>
+                      </>
+                    )}
+                    {(org.supportPhone || org.phone) && (
+                      <> or <strong className="text-gray-800">{org.supportPhone || org.phone}</strong></>
+                    )}
                   </span>
                 </li>
               </ul>
@@ -186,16 +193,20 @@ export default function OrderConfirmationPage() {
                 Contact our support team for assistance:
               </p>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Mail size={14} className="text-gray-400 shrink-0" />
-                  <a href="mailto:support@nidotech.com" className="text-blue-600 hover:underline">
-                    support@nidotech.com
-                  </a>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <Phone size={14} className="text-gray-400 shrink-0" />
-                  <span>+91 98765 43210</span>
-                </div>
+                {(org.supportEmail || org.email) && (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Mail size={14} className="text-gray-400 shrink-0" />
+                    <a href={`mailto:${org.supportEmail || org.email}`} className="text-blue-600 hover:underline">
+                      {org.supportEmail || org.email}
+                    </a>
+                  </div>
+                )}
+                {(org.supportPhone || org.phone) && (
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <Phone size={14} className="text-gray-400 shrink-0" />
+                    <span>{org.supportPhone || org.phone}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

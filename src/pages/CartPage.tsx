@@ -8,6 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { useOrgConfig } from "@/contexts/ConfigContext";
 
 function formatPrice(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -190,6 +191,7 @@ function SuggestedCard({
 export default function CartPage() {
   const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
   const navigate = useNavigate();
+  const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
   const [suggested, setSuggested] = useState<ClientCatalogEntry[]>(() => getSuggested(cart));
 
@@ -426,14 +428,20 @@ export default function CartPage() {
               <p className="font-semibold text-blue-600 text-sm mb-1">Need help with your order?</p>
               <p className="text-xs text-gray-500 mb-3">Contact our support team</p>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Mail size={13} className="text-gray-400" />
-                  support@nido.com
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Phone size={13} className="text-gray-400" />
-                  +91 1800 123 4567
-                </div>
+                {(org.supportEmail || org.email) && (
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Mail size={13} className="text-gray-400" />
+                    <a href={`mailto:${org.supportEmail || org.email}`} className="hover:text-blue-600">
+                      {org.supportEmail || org.email}
+                    </a>
+                  </div>
+                )}
+                {(org.supportPhone || org.phone) && (
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <Phone size={13} className="text-gray-400" />
+                    {org.supportPhone || org.phone}
+                  </div>
+                )}
               </div>
             </div>
           </div>
