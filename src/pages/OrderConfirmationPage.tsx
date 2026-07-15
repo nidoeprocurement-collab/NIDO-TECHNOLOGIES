@@ -22,7 +22,7 @@ type ConfirmationState = {
   gst: number;
   shipping: number;
   total: number;
-  address: { label: string; line1: string; line2: string; line3?: string; phone: string } | null;
+  address: { label: string; line1: string; line2: string; city?: string; state?: string; zip?: string; line3?: string; phone: string } | null;
   paymentMethod: string;
   cardLast4: string;
   paymentTerms: string;
@@ -279,6 +279,9 @@ export default function OrderConfirmationPage() {
                   <p className="font-medium text-gray-800">{address.label}</p>
                   <p>{address.line1}</p>
                   {address.line2 && <p>{address.line2}</p>}
+                  {(address.city || address.state || address.zip) && (
+                    <p>{[address.city, address.state, address.zip].filter(Boolean).join(", ")}</p>
+                  )}
                   {address.line3 && <p>{address.line3}</p>}
                   <p className="text-gray-400 text-xs mt-1">{address.phone}</p>
                 </div>

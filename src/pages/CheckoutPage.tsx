@@ -15,12 +15,23 @@ interface DeliveryAddress {
   label: string;
   line1: string;
   line2: string;
+  city: string;
+  state: string;
+  zip: string;
   phone: string;
   isDefault: boolean;
 }
 
 type AddressForm = Omit<DeliveryAddress, "id" | "isDefault">;
-const EMPTY_FORM: AddressForm = { label: "", line1: "", line2: "", phone: "" };
+const EMPTY_FORM: AddressForm = { label: "", line1: "", line2: "", city: "", state: "", zip: "", phone: "" };
+
+function isValidPhone(raw: string): boolean {
+  const digits = raw.replace(/[\s\-().+]/g, "");
+  // Accept 10-digit Indian mobile (starts 6-9) or with 91 prefix (12 digits)
+  if (/^[6-9]\d{9}$/.test(digits)) return true;
+  if (/^91[6-9]\d{9}$/.test(digits)) return true;
+  return false;
+}
 
 // ── Persistence ────────────────────────────────────────────────────────────────
 
@@ -44,14 +55,14 @@ function persistAddresses(clientId: string, addresses: DeliveryAddress[]) {
 function buildDefaultAddress(clientId: string): DeliveryAddress | null {
   const client = getClients().find((c) => c.id === clientId);
   if (!client) return null;
-  const cityLine = [client.billingCity, client.billingState, client.billingPincode]
-    .filter(Boolean)
-    .join(", ");
   return {
     id: 1,
     label: "Office",
     line1: client.billingAddress || "",
-    line2: cityLine,
+    line2: "",
+    city: client.billingCity || "",
+    state: client.billingState || "",
+    zip: client.billingPincode || "",
     phone: client.phone || client.mobile || "",
     isDefault: true,
   };
@@ -78,52 +89,109 @@ function AddressFormBlock({
   onSave: (f: AddressForm) => void;
   onCancel: () => void;
 }) {
-  const [form, setForm] = useState<AddressForm>(initial);
+  const [form, setForm] = useState<AddressForm>({ ...EMPTY_FORM, ...initial });
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
   const set = (k: keyof AddressForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [k]: e.target.value }));
 
-  const valid = form.label.trim() && form.line1.trim() && form.phone.trim();
+  const phoneValid = isValidPhone(form.phone);
+  const phoneError = phoneTouched && form.phone.trim() && !phoneValid;
+
+  const valid =
+    form.label.trim() &&
+    form.line1.trim() &&
+    form.city.trim() &&
+    form.state.trim() &&
+    form.zip.trim() &&
+    form.phone.trim() &&
+    phoneValid;
 
   return (
     <div className="border border-blue-300 bg-blue-50 rounded-xl p-2 space-y-3">
+      {/* Row 1: Label + Phone */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Label</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Label <span className="text-red-500">*</span></label>
           <input
             value={form.label}
             onChange={set("label")}
             placeholder="e.g. Office, Warehouse"
-            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
           <input
             value={form.phone}
             onChange={set("phone")}
+            onBlur={() => setPhoneTouched(true)}
             placeholder="+91 98765 43210"
-            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
+            maxLength={15}
+            className={`w-full border rounded-lg px-2 py-2 text-sm outline-none transition-colors bg-white ${
+              phoneError ? "border-red-400 focus:border-red-400" : "border-gray-200 focus:border-blue-400"
+            }`}
           />
+          {phoneError && (
+            <p className="text-xs text-red-500 mt-1">Enter a valid 10-digit mobile number</p>
+          )}
         </div>
       </div>
+
+      {/* Row 2: Address Line 1 */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 1</label>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 1 <span className="text-red-500">*</span></label>
         <input
           value={form.line1}
           onChange={set("line1")}
           placeholder="Street, building, floor..."
-          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
+          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
         />
       </div>
+
+      {/* Row 3: Address Line 2 */}
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 2</label>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 2 <span className="text-gray-400 font-normal">(optional)</span></label>
         <input
           value={form.line2}
           onChange={set("line2")}
-          placeholder="City, state, pincode..."
-          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400"
+          placeholder="Apartment, suite, floor..."
+          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
         />
       </div>
+
+      {/* Row 4: City + State + Zip */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
+          <input
+            value={form.city}
+            onChange={set("city")}
+            placeholder="e.g. Chennai"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">State <span className="text-red-500">*</span></label>
+          <input
+            value={form.state}
+            onChange={set("state")}
+            placeholder="e.g. Tamil Nadu"
+            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">ZIP / Pincode <span className="text-red-500">*</span></label>
+          <input
+            value={form.zip}
+            onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+            placeholder="600001"
+            maxLength={6}
+            className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
+          />
+        </div>
+      </div>
+
       <div className="flex gap-2 justify-end">
         <button
           onClick={onCancel}
@@ -241,7 +309,7 @@ export default function CheckoutPage() {
                   editingId === addr.id ? (
                     <AddressFormBlock
                       key={addr.id}
-                      initial={{ label: addr.label, line1: addr.line1, line2: addr.line2, phone: addr.phone }}
+                      initial={{ label: addr.label, line1: addr.line1, line2: addr.line2 ?? "", city: addr.city ?? "", state: addr.state ?? "", zip: addr.zip ?? "", phone: addr.phone }}
                       onSave={(f) => saveEdit(addr.id, f)}
                       onCancel={() => setEditingId(null)}
                     />
@@ -276,6 +344,9 @@ export default function CheckoutPage() {
                         <p className="text-xs text-gray-500 leading-relaxed">
                           {addr.line1}
                           {addr.line2 && <><br />{addr.line2}</>}
+                          {(addr.city || addr.state || addr.zip) && (
+                            <><br />{[addr.city, addr.state, addr.zip].filter(Boolean).join(", ")}</>
+                          )}
                           <br />{addr.phone}
                         </p>
                       </div>

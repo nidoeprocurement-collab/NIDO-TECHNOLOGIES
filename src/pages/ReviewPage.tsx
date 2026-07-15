@@ -14,6 +14,9 @@ interface DeliveryAddress {
   label: string;
   line1: string;
   line2: string;
+  city?: string;
+  state?: string;
+  zip?: string;
   phone: string;
   isDefault: boolean;
 }
@@ -161,7 +164,7 @@ export default function ReviewPage() {
         shipping: SHIPPING_FEE,
         total: totalAmount,
         address: selectedAddr
-          ? { label: selectedAddr.label, line1: selectedAddr.line1, line2: selectedAddr.line2, phone: selectedAddr.phone }
+          ? { label: selectedAddr.label, line1: selectedAddr.line1, line2: selectedAddr.line2 ?? "", city: selectedAddr.city ?? "", state: selectedAddr.state ?? "", zip: selectedAddr.zip ?? "", phone: selectedAddr.phone }
           : null,
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
