@@ -200,9 +200,12 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     { key: "contract",         label: "Contract",                value: "CTR-",  description: "Contract documents",                builtIn: true },
     { key: "serviceRequest",   label: "Service Request",         value: "SVC-",  description: "Service Request numbers",           builtIn: true },
     { key: "supportTicket",    label: "Support Ticket",          value: "TKT-",  description: "Support Ticket numbers",            builtIn: true },
-    { key: "vendor",           label: "Vendor",                  value: "VND-",  description: "Vendor IDs",                        builtIn: true },
-    { key: "client",           label: "Client",                  value: "CL-",   description: "Client IDs",                        builtIn: true },
-    { key: "department",       label: "Department",              value: "DEPT-", description: "Department IDs",                    builtIn: true },
+    { key: "vendor",              label: "Vendor",                  value: "VND-",  description: "Vendor IDs",                              builtIn: true },
+    { key: "client",              label: "Client",                  value: "CL-",   description: "Client IDs",                              builtIn: true },
+    { key: "department",          label: "Department",              value: "DEPT-", description: "Department IDs",                          builtIn: true },
+    { key: "vendorProductCode",   label: "Vendor Product Code",     value: "VPC-",  description: "Vendor-specific product codes",           builtIn: true },
+    { key: "masterProductCode",   label: "Master Product Code",     value: "MPC-",  description: "Master catalogue product codes",          builtIn: true },
+    { key: "sku",                 label: "SKU",                     value: "SKU-",  description: "Stock Keeping Unit codes",                builtIn: true },
   ],
 };
 

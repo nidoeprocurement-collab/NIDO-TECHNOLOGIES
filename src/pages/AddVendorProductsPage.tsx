@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
+import { getPrefix } from "@/lib/configService";
 import {
   addVendorProducts,
   updateVendorProduct,
@@ -137,7 +138,8 @@ export default function AddVendorProductsPage() {
         // reserved when the user confirms with "Add Products", so cancelling
         // the page wastes no sequence numbers.
         setSelectedRows((rows) => {
-          const preview = `VPC-${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
+          const vpcPrefix = getPrefix('vendorProductCode') || 'VPC-';
+          const preview = `${vpcPrefix}${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
           return [...rows, { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: preview }];
         });
       }

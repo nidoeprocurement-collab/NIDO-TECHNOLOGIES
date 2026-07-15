@@ -74,7 +74,11 @@ export function getAllVendorProducts(): Record<string, VendorProduct[]> {
 // On first use the counter is bootstrapped by scanning all existing products
 // so that any products added before this code was deployed are accounted for.
 
+import { getPrefix } from './configService';
+
 const VPC_COUNTER_KEY = 'nido_vpc_counter';
+// Historical bootstrap regex — always matches the original VPC- default so
+// existing product codes are counted regardless of the current prefix setting.
 const VPC_RE = /^VPC-(\d+)$/i;
 
 function readVpcCounter(): number {
@@ -119,9 +123,10 @@ export function peekVpcCounter(): number {
  */
 export function reserveVendorProductCodes(count: number): string[] {
   if (count <= 0) return [];
+  const prefix = getPrefix('vendorProductCode') || 'VPC-';
   const current = readVpcCounter();
   const codes = Array.from({ length: count }, (_, i) =>
-    `VPC-${String(current + 1 + i).padStart(5, '0')}`
+    `${prefix}${String(current + 1 + i).padStart(5, '0')}`
   );
   writeVpcCounter(current + count);
   return codes;

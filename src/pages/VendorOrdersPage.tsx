@@ -84,6 +84,12 @@ const LINE_ITEMS = [
 ];
 
 function OrderDetail({ order, onBack }: OrderDetailProps) {
+  const { config } = useConfig();
+  const skuPrefix = config.prefixes.find(p => p.key === "sku")?.value || "SKU-";
+  const displayedLineItems = useMemo(
+    () => LINE_ITEMS.map(li => ({ ...li, sku: li.sku.replace(/^SKU-/, skuPrefix) })),
+    [skuPrefix]
+  );
   const infoRows: [string, React.ReactNode][] = [
     ["Order ID",   <OrderLink id={order.orderId} style={{ fontFamily: "monospace", fontWeight: 500 }} />],
     ["PO Number",  <POLink id={order.id} style={{ fontWeight: 500 }} />],
@@ -164,7 +170,7 @@ function OrderDetail({ order, onBack }: OrderDetailProps) {
               <tr>{["Item", "SKU", "Qty", "Unit Price", "Total"].map(h => <th key={h} style={th}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {LINE_ITEMS.map(item => (
+              {displayedLineItems.map(item => (
                 <tr key={item.sku}>
                   <td style={cell}>{item.name}</td>
                   <td style={{ ...cell, fontFamily: "monospace", fontSize: 12, color: _muted }}>{item.sku}</td>

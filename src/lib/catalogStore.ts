@@ -1,3 +1,5 @@
+import { getPrefix } from './configService';
+
 export interface CatalogSpec {
   id: string;
   specification: string;
@@ -194,8 +196,9 @@ export function removeArchivedProductFromDownstream(id: string, masterProductCod
 }
 
 export function generateMasterProductCode(): string {
+  const prefix = getPrefix('masterProductCode') || 'MPC-';
   const year = new Date().getFullYear();
   const counter = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) + 1;
   localStorage.setItem(COUNTER_KEY, String(counter));
-  return `MPC-${year}-${String(counter).padStart(6, '0')}`;
+  return `${prefix}${year}-${String(counter).padStart(6, '0')}`;
 }
