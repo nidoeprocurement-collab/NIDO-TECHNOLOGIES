@@ -1,19 +1,157 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
+  TableBody,
+  TableCell,
+  TableHead,
   TableHeader,
   TableRow,
-  TableHead,
 } from "@/components/ui/table"
+import { Download, Plus, FileText, Search, RefreshCw } from "lucide-react"
+import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore"
 
-import { Download, Plus } from "lucide-react"
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatINR(n: number) {
+  return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatDate(iso: string): string {
+  if (!iso) return "—"
+  try {
+    const d = new Date(iso)
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+  } catch {
+    return iso
+  }
+}
+
+// ── Status badge colours ───────────────────────────────────────────────────────
+
+const STATUS_STYLES: Record<POStatus, { bg: string; text: string; border: string }> = {
+  Draft:       { bg: "#f9fafb", text: "#6b7280", border: "#e5e7eb" },
+  Processing:  { bg: "#faf5ff", text: "#6b21a8", border: "#d8b4fe" },
+  Confirmed:   { bg: "#fffbeb", text: "#92400e", border: "#fcd34d" },
+  Shipped:     { bg: "#eff6ff", text: "#1e40af", border: "#bfdbfe" },
+  Delivered:   { bg: "#f0fdf4", text: "#166534", border: "#bbf7d0" },
+  Closed:      { bg: "#f3f4f6", text: "#374151", border: "#d1d5db" },
+  Cancelled:   { bg: "#fef2f2", text: "#991b1b", border: "#fecaca" },
+}
+
+function StatusPill({ status }: { status: POStatus }) {
+  const s = STATUS_STYLES[status] ?? STATUS_STYLES["Draft"]
+  return (
+    <span
+      style={{
+        padding: "3px 10px",
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 500,
+        background: s.bg,
+        color: s.text,
+        border: `1px solid ${s.border}`,
+        whiteSpace: "nowrap",
+        display: "inline-block",
+      }}
+    >
+      {status}
+    </span>
+  )
+}
+
+// Billed status is derived — no field exists yet, default to "Unbilled" for new POs
+function getBilledStatus(po: StoredPO): string {
+  if (po.status === "Closed" || po.status === "Delivered") return "Billed"
+  if (po.status === "Cancelled") return "Void"
+  return "Unbilled"
+}
+
+function BilledPill({ label }: { label: string }) {
+  const map: Record<string, { bg: string; text: string }> = {
+    Billed:   { bg: "#f0fdf4", text: "#166534" },
+    Unbilled: { bg: "#f9fafb", text: "#6b7280" },
+    Void:     { bg: "#fef2f2", text: "#991b1b" },
+  }
+  const s = map[label] ?? map["Unbilled"]
+  return (
+    <span
+      style={{
+        padding: "3px 10px",
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 500,
+        background: s.bg,
+        color: s.text,
+        border: "1px solid transparent",
+        whiteSpace: "nowrap",
+        display: "inline-block",
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function PurchaseOrdersPage() {
+  const [pos, setPos] = useState<StoredPO[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState("")
+
+  // Load POs on mount and whenever the localStorage store changes
+  function loadPOs() {
+    setPos(getAllPOs())
+  }
+
+  useEffect(() => {
+    loadPOs()
+    // Re-read when another tab or component saves a new PO
+    const handler = () => loadPOs()
+    window.addEventListener("storage", handler)
+    window.addEventListener("poCreated", handler)
+    return () => {
+      window.removeEventListener("storage", handler)
+      window.removeEventListener("poCreated", handler)
+    }
+  }, [])
+
+  // Filter by search
+  const filtered = pos.filter((po) => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (
+      po.poNumber.toLowerCase().includes(q) ||
+      po.orderId.toLowerCase().includes(q) ||
+      po.vendorName.toLowerCase().includes(q) ||
+      po.referenceNumber?.toLowerCase().includes(q)
+    )
+  })
+
+  const allChecked = filtered.length > 0 && filtered.every((po) => selected.has(po.poNumber))
+
+  function toggleAll() {
+    if (allChecked) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map((po) => po.poNumber)))
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   return (
     <div className="max-w-[1280px] mx-auto">
 
@@ -22,11 +160,30 @@ export default function PurchaseOrdersPage() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-foreground">
-            All Purchase Orders
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">All Purchase Orders</h1>
+            {pos.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-0.5">{pos.length} purchase order{pos.length !== 1 ? "s" : ""}</p>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
+
+            {/* Search */}
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search PO, order, vendor…"
+                className="pl-8 pr-3 py-1.5 text-sm border border-border rounded-lg outline-none focus:border-blue-400 bg-background w-52"
+              />
+            </div>
+
+            {/* Refresh */}
+            <Button variant="outline" size="sm" onClick={loadPOs} title="Refresh">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
 
             {/* Export Button */}
             <Button
@@ -56,7 +213,7 @@ export default function PurchaseOrdersPage() {
 
                 {/* Checkbox */}
                 <TableHead className="w-[40px]">
-                  <Checkbox />
+                  <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
                 </TableHead>
 
                 <TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
@@ -97,6 +254,97 @@ export default function PurchaseOrdersPage() {
 
               </TableRow>
             </TableHeader>
+
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={10} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                      <FileText size={40} className="text-muted-foreground/40" />
+                      <p className="text-sm font-medium">
+                        {search.trim() ? "No purchase orders match your search" : "No purchase orders yet"}
+                      </p>
+                      {!search.trim() && (
+                        <p className="text-xs text-muted-foreground/70">
+                          Purchase orders are created when you assign vendors to items in an order.
+                        </p>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((po) => (
+                  <TableRow
+                    key={po.poNumber}
+                    className={`hover:bg-muted/30 transition-colors ${selected.has(po.poNumber) ? "bg-blue-50/50" : ""}`}
+                  >
+                    {/* Checkbox */}
+                    <TableCell className="w-[40px]">
+                      <Checkbox
+                        checked={selected.has(po.poNumber)}
+                        onCheckedChange={() => toggleOne(po.poNumber)}
+                      />
+                    </TableCell>
+
+                    {/* Date */}
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {po.createdOnDisplay || formatDate(po.createdOn)}
+                    </TableCell>
+
+                    {/* Purchase Order# */}
+                    <TableCell>
+                      <span className="text-sm font-semibold text-blue-600">{po.poNumber}</span>
+                    </TableCell>
+
+                    {/* Source Order# */}
+                    <TableCell className="text-sm text-foreground font-medium">
+                      {po.orderId || "—"}
+                    </TableCell>
+
+                    {/* Reference# */}
+                    <TableCell className="text-sm text-muted-foreground">
+                      {po.referenceNumber || po.subOrderId || "—"}
+                    </TableCell>
+
+                    {/* Vendor Name */}
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                          style={{ background: "#2563eb" }}
+                        >
+                          {(po.vendorName?.[0] ?? "V").toUpperCase()}
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{po.vendorName}</span>
+                      </div>
+                    </TableCell>
+
+                    {/* Status */}
+                    <TableCell>
+                      <StatusPill status={po.status} />
+                    </TableCell>
+
+                    {/* Billed Status */}
+                    <TableCell>
+                      <BilledPill label={getBilledStatus(po)} />
+                    </TableCell>
+
+                    {/* Amount */}
+                    <TableCell className="text-sm font-semibold text-foreground text-right whitespace-nowrap">
+                      {formatINR(po.grandTotal)}
+                    </TableCell>
+
+                    {/* Delivery Date */}
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {po.requestedDelivery
+                        ? formatDate(po.requestedDelivery)
+                        : "—"}
+                    </TableCell>
+
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
           </Table>
 
         </div>
