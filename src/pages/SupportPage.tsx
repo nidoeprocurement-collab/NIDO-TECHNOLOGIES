@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getPrefix } from "@/lib/configService";
 import { toast } from "sonner";
 import { Plus, Search, MessageCircle, Clock, CheckCircle, AlertCircle } from "lucide-react";
 
@@ -60,7 +61,7 @@ export default function SupportPage() {
     }
     const newTicket = {
       id: `tkt_${Date.now()}`,
-      number: `TKT-${String(tickets.length + 1).padStart(3, "0")}`,
+      number: `${getPrefix("supportTicket") || "TKT-"}${String(tickets.length + 1).padStart(3, "0")}`,
       subject: form.subject,
       status: "open",
       priority: form.priority,

@@ -2,6 +2,8 @@
 // All POs created from the order-detail flow are written here so that
 // VendorOrdersPage and VendorOrderDetailPage can read real data.
 
+import { getPrefix } from "./configService";
+
 export interface PODocument {
   id: string;
   name: string;
@@ -127,11 +129,18 @@ const COUNTER_KEY = "nido_po_counter";
  * Generate the next PO number atomically.
  * Reads a dedicated counter, increments it, and verifies uniqueness
  * against existing records to survive concurrent tabs.
+ * Reads the current prefix from config so changes in General Settings take effect immediately.
  */
 export function generatePoNumber(): string {
+  const prefix = getPrefix("purchaseOrder") || "PO-";
+
+  // Build regex dynamically from current prefix to parse existing numbers
+  const prefixEscaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${prefixEscaped}(\\d+)$`);
+
   const existing = new Set(
     getAllPOs()
-      .map(p => { const m = p.poNumber.match(/^PO-(\d+)$/); return m ? parseInt(m[1], 10) : 0; })
+      .map(p => { const m = p.poNumber.match(re); return m ? parseInt(m[1], 10) : 0; })
   );
 
   // Start from the stored counter or 8 (one before the sample PO-00008)
@@ -141,5 +150,5 @@ export function generatePoNumber(): string {
   while (existing.has(next)) next++;
 
   localStorage.setItem(COUNTER_KEY, String(next));
-  return `PO-${String(next).padStart(5, "0")}`;
+  return `${prefix}${String(next).padStart(5, "0")}`;
 }

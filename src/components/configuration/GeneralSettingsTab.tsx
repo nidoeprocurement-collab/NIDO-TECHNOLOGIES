@@ -7,9 +7,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Eye, Save, Upload, AlertCircle, RotateCcw } from "lucide-react"
+import { Eye, Save, Upload, AlertCircle, RotateCcw, Plus, Trash2 } from "lucide-react"
 import { useConfig } from "@/contexts/ConfigContext"
-import type { GeneralSettings } from "@/lib/configService"
+import type { GeneralSettings, PrefixEntry } from "@/lib/configService"
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -86,6 +86,36 @@ export default function GeneralSettingsPage() {
     reader.readAsDataURL(file)
   }
 
+  // ── Prefix helpers ──────────────────────────────────────────────────────────
+  const updatePrefix = (key: string, value: string) => {
+    setDraft(prev => ({
+      ...prev,
+      prefixes: prev.prefixes.map(p => p.key === key ? { ...p, value } : p),
+    }))
+  }
+
+  const addCustomPrefix = () => {
+    const newEntry: PrefixEntry = {
+      key: `custom_${Date.now()}`,
+      label: "New Prefix",
+      value: "NEW-",
+      description: "Custom prefix",
+      builtIn: false,
+    }
+    setDraft(prev => ({ ...prev, prefixes: [...prev.prefixes, newEntry] }))
+  }
+
+  const updateCustomPrefix = (key: string, patch: Partial<PrefixEntry>) => {
+    setDraft(prev => ({
+      ...prev,
+      prefixes: prev.prefixes.map(p => p.key === key ? { ...p, ...patch } : p),
+    }))
+  }
+
+  const deleteCustomPrefix = (key: string) => {
+    setDraft(prev => ({ ...prev, prefixes: prev.prefixes.filter(p => p.key !== key) }))
+  }
+
   const { organization: org, theme, localization, procurement, notifications, security } = draft
 
   return (
@@ -127,7 +157,7 @@ export default function GeneralSettingsPage() {
           <TabsTrigger value="organization">Organization</TabsTrigger>
           <TabsTrigger value="theme">Theme & Appearance</TabsTrigger>
           <TabsTrigger value="localization">Localization</TabsTrigger>
-          <TabsTrigger value="procurement">Procurement Defaults</TabsTrigger>
+          <TabsTrigger value="prefixes">Prefixes</TabsTrigger>
           <TabsTrigger value="notifications">Notifications & Alerts</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -373,104 +403,86 @@ export default function GeneralSettingsPage() {
           </Section>
         </TabsContent>
 
-        {/* ── Procurement Defaults ─────────────────────────────────────────── */}
-        <TabsContent value="procurement" className="space-y-6 mt-4">
-          <Section title="Order Defaults" description="Pre-filled values used when creating new procurement documents.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Currency</Label>
-                <Select value={procurement.defaultCurrency} onValueChange={v => update("procurement", { defaultCurrency: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="INR (₹)">INR (₹)</SelectItem>
-                    <SelectItem value="USD ($)">USD ($)</SelectItem>
-                    <SelectItem value="EUR (€)">EUR (€)</SelectItem>
-                    <SelectItem value="GBP (£)">GBP (£)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Payment Terms</Label>
-                <Select value={procurement.defaultPaymentTerms} onValueChange={v => update("procurement", { defaultPaymentTerms: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Net 15 (Payment due in 15 days)">Net 15</SelectItem>
-                    <SelectItem value="Net 30 (Payment due in 30 days)">Net 30</SelectItem>
-                    <SelectItem value="Net 45 (Payment due in 45 days)">Net 45</SelectItem>
-                    <SelectItem value="Net 60 (Payment due in 60 days)">Net 60</SelectItem>
-                    <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Delivery Terms</Label>
-                <Select value={procurement.defaultDeliveryTerms} onValueChange={v => update("procurement", { defaultDeliveryTerms: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Ex-Works">Ex-Works</SelectItem>
-                    <SelectItem value="FOB">FOB</SelectItem>
-                    <SelectItem value="CIF">CIF</SelectItem>
-                    <SelectItem value="DDP">DDP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Shipping Method</Label>
-                <Select value={procurement.defaultShippingMethod} onValueChange={v => update("procurement", { defaultShippingMethod: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Standard Shipping">Standard Shipping</SelectItem>
-                    <SelectItem value="Express Shipping">Express Shipping</SelectItem>
-                    <SelectItem value="Vendor Pickup">Vendor Pickup</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default GST %</Label>
-                <Input type="number" min={0} max={100} value={procurement.defaultGstPercent} onChange={e => update("procurement", { defaultGstPercent: e.target.value })} />
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Lead Time (days)</Label>
-                <Input type="number" min={0} value={procurement.defaultLeadTimeDays} onChange={e => update("procurement", { defaultLeadTimeDays: e.target.value })} />
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default MOQ</Label>
-                <Input type="number" min={1} value={procurement.defaultMOQ} onChange={e => update("procurement", { defaultMOQ: e.target.value })} />
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Quote Validity (days)</Label>
-                <Input type="number" min={1} value={procurement.defaultQuoteValidityDays} onChange={e => update("procurement", { defaultQuoteValidityDays: e.target.value })} />
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Default Order Priority</Label>
-                <Select value={procurement.defaultOrderPriority} onValueChange={v => update("procurement", { defaultOrderPriority: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Critical">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Approval Threshold ({localization.currencySymbol})</Label>
-                <Input type="number" min={0} value={procurement.approvalThreshold} onChange={e => update("procurement", { approvalThreshold: e.target.value })} />
-              </div>
+        {/* ── Prefixes ─────────────────────────────────────────────────────── */}
+        <TabsContent value="prefixes" className="space-y-6 mt-4">
+          <Section
+            title="Document & ID Prefixes"
+            description="Control the prefix used when generating document and entity numbers across the platform. Changes apply to all new documents immediately after saving."
+          >
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-slate-600 w-48">Document Type</th>
+                    <th className="text-left px-3 py-2 font-medium text-slate-600 w-32">Prefix</th>
+                    <th className="text-left px-3 py-2 font-medium text-slate-600">Description</th>
+                    <th className="text-left px-3 py-2 font-medium text-slate-600 w-28">Example</th>
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {draft.prefixes.map(p => (
+                    <tr key={p.key} className="hover:bg-slate-50/50">
+                      <td className="px-3 py-2">
+                        {p.builtIn
+                          ? <span className="font-medium text-slate-800">{p.label}</span>
+                          : <Input
+                              className="h-7 text-sm"
+                              value={p.label}
+                              onChange={e => updateCustomPrefix(p.key, { label: e.target.value })}
+                              placeholder="Label"
+                            />
+                        }
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-7 text-sm font-mono w-24"
+                          value={p.value}
+                          onChange={e => {
+                            const v = e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "")
+                            p.builtIn ? updatePrefix(p.key, v) : updateCustomPrefix(p.key, { value: v })
+                          }}
+                          placeholder="PREFIX-"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        {p.builtIn
+                          ? <span className="text-slate-500">{p.description}</span>
+                          : <Input
+                              className="h-7 text-sm"
+                              value={p.description}
+                              onChange={e => updateCustomPrefix(p.key, { description: e.target.value })}
+                              placeholder="Description"
+                            />
+                        }
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs text-slate-500">
+                        {p.value || "—"}00001
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {!p.builtIn && (
+                          <button
+                            onClick={() => deleteCustomPrefix(p.key)}
+                            className="text-red-400 hover:text-red-600 p-1"
+                            title="Delete custom prefix"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="pt-2 border-t">
-              <ToggleRow
-                label="Auto-approve orders under threshold"
-                description="Orders below the approval threshold skip manual review."
-                checked={procurement.autoApproveUnderThreshold}
-                onCheckedChange={v => update("procurement", { autoApproveUnderThreshold: v })}
-              />
-              <ToggleRow
-                label="Require vendor quote comparison"
-                description="At least two vendor quotes must be attached before a PO can be created."
-                checked={procurement.requireVendorQuoteComparison}
-                onCheckedChange={v => update("procurement", { requireVendorQuoteComparison: v })}
-              />
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Prefix changes apply to new documents only. Existing documents keep their original prefix.
+              </p>
+              <Button variant="outline" size="sm" onClick={addCustomPrefix}>
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Custom Prefix
+              </Button>
             </div>
           </Section>
         </TabsContent>

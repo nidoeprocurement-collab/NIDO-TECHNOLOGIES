@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { addClient as addStoredClient, getClients } from "@/lib/clientStore";
+import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -254,7 +255,7 @@ export default function AddClient() {
       const timer = setTimeout(() => {
         // Generate next ID: CL-00001, CL-00002, etc.
         const nextNumber = Math.floor(Math.random() * 10000) + 1;
-        const clientId = `CL-${String(nextNumber).padStart(5, "0")}`;
+        const clientId = `${getPrefix("client") || "CL-"}${String(nextNumber).padStart(5, "0")}`;
 
         setFormData((prev) => ({
           ...prev,

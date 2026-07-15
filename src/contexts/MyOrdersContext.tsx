@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { getPrefix } from "../lib/configService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -87,7 +88,8 @@ function cascadeStatusToSubOrders(order: MyOrder, status: MyOrderStatus) {
     }
     const updatedOn = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     for (let i = 0; i < itemCount; i++) {
-      const subId = `SO-${order.id}-${String(i + 1).padStart(3, "0")}`;
+      const soPrefix = getPrefix("salesOrder") || "SO-";
+      const subId = `${soPrefix}${order.id}-${String(i + 1).padStart(3, "0")}`;
       saved[subId] = { ...(saved[subId] || {}), itemStatus: status, updatedOn };
     }
     localStorage.setItem(key, JSON.stringify(saved));

@@ -89,6 +89,14 @@ export interface SecuritySettings {
   allowedFileTypes: string;
 }
 
+export interface PrefixEntry {
+  key: string;       // internal key e.g. "purchaseOrder"
+  label: string;     // display name e.g. "Purchase Order"
+  value: string;     // the actual prefix string e.g. "PO-"
+  description: string;
+  builtIn: boolean;  // built-in entries cannot be deleted
+}
+
 export interface GeneralSettings {
   organization: OrgSettings;
   theme: ThemeSettings;
@@ -96,6 +104,7 @@ export interface GeneralSettings {
   procurement: ProcurementSettings;
   notifications: NotificationSettings;
   security: SecuritySettings;
+  prefixes: PrefixEntry[];
 }
 
 // ── Defaults ───────────────────────────────────────────────────────────────────
@@ -175,6 +184,26 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     fileUploadLimitMB: "25",
     allowedFileTypes: ".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg",
   },
+  prefixes: [
+    { key: "purchaseOrder",    label: "Purchase Order",          value: "PO-",   description: "Purchase Order documents",          builtIn: true },
+    { key: "purchaseRequest",  label: "Purchase Request",        value: "PR-",   description: "Purchase Request documents",        builtIn: true },
+    { key: "invoice",          label: "Invoice",                 value: "INV-",  description: "Invoice documents",                 builtIn: true },
+    { key: "salesOrder",       label: "Sales Order / Sub-order", value: "SO-",   description: "Sales Orders and Sub-order IDs",    builtIn: true },
+    { key: "salesQuote",       label: "Sales Quote",             value: "QT-",   description: "Sales Quotation documents",         builtIn: true },
+    { key: "rfq",              label: "Request for Quotation",   value: "RFQ-",  description: "RFQ sent to vendors",               builtIn: true },
+    { key: "bill",             label: "Bill",                    value: "BL-",   description: "Bills received from vendors",       builtIn: true },
+    { key: "expense",          label: "Expense",                 value: "EXP-",  description: "Expense records",                   builtIn: true },
+    { key: "payment",          label: "Payment",                 value: "PMT-",  description: "Payment records",                   builtIn: true },
+    { key: "creditNote",       label: "Credit Note",             value: "CR-",   description: "Credit Note documents",             builtIn: true },
+    { key: "debitNote",        label: "Debit Note",              value: "DN-",   description: "Debit Note documents",              builtIn: true },
+    { key: "goodsReceipt",     label: "Goods Receipt Note",      value: "GRN-",  description: "Goods Receipt Note documents",      builtIn: true },
+    { key: "contract",         label: "Contract",                value: "CTR-",  description: "Contract documents",                builtIn: true },
+    { key: "serviceRequest",   label: "Service Request",         value: "SVC-",  description: "Service Request numbers",           builtIn: true },
+    { key: "supportTicket",    label: "Support Ticket",          value: "TKT-",  description: "Support Ticket numbers",            builtIn: true },
+    { key: "vendor",           label: "Vendor",                  value: "VND-",  description: "Vendor IDs",                        builtIn: true },
+    { key: "client",           label: "Client",                  value: "CL-",   description: "Client IDs",                        builtIn: true },
+    { key: "department",       label: "Department",              value: "DEPT-", description: "Department IDs",                    builtIn: true },
+  ],
 };
 
 // ── Core Functions ─────────────────────────────────────────────────────────────
@@ -185,6 +214,17 @@ export function loadConfig(): GeneralSettings {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
     if (!raw) return CONFIG_DEFAULTS;
     const parsed = JSON.parse(raw);
+
+    // Merge prefixes: keep all built-in defaults, overlay saved values, append any custom entries
+    const savedPrefixes: PrefixEntry[] = Array.isArray(parsed.prefixes) ? parsed.prefixes : [];
+    const mergedPrefixes = CONFIG_DEFAULTS.prefixes.map((def) => {
+      const saved = savedPrefixes.find((p) => p.key === def.key);
+      return saved ? { ...def, value: saved.value } : def;
+    });
+    // Append user-added custom prefixes (builtIn === false) that aren't in defaults
+    const defaultKeys = new Set(CONFIG_DEFAULTS.prefixes.map((p) => p.key));
+    const customPrefixes = savedPrefixes.filter((p) => !defaultKeys.has(p.key));
+
     return {
       organization: { ...CONFIG_DEFAULTS.organization, ...parsed.organization },
       theme: { ...CONFIG_DEFAULTS.theme, ...parsed.theme },
@@ -192,10 +232,23 @@ export function loadConfig(): GeneralSettings {
       procurement: { ...CONFIG_DEFAULTS.procurement, ...parsed.procurement },
       notifications: { ...CONFIG_DEFAULTS.notifications, ...parsed.notifications },
       security: { ...CONFIG_DEFAULTS.security, ...parsed.security },
+      prefixes: [...mergedPrefixes, ...customPrefixes],
     };
   } catch {
     return CONFIG_DEFAULTS;
   }
+}
+
+/**
+ * Get the current prefix string for a given key (e.g. "purchaseOrder" → "PO-").
+ * Falls back to the default if not found. Safe to call from non-React code.
+ */
+export function getPrefix(key: string): string {
+  const cfg = loadConfig();
+  const entry = cfg.prefixes.find((p) => p.key === key);
+  if (entry) return entry.value;
+  const def = CONFIG_DEFAULTS.prefixes.find((p) => p.key === key);
+  return def ? def.value : "";
 }
 
 /** Save settings to localStorage and notify all subscribers. */

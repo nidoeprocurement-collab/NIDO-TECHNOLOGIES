@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getPrefix } from "@/lib/configService";
 import { useNavigate } from "react-router-dom";
 import { ChevronRight, ArrowLeft, Pencil, MapPin, Building2, Lock } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
@@ -61,7 +62,7 @@ export default function ReviewPage() {
       client: "Nido Tech CorpEssentials",
       clientColor: "#2563eb",
       clientInitial: "N",
-      poNumber: `PO-${poRef}`,
+      poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
       requester: "Owner",
       requesterRole: "System Owner",
       requesterInitial: "O",
