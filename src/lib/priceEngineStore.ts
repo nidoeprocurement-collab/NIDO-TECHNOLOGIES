@@ -3,12 +3,17 @@
 // Master data, computes the winning vendor + landed cost per product, then
 // computes the client selling price from per-client charge settings, and
 // syncs the result into every client catalog that carries the product.
+//
+// Tax calculations are delegated to the centralised Tax Engine (taxEngine.ts).
+// Never hardcode tax rates here — always read from the Tax Engine so that
+// changes in Tax Settings flow through immediately to all price calculations.
 
 import { getCatalogProducts } from './catalogStore';
 import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
 import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
 import { getClientCatalog, saveClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
+import { getEffectiveVendorTaxPct, getEffectiveTaxPctForCategory } from './taxEngine';
 
 // ─── Per-vendor / per-client settings ──────────────────────────────────────
 // Charges/margins aren't captured anywhere else in the real data sources
@@ -219,11 +224,20 @@ const TERMS_MAP: Record<string, string> = {
   'NET 45': '45 Days Credit', 'NET 60': '60 Days Credit', 'NET 7': '7 Days Credit',
 };
 
-export function getLandedCost(basePrice: number, settings: VendorCommonSettings): number {
+export function getLandedCost(
+  basePrice: number,
+  settings: VendorCommonSettings,
+  productCategory?: string,
+): number {
   const extraPct = settings.extraCharges.reduce((sum, c) => sum + c.value, 0);
   const totalPct = settings.logisticsPct + settings.handlingPct + extraPct;
   const preTax = basePrice * (1 + totalPct / 100);
-  return preTax * (1 + settings.taxPct / 100);
+  // Use the Tax Engine when a product category is known; fall back to the
+  // per-vendor override only when no category context is available.
+  const effectiveTaxPct = productCategory
+    ? getEffectiveVendorTaxPct(productCategory)
+    : settings.taxPct;
+  return preTax * (1 + effectiveTaxPct / 100);
 }
 
 export interface VendorComparisonRow {
@@ -239,7 +253,7 @@ export interface VendorComparisonRow {
   score: number;
 }
 
-export function computeVendorComparisons(masterProductCode: string): VendorComparisonRow[] {
+export function computeVendorComparisons(masterProductCode: string, productCategory?: string): VendorComparisonRow[] {
   const storeMap = getAllVendorProducts();
   const allVendors = getVendors();
   const rows: VendorComparisonRow[] = [];
@@ -260,7 +274,8 @@ export function computeVendorComparisons(masterProductCode: string): VendorCompa
       stock: parseInt(match.stock) || 0,
       rating: info?.rating || 0,
       paymentTerms: TERMS_MAP[rawTerms] || rawTerms || '—',
-      landedCostPerUnit: getLandedCost(basePrice, vendorSettings),
+      // Pass category to Tax Engine for accurate, category-specific vendor tax rates
+      landedCostPerUnit: getLandedCost(basePrice, vendorSettings, productCategory),
       score: 0,
     });
   });
@@ -316,7 +331,8 @@ export interface ProductPricing {
 export function getAllProductPricing(): ProductPricing[] {
   const catalog = getCatalogProducts();
   return catalog.map(p => {
-    const comparisons = computeVendorComparisons(p.masterProductCode);
+    // Pass the product category so Tax Engine can apply category-specific vendor tax rates
+    const comparisons = computeVendorComparisons(p.masterProductCode, p.category);
     const winner = comparisons[0] || null;
     return {
       masterProductCode: p.masterProductCode,
@@ -346,6 +362,7 @@ export function computeClientFinalPrice(
   landedCostPerUnit: number,
   settings: ClientCommonSettings,
   overrideProfitPct?: number,
+  productCategory?: string,
 ): ClientPriceCalc {
   const s = settings;
   const effectiveProfitPct = overrideProfitPct ?? s.profitPct;
@@ -356,7 +373,11 @@ export function computeClientFinalPrice(
   const profit = (subtotal * effectiveProfitPct) / 100;
   const discount = ((subtotal + profit) * s.discountPct) / 100;
   const taxBase = subtotal + profit - discount;
-  const tax = (taxBase * s.taxPct) / 100;
+  // Use the Tax Engine for category-based tax rate; fall back to per-client override
+  const effectiveTaxPct = productCategory
+    ? getEffectiveTaxPctForCategory(productCategory)
+    : s.taxPct;
+  const tax = (taxBase * effectiveTaxPct) / 100;
   let finalPrice = subtotal + profit - discount + tax;
   if (s.roundOff === 'nearest') finalPrice = Math.round(finalPrice);
   else if (s.roundOff === 'up') finalPrice = Math.ceil(finalPrice);
@@ -395,6 +416,7 @@ export function getAllClientPricing(): ClientPricingRow[] {
             pp.landedCostPerUnit,
             settings,
             getCategoryMarginPct(pp.category, settings.profitPct),
+            pp.category,
           )
         : null;
       rows.push({
@@ -456,6 +478,7 @@ export function syncClientPrices(clientId: string): number {
       pp.landedCostPerUnit,
       settings,
       getCategoryMarginPct(pp.category, settings.profitPct),
+      pp.category,
     );
     if (entry.priceNum === calc.finalPrice) return entry;
     updated++;

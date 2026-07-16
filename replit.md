@@ -47,6 +47,18 @@ rather than hardcoding fonts, sizes, or hex colors.
 - Keep the existing project structure and dark-themed UI.
 - Follow STYLE_GUIDE.md (Inter/Poppins fonts, enterprise blue palette, 8pt spacing) for all UI work, now and in future.
 
+## Tax Engine
+
+A centralised Tax Engine (`src/lib/taxEngine.ts`) is the single source of truth for all tax calculations. Every module that does price calculations must derive tax through this engine — never hardcode rates elsewhere.
+
+- **Route:** `/configuration/tax-settings` (7 tabs: Vendor Tax, Client Tax, Service Tax, Tax Categories, HSN/SAC, Category Mapping, Audit Log)
+- **Config page:** `src/pages/TaxSettingsPage.tsx`
+- **Tab components:** `src/components/configuration/tax/`
+- **Store + calculation API:** `src/lib/taxEngine.ts`
+- **Price engine integration:** `src/lib/priceEngineStore.ts` calls `getEffectiveVendorTaxPct()` and `getEffectiveTaxPctForCategory()` from the Tax Engine for every landed cost and client price calculation
+- All settings are persisted in `localStorage` and take effect immediately for new transactions via `taxEngineUpdated` custom events
+- Every save is recorded in the Tax Audit Log
+
 ## RBAC / NIDO Users & Roles
 
 There is a single, canonical Users & Roles module at `/configuration/nido-users`

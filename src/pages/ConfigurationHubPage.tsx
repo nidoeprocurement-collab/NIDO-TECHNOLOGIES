@@ -10,6 +10,7 @@ import {
   Zap,
   DollarSign,
   Mail,
+  Calculator,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -80,6 +81,12 @@ const menuItems = [
     description: "Configure pricing rules and calculations",
     icon: DollarSign,
     href: "/configuration/pricing",
+  },
+  {
+    title: "Tax Settings",
+    description: "Centralized Tax Engine — GST, HSN/SAC, category rules",
+    icon: Calculator,
+    href: "/configuration/tax-settings",
   },
 ];
 

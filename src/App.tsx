@@ -240,6 +240,7 @@ const OrderConfirmationPage = lazy(
 );
 const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
 const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
+const TaxSettingsPage = lazy(() => import("@/pages/TaxSettingsPage"));
 
 function RootRedirect() {
   const { isClientPortalUser } = useAuth();
@@ -508,6 +509,10 @@ function AppRoutes() {
           <Route
             path="configuration/pricing"
             element={<PricingDiscountsPage />}
+          />
+          <Route
+            path="configuration/tax-settings"
+            element={<TaxSettingsPage />}
           />
           <Route
             path="configuration/master-catalogue"
