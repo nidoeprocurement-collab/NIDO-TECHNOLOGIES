@@ -1118,7 +1118,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     qty: item.quantity,
     unitPrice: `₹${Number(item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     total: `₹${(item.priceNum * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    requiredDate: "Within 30 days",
+    requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
     itemStatus: "Processing",
     updatedOn: orderDate,
     deliveredAt: null,

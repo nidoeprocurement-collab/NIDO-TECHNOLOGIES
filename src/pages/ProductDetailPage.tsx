@@ -213,7 +213,7 @@ export default function ProductDetailPage() {
   const handleAdd = () => {
     if (added) return;
     addItem(
-      { id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category },
+      { id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode, leadTime: product.leadTime },
       Math.max(1, qty)
     );
     setAdded(true);
@@ -490,7 +490,7 @@ export default function ProductDetailPage() {
                         onClick={e => {
                           e.stopPropagation();
                           addItem(
-                            { id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category },
+                            { id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category, productCode: rp.productCode, leadTime: rp.leadTime },
                             Math.max(1, rp.moq)
                           );
                         }}

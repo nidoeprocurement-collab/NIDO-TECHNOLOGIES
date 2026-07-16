@@ -11,6 +11,7 @@ export type CartItem = {
   clientId?: string;
   category?: string;
   productCode?: string;
+  leadTime?: string;
 };
 
 interface CartContextType {
