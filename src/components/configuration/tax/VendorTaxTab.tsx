@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Save, Truck, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { getVendorTaxSettings, saveVendorTaxSettings, getTaxCategories, type VendorTaxSettings } from '@/lib/taxEngine';
+import { useAuth } from '@/contexts/AuthContext';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -39,6 +40,7 @@ function Toggle({ label, description, checked, onCheckedChange }: { label: strin
 }
 
 export default function VendorTaxTab() {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<VendorTaxSettings>(getVendorTaxSettings);
   const categories = getTaxCategories().filter(c => c.status === 'Active');
 
@@ -46,7 +48,7 @@ export default function VendorTaxTab() {
     setSettings(s => ({ ...s, [k]: v }));
 
   const handleSave = () => {
-    saveVendorTaxSettings(settings);
+    saveVendorTaxSettings(settings, user?.name || user?.email || 'System');
     toast.success('Vendor tax settings saved — Tax Engine updated immediately');
   };
 

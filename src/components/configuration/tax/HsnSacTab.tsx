@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Pencil, Trash2, Search, Hash } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   getHsnCodes, saveHsnCodes, getSacCodes, saveSacCodes,
   getTaxCategories, type HsnCode, type SacCode,
@@ -19,6 +20,8 @@ const EMPTY_HSN: Omit<HsnCode, 'id'> = { code: '', description: '', gstRate: 18,
 const EMPTY_SAC: Omit<SacCode, 'id'> = { code: '', description: '', gstRate: 18, taxCategoryId: 'tc-9', serviceCategory: '', status: 'Active' };
 
 function HsnTable() {
+  const { user } = useAuth();
+  const auditUser = user?.name || user?.email || 'System';
   const [codes, setCodes] = useState<HsnCode[]>(getHsnCodes);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -40,7 +43,7 @@ function HsnTable() {
     const updated = editing
       ? codes.map(c => c.id === editing.id ? { ...form, id: editing.id } : c)
       : [...codes, { ...form, id: crypto.randomUUID() }];
-    saveHsnCodes(updated);
+    saveHsnCodes(updated, auditUser);
     setCodes(updated);
     setOpen(false);
     toast.success(editing ? 'HSN code updated' : 'HSN code added');
@@ -48,7 +51,7 @@ function HsnTable() {
 
   const handleDelete = (id: string) => {
     const updated = codes.filter(c => c.id !== id);
-    saveHsnCodes(updated);
+    saveHsnCodes(updated, auditUser);
     setCodes(updated);
     toast.success('HSN code deleted');
   };
@@ -146,6 +149,8 @@ function HsnTable() {
 }
 
 function SacTable() {
+  const { user } = useAuth();
+  const auditUser = user?.name || user?.email || 'System';
   const [codes, setCodes] = useState<SacCode[]>(getSacCodes);
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -167,7 +172,7 @@ function SacTable() {
     const updated = editing
       ? codes.map(c => c.id === editing.id ? { ...form, id: editing.id } : c)
       : [...codes, { ...form, id: crypto.randomUUID() }];
-    saveSacCodes(updated);
+    saveSacCodes(updated, auditUser);
     setCodes(updated);
     setOpen(false);
     toast.success(editing ? 'SAC code updated' : 'SAC code added');
@@ -175,7 +180,7 @@ function SacTable() {
 
   const handleDelete = (id: string) => {
     const updated = codes.filter(c => c.id !== id);
-    saveSacCodes(updated);
+    saveSacCodes(updated, auditUser);
     setCodes(updated);
     toast.success('SAC code deleted');
   };

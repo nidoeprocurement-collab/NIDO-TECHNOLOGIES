@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Pencil, Trash2, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTaxCategories, saveTaxCategories, type TaxCategory } from '@/lib/taxEngine';
+import { useAuth } from '@/contexts/AuthContext';
 
 const EMPTY: Omit<TaxCategory, 'id'> = {
   name: '', description: '', cgstPct: 9, sgstPct: 9, igstPct: 18, utgstPct: 9,
@@ -19,6 +20,8 @@ const EMPTY: Omit<TaxCategory, 'id'> = {
 };
 
 export default function TaxCategoriesTab() {
+  const { user } = useAuth();
+  const auditUser = user?.name || user?.email || 'System';
   const [categories, setCategories] = useState<TaxCategory[]>(getTaxCategories);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TaxCategory | null>(null);
@@ -34,7 +37,7 @@ export default function TaxCategoriesTab() {
     const updated = editing
       ? categories.map(c => c.id === editing.id ? { ...form, id: editing.id } : c)
       : [...categories, { ...form, id: crypto.randomUUID() }];
-    saveTaxCategories(updated);
+    saveTaxCategories(updated, auditUser);
     setCategories(updated);
     setOpen(false);
     toast.success(editing ? 'Tax category updated' : 'Tax category created');
@@ -42,7 +45,7 @@ export default function TaxCategoriesTab() {
 
   const handleDelete = (id: string) => {
     const updated = categories.filter(c => c.id !== id);
-    saveTaxCategories(updated);
+    saveTaxCategories(updated, auditUser);
     setCategories(updated);
     toast.success('Tax category deleted');
   };
@@ -51,7 +54,7 @@ export default function TaxCategoriesTab() {
     const updated = categories.map(c =>
       c.id === id ? { ...c, status: c.status === 'Active' ? 'Inactive' : 'Active' as const } : c
     );
-    saveTaxCategories(updated);
+    saveTaxCategories(updated, auditUser);
     setCategories(updated);
   };
 

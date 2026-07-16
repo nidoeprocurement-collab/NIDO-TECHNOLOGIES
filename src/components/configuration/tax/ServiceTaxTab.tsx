@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Save, Wrench, Plus, Pencil, Trash2, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   getServiceTaxSettings, saveServiceTaxSettings,
   getSacCodes, getTaxCategories,
@@ -43,6 +44,7 @@ const EMPTY_RULE: Omit<ServiceCategoryTaxRule, 'id'> = {
 };
 
 export default function ServiceTaxTab() {
+  const { user } = useAuth();
   const [settings, setSettings] = useState<ServiceTaxSettings>(getServiceTaxSettings);
   const [ruleOpen, setRuleOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<ServiceCategoryTaxRule | null>(null);
@@ -54,7 +56,7 @@ export default function ServiceTaxTab() {
     setSettings(s => ({ ...s, [k]: v }));
 
   const handleSave = () => {
-    saveServiceTaxSettings(settings);
+    saveServiceTaxSettings(settings, user?.name || user?.email || 'System');
     toast.success('Service tax settings saved — Tax Engine updated immediately');
   };
 

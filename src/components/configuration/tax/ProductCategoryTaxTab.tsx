@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Pencil, Trash2, Layers } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   getProductCategoryTaxMap, saveProductCategoryTaxMap,
   getHsnCodes, getTaxCategories, type ProductCategoryTaxMap,
@@ -22,6 +23,8 @@ const EMPTY: Omit<ProductCategoryTaxMap, 'id'> = {
 };
 
 export default function ProductCategoryTaxTab() {
+  const { user } = useAuth();
+  const auditUser = user?.name || user?.email || 'System';
   const [maps, setMaps] = useState<ProductCategoryTaxMap[]>(getProductCategoryTaxMap);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProductCategoryTaxMap | null>(null);
@@ -51,7 +54,7 @@ export default function ProductCategoryTaxTab() {
     const updated = editing
       ? maps.map(m => m.id === editing.id ? { ...form, id: editing.id } : m)
       : [...maps, { ...form, id: crypto.randomUUID() }];
-    saveProductCategoryTaxMap(updated);
+    saveProductCategoryTaxMap(updated, auditUser);
     setMaps(updated);
     setOpen(false);
     toast.success(editing ? 'Mapping updated' : 'Category tax mapping added');
@@ -59,7 +62,7 @@ export default function ProductCategoryTaxTab() {
 
   const handleDelete = (id: string) => {
     const updated = maps.filter(m => m.id !== id);
-    saveProductCategoryTaxMap(updated);
+    saveProductCategoryTaxMap(updated, auditUser);
     setMaps(updated);
     toast.success('Mapping deleted');
   };

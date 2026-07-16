@@ -25,6 +25,8 @@ function load<T>(key: string, fallback: T): T {
 function save(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
   window.dispatchEvent(new CustomEvent('taxEngineUpdated', { detail: { key } }));
+  // Also notify price-engine-aware pages so they re-render with updated tax rates
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
 }
 
 // ─── Tax Category ─────────────────────────────────────────────────────────────
