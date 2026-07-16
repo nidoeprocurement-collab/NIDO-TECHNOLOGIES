@@ -1,10 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -16,6 +15,16 @@ import {
 import { Download, Plus, FileText, Search, RefreshCw } from "lucide-react"
 import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore"
 
+// Download a PO PDF from the stored data-URI
+function downloadPODoc(po: StoredPO) {
+  const doc = po.documents?.find((d) => d.ext === "pdf" && d.dataUrl)
+  if (!doc?.dataUrl) return
+  const a = document.createElement("a")
+  a.href = doc.dataUrl
+  a.download = doc.name || `${po.poNumber}.pdf`
+  a.click()
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatINR(n: number) {
@@ -26,6 +35,7 @@ function formatDate(iso: string): string {
   if (!iso) return "—"
   try {
     const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso // not a real date — show as-is (e.g. "Within 30 days")
     return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
   } catch {
     return iso
@@ -101,6 +111,7 @@ function BilledPill({ label }: { label: string }) {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function PurchaseOrdersPage() {
+  const navigate = useNavigate()
   const [pos, setPos] = useState<StoredPO[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState("")
@@ -252,13 +263,17 @@ export default function PurchaseOrdersPage() {
                   Delivery Date
                 </TableHead>
 
+                <TableHead className="text-xs text-muted-foreground uppercase tracking-wide text-center w-[60px]">
+                  PDF
+                </TableHead>
+
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-16 text-center">
+                  <TableCell colSpan={11} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <FileText size={40} className="text-muted-foreground/40" />
                       <p className="text-sm font-medium">
@@ -293,12 +308,25 @@ export default function PurchaseOrdersPage() {
 
                     {/* Purchase Order# */}
                     <TableCell>
-                      <span className="text-sm font-semibold text-blue-600">{po.poNumber}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => navigate(`/orders/${po.orderId}`)}
+                          className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
+                        >
+                          {po.poNumber}
+                        </button>
+                        <span className="text-xs text-muted-foreground">Purchase Order</span>
+                      </div>
                     </TableCell>
 
                     {/* Source Order# */}
-                    <TableCell className="text-sm text-foreground font-medium">
-                      {po.orderId || "—"}
+                    <TableCell>
+                      <button
+                        onClick={() => navigate(`/orders/${po.orderId}`)}
+                        className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {po.orderId || "—"}
+                      </button>
                     </TableCell>
 
                     {/* Reference# */}
@@ -339,6 +367,21 @@ export default function PurchaseOrdersPage() {
                       {po.requestedDelivery
                         ? formatDate(po.requestedDelivery)
                         : "—"}
+                    </TableCell>
+
+                    {/* PDF Download */}
+                    <TableCell className="text-center">
+                      {po.documents?.some((d) => d.ext === "pdf" && d.dataUrl) ? (
+                        <button
+                          onClick={() => downloadPODoc(po)}
+                          title="Download PO PDF"
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-md hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <Download size={14} />
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
+                      )}
                     </TableCell>
 
                   </TableRow>

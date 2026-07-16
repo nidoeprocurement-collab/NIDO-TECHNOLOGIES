@@ -111,6 +111,8 @@ export function savePO(po: StoredPO): void {
     all.unshift(po);
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  // Notify any listening page (e.g. PurchaseOrdersPage) to refresh
+  try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber: po.poNumber } })); } catch { /* SSR safe */ }
 }
 
 export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
@@ -119,6 +121,7 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
   if (idx >= 0) {
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber } })); } catch { /* SSR safe */ }
   }
 }
 
