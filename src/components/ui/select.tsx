@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 
 interface SelectContextType {
@@ -157,7 +156,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         : { top: rect.bottom + 4 }),
     };
 
-    return createPortal(
+    return (
       <div
         ref={(el) => {
           context.contentRef.current = el;
@@ -169,8 +168,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         {...props}
       >
         {children}
-      </div>,
-      document.body
+      </div>
     );
   }
 );
