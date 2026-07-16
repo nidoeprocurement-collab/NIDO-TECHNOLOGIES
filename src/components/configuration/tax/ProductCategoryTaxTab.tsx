@@ -28,6 +28,10 @@ const EMPTY: Omit<ProductCategoryTaxMap, 'id'> = {
   taxInclusive: false, isReverseCharge: false, isExempt: false, priority: 1,
 };
 
+// Sentinel used in Radix <Select> to represent "no HSN code selected".
+// Radix does not support empty-string values, so we map '' <-> '__none__'.
+const HSN_NONE = '__none__';
+
 export default function ProductCategoryTaxTab() {
   const { user } = useAuth();
   const auditUser = user?.name || user?.email || 'System';
@@ -198,28 +202,42 @@ export default function ProductCategoryTaxTab() {
             <div>
               <Label>Product Category *</Label>
               {masterCategories.length > 0 ? (
-                <Select value={form.productCategory} onValueChange={onProductCategoryChange}>
+                <Select
+                  value={form.productCategory || '__pick__'}
+                  onValueChange={v => onProductCategoryChange(v === '__pick__' ? '' : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category from Master Catalog…" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__pick__" disabled>Select a category…</SelectItem>
                     {masterCategories.map(cat => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                  No categories found in the Master Catalog yet. Add products with a category there first.
+                <div className="space-y-1">
+                  <Input
+                    placeholder="Type a product category name…"
+                    value={form.productCategory}
+                    onChange={e => setForm(f => ({ ...f, productCategory: e.target.value }))}
+                  />
+                  <p className="text-xs text-amber-600">
+                    No categories in Master Catalog yet — type a category name manually.
+                  </p>
                 </div>
               )}
             </div>
             <div>
               <Label>Default HSN Code</Label>
-              <Select value={form.defaultHsnCode} onValueChange={v => p('defaultHsnCode', v)}>
+              <Select
+                value={form.defaultHsnCode === '' ? HSN_NONE : form.defaultHsnCode}
+                onValueChange={v => p('defaultHsnCode', v === HSN_NONE ? '' : v)}
+              >
                 <SelectTrigger><SelectValue placeholder="Select HSN code…" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value={HSN_NONE}>None</SelectItem>
                   {hsnCodes.filter(h => h.status === 'Active').map(h => (
                     <SelectItem key={h.id} value={h.code}>{h.code} — {h.description}</SelectItem>
                   ))}
