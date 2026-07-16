@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,12 @@ import {
   getProductCategoryTaxMap, saveProductCategoryTaxMap,
   getHsnCodes, getTaxCategories, type ProductCategoryTaxMap,
 } from '@/lib/taxEngine';
+import { getCatalogProducts } from '@/lib/catalogStore';
+
+function getMasterCategories(): string[] {
+  const cats = new Set(getCatalogProducts().map(p => p.category).filter(Boolean));
+  return [...cats].sort((a, b) => a.localeCompare(b));
+}
 
 const EMPTY: Omit<ProductCategoryTaxMap, 'id'> = {
   productCategory: '', defaultHsnCode: '', taxCategoryId: 'tc-1',
@@ -29,8 +35,16 @@ export default function ProductCategoryTaxTab() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ProductCategoryTaxMap | null>(null);
   const [form, setForm] = useState<Omit<ProductCategoryTaxMap, 'id'>>(EMPTY);
+  const [masterCategories, setMasterCategories] = useState<string[]>(getMasterCategories);
   const categories = getTaxCategories();
   const hsnCodes = getHsnCodes();
+
+  // Re-derive categories whenever master catalog changes
+  useEffect(() => {
+    const refresh = () => setMasterCategories(getMasterCategories());
+    window.addEventListener('catalogUpdated', refresh);
+    return () => window.removeEventListener('catalogUpdated', refresh);
+  }, []);
 
   const openAdd = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (m: ProductCategoryTaxMap) => { setEditing(m); setForm({ ...m }); setOpen(true); };
@@ -159,7 +173,22 @@ export default function ProductCategoryTaxTab() {
           <div className="space-y-3">
             <div>
               <Label>Product Category *</Label>
-              <Input value={form.productCategory} onChange={e => p('productCategory', e.target.value)} placeholder="e.g., Computers & Laptops" />
+              {masterCategories.length > 0 ? (
+                <Select value={form.productCategory} onValueChange={v => p('productCategory', v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category from Master Catalog…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {masterCategories.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  No categories found in the Master Catalog yet. Add products with a category there first.
+                </div>
+              )}
             </div>
             <div>
               <Label>Default HSN Code</Label>
