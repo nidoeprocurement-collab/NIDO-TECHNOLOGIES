@@ -240,6 +240,7 @@ export default function CartPage() {
                   const gstRate        = getEffectiveTaxPctForCategory(item.category || "");
                   const preTaxLine     = inclusiveTotal * 100 / (100 + gstRate);
                   const gstLine        = inclusiveTotal - preTaxLine;
+                  const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
                   const catalog        = catalogMap.get(item.productCode || "");
                   const hsnCode        = hsnByCategory.get((item.category || "").toLowerCase()) || "—";
 
@@ -303,15 +304,15 @@ export default function CartPage() {
                         {gstRate}%
                       </td>
 
-                      {/* Unit Price */}
+                      {/* Unit Price (pre-tax) */}
                       <td className="px-3 py-5 align-top whitespace-nowrap">
                         {discountPct > 0 ? (
                           <>
-                            <p className="text-xs text-gray-400 line-through">{formatPrice(item.priceNum)}</p>
-                            <p className="text-sm font-semibold text-green-600">{formatPrice(effectivePrice)}</p>
+                            <p className="text-xs text-gray-400 line-through">{formatPrice(item.priceNum * 100 / (100 + gstRate))}</p>
+                            <p className="text-sm font-semibold text-green-600">{formatPrice(preTaxUnit)}</p>
                           </>
                         ) : (
-                          <p className="text-sm font-semibold text-gray-900">{formatPrice(effectivePrice)}</p>
+                          <p className="text-sm font-semibold text-gray-900">{formatPrice(preTaxUnit)}</p>
                         )}
                         <p className="text-xs text-gray-400 mt-0.5">/ Unit</p>
                       </td>
