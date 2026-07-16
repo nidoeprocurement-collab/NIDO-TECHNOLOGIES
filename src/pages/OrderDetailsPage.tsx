@@ -155,7 +155,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid hsl(var(--border))" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: "hsl(var(--foreground))" }}>Vendor Selection — {sub.id} ({sub.itemName})</div>
-            <div style={{ fontSize: 12.5, color: "hsl(var(--muted-foreground))", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by score</div>
+            <div style={{ fontSize: 12.5, color: "hsl(var(--muted-foreground))", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by lowest price</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "hsl(var(--muted-foreground))", lineHeight: 1 }}>×</button>
         </div>

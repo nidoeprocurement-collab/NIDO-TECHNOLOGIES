@@ -296,7 +296,13 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
       (r.stock / (maxS || 1)) * 15;
   });
 
-  return rows.sort((a, b) => b.score - a.score);
+  // Primary sort: lowest landed cost first.
+  // Secondary sort: composite score (rating, lead time, stock) breaks ties.
+  return rows.sort((a, b) =>
+    a.landedCostPerUnit !== b.landedCostPerUnit
+      ? a.landedCostPerUnit - b.landedCostPerUnit
+      : b.score - a.score,
+  );
 }
 
 // Update the MOQ on the winning vendor's product listing for a given master
