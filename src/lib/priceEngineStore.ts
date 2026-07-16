@@ -239,6 +239,7 @@ export function getLandedCost(
 export interface VendorComparisonRow {
   vendorId: string;
   vendorName: string;
+  vendorProductCode: string;
   basePrice: number;
   moq: number;
   leadTime: number;
@@ -264,6 +265,7 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
     rows.push({
       vendorId,
       vendorName: info?.name || vendorId,
+      vendorProductCode: match.vendorProductCode || '—',
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
@@ -394,6 +396,7 @@ export interface ClientPricingRow {
   productName: string;
   sku: string;
   category: string;
+  clientProductCode: string;
   winningVendor: VendorComparisonRow | null;
   landedCostPerUnit: number;
   calc: ClientPriceCalc | null;
@@ -426,6 +429,7 @@ export function getAllClientPricing(): ClientPricingRow[] {
         productName: pp.productName,
         sku: pp.sku,
         category: pp.category,
+        clientProductCode: entry.cpc || '—',
         winningVendor: pp.winningVendor,
         landedCostPerUnit: pp.landedCostPerUnit,
         calc,

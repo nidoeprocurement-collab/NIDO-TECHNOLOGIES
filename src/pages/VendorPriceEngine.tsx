@@ -38,8 +38,9 @@ export default function VendorPriceEngine() {
       const haystack = [
         p.productName,
         p.masterProductCode,
-        p.sku,
+        p.category,
         p.winningVendor?.vendorName,
+        p.winningVendor?.vendorProductCode,
         ...p.vendorComparisons.map(v => v.vendorName),
       ]
         .filter(Boolean)
@@ -85,7 +86,7 @@ export default function VendorPriceEngine() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by product, code, SKU or vendor..."
+            placeholder="Search by product, code, category or vendor..."
             className="w-full text-xs pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -106,13 +107,14 @@ export default function VendorPriceEngine() {
                 <tr className="bg-blue-600 text-white">
                   <th className="py-2 px-2 w-6"></th>
                   <th className="py-2 px-2 text-left font-semibold">Product</th>
+                  <th className="py-2 px-2 text-left font-semibold">Category</th>
                   <th className="py-2 px-2 text-left font-semibold">Winning Vendor</th>
+                  <th className="py-2 px-2 text-left font-semibold">Vendor Product Code</th>
                   <th className="py-2 px-2 text-right font-semibold">Base Price</th>
                   <th className="py-2 px-2 text-right font-semibold">MOQ</th>
                   <th className="py-2 px-2 text-right font-semibold">Lead Time</th>
                   <th className="py-2 px-2 text-right font-semibold">Stock</th>
                   <th className="py-2 px-2 text-center font-semibold">Rating</th>
-                  <th className="py-2 px-2 text-left font-semibold">Payment Terms</th>
                   <th className="py-2 px-2 text-right font-semibold">Landed Cost / Unit</th>
                   <th className="py-2 px-2 text-right font-semibold">Landed Cost (Total)</th>
                 </tr>
@@ -130,37 +132,39 @@ export default function VendorPriceEngine() {
                       </td>
                       <td className="py-2 px-3">
                         <div className="font-semibold text-gray-800">{p.productName}</div>
-                        <div className="text-gray-400">{p.masterProductCode}{p.sku ? ` · ${p.sku}` : ''}</div>
+                        <div className="text-gray-400 text-xs">{p.masterProductCode}</div>
                       </td>
+                      <td className="py-2 px-2 text-gray-600">{p.category || '—'}</td>
                       {p.winningVendor ? (
                         <>
                           <td className="py-2 px-3">
                             <span className="text-green-700 font-semibold bg-green-100 px-2 py-0.5 rounded">⭐ {p.winningVendor.vendorName}</span>
                           </td>
+                          <td className="py-2 px-2 text-gray-700">{p.winningVendor.vendorProductCode}</td>
                           <td className="py-2 px-2 text-right">{fmt(p.winningVendor.basePrice)}</td>
                           <td className="py-2 px-2 text-right">{fmtNos(p.winningVendor.moq)}</td>
                           <td className="py-2 px-2 text-right">{p.winningVendor.leadTime}d</td>
                           <td className="py-2 px-2 text-right">{fmtNos(p.winningVendor.stock)}</td>
                           <td className="py-2 px-2 text-center"><Stars r={p.winningVendor.rating} /></td>
-                          <td className="py-2 px-3">{p.winningVendor.paymentTerms}</td>
                           <td className="py-2 px-2 text-right font-bold text-blue-800">{fmt(p.landedCostPerUnit)}</td>
                           <td className="py-2 px-2 text-right font-bold text-blue-800">{fmt(p.landedCostPerUnit * p.moq)}</td>
                         </>
                       ) : (
-                        <td colSpan={9} className="py-2 px-2 text-amber-600">No active vendor carries this product yet</td>
+                        <td colSpan={10} className="py-2 px-2 text-amber-600">No active vendor carries this product yet</td>
                       )}
                     </tr>
                     {expanded[p.masterProductCode] && p.vendorComparisons.map(v => (
                       <tr key={v.vendorId} className={`border-b border-gray-50 bg-gray-50/50 ${v.vendorId === p.winningVendor?.vendorId ? 'bg-green-50/60' : ''}`}>
                         <td></td>
                         <td className="py-1.5 px-2 pl-8 text-gray-500">↳ {v.vendorId === p.winningVendor?.vendorId ? 'Winning' : 'Compared'}</td>
+                        <td></td>
                         <td className="py-1.5 px-2 text-gray-700">{v.vendorName}</td>
+                        <td className="py-1.5 px-2 text-gray-700">{v.vendorProductCode}</td>
                         <td className="py-1.5 px-2 text-right text-gray-700">{fmt(v.basePrice)}</td>
                         <td className="py-1.5 px-2 text-right text-gray-700">{fmtNos(v.moq)}</td>
                         <td className="py-1.5 px-2 text-right text-gray-700">{v.leadTime}d</td>
                         <td className="py-1.5 px-2 text-right text-gray-700">{fmtNos(v.stock)}</td>
                         <td className="py-1.5 px-2 text-center"><Stars r={v.rating} /></td>
-                        <td className="py-1.5 px-2 text-gray-700">{v.paymentTerms}</td>
                         <td className="py-1.5 px-2 text-right text-gray-700">{fmt(v.landedCostPerUnit)}</td>
                         <td className="py-1.5 px-2 text-right text-gray-700">{fmt(v.landedCostPerUnit * v.moq)}</td>
                       </tr>

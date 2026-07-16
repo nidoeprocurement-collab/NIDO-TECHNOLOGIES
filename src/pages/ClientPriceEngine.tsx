@@ -37,7 +37,8 @@ export default function ClientPriceEngine() {
         r.clientName,
         r.productName,
         r.masterProductCode,
-        r.sku,
+        r.category,
+        r.clientProductCode,
         r.winningVendor?.vendorName,
       ]
         .filter(Boolean)
@@ -113,7 +114,7 @@ export default function ClientPriceEngine() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by client, product, code, SKU or vendor..."
+            placeholder="Search by client, product, code, category or vendor..."
             className="w-full text-xs pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -134,6 +135,8 @@ export default function ClientPriceEngine() {
                 <tr className="bg-blue-600 text-white">
                   <th className="py-2 px-2 text-left font-semibold">Client</th>
                   <th className="py-2 px-2 text-left font-semibold">Product</th>
+                  <th className="py-2 px-2 text-left font-semibold">Category</th>
+                  <th className="py-2 px-2 text-left font-semibold">Client Product Code</th>
                   <th className="py-2 px-2 text-left font-semibold">Winning Vendor</th>
                   <th className="py-2 px-2 text-right font-semibold">Landed Cost</th>
                   <th className="py-2 px-2 text-right font-semibold">Charges + Overhead</th>
@@ -149,8 +152,10 @@ export default function ClientPriceEngine() {
                     <td className="py-2 px-2 font-medium text-gray-700">{r.clientName}</td>
                     <td className="py-2 px-3">
                       <div className="font-semibold text-gray-800">{r.productName}</div>
-                      <div className="text-gray-400">{r.masterProductCode}{r.sku ? ` · ${r.sku}` : ''}</div>
+                      <div className="text-gray-400 text-xs">{r.masterProductCode}</div>
                     </td>
+                    <td className="py-2 px-2 text-gray-600">{r.category || '—'}</td>
+                    <td className="py-2 px-2 text-gray-700">{r.clientProductCode}</td>
                     {r.winningVendor && r.calc ? (
                       <>
                         <td className="py-2 px-2 text-green-700 font-medium">{r.winningVendor.vendorName}</td>
