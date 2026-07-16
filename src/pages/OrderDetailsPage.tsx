@@ -1652,12 +1652,16 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          <button
-                            onClick={() => navigate(`/vendor-orders/${hasPO ? createdPOs[sub.id].poNumber : sub.poNumber}`)}
-                            style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                          >
-                            {hasPO ? createdPOs[sub.id].poNumber : sub.poNumber} ↗
-                          </button>
+                          {hasPO ? (
+                            <button
+                              onClick={() => navigate(`/vendor-orders/${createdPOs[sub.id].poNumber}`)}
+                              style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
+                            >
+                              {createdPOs[sub.id].poNumber} ↗
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                          )}
                         </div>
                       )}
                       <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
@@ -1671,6 +1675,17 @@ export default function MyOrderPage() {
                         <div style={{ minWidth: 0 }}>
                           {isOrderInactive ? (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                          ) : hasPO ? (
+                            // PO already issued — lock the vendor, no change allowed until PO is cancelled
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                  {(createdPOs[sub.id].vendorName?.[0] || "V").toUpperCase()}
+                                </div>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{createdPOs[sub.id].vendorName}</span>
+                              </div>
+                              <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued · Cancel PO to change</span>
+                            </div>
                           ) : selVendor ? (
                             <div>
                               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
