@@ -6,6 +6,8 @@ import { useOrgConfig } from "@/contexts/ConfigContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+type GstSlab = { rate: number; taxable: number; gst: number };
+
 type ConfirmationState = {
   orderNumber: string;
   orderDate: string;
@@ -20,6 +22,7 @@ type ConfirmationState = {
   }[];
   subtotal: number;
   gst: number;
+  gstSlabs?: GstSlab[];
   shipping: number;
   total: number;
   address: { label: string; line1: string; line2: string; city?: string; state?: string; zip?: string; line3?: string; phone: string } | null;
@@ -58,6 +61,7 @@ export default function OrderConfirmationPage() {
   const items = state?.items ?? [];
   const subtotal = state?.subtotal ?? 0;
   const gst = state?.gst ?? 0;
+  const gstSlabs: GstSlab[] = state?.gstSlabs ?? [];
   const shipping = state?.shipping ?? 0;
   const total = state?.total ?? 0;
   const address = state?.address ?? null;
@@ -258,10 +262,19 @@ export default function OrderConfirmationPage() {
                 <span className="text-gray-500">Subtotal</span>
                 <span className="text-gray-700 font-medium">{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">GST (18%)</span>
-                <span className="text-gray-700 font-medium">{formatPrice(gst)}</span>
-              </div>
+              {gstSlabs.length > 0 ? (
+                gstSlabs.map(sl => (
+                  <div key={sl.rate} className="flex justify-between text-sm">
+                    <span className="text-gray-500">GST ({sl.rate}%)</span>
+                    <span className="text-gray-700 font-medium">{formatPrice(sl.gst)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">GST</span>
+                  <span className="text-gray-700 font-medium">{formatPrice(gst)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center border-t border-gray-100 pt-2 mt-1">
                 <span className="text-sm font-bold text-gray-900">Total</span>
                 <span className="text-sm font-bold text-gray-900">{formatPrice(total)}</span>

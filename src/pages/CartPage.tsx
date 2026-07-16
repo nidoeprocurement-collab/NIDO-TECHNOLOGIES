@@ -7,6 +7,7 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 
@@ -212,8 +213,14 @@ export default function CartPage() {
     const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
     return s + effectivePrice * i.quantity;
   }, 0);
-  const gst = Math.round(subtotal * 0.18);
-  const total = subtotal + gst;
+  const { slabs: gstSlabs, totalGst } = computeCartGST(
+    cart.map(i => {
+      const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
+      const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
+      return { taxableAmount: effectivePrice * i.quantity, category: i.category };
+    })
+  );
+  const total = subtotal + totalGst;
 
   const visibleCount = 4;
   const maxScroll = Math.max(0, suggested.length - visibleCount);
@@ -381,10 +388,12 @@ export default function CartPage() {
                   <span className="text-gray-600">Subtotal</span>
                   <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">GST (18%)</span>
-                  <span className="font-medium text-gray-900">{formatPrice(gst)}</span>
-                </div>
+                {gstSlabs.map(sl => (
+                  <div key={sl.rate} className="flex justify-between">
+                    <span className="text-gray-600">GST ({sl.rate}%)</span>
+                    <span className="font-medium text-gray-900">{formatPrice(sl.gst)}</span>
+                  </div>
+                ))}
                 <div className="border-t border-gray-100 pt-3 flex justify-between">
                   <span className="font-semibold text-gray-900">Total Amount</span>
                   <span className="font-bold text-gray-900 text-base">{formatPrice(total)}</span>

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Shield, Truck, RotateCcw, Mail, Phone, Pencil } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { computeCartGST } from "@/lib/cartGstHelper";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 
 function formatPrice(n: number) {
@@ -19,8 +20,10 @@ export default function OrderSummaryPanel({
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
-  const gst = Math.round(subtotal * 0.18);
-  const total = subtotal + gst;
+  const { slabs: gstSlabs, totalGst } = computeCartGST(
+    cart.map(i => ({ taxableAmount: i.priceNum * i.quantity, category: i.category }))
+  );
+  const total = subtotal + totalGst;
   return (
     <div className="w-72 shrink-0 space-y-4">
       {/* Order Summary card */}
@@ -64,10 +67,12 @@ export default function OrderSummaryPanel({
                 <span className="text-gray-500">Subtotal</span>
                 <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">GST (18%)</span>
-                <span className="font-medium text-gray-900">{formatPrice(gst)}</span>
-              </div>
+              {gstSlabs.map(sl => (
+                <div key={sl.rate} className="flex justify-between">
+                  <span className="text-gray-500">GST ({sl.rate}%)</span>
+                  <span className="font-medium text-gray-900">{formatPrice(sl.gst)}</span>
+                </div>
+              ))}
               <div className="flex justify-between pt-1 border-t border-gray-100">
                 <span className="font-semibold text-gray-900">Total Amount</span>
                 <span className="font-bold text-gray-900">{formatPrice(total)}</span>

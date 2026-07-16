@@ -5,6 +5,7 @@ import { ChevronRight, ArrowLeft, Pencil, MapPin, CreditCard, Landmark, Wallet, 
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
+import { computeCartGST } from "@/lib/cartGstHelper";
 import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
@@ -106,14 +107,16 @@ export default function ReviewPage() {
   const paymentSummary = getPaymentSummary();
 
   const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
-  const gst = Math.round(subtotal * 0.18);
+  const { slabs: gstSlabs, totalGst } = computeCartGST(
+    cart.map(i => ({ taxableAmount: i.priceNum * i.quantity, category: i.category }))
+  );
   const SHIPPING_FEE = 500;
 
   const handlePlaceOrder = () => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     const itemsSnapshot = cart.map((i) => ({ ...i }));
-    const totalAmount = subtotal + gst + SHIPPING_FEE;
+    const totalAmount = subtotal + totalGst + SHIPPING_FEE;
     const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
@@ -160,7 +163,8 @@ export default function ReviewPage() {
         orderDate: today,
         items: itemsSnapshot,
         subtotal,
-        gst,
+        gst: totalGst,
+        gstSlabs,
         shipping: SHIPPING_FEE,
         total: totalAmount,
         address: selectedAddr
