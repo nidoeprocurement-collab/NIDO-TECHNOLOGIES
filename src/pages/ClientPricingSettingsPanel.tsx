@@ -46,11 +46,12 @@ export default function ClientPricingSettingsPanel({ clientId }: { clientId: str
     <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-5">
       <h2 className="text-sm font-bold text-blue-700 uppercase mb-1">Pricing Settings (This Client Only)</h2>
       <p className="text-xs text-gray-500 mb-4">
-        Vendor landed cost is pulled automatically from the Vendor Price Engine. These margin/tax settings apply
+        Vendor landed cost is pulled automatically from the Vendor Price Engine. These margin settings apply
         only to this client and are used to compute the Selling Price shown in the catalog below.
+        Tax rates are applied automatically from Tax Settings.
       </p>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
         <div>
           <Label className="text-xs text-gray-600">Overhead (% of Landed Cost)</Label>
           <div className="flex items-center gap-1 mt-1">
@@ -72,14 +73,6 @@ export default function ClientPricingSettingsPanel({ clientId }: { clientId: str
           <div className="flex items-center gap-1 mt-1">
             <Input type="number" value={settings.discountPct}
               onChange={e => updateField('discountPct', parseFloat(e.target.value) || 0)} className="h-8 text-xs bg-white" />
-            <span className="text-gray-400 text-xs">%</span>
-          </div>
-        </div>
-        <div>
-          <Label className="text-xs text-gray-600">Tax (%)</Label>
-          <div className="flex items-center gap-1 mt-1">
-            <Input type="number" value={settings.taxPct}
-              onChange={e => updateField('taxPct', parseFloat(e.target.value) || 0)} className="h-8 text-xs bg-white" />
             <span className="text-gray-400 text-xs">%</span>
           </div>
         </div>

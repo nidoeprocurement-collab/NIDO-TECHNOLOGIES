@@ -32,11 +32,10 @@ export interface ChargeItem {
 export interface VendorCommonSettings {
   logisticsPct: number;
   handlingPct: number;
-  taxPct: number;
   extraCharges: ChargeItem[];
 }
 
-const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logisticsPct: 0, handlingPct: 0, taxPct: 18, extraCharges: [] };
+const DEFAULT_VENDOR_SETTINGS: VendorCommonSettings = { logisticsPct: 0, handlingPct: 0, extraCharges: [] };
 
 function getAllVendorSettings(): Record<string, VendorCommonSettings> {
   try {
@@ -65,7 +64,6 @@ export interface ClientCommonSettings {
   overheadPct: number;
   profitPct: number;
   discountPct: number;
-  taxPct: number;
   roundOff: 'none' | 'nearest' | 'up' | 'down';
 }
 
@@ -74,7 +72,6 @@ const DEFAULT_CLIENT_SETTINGS: ClientCommonSettings = {
   overheadPct: 0,
   profitPct: 20,
   discountPct: 0,
-  taxPct: 18,
   roundOff: 'none',
 };
 
@@ -234,9 +231,8 @@ export function getLandedCost(
   const preTax = basePrice * (1 + totalPct / 100);
   // Use the Tax Engine when a product category is known; fall back to the
   // per-vendor override only when no category context is available.
-  const effectiveTaxPct = productCategory
-    ? getEffectiveVendorTaxPct(productCategory)
-    : settings.taxPct;
+  // Tax always comes from the Tax Settings engine — never a local override.
+  const effectiveTaxPct = getEffectiveVendorTaxPct(productCategory || '');
   return preTax * (1 + effectiveTaxPct / 100);
 }
 
@@ -379,10 +375,8 @@ export function computeClientFinalPrice(
   const profit = (subtotal * effectiveProfitPct) / 100;
   const discount = ((subtotal + profit) * s.discountPct) / 100;
   const taxBase = subtotal + profit - discount;
-  // Use the Tax Engine for category-based tax rate; fall back to per-client override
-  const effectiveTaxPct = productCategory
-    ? getEffectiveTaxPctForCategory(productCategory)
-    : s.taxPct;
+  // Tax always comes from the Tax Settings engine — never a local override.
+  const effectiveTaxPct = getEffectiveTaxPctForCategory(productCategory || '');
   const tax = (taxBase * effectiveTaxPct) / 100;
   let finalPrice = subtotal + profit - discount + tax;
   if (s.roundOff === 'nearest') finalPrice = Math.round(finalPrice);
