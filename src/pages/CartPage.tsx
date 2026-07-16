@@ -10,7 +10,7 @@ import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
-import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } from "@/lib/taxEngine";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 
 function formatPrice(n: number) {
@@ -135,16 +135,32 @@ export default function CartPage() {
 
   const onAddToCart = (p: Omit<CartItem, "quantity">) => addItem(p);
 
-  // Catalog lookup map for brand / SKU / HSN code
+  // Catalog lookup map for brand / SKU (by productCode)
   const catalogMap = useMemo(() => {
-    const map = new Map<string, { brand: string; sku: string; hsnCode: string; status: string }>();
+    const map = new Map<string, { brand: string; sku: string }>();
     getCatalogProducts().forEach(p => {
       map.set(p.productCode || p.skuCode || "", {
         brand: p.brand || "",
         sku: p.skuCode || "",
-        hsnCode: p.hsnCode || "",
-        status: p.status || "In Stock",
       });
+    });
+    return map;
+  }, []);
+
+  // HSN lookup by product category — from Tax Settings (Category Mapping first, then HSN/SAC table)
+  const hsnByCategory = useMemo(() => {
+    const map = new Map<string, string>();
+    // Secondary source: HSN/SAC codes table
+    getHsnCodes().forEach(h => {
+      if (h.status === "Active" && h.productCategory) {
+        map.set(h.productCategory.toLowerCase(), h.code);
+      }
+    });
+    // Primary source: Category Tax Mapping (overrides HSN table)
+    getProductCategoryTaxMap().forEach(m => {
+      if (m.defaultHsnCode && m.productCategory) {
+        map.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
+      }
     });
     return map;
   }, []);
@@ -225,6 +241,7 @@ export default function CartPage() {
                   const preTaxLine     = inclusiveTotal * 100 / (100 + gstRate);
                   const gstLine        = inclusiveTotal - preTaxLine;
                   const catalog        = catalogMap.get(item.productCode || "");
+                  const hsnCode        = hsnByCategory.get((item.category || "").toLowerCase()) || "—";
 
                   return (
                     <tr key={item.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
@@ -278,7 +295,7 @@ export default function CartPage() {
 
                       {/* HSN Code */}
                       <td className="px-3 py-5 align-top text-sm text-gray-700 font-mono whitespace-nowrap">
-                        {catalog?.hsnCode || "—"}
+                        {hsnCode}
                       </td>
 
                       {/* GST % */}
