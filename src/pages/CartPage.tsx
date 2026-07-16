@@ -208,19 +208,17 @@ export default function CartPage() {
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
-  const subtotal = cart.reduce((s, i) => {
-    const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-    const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
-    return s + effectivePrice * i.quantity;
-  }, 0);
-  const { slabs: gstSlabs, totalGst } = computeCartGST(
+  // priceNum is the tax-inclusive final selling price from the Client Price Engine.
+  // Extract embedded GST per category rate rather than adding tax on top.
+  const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
     cart.map(i => {
       const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
       const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
-      return { taxableAmount: effectivePrice * i.quantity, category: i.category };
+      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category };
     })
   );
-  const total = subtotal + totalGst;
+  const subtotal = preTaxSubtotal;
+  const total = preTaxSubtotal + totalGst;
 
   const visibleCount = 4;
   const maxScroll = Math.max(0, suggested.length - visibleCount);

@@ -106,10 +106,11 @@ export default function ReviewPage() {
 
   const paymentSummary = getPaymentSummary();
 
-  const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
-  const { slabs: gstSlabs, totalGst } = computeCartGST(
-    cart.map(i => ({ taxableAmount: i.priceNum * i.quantity, category: i.category }))
+  // priceNum is tax-inclusive — extract embedded GST, don't add on top.
+  const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
+    cart.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
   );
+  const subtotal = preTaxSubtotal;
   const SHIPPING_FEE = 500;
 
   const handlePlaceOrder = () => {

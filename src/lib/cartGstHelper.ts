@@ -1,44 +1,55 @@
-// Cart GST Helper — computes per-category tax breakdowns using the Tax Engine.
-// Always reads rates from Tax Settings so any change there flows through
-// immediately to the Cart, Checkout, and Order Confirmation pages.
+// Cart GST Helper — extracts the GST already embedded in tax-inclusive item prices.
+// The Client Price Engine builds finalPrice = preTax + tax, so priceNum in the cart
+// already contains GST. We back-calculate it here by rate so summaries show the
+// correct pre-tax subtotal + per-rate GST breakdown instead of adding tax twice.
 
 import { getEffectiveTaxPctForCategory } from './taxEngine';
 
 export interface GstSlab {
-  rate: number;     // e.g. 18
-  taxable: number;  // sum of item amounts taxed at this rate
-  gst: number;      // tax amount for this slab (Math.round)
+  rate: number;     // GST rate %, e.g. 18
+  taxable: number;  // pre-tax amount for items at this rate (rounded)
+  gst: number;      // GST amount for this slab (rounded)
 }
 
 export interface CartGstResult {
-  slabs: GstSlab[];   // one entry per distinct rate, sorted ascending
-  totalGst: number;   // sum of all slab gst values
-  isMixed: boolean;   // true when 2+ distinct rates exist
+  slabs: GstSlab[];      // one entry per distinct rate, sorted ascending
+  totalGst: number;      // sum of all slab gst values
+  preTaxSubtotal: number; // sum of all pre-tax amounts (= total - totalGst)
+  isMixed: boolean;      // true when 2+ distinct rates exist in the cart
 }
 
 /**
- * Compute GST breakdown for a list of cart items.
- * Each item supplies the already-discounted taxable amount and its product category.
+ * Given items whose `inclusiveAmount` is the tax-inclusive price total
+ * (priceNum × qty, after any slab discounts), extract the GST component
+ * per category rate and return the pre-tax subtotal + per-rate breakdown.
+ *
+ * Formula (tax-exclusive rate R added on top):
+ *   preTax  = inclusiveAmount × 100 / (100 + R)
+ *   gst     = inclusiveAmount − preTax
  */
 export function computeCartGST(
-  items: { taxableAmount: number; category?: string }[],
+  items: { inclusiveAmount: number; category?: string }[],
 ): CartGstResult {
-  const rateMap = new Map<number, number>(); // rate% → taxable total
+  const rateMap = new Map<number, { preTax: number; gst: number }>();
 
   for (const item of items) {
     const rate = getEffectiveTaxPctForCategory(item.category || '');
-    rateMap.set(rate, (rateMap.get(rate) ?? 0) + item.taxableAmount);
+    const preTax = item.inclusiveAmount * 100 / (100 + rate);
+    const gst   = item.inclusiveAmount - preTax;
+    const prev  = rateMap.get(rate) ?? { preTax: 0, gst: 0 };
+    rateMap.set(rate, { preTax: prev.preTax + preTax, gst: prev.gst + gst });
   }
 
   const slabs: GstSlab[] = [...rateMap.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([rate, taxable]) => ({
+    .map(([rate, { preTax, gst }]) => ({
       rate,
-      taxable,
-      gst: Math.round(taxable * rate / 100),
+      taxable: Math.round(preTax),
+      gst:     Math.round(gst),
     }));
 
-  const totalGst = slabs.reduce((s, sl) => s + sl.gst, 0);
+  const totalGst       = slabs.reduce((s, sl) => s + sl.gst, 0);
+  const preTaxSubtotal = slabs.reduce((s, sl) => s + sl.taxable, 0);
 
-  return { slabs, totalGst, isMixed: slabs.length > 1 };
+  return { slabs, totalGst, preTaxSubtotal, isMixed: slabs.length > 1 };
 }

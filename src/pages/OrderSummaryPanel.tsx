@@ -19,11 +19,12 @@ export default function OrderSummaryPanel({
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
-  const subtotal = cart.reduce((s, i) => s + i.priceNum * i.quantity, 0);
-  const { slabs: gstSlabs, totalGst } = computeCartGST(
-    cart.map(i => ({ taxableAmount: i.priceNum * i.quantity, category: i.category }))
+  // priceNum is tax-inclusive — extract embedded GST, don't add on top.
+  const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
+    cart.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
   );
-  const total = subtotal + totalGst;
+  const subtotal = preTaxSubtotal;
+  const total = preTaxSubtotal + totalGst;
   return (
     <div className="w-72 shrink-0 space-y-4">
       {/* Order Summary card */}
