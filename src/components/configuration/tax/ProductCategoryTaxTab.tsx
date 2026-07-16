@@ -49,6 +49,30 @@ export default function ProductCategoryTaxTab() {
   const openAdd = () => { setEditing(null); setForm(EMPTY); setOpen(true); };
   const openEdit = (m: ProductCategoryTaxMap) => { setEditing(m); setForm({ ...m }); setOpen(true); };
 
+  // When a product category is selected, auto-match HSN code + tax rules from the HSN table
+  const onProductCategoryChange = (category: string) => {
+    const matchedHsn = hsnCodes.find(
+      h => h.status === 'Active' && h.productCategory.toLowerCase() === category.toLowerCase()
+    );
+    if (matchedHsn) {
+      const taxCat = categories.find(c => c.id === matchedHsn.taxCategoryId);
+      setForm(f => ({
+        ...f,
+        productCategory: category,
+        defaultHsnCode: matchedHsn.code,
+        taxCategoryId: matchedHsn.taxCategoryId,
+        gstRate: matchedHsn.gstRate,
+        cgstPct: taxCat?.cgstPct ?? matchedHsn.gstRate / 2,
+        sgstPct: taxCat?.sgstPct ?? matchedHsn.gstRate / 2,
+        igstPct: taxCat?.igstPct ?? matchedHsn.gstRate,
+        isReverseCharge: taxCat?.isReverseCharge ?? f.isReverseCharge,
+        isExempt: taxCat?.isExempt ?? f.isExempt,
+      }));
+    } else {
+      setForm(f => ({ ...f, productCategory: category }));
+    }
+  };
+
   // When tax category changes, auto-fill rates
   const onCategoryChange = (id: string) => {
     const cat = categories.find(c => c.id === id);
@@ -174,7 +198,7 @@ export default function ProductCategoryTaxTab() {
             <div>
               <Label>Product Category *</Label>
               {masterCategories.length > 0 ? (
-                <Select value={form.productCategory} onValueChange={v => p('productCategory', v)}>
+                <Select value={form.productCategory} onValueChange={onProductCategoryChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category from Master Catalog…" />
                   </SelectTrigger>
