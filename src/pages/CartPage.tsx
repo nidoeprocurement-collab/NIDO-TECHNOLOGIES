@@ -434,50 +434,6 @@ export default function CartPage() {
             </button>
           </div>
 
-          {/* Why shop with NIDO */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h2 className="font-semibold text-gray-900 mb-4">Why shop with NIDO?</h2>
-            <div className="space-y-4">
-              {[
-                { icon: Shield,    label: "100% Secure Transactions",  sub: "Your data is always protected" },
-                { icon: Shield,    label: "GST Compliant Invoices",     sub: "Automatically generated" },
-                { icon: Truck,     label: "Fast Delivery",              sub: "Across India" },
-                { icon: RotateCcw, label: "Easy Returns",               sub: "Hassle-free returns" },
-              ].map(({ icon: Icon, label, sub }) => (
-                <div key={label} className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-                    <Icon size={15} className="text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{label}</p>
-                    <p className="text-xs text-gray-500">{sub}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Support */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <p className="font-semibold text-blue-600 text-sm mb-1">Need help with your order?</p>
-            <p className="text-xs text-gray-500 mb-3">Contact our support team</p>
-            <div className="space-y-2">
-              {(org.supportEmail || org.email) && (
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Mail size={13} className="text-gray-400" />
-                  <a href={`mailto:${org.supportEmail || org.email}`} className="hover:text-blue-600">
-                    {org.supportEmail || org.email}
-                  </a>
-                </div>
-              )}
-              {(org.supportPhone || org.phone) && (
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Phone size={13} className="text-gray-400" />
-                  {org.supportPhone || org.phone}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>
