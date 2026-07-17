@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import PermissionGate from './PermissionGate';
-import SLANotificationPopup from '@/components/shared/SLANotificationPopup';
 
 const COLLAPSE_STORAGE_KEY = 'nido:sidebar-collapsed';
 
@@ -52,7 +51,6 @@ export default function AppLayout() {
             </PermissionGate>
           </div>
         </main>
-        <SLANotificationPopup />
       </div>
     </div>
   );

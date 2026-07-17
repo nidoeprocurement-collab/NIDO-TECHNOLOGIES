@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Bell, Search, ArrowLeft, ChevronRight, Home } from 'lucide-react';
+import { Search, ArrowLeft, ChevronRight, Home } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import SLANotificationPopup from '@/components/shared/SLANotificationPopup';
 
 // Route to label mapping for breadcrumbs
 const routeLabels: Record<string, string> = {
@@ -124,11 +125,8 @@ export default function TopBar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
-          {/* Notifications */}
-          <button className="relative p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors">
-            <Bell size={20} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          {/* SLA Notifications */}
+          <SLANotificationPopup />
 
           {/* Live Date & Time */}
           <div className="flex items-center gap-3 pl-4 border-l border-border">
