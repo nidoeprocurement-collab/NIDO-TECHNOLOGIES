@@ -273,9 +273,15 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
         </div>
 
         {/* ── Footer (fixed, never scrolls) ── */}
-        <div className="shrink-0 border-t border-border bg-background px-6 py-4 flex flex-row items-center justify-between gap-3">
-          {/* Left: Add Module button */}
-          {!superAdmin ? (
+        <div className="shrink-0 border-t border-border bg-background px-6 py-4 min-h-[68px] flex flex-row items-center justify-between gap-3">
+          {/* Left side */}
+          {superAdmin ? (
+            /* Lock notice for System Owner */
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <Shield size={15} className="shrink-0" />
+              <span className="text-xs font-medium">All permissions are permanently granted for this role</span>
+            </div>
+          ) : (
             <Button
               variant="outline"
               size="sm"
@@ -283,15 +289,15 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               className="flex items-center gap-1.5"
             >
               <Plus size={14} />
-              {showAddModule ? 'Cancel' : 'Add Module'}
+              {showAddModule ? 'Cancel Add' : 'Add Module'}
             </Button>
-          ) : (
-            <div />
           )}
 
-          {/* Right: Cancel + Save */}
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          {/* Right side: action buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {superAdmin ? 'Close' : 'Cancel'}
+            </Button>
             {!superAdmin && (
               <Button onClick={handleSave}>Save Permissions</Button>
             )}
