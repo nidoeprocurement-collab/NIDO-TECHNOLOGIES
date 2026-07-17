@@ -47,7 +47,6 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
 
   const superAdmin = !!(role && isSuperAdmin(role.name));
 
-  // Reload modules list when custom modules change
   useEffect(() => {
     const handler = () => setModules(getAllModules());
     window.addEventListener(CUSTOM_MODULES_EVENT, handler);
@@ -100,11 +99,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
     const trimmed = newModuleName.trim();
     if (!trimmed) { setAddError('Module name is required.'); return; }
     const mod = addCustomModule(trimmed);
-    if (!mod) {
-      setAddError('A module with that name already exists.');
-      return;
-    }
-    // Add the new module row to the local matrix (empty permissions)
+    if (!mod) { setAddError('A module with that name already exists.'); return; }
     setMatrix(prev => ({ ...prev, [mod.key]: {} }));
     setModules(getAllModules());
     setNewModuleName('');
@@ -115,11 +110,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
 
   const handleDeleteCustomModule = (key: string, label: string) => {
     deleteCustomModule(key);
-    setMatrix(prev => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
+    setMatrix(prev => { const next = { ...prev }; delete next[key]; return next; });
     setModules(getAllModules());
     toast.info('Module removed', { description: `"${label}" has been removed from the permissions matrix.` });
   };
@@ -133,34 +124,39 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
 
   if (!role) return null;
 
-  const builtInCount = modules.filter(m => !('custom' in m && m.custom)).length;
   const customModules = modules.filter(m => 'custom' in m && m.custom);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none sm:rounded-none overflow-hidden flex flex-col p-6">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="text-lg">Permissions — {role.name}</DialogTitle>
-              <DialogDescription>
-                {superAdmin
-                  ? 'System Owner has unrestricted access to all modules.'
-                  : 'Toggle permissions for each module. Click a module name to toggle its entire row.'}
-              </DialogDescription>
-            </div>
-          </div>
-          {superAdmin && (
-            <Badge className="w-fit bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 mt-2">
-              Super Administrator — All permissions always granted
-            </Badge>
-          )}
-        </DialogHeader>
+      {/* Full-screen dialog split into 3 fixed sections: header / scroll-body / footer */}
+      <DialogContent className="w-screen h-screen max-w-none max-h-none sm:rounded-none p-0 flex flex-col overflow-hidden">
 
-        <div className="overflow-auto flex-1 -mx-6 px-6">
+        {/* ── Header (fixed, never scrolls) ── */}
+        <div className="shrink-0 px-6 pt-6 pb-4 border-b border-border">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Shield className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg">Permissions — {role.name}</DialogTitle>
+                <DialogDescription>
+                  {superAdmin
+                    ? 'System Owner has unrestricted access to all modules.'
+                    : 'Toggle permissions for each module. Click a module name to toggle its entire row.'}
+                </DialogDescription>
+              </div>
+            </div>
+            {superAdmin && (
+              <Badge className="w-fit bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 mt-3">
+                Super Administrator — All permissions always granted
+              </Badge>
+            )}
+          </DialogHeader>
+        </div>
+
+        {/* ── Scrollable table body ── */}
+        <div className="flex-1 overflow-auto px-6 py-4">
           <table className="w-full border-collapse text-sm min-w-[700px]">
             <thead className="sticky top-0 bg-background z-10">
               <tr>
@@ -170,15 +166,14 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                 {ACTIONS.map(a => (
                   <th key={a.key} className="py-3 px-2 text-center font-semibold text-foreground border-b border-border">
                     <button
-                      className={`flex flex-col items-center gap-1 mx-auto ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
+                      className={`flex flex-col items-center gap-1 mx-auto text-xs ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
                       onClick={() => toggleColumn(a.key)}
                       title={superAdmin ? undefined : `Toggle all ${a.label}`}
                     >
-                      <span className="text-xs">{a.label}</span>
+                      {a.label}
                     </button>
                   </th>
                 ))}
-                {/* Extra column for delete button on custom rows */}
                 <th className="w-8 border-b border-border" />
               </tr>
             </thead>
@@ -186,7 +181,6 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               {modules.map((m, idx) => {
                 const modPerms = matrix[m.key] ?? {};
                 const isCustom = 'custom' in m && m.custom;
-
                 return (
                   <tr key={m.key} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
                     <td className="py-2.5 px-3 border-b border-border">
@@ -240,16 +234,19 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                 );
               })}
 
-              {/* Add Module inline row */}
+              {/* Add Module inline input row */}
               {showAddModule && !superAdmin && (
                 <tr className="bg-blue-50/60 dark:bg-blue-950/20">
-                  <td colSpan={ACTIONS.length + 2} className="px-3 py-2.5 border-b border-border">
+                  <td colSpan={ACTIONS.length + 2} className="px-3 py-3 border-b border-border">
                     <div className="flex items-center gap-2 max-w-sm">
                       <Input
                         autoFocus
                         value={newModuleName}
                         onChange={e => { setNewModuleName(e.target.value); setAddError(''); }}
-                        onKeyDown={e => { if (e.key === 'Enter') handleAddModule(); if (e.key === 'Escape') { setShowAddModule(false); setNewModuleName(''); setAddError(''); } }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleAddModule();
+                          if (e.key === 'Escape') { setShowAddModule(false); setNewModuleName(''); setAddError(''); }
+                        }}
                         placeholder="Module name (e.g. Inventory)"
                         className="h-8 text-sm"
                       />
@@ -268,15 +265,16 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
             </tbody>
           </table>
 
-          {/* Summary line */}
+          {/* Module count summary */}
           <p className="text-xs text-muted-foreground mt-3 px-1">
-            {builtInCount} built-in module{builtInCount !== 1 ? 's' : ''}
+            {modules.filter(m => !('custom' in m && m.custom)).length} built-in modules
             {customModules.length > 0 && ` · ${customModules.length} custom module${customModules.length !== 1 ? 's' : ''}`}
           </p>
         </div>
 
-        {/* Footer — plain div to avoid DialogFooter's justify-end override */}
-        <div className="border-t border-border pt-4 mt-2 flex flex-row items-center justify-between gap-2">
+        {/* ── Footer (fixed, never scrolls) ── */}
+        <div className="shrink-0 border-t border-border bg-background px-6 py-4 flex flex-row items-center justify-between gap-3">
+          {/* Left: Add Module button */}
           {!superAdmin ? (
             <Button
               variant="outline"
@@ -285,16 +283,21 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               className="flex items-center gap-1.5"
             >
               <Plus size={14} />
-              {showAddModule ? 'Cancel Add' : 'Add Module'}
+              {showAddModule ? 'Cancel' : 'Add Module'}
             </Button>
           ) : (
-            <span />
+            <div />
           )}
-          <div className="flex gap-2">
+
+          {/* Right: Cancel + Save */}
+          <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            {!superAdmin && <Button onClick={handleSave}>Save Permissions</Button>}
+            {!superAdmin && (
+              <Button onClick={handleSave}>Save Permissions</Button>
+            )}
           </div>
         </div>
+
       </DialogContent>
     </Dialog>
   );
