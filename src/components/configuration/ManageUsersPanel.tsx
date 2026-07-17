@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import {
   Search, Plus, Download, FileText, MoreHorizontal,
   Pencil, Trash2, Key, UserCheck, UserX, PauseCircle,
-  MailPlus, AlertTriangle, Lock, Unlock, History,
+  MailPlus, AlertTriangle, Lock, Unlock, History, Eye, EyeOff,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -258,6 +258,16 @@ export default function ManageUsersPanel() {
   const [roles, setRoles] = useState<NidoRole[]>([])
   const [userDialogOpen, setUserDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<NidoUser | null>(null)
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
+
+  const togglePassword = (id: string) =>
+    setVisiblePasswords(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    })
+
+  const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
 
   const refresh = () => { setUsers(getUsers()); setRoles(getRoles()); }
 
@@ -326,7 +336,7 @@ export default function ManageUsersPanel() {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/40">
-                {["Emp ID", "Name", "Email", "Role", "Department", "Status", "Last Login", "Actions"].map(h => (
+                {["Emp ID", "Name", "Email", "Role", "Department", "Password", "Status", "Last Login", "Actions"].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -352,6 +362,25 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
                   <td className="px-4 py-3 text-sm">{user.role}</td>
                   <td className="px-4 py-3 text-sm">{user.department}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {SHOW_PASSWORD_ROLES.has(user.role) ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs text-gray-700">
+                          {visiblePasswords.has(user.id) ? user.password : "••••••••"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => togglePassword(user.id)}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title={visiblePasswords.has(user.id) ? "Hide password" : "Show password"}
+                        >
+                          {visiblePasswords.has(user.id) ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><StatusBadge status={user.status} locked={isUserLocked(user)} /></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{user.lastLogin ?? "Never"}</td>
                   <td className="px-4 py-3">
@@ -361,7 +390,7 @@ export default function ManageUsersPanel() {
               ))}
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
                     No users match your search.
                   </td>
                 </tr>
