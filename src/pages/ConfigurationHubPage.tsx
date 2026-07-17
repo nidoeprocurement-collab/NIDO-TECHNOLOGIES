@@ -11,6 +11,7 @@ import {
   DollarSign,
   Mail,
   Calculator,
+  Gauge,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -87,6 +88,12 @@ const menuItems = [
     description: "Centralized Tax Engine — GST, HSN/SAC, category rules",
     icon: Calculator,
     href: "/configuration/tax-settings",
+  },
+  {
+    title: "SLA Management",
+    description: "Centralized SLA Engine — vendor, client, procurement & service SLAs",
+    icon: Gauge,
+    href: "/configuration/sla-settings",
   },
 ];
 
