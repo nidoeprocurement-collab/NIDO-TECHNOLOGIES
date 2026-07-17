@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getPrefix } from "@/lib/configService";
 import { useConfig } from "@/contexts/ConfigContext";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { Plus, Search, MessageCircle, Clock, CheckCircle, AlertCircle } from "lu
 import { getServiceSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
+import { saveSupportTickets } from "@/lib/supportTicketStore";
 
 const MOCK_TICKETS = [
   {
@@ -63,6 +64,19 @@ export default function SupportPage() {
     in_progress: tickets.filter((t) => t.status === "in_progress").length,
     resolved: tickets.filter((t) => t.status === "resolved").length,
   };
+
+  // Keep the shared store in sync so the SLA notification hook can read tickets
+  // outside of this component's local state.
+  useEffect(() => {
+    saveSupportTickets(tickets.map(t => ({
+      id: t.id,
+      number: t.number,
+      subject: t.subject,
+      status: t.status,
+      priority: t.priority,
+      created: t.created,
+    })));
+  }, [tickets]);
 
   const handleCreate = () => {
     if (!form.subject) {
