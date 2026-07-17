@@ -3,6 +3,9 @@ import { getPrefix } from "@/lib/configService";
 import { useConfig } from "@/contexts/ConfigContext";
 import { toast } from "sonner";
 import { Plus, Search, MessageCircle, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { getServiceSLA } from "@/lib/slaEngine";
+import { computeSLAStatus } from "@/lib/slaUtils";
+import SLABadge from "@/components/shared/SLABadge";
 
 const MOCK_TICKETS = [
   {
@@ -186,6 +189,7 @@ export default function SupportPage() {
                 <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Priority</th>
                 <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Created</th>
                 <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold text-muted-foreground">SLA</th>
               </tr>
             </thead>
             <tbody>
@@ -208,6 +212,21 @@ export default function SupportPage() {
                         {ticket.status.replace("_", " ")}
                       </span>
                     </div>
+                  </td>
+                  <td className="px-4 md:px-6 py-2 md:py-4 text-sm">
+                    {(() => {
+                      const svcSLA = getServiceSLA();
+                      const priorityMap: Record<string, string> = {
+                        high:   "Technical Support",
+                        medium: "Remote Support",
+                        low:    "On-site Support",
+                      };
+                      const cat = svcSLA.find(s => s.category === (priorityMap[ticket.priority] ?? "Technical Support"));
+                      const targetHrs = cat?.resolutionTimeHrs ?? 4;
+                      const done = ticket.status === "resolved";
+                      const sla = computeSLAStatus(ticket.created, targetHrs, done);
+                      return <SLABadge sla={sla} compact />;
+                    })()}
                   </td>
                 </tr>
               ))}

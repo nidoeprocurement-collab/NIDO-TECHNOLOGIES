@@ -6,6 +6,9 @@ import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceE
 import { getVendorById } from "@/lib/vendorDataStore";
 import { savePO, generatePoNumber, type StoredPO } from "@/lib/purchaseOrderStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
+import { getClientSLA } from "@/lib/slaEngine";
+import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
+import SLABadge from "@/components/shared/SLABadge";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -1508,6 +1511,38 @@ export default function MyOrderPage() {
             <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
           </div>
         </div>
+
+        {/* SLA Status Panel */}
+        {(() => {
+          const tiers = getClientSLA();
+          const std = tiers.find(t => t.name === "Standard") ?? tiers[0];
+          const targetHrs = std?.orderProcessingTime ?? 24;
+          const start = order ? `${order.orderDate} ${order.orderTime || ""}` : null;
+          const done = masterStatus === "Delivered" || masterStatus === "Cancelled";
+          const sla = computeSLAStatus(start, targetHrs, done);
+          const colors: Record<string, string> = {
+            'on-track': '#f0fdf4', 'warning': '#fffbeb', 'breached': '#fef2f2',
+            'sla-met': '#f0fdf4', 'sla-missed': '#fef2f2', 'unknown': '#f9fafb',
+          };
+          const borders: Record<string, string> = {
+            'on-track': '#bbf7d0', 'warning': '#fcd34d', 'breached': '#fecaca',
+            'sla-met': '#bbf7d0', 'sla-missed': '#fecaca', 'unknown': '#e5e7eb',
+          };
+          return (
+            <div style={{ background: colors[sla.state], border: `1px solid ${borders[sla.state]}`, borderRadius: 10, padding: "12px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Order Processing SLA</div>
+                <div style={{ fontSize: 13, color: "#374151" }}>Target: <b>{targetHrs}h</b> (Standard tier)</div>
+              </div>
+              <SLABadge sla={sla} />
+              {sla.deadlineISO && sla.state !== 'unknown' && (
+                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                  SLA Deadline: <b style={{ color: "#374151" }}>{new Date(sla.deadlineISO).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</b>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Info Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>

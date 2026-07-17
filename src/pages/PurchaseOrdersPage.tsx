@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/table"
 import { Download, Plus, FileText, Search, RefreshCw } from "lucide-react"
 import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore"
+import { getProcurementSLA } from "@/lib/slaEngine"
+import { computeSLAStatus } from "@/lib/slaUtils"
+import SLABadge from "@/components/shared/SLABadge"
 
 // Download a PO PDF from the stored data-URI
 function downloadPODoc(po: StoredPO) {
@@ -252,6 +255,10 @@ export default function PurchaseOrdersPage() {
                 </TableHead>
 
                 <TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
+                  SLA
+                </TableHead>
+
+                <TableHead className="text-xs text-muted-foreground uppercase tracking-wide">
                   Billed Status
                 </TableHead>
 
@@ -273,7 +280,7 @@ export default function PurchaseOrdersPage() {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="py-16 text-center">
+                  <TableCell colSpan={12} className="py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-muted-foreground">
                       <FileText size={40} className="text-muted-foreground/40" />
                       <p className="text-sm font-medium">
@@ -350,6 +357,29 @@ export default function PurchaseOrdersPage() {
                     {/* Status */}
                     <TableCell>
                       <StatusPill status={po.status} />
+                    </TableCell>
+
+                    {/* SLA */}
+                    <TableCell>
+                      {(() => {
+                        const stages = getProcurementSLA();
+                        const stageMap: Record<string, string> = {
+                          "Draft":               "Purchase Order Creation",
+                          "Pending":             "Purchase Order Approval",
+                          "Processing":          "Vendor Confirmation",
+                          "Confirmed":           "Vendor Confirmation",
+                          "Partially Shipped":   "Goods Dispatch",
+                          "Shipped":             "Goods Dispatch",
+                          "Partially Delivered": "Goods Receipt",
+                          "Delivered":           "Payment Processing",
+                        };
+                        const stageName = stageMap[po.status] ?? "Purchase Order Creation";
+                        const stage = stages.find(s => s.stage === stageName);
+                        const targetHrs = stage?.targetTimeHrs ?? 24;
+                        const done = po.status === "Delivered";
+                        const sla = computeSLAStatus(po.createdOn, targetHrs, done);
+                        return <SLABadge sla={sla} compact />;
+                      })()}
                     </TableCell>
 
                     {/* Billed Status */}

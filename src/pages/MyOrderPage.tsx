@@ -1,6 +1,9 @@
 import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMyOrders, type MyOrder as Order, type MyOrderStatus as OrderStatus } from "@/contexts/MyOrdersContext";
+import { getClientSLA } from "@/lib/slaEngine";
+import { computeSLAStatus } from "@/lib/slaUtils";
+import SLABadge from "@/components/shared/SLABadge";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -643,13 +646,15 @@ export default function MyOrderPage() {
                       </td>
                       <td style={tdSt}><StatusBadge status={order.status} /></td>
                       <td style={tdSt}>
-                        {order.slaTime ? (
-                          <span style={{ color: order.slaAlert ? "#dc2626" : "hsl(var(--foreground))", fontWeight: order.slaAlert ? 700 : 400 }}>
-                            {order.slaTime}
-                          </span>
-                        ) : (
-                          <span style={{ color: "hsl(var(--muted-foreground))" }}>-</span>
-                        )}
+                        {(() => {
+                          const tiers = getClientSLA();
+                          const std = tiers.find(t => t.name === "Standard") ?? tiers[0];
+                          const targetHrs = std?.orderProcessingTime ?? 24;
+                          const start = order.orderDate ? `${order.orderDate} ${order.orderTime || ""}` : null;
+                          const done = order.status === "Delivered" || order.status === "Cancelled";
+                          const sla = computeSLAStatus(start, targetHrs, done);
+                          return <SLABadge sla={sla} compact />;
+                        })()}
                       </td>
                       <td style={{ ...tdSt, fontWeight: 600, color: "hsl(var(--foreground))" }}>{order.totalAmount}</td>
                     </tr>
