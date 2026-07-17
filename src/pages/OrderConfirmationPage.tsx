@@ -138,7 +138,7 @@ export default function OrderConfirmationPage() {
               </p>
 
               <button
-                onClick={() => navigate("/orders")}
+                onClick={() => navigate(`/orders/${orderId}`)}
                 className="w-full max-w-xs bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg py-3 text-sm transition-colors mb-6"
               >
                 Track Order
