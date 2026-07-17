@@ -311,6 +311,14 @@ function AppRoutes() {
           <Route path="dashboard/vendor" element={<VendorDashboard />} />
           <Route path="dashboard/sla" element={<SLAOverview />} />
           <Route
+            path="my-profile"
+            element={
+              <PageErrorBoundary title="My Profile failed to load" resetKey={location.pathname}>
+                <NidoUserProfilePage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
             path="orders"
             element={
               <PageErrorBoundary

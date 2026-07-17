@@ -11,7 +11,7 @@ import {
   ClipboardList, Tags, ShoppingBag, Gauge, FileText, Receipt,
   Repeat, Truck, FileMinus, FileCheck, Wallet, CreditCard,
   Banknote, ShieldCheck, Building2, Mail, History, LogOut,
-  Bell, User,
+  Bell, User, KeyRound,
 } from 'lucide-react';
 
 interface NavItem {
@@ -414,6 +414,15 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
               >
                 {avatarInitial}
               </div>
+              {!isClientPortalUser && (
+                <Link
+                  to="/my-profile"
+                  title="My Profile"
+                  className="w-8 h-8 flex items-center justify-center text-sidebar-foreground/60 hover:text-blue-400 rounded-lg hover:bg-blue-500/10 transition-all"
+                >
+                  <KeyRound size={15} />
+                </Link>
+              )}
               <button
                 title="Sign Out"
                 onClick={handleSignOut}
@@ -437,9 +446,17 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
                   <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
                 </div>
               </div>
+              {!isClientPortalUser && (
+                <Link
+                  to="/my-profile"
+                  className="w-full mt-1 px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-blue-400 text-left rounded-lg hover:bg-blue-500/10 transition-all flex items-center gap-2"
+                >
+                  <KeyRound size={14} /> My Profile & Recovery Codes
+                </Link>
+              )}
               <button
                 onClick={handleSignOut}
-                className="w-full mt-2 px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-red-400 text-left rounded-lg hover:bg-red-500/10 transition-all flex items-center gap-2"
+                className="w-full mt-1 px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-red-400 text-left rounded-lg hover:bg-red-500/10 transition-all flex items-center gap-2"
               >
                 <LogOut size={14} /> Sign Out
               </button>
