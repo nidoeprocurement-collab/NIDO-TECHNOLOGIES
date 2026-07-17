@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -276,24 +275,26 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
           </p>
         </div>
 
-        <DialogFooter className="border-t border-border pt-4 mt-2 flex-row items-center justify-between gap-2">
-          {!superAdmin && (
+        {/* Footer — plain div to avoid DialogFooter's justify-end override */}
+        <div className="border-t border-border pt-4 mt-2 flex flex-row items-center justify-between gap-2">
+          {!superAdmin ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => { setShowAddModule(v => !v); setNewModuleName(''); setAddError(''); }}
-              className="flex items-center gap-1.5 mr-auto"
+              className="flex items-center gap-1.5"
             >
               <Plus size={14} />
               {showAddModule ? 'Cancel Add' : 'Add Module'}
             </Button>
+          ) : (
+            <span />
           )}
-          {superAdmin && <span />}
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             {!superAdmin && <Button onClick={handleSave}>Save Permissions</Button>}
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
