@@ -3,6 +3,9 @@ import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
 import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getProcurementSLA } from "@/lib/slaEngine";
+import { computeSLAStatus } from "@/lib/slaUtils";
+import SLABadge from "@/components/shared/SLABadge";
 
 type OrderStatus = "Draft" | "Processing" | "Confirmed" | "Shipped" | "Delivered" | "Closed" | "Cancelled";
 
@@ -559,11 +562,12 @@ export default function VendorOrderList() {
                     </span>
                   </th>
                 ))}
+                <th style={s.th}>SLA</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <tr><td colSpan={9} style={{ ...s.td, textAlign: "center", color: muted, padding: 32 }}>No orders found</td></tr>
+                <tr><td colSpan={10} style={{ ...s.td, textAlign: "center", color: muted, padding: 32 }}>No orders found</td></tr>
               ) : pageRows.map(row => (
                 <tr
                   key={row.id}
@@ -583,6 +587,28 @@ export default function VendorOrderList() {
                   <td style={s.td}>{row.amountStr}</td>
                   <td style={s.td}>{row.delivery}</td>
                   <td style={s.td}>{row.by}</td>
+                  <td style={s.td} onClick={e => e.stopPropagation()}>
+                    {(() => {
+                      const stages = getProcurementSLA();
+                      const stageMap: Record<string, string> = {
+                        "Draft":               "Purchase Order Creation",
+                        "Pending":             "Purchase Order Approval",
+                        "Processing":          "Vendor Confirmation",
+                        "Confirmed":           "Vendor Confirmation",
+                        "Partially Shipped":   "Goods Dispatch",
+                        "Shipped":             "Goods Dispatch",
+                        "Partially Delivered": "Goods Receipt",
+                        "Delivered":           "Payment Processing",
+                        "Closed":              "Payment Processing",
+                      };
+                      const stageName = stageMap[row.status] ?? "Purchase Order Creation";
+                      const stage = stages.find(s => s.stage === stageName);
+                      const targetHrs = stage?.targetTimeHrs ?? 24;
+                      const done = row.status === "Delivered" || row.status === "Closed";
+                      const sla = computeSLAStatus(row.date, targetHrs, done);
+                      return <SLABadge sla={sla} compact />;
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>
