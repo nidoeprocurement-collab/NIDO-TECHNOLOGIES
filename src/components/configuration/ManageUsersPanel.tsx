@@ -23,10 +23,21 @@ import {
   getUsers, getRoles, addUser, updateUser, deleteUser, unlockUser,
   exportUsersCsv, exportUsersPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
+  MAX_FAILED_LOGIN_ATTEMPTS,
 } from "@/lib/nidoUsersStore"
 
+/** Returns true when a user should be treated as locked — covers both the explicit
+ *  `locked` boolean and the case where failedLoginAttempts hit the threshold but
+ *  the flag wasn't persisted (edge-case migration / stale read guard). */
+function isUserLocked(user: NidoUser): boolean {
+  return !!user.locked || (user.failedLoginAttempts ?? 0) >= MAX_FAILED_LOGIN_ATTEMPTS;
+}
+
 // ── Status badge ───────────────────────────────────────────────────────────────
-function StatusBadge({ status }: { status: NidoUser["status"] }) {
+function StatusBadge({ status, locked }: { status: NidoUser["status"]; locked?: boolean }) {
+  if (locked) {
+    return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Locked</Badge>;
+  }
   const cls =
     status === "Active"   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
     status === "Suspended"? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
@@ -199,7 +210,7 @@ function ActionsMenu({
               <History size={14} className="text-muted-foreground" /> View Login History
             </button>
             <div className="my-1 border-t border-border" />
-            {user.locked && (
+            {isUserLocked(user) && (
               <button className={itemCls} onClick={() => act(handleUnlock)}>
                 <Unlock size={14} className="text-green-600" /> Unlock Account
               </button>
@@ -332,7 +343,7 @@ export default function ManageUsersPanel() {
                         <AlertTriangle size={10} /> Password change required
                       </span>
                     )}
-                    {user.locked && (
+                    {isUserLocked(user) && (
                       <span className="inline-flex items-center gap-1 text-xs text-red-600 mt-0.5">
                         <Lock size={10} /> Locked
                       </span>
@@ -341,7 +352,7 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3 text-sm text-muted-foreground">{user.email}</td>
                   <td className="px-4 py-3 text-sm">{user.role}</td>
                   <td className="px-4 py-3 text-sm">{user.department}</td>
-                  <td className="px-4 py-3"><StatusBadge status={user.status} /></td>
+                  <td className="px-4 py-3"><StatusBadge status={user.status} locked={isUserLocked(user)} /></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{user.lastLogin ?? "Never"}</td>
                   <td className="px-4 py-3">
                     <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
