@@ -96,8 +96,8 @@ export default function OrderSummaryPanel({
                 <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">GST (18%)</span>
-                <span className="font-medium text-gray-900">{formatPrice(gst)}</span>
+                <span className="text-gray-500">GST</span>
+                <span className="font-medium text-gray-900">{formatPrice(totalGst)}</span>
               </div>
               <div className="border-t border-gray-100 pt-2 flex justify-between">
                 <span className="font-semibold text-gray-900">Total Amount</span>
