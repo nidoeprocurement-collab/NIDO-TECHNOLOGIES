@@ -65,6 +65,16 @@ export function getCatalogProducts(): CatalogProduct[] {
   }
 }
 
+/** Returns sorted unique category names from the master catalog. */
+export function getMasterCatalogCategories(): string[] {
+  const products = getCatalogProducts();
+  const seen = new Set<string>();
+  for (const p of products) {
+    if (p.category && p.category.trim()) seen.add(p.category.trim());
+  }
+  return Array.from(seen).sort();
+}
+
 export function saveCatalogProduct(product: CatalogProduct): void {
   const products = getCatalogProducts();
   const idx = products.findIndex(p => p.id === product.id);

@@ -8,17 +8,21 @@ import {
   saveClientPriceSlabs,
   type PriceSlab,
 } from '@/lib/priceEngineStore';
+import { getMasterCatalogCategories } from '@/lib/catalogStore';
 
-const APPLY_TO_OPTIONS = ['All Products', 'Electronics', 'Office Supplies', 'Furniture', 'Pantry', 'Networking'];
+/** Always "All Products" first, then live categories from master catalog. */
+function buildApplyToOptions(): string[] {
+  return ['All Products', ...getMasterCatalogCategories()];
+}
 
-function emptySlab(): PriceSlab {
+function emptySlab(applyToOptions: string[]): PriceSlab {
   return {
     id: `slab-${Date.now()}`,
     name: '',
     minQty: 1,
     maxQty: 100,
     discountPct: 0,
-    applyTo: 'All Products',
+    applyTo: applyToOptions[0] ?? 'All Products',
     status: 'Active',
   };
 }
@@ -28,6 +32,14 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<PriceSlab | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [applyToOptions, setApplyToOptions] = useState<string[]>(buildApplyToOptions);
+
+  // Re-build options whenever master catalog changes
+  useEffect(() => {
+    const handler = () => setApplyToOptions(buildApplyToOptions());
+    window.addEventListener('catalogUpdated', handler);
+    return () => window.removeEventListener('catalogUpdated', handler);
+  }, []);
 
   useEffect(() => {
     setSlabs(getClientPriceSlabs(clientId));
@@ -42,7 +54,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
   };
 
   const startAdd = () => {
-    const slab = emptySlab();
+    const slab = emptySlab(applyToOptions);
     setDraft(slab);
     setEditingId(slab.id);
     setIsNew(true);
@@ -147,7 +159,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                         onChange={(e) => setDraft({ ...draft, applyTo: e.target.value })}
                         className="h-8 text-xs border border-gray-300 rounded px-2 bg-white"
                       >
-                        {APPLY_TO_OPTIONS.map((opt) => (
+                        {applyToOptions.map((opt) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
                       </select>
@@ -241,7 +253,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     onChange={(e) => setDraft({ ...draft, applyTo: e.target.value })}
                     className="h-8 text-xs border border-gray-300 rounded px-2 bg-white"
                   >
-                    {APPLY_TO_OPTIONS.map((opt) => (
+                    {applyToOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
