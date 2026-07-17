@@ -7,6 +7,7 @@ import {
   Pencil, Trash2, Key, UserCheck, UserX, PauseCircle,
   MailPlus, AlertTriangle, Lock, Unlock, History, Eye, EyeOff,
 } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -252,7 +253,13 @@ function ActionsMenu({
 }
 
 // ── Main panel ─────────────────────────────────────────────────────────────────
+/** Roles that are allowed to view passwords in the user table. */
+const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
+
 export default function ManageUsersPanel() {
+  const { user: currentUser } = useAuth()
+  const canViewPasswords = SHOW_PASSWORD_ROLES.has(currentUser?.role ?? "")
+
   const [search, setSearch] = useState("")
   const [users, setUsers] = useState<NidoUser[]>([])
   const [roles, setRoles] = useState<NidoRole[]>([])
@@ -266,8 +273,6 @@ export default function ManageUsersPanel() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     })
-
-  const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
 
   const refresh = () => { setUsers(getUsers()); setRoles(getRoles()); }
 
@@ -363,7 +368,7 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3 text-sm">{user.role}</td>
                   <td className="px-4 py-3 text-sm">{user.department}</td>
                   <td className="px-4 py-3 text-sm">
-                    {SHOW_PASSWORD_ROLES.has(user.role) ? (
+                    {canViewPasswords ? (
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs text-gray-700">
                           {visiblePasswords.has(user.id) ? user.password : "••••••••"}

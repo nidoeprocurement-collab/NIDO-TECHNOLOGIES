@@ -31,6 +31,47 @@ export const MODULES = [
 
 export type ModuleKey = typeof MODULES[number]['key'];
 
+// ── Custom (user-defined) modules ─────────────────────────────────────────────
+
+export interface CustomModule { key: string; label: string; }
+const CUSTOM_MODULES_KEY = 'nido_custom_modules';
+export const CUSTOM_MODULES_EVENT = 'nidoCustomModulesUpdated';
+
+export function getCustomModules(): CustomModule[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_MODULES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+export function saveCustomModules(modules: CustomModule[]): void {
+  localStorage.setItem(CUSTOM_MODULES_KEY, JSON.stringify(modules));
+  window.dispatchEvent(new Event(CUSTOM_MODULES_EVENT));
+}
+
+/** Add a new custom module. Returns false if the key already exists. */
+export function addCustomModule(label: string): CustomModule | null {
+  const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const existing = [...MODULES.map(m => m.key), ...getCustomModules().map(m => m.key)];
+  if (existing.includes(key)) return null;
+  const mod: CustomModule = { key, label };
+  saveCustomModules([...getCustomModules(), mod]);
+  return mod;
+}
+
+/** Delete a custom module by key. */
+export function deleteCustomModule(key: string): void {
+  saveCustomModules(getCustomModules().filter(m => m.key !== key));
+}
+
+/** All modules — built-in + custom — as a flat array for use in the matrix. */
+export function getAllModules(): { key: string; label: string; custom?: boolean }[] {
+  return [
+    ...MODULES.map(m => ({ ...m })),
+    ...getCustomModules().map(m => ({ ...m, custom: true })),
+  ];
+}
+
 export const ACTIONS = [
   { key: 'view',      label: 'View' },
   { key: 'create',    label: 'Create' },
