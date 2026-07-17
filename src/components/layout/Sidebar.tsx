@@ -11,8 +11,10 @@ import {
   ClipboardList, Tags, ShoppingBag, Gauge, FileText, Receipt,
   Repeat, Truck, FileMinus, FileCheck, Wallet, CreditCard,
   Banknote, ShieldCheck, Building2, Mail, History, LogOut,
-  Bell, User, KeyRound,
+  Bell, User, KeyRound, ShieldAlert,
 } from 'lucide-react';
+
+const RECOVERY_CODE_ROLES = ['System Owner', 'System Admin'];
 
 interface NavItem {
   label: string;
@@ -274,6 +276,8 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const org = useOrgConfig();
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
   // Build filtered nav for admin users; client portal nav is always unfiltered
@@ -297,10 +301,25 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
 
   const effectiveCollapsed = collapsed && isDesktop;
 
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen]);
+
   const handleSignOut = () => {
+    setUserMenuOpen(false);
     logout();
     navigate('/login', { replace: true });
   };
+
+  const showRecoveryCodes = !isClientPortalUser && RECOVERY_CODE_ROLES.includes(user?.role ?? '');
 
   const displayName  = user?.name ?? 'Unknown User';
   const displayRole  = isClientPortalUser
@@ -400,67 +419,95 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
           ))}
         </nav>
 
-        {/* Bottom — user + sign-out */}
-        <div className="shrink-0 border-t border-sidebar-border">
+        {/* Bottom — user menu trigger */}
+        <div ref={userMenuRef} className="shrink-0 border-t border-sidebar-border relative">
+
+          {/* Dropdown menu — opens upward above the trigger */}
+          {userMenuOpen && (
+            <div className="absolute bottom-full left-2 right-2 mb-2 bg-background border border-border rounded-xl shadow-xl overflow-hidden z-50">
+              {/* User info header */}
+              <div className="px-4 py-3 border-b border-border bg-muted/40">
+                <p className="text-xs font-semibold text-foreground truncate">{displayName}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{displayRole}</p>
+              </div>
+
+              {/* Menu items */}
+              <div className="p-1.5 space-y-0.5">
+                {/* My Profile — always visible for non-portal users */}
+                {!isClientPortalUser && (
+                  <Link
+                    to="/my-profile"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-foreground rounded-lg hover:bg-muted transition-colors w-full"
+                  >
+                    <User size={15} className="text-muted-foreground shrink-0" />
+                    My Profile
+                  </Link>
+                )}
+
+                {/* Recovery Codes — only for System Owner & System Admin */}
+                {showRecoveryCodes && (
+                  <Link
+                    to="/my-profile"
+                    onClick={() => setUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-foreground rounded-lg hover:bg-muted transition-colors w-full"
+                  >
+                    <ShieldAlert size={15} className="text-amber-500 shrink-0" />
+                    Recovery Codes
+                  </Link>
+                )}
+
+                <div className="h-px bg-border my-1" />
+
+                {/* Sign Out */}
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors w-full text-left"
+                >
+                  <LogOut size={15} className="shrink-0" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Collapsed sidebar: just avatar button */}
           {effectiveCollapsed ? (
             <div className="p-2 flex flex-col items-center gap-2">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+              <button
+                onClick={() => setUserMenuOpen(v => !v)}
+                title={`${displayName} — ${displayRole}`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-transform hover:scale-105 ${
                   isClientPortalUser
                     ? 'bg-gradient-to-br from-purple-500 to-purple-700'
                     : 'bg-gradient-to-br from-blue-600 to-blue-700'
                 }`}
-                title={`${displayName} — ${displayRole}`}
               >
                 {avatarInitial}
-              </div>
-              {!isClientPortalUser && (
-                <Link
-                  to="/my-profile"
-                  title="My Profile"
-                  className="w-8 h-8 flex items-center justify-center text-sidebar-foreground/60 hover:text-blue-400 rounded-lg hover:bg-blue-500/10 transition-all"
-                >
-                  <KeyRound size={15} />
-                </Link>
-              )}
-              <button
-                title="Sign Out"
-                onClick={handleSignOut}
-                className="w-8 h-8 flex items-center justify-center text-sidebar-foreground/60 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-all"
-              >
-                <LogOut size={15} />
               </button>
             </div>
           ) : (
-            <div className="p-4">
-              <div className="flex items-center gap-3 px-3 py-2.5">
-                <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                  isClientPortalUser
-                    ? 'bg-gradient-to-br from-purple-500 to-purple-700'
-                    : 'bg-gradient-to-br from-blue-600 to-blue-700'
-                }`}>
-                  {avatarInitial}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-sidebar-foreground truncate">{displayName}</p>
-                  <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
-                </div>
+            /* Expanded sidebar: full clickable row */
+            <button
+              onClick={() => setUserMenuOpen(v => !v)}
+              className="w-full p-4 flex items-center gap-3 hover:bg-sidebar-accent/50 transition-colors group"
+            >
+              <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                isClientPortalUser
+                  ? 'bg-gradient-to-br from-purple-500 to-purple-700'
+                  : 'bg-gradient-to-br from-blue-600 to-blue-700'
+              }`}>
+                {avatarInitial}
               </div>
-              {!isClientPortalUser && (
-                <Link
-                  to="/my-profile"
-                  className="w-full mt-1 px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-blue-400 text-left rounded-lg hover:bg-blue-500/10 transition-all flex items-center gap-2"
-                >
-                  <KeyRound size={14} /> My Profile & Recovery Codes
-                </Link>
-              )}
-              <button
-                onClick={handleSignOut}
-                className="w-full mt-1 px-3 py-2 text-xs text-sidebar-foreground/70 hover:text-red-400 text-left rounded-lg hover:bg-red-500/10 transition-all flex items-center gap-2"
-              >
-                <LogOut size={14} /> Sign Out
-              </button>
-            </div>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-xs font-medium text-sidebar-foreground truncate">{displayName}</p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">{displayRole}</p>
+              </div>
+              <ChevronDown
+                size={14}
+                className={`shrink-0 text-sidebar-foreground/40 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
           )}
         </div>
       </aside>
