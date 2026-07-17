@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { findPortalUser } from '@/lib/portalUserStore';
-import { authenticateNidoUser } from '@/lib/nidoUsersStore';
+import { authenticateNidoUser, unlockUser, getUsers } from '@/lib/nidoUsersStore';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { Mail, Lock, Eye, EyeOff, Loader2, Zap } from 'lucide-react';
 
@@ -15,10 +15,24 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isLocked, setIsLocked] = useState(false);
+
+  const handleUnlockSelf = () => {
+    const users = getUsers();
+    const match = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (match) {
+      unlockUser(match.id);
+      setError('');
+      setIsLocked(false);
+    } else {
+      setError('Enter your email above first, then click Unlock.');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLocked(false);
     setIsLoading(true);
 
     try {
@@ -50,7 +64,8 @@ export default function LoginPage() {
           return;
         }
         if (result.error === 'locked') {
-          setError('This account has been locked after too many failed sign-in attempts. Contact your administrator to unlock it.');
+          setError('This account has been locked after too many failed sign-in attempts.');
+          setIsLocked(true);
           return;
         }
         // invalid_credentials — fall through to try client portal
@@ -150,6 +165,15 @@ export default function LoginPage() {
               {error && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-700 text-sm">{error}</p>
+                  {isLocked && (
+                    <button
+                      type="button"
+                      onClick={handleUnlockSelf}
+                      className="mt-2 w-full text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg py-1.5 transition-colors"
+                    >
+                      🔓 Unlock My Account
+                    </button>
+                  )}
                 </div>
               )}
 
