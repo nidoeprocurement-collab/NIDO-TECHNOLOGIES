@@ -1147,6 +1147,66 @@ export default function MyOrderPage() {
   // Find the real order from context
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
+  // ── Checkout fallbacks ────────────────────────────────────────────────────
+  // For orders placed before paymentMethod/deliveryAddress were persisted on
+  // the order itself, read them live from the same localStorage keys the
+  // checkout flow writes, so those fields are never shown as "—".
+  const paymentFallback = useMemo(() => {
+    if (order?.paymentMethod) return null; // field already stored on order
+    try {
+      const saved: Record<string, string> = JSON.parse(
+        localStorage.getItem("nido_payment_selection") || "{}"
+      );
+      const methodId = saved.paymentMethod || "card";
+      const LABELS: Record<string, string> = {
+        card: "Credit / Debit Card", netbanking: "Net Banking", upi: "UPI",
+        wallets: "Wallet", neft: "NEFT / RTGS", ban: "Company BAN",
+      };
+      const WALLET_NAMES: Record<string, string> = {
+        phonepe: "PhonePe", paytm: "Paytm", amazonpay: "Amazon Pay",
+        googlepay: "Google Pay", mobikwik: "MobiKwik",
+      };
+      const label = LABELS[methodId] ?? methodId;
+      let detail = "";
+      switch (methodId) {
+        case "card": {
+          const last4 = saved.cardNumber?.replace(/\s/g, "").slice(-4) || "";
+          const name = saved.cardName || "";
+          detail = last4 ? `**** **** **** ${last4}${name ? ` • ${name}` : ""}` : "Card details entered";
+          break;
+        }
+        case "netbanking": detail = saved.netBankingBank || "Bank selected"; break;
+        case "upi": detail = saved.upiId || "UPI ID entered"; break;
+        case "wallets": {
+          const wName = WALLET_NAMES[saved.selectedWallet] ?? saved.selectedWallet ?? "Wallet selected";
+          const mob = saved.walletMobile ? ` • +91 ${saved.walletMobile}` : "";
+          detail = `${wName}${mob}`;
+          break;
+        }
+        case "neft":
+          detail = saved.neftAccountName
+            ? `${saved.neftAccountName} • ${saved.neftBankName || ""}`.trim().replace(/•\s*$/, "")
+            : "Bank account entered";
+          break;
+        case "ban": detail = "Billed to company account"; break;
+      }
+      return { label, detail };
+    } catch { return null; }
+  }, [order?.paymentMethod]);
+
+  const deliveryAddressFallback = useMemo(() => {
+    if (order?.deliveryAddress) return null; // field already stored on order
+    try {
+      const clientId = localStorage.getItem("nido_shop_selected_client") || "";
+      const addrs: any[] = JSON.parse(
+        localStorage.getItem(`nido_delivery_addresses_${clientId}`) || "[]"
+      );
+      const addr = addrs.find(a => a.isDefault) ?? addrs[0] ?? null;
+      if (!addr) return null;
+      return [addr.line1, addr.line2, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
+    } catch { return null; }
+  }, [order?.deliveryAddress]);
+
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
   const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Vendor Selected Summary"];
@@ -1565,12 +1625,14 @@ export default function MyOrderPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
             <Field label="Client" value={order?.client || "—"} />
-            <Field label="Payment Method" value={order?.paymentMethod || "—"} />
-            {order?.paymentDetail && <Field label="Payment Detail" value={order.paymentDetail} />}
+            <Field label="Payment Method" value={order?.paymentMethod || paymentFallback?.label || "—"} />
+            {(order?.paymentDetail || paymentFallback?.detail) && (
+              <Field label="Payment Detail" value={order?.paymentDetail || paymentFallback?.detail || ""} />
+            )}
             <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
           </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
-            <Field label="Delivery Address" value={order?.deliveryAddress || "As per checkout"} />
+            <Field label="Delivery Address" value={order?.deliveryAddress || deliveryAddressFallback || "As per checkout"} />
             <Field label="Requested Delivery" value="Within 30 days" />
             <Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} />
           </div>
