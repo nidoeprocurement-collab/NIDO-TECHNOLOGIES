@@ -497,6 +497,64 @@ export interface ProductPricing {
   moq: number;
 }
 
+// ─── Stock info helpers ─────────────────────────────────────────────────────
+// Aggregates vendor-level stock into a single product-level view and supports
+// the cheapest-vendor-first allocation model the cart and shop pages use.
+
+export interface VendorStockAllocation {
+  vendorId: string;
+  vendorName: string;
+  stock: number;
+  landedCostPerUnit: number;
+  basePrice: number;
+  moq: number;
+}
+
+export interface ProductStockInfo {
+  /** Sum of stock across every active vendor for this product. */
+  totalStock: number;
+  /** Vendors sorted cheapest landed-cost first (same order as computeVendorComparisons). */
+  allocations: VendorStockAllocation[];
+}
+
+/** Return the total available stock and per-vendor breakdown for a product. */
+export function getProductStockInfo(masterProductCode: string, productCategory?: string): ProductStockInfo {
+  const comparisons = computeVendorComparisons(masterProductCode, productCategory);
+  const allocations: VendorStockAllocation[] = comparisons
+    .filter(r => r.stock > 0)
+    .map(r => ({
+      vendorId: r.vendorId,
+      vendorName: r.vendorName,
+      stock: r.stock,
+      landedCostPerUnit: r.landedCostPerUnit,
+      basePrice: r.basePrice,
+      moq: r.moq,
+    }));
+  return {
+    totalStock: allocations.reduce((s, a) => s + a.stock, 0),
+    allocations,
+  };
+}
+
+/**
+ * Given an ordered quantity and the cheapest-first vendor list, return which
+ * vendors fulfill how much.  Fills cheapest vendor first until its stock runs
+ * out, then spills into the next vendor, and so on.
+ */
+export function allocateQtyAcrossVendors(
+  qty: number,
+  allocations: VendorStockAllocation[],
+): Array<VendorStockAllocation & { allocated: number }> {
+  let remaining = qty;
+  return allocations
+    .map(a => {
+      const allocated = Math.min(remaining, a.stock);
+      remaining -= allocated;
+      return { ...a, allocated };
+    })
+    .filter(a => a.allocated > 0);
+}
+
 export function getAllProductPricing(): ProductPricing[] {
   const catalog = getCatalogProducts();
   return catalog.map(p => {

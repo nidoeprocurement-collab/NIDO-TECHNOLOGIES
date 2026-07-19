@@ -6,6 +6,8 @@ export type CartItem = {
   image: string;
   specs: string[];
   moq: number;
+  /** Total units available across all vendors. 0 = unknown / not set. */
+  totalStock: number;
   priceNum: number;
   quantity: number;
   clientId?: string;
@@ -51,7 +53,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         prev.map((i) => {
           if (i.id !== id) return i;
           // Never let quantity drop below the item's MOQ.
-          const enforced = Math.max(i.moq > 0 ? i.moq : 1, quantity);
+          const moqFloor = i.moq > 0 ? i.moq : 1;
+          // Never let quantity exceed available stock (when stock is known).
+          const stockCeil = i.totalStock > 0 ? i.totalStock : Infinity;
+          const enforced = Math.min(stockCeil, Math.max(moqFloor, quantity));
           return { ...i, quantity: enforced };
         })
       );

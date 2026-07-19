@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
-import { getSlabDiscountPct, getAllProductPricing } from "@/lib/priceEngineStore";
+import { getSlabDiscountPct, getAllProductPricing, allocateQtyAcrossVendors, type VendorStockAllocation } from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
@@ -31,42 +31,51 @@ function getSuggested(cartItems: CartItem[]): ClientCatalogEntry[] {
 }
 
 function QtyInput({
-  value, moq, onChange,
+  value, moq, max, onChange,
 }: {
-  value: number; moq: number; onChange: (qty: number) => void;
+  value: number; moq: number; max?: number; onChange: (qty: number) => void;
 }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => { setDraft(String(value)); }, [value]);
   const min = Math.max(1, moq);
+  const atMax = max !== undefined && max > 0 && value >= max;
   const commit = () => {
     const parsed = parseInt(draft, 10);
-    const clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    let clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    if (max !== undefined && max > 0) clamped = Math.min(max, clamped);
     setDraft(String(clamped));
     onChange(clamped);
   };
   return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={() => onChange(Math.max(min, value - 1))}
-        className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
-      >
-        <Minus size={12} />
-      </button>
-      <input
-        type="number"
-        value={draft}
-        min={min}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={e => e.key === "Enter" && commit()}
-        className="w-10 text-center text-sm font-medium text-gray-900 border border-gray-200 rounded-md py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-      />
-      <button
-        onClick={() => onChange(value + 1)}
-        className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
-      >
-        <Plus size={12} />
-      </button>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors shrink-0"
+        >
+          <Minus size={12} />
+        </button>
+        <input
+          type="number"
+          value={draft}
+          min={min}
+          max={max}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => e.key === "Enter" && commit()}
+          className="w-10 text-center text-sm font-medium text-gray-900 border border-gray-200 rounded-md py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        />
+        <button
+          onClick={() => { if (!atMax) onChange(value + 1); }}
+          disabled={atMax}
+          className={`w-7 h-7 rounded-full border flex items-center justify-center transition-colors shrink-0 ${atMax ? "border-gray-200 text-gray-300 cursor-not-allowed" : "border-gray-300 hover:bg-gray-50"}`}
+        >
+          <Plus size={12} />
+        </button>
+      </div>
+      {max !== undefined && max > 0 && (
+        <p className="text-[10px] text-gray-400 pl-1">Max: {max.toLocaleString("en-IN")}</p>
+      )}
     </div>
   );
 }
@@ -113,12 +122,15 @@ function SuggestedCard({
 
         <button
           onClick={() => {
+            const totalStock = (product as ClientCatalogEntry & { totalStock?: number }).totalStock ?? 0;
+            if (totalStock > 0 && totalStock <= 0) return; // guard (handled by disabled)
             onAdd({
               id: Math.abs(product.productCode.split("").reduce((a, c) => a + c.charCodeAt(0), 0)),
               name: product.name,
               image,
               specs,
               moq: product.moq ?? 1,
+              totalStock,
               priceNum,
               clientId: undefined,
               category: product.category,
@@ -127,10 +139,17 @@ function SuggestedCard({
             setAdded(true);
             setTimeout(() => setAdded(false), 1500);
           }}
-          className={`mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors ${added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+          disabled={(product as ClientCatalogEntry & { totalStock?: number }).totalStock === 0}
+          className={`mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors ${
+            (product as ClientCatalogEntry & { totalStock?: number }).totalStock === 0
+              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+              : added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+          }`}
         >
           <ShoppingCart size={12} />
-          {added ? "Added!" : "Add to Cart"}
+          {(product as ClientCatalogEntry & { totalStock?: number }).totalStock === 0
+            ? "Out of Stock"
+            : added ? "Added!" : "Add to Cart"}
         </button>
       </div>
     </div>
@@ -143,19 +162,37 @@ export default function CartPage() {
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
 
-  // Vendor match map — same logic as ShopPage's getVendorMatchMap().
-  // This is the authoritative source for leadTime and moq: it reads from the
-  // winning vendor via getAllProductPricing(), keyed by masterProductCode
-  // (= ClientCatalogEntry.productCode).
+  // Product-level stock + vendor data map — single source of truth for moq,
+  // leadTime, totalStock, and the cheapest-first vendor allocation list.
+  // Keyed by masterProductCode (= ClientCatalogEntry.productCode).
   const vendorMatchMap = useMemo(() => {
-    const map = new Map<string, { leadTime: string; moq: number }>();
+    const map = new Map<string, {
+      leadTime: string;
+      moq: number;
+      totalStock: number;
+      allocations: VendorStockAllocation[];
+    }>();
     getAllProductPricing().forEach(p => {
-      if (!p.winningVendor) return;
-      const days = p.winningVendor.leadTime;
+      const days = p.winningVendor?.leadTime ?? 0;
       const displayDays = days > 0 ? days * 2 : 0;
+      // Sum stock across ALL vendors (not just the winner) — the cart should
+      // show the combined capacity before signalling "Out of Stock".
+      const allocations: VendorStockAllocation[] = p.vendorComparisons
+        .filter(r => r.stock > 0)
+        .map(r => ({
+          vendorId: r.vendorId,
+          vendorName: r.vendorName,
+          stock: r.stock,
+          landedCostPerUnit: r.landedCostPerUnit,
+          basePrice: r.basePrice,
+          moq: r.moq,
+        }));
+      const totalStock = allocations.reduce((s, a) => s + a.stock, 0);
       map.set(p.masterProductCode, {
         leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
-        moq: p.winningVendor.moq,
+        moq: p.winningVendor?.moq ?? 0,
+        totalStock,
+        allocations,
       });
     });
     return map;
@@ -173,15 +210,16 @@ export default function CartPage() {
     return map;
   }, []);
 
-  // Enrich suggested entries with live vendor leadTime and moq — mirrors
-  // ShopPage's entryToProduct() so the card shows identical data.
+  // Enrich suggested entries with live vendor leadTime, moq, totalStock — mirrors
+  // ShopPage's entryToProduct() so every card shows identical data.
   const enrich = (entries: ClientCatalogEntry[]): ClientCatalogEntry[] =>
     entries.map(e => {
       const vendor = vendorMatchMap.get(e.productCode);
-      const moq      = vendor?.moq && vendor.moq > 0 ? vendor.moq
-                     : (e.moq && e.moq > 0 ? e.moq : 1);
-      const leadTime = vendor?.leadTime || e.leadTime || "";
-      return { ...e, moq, leadTime };
+      const moq        = vendor?.moq && vendor.moq > 0 ? vendor.moq
+                       : (e.moq && e.moq > 0 ? e.moq : 1);
+      const leadTime   = vendor?.leadTime || e.leadTime || "";
+      const totalStock = vendor?.totalStock ?? 0;
+      return { ...e, moq, leadTime, totalStock };
     });
 
   const [suggested, setSuggested] = useState<ClientCatalogEntry[]>(() =>
@@ -196,9 +234,10 @@ export default function CartPage() {
   }, [cart, vendorMatchMap]);
 
   const onAddToCart = (p: Omit<CartItem, "quantity">) => {
-    // p.moq is already authoritative (enriched above from live vendor data).
+    // p.moq and p.totalStock are already authoritative (enriched from live vendor data).
     const correctMoq = Math.max(1, p.moq);
-    addItem({ ...p, moq: correctMoq }, correctMoq);
+    const qty = p.totalStock > 0 ? Math.min(p.totalStock, correctMoq) : correctMoq;
+    addItem({ ...p, moq: correctMoq }, qty);
   };
 
   // HSN lookup by product category — from Tax Settings (Category Mapping first, then HSN/SAC table)
@@ -297,9 +336,22 @@ export default function CartPage() {
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
                   const catalog        = catalogMap.get(item.productCode || "");
                   const hsnCode        = hsnByCategory.get((item.category || "").toLowerCase()) || "—";
+                  const stockInfo      = vendorMatchMap.get(item.productCode || "");
+                  const totalStock     = item.totalStock > 0 ? item.totalStock : (stockInfo?.totalStock ?? 0);
+                  const isOutOfStock   = totalStock > 0 && item.quantity > totalStock;
+                  const stockBadge = totalStock === 0
+                    ? { label: "Stock Unknown", cls: "bg-gray-50 text-gray-500 border-gray-200" }
+                    : item.quantity > totalStock
+                    ? { label: "Out of Stock", cls: "bg-red-50 text-red-600 border-red-200" }
+                    : totalStock - item.quantity < 50
+                    ? { label: `${totalStock - item.quantity} left`, cls: "bg-amber-50 text-amber-600 border-amber-200" }
+                    : { label: "In Stock", cls: "bg-green-50 text-green-600 border-green-200" };
+                  const allocation = stockInfo?.allocations
+                    ? allocateQtyAcrossVendors(item.quantity, stockInfo.allocations)
+                    : [];
 
                   return (
-                    <tr key={item.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 transition-colors">
+                    <tr key={item.id} className={`border-b border-gray-100 last:border-0 transition-colors ${isOutOfStock ? "bg-red-50/30" : "hover:bg-gray-50/50"}`}>
 
                       {/* Product Details */}
                       <td className="px-5 py-5 align-top">
@@ -310,8 +362,8 @@ export default function CartPage() {
                               alt={item.name}
                               className="w-24 h-24 object-cover rounded-xl border border-gray-200"
                             />
-                            <span className="text-[10px] font-semibold bg-green-50 text-green-600 border border-green-200 rounded-full px-2.5 py-0.5">
-                              In Stock
+                            <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-0.5 ${stockBadge.cls}`}>
+                              {stockBadge.label}
                             </span>
                           </div>
                           <div className="min-w-0">
@@ -376,8 +428,23 @@ export default function CartPage() {
                         <QtyInput
                           value={item.quantity}
                           moq={item.moq}
+                          max={totalStock > 0 ? totalStock : undefined}
                           onChange={qty => onUpdateQuantity(item.id, qty)}
                         />
+                        {isOutOfStock && (
+                          <p className="text-[10px] text-red-500 font-medium mt-1.5">
+                            Exceeds stock ({totalStock.toLocaleString("en-IN")} available)
+                          </p>
+                        )}
+                        {!isOutOfStock && allocation.length > 1 && (
+                          <div className="mt-2 space-y-0.5">
+                            {allocation.map(a => (
+                              <p key={a.vendorId} className="text-[10px] text-gray-400 leading-tight">
+                                {a.allocated.toLocaleString("en-IN")} × {a.vendorName}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                       </td>
 
                       {/* GST Amount */}

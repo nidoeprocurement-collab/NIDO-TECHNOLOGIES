@@ -21,6 +21,8 @@ type Product = {
   specs: string[];
   leadTime: string;
   moq: number;
+  /** Combined stock across all active vendors (0 = no vendor stock data). */
+  totalStock: number;
   priceNum: number;
   inStock: boolean;
   description?: string;
@@ -77,17 +79,19 @@ function formatPrice(n: number) {
 function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
-type VendorMatch = { leadTime: string; moq: number };
+type VendorMatch = { leadTime: string; moq: number; totalStock: number };
 
 function getVendorMatchMap(): Map<string, VendorMatch> {
   const map = new Map<string, VendorMatch>();
   getAllProductPricing().forEach(p => {
-    if (!p.winningVendor) return;
-    const days = p.winningVendor.leadTime;
+    const days = p.winningVendor?.leadTime ?? 0;
     const displayDays = days > 0 ? days * 2 : 0;
+    // Sum across ALL vendors so the shop knows the real combined capacity.
+    const totalStock = p.vendorComparisons.reduce((s, r) => s + (r.stock ?? 0), 0);
     map.set(p.masterProductCode, {
       leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
-      moq: p.winningVendor.moq,
+      moq: p.winningVendor?.moq ?? 0,
+      totalStock,
     });
   });
   return map;
@@ -106,6 +110,7 @@ function prefOrder(pref?: string): number {
 
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
+  const totalStock = match?.totalStock ?? 0;
   return {
     id: `client-${e.productCode}`,
     productCode: e.productCode,
@@ -115,8 +120,10 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     specs: e.specs || [],
     leadTime: match?.leadTime || e.leadTime || "",
     moq: match?.moq ?? e.moq ?? 0,
+    totalStock,
     priceNum: e.priceNum ?? 0,
-    inStock: e.availability !== "Out of Stock",
+    // Out of stock if: marked so in the catalog OR vendor stock is known and is 0.
+    inStock: e.availability !== "Out of Stock" && (totalStock > 0 || match === undefined),
     description: e.description,
     generalSpecs: e.generalSpecs,
     preference: e.preference,
@@ -172,10 +179,13 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   useEffect(() => { if (product) { const v = Math.max(1, product.moq); setQty(v); setQtyDraft(String(v)); } }, [product]);
   useEffect(() => { if (product) setMoqDraft(String(product.moq)); }, [product?.moq]);
 
+  const dialogMaxQty = product ? (product.totalStock > 0 ? product.totalStock : undefined) : undefined;
+
   const commitDialogQty = () => {
     const min = Math.max(1, product?.moq ?? 1);
     const parsed = parseInt(qtyDraft, 10);
-    const clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    let clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    if (dialogMaxQty !== undefined) clamped = Math.min(dialogMaxQty, clamped);
     setQty(clamped);
     setQtyDraft(String(clamped));
   };
@@ -187,7 +197,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
   const handleAdd = () => {
     if (added) return;
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -318,24 +328,35 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                     type="number"
                     value={qtyDraft}
                     min={Math.max(1, product.moq)}
+                    max={dialogMaxQty}
                     onChange={e => setQtyDraft(e.target.value)}
                     onBlur={commitDialogQty}
                     onKeyDown={e => e.key === "Enter" && commitDialogQty()}
                     className="flex-1 text-center font-bold text-base border border-gray-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
-                    onClick={() => { const v = qty + 1; setQty(v); setQtyDraft(String(v)); }}
-                    className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
+                    onClick={() => { if (dialogMaxQty === undefined || qty < dialogMaxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
+                    disabled={dialogMaxQty !== undefined && qty >= dialogMaxQty}
+                    className={`w-9 h-9 rounded-full border flex items-center justify-center text-lg leading-none shrink-0 ${dialogMaxQty !== undefined && qty >= dialogMaxQty ? "border-gray-200 text-gray-300 cursor-not-allowed" : "border-gray-300 text-gray-600 hover:bg-gray-50"}`}
                   >+</button>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">(Min: {formatMoq(product.moq)})</span>
+                  <div className="flex flex-col text-xs text-gray-400 whitespace-nowrap">
+                    <span>Min: {formatMoq(product.moq)}</span>
+                    {dialogMaxQty !== undefined && <span>Max: {dialogMaxQty.toLocaleString("en-IN")}</span>}
+                  </div>
                 </div>
+                {dialogMaxQty !== undefined && qty >= dialogMaxQty && (
+                  <p className="text-xs text-amber-600 mt-1.5 font-medium">
+                    Maximum available stock reached ({dialogMaxQty.toLocaleString("en-IN")} units)
+                  </p>
+                )}
 
                 <button
                   onClick={handleAdd}
-                  className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                  disabled={!product.inStock}
+                  className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                 >
                   {added ? <Check size={16} /> : <ShoppingCart size={16} />}
-                  {added ? "Added to Cart!" : "Add to Cart"}
+                  {!product.inStock ? "Out of Stock" : added ? "Added to Cart!" : "Add to Cart"}
                 </button>
 
                 <div className="mt-5 space-y-2.5 border-t border-gray-100 pt-4">
@@ -455,10 +476,13 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [qtyDraft, setQtyDraft] = useState(String(Math.max(1, product.moq)));
   const [adding, setAdding] = useState(false);
 
+  const maxQty = product.totalStock > 0 ? product.totalStock : undefined;
+
   const commitCardQty = () => {
     const min = Math.max(1, product.moq);
     const parsed = parseInt(qtyDraft, 10);
-    const clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    let clamped = isNaN(parsed) || parsed < min ? min : parsed;
+    if (maxQty !== undefined) clamped = Math.min(maxQty, clamped);
     setQty(clamped);
     setQtyDraft(String(clamped));
   };
@@ -470,7 +494,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     e.stopPropagation();
     if (!product.inStock || adding) return;
     setAdding(true);
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setTimeout(() => setAdding(false), 1500);
   };
 
@@ -542,7 +566,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : adding ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
           >
             {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
-            {adding ? "Added!" : "Add to Cart"}
+            {adding ? "Added!" : !product.inStock ? "Out of Stock" : "Add to Cart"}
           </button>
           <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
             <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
@@ -550,14 +574,22 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               type="number"
               value={qtyDraft}
               min={Math.max(1, product.moq)}
+              max={maxQty}
               onChange={e => setQtyDraft(e.target.value)}
               onBlur={commitCardQty}
               onKeyDown={e => e.key === "Enter" && commitCardQty()}
               className="w-10 text-center text-xs font-semibold text-gray-800 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
-            <button onClick={() => { const v = qty + 1; setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">+</button>
+            <button
+              onClick={() => { if (maxQty === undefined || qty < maxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
+              disabled={maxQty !== undefined && qty >= maxQty}
+              className={`px-1.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
+            >+</button>
           </div>
         </div>
+        {maxQty !== undefined && (
+          <p className="text-[10px] text-gray-400 mt-1 text-right">{maxQty.toLocaleString("en-IN")} in stock</p>
+        )}
       </div>
     </div>
   );
