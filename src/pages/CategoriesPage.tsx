@@ -3,10 +3,17 @@ import { toast } from "sonner";
 import { Plus, Search, MoreVertical, Trash2, Edit2 } from "lucide-react";
 
 const MOCK_CATEGORIES = [
-  { id: "cat_001", name: "IT Hardware", description: "Computer equipment and networking devices" },
-  { id: "cat_002", name: "Office Supplies", description: "Stationery and office materials" },
-  { id: "cat_003", name: "Equipment", description: "Heavy equipment and machinery" },
-  { id: "cat_004", name: "Services", description: "Professional services and consulting" },
+  { id: "cat_001", name: "Computers", description: "Laptops, desktops, monitors and accessories" },
+  { id: "cat_002", name: "Networking", description: "Routers, switches, access points and cables" },
+  { id: "cat_003", name: "Office Supplies", description: "General office materials and desk accessories" },
+  { id: "cat_004", name: "Furniture", description: "Chairs, desks, cabinets and storage units" },
+  { id: "cat_005", name: "Electrical", description: "Cables, switches, lighting and power equipment" },
+  { id: "cat_006", name: "Cloud Software", description: "SaaS, productivity and cloud-based tools" },
+  { id: "cat_007", name: "Stationery", description: "Pens, notebooks, envelopes and writing materials" },
+  { id: "cat_008", name: "Pantry", description: "Beverages, snacks and kitchen supplies" },
+  { id: "cat_009", name: "Cleaning Supplies", description: "Detergents, disinfectants and janitorial items" },
+  { id: "cat_010", name: "Medical Supplies", description: "First aid, PPE, medicines and sanitizers" },
+  { id: "cat_011", name: "Services", description: "IT services, consulting and facility management" },
 ];
 
 export default function CategoriesPage() {

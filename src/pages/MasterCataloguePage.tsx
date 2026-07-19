@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode, removeArchivedProductFromDownstream } from '@/lib/catalogStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -69,11 +70,7 @@ interface CatalogItem {
   images?: string[];
 }
 
-const defaultCategories: Record<string, string[]> = {
-  'IT Hardware': ['Laptops', 'Desktops', 'Monitors', 'Peripherals', 'Storage', 'Networking'],
-  'Stationery': ['Paper', 'Writing', 'Filing', 'Desk Accessories'],
-  'Office Supplies': ['Furniture', 'Cleaning', 'Pantry', 'Safety'],
-};
+const defaultCategories: Record<string, string[]> = { ...CATEGORY_SUBCATEGORIES };
 
 const defaultBrands = ['HP', 'Sandisk', 'Logitech', 'Apple', 'Epson', 'Dell', 'Lenovo', 'Samsung'];
 const defaultVendors = ['HP Direct', 'Sandisk Global', 'Epson Hub', 'Apple Store B2B', 'Dell Enterprise'];

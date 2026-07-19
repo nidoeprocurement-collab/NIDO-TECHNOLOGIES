@@ -33,10 +33,9 @@ export default function VendorEditPage() {
   // ── Dropdown option lists ───────────────────────────────────────────────────
   // Categories includes all stored categories + standard onboarding categories
   const baseCategories = [
-    'IT Services', 'IT Hardware', 'Software', 'Office Supplies', 'Services',
-    'Machinery & Equipment', 'Electronics', 'Networking', 'Furniture & Fixtures',
-    'Facility Management', 'Logistics', 'Raw Materials', 'Manufacturing',
-    'Marketing', 'Packaging', 'Agriculture', 'Other',
+    'Computers', 'Networking', 'Office Supplies', 'Furniture', 'Electrical',
+    'Cloud Software', 'Stationery', 'Pantry', 'Cleaning Supplies',
+    'Medical Supplies', 'Services', 'Other',
   ];
   const categories = withCurrentValue(baseCategories, vendor?.category);
 

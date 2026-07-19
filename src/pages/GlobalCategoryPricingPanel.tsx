@@ -14,7 +14,7 @@ import { getCatalogProducts } from '@/lib/catalogStore';
 function loadCatalogCategories(): string[] {
   const cats = getCatalogProducts().map(p => p.category).filter(Boolean);
   const unique = Array.from(new Set(cats)).sort();
-  return unique.length > 0 ? unique : ['Office Supplies', 'Electronics', 'Furniture', 'Services'];
+  return unique.length > 0 ? unique : ['Computers', 'Networking', 'Office Supplies', 'Furniture', 'Electrical', 'Cloud Software', 'Stationery', 'Pantry', 'Cleaning Supplies', 'Medical Supplies', 'Services'];
 }
 
 const ADD_NEW_SENTINEL = '__ADD_NEW__';

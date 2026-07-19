@@ -2,16 +2,15 @@
 
 import React, { useState } from 'react';
 import { Cloud, Plus, Trash2, Star } from 'lucide-react';
+import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 
 export default function AddVendorPage() {
   // Dropdown options data
-  const categories = ['IT Hardware', 'Software', 'Office Supplies', 'Services', 'Machinery & Equipment', 'Electronics', 'Networking', 'Furniture & Fixtures', 'Facility Management', 'Other', '+ Add New Category'];
+  const categories = [...CATEGORY_LIST, '+ Add New Category'];
   
-  const subCategories = {
-    'IT Hardware': ['Servers', 'Laptops', 'Desktops', 'Storage', 'Printers', 'Networking Devices', 'Peripherals', 'Accessories', 'Consumables', 'Others', '+ Add New Sub Category'],
-    'Software': ['Operating System', 'Productivity', 'Development', 'Security', 'Others', '+ Add New Sub Category'],
-    'Office Supplies': ['Stationery', 'Furniture', 'Cleaning', 'Others', '+ Add New Sub Category'],
-  };
+  const subCategories: Record<string, string[]> = Object.fromEntries(
+    Object.entries(CATEGORY_SUBCATEGORIES).map(([k, v]) => [k, [...(v as string[]), '+ Add New Sub Category']])
+  );
 
   const contacts = [
     { name: 'Rahul Sharma', title: 'Manager - Sales' },

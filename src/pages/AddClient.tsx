@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { CATEGORY_LIST } from "@/lib/categories";
 import { addClient as addStoredClient, getClients } from "@/lib/clientStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
@@ -29,13 +30,7 @@ const STEPS = [
   { label: "Documents", icon: "E" },
 ];
 
-const CATEGORIES = [
-  "IT Hardware",
-  "Cloud Servers",
-  "Office Supplies",
-  "Networking",
-  "Miscellaneous",
-];
+const CATEGORIES = CATEGORY_LIST;
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY"];
 
