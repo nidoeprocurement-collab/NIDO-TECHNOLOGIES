@@ -105,10 +105,10 @@ function SuggestedCard({
           {priceNum > 0 && <span className="text-[11px] font-normal text-gray-500"> / each</span>}
         </p>
 
-        {/* Lead time + MOQ — mirrors shop page footer */}
-        <div className="flex items-center justify-between text-[10px] text-gray-400 mb-2 gap-1">
-          <span className="truncate">Lead: {formatLeadTime(product.leadTime)}</span>
-          <span className="shrink-0">MOQ: {formatMoq(product.moq)}</span>
+        {/* Lead Time + MOQ — exact same style as shop page ProductCard footer */}
+        <div className="flex items-center justify-between text-[11px] text-gray-500 border-t border-gray-100 pt-2 mb-2">
+          <span>Lead Time: {formatLeadTime(product.leadTime)}</span>
+          <span>MOQ: {formatMoq(product.moq)}</span>
         </div>
 
         <button
