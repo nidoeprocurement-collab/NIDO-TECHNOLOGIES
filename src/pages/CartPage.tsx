@@ -87,7 +87,7 @@ function SuggestedCard({
   product, onAdd,
 }: {
   product: ClientCatalogEntry;
-  onAdd: (p: Omit<CartItem, "quantity">) => void;
+  onAdd: (p: Omit<CartItem, "quantity" | "vendorAllocations">) => void;
 }) {
   const [added, setAdded] = useState(false);
   const image = product.img ?? "";
@@ -162,21 +162,15 @@ export default function CartPage() {
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
 
-  // Product-level stock + vendor data map — single source of truth for moq,
-  // leadTime, totalStock, and the cheapest-first vendor allocation list.
-  // Keyed by masterProductCode (= ClientCatalogEntry.productCode).
-  const vendorMatchMap = useMemo(() => {
-    const map = new Map<string, {
-      leadTime: string;
-      moq: number;
-      totalStock: number;
-      allocations: VendorStockAllocation[];
-    }>();
+  // Product-level stock + vendor data map — reactive: rebuilds whenever vendor
+  // stock changes (vendorProductsUpdated fires after every reserveStock /
+  // releaseStock call so the badge + max-qty update immediately).
+  type VendorInfo = { leadTime: string; moq: number; totalStock: number; allocations: VendorStockAllocation[] };
+  const buildVendorMatchMap = (): Map<string, VendorInfo> => {
+    const map = new Map<string, VendorInfo>();
     getAllProductPricing().forEach(p => {
       const days = p.winningVendor?.leadTime ?? 0;
       const displayDays = days > 0 ? days * 2 : 0;
-      // Sum stock across ALL vendors (not just the winner) — the cart should
-      // show the combined capacity before signalling "Out of Stock".
       const allocations: VendorStockAllocation[] = p.vendorComparisons
         .filter(r => r.stock > 0)
         .map(r => ({
@@ -196,6 +190,14 @@ export default function CartPage() {
       });
     });
     return map;
+  };
+
+  const [vendorMatchMap, setVendorMatchMap] = useState<Map<string, VendorInfo>>(buildVendorMatchMap);
+
+  useEffect(() => {
+    const refresh = () => setVendorMatchMap(buildVendorMatchMap());
+    window.addEventListener("vendorProductsUpdated", refresh);
+    return () => window.removeEventListener("vendorProductsUpdated", refresh);
   }, []);
 
   // Catalog map — brand/sku only (MOQ now comes from vendorMatchMap).
@@ -233,7 +235,7 @@ export default function CartPage() {
     return () => window.removeEventListener("clientCatalogUpdated", handler);
   }, [cart, vendorMatchMap]);
 
-  const onAddToCart = (p: Omit<CartItem, "quantity">) => {
+  const onAddToCart = (p: Omit<CartItem, "quantity" | "vendorAllocations">) => {
     // p.moq and p.totalStock are already authoritative (enriched from live vendor data).
     const correctMoq = Math.max(1, p.moq);
     const qty = p.totalStock > 0 ? Math.min(p.totalStock, correctMoq) : correctMoq;
@@ -337,21 +339,24 @@ export default function CartPage() {
                   const catalog        = catalogMap.get(item.productCode || "");
                   const hsnCode        = hsnByCategory.get((item.category || "").toLowerCase()) || "—";
                   const stockInfo      = vendorMatchMap.get(item.productCode || "");
-                  const totalStock     = item.totalStock > 0 ? item.totalStock : (stockInfo?.totalStock ?? 0);
-                  const isOutOfStock   = totalStock > 0 && item.quantity > totalStock;
-                  const stockBadge = totalStock === 0
-                    ? { label: "Stock Unknown", cls: "bg-gray-50 text-gray-500 border-gray-200" }
-                    : item.quantity > totalStock
-                    ? { label: "Out of Stock", cls: "bg-red-50 text-red-600 border-red-200" }
-                    : totalStock - item.quantity < 50
-                    ? { label: `${totalStock - item.quantity} left`, cls: "bg-amber-50 text-amber-600 border-amber-200" }
+                  // After reserveStock, vendor stock is already reduced by item.quantity.
+                  // stockInfo.totalStock = REMAINING stock on shelves (not yet reserved).
+                  // maxQty = what the user could have in total = reserved + remaining.
+                  const liveRemaining  = stockInfo?.totalStock ?? 0;
+                  const stockDataKnown = stockInfo !== undefined;
+                  const maxQty         = stockDataKnown ? item.quantity + liveRemaining : undefined;
+                  const stockBadge = !stockDataKnown
+                    ? { label: "In Stock", cls: "bg-green-50 text-green-600 border-green-200" }
+                    : liveRemaining === 0
+                    ? { label: "Reserved", cls: "bg-blue-50 text-blue-600 border-blue-200" }
+                    : liveRemaining < 50
+                    ? { label: `${liveRemaining} left`, cls: "bg-amber-50 text-amber-600 border-amber-200" }
                     : { label: "In Stock", cls: "bg-green-50 text-green-600 border-green-200" };
-                  const allocation = stockInfo?.allocations
-                    ? allocateQtyAcrossVendors(item.quantity, stockInfo.allocations)
-                    : [];
+                  // Vendor split comes from what was actually reserved (item.vendorAllocations).
+                  const allocation = item.vendorAllocations ?? [];
 
                   return (
-                    <tr key={item.id} className={`border-b border-gray-100 last:border-0 transition-colors ${isOutOfStock ? "bg-red-50/30" : "hover:bg-gray-50/50"}`}>
+                    <tr key={item.id} className="border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/50">
 
                       {/* Product Details */}
                       <td className="px-5 py-5 align-top">
@@ -428,15 +433,20 @@ export default function CartPage() {
                         <QtyInput
                           value={item.quantity}
                           moq={item.moq}
-                          max={totalStock > 0 ? totalStock : undefined}
+                          max={maxQty}
                           onChange={qty => onUpdateQuantity(item.id, qty)}
                         />
-                        {isOutOfStock && (
-                          <p className="text-[10px] text-red-500 font-medium mt-1.5">
-                            Exceeds stock ({totalStock.toLocaleString("en-IN")} available)
+                        {liveRemaining === 0 && stockDataKnown && (
+                          <p className="text-[10px] text-blue-500 font-medium mt-1.5">
+                            All available stock reserved
                           </p>
                         )}
-                        {!isOutOfStock && allocation.length > 1 && (
+                        {liveRemaining > 0 && liveRemaining < 50 && (
+                          <p className="text-[10px] text-amber-600 font-medium mt-1.5">
+                            Only {liveRemaining} more available
+                          </p>
+                        )}
+                        {allocation.length > 1 && (
                           <div className="mt-2 space-y-0.5">
                             {allocation.map(a => (
                               <p key={a.vendorId} className="text-[10px] text-gray-400 leading-tight">
