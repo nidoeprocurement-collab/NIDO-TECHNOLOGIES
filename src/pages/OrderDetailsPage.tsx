@@ -347,72 +347,77 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                 )}
               </div>
 
-              {/* Allocation rows */}
+              {/* Allocation rows — fixed vendor cards, no dropdown */}
               {allocations.map((alloc, idx) => {
                 const comp = comparisons.find(c => c.vendorId === alloc.vendorId);
                 const stock = getVendorStock(alloc.vendorId);
                 const stockOk = stock === null || stock >= alloc.qty;
-                const availableVendors = comparisons.filter(c => c.vendorId === alloc.vendorId || !usedIds.has(c.vendorId));
+                const isPrimary = idx === 0;
+                const accent = isPrimary ? "#2563eb" : "#16a34a";
+                const bgRow   = isPrimary ? "#f0f7ff" : "#f6fef9";
+                const borderRow = isPrimary ? "#bfdbfe" : "#bbf7d0";
                 return (
-                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 100px 120px 38px", gap: 12, padding: "12px 18px", alignItems: "center", borderBottom: idx < allocations.length - 1 ? "1px solid #f3f4f6" : "none", background: idx === 0 ? "#eff6ff" : "#fff" }}>
-                    {/* Vendor picker */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 26, height: 26, borderRadius: "50%", background: idx === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                  <div key={idx} style={{ padding: "14px 18px", borderBottom: idx < allocations.length - 1 ? "1px solid #e5e7eb" : "none", background: bgRow, borderLeft: `4px solid ${accent}` }}>
+                    {/* Vendor identity row */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      {/* Number badge */}
+                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                         {idx + 1}
                       </div>
+                      {/* Vendor name + meta */}
                       <div style={{ flex: 1 }}>
-                        <select
-                          value={alloc.vendorId}
-                          onChange={e => handleAllocationVendorChange(idx, e.target.value)}
-                          style={{ width: "100%", padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}
-                        >
-                          {availableVendors.map(c => (
-                            <option key={c.vendorId} value={c.vendorId}>{c.vendorName}</option>
-                          ))}
-                        </select>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>
+                          {comp?.vendorName || alloc.vendorId}
+                          {isPrimary && <span style={{ marginLeft: 8, fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Primary</span>}
+                        </div>
                         {comp && (
-                          <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3 }}>
-                            Unit: {fmt(comp.landedCostPerUnit)} · Lead: {comp.leadTime}d
+                          <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 2 }}>
+                            Unit Cost: <b style={{ color: "#374151" }}>{fmt(comp.landedCostPerUnit)}</b>
+                            &nbsp;·&nbsp;Lead Time: <b style={{ color: "#374151" }}>{comp.leadTime} day{comp.leadTime !== 1 ? "s" : ""}</b>
                           </div>
                         )}
                       </div>
                       {/* Stock badge */}
-                      <div style={{ flexShrink: 0 }}>
+                      <div style={{ flexShrink: 0, textAlign: "right" }}>
                         {stock === null
                           ? <span style={{ fontSize: 12, color: "#9ca3af" }}>Stock: —</span>
-                          : <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fef2f2", color: stockOk ? "#166534" : "#991b1b", border: `1px solid ${stockOk ? "#bbf7d0" : "#fecaca"}` }}>
-                              Stock: {stock}
+                          : <span style={{ display: "inline-block", padding: "3px 12px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                              background: stockOk ? "#f0fdf4" : "#fef2f2",
+                              color:      stockOk ? "#166534" : "#991b1b",
+                              border:     `1px solid ${stockOk ? "#bbf7d0" : "#fecaca"}` }}>
+                              Stock: {stock} Nos
                             </span>
                         }
                         {!stockOk && stock !== null && (
-                          <div style={{ fontSize: 10.5, color: "#dc2626", marginTop: 2 }}>⚠ Insufficient — add another vendor</div>
+                          <div style={{ fontSize: 10.5, color: "#dc2626", marginTop: 3 }}>⚠ Insufficient — add another vendor</div>
                         )}
                       </div>
-                    </div>
-                    {/* Qty input */}
-                    <div>
-                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>Order Qty</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={alloc.qty}
-                        onChange={e => handleQtyChange(idx, parseInt(e.target.value) || 1)}
-                        style={{ width: "100%", padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", textAlign: "center" }}
-                      />
-                    </div>
-                    {/* Line total */}
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>Line Total</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{comp ? fmt(comp.landedCostPerUnit * alloc.qty) : "—"}</div>
-                    </div>
-                    {/* Remove */}
-                    <div style={{ display: "flex", justifyContent: "center" }}>
+                      {/* Remove button */}
                       {allocations.length > 1 && (
                         <button
                           onClick={() => handleRemoveAllocation(idx)}
                           title="Remove this vendor"
-                          style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}
+                          style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}
                         >×</button>
+                      )}
+                    </div>
+                    {/* Qty + Line total row */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 20, paddingLeft: 38 }}>
+                      <div>
+                        <div style={{ fontSize: 10.5, color: "#6b7280", marginBottom: 3, fontWeight: 600, letterSpacing: 0.3 }}>ORDER QTY</div>
+                        <input
+                          type="number"
+                          min={1}
+                          value={alloc.qty}
+                          onChange={e => handleQtyChange(idx, parseInt(e.target.value) || 1)}
+                          style={{ width: 90, padding: "6px 10px", border: `1px solid ${borderRow}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", textAlign: "center", background: "#fff" }}
+                        />
+                      </div>
+                      {comp && (
+                        <div>
+                          <div style={{ fontSize: 10.5, color: "#6b7280", marginBottom: 3, fontWeight: 600, letterSpacing: 0.3 }}>LINE TOTAL</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: accent }}>{fmt(comp.landedCostPerUnit * alloc.qty)}</div>
+                        </div>
                       )}
                     </div>
                   </div>
