@@ -1010,8 +1010,13 @@ function CancelItemModal({ itemName, onConfirm, onClose }) {
   );
 }
 
-function Stepper({ currentStatus }) {
-  const steps = [{ label: "Processing", note: "Apr 16, 2026" }, { label: "Partially Shipped", note: "In Progress" }, { label: "Partially Delivered", note: "Pending" }, { label: "Delivered", note: "Pending" }];
+function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDate?: string }) {
+  const steps = [
+    { label: "Processing", note: orderDate || "—" },
+    { label: "Partially Shipped", note: "In Progress" },
+    { label: "Partially Delivered", note: "Pending" },
+    { label: "Delivered", note: "Pending" },
+  ];
   const activeIdx = Math.max(0, steps.findIndex(s => s.label === currentStatus));
   return (
     <div style={{ display: "flex", alignItems: "flex-start", flex: 1, padding: "0 12px" }}>
@@ -1558,8 +1563,17 @@ export default function MyOrderPage() {
 
         {/* Info Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div><Field label="Client" value={order?.client || "—"} /><Field label="Payment Method" value="Credit Card" /><Field label="Payment Terms" value="Net 30 (Payment due in 30 days)" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div><Field label="Delivery Address" value="No. 45, 3rd Floor, Embassy Tech Village, Outer Ring Road, Bangalore - 560103" /><Field label="Requested Delivery" value="Within 30 days" /><Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} /></div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
+            <Field label="Client" value={order?.client || "—"} />
+            <Field label="Payment Method" value={order?.paymentMethod || "—"} />
+            {order?.paymentDetail && <Field label="Payment Detail" value={order.paymentDetail} />}
+            <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
+          </div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
+            <Field label="Delivery Address" value={order?.deliveryAddress || "As per checkout"} />
+            <Field label="Requested Delivery" value="Within 30 days" />
+            <Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} />
+          </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
             <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
           ) : (
@@ -1582,7 +1596,7 @@ export default function MyOrderPage() {
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>🚚</div>
                 <div><div style={{ fontSize: 11, color: "#6b7280", marginBottom: 2 }}>Master Order Status</div><div style={{ fontSize: 17, fontWeight: 700 }}>{masterStatus}</div><div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{subOrders.length} sub-order{subOrders.length !== 1 ? "s" : ""} in this order</div></div>
               </div>
-              <Stepper currentStatus={masterStatus} />
+              <Stepper currentStatus={masterStatus} orderDate={order?.orderDate} />
             </div>
             {!isClientPortalUser && (
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>

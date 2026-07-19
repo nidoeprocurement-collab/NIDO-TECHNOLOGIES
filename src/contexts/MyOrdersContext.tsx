@@ -48,6 +48,11 @@ export interface MyOrder {
   cartItems?: OrderCartItem[];
   // Numeric total for easy calculation
   totalAmountNum?: number;
+  // Payment & delivery captured at checkout
+  paymentMethod?: string;
+  paymentDetail?: string;
+  paymentTerms?: string;
+  deliveryAddress?: string;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────

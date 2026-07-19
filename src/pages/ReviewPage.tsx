@@ -141,6 +141,13 @@ export default function ReviewPage() {
       slaAlert: false,
       totalAmount: formattedTotal,
       totalAmountNum: totalAmount,
+      paymentMethod: paymentSummary.label,
+      paymentDetail: paymentSummary.detail,
+      paymentTerms: "Net 30 (Payment due in 30 days)",
+      deliveryAddress: selectedAddr
+        ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
+            .filter(Boolean).join(", ")
+        : "",
       cartItems: itemsSnapshot.map((i) => ({
         id: i.id,
         name: i.name,
