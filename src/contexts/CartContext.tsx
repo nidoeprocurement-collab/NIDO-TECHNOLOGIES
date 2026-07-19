@@ -48,7 +48,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem(id);
     } else {
       setItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity } : i))
+        prev.map((i) => {
+          if (i.id !== id) return i;
+          // Never let quantity drop below the item's MOQ.
+          const enforced = Math.max(i.moq > 0 ? i.moq : 1, quantity);
+          return { ...i, quantity: enforced };
+        })
       );
     }
   };

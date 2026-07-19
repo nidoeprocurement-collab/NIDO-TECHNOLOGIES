@@ -124,36 +124,52 @@ export default function CartPage() {
   const navigate = useNavigate();
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
-  const [suggested, setSuggested] = useState<ClientCatalogEntry[]>(() => getSuggested(cart));
 
-  useEffect(() => {
-    setSuggested(getSuggested(cart));
-    const handler = () => setSuggested(getSuggested(cart));
-    window.addEventListener("clientCatalogUpdated", handler);
-    return () => window.removeEventListener("clientCatalogUpdated", handler);
-  }, [cart]);
-
-  const onAddToCart = (p: Omit<CartItem, "quantity">) => {
-    // Use canonical MOQ from the master catalog if available; fall back to what
-    // the client-catalog entry says (which may be missing/1 if not populated).
-    const catalogMoq = catalogMap.get(p.productCode ?? "")?.moq;
-    const correctMoq = Math.max(1, catalogMoq ?? p.moq);
-    addItem({ ...p, moq: correctMoq }, correctMoq);
-  };
-
-  // Catalog lookup map for brand / SKU / MOQ — keyed by masterProductCode
-  // (ClientCatalogEntry.productCode === CatalogProduct.masterProductCode)
+  // Catalog lookup map for brand / SKU / MOQ — keyed by masterProductCode.
+  // MUST be defined before suggested and onAddToCart so the closure sees the
+  // correct value immediately.
+  // ClientCatalogEntry.productCode === CatalogProduct.masterProductCode.
   const catalogMap = useMemo(() => {
     const map = new Map<string, { brand: string; sku: string; moq: number }>();
     getCatalogProducts().forEach(p => {
       map.set(p.masterProductCode || p.skuCode || "", {
         brand: p.brand || "",
         sku: p.skuCode || "",
-        moq: p.moq ?? 1,
+        moq: p.moq,          // use raw value — Math.max guard is in onAddToCart
       });
     });
     return map;
   }, []);
+
+  // Enrich client-catalog entries with the authoritative MOQ from the master
+  // catalog. The client-catalog moq field is optional and is NOT updated when
+  // the master catalog MOQ changes (only prices are synced), so it can be
+  // stale or missing.  We fix it here before any card or add-to-cart uses it.
+  const enrichWithMoq = (entries: ClientCatalogEntry[]): ClientCatalogEntry[] =>
+    entries.map(e => {
+      const masterMoq = catalogMap.get(e.productCode)?.moq;
+      // masterMoq may be 0 if the product has no vendor MOQ yet — treat 0 as
+      // "unset" and fall back to the client-catalog value, then default to 1.
+      const moq = masterMoq && masterMoq > 0 ? masterMoq : (e.moq && e.moq > 0 ? e.moq : 1);
+      return moq === e.moq ? e : { ...e, moq };
+    });
+
+  const [suggested, setSuggested] = useState<ClientCatalogEntry[]>(() =>
+    enrichWithMoq(getSuggested(cart))
+  );
+
+  useEffect(() => {
+    setSuggested(enrichWithMoq(getSuggested(cart)));
+    const handler = () => setSuggested(enrichWithMoq(getSuggested(cart)));
+    window.addEventListener("clientCatalogUpdated", handler);
+    return () => window.removeEventListener("clientCatalogUpdated", handler);
+  }, [cart, catalogMap]);
+
+  const onAddToCart = (p: Omit<CartItem, "quantity">) => {
+    // p.moq is already authoritative (enriched above from the master catalog).
+    const correctMoq = Math.max(1, p.moq);
+    addItem({ ...p, moq: correctMoq }, correctMoq);
+  };
 
   // HSN lookup by product category — from Tax Settings (Category Mapping first, then HSN/SAC table)
   const hsnByCategory = useMemo(() => {
