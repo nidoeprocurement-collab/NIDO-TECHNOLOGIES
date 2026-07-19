@@ -133,15 +133,22 @@ export default function CartPage() {
     return () => window.removeEventListener("clientCatalogUpdated", handler);
   }, [cart]);
 
-  const onAddToCart = (p: Omit<CartItem, "quantity">) => addItem(p);
+  const onAddToCart = (p: Omit<CartItem, "quantity">) => {
+    // Use canonical MOQ from the master catalog if available; fall back to what
+    // the client-catalog entry says (which may be missing/1 if not populated).
+    const catalogMoq = catalogMap.get(p.productCode ?? "")?.moq;
+    const correctMoq = Math.max(1, catalogMoq ?? p.moq);
+    addItem({ ...p, moq: correctMoq }, correctMoq);
+  };
 
-  // Catalog lookup map for brand / SKU (by productCode)
+  // Catalog lookup map for brand / SKU / MOQ (by productCode)
   const catalogMap = useMemo(() => {
-    const map = new Map<string, { brand: string; sku: string }>();
+    const map = new Map<string, { brand: string; sku: string; moq: number }>();
     getCatalogProducts().forEach(p => {
       map.set(p.productCode || p.skuCode || "", {
         brand: p.brand || "",
         sku: p.skuCode || "",
+        moq: p.moq ?? 1,
       });
     });
     return map;
