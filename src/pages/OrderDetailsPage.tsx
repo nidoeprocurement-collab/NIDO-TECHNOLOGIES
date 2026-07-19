@@ -119,146 +119,338 @@ function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
 
 // ── Vendor Selection Modal (popup) — uses Price Engine top-4 ─────────────────
 function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
-  // Load top-4 vendors from Price Engine for this product
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  const [pickedId, setPickedId] = useState<string>(
-    selectedVendorId || comparisons[0]?.vendorId || ""
-  );
-  const picked = comparisons.find(c => c.vendorId === pickedId);
-  const pickedVendorInfo = picked ? getVendorById(picked.vendorId) : undefined;
+  // Live stock lookup per vendor
+  const vendorProducts = useMemo(() => getAllVendorProducts(), []);
+  const getVendorStock = (vendorId: string): number | null => {
+    if (!sub.productCode) return null;
+    const prods = vendorProducts[vendorId] || [];
+    const match = prods.find((p: any) => p.masterProductCode === sub.productCode && p.status === "Active");
+    return match ? (parseInt((match as any).stock) || 0) : null;
+  };
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const handleConfirm = () => {
-    if (!picked) return;
-    const v = getVendorById(picked.vendorId);
-    onSelect(sub.id, picked.vendorId, {
-      vendorId: picked.vendorId,
-      vendorName: picked.vendorName,
-      unitPrice: picked.landedCostPerUnit,
-      location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : picked.vendorId,
+  // Allocation list: one entry per vendor split
+  const defaultVendorId = selectedVendorId || comparisons[0]?.vendorId || "";
+  const [allocations, setAllocations] = useState<Array<{ vendorId: string; qty: number }>>(
+    defaultVendorId ? [{ vendorId: defaultVendorId, qty: sub.qty }] : []
+  );
+
+  const totalAllocated = allocations.reduce((s, a) => s + a.qty, 0);
+  const remaining = sub.qty - totalAllocated;
+  const usedIds = new Set(allocations.map(a => a.vendorId));
+  const unusedComparisons = comparisons.filter(c => !usedIds.has(c.vendorId));
+
+  // Radio click in the vendor table → sets the PRIMARY (first) allocation's vendor
+  const handlePickPrimary = (vendorId: string) => {
+    setAllocations(prev => {
+      // If this vendor is already a secondary, just swap it to primary
+      const secIdx = prev.findIndex((a, i) => i > 0 && a.vendorId === vendorId);
+      if (secIdx > -1) {
+        const next = [...prev];
+        const [swapped] = next.splice(secIdx, 1);
+        const primary = next[0];
+        next[0] = { ...swapped, qty: primary.qty };
+        next.splice(1, 0, { ...primary, qty: swapped.qty });
+        return next;
+      }
+      return [{ vendorId, qty: prev[0]?.qty ?? sub.qty }, ...prev.slice(1)];
+    });
+  };
+
+  const handleAddVendor = () => {
+    if (unusedComparisons.length === 0) return;
+    const r = Math.max(1, remaining > 0 ? remaining : 1);
+    setAllocations(prev => [...prev, { vendorId: unusedComparisons[0].vendorId, qty: r }]);
+  };
+
+  const handleRemoveAllocation = (idx: number) => {
+    setAllocations(prev => {
+      const removed = prev[idx];
+      const next = prev.filter((_, i) => i !== idx);
+      if (next.length > 0 && removed) {
+        next[0] = { ...next[0], qty: next[0].qty + removed.qty };
+      }
+      return next;
+    });
+  };
+
+  const handleQtyChange = (idx: number, val: number) => {
+    setAllocations(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], qty: Math.max(1, val) };
+      return next;
+    });
+  };
+
+  const handleAllocationVendorChange = (idx: number, vendorId: string) => {
+    setAllocations(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], vendorId };
+      return next;
+    });
+  };
+
+  const buildMeta = (vendorId: string) => {
+    const c = comparisons.find(x => x.vendorId === vendorId);
+    const v = getVendorById(vendorId);
+    return {
+      vendorId,
+      vendorName: c?.vendorName || vendorId,
+      unitPrice: c?.landedCostPerUnit || 0,
+      location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : vendorId,
       gstin: v?.taxId || v?.pan || "",
       contact: v?.primaryContact || "",
       email: v?.email || "",
       phone: v?.phone || "",
-      addressLine1: v?.addressLine1 || v?.address || "",
+      addressLine1: v?.addressLine1 || (v as any)?.address || "",
       addressLine2: v?.addressLine2 || "",
       city: v?.city || "",
       state: v?.state || "",
       pincode: v?.zipCode || "",
-    });
+    };
+  };
+
+  const handleConfirm = () => {
+    if (allocations.length === 0) return;
+    const allocationData = allocations.map(a => ({ vendorId: a.vendorId, qty: a.qty, meta: buildMeta(a.vendorId) }));
+    onSelect(sub.id, allocationData);
     onClose();
   };
 
+  const primaryVendorId = allocations[0]?.vendorId;
+  const primaryComp = comparisons.find(c => c.vendorId === primaryVendorId);
+  const primaryVendorInfo = primaryComp ? getVendorById(primaryComp.vendorId) : undefined;
+
+  const TABLE_COLS = "28px 24px 1fr 80px 70px 100px 80px 90px 90px";
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "hsl(var(--card))", borderRadius: 14, width: 920, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "hsl(var(--card))", borderRadius: 14, width: 980, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "94vh", display: "flex", flexDirection: "column" }}>
+
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid hsl(var(--border))" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: "hsl(var(--foreground))" }}>Vendor Selection — {sub.id} ({sub.itemName})</div>
-            <div style={{ fontSize: 12.5, color: "hsl(var(--muted-foreground))", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by lowest price</div>
+            <div style={{ fontSize: 12.5, color: "hsl(var(--muted-foreground))", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by lowest price. Split across multiple vendors if stock is insufficient.</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "hsl(var(--muted-foreground))", lineHeight: 1 }}>×</button>
         </div>
 
-        {/* Req info */}
+        {/* Required info bar */}
         <div style={{ padding: "12px 22px", display: "flex", gap: 32, background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
           <div style={{ fontSize: 13.5 }}>Required Qty : <b style={{ color: "#111827" }}>{sub.qty} Nos</b></div>
           <div style={{ fontSize: 13.5 }}>Required Date : <b style={{ color: "#111827" }}>{sub.requiredDate}</b></div>
           {sub.productCode && <div style={{ fontSize: 13.5, color: "#6b7280" }}>Product Code : <b style={{ color: "#374151" }}>{sub.productCode}</b></div>}
         </div>
 
-        {/* Vendor table */}
-        <div style={{ padding: "14px 22px 0", overflow: "auto" }}>
-          {comparisons.length === 0 ? (
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
-              <div style={{ fontSize: 26, marginBottom: 8 }}>🏪</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No vendor pricing data found</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>Add this product to a vendor's catalog in the Vendor Catalog page, then set up the Price Engine to see recommendations here.</div>
-            </div>
-          ) : (
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "28px 24px 1fr 80px 70px 100px 90px 90px", gap: "1px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
-                {["", "#", "Vendor", "Score", "Rating", "Lead Time", "Unit Cost", "Total Cost"].map(h => <div key={h}>{h}</div>)}
+        <div style={{ overflow: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
+          {/* ── Vendor comparison table ── */}
+          <div style={{ padding: "14px 22px 0" }}>
+            {comparisons.length === 0 ? (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+                <div style={{ fontSize: 26, marginBottom: 8 }}>🏪</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No vendor pricing data found</div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>Add this product to a vendor's catalog, then configure the Price Engine.</div>
               </div>
-              {comparisons.map((c, i) => {
-                const isSel = pickedId === c.vendorId;
-                const total = c.landedCostPerUnit * sub.qty;
-                const scorePct = Math.round(c.score);
-                return (
-                  <div
-                    key={c.vendorId}
-                    onClick={() => setPickedId(c.vendorId)}
-                    style={{ display: "grid", gridTemplateColumns: "28px 24px 1fr 80px 70px 100px 90px 90px", gap: "1px", padding: "12px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isSel ? "#eff6ff" : "#fff", cursor: "pointer" }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isSel ? "#2563eb" : "#d1d5db"}`, background: isSel ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        {isSel && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
-                      </div>
-                    </div>
-                    {/* Rank badge */}
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fef9c3" : "#f3f4f6", color: i === 0 ? "#92400e" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
-                      {i + 1}
-                    </div>
-                    <div style={{ fontWeight: isSel ? 600 : 400, fontSize: 13.5, color: "#111827" }}>
-                      {c.vendorName}
-                      {i === 0 && <span style={{ marginLeft: 8, fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Recommended</span>}
-                    </div>
-                    {/* Score */}
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: `${scorePct}%`, background: scorePct >= 70 ? "#16a34a" : scorePct >= 50 ? "#f59e0b" : "#dc2626", borderRadius: 3 }} />
+            ) : (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
+                {/* Table header */}
+                <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+                  {["", "#", "Vendor", "Score", "Rating", "Lead Time", "Stock", "Unit Cost", "Total Cost"].map(h => <div key={h}>{h}</div>)}
+                </div>
+                {comparisons.map((c, i) => {
+                  const isPrimary = primaryVendorId === c.vendorId;
+                  const isInAlloc = usedIds.has(c.vendorId);
+                  const stock = getVendorStock(c.vendorId);
+                  const stockOk = stock === null || stock >= sub.qty;
+                  const scorePct = Math.round(c.score);
+                  return (
+                    <div
+                      key={c.vendorId}
+                      onClick={() => handlePickPrimary(c.vendorId)}
+                      style={{ display: "grid", gridTemplateColumns: TABLE_COLS, padding: "12px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isPrimary ? "#eff6ff" : isInAlloc ? "#f0fdf4" : "#fff", cursor: "pointer" }}
+                    >
+                      {/* Radio */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isPrimary ? "#2563eb" : isInAlloc ? "#16a34a" : "#d1d5db"}`, background: isPrimary ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {isPrimary && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
+                          {!isPrimary && isInAlloc && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#16a34a" }} />}
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", minWidth: 28 }}>{scorePct}</span>
+                      </div>
+                      {/* Rank */}
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fef9c3" : "#f3f4f6", color: i === 0 ? "#92400e" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>{i + 1}</div>
+                      {/* Vendor */}
+                      <div style={{ fontWeight: isPrimary ? 600 : 400, fontSize: 13.5, color: "#111827" }}>
+                        {c.vendorName}
+                        {i === 0 && <span style={{ marginLeft: 8, fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Recommended</span>}
+                        {isInAlloc && !isPrimary && <span style={{ marginLeft: 8, fontSize: 10, background: "#dcfce7", color: "#166534", border: "1px solid #86efac", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Added</span>}
+                      </div>
+                      {/* Score */}
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${scorePct}%`, background: scorePct >= 70 ? "#16a34a" : scorePct >= 50 ? "#f59e0b" : "#dc2626", borderRadius: 3 }} />
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", minWidth: 28 }}>{scorePct}</span>
+                        </div>
+                      </div>
+                      <div><StarRating rating={c.rating} /></div>
+                      <div style={{ fontSize: 13, color: "#374151" }}>{c.leadTime} day{c.leadTime !== 1 ? "s" : ""}</div>
+                      {/* Stock */}
+                      <div>
+                        {stock === null
+                          ? <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
+                          : <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fef2f2", color: stockOk ? "#166534" : "#991b1b", border: `1px solid ${stockOk ? "#bbf7d0" : "#fecaca"}` }}>
+                              {stock} Nos
+                            </span>
+                        }
+                      </div>
+                      <div style={{ fontSize: 13, color: "#374151" }}>{fmt(c.landedCostPerUnit)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(c.landedCostPerUnit * sub.qty)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Vendor Allocation section ── */}
+          {allocations.length > 0 && (
+            <div style={{ margin: "16px 22px 0", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+              {/* Section header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Vendor Allocation</span>
+                  <span style={{ marginLeft: 12, fontSize: 12.5, color: remaining > 0 ? "#dc2626" : remaining < 0 ? "#d97706" : "#16a34a", fontWeight: 600 }}>
+                    {remaining > 0 ? `${remaining} units unallocated` : remaining < 0 ? `Over-allocated by ${-remaining} units` : `✓ Fully allocated (${sub.qty} Nos)`}
+                  </span>
+                </div>
+                {unusedComparisons.length > 0 && (
+                  <button
+                    onClick={handleAddVendor}
+                    style={{ padding: "6px 14px", border: "1px solid #2563eb", borderRadius: 7, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 12.5, fontFamily: "inherit" }}
+                  >
+                    + Add Another Vendor
+                  </button>
+                )}
+              </div>
+
+              {/* Allocation rows */}
+              {allocations.map((alloc, idx) => {
+                const comp = comparisons.find(c => c.vendorId === alloc.vendorId);
+                const stock = getVendorStock(alloc.vendorId);
+                const stockOk = stock === null || stock >= alloc.qty;
+                const availableVendors = comparisons.filter(c => c.vendorId === alloc.vendorId || !usedIds.has(c.vendorId));
+                return (
+                  <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr 100px 120px 38px", gap: 12, padding: "12px 18px", alignItems: "center", borderBottom: idx < allocations.length - 1 ? "1px solid #f3f4f6" : "none", background: idx === 0 ? "#eff6ff" : "#fff" }}>
+                    {/* Vendor picker */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: "50%", background: idx === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                        {idx + 1}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <select
+                          value={alloc.vendorId}
+                          onChange={e => handleAllocationVendorChange(idx, e.target.value)}
+                          style={{ width: "100%", padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", background: "#fff", outline: "none" }}
+                        >
+                          {availableVendors.map(c => (
+                            <option key={c.vendorId} value={c.vendorId}>{c.vendorName}</option>
+                          ))}
+                        </select>
+                        {comp && (
+                          <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3 }}>
+                            Unit: {fmt(comp.landedCostPerUnit)} · Lead: {comp.leadTime}d
+                          </div>
+                        )}
+                      </div>
+                      {/* Stock badge */}
+                      <div style={{ flexShrink: 0 }}>
+                        {stock === null
+                          ? <span style={{ fontSize: 12, color: "#9ca3af" }}>Stock: —</span>
+                          : <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fef2f2", color: stockOk ? "#166534" : "#991b1b", border: `1px solid ${stockOk ? "#bbf7d0" : "#fecaca"}` }}>
+                              Stock: {stock}
+                            </span>
+                        }
+                        {!stockOk && stock !== null && (
+                          <div style={{ fontSize: 10.5, color: "#dc2626", marginTop: 2 }}>⚠ Insufficient — add another vendor</div>
+                        )}
                       </div>
                     </div>
-                    <div><StarRating rating={c.rating} /></div>
-                    <div style={{ fontSize: 13, color: "#374151" }}>{c.leadTime} day{c.leadTime !== 1 ? "s" : ""}</div>
-                    <div style={{ fontSize: 13, color: "#374151" }}>{fmt(c.landedCostPerUnit)}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(total)}</div>
+                    {/* Qty input */}
+                    <div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>Order Qty</div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={alloc.qty}
+                        onChange={e => handleQtyChange(idx, parseInt(e.target.value) || 1)}
+                        style={{ width: "100%", padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", textAlign: "center" }}
+                      />
+                    </div>
+                    {/* Line total */}
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 3 }}>Line Total</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{comp ? fmt(comp.landedCostPerUnit * alloc.qty) : "—"}</div>
+                    </div>
+                    {/* Remove */}
+                    <div style={{ display: "flex", justifyContent: "center" }}>
+                      {allocations.length > 1 && (
+                        <button
+                          onClick={() => handleRemoveAllocation(idx)}
+                          title="Remove this vendor"
+                          style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}
+                        >×</button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
 
-        {/* Selected vendor details */}
-        {picked && pickedVendorInfo && (
-          <div style={{ margin: "14px 22px 0", border: "1px solid #e5e7eb", borderRadius: 9, padding: "14px 18px", background: "#fafafa" }}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Selected Vendor Details</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 0" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{pickedVendorInfo.name}</div>
-                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>GSTIN : {pickedVendorInfo.taxId || pickedVendorInfo.pan || "—"}</div>
-                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Location : {pickedVendorInfo.city || pickedVendorInfo.address}</div>
-                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Contact : {pickedVendorInfo.primaryContact}</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>Rating : <b>{pickedVendorInfo.rating.toFixed(1)} / 5</b></div>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>Category : <b>{pickedVendorInfo.category}</b></div>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>MOQ : <b>{picked.moq} units</b></div>
-                <div style={{ fontSize: 12.5, color: "#374151" }}>Payment Terms : <b>{picked.paymentTerms || "—"}</b></div>
+          {/* Primary vendor details card */}
+          {primaryVendorInfo && (
+            <div style={{ margin: "14px 22px 0", border: "1px solid #e5e7eb", borderRadius: 9, padding: "14px 18px", background: "#fafafa" }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Primary Vendor Details</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 0" }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{primaryVendorInfo.name}</div>
+                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>GSTIN : {primaryVendorInfo.taxId || (primaryVendorInfo as any).pan || "—"}</div>
+                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Location : {primaryVendorInfo.city || (primaryVendorInfo as any).address}</div>
+                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Contact : {primaryVendorInfo.primaryContact}</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <div style={{ fontSize: 12.5, color: "#374151" }}>Rating : <b>{primaryVendorInfo.rating.toFixed(1)} / 5</b></div>
+                  <div style={{ fontSize: 12.5, color: "#374151" }}>Category : <b>{primaryVendorInfo.category}</b></div>
+                  {primaryComp && <div style={{ fontSize: 12.5, color: "#374151" }}>MOQ : <b>{primaryComp.moq} units</b></div>}
+                  {primaryComp && <div style={{ fontSize: 12.5, color: "#374151" }}>Payment Terms : <b>{primaryComp.paymentTerms || "—"}</b></div>}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          <div style={{ height: 16 }} />
+        </div>
 
         {/* Footer */}
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 22px 18px", marginTop: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 22px 18px", borderTop: "1px solid hsl(var(--border))" }}>
+          <div style={{ fontSize: 13, color: "#6b7280" }}>
+            {allocations.length > 1 && <span>Split across <b>{allocations.length} vendors</b> · {allocations.length} POs will be created</span>}
+          </div>
           <button
             onClick={handleConfirm}
-            disabled={!picked}
-            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: picked ? "#2563eb" : "#93c5fd", color: "#fff", cursor: picked ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+            disabled={allocations.length === 0}
+            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: allocations.length > 0 ? "#2563eb" : "#93c5fd", color: "#fff", cursor: allocations.length > 0 ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
           >
-            Select Vendor
+            Confirm Selection
           </button>
         </div>
       </div>
@@ -380,81 +572,42 @@ function ViewItemsModal({ group, onClose }) {
 }
 
 // ── Vendor Selected Summary Tab ───────────────────────────────────────────────
-function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMeta, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
+// Simplified: shows ordered qty only. No checkboxes, no stock column, no custom qty input.
+function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMeta, vendorAllocations, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
   const fmtINR = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
-  // ── Pending items: vendor selected but no PO yet (item-level rows) ──
-  const pendingItems: { sub: any; vendorId: string; vendorName: string; location: string; unitPrice: number }[] = [];
+  // ── Pending items: vendor selected but PO not yet raised ──
+  type PendingItem = {
+    sub: any;
+    allocations: Array<{ vendorId: string; qty: number; vendorName: string; unitPrice: number; location: string }>;
+  };
+  const pendingItems: PendingItem[] = [];
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
     if (!vid || createdPOs[sub.id]) continue;
-    const meta = selectedVendorMeta[sub.id];
-    pendingItems.push({
-      sub,
-      vendorId: vid,
-      vendorName: meta?.vendorName || vid,
-      location: meta?.location || "",
-      unitPrice: meta?.unitPrice || 0,
-    });
+    const allocs = vendorAllocations?.[sub.id];
+    if (allocs && allocs.length > 0) {
+      pendingItems.push({
+        sub,
+        allocations: allocs.map((a: any) => ({
+          vendorId: a.vendorId,
+          qty: a.qty,
+          vendorName: a.meta?.vendorName || a.vendorId,
+          unitPrice: a.meta?.unitPrice || 0,
+          location: a.meta?.location || "",
+        })),
+      });
+    } else {
+      const meta = selectedVendorMeta[sub.id];
+      pendingItems.push({
+        sub,
+        allocations: [{ vendorId: vid, qty: sub.qty, vendorName: meta?.vendorName || vid, unitPrice: meta?.unitPrice || 0, location: meta?.location || "" }],
+      });
+    }
   }
-
-  // Per-row order qty state (defaults to sub.qty); per-row checkbox selection
-  const [orderQtyMap, setOrderQtyMap] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    for (const pi of pendingItems) init[pi.sub.id] = pi.sub.qty;
-    return init;
-  });
-  const [selectedSubIds, setSelectedSubIds] = useState<Set<string>>(() => new Set(pendingItems.map(pi => pi.sub.id)));
-
-  // Keep qty map in sync when pendingItems changes (new vendor selections arrive)
-  useEffect(() => {
-    setOrderQtyMap(prev => {
-      const next = { ...prev };
-      for (const pi of pendingItems) {
-        if (!(pi.sub.id in next)) next[pi.sub.id] = pi.sub.qty;
-      }
-      return next;
-    });
-    setSelectedSubIds(prev => {
-      const next = new Set(prev);
-      for (const pi of pendingItems) next.add(pi.sub.id); // auto-select new rows
-      return next;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingItems.map(p => p.sub.id).join(",")]);
-
-  // Live vendor stock lookup
-  const vendorProducts = useMemo(() => getAllVendorProducts(), []);
-  const getVendorStock = (vendorId: string, productCode: string): string => {
-    if (!productCode) return "—";
-    const prods = vendorProducts[vendorId] || [];
-    const match = prods.find(p => p.masterProductCode === productCode && p.status === "Active");
-    return match ? `${parseInt(match.stock) || 0} Nos` : "—";
-  };
-
-  // Selection helpers
-  const allSelected = pendingItems.length > 0 && pendingItems.every(pi => selectedSubIds.has(pi.sub.id));
-  const someSelected = pendingItems.some(pi => selectedSubIds.has(pi.sub.id));
-  const toggleAll = () => {
-    if (allSelected) setSelectedSubIds(new Set());
-    else setSelectedSubIds(new Set(pendingItems.map(pi => pi.sub.id)));
-  };
-  const toggleRow = (subId: string) => {
-    setSelectedSubIds(prev => {
-      const next = new Set(prev);
-      next.has(subId) ? next.delete(subId) : next.add(subId);
-      return next;
-    });
-  };
-
-  const selectedCount = pendingItems.filter(pi => selectedSubIds.has(pi.sub.id)).length;
-  const selectedTotal = pendingItems
-    .filter(pi => selectedSubIds.has(pi.sub.id))
-    .reduce((a, pi) => a + pi.unitPrice * (orderQtyMap[pi.sub.id] ?? pi.sub.qty), 0);
 
   // ── Created POs ──
   const poList = Object.values(createdPOs) as any[];
-  // De-duplicate: show one row per unique PO number
   const uniquePOs = Array.from(new Map(poList.map(p => [p.poNumber, p])).values());
   const hasPOs = uniquePOs.length > 0;
   const poTotal = uniquePOs.reduce((a, p) => a + (p.grandTotal ?? p.total ?? 0), 0);
@@ -462,11 +615,10 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
     ? new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) +
       " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
     : "";
-
   const nothingAtAll = !hasPOs && pendingItems.length === 0;
 
-  const COL_PO  = "160px 180px 1fr 80px 150px 110px 100px";
-  const COL_PND = "32px 1fr 160px 110px 110px 110px 120px";
+  const COL_PO  = "160px 180px 1fr 90px 150px 110px 100px";
+  const COL_PND = "1fr 200px 90px 110px 120px";
 
   return (
     <div style={{ padding: "20px 24px 28px", display: "flex", flexDirection: "column", gap: 28 }}>
@@ -476,7 +628,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "48px 20px", textAlign: "center", color: "#9ca3af", background: "#fafafa" }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>🏪</div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 4 }}>No vendors selected yet</div>
-          <div style={{ fontSize: 13 }}>Use the "Select Vendor" button in each row of the Sub Orders tab.</div>
+          <div style={{ fontSize: 13 }}>Use the "Select Vendor" button in the Vendor Selection tab.</div>
         </div>
       )}
 
@@ -518,9 +670,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
                   <div style={{ fontSize: 11, color: "#9ca3af" }}>Sub Order: {po.subOrderId}</div>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{po.qty} Nos</div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>
-                  {fmtINR(po.grandTotal ?? po.total ?? 0)}
-                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>{fmtINR(po.grandTotal ?? po.total ?? 0)}</div>
                 <div>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", fontSize: 12, fontWeight: 600 }}>
                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />Created
@@ -543,162 +693,101 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
         </div>
       )}
 
-      {/* ── Pending selections: item-level rows ── */}
+      {/* ── Pending: vendor allocated, PO not yet raised ── */}
       {pendingItems.length > 0 && (
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
-                {hasPOs ? "Additional Vendor Selections — Pending PO" : "Vendor Selection — Ready to Raise PO"}
+                {hasPOs ? "Additional Vendor Selections — Pending PO" : "Vendor Selections — Ready to Raise PO"}
               </div>
               <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>
-                Select items below, adjust order quantities, then click <b>Raise PO for Selected</b>.
-                A separate PO will be raised per vendor.
+                A separate PO is raised per vendor. Multi-vendor splits each create their own PO.
               </div>
             </div>
             <button
-              disabled={selectedCount === 0}
-              onClick={() => onCreatePurchaseOrders(Array.from(selectedSubIds), orderQtyMap)}
-              style={{
-                padding: "9px 22px", border: "none", borderRadius: 8,
-                background: selectedCount > 0 ? "#2563eb" : "#e5e7eb",
-                color: selectedCount > 0 ? "#fff" : "#9ca3af",
-                cursor: selectedCount > 0 ? "pointer" : "not-allowed",
-                fontWeight: 700, fontSize: 14, fontFamily: "inherit", whiteSpace: "nowrap",
-              }}
+              onClick={() => onCreatePurchaseOrders(pendingItems.map(p => p.sub.id))}
+              style={{ padding: "9px 22px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit", whiteSpace: "nowrap" }}
             >
-              Raise PO for Selected ({selectedCount})
+              Raise Purchase Orders ({pendingItems.length})
             </button>
           </div>
 
-          {/* Summary bar */}
-          {someSelected && (
-            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 16px", marginBottom: 12, display: "flex", gap: 24, fontSize: 13, color: "#1e40af", flexWrap: "wrap" }}>
-              <span><b>{selectedCount}</b> item{selectedCount !== 1 ? "s" : ""} selected</span>
-              <span>Est. total: <b>{fmtINR(selectedTotal)}</b></span>
-              <span style={{ color: "#6b7280", fontSize: 12 }}>Individual POs will be raised for each unique vendor.</span>
-            </div>
-          )}
-
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "auto" }}>
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
             {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "11px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4, minWidth: 780 }}>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  style={{ cursor: "pointer", width: 15, height: 15 }}
-                  title="Select / deselect all"
-                />
-              </div>
-              {["ITEM / SUB-ORDER", "VENDOR", "STOCK AT VENDOR", "ORDER QTY", "UNIT PRICE", "LINE TOTAL"].map(h => (
-                <div key={h}>{h}</div>
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+              {["ITEM / SUB-ORDER", "VENDOR(S)", "ORDERED QTY", "UNIT PRICE", "EST. TOTAL"].map(h => <div key={h}>{h}</div>)}
             </div>
 
             {/* Rows */}
             {pendingItems.map((pi, idx) => {
-              const isChecked = selectedSubIds.has(pi.sub.id);
-              const qty = orderQtyMap[pi.sub.id] ?? pi.sub.qty;
-              const lineTotal = pi.unitPrice * qty;
-              const stock = getVendorStock(pi.vendorId, pi.sub.productCode);
-              const stockNum = parseInt(stock) || 0;
-              const stockOk = !pi.sub.productCode || stock === "—" || stockNum >= qty;
+              const isMulti = pi.allocations.length > 1;
+              const totalQty = pi.allocations.reduce((s, a) => s + a.qty, 0);
+              const estTotal = pi.allocations.reduce((s, a) => s + a.unitPrice * a.qty, 0);
+              const primaryAlloc = pi.allocations[0];
               return (
-                <div
-                  key={pi.sub.id}
-                  style={{
-                    display: "grid", gridTemplateColumns: COL_PND,
-                    padding: "14px 20px", alignItems: "center",
-                    borderBottom: idx < pendingItems.length - 1 ? "1px solid #f3f4f6" : "none",
-                    background: isChecked ? "#f0f7ff" : "#fff",
-                    minWidth: 780, transition: "background 0.12s",
-                  }}
-                >
-                  {/* Checkbox */}
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleRow(pi.sub.id)}
-                      style={{ cursor: "pointer", width: 15, height: 15 }}
-                    />
-                  </div>
-
-                  {/* Item / Sub-order */}
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}</div>
-                    {pi.sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{pi.sub.category}</div>}
-                  </div>
-
-                  {/* Vendor */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                      {(pi.vendorName?.[0] || "V").toUpperCase()}
-                    </div>
+                <div key={pi.sub.id} style={{ borderBottom: idx < pendingItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "14px 20px", alignItems: "start" }}>
+                    {/* Item */}
                     <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{pi.vendorName}</div>
-                      {pi.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{pi.location}</div>}
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}</div>
+                      {pi.sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{pi.sub.category}</div>}
                     </div>
+                    {/* Vendor(s) */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {isMulti
+                        ? pi.allocations.map((a, ai) => (
+                          <div key={ai} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: ai === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                              {(a.vendorName[0] || "V").toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{a.vendorName}</div>
+                              <div style={{ fontSize: 11, color: "#6b7280" }}>{a.qty} Nos</div>
+                            </div>
+                          </div>
+                        ))
+                        : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              {(primaryAlloc.vendorName[0] || "V").toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{primaryAlloc.vendorName}</div>
+                              {primaryAlloc.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{primaryAlloc.location}</div>}
+                            </div>
+                          </div>
+                        )
+                      }
+                      {isMulti && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{pi.allocations.length} vendors · {pi.allocations.length} POs will be raised</div>}
+                    </div>
+                    {/* Ordered Qty */}
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", paddingTop: 2 }}>{totalQty} Nos</div>
+                    {/* Unit Price */}
+                    <div style={{ fontSize: 13, color: "#374151", paddingTop: 2 }}>
+                      {isMulti
+                        ? <span style={{ fontSize: 12, color: "#6b7280" }}>Split</span>
+                        : fmtINR(primaryAlloc.unitPrice)
+                      }
+                    </div>
+                    {/* Est. Total */}
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827", paddingTop: 2 }}>{fmtINR(estTotal)}</div>
                   </div>
-
-                  {/* Stock at vendor */}
-                  <div>
-                    <span style={{
-                      display: "inline-block", padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600,
-                      background: stock === "—" ? "#f3f4f6" : stockOk ? "#f0fdf4" : "#fef2f2",
-                      color: stock === "—" ? "#6b7280" : stockOk ? "#166534" : "#991b1b",
-                      border: `1px solid ${stock === "—" ? "#e5e7eb" : stockOk ? "#bbf7d0" : "#fecaca"}`,
-                    }}>
-                      {stock}
-                    </span>
-                    {!stockOk && stock !== "—" && (
-                      <div style={{ fontSize: 10.5, color: "#dc2626", marginTop: 3 }}>⚠ Qty exceeds stock</div>
-                    )}
-                  </div>
-
-                  {/* Order Qty input */}
-                  <div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={qty}
-                      onChange={e => {
-                        const v = Math.max(1, parseInt(e.target.value) || 1);
-                        setOrderQtyMap(prev => ({ ...prev, [pi.sub.id]: v }));
-                      }}
-                      style={{
-                        width: 80, padding: "6px 10px", border: `1px solid ${!stockOk && stock !== "—" ? "#fca5a5" : "#d1d5db"}`,
-                        borderRadius: 6, fontSize: 13, fontFamily: "inherit", outline: "none", textAlign: "center",
-                      }}
-                    />
-                  </div>
-
-                  {/* Unit Price */}
-                  <div style={{ fontSize: 13, color: "#374151" }}>{fmtINR(pi.unitPrice)}</div>
-
-                  {/* Line Total */}
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>{fmtINR(lineTotal)}</div>
                 </div>
               );
             })}
 
-            {/* Footer totals */}
-            <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "12px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb", minWidth: 780 }}>
+            {/* Footer */}
+            <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "12px 20px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{pendingItems.length} item{pendingItems.length !== 1 ? "s" : ""}</div>
               <div />
               <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
-                {pendingItems.length} item{pendingItems.length !== 1 ? "s" : ""}
-              </div>
-              <div />
-              <div />
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>
-                {pendingItems.reduce((a, pi) => a + (orderQtyMap[pi.sub.id] ?? pi.sub.qty), 0)} Nos
+                {pendingItems.reduce((a, pi) => a + pi.allocations.reduce((s, al) => s + al.qty, 0), 0)} Nos
               </div>
               <div />
               <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>
-                {fmtINR(pendingItems.reduce((a, pi) => a + pi.unitPrice * (orderQtyMap[pi.sub.id] ?? pi.sub.qty), 0))}
+                {fmtINR(pendingItems.reduce((a, pi) => a + pi.allocations.reduce((s, al) => s + al.unitPrice * al.qty, 0), 0))}
               </div>
             </div>
           </div>
@@ -1414,12 +1503,15 @@ export default function MyOrderPage() {
     gstin: string; contact: string; email: string; phone: string;
     addressLine1: string; addressLine2: string; city: string; state: string; pincode: string;
   }>>({});
+  // Multi-vendor allocations per sub-order: [{vendorId, qty, meta}]
+  const [vendorAllocations, setVendorAllocations] = useState<Record<string, Array<{ vendorId: string; qty: number; meta: any }>>>({});
 
   // Reload per-order localStorage state when navigating between orders
   useEffect(() => {
     try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
     try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
     setSelectedVendorMeta({});
+    setVendorAllocations({});
   }, [orderId]);
   const [vendorModalSub, setVendorModalSub] = useState<any>(null);
   const [showEditAssignment, setShowEditAssignment] = useState(false);
@@ -1509,53 +1601,58 @@ export default function MyOrderPage() {
   const updateStatus = (id, status) => setSubOrders(prev => prev.map(s => s.id === id ? { ...s, itemStatus: status, deliveredAt: status === "Delivered" ? new Date() : s.deliveredAt, updatedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) } : s));
   const filtered = subOrders.filter(s => !subSearch || s.itemName.toLowerCase().includes(subSearch.toLowerCase()) || s.id.toLowerCase().includes(subSearch.toLowerCase()));
 
-  const handleSelectVendor = (subId: string, vendorId: string, meta?: any) => {
+  // Accepts an array of allocations from the modal (one per vendor split).
+  // Primary vendor kept in selectedVendors/Meta for display in VendorSelectionTab.
+  const handleSelectVendor = (subId: string, allocations: Array<{ vendorId: string; qty: number; meta: any }>) => {
     if (createdPOs[subId]) return;
-    setSelectedVendors(prev => ({ ...prev, [subId]: vendorId }));
-    if (meta) setSelectedVendorMeta(prev => ({ ...prev, [subId]: meta }));
+    const primary = allocations[0];
+    if (primary) {
+      setSelectedVendors(prev => ({ ...prev, [subId]: primary.vendorId }));
+      setSelectedVendorMeta(prev => ({ ...prev, [subId]: primary.meta }));
+    }
+    setVendorAllocations(prev => ({ ...prev, [subId]: allocations }));
   };
 
-  // selectedSubIds: the sub-order IDs the user checked in the Vendor tab.
-  // qtyOverrides:  per-sub-order qty the user typed in the Order Qty input.
-  // One PO is raised per unique vendor among the selected items.
-  const handleCreatePurchaseOrders = (
-    selectedSubIds: string[],
-    qtyOverrides: Record<string, number>,
-  ) => {
-    const selectedSet = new Set(selectedSubIds);
+  // One PO per unique vendor across all selected sub-orders (handles multi-vendor splits).
+  const handleCreatePurchaseOrders = (subIds: string[]) => {
+    const selectedSet = new Set(subIds);
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, "0");
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const yyyy = now.getFullYear();
     const displayDate = `${dd}/${mm}/${yyyy}`;
 
-    // ── Group selected sub-orders by vendor (one PO per vendor) ──
-    type GroupEntry = { vendorId: string; meta: any; subs: typeof subOrders };
-    const vendorGroups = new Map<string, GroupEntry>();
+    // Flatten sub-orders into per-vendor line entries
+    type LineEntry = { sub: any; qty: number; meta: any };
+    const vendorLines = new Map<string, { meta: any; lines: LineEntry[] }>();
 
     for (const sub of subOrders) {
-      if (!selectedSet.has(sub.id)) continue;   // only the rows the user picked
-      if (createdPOs[sub.id]) continue;          // skip already-raised POs
-      const vendorId = selectedVendors[sub.id];
-      if (!vendorId) continue;
-      const meta = selectedVendorMeta[sub.id];
-      if (!meta) continue;
+      if (!selectedSet.has(sub.id) || createdPOs[sub.id]) continue;
 
-      if (!vendorGroups.has(vendorId)) {
-        vendorGroups.set(vendorId, { vendorId, meta, subs: [] });
+      // Get allocations: multi-vendor array or single-vendor fallback
+      const allocs: Array<{ vendorId: string; qty: number; meta: any }> =
+        vendorAllocations[sub.id]?.length
+          ? vendorAllocations[sub.id]
+          : selectedVendors[sub.id] && selectedVendorMeta[sub.id]
+            ? [{ vendorId: selectedVendors[sub.id], qty: sub.qty, meta: selectedVendorMeta[sub.id] }]
+            : [];
+
+      for (const alloc of allocs) {
+        if (!alloc.vendorId || !alloc.meta) continue;
+        if (!vendorLines.has(alloc.vendorId)) {
+          vendorLines.set(alloc.vendorId, { meta: alloc.meta, lines: [] });
+        }
+        vendorLines.get(alloc.vendorId)!.lines.push({ sub, qty: alloc.qty, meta: alloc.meta });
       }
-      vendorGroups.get(vendorId)!.subs.push(sub);
     }
 
     const newPOs: Record<string, any> = {};
 
-    for (const { vendorId, meta, subs } of vendorGroups.values()) {
+    for (const [vendorId, { meta, lines }] of vendorLines.entries()) {
       const poNumber = generatePoNumber();
 
-      // Build one line item per sub-order; honour the user-edited order qty
-      const lineItems = subs.map(sub => {
-        const unitPrice = (selectedVendorMeta[sub.id] ?? meta).unitPrice || 0;
-        const qty = qtyOverrides[sub.id] ?? sub.qty;
+      const lineItems = lines.map(({ sub, qty, meta: lm }) => {
+        const unitPrice = lm.unitPrice || 0;
         const lineSubtotal = unitPrice * qty;
         const taxRate = getEffectiveTaxPctForCategory(sub.category);
         return {
@@ -1574,8 +1671,6 @@ export default function MyOrderPage() {
       });
 
       const subtotal = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-
-      // Per-line GST then aggregate (handles mixed-category POs correctly)
       const totalSgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * (li._taxRate / 2) / 100, 0);
       const totalCgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * (li._taxRate / 2) / 100, 0);
       const sgstAmt = Math.round(totalSgstRaw * 100) / 100;
@@ -1586,14 +1681,14 @@ export default function MyOrderPage() {
       const sgstPct = primaryTaxRate / 2;
       const cgstPct = primaryTaxRate / 2;
 
-      const primarySub = subs[0];
+      const primarySub = lines[0].sub;
       const primaryLine = lineItems[0];
 
       const po: StoredPO = {
         poNumber,
         orderId,
         subOrderId: primarySub.id,
-        subOrderIds: subs.map(s => s.id),
+        subOrderIds: lines.map(l => l.sub.id),
         items: lineItems,
         vendorId,
         vendorName: meta.vendorName,
@@ -1630,18 +1725,9 @@ export default function MyOrderPage() {
         notes: [],
       };
 
-      // Generate PDF and trigger one download per vendor PO
       try {
         const dataUri = getPODataUri(po);
-        po.documents = [{
-          id: `doc-${poNumber}-pdf`,
-          name: `${poNumber}.pdf`,
-          ext: "pdf",
-          type: "Purchase Order",
-          uploadedBy: "System",
-          uploadedOn: displayDate,
-          dataUrl: dataUri,
-        }];
+        po.documents = [{ id: `doc-${poNumber}-pdf`, name: `${poNumber}.pdf`, ext: "pdf", type: "Purchase Order", uploadedBy: "System", uploadedOn: displayDate, dataUrl: dataUri }];
         downloadPOPdf(po);
       } catch (e) {
         console.warn("PDF generation failed:", e);
@@ -1649,20 +1735,9 @@ export default function MyOrderPage() {
 
       savePO(po);
 
-      // Map every sub-order in this vendor group to this PO entry
-      for (const sub of subs) {
-        const lineItem = lineItems.find(li => li.subOrderId === sub.id)!;
-        newPOs[sub.id] = {
-          vendorId,
-          vendorName: meta.vendorName,
-          poNumber,
-          item: sub.itemName,
-          qty: lineItem.qty,
-          unitPrice: lineItem.unitPrice,
-          grandTotal,
-          total: grandTotal,
-          subOrderId: sub.id,
-        };
+      for (const { sub } of lines) {
+        const li = lineItems.find(x => x.subOrderId === sub.id)!;
+        newPOs[sub.id] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
       }
     }
 
@@ -1675,6 +1750,7 @@ export default function MyOrderPage() {
     setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendors(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendorMeta(prev => { const n = { ...prev }; delete n[subId]; return n; });
+    setVendorAllocations(prev => { const n = { ...prev }; delete n[subId]; return n; });
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
@@ -2083,6 +2159,7 @@ export default function MyOrderPage() {
               subOrders={subOrders}
               selectedVendors={selectedVendors}
               selectedVendorMeta={selectedVendorMeta}
+              vendorAllocations={vendorAllocations}
               createdPOs={createdPOs}
               onCreatePurchaseOrders={handleCreatePurchaseOrders}
               onCancelPO={handleCancelPO}
