@@ -214,6 +214,171 @@ export function getCategoryMarginPct(category: string, globalProfitPct: number):
   return rule ? globalProfitPct + rule.marginPct + rule.bufferPct : globalProfitPct;
 }
 
+// ─── Per-client extended profit settings ────────────────────────────────────
+// Stores the extra guardrail/toggle fields that supplement the client's
+// default profit %. The "Default Profit %" itself lives in
+// ClientCommonSettings.profitPct for full backward compatibility.
+
+const CLIENT_PROFIT_SETTINGS_KEY = 'nido_client_profit_settings';
+
+export interface ClientProfitSettings {
+  minProfitPct: number;
+  minProfitAmount: number;
+  maxDiscountAllowed: number;
+  enableManualOverride: boolean;
+  enableMarketPriceValidation: boolean;
+  enableSmartPricing: boolean;
+}
+
+const DEFAULT_PROFIT_SETTINGS: ClientProfitSettings = {
+  minProfitPct: 0,
+  minProfitAmount: 0,
+  maxDiscountAllowed: 0,
+  enableManualOverride: false,
+  enableMarketPriceValidation: false,
+  enableSmartPricing: false,
+};
+
+function getAllClientProfitSettings(): Record<string, ClientProfitSettings> {
+  try {
+    const raw = localStorage.getItem(CLIENT_PROFIT_SETTINGS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+export function getClientProfitSettings(clientId: string): ClientProfitSettings {
+  const all = getAllClientProfitSettings();
+  return { ...DEFAULT_PROFIT_SETTINGS, ...(all[clientId] || {}) };
+}
+
+export function saveClientProfitSettings(clientId: string, settings: ClientProfitSettings): void {
+  const all = getAllClientProfitSettings();
+  all[clientId] = settings;
+  localStorage.setItem(CLIENT_PROFIT_SETTINGS_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
+// ─── Per-client category profit rules ───────────────────────────────────────
+// Each client has its own category profit percentages. When a category rule
+// is enabled, Priority 2 of the profit resolution picks it up.
+
+const CLIENT_CATEGORY_PROFIT_KEY = 'nido_client_category_profit';
+
+export const DEFAULT_PROFIT_CATEGORIES = [
+  'Computers', 'Networking', 'Office Supplies', 'Furniture', 'Electrical',
+  'Cloud', 'Software', 'Stationery', 'Pantry', 'Cleaning Supplies',
+  'Medical Supplies', 'Services',
+] as const;
+
+const DEFAULT_CATEGORY_PROFIT_MAP: Record<string, number> = {
+  Computers: 5, Networking: 7, 'Office Supplies': 10, Furniture: 12,
+  Electrical: 8, Cloud: 20, Software: 18, Stationery: 15, Pantry: 12,
+  'Cleaning Supplies': 15, 'Medical Supplies': 10, Services: 25,
+};
+
+export interface ClientCategoryProfitRule {
+  category: string;
+  profitPct: number;
+  enabled: boolean;
+}
+
+function buildDefaultCategoryRules(): ClientCategoryProfitRule[] {
+  return DEFAULT_PROFIT_CATEGORIES.map(cat => ({
+    category: cat,
+    profitPct: DEFAULT_CATEGORY_PROFIT_MAP[cat] ?? 10,
+    enabled: true,
+  }));
+}
+
+function getAllClientCategoryProfitRules(): Record<string, ClientCategoryProfitRule[]> {
+  try {
+    const raw = localStorage.getItem(CLIENT_CATEGORY_PROFIT_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+export function getClientCategoryProfitRules(clientId: string): ClientCategoryProfitRule[] {
+  const all = getAllClientCategoryProfitRules();
+  if (all[clientId]) {
+    // Ensure all default categories are represented (in case new ones were added)
+    const stored = all[clientId];
+    const defaults = buildDefaultCategoryRules();
+    const merged = defaults.map(d => stored.find(s => s.category === d.category) ?? d);
+    return merged;
+  }
+  return buildDefaultCategoryRules();
+}
+
+export function saveClientCategoryProfitRules(clientId: string, rules: ClientCategoryProfitRule[]): void {
+  const all = getAllClientCategoryProfitRules();
+  all[clientId] = rules;
+  localStorage.setItem(CLIENT_CATEGORY_PROFIT_KEY, JSON.stringify(all));
+  syncClientPrices(clientId);
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
+// ─── Per-client product-specific profit rules ────────────────────────────────
+// Priority 1 in the profit resolution. Setting profitPct to null means
+// "fall through to category or default".
+
+const CLIENT_PRODUCT_PROFIT_KEY = 'nido_client_product_profit';
+
+export interface ClientProductProfitRule {
+  masterProductCode: string;
+  productName: string;
+  profitPct: number | null;
+}
+
+function getAllClientProductProfitRules(): Record<string, ClientProductProfitRule[]> {
+  try {
+    const raw = localStorage.getItem(CLIENT_PRODUCT_PROFIT_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+export function getClientProductProfitRules(clientId: string): ClientProductProfitRule[] {
+  const all = getAllClientProductProfitRules();
+  return all[clientId] || [];
+}
+
+export function saveClientProductProfitRules(clientId: string, rules: ClientProductProfitRule[]): void {
+  const all = getAllClientProductProfitRules();
+  all[clientId] = rules;
+  localStorage.setItem(CLIENT_PRODUCT_PROFIT_KEY, JSON.stringify(all));
+  syncClientPrices(clientId);
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
+// Resolve effective profit % for a given client + product using the 3-tier hierarchy:
+//   Priority 1 — product-specific profit % (if set and > 0)
+//   Priority 2 — category profit % (per-client rule, if that category is enabled)
+//   Priority 3 — client default profit % (ClientCommonSettings.profitPct)
+export function resolveClientProfitPct(
+  clientId: string,
+  masterProductCode: string,
+  category: string,
+): number {
+  // Priority 1: product-specific
+  const productRules = getClientProductProfitRules(clientId);
+  const productRule = productRules.find(r => r.masterProductCode === masterProductCode);
+  if (productRule && productRule.profitPct !== null && productRule.profitPct > 0) {
+    return productRule.profitPct;
+  }
+
+  // Priority 2: per-client category rule (if enabled)
+  const catRules = getClientCategoryProfitRules(clientId);
+  const catRule = catRules.find(
+    r => r.category.toLowerCase() === (category || '').toLowerCase() && r.enabled,
+  );
+  if (catRule) return catRule.profitPct;
+
+  // Priority 3: client default
+  return getClientCommonSettings(clientId).profitPct;
+}
+
 // ─── Vendor-side computation ────────────────────────────────────────────────
 
 const TERMS_MAP: Record<string, string> = {
@@ -418,7 +583,7 @@ export function getAllClientPricing(): ClientPricingRow[] {
         ? computeClientFinalPrice(
             pp.landedCostPerUnit,
             settings,
-            getCategoryMarginPct(pp.category, settings.profitPct),
+            resolveClientProfitPct(c.id, pp.masterProductCode, pp.category),
             pp.category,
           )
         : null;
@@ -481,7 +646,7 @@ export function syncClientPrices(clientId: string): number {
     const calc = computeClientFinalPrice(
       pp.landedCostPerUnit,
       settings,
-      getCategoryMarginPct(pp.category, settings.profitPct),
+      resolveClientProfitPct(clientId, pp.masterProductCode, pp.category),
       pp.category,
     );
     if (entry.priceNum === calc.finalPrice) return entry;
