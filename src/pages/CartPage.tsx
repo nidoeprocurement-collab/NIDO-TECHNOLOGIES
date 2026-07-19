@@ -71,6 +71,9 @@ function QtyInput({
   );
 }
 
+function formatMoq(n?: number) { return n && n > 0 ? String(n) : "—"; }
+function formatLeadTime(t?: string) { return t ? `${t} (Subject to Availability)` : "—"; }
+
 function SuggestedCard({
   product, onAdd,
 }: {
@@ -83,38 +86,53 @@ function SuggestedCard({
   const specs = product.specs?.slice(0, 2) ?? [];
 
   return (
-    <div className="min-w-[170px] max-w-[170px] border border-gray-200 rounded-xl bg-white p-3 flex flex-col">
+    <div className="min-w-[190px] max-w-[190px] border border-gray-200 rounded-xl bg-white overflow-hidden flex flex-col">
+      {/* Image */}
       {image ? (
-        <img src={image} alt={product.name} className="w-full h-28 object-cover rounded-lg mb-2 bg-gray-100" />
+        <img src={image} alt={product.name} className="w-full h-28 object-cover bg-gray-100" />
       ) : (
-        <div className="w-full h-28 rounded-lg mb-2 bg-gray-100 flex items-center justify-center text-gray-300">
+        <div className="w-full h-28 bg-gray-100 flex items-center justify-center text-gray-300">
           <ShoppingCart size={28} />
         </div>
       )}
-      <p className="text-xs text-gray-400 mb-0.5">{product.category}</p>
-      <p className="text-xs font-medium text-gray-800 mb-1 line-clamp-2">{product.name}</p>
-      <p className="text-sm font-bold text-gray-900 mb-2">{formatPrice(priceNum)}</p>
-      <button
-        onClick={() => {
-          onAdd({
-            id: Math.abs(product.productCode.split("").reduce((a, c) => a + c.charCodeAt(0), 0)),
-            name: product.name,
-            image,
-            specs,
-            moq: product.moq ?? 1,
-            priceNum,
-            clientId: undefined,
-            category: product.category,
-            productCode: product.productCode,
-          });
-          setAdded(true);
-          setTimeout(() => setAdded(false), 1500);
-        }}
-        className={`mt-auto flex items-center justify-center gap-1 text-xs font-medium rounded-lg py-1.5 transition-colors ${added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
-      >
-        <ShoppingCart size={12} />
-        {added ? "Added!" : "Add to Cart"}
-      </button>
+
+      {/* Body */}
+      <div className="p-3 flex flex-col flex-1">
+        <p className="text-xs text-gray-400 mb-0.5">{product.category}</p>
+        <p className="text-xs font-semibold text-gray-800 mb-1 line-clamp-2 leading-snug">{product.name}</p>
+        <p className="text-sm font-bold text-gray-900 mb-2">
+          {formatPrice(priceNum)}
+          {priceNum > 0 && <span className="text-[11px] font-normal text-gray-500"> / each</span>}
+        </p>
+
+        {/* Lead time + MOQ — mirrors shop page footer */}
+        <div className="flex items-center justify-between text-[10px] text-gray-400 mb-2 gap-1">
+          <span className="truncate">Lead: {formatLeadTime(product.leadTime)}</span>
+          <span className="shrink-0">MOQ: {formatMoq(product.moq)}</span>
+        </div>
+
+        <button
+          onClick={() => {
+            onAdd({
+              id: Math.abs(product.productCode.split("").reduce((a, c) => a + c.charCodeAt(0), 0)),
+              name: product.name,
+              image,
+              specs,
+              moq: product.moq ?? 1,
+              priceNum,
+              clientId: undefined,
+              category: product.category,
+              productCode: product.productCode,
+            });
+            setAdded(true);
+            setTimeout(() => setAdded(false), 1500);
+          }}
+          className={`mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors ${added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+        >
+          <ShoppingCart size={12} />
+          {added ? "Added!" : "Add to Cart"}
+        </button>
+      </div>
     </div>
   );
 }
