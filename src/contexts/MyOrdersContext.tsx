@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { getPrefix } from "../lib/configService";
+import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -22,6 +23,8 @@ export interface OrderCartItem {
   moq: number;
   clientId: string;
   productCode?: string;
+  /** Vendor allocation snapshot — used to restore stock if the order is cancelled. */
+  vendorAllocations?: StockAllocation[];
 }
 
 export interface MyOrder {
