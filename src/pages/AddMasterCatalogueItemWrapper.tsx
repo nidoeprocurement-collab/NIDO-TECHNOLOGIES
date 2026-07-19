@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -86,8 +87,10 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const [productTypesList, setProductTypesList] = useState(['Product', 'Service', 'Bundle']);
   const [physicalTypesList, setPhysicalTypesList] = useState(['Physical', 'Digital', 'Service']);
-  const [categoriesList, setCategoriesList] = useState(['IT Hardware', 'Cloud Servers', 'Office Supplies', 'Networking', 'Miscellaneous']);
-  const [subcategoriesList, setSubcategoriesList] = useState(['Laptops', 'Desktops', 'Printers', 'Monitors', 'Peripherals', 'Storage', 'Networking']);
+  const [categoriesList, setCategoriesList] = useState<string[]>(CATEGORY_LIST);
+  const [subcategoriesList, setSubcategoriesList] = useState<string[]>(
+    category ? (CATEGORY_SUBCATEGORIES[category] ?? []) : []
+  );
   const [brandsList, setBrandsList] = useState(['Apple', 'Dell', 'HP', 'Lenovo', 'Samsung', 'Sony']);
   const [unitsList, setUnitsList] = useState(['-', 'ppm', 'dpi', 'pages', 'GB', 'TB', 'Hz', 'mm', 'cm', 'kg', 'inch', 'W', 'V']);
 
@@ -305,7 +308,7 @@ export default function AddMasterCatalogueItemWrapper() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <div>
                 <Label className="text-xs sm:text-sm font-medium text-gray-700">Category</Label>
-                <SelectWithAdd value={category} onValueChange={setCategory} options={categoriesList} placeholder="Select category..." dialogType="category" />
+                <SelectWithAdd value={category} onValueChange={(v) => { setCategory(v); setSubcategory(''); setSubcategoriesList(CATEGORY_SUBCATEGORIES[v] ?? []); }} options={categoriesList} placeholder="Select category..." dialogType="category" />
               </div>
               <div>
                 <Label className="text-xs sm:text-sm font-medium text-gray-700">Subcategory</Label>
