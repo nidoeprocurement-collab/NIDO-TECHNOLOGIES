@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
-import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { getSlabDiscountPct, getAllProductPricing } from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
@@ -143,48 +143,60 @@ export default function CartPage() {
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
 
-  // Catalog lookup map for brand / SKU / MOQ — keyed by masterProductCode.
-  // MUST be defined before suggested and onAddToCart so the closure sees the
-  // correct value immediately.
-  // ClientCatalogEntry.productCode === CatalogProduct.masterProductCode.
-  const catalogMap = useMemo(() => {
-    const map = new Map<string, { brand: string; sku: string; moq: number }>();
-    getCatalogProducts().forEach(p => {
-      map.set(p.masterProductCode || p.skuCode || "", {
-        brand: p.brand || "",
-        sku: p.skuCode || "",
-        moq: p.moq,          // use raw value — Math.max guard is in onAddToCart
+  // Vendor match map — same logic as ShopPage's getVendorMatchMap().
+  // This is the authoritative source for leadTime and moq: it reads from the
+  // winning vendor via getAllProductPricing(), keyed by masterProductCode
+  // (= ClientCatalogEntry.productCode).
+  const vendorMatchMap = useMemo(() => {
+    const map = new Map<string, { leadTime: string; moq: number }>();
+    getAllProductPricing().forEach(p => {
+      if (!p.winningVendor) return;
+      const days = p.winningVendor.leadTime;
+      const displayDays = days > 0 ? days * 2 : 0;
+      map.set(p.masterProductCode, {
+        leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
+        moq: p.winningVendor.moq,
       });
     });
     return map;
   }, []);
 
-  // Enrich client-catalog entries with the authoritative MOQ from the master
-  // catalog. The client-catalog moq field is optional and is NOT updated when
-  // the master catalog MOQ changes (only prices are synced), so it can be
-  // stale or missing.  We fix it here before any card or add-to-cart uses it.
-  const enrichWithMoq = (entries: ClientCatalogEntry[]): ClientCatalogEntry[] =>
+  // Catalog map — brand/sku only (MOQ now comes from vendorMatchMap).
+  const catalogMap = useMemo(() => {
+    const map = new Map<string, { brand: string; sku: string }>();
+    getCatalogProducts().forEach(p => {
+      map.set(p.masterProductCode || p.skuCode || "", {
+        brand: p.brand || "",
+        sku: p.skuCode || "",
+      });
+    });
+    return map;
+  }, []);
+
+  // Enrich suggested entries with live vendor leadTime and moq — mirrors
+  // ShopPage's entryToProduct() so the card shows identical data.
+  const enrich = (entries: ClientCatalogEntry[]): ClientCatalogEntry[] =>
     entries.map(e => {
-      const masterMoq = catalogMap.get(e.productCode)?.moq;
-      // masterMoq may be 0 if the product has no vendor MOQ yet — treat 0 as
-      // "unset" and fall back to the client-catalog value, then default to 1.
-      const moq = masterMoq && masterMoq > 0 ? masterMoq : (e.moq && e.moq > 0 ? e.moq : 1);
-      return moq === e.moq ? e : { ...e, moq };
+      const vendor = vendorMatchMap.get(e.productCode);
+      const moq      = vendor?.moq && vendor.moq > 0 ? vendor.moq
+                     : (e.moq && e.moq > 0 ? e.moq : 1);
+      const leadTime = vendor?.leadTime || e.leadTime || "";
+      return { ...e, moq, leadTime };
     });
 
   const [suggested, setSuggested] = useState<ClientCatalogEntry[]>(() =>
-    enrichWithMoq(getSuggested(cart))
+    enrich(getSuggested(cart))
   );
 
   useEffect(() => {
-    setSuggested(enrichWithMoq(getSuggested(cart)));
-    const handler = () => setSuggested(enrichWithMoq(getSuggested(cart)));
+    setSuggested(enrich(getSuggested(cart)));
+    const handler = () => setSuggested(enrich(getSuggested(cart)));
     window.addEventListener("clientCatalogUpdated", handler);
     return () => window.removeEventListener("clientCatalogUpdated", handler);
-  }, [cart, catalogMap]);
+  }, [cart, vendorMatchMap]);
 
   const onAddToCart = (p: Omit<CartItem, "quantity">) => {
-    // p.moq is already authoritative (enriched above from the master catalog).
+    // p.moq is already authoritative (enriched above from live vendor data).
     const correctMoq = Math.max(1, p.moq);
     addItem({ ...p, moq: correctMoq }, correctMoq);
   };
