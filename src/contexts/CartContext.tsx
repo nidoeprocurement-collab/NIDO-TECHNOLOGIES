@@ -25,6 +25,8 @@ interface CartContextType {
   removeItem: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
+  /** Like clearCart but does NOT restore vendor stock — call this after a confirmed order. */
+  consumeCart: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -111,8 +113,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  /** Clears the cart and keeps vendor stock permanently deducted (use after a confirmed order). */
+  const consumeCart = () => {
+    setItems([]);
+  };
+
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart }}>
+    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, consumeCart }}>
       {children}
     </CartContext.Provider>
   );

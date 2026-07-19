@@ -36,7 +36,7 @@ function formatPrice(n: number) {
 
 export default function ReviewPage() {
   const navigate = useNavigate();
-  const { items: cart, clearCart } = useCart();
+  const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
 
   const clientId = localStorage.getItem("nido_shop_selected_client") || "";
@@ -162,7 +162,7 @@ export default function ReviewPage() {
       })) satisfies OrderCartItem[],
     });
 
-    clearCart();
+    consumeCart();
     navigate(`/shop/order-confirmation/${orderNumber}`, {
       state: {
         orderNumber,
