@@ -111,13 +111,11 @@ export default function ReviewPage() {
     cart.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
   );
   const subtotal = preTaxSubtotal;
-  const SHIPPING_FEE = 500;
-
   const handlePlaceOrder = () => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     const itemsSnapshot = cart.map((i) => ({ ...i }));
-    const totalAmount = subtotal + totalGst + SHIPPING_FEE;
+    const totalAmount = subtotal + totalGst;
     const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
@@ -166,7 +164,7 @@ export default function ReviewPage() {
         subtotal,
         gst: totalGst,
         gstSlabs,
-        shipping: SHIPPING_FEE,
+        shipping: 0,
         total: totalAmount,
         address: selectedAddr
           ? { label: selectedAddr.label, line1: selectedAddr.line1, line2: selectedAddr.line2 ?? "", city: selectedAddr.city ?? "", state: selectedAddr.state ?? "", zip: selectedAddr.zip ?? "", phone: selectedAddr.phone }

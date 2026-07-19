@@ -149,7 +149,7 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     defaultCurrency: "INR (₹)",
     defaultPaymentTerms: "Net 30 (Payment due in 30 days)",
     defaultDeliveryTerms: "Ex-Works",
-    defaultShippingMethod: "Standard Shipping",
+    defaultShippingMethod: "Direct Delivery",
     defaultGstPercent: "18",
     defaultLeadTimeDays: "14",
     defaultMOQ: "1",

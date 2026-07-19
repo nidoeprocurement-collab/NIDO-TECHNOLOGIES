@@ -22,7 +22,7 @@ const PO_DATA: Record<string, any> = {
     },
     shipping: {
       address: "1235 Ave, San, CA 94821",
-      deliveryMethod: "Standard Ground",
+      deliveryMethod: "Direct Delivery",
       requestedDelivery: "Apr 28, 2026",
     },
     billing: {
@@ -566,7 +566,7 @@ function storedPOToDetail(po: StoredPO) {
     },
     shipping: {
       address: [po.vendorAddressLine1, po.vendorCity, po.vendorState].filter(Boolean).join(", ") || "—",
-      deliveryMethod: "Standard Ground",
+      deliveryMethod: "Direct Delivery",
       requestedDelivery: po.requestedDelivery || "Within 30 days",
     },
     billing: {

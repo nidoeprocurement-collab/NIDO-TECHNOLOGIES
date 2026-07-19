@@ -9,6 +9,8 @@ import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
+import { computeCartGST } from "@/lib/cartGstHelper";
+import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -1320,12 +1322,12 @@ export default function MyOrderPage() {
 
     for (const { vendorId, meta, subs } of vendorGroups.values()) {
       const poNumber = generatePoNumber();
-      const sgstPct = 9, cgstPct = 9;
 
-      // Build one line item per sub-order
+      // Build one line item per sub-order; use per-category GST rate (same as cart page)
       const lineItems = subs.map(sub => {
         const unitPrice = (selectedVendorMeta[sub.id] ?? meta).unitPrice || 0;
         const lineSubtotal = unitPrice * sub.qty;
+        const taxRate = getEffectiveTaxPctForCategory(sub.category);
         return {
           subOrderId: sub.id,
           item: sub.itemName,
@@ -1337,13 +1339,23 @@ export default function MyOrderPage() {
           qty: sub.qty,
           unitPrice,
           lineSubtotal,
+          _taxRate: taxRate,
         };
       });
 
       const subtotal = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-      const sgstAmt = Math.round(subtotal * sgstPct) / 100;
-      const cgstAmt = Math.round(subtotal * cgstPct) / 100;
+
+      // Compute per-line tax then aggregate (handles mixed-category POs correctly)
+      const totalSgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * (li._taxRate / 2) / 100, 0);
+      const totalCgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * (li._taxRate / 2) / 100, 0);
+      const sgstAmt = Math.round(totalSgstRaw * 100) / 100;
+      const cgstAmt = Math.round(totalCgstRaw * 100) / 100;
       const grandTotal = subtotal + sgstAmt + cgstAmt;
+
+      // Use the primary category rate for the PO-level display pcts
+      const primaryTaxRate = lineItems[0]?._taxRate ?? 18;
+      const sgstPct = primaryTaxRate / 2;
+      const cgstPct = primaryTaxRate / 2;
 
       // Primary item (first) used for single-item compat fields
       const primarySub = subs[0];
@@ -1547,7 +1559,7 @@ export default function MyOrderPage() {
         {/* Info Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div><Field label="Client" value={order?.client || "—"} /><Field label="Payment Method" value="Credit Card" /><Field label="Payment Terms" value="Net 30 (Payment due in 30 days)" /></div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div><Field label="Shipping Address" value="No. 45, 3rd Floor, Embassy Tech Village, Outer Ring Road, Bangalore - 560103" /><Field label="Delivery Method" value="Standard Shipping" /><Field label="Requested Delivery" value="Within 30 days" /></div>
+          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div><Field label="Delivery Address" value="No. 45, 3rd Floor, Embassy Tech Village, Outer Ring Road, Bangalore - 560103" /><Field label="Requested Delivery" value="Within 30 days" /><Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} /></div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
             <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
           ) : (
@@ -1766,31 +1778,36 @@ export default function MyOrderPage() {
                 })}
               </div>
               {(() => {
-                const itemsSubtotal = subOrders.reduce((s, o) => {
-                  const raw = o.total.replace(/[₹,]/g, "");
-                  return s + (parseFloat(raw) || 0);
-                }, 0);
-                const gst = Math.round(itemsSubtotal * 0.18);
-                // Shipping fee matches ReviewPage (₹500 flat rate)
-                const SHIPPING = 500;
-                const grandTotal = order.totalAmountNum ?? (itemsSubtotal + gst + SHIPPING);
+                // Use computeCartGST on the real cart items — same logic as CartPage and ReviewPage.
+                // priceNum is tax-inclusive so we back-calculate per-category rates, not a flat 18%.
+                const cartItems = order.cartItems || [];
+                const { slabs, totalGst, preTaxSubtotal } = computeCartGST(
+                  cartItems.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
+                );
+                const grandTotal = preTaxSubtotal + totalGst;
                 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
                 return (
                   <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
-                    <div style={{ width: 270 }}>
-                      {[
-                        ["Sub-total", fmt(itemsSubtotal)],
-                        ["GST (18%)", fmt(gst)],
-                        ["Standard Shipping", fmt(SHIPPING)],
-                      ].map(([l, v]) => (
-                        <div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>{l}</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{v}</span>
+                    <div style={{ width: 300 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 13.5, color: "#6b7280" }}>Sub-total (excl. GST)</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(preTaxSubtotal)}</span>
+                      </div>
+                      {slabs.map(sl => (
+                        <div key={sl.rate} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>GST ({sl.rate}%)</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(sl.gst)}</span>
                         </div>
                       ))}
+                      {slabs.length === 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>GST</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(totalGst)}</span>
+                        </div>
+                      )}
                       <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
                         <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
-                        <span style={{ fontSize: 15, fontWeight: 800 }}>{order.totalAmount || fmt(grandTotal)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 800 }}>{fmt(grandTotal)}</span>
                       </div>
                     </div>
                   </div>

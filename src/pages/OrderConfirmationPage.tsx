@@ -256,10 +256,10 @@ export default function OrderConfirmationPage() {
               )}
             </div>
 
-            {/* Subtotal / GST / Shipping / Total */}
+            {/* Subtotal / GST / Total */}
             <div className="px-2 py-3 border-t border-gray-100 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Subtotal</span>
+                <span className="text-gray-500">Sub-total (excl. GST)</span>
                 <span className="text-gray-700 font-medium">{formatPrice(subtotal)}</span>
               </div>
               {gstSlabs.length > 0 ? (
@@ -269,12 +269,12 @@ export default function OrderConfirmationPage() {
                     <span className="text-gray-700 font-medium">{formatPrice(sl.gst)}</span>
                   </div>
                 ))
-              ) : (
+              ) : gst > 0 ? (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">GST</span>
                   <span className="text-gray-700 font-medium">{formatPrice(gst)}</span>
                 </div>
-              )}
+              ) : null}
               <div className="flex justify-between items-center border-t border-gray-100 pt-2 mt-1">
                 <span className="text-sm font-bold text-gray-900">Total</span>
                 <span className="text-sm font-bold text-gray-900">{formatPrice(total)}</span>
