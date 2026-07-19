@@ -626,6 +626,25 @@ export function syncAllPricesToClientCatalogs(): number {
   return updated;
 }
 
+// ─── Retail Market Prices ───────────────────────────────────────────────────
+// Global per-product retail (market) prices used by Market Price Validation.
+// Stored as a flat map: masterProductCode → retail price (number).
+
+const RETAIL_MARKET_PRICES_KEY = 'nido_retail_market_prices';
+
+export function getRetailMarketPrices(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(RETAIL_MARKET_PRICES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {};
+}
+
+export function saveRetailMarketPrices(prices: Record<string, number>): void {
+  localStorage.setItem(RETAIL_MARKET_PRICES_KEY, JSON.stringify(prices));
+  window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
 // Recompute and push selling prices for a single client only, using that
 // client's own pricing settings. Called whenever a client's catalog is
 // viewed or that client's Pricing Settings are changed, so the selling
