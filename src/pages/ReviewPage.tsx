@@ -159,6 +159,7 @@ export default function ReviewPage() {
         moq: i.moq,
         clientId: i.clientId,
         productCode: i.productCode,
+        vendorAllocations: i.vendorAllocations,
       })) satisfies OrderCartItem[],
     });
 
