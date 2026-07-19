@@ -11,6 +11,7 @@ import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { releaseStock } from "@/lib/stockEngine";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -1229,6 +1230,19 @@ export default function MyOrderPage() {
   };
   const [showStatusDd, setShowStatusDd] = useState(false);
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
+
+  // Cancels the order: releases all reserved stock back to vendors, then marks
+  // the master order as Cancelled (which cascades to all sub-orders via context).
+  const handleCancelOrder = () => {
+    if (order?.cartItems?.length) {
+      for (const item of order.cartItems) {
+        if (item.vendorAllocations?.length) {
+          releaseStock(item.vendorAllocations);
+        }
+      }
+    }
+    setMasterStatus("Cancelled");
+  };
   // Per-item overrides (status, tracking) are persisted separately from the
   // base cart-item snapshot so a cancel/status/tracking change made on one
   // platform (owner or client portal) is picked up by the other immediately.
@@ -1572,20 +1586,41 @@ export default function MyOrderPage() {
 
         {/* Header */}
         <div style={{ marginBottom: 22 }}>
-          <button
-            onClick={() => navigate(-1)}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 13, fontFamily: "inherit", marginBottom: 12, padding: 0 }}
-          >
-            ← Back to Orders
-          </button>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Order Details / <span style={{ color: "#374151" }}>Order #{orderId}</span></h1>
-            <StatusPill status={masterStatus} />
-          </div>
-          <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
-            <span>Created on <b style={{ color: "#374151" }}>{order ? `${order.orderDate} ${order.orderTime}` : "—"}</b></span><span style={{ color: "#d1d5db" }}>•</span>
-            <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <button
+                onClick={() => navigate(-1)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 13, fontFamily: "inherit", marginBottom: 12, padding: 0 }}
+              >
+                ← Back to Orders
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Order Details / <span style={{ color: "#374151" }}>Order #{orderId}</span></h1>
+                <StatusPill status={masterStatus} />
+              </div>
+              <div style={{ fontSize: 13, color: "#6b7280", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <span>Master Order</span><span style={{ color: "#d1d5db" }}>•</span>
+                <span>Created on <b style={{ color: "#374151" }}>{order ? `${order.orderDate} ${order.orderTime}` : "—"}</b></span><span style={{ color: "#d1d5db" }}>•</span>
+                <span>Requested by <b style={{ color: "#374151" }}>{order ? `${order.requester} (${order.requesterRole})` : "—"}</b></span>
+              </div>
+            </div>
+            {/* Cancel Order button — top-right, hidden for portal users and already-cancelled orders */}
+            {!isClientPortalUser && (
+              isOrderCancelled ? (
+                <span style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                  ✕ Order Cancelled
+                </span>
+              ) : (
+                <button
+                  onClick={() => setPendingCancelStatus(true)}
+                  style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                >
+                  ✕ Cancel Order
+                </button>
+              )
+            )}
           </div>
         </div>
 
@@ -1930,7 +1965,7 @@ export default function MyOrderPage() {
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}
       {referenceTarget && <ReferenceNumberModal itemName={subOrders.find(s => s.id === referenceTarget)?.itemName || ""} current={subOrders.find(s => s.id === referenceTarget)?.referenceNumber || ""} onSave={v => setSubOrders(prev => prev.map(s => s.id === referenceTarget ? { ...s, referenceNumber: v } : s))} onClose={() => setReferenceTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={() => setSubOrders(prev => prev.map(s => s.id === cancelTarget ? { ...s, itemStatus: "Pending" } : s))} onClose={() => setCancelTarget(null)} />}
-      {pendingCancelStatus && <CancelOrderStatusModal onConfirm={() => setMasterStatus("Cancelled")} onClose={() => setPendingCancelStatus(false)} />}
+      {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
     </div>
   );
