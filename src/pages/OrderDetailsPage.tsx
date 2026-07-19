@@ -124,13 +124,18 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Live stock lookup per vendor
+  // Live stock lookup per vendor.
+  // Nido sees: currentStock + qty already reserved for this order = vendor's true supply capacity.
   const vendorProducts = useMemo(() => getAllVendorProducts(), []);
   const getVendorStock = (vendorId: string): number | null => {
     if (!sub.productCode) return null;
     const prods = vendorProducts[vendorId] || [];
     const match = prods.find((p: any) => p.masterProductCode === sub.productCode && p.status === "Active");
-    return match ? (parseInt((match as any).stock) || 0) : null;
+    if (!match) return null;
+    const currentStock = parseInt((match as any).stock) || 0;
+    // Add back whatever was reserved from this vendor when the client placed the order
+    const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === vendorId)?.allocated || 0;
+    return currentStock + reserved;
   };
 
   const fmt = (n: number) =>
@@ -463,15 +468,18 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
   // Compute all-vendor stock breakdown once per render for every sub-order
   const vendorProducts = useMemo(() => getAllVendorProducts(), []);
 
-  // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product
-  const getVendorStockBreakdown = (productCode: string) => {
+  // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product.
+  // Stock = currentStock + qty reserved from this vendor when the client placed the order,
+  // giving Nido the vendor's true supply capacity for PO-raising decisions.
+  const getVendorStockBreakdown = (productCode: string, stockAllocations: any[] = []) => {
     if (!productCode) return [];
     const comparisons = computeVendorComparisons(productCode);
     return comparisons.map(c => {
       const prods = vendorProducts[c.vendorId] || [];
       const match = prods.find((p: any) => p.masterProductCode === productCode && p.status === "Active");
-      const stock = match ? (parseInt((match as any).stock) || 0) : 0;
-      return { vendorId: c.vendorId, vendorName: c.vendorName, stock };
+      const currentStock = match ? (parseInt((match as any).stock) || 0) : 0;
+      const reserved = stockAllocations.find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
+      return { vendorId: c.vendorId, vendorName: c.vendorName, stock: currentStock + reserved };
     });
   };
 
@@ -496,7 +504,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const hasVendor = !!meta || !!selectedVendors[sub.id];
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc = meta?.location || "";
-          const stockBreakdown = getVendorStockBreakdown(sub.productCode);
+          const stockBreakdown = getVendorStockBreakdown(sub.productCode, sub.stockAllocations);
           const totalStock = stockBreakdown.reduce((s, v) => s + v.stock, 0);
 
           return (
@@ -1432,6 +1440,10 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     updatedOn: orderDate,
     deliveredAt: null,
     tracking: null,
+    // Stock reservations made at order-placement time (StockAllocation[]).
+    // Used by Nido's vendor selection to add back reserved qty and show
+    // the vendor's true supply capacity (currentStock + reservedForThisOrder).
+    stockAllocations: item.vendorAllocations || [],
   }));
 }
 
