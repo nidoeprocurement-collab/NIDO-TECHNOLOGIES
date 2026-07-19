@@ -460,14 +460,35 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
+  // Compute all-vendor stock breakdown once per render for every sub-order
+  const vendorProducts = useMemo(() => getAllVendorProducts(), []);
+
+  // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product
+  const getVendorStockBreakdown = (productCode: string) => {
+    if (!productCode) return [];
+    const comparisons = computeVendorComparisons(productCode);
+    return comparisons.map(c => {
+      const prods = vendorProducts[c.vendorId] || [];
+      const match = prods.find((p: any) => p.masterProductCode === productCode && p.status === "Active");
+      const stock = match ? (parseInt((match as any).stock) || 0) : 0;
+      return { vendorId: c.vendorId, vendorName: c.vendorName, stock };
+    });
+  };
+
+  const COLS = "20px 70px 1fr 42px 55px 180px 90px 70px";
+  const HEADERS = ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "VENDOR STOCK", "SELECTED VENDOR", "ACTION"];
+
   return (
     <div style={{ padding: "20px 24px 28px" }}>
       <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", marginBottom: 4 }}>Vendor Selection</div>
-      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>Click "Select Vendor" to open the Price Engine recommendation dialog and pick from top-4 vendors.</div>
+      <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 18 }}>
+        Click "Select Vendor" to open the Price Engine dialog. The <strong>Vendor Stock</strong> column shows live individual stock per vendor so you can plan splits before selecting.
+      </div>
 
       <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "25px 70px 1fr 38px 55px 90px 65px", gap: "2px", padding: "8px 10px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 10, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
-          {["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "REQ DATE", "SELECTED VENDOR", "ACTION"].map(h => <div key={h}>{h}</div>)}
+        {/* Header */}
+        <div style={{ display: "grid", gridTemplateColumns: COLS, gap: "2px", padding: "8px 10px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 10, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+          {HEADERS.map(h => <div key={h}>{h}</div>)}
         </div>
 
         {subOrders.map((sub, idx) => {
@@ -475,43 +496,89 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const hasVendor = !!meta || !!selectedVendors[sub.id];
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc = meta?.location || "";
+          const stockBreakdown = getVendorStockBreakdown(sub.productCode);
+          const totalStock = stockBreakdown.reduce((s, v) => s + v.stock, 0);
+
           return (
-            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: "25px 70px 1fr 38px 55px 90px 65px", gap: "2px", padding: "10px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={sub.id} style={{ display: "grid", gridTemplateColumns: COLS, gap: "2px", padding: "10px", alignItems: "center", borderBottom: idx < subOrders.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+              {/* # */}
               <div style={{ color: "#6b7280", fontSize: 13 }}>{sub.num}</div>
+
+              {/* Sub Order ID */}
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{sub.id}</div>
                 <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
               </div>
+
+              {/* Item Details */}
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 38, height: 38, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>📦</div>
+                <div style={{ width: 36, height: 36, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>📦</div>
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
-                  {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                  <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{sub.itemName}</div>
+                  {sub.referenceNumber && <div style={{ fontSize: 11, color: "#6b7280" }}>Ref: {sub.referenceNumber}</div>}
                 </div>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty} Nos</div>
-              <div style={{ fontSize: 12.5, color: "#374151" }}>{sub.requiredDate}</div>
+
+              {/* Qty */}
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}<div style={{ fontSize: 10, color: "#9ca3af" }}>Nos</div></div>
+
+              {/* Req Date */}
+              <div style={{ fontSize: 12, color: "#374151" }}>{sub.requiredDate}</div>
+
+              {/* Vendor Stock — per-vendor breakdown */}
+              <div>
+                {stockBreakdown.length === 0 ? (
+                  <span style={{ fontSize: 11.5, color: "#9ca3af" }}>No data</span>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {stockBreakdown.map(v => {
+                      const ok = v.stock >= sub.qty;
+                      const zero = v.stock === 0;
+                      return (
+                        <div key={v.vendorId} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ fontSize: 11.5, color: "#374151", fontWeight: 500, minWidth: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.vendorName}</span>
+                          <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: 8, fontSize: 11, fontWeight: 700, flexShrink: 0,
+                            background: zero ? "#f3f4f6" : ok ? "#f0fdf4" : "#fef2f2",
+                            color: zero ? "#9ca3af" : ok ? "#166534" : "#991b1b",
+                            border: `1px solid ${zero ? "#e5e7eb" : ok ? "#bbf7d0" : "#fecaca"}` }}>
+                            {v.stock} Nos
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {/* Total */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2, paddingTop: 3, borderTop: "1px dashed #e5e7eb" }}>
+                      <span style={{ fontSize: 11, color: "#6b7280", flex: 1 }}>Total</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: totalStock >= sub.qty ? "#15803d" : "#b91c1c" }}>{totalStock} Nos</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Vendor */}
               <div>
                 {displayName ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                       {(displayName[0] || "V").toUpperCase()}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{displayName}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{displayName}</div>
                       {displayLoc && <div style={{ fontSize: 11, color: "#6b7280" }}>{displayLoc.split(",")[0]}</div>}
                     </div>
                   </div>
                 ) : (
-                  <span style={{ fontSize: 12.5, color: "#9ca3af" }}>Not selected</span>
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Not selected</span>
                 )}
               </div>
+
+              {/* Action */}
               <div>
                 <button
                   onClick={() => onOpenModal(sub)}
-                  style={{ padding: "7px 16px", border: `1px solid ${hasVendor ? "#2563eb" : "#d1d5db"}`, borderRadius: 7, background: hasVendor ? "#eff6ff" : "#fff", color: hasVendor ? "#2563eb" : "#374151", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+                  style={{ padding: "6px 12px", border: `1px solid ${hasVendor ? "#2563eb" : "#d1d5db"}`, borderRadius: 7, background: hasVendor ? "#eff6ff" : "#fff", color: hasVendor ? "#2563eb" : "#374151", cursor: "pointer", fontWeight: 600, fontSize: 12.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
                 >
-                  {hasVendor ? "Change Vendor" : "Select Vendor"}
+                  {hasVendor ? "Change" : "Select Vendor"}
                 </button>
               </div>
             </div>
