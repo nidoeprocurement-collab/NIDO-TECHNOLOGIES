@@ -141,11 +141,12 @@ export default function CartPage() {
     addItem({ ...p, moq: correctMoq }, correctMoq);
   };
 
-  // Catalog lookup map for brand / SKU / MOQ (by productCode)
+  // Catalog lookup map for brand / SKU / MOQ — keyed by masterProductCode
+  // (ClientCatalogEntry.productCode === CatalogProduct.masterProductCode)
   const catalogMap = useMemo(() => {
     const map = new Map<string, { brand: string; sku: string; moq: number }>();
     getCatalogProducts().forEach(p => {
-      map.set(p.productCode || p.skuCode || "", {
+      map.set(p.masterProductCode || p.skuCode || "", {
         brand: p.brand || "",
         sku: p.skuCode || "",
         moq: p.moq ?? 1,
