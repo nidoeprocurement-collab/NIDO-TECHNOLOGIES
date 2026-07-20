@@ -123,13 +123,9 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Stock per vendor = c.stock (post-reservation, from computeVendorComparisons) + qty reserved
-  // for THIS order (adds back what was deducted when the client placed the order), giving Nido
-  // the vendor's true supply capacity for PO-raising decisions.
-  const getVendorStock = (c: VendorComparisonRow): number => {
-    const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
-    return c.stock + reserved;
-  };
+  // Stock per vendor = raw stock entered when the product was assigned to the vendor.
+  // This is the vendor's actual available stock, independent of shop/cart allocations.
+  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -515,14 +511,15 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
   // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product.
-  // c.stock from computeVendorComparisons is the post-reservation live stock; adding back
-  // the qty reserved for THIS order gives Nido the vendor's true supply capacity.
-  const getVendorStockBreakdown = (productCode: string, stockAllocations: any[] = []) => {
+  // Shows the raw stock entered when the product was assigned to each vendor.
+  // This is Nido-internal data only — not linked to shop/cart stock management.
+  const getVendorStockBreakdown = (productCode: string) => {
     if (!productCode) return [];
-    return computeVendorComparisons(productCode).map(c => {
-      const reserved = stockAllocations.find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
-      return { vendorId: c.vendorId, vendorName: c.vendorName, stock: c.stock + reserved };
-    });
+    return computeVendorComparisons(productCode).map(c => ({
+      vendorId: c.vendorId,
+      vendorName: c.vendorName,
+      stock: c.stock,
+    }));
   };
 
   const COLS = "20px 70px 1fr 42px 55px 180px 90px 70px";
@@ -546,7 +543,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const hasVendor = !!meta || !!selectedVendors[sub.id];
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc = meta?.location || "";
-          const stockBreakdown = getVendorStockBreakdown(sub.productCode, sub.stockAllocations);
+          const stockBreakdown = getVendorStockBreakdown(sub.productCode);
           const totalStock = stockBreakdown.reduce((s, v) => s + v.stock, 0);
 
           return (
