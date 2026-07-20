@@ -117,15 +117,47 @@ function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
 }
 
 // ── Vendor Selection Modal (popup) — uses Price Engine top-4 ─────────────────
+/**
+ * Returns the full vendor stock capacity for a product as originally entered,
+ * regardless of how much the shop/cart has reserved so far.
+ *
+ * The shop's reserveStock() deducts from vendorStore live stock each time a
+ * client adds to cart / places an order. For Vendor Selection (Nido-internal),
+ * we need the original capacity: live stock + everything reserved across all
+ * active (non-cancelled) orders for this product from this vendor.
+ */
+function getFullVendorStock(vendorId: string, masterProductCode: string, liveStock: number): number {
+  try {
+    const orders = JSON.parse(localStorage.getItem("nido_my_orders") || "[]");
+    let totalReserved = 0;
+    for (const order of orders) {
+      if (order.status === "Cancelled") continue;
+      for (const item of (order.cartItems || [])) {
+        if (item.productCode !== masterProductCode) continue;
+        for (const alloc of (item.vendorAllocations || [])) {
+          if (alloc.vendorId === vendorId) {
+            totalReserved += (alloc.allocated || 0);
+          }
+        }
+      }
+    }
+    return liveStock + totalReserved;
+  } catch {
+    return liveStock;
+  }
+}
+
 function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Show the raw stock the vendor has available (as entered in vendor product assignment).
-  // Never add back cart/order reservations — those are client-side and not reliable.
-  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
+  // Full vendor capacity: live stock + everything the shop has reserved across all
+  // active orders for this product from this vendor. This restores the original
+  // stock as entered in vendor product assignment, independent of shop deductions.
+  const getVendorStock = (c: VendorComparisonRow): number =>
+    getFullVendorStock(c.vendorId, sub.productCode, c.stock);
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -561,14 +593,15 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
-  // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product.
-  // Shows raw vendor stock as entered in vendor product assignment — no cart/reservation math.
+  // Returns [{vendorId, vendorName, stock}] per vendor for this product.
+  // Uses getFullVendorStock so shop deductions are reversed and the original
+  // vendor capacity is shown — same stock management logic as the shop page.
   const getVendorStockBreakdown = (productCode: string) => {
     if (!productCode) return [];
     return computeVendorComparisons(productCode).map(c => ({
       vendorId: c.vendorId,
       vendorName: c.vendorName,
-      stock: c.stock,
+      stock: getFullVendorStock(c.vendorId, productCode, c.stock),
     }));
   };
 
