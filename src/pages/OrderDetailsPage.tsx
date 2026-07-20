@@ -4,7 +4,6 @@ import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { getAllVendorProducts } from "@/lib/vendorStore";
 import { savePO, generatePoNumber, type StoredPO } from "@/lib/purchaseOrderStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -124,16 +123,12 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Live stock: currentStock + qty reserved when client placed the order = vendor's true capacity
-  const vendorProducts = useMemo(() => getAllVendorProducts(), []);
-  const getVendorStock = (vendorId: string): number | null => {
-    if (!sub.productCode) return null;
-    const prods = vendorProducts[vendorId] || [];
-    const match = prods.find((p: any) => p.masterProductCode === sub.productCode && p.status === "Active");
-    if (!match) return null;
-    const current = parseInt((match as any).stock) || 0;
-    const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === vendorId)?.allocated || 0;
-    return current + reserved;
+  // Stock per vendor = c.stock (post-reservation, from computeVendorComparisons) + qty reserved
+  // for THIS order (adds back what was deducted when the client placed the order), giving Nido
+  // the vendor's true supply capacity for PO-raising decisions.
+  const getVendorStock = (c: VendorComparisonRow): number => {
+    const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
+    return c.stock + reserved;
   };
 
   const fmt = (n: number) =>
@@ -312,8 +307,8 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
               {/* Data rows */}
               {comparisons.map((c, i) => {
                 const isChecked = checkedSet.has(c.vendorId);
-                const stock = getVendorStock(c.vendorId);
-                const stockOk = stock === null || stock >= sub.qty;
+                const stock = getVendorStock(c);
+                const stockOk = stock >= sub.qty;
                 const qty = rowQtys[c.vendorId] || 0;
                 const moqVal = c.moq || 0;
                 const moqOk = qty === 0 || qty >= moqVal;
@@ -356,7 +351,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                     {/* Available Stock */}
                     <div style={{ textAlign: "center" }}>
                       <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
-                        {stock === null ? "—" : `${stock} Nos`}
+                        {`${stock} Nos`}
                       </span>
                     </div>
 
@@ -519,21 +514,14 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
-  // Compute all-vendor stock breakdown once per render for every sub-order
-  const vendorProducts = useMemo(() => getAllVendorProducts(), []);
-
   // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product.
-  // Stock = currentStock + qty reserved from this vendor when the client placed the order,
-  // giving Nido the vendor's true supply capacity for PO-raising decisions.
+  // c.stock from computeVendorComparisons is the post-reservation live stock; adding back
+  // the qty reserved for THIS order gives Nido the vendor's true supply capacity.
   const getVendorStockBreakdown = (productCode: string, stockAllocations: any[] = []) => {
     if (!productCode) return [];
-    const comparisons = computeVendorComparisons(productCode);
-    return comparisons.map(c => {
-      const prods = vendorProducts[c.vendorId] || [];
-      const match = prods.find((p: any) => p.masterProductCode === productCode && p.status === "Active");
-      const currentStock = match ? (parseInt((match as any).stock) || 0) : 0;
+    return computeVendorComparisons(productCode).map(c => {
       const reserved = stockAllocations.find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
-      return { vendorId: c.vendorId, vendorName: c.vendorName, stock: currentStock + reserved };
+      return { vendorId: c.vendorId, vendorName: c.vendorName, stock: c.stock + reserved };
     });
   };
 
