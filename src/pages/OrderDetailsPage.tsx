@@ -123,9 +123,14 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Stock per vendor = raw stock entered when the product was assigned to the vendor.
-  // This is the vendor's actual available stock, independent of shop/cart allocations.
-  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
+  // Stock available for THIS order's PO from this vendor:
+  //   c.stock  = live vendorStore stock (already decremented by reserveStock when client placed the order)
+  //   reserved = what was deducted from this vendor for THIS specific order item
+  // Together they show the true supply capacity this vendor can offer for the PO.
+  const getVendorStock = (c: VendorComparisonRow): number => {
+    const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
+    return c.stock + reserved;
+  };
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -187,6 +192,12 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
   const selectedComps = comparisons.filter(c => checkedSet.has(c.vendorId));
   const totalAllocated = selectedComps.reduce((s, c) => s + (rowQtys[c.vendorId] || 0), 0);
+  const remaining = sub.qty - totalAllocated;
+
+  // True when no single vendor can cover the full order qty alone
+  const needsSplit = comparisons.length > 0 && !comparisons.some(c => getVendorStock(c) >= sub.qty);
+  // Total available across all vendors
+  const totalAvailable = comparisons.reduce((s, c) => s + getVendorStock(c), 0);
 
   const buildMeta = (vendorId: string) => {
     const c = comparisons.find(x => x.vendorId === vendorId);
@@ -219,7 +230,7 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
   const detailComp = comparisons.find(c => c.vendorId === detailVendorId);
   const detailVendorInfo = detailVendorId ? getVendorById(detailVendorId) : undefined;
-  const canConfirm = selectedComps.length > 0 && totalAllocated > 0;
+  const canConfirm = selectedComps.length > 0 && totalAllocated === sub.qty;
 
   // 13-column grid: cb | # | Vendor | Price | Stock | LeadTime | Rating | OnTime | PayTerms | MOQ | AllocQty | Total | chevron
   const GRID = "36px 32px 1fr 100px 88px 110px 62px 72px 106px 66px 106px 98px 28px";
@@ -258,6 +269,24 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
             </div>
           ))}
         </div>
+
+        {/* ── Split-required / stock warning banner ── */}
+        {comparisons.length > 0 && (needsSplit || totalAvailable < sub.qty) && (
+          <div style={{ padding: "10px 24px", background: totalAvailable < sub.qty ? "#fef2f2" : "#fffbeb", borderBottom: "1px solid " + (totalAvailable < sub.qty ? "#fecaca" : "#fde68a"), display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 16 }}>{totalAvailable < sub.qty ? "⚠️" : "ℹ️"}</span>
+            <div>
+              {totalAvailable < sub.qty ? (
+                <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>
+                  Combined stock across all vendors ({totalAvailable} Nos) is less than the required qty ({sub.qty} Nos). Contact vendors to replenish before raising POs.
+                </span>
+              ) : (
+                <span style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>
+                  No single vendor has enough stock for this order ({sub.qty} Nos). Select multiple vendors below and split the qty across them to cover the full order.
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         <div style={{ overflow: "auto", flex: 1 }}>
           {/* ── Vendor comparison table ── */}
@@ -378,26 +407,30 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                       <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal} Nos` : "—"}</div>
                     </div>
 
-                    {/* Allocate Qty — stepper input */}
+                    {/* Allocate Qty — stepper input capped to vendor available stock */}
                     <div style={{ padding: "10px 8px" }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: "flex", alignItems: "center", border: "1px solid #d1d5db", borderRadius: 6, overflow: "hidden", background: "#fff" }}>
+                      <div style={{ display: "flex", alignItems: "center", border: `1px solid ${qty > stock ? "#f87171" : "#d1d5db"}`, borderRadius: 6, overflow: "hidden", background: "#fff" }}>
                         <input
                           type="number"
                           min={0}
+                          max={stock}
                           value={qty}
-                          onChange={e => handleQtyChange(c.vendorId, parseInt(e.target.value) || 0)}
+                          onChange={e => handleQtyChange(c.vendorId, Math.min(parseInt(e.target.value) || 0, stock))}
                           style={{ flex: 1, width: 0, border: "none", outline: "none", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 4px", fontFamily: "inherit" }}
                         />
                         <div style={{ display: "flex", flexDirection: "column", borderLeft: "1px solid #e5e7eb" }}>
-                          <button onClick={() => handleQtyChange(c.vendorId, qty + 1)} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>▲</button>
+                          <button onClick={() => handleQtyChange(c.vendorId, Math.min(qty + 1, stock))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>▲</button>
                           <button onClick={() => handleQtyChange(c.vendorId, Math.max(0, qty - 1))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151" }}>▼</button>
                         </div>
                       </div>
-                      {isChecked && moqVal > 0 && (
-                        <div style={{ fontSize: 10.5, marginTop: 3, color: moqOk ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
-                          {moqOk ? "✓ Within MOQ" : "▲ Below Required"}
-                        </div>
-                      )}
+                      <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", flexDirection: "column", gap: 1 }}>
+                        <span style={{ color: "#9ca3af" }}>Max: {stock} Nos</span>
+                        {isChecked && moqVal > 0 && (
+                          <span style={{ color: moqOk ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
+                            {moqOk ? "✓ Within MOQ" : "▲ Below Required"}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Total Cost */}
@@ -488,13 +521,36 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
         </div>
 
         {/* ── Footer ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", borderTop: "1px solid #e5e7eb" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", borderTop: "1px solid #e5e7eb", gap: 16 }}>
           <button
             onClick={onClose}
             style={{ padding: "9px 26px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
           >
             Cancel
           </button>
+
+          {/* Allocation progress */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 12, justifyContent: "center" }}>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+              Allocated: <strong style={{ color: totalAllocated === sub.qty ? "#16a34a" : "#374151" }}>{totalAllocated}</strong> / {sub.qty} Nos
+            </div>
+            {remaining > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 600, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa", borderRadius: 8, padding: "2px 10px" }}>
+                {remaining} Nos still unassigned
+              </span>
+            )}
+            {remaining < 0 && (
+              <span style={{ fontSize: 12, fontWeight: 600, background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 8, padding: "2px 10px" }}>
+                Over by {Math.abs(remaining)} Nos
+              </span>
+            )}
+            {remaining === 0 && totalAllocated > 0 && (
+              <span style={{ fontSize: 12, fontWeight: 600, background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0", borderRadius: 8, padding: "2px 10px" }}>
+                ✓ Fully covered
+              </span>
+            )}
+          </div>
+
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
@@ -511,15 +567,15 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
   // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product.
-  // Shows the raw stock entered when the product was assigned to each vendor.
-  // This is Nido-internal data only — not linked to shop/cart stock management.
-  const getVendorStockBreakdown = (productCode: string) => {
+  // stock = live vendorStore stock + qty reserved for THIS order from that vendor,
+  // giving the true available supply per vendor for PO-raising decisions.
+  // Nido-internal only — not linked to shop/cart stock management.
+  const getVendorStockBreakdown = (productCode: string, stockAllocations: any[] = []) => {
     if (!productCode) return [];
-    return computeVendorComparisons(productCode).map(c => ({
-      vendorId: c.vendorId,
-      vendorName: c.vendorName,
-      stock: c.stock,
-    }));
+    return computeVendorComparisons(productCode).map(c => {
+      const reserved = stockAllocations.find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
+      return { vendorId: c.vendorId, vendorName: c.vendorName, stock: c.stock + reserved };
+    });
   };
 
   const COLS = "20px 70px 1fr 42px 55px 180px 90px 70px";
@@ -543,7 +599,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const hasVendor = !!meta || !!selectedVendors[sub.id];
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc = meta?.location || "";
-          const stockBreakdown = getVendorStockBreakdown(sub.productCode);
+          const stockBreakdown = getVendorStockBreakdown(sub.productCode, sub.stockAllocations);
           const totalStock = stockBreakdown.reduce((s, v) => s + v.stock, 0);
 
           return (
