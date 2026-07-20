@@ -123,14 +123,9 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Stock available for THIS order's PO from this vendor:
-  //   c.stock  = live vendorStore stock (already decremented by reserveStock when client placed the order)
-  //   reserved = what was deducted from this vendor for THIS specific order item
-  // Together they show the true supply capacity this vendor can offer for the PO.
-  const getVendorStock = (c: VendorComparisonRow): number => {
-    const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
-    return c.stock + reserved;
-  };
+  // Show the raw stock the vendor has available (as entered in vendor product assignment).
+  // Never add back cart/order reservations — those are client-side and not reliable.
+  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -567,15 +562,14 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
   // Returns [{vendorId, vendorName, stock}] for every vendor that carries this product.
-  // stock = live vendorStore stock + qty reserved for THIS order from that vendor,
-  // giving the true available supply per vendor for PO-raising decisions.
-  // Nido-internal only — not linked to shop/cart stock management.
-  const getVendorStockBreakdown = (productCode: string, stockAllocations: any[] = []) => {
+  // Shows raw vendor stock as entered in vendor product assignment — no cart/reservation math.
+  const getVendorStockBreakdown = (productCode: string) => {
     if (!productCode) return [];
-    return computeVendorComparisons(productCode).map(c => {
-      const reserved = stockAllocations.find((a: any) => a.vendorId === c.vendorId)?.allocated || 0;
-      return { vendorId: c.vendorId, vendorName: c.vendorName, stock: c.stock + reserved };
-    });
+    return computeVendorComparisons(productCode).map(c => ({
+      vendorId: c.vendorId,
+      vendorName: c.vendorName,
+      stock: c.stock,
+    }));
   };
 
   const COLS = "20px 70px 1fr 42px 55px 180px 90px 70px";
@@ -599,7 +593,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
           const hasVendor = !!meta || !!selectedVendors[sub.id];
           const displayName = meta?.vendorName || selectedVendors[sub.id] || null;
           const displayLoc = meta?.location || "";
-          const stockBreakdown = getVendorStockBreakdown(sub.productCode, sub.stockAllocations);
+          const stockBreakdown = getVendorStockBreakdown(sub.productCode);
           const totalStock = stockBreakdown.reduce((s, v) => s + v.stock, 0);
 
           return (
