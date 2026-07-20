@@ -124,83 +124,78 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Live stock lookup per vendor.
-  // Nido sees: currentStock + qty already reserved for this order = vendor's true supply capacity.
+  // Live stock: currentStock + qty reserved when client placed the order = vendor's true capacity
   const vendorProducts = useMemo(() => getAllVendorProducts(), []);
   const getVendorStock = (vendorId: string): number | null => {
     if (!sub.productCode) return null;
     const prods = vendorProducts[vendorId] || [];
     const match = prods.find((p: any) => p.masterProductCode === sub.productCode && p.status === "Active");
     if (!match) return null;
-    const currentStock = parseInt((match as any).stock) || 0;
-    // Add back whatever was reserved from this vendor when the client placed the order
+    const current = parseInt((match as any).stock) || 0;
     const reserved = (sub.stockAllocations || []).find((a: any) => a.vendorId === vendorId)?.allocated || 0;
-    return currentStock + reserved;
+    return current + reserved;
   };
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Allocation list: one entry per vendor split
-  const defaultVendorId = selectedVendorId || comparisons[0]?.vendorId || "";
-  const [allocations, setAllocations] = useState<Array<{ vendorId: string; qty: number }>>(
-    defaultVendorId ? [{ vendorId: defaultVendorId, qty: sub.qty }] : []
+  // On-time delivery % — deterministic approximation from rating
+  const onTimePct = (c: VendorComparisonRow) =>
+    Math.min(99, Math.round(c.rating * 5 + 74));
+
+  // Lead time: split roughly 60/40 into dispatch + transit
+  const splitLT = (lt: number) => {
+    const d = Math.ceil(lt * 0.6);
+    return { d, t: lt - d, total: lt };
+  };
+
+  // ── Checkbox + qty state ─────────────────────────────────────────────────
+  const [rowQtys, setRowQtys] = useState<Record<string, number>>(() => {
+    const q: Record<string, number> = {};
+    for (const c of comparisons) q[c.vendorId] = 0;
+    const pre = selectedVendorId || comparisons[0]?.vendorId;
+    if (pre) q[pre] = sub.qty;
+    return q;
+  });
+  const [checkedSet, setCheckedSet] = useState<Set<string>>(() => {
+    const s = new Set<string>();
+    const pre = selectedVendorId || comparisons[0]?.vendorId;
+    if (pre) s.add(pre);
+    return s;
+  });
+  // Which vendor's details are shown at the bottom
+  const [detailVendorId, setDetailVendorId] = useState<string>(
+    selectedVendorId || comparisons[0]?.vendorId || ""
   );
 
-  const totalAllocated = allocations.reduce((s, a) => s + a.qty, 0);
-  const remaining = sub.qty - totalAllocated;
-  const usedIds = new Set(allocations.map(a => a.vendorId));
-  const unusedComparisons = comparisons.filter(c => !usedIds.has(c.vendorId));
-
-  // Radio click in the vendor table → sets the PRIMARY (first) allocation's vendor
-  const handlePickPrimary = (vendorId: string) => {
-    setAllocations(prev => {
-      // If this vendor is already a secondary, just swap it to primary
-      const secIdx = prev.findIndex((a, i) => i > 0 && a.vendorId === vendorId);
-      if (secIdx > -1) {
-        const next = [...prev];
-        const [swapped] = next.splice(secIdx, 1);
-        const primary = next[0];
-        next[0] = { ...swapped, qty: primary.qty };
-        next.splice(1, 0, { ...primary, qty: swapped.qty });
-        return next;
-      }
-      return [{ vendorId, qty: prev[0]?.qty ?? sub.qty }, ...prev.slice(1)];
-    });
-  };
-
-  const handleAddVendor = () => {
-    if (unusedComparisons.length === 0) return;
-    const r = Math.max(1, remaining > 0 ? remaining : 1);
-    setAllocations(prev => [...prev, { vendorId: unusedComparisons[0].vendorId, qty: r }]);
-  };
-
-  const handleRemoveAllocation = (idx: number) => {
-    setAllocations(prev => {
-      const removed = prev[idx];
-      const next = prev.filter((_, i) => i !== idx);
-      if (next.length > 0 && removed) {
-        next[0] = { ...next[0], qty: next[0].qty + removed.qty };
+  const handleToggleCheck = (vendorId: string) => {
+    setCheckedSet(prev => {
+      const next = new Set(prev);
+      if (next.has(vendorId)) {
+        next.delete(vendorId);
+        setRowQtys(q => ({ ...q, [vendorId]: 0 }));
+      } else {
+        next.add(vendorId);
+        // Default to remaining unallocated (min 1)
+        const allocated = [...prev].reduce((s, vid) => s + (rowQtys[vid] || 0), 0);
+        const rem = Math.max(1, sub.qty - allocated);
+        setRowQtys(q => ({ ...q, [vendorId]: rem }));
       }
       return next;
     });
+    setDetailVendorId(vendorId);
   };
 
-  const handleQtyChange = (idx: number, val: number) => {
-    setAllocations(prev => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], qty: Math.max(1, val) };
-      return next;
-    });
+  const handleQtyChange = (vendorId: string, val: number) => {
+    const n = Math.max(0, val);
+    setRowQtys(prev => ({ ...prev, [vendorId]: n }));
+    if (n > 0 && !checkedSet.has(vendorId)) {
+      setCheckedSet(prev => new Set([...prev, vendorId]));
+    }
   };
 
-  const handleAllocationVendorChange = (idx: number, vendorId: string) => {
-    setAllocations(prev => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], vendorId };
-      return next;
-    });
-  };
+  const selectedComps = comparisons.filter(c => checkedSet.has(c.vendorId));
+  const totalAllocated = selectedComps.reduce((s, c) => s + (rowQtys[c.vendorId] || 0), 0);
 
   const buildMeta = (vendorId: string) => {
     const c = comparisons.find(x => x.vendorId === vendorId);
@@ -209,8 +204,8 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
       vendorId,
       vendorName: c?.vendorName || vendorId,
       unitPrice: c?.landedCostPerUnit || 0,
-      location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : vendorId,
-      gstin: v?.taxId || v?.pan || "",
+      location: v ? `${v.city || ""}, ${v.state || ""}`.replace(/^,\s*/, "").replace(/,\s*$/, "") : "",
+      gstin: v?.taxId || (v as any)?.pan || "",
       contact: v?.primaryContact || "",
       email: v?.email || "",
       phone: v?.phone || "",
@@ -223,242 +218,296 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   };
 
   const handleConfirm = () => {
-    if (allocations.length === 0) return;
-    const allocationData = allocations.map(a => ({ vendorId: a.vendorId, qty: a.qty, meta: buildMeta(a.vendorId) }));
-    onSelect(sub.id, allocationData);
+    const allocs = selectedComps
+      .map(c => ({ vendorId: c.vendorId, qty: rowQtys[c.vendorId] || 0, meta: buildMeta(c.vendorId) }))
+      .filter(a => a.qty > 0);
+    if (allocs.length === 0) return;
+    onSelect(sub.id, allocs);
     onClose();
   };
 
-  const primaryVendorId = allocations[0]?.vendorId;
-  const primaryComp = comparisons.find(c => c.vendorId === primaryVendorId);
-  const primaryVendorInfo = primaryComp ? getVendorById(primaryComp.vendorId) : undefined;
+  const detailComp = comparisons.find(c => c.vendorId === detailVendorId);
+  const detailVendorInfo = detailVendorId ? getVendorById(detailVendorId) : undefined;
+  const canConfirm = selectedComps.length > 0 && totalAllocated > 0;
 
-  const TABLE_COLS = "28px 24px 1fr 80px 70px 100px 80px 90px 90px";
+  // 13-column grid: cb | # | Vendor | Price | Stock | LeadTime | Rating | OnTime | PayTerms | MOQ | AllocQty | Total | chevron
+  const GRID = "36px 32px 1fr 100px 88px 110px 62px 72px 106px 66px 106px 98px 28px";
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "hsl(var(--card))", borderRadius: 14, width: 980, boxShadow: "0 12px 48px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "94vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.48)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 1080, boxShadow: "0 20px 60px rgba(0,0,0,0.28)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
 
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid hsl(var(--border))" }}>
+        {/* ── Header ── */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "18px 24px 14px", borderBottom: "1px solid #e5e7eb" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "hsl(var(--foreground))" }}>Vendor Selection — {sub.id} ({sub.itemName})</div>
-            <div style={{ fontSize: 12.5, color: "hsl(var(--muted-foreground))", marginTop: 3 }}>Top recommended vendors from Price Engine · ranked by lowest price. Split across multiple vendors if stock is insufficient.</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", display: "flex", alignItems: "center", gap: 10 }}>
+              Vendor Selection
+              <span style={{ color: "#d1d5db", fontWeight: 300, fontSize: 18 }}>|</span>
+              <span style={{ fontWeight: 500, color: "#374151", fontSize: 14 }}>{sub.id} ({sub.itemName})</span>
+            </div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 4 }}>Compare vendors and allocate quantity to get the best value for your order.</div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "hsl(var(--muted-foreground))", lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1, padding: 0, marginTop: 2 }}>×</button>
         </div>
 
-        {/* Required info bar */}
-        <div style={{ padding: "12px 22px", display: "flex", gap: 32, background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
-          <div style={{ fontSize: 13.5 }}>Required Qty : <b style={{ color: "#111827" }}>{sub.qty} Nos</b></div>
-          <div style={{ fontSize: 13.5 }}>Required Date : <b style={{ color: "#111827" }}>{sub.requiredDate}</b></div>
-          {sub.productCode && <div style={{ fontSize: 13.5, color: "#6b7280" }}>Product Code : <b style={{ color: "#374151" }}>{sub.productCode}</b></div>}
+        {/* ── Info bar — 4 stat cards ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderBottom: "1px solid #e5e7eb" }}>
+          {[
+            { icon: "📋", label: "Required Qty", value: `${sub.qty} Nos` },
+            { icon: "📅", label: "Required Date", value: sub.requiredDate },
+            { icon: "🏷", label: "Product Code", value: sub.productCode || "—" },
+            { icon: "🔖", label: "HSN Code", value: "—" },
+          ].map((card, i) => (
+            <div key={i} style={{ padding: "14px 20px", borderRight: i < 3 ? "1px solid #e5e7eb" : "none", display: "flex", alignItems: "center", gap: 12, background: "#fafafa" }}>
+              <span style={{ fontSize: 22 }}>{card.icon}</span>
+              <div>
+                <div style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, marginBottom: 3 }}>{card.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>{card.value}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div style={{ overflow: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ overflow: "auto", flex: 1 }}>
           {/* ── Vendor comparison table ── */}
-          <div style={{ padding: "14px 22px 0" }}>
-            {comparisons.length === 0 ? (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
-                <div style={{ fontSize: 26, marginBottom: 8 }}>🏪</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No vendor pricing data found</div>
-                <div style={{ fontSize: 13, marginTop: 4 }}>Add this product to a vendor's catalog, then configure the Price Engine.</div>
-              </div>
-            ) : (
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden" }}>
-                {/* Table header */}
-                <div style={{ display: "grid", gridTemplateColumns: TABLE_COLS, padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
-                  {["", "#", "Vendor", "Score", "Rating", "Lead Time", "Stock", "Unit Cost", "Total Cost"].map(h => <div key={h}>{h}</div>)}
-                </div>
-                {comparisons.map((c, i) => {
-                  const isPrimary = primaryVendorId === c.vendorId;
-                  const isInAlloc = usedIds.has(c.vendorId);
-                  const stock = getVendorStock(c.vendorId);
-                  const stockOk = stock === null || stock >= sub.qty;
-                  const scorePct = Math.round(c.score);
-                  return (
-                    <div
-                      key={c.vendorId}
-                      onClick={() => handlePickPrimary(c.vendorId)}
-                      style={{ display: "grid", gridTemplateColumns: TABLE_COLS, padding: "12px", alignItems: "center", borderBottom: i < comparisons.length - 1 ? "1px solid #f3f4f6" : "none", background: isPrimary ? "#eff6ff" : isInAlloc ? "#f0fdf4" : "#fff", cursor: "pointer" }}
-                    >
-                      {/* Radio */}
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${isPrimary ? "#2563eb" : isInAlloc ? "#16a34a" : "#d1d5db"}`, background: isPrimary ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {isPrimary && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff" }} />}
-                          {!isPrimary && isInAlloc && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#16a34a" }} />}
-                        </div>
-                      </div>
-                      {/* Rank */}
-                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fef9c3" : "#f3f4f6", color: i === 0 ? "#92400e" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>{i + 1}</div>
-                      {/* Vendor */}
-                      <div style={{ fontWeight: isPrimary ? 600 : 400, fontSize: 13.5, color: "#111827" }}>
-                        {c.vendorName}
-                        {i === 0 && <span style={{ marginLeft: 8, fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Recommended</span>}
-                        {isInAlloc && !isPrimary && <span style={{ marginLeft: 8, fontSize: 10, background: "#dcfce7", color: "#166534", border: "1px solid #86efac", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Added</span>}
-                      </div>
-                      {/* Score */}
-                      <div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ flex: 1, height: 6, borderRadius: 3, background: "#e5e7eb", overflow: "hidden" }}>
-                            <div style={{ height: "100%", width: `${scorePct}%`, background: scorePct >= 70 ? "#16a34a" : scorePct >= 50 ? "#f59e0b" : "#dc2626", borderRadius: 3 }} />
-                          </div>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#374151", minWidth: 28 }}>{scorePct}</span>
-                        </div>
-                      </div>
-                      <div><StarRating rating={c.rating} /></div>
-                      <div style={{ fontSize: 13, color: "#374151" }}>{c.leadTime} day{c.leadTime !== 1 ? "s" : ""}</div>
-                      {/* Stock */}
-                      <div>
-                        {stock === null
-                          ? <span style={{ fontSize: 12, color: "#9ca3af" }}>—</span>
-                          : <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fef2f2", color: stockOk ? "#166534" : "#991b1b", border: `1px solid ${stockOk ? "#bbf7d0" : "#fecaca"}` }}>
-                              {stock} Nos
-                            </span>
-                        }
-                      </div>
-                      <div style={{ fontSize: 13, color: "#374151" }}>{fmt(c.landedCostPerUnit)}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(c.landedCostPerUnit * sub.qty)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* ── Vendor Allocation section ── */}
-          {allocations.length > 0 && (
-            <div style={{ margin: "16px 22px 0", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-              {/* Section header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <div>
-                  <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>Vendor Allocation</span>
-                  <span style={{ marginLeft: 12, fontSize: 12.5, color: remaining > 0 ? "#dc2626" : remaining < 0 ? "#d97706" : "#16a34a", fontWeight: 600 }}>
-                    {remaining > 0 ? `${remaining} units unallocated` : remaining < 0 ? `Over-allocated by ${-remaining} units` : `✓ Fully allocated (${sub.qty} Nos)`}
-                  </span>
-                </div>
-                {unusedComparisons.length > 0 && (
-                  <button
-                    onClick={handleAddVendor}
-                    style={{ padding: "6px 14px", border: "1px solid #2563eb", borderRadius: 7, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontWeight: 600, fontSize: 12.5, fontFamily: "inherit" }}
-                  >
-                    + Add Another Vendor
-                  </button>
-                )}
+          {comparisons.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+              <div style={{ fontSize: 26, marginBottom: 8 }}>🏪</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No vendor pricing data found</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>Add this product to a vendor's catalog, then configure the Price Engine.</div>
+            </div>
+          ) : (
+            <div style={{ minWidth: 960 }}>
+              {/* Group-header row */}
+              <div style={{ display: "grid", gridTemplateColumns: GRID, background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#374151", textAlign: "center" }}>
+                <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }} />
+                <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }}>#</div>
+                <div style={{ padding: "9px 12px", textAlign: "left", borderRight: "1px solid #e5e7eb" }}>Vendor</div>
+                <div style={{ padding: "9px 6px", background: "#fffbeb", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Price Summary (₹)</div>
+                <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Availability &amp; Delivery</div>
+                <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#f0fdf4", color: "#15803d", borderRight: "1px solid #e5e7eb" }}>Vendor Performance</div>
+                <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#faf5ff", color: "#7e22ce", borderRight: "1px solid #e5e7eb" }}>Commercial Terms</div>
+                <div style={{ padding: "9px 6px", borderRight: "1px solid #e5e7eb" }}>Allocate Qty</div>
+                <div style={{ padding: "9px 6px" }}>Total Cost (₹)</div>
+                <div />
               </div>
 
-              {/* Allocation rows — fixed vendor cards, no dropdown */}
-              {allocations.map((alloc, idx) => {
-                const comp = comparisons.find(c => c.vendorId === alloc.vendorId);
-                const stock = getVendorStock(alloc.vendorId);
-                const stockOk = stock === null || stock >= alloc.qty;
-                const isPrimary = idx === 0;
-                const accent = isPrimary ? "#2563eb" : "#16a34a";
-                const bgRow   = isPrimary ? "#f0f7ff" : "#f6fef9";
-                const borderRow = isPrimary ? "#bfdbfe" : "#bbf7d0";
+              {/* Sub-header row */}
+              <div style={{ display: "grid", gridTemplateColumns: GRID, background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 10.5, fontWeight: 600, color: "#6b7280", textAlign: "center" }}>
+                <div style={{ padding: "6px 0" }} />
+                <div style={{ padding: "6px 0" }} />
+                <div style={{ padding: "6px 12px", textAlign: "left" }} />
+                <div style={{ padding: "6px 4px", background: "#fffef5" }}>Client Selling Price<br />(Per Unit)</div>
+                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Available<br />Stock</div>
+                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Lead Time<br />(Dispatch + Transit)</div>
+                <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>Rating</div>
+                <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>On-Time<br />Delivery</div>
+                <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>Payment Terms</div>
+                <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>MOQ</div>
+                <div style={{ padding: "6px 4px" }} />
+                <div style={{ padding: "6px 4px" }} />
+                <div />
+              </div>
+
+              {/* Data rows */}
+              {comparisons.map((c, i) => {
+                const isChecked = checkedSet.has(c.vendorId);
+                const stock = getVendorStock(c.vendorId);
+                const stockOk = stock === null || stock >= sub.qty;
+                const qty = rowQtys[c.vendorId] || 0;
+                const moqVal = c.moq || 0;
+                const moqOk = qty === 0 || qty >= moqVal;
+                const lt = splitLT(c.leadTime);
+                const lineTotal = c.landedCostPerUnit * qty;
+                const isLowest = i === 0;
+
                 return (
-                  <div key={idx} style={{ padding: "14px 18px", borderBottom: idx < allocations.length - 1 ? "1px solid #e5e7eb" : "none", background: bgRow, borderLeft: `4px solid ${accent}` }}>
-                    {/* Vendor identity row */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      {/* Number badge */}
-                      <div style={{ width: 28, height: 28, borderRadius: "50%", background: accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                        {idx + 1}
+                  <div
+                    key={c.vendorId}
+                    onClick={() => setDetailVendorId(c.vendorId)}
+                    style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", borderBottom: "1px solid #f0f0f0", background: isChecked ? "#eff6ff" : "#fff", cursor: "pointer" }}
+                  >
+                    {/* Checkbox */}
+                    <div style={{ display: "flex", justifyContent: "center", padding: "14px 0" }} onClick={e => { e.stopPropagation(); handleToggleCheck(c.vendorId); }}>
+                      <div style={{ width: 18, height: 18, border: `2px solid ${isChecked ? "#2563eb" : "#d1d5db"}`, borderRadius: 4, background: isChecked ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                        {isChecked && <span style={{ color: "#fff", fontSize: 11, fontWeight: 800, lineHeight: 1 }}>✓</span>}
                       </div>
-                      {/* Vendor name + meta */}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>
-                          {comp?.vendorName || alloc.vendorId}
-                          {isPrimary && <span style={{ marginLeft: 8, fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>Primary</span>}
-                        </div>
-                        {comp && (
-                          <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 2 }}>
-                            Unit Cost: <b style={{ color: "#374151" }}>{fmt(comp.landedCostPerUnit)}</b>
-                            &nbsp;·&nbsp;Lead Time: <b style={{ color: "#374151" }}>{comp.leadTime} day{comp.leadTime !== 1 ? "s" : ""}</b>
-                          </div>
-                        )}
-                      </div>
-                      {/* Stock badge */}
-                      <div style={{ flexShrink: 0, textAlign: "right" }}>
-                        {stock === null
-                          ? <span style={{ fontSize: 12, color: "#9ca3af" }}>Stock: —</span>
-                          : <span style={{ display: "inline-block", padding: "3px 12px", borderRadius: 10, fontSize: 12, fontWeight: 600,
-                              background: stockOk ? "#f0fdf4" : "#fef2f2",
-                              color:      stockOk ? "#166534" : "#991b1b",
-                              border:     `1px solid ${stockOk ? "#bbf7d0" : "#fecaca"}` }}>
-                              Stock: {stock} Nos
-                            </span>
-                        }
-                        {!stockOk && stock !== null && (
-                          <div style={{ fontSize: 10.5, color: "#dc2626", marginTop: 3 }}>⚠ Insufficient — add another vendor</div>
-                        )}
-                      </div>
-                      {/* Remove button */}
-                      {allocations.length > 1 && (
-                        <button
-                          onClick={() => handleRemoveAllocation(idx)}
-                          title="Remove this vendor"
-                          style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", flexShrink: 0 }}
-                        >×</button>
-                      )}
                     </div>
-                    {/* Qty + Line total row */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 20, paddingLeft: 38 }}>
-                      <div>
-                        <div style={{ fontSize: 10.5, color: "#6b7280", marginBottom: 3, fontWeight: 600, letterSpacing: 0.3 }}>ORDER QTY</div>
+
+                    {/* # badge */}
+                    <div style={{ display: "flex", justifyContent: "center" }}>
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", background: isLowest ? "#fef9c3" : "#f3f4f6", color: isLowest ? "#92400e" : "#6b7280", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>{i + 1}</div>
+                    </div>
+
+                    {/* Vendor name */}
+                    <div style={{ padding: "14px 12px" }}>
+                      <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{c.vendorName}</div>
+                      <div style={{ display: "flex", gap: 5, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+                        {isLowest && <span style={{ fontSize: 10, background: "#fef9c3", color: "#92400e", border: "1px solid #fcd34d", borderRadius: 8, padding: "1px 7px", fontWeight: 600 }}>Recommended</span>}
+                        {isLowest && <span style={{ fontSize: 10.5, color: "#2563eb", fontWeight: 500 }}>Lowest Client Price</span>}
+                      </div>
+                    </div>
+
+                    {/* Client Selling Price */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
+                    </div>
+
+                    {/* Available Stock */}
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
+                        {stock === null ? "—" : `${stock} Nos`}
+                      </span>
+                    </div>
+
+                    {/* Lead Time */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t} Days</div>
+                      <div style={{ fontSize: 11, color: "#6b7280" }}>({lt.total} Days)</div>
+                    </div>
+
+                    {/* Rating */}
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: "#111827" }}>{c.rating.toFixed(1)}</span>
+                      <span style={{ color: "#f59e0b", marginLeft: 3 }}>★</span>
+                    </div>
+
+                    {/* On-Time Delivery */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{onTimePct(c)}%</div>
+                    </div>
+
+                    {/* Payment Terms */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 12, color: "#374151" }}>{c.paymentTerms || "—"}</div>
+                    </div>
+
+                    {/* MOQ */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal} Nos` : "—"}</div>
+                    </div>
+
+                    {/* Allocate Qty — stepper input */}
+                    <div style={{ padding: "10px 8px" }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: "flex", alignItems: "center", border: "1px solid #d1d5db", borderRadius: 6, overflow: "hidden", background: "#fff" }}>
                         <input
                           type="number"
-                          min={1}
-                          value={alloc.qty}
-                          onChange={e => handleQtyChange(idx, parseInt(e.target.value) || 1)}
-                          style={{ width: 90, padding: "6px 10px", border: `1px solid ${borderRow}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", textAlign: "center", background: "#fff" }}
+                          min={0}
+                          value={qty}
+                          onChange={e => handleQtyChange(c.vendorId, parseInt(e.target.value) || 0)}
+                          style={{ flex: 1, width: 0, border: "none", outline: "none", textAlign: "center", fontSize: 13, fontWeight: 600, padding: "6px 4px", fontFamily: "inherit" }}
                         />
+                        <div style={{ display: "flex", flexDirection: "column", borderLeft: "1px solid #e5e7eb" }}>
+                          <button onClick={() => handleQtyChange(c.vendorId, qty + 1)} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151", borderBottom: "1px solid #e5e7eb" }}>▲</button>
+                          <button onClick={() => handleQtyChange(c.vendorId, Math.max(0, qty - 1))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151" }}>▼</button>
+                        </div>
                       </div>
-                      {comp && (
-                        <div>
-                          <div style={{ fontSize: 10.5, color: "#6b7280", marginBottom: 3, fontWeight: 600, letterSpacing: 0.3 }}>LINE TOTAL</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: accent }}>{fmt(comp.landedCostPerUnit * alloc.qty)}</div>
+                      {isChecked && moqVal > 0 && (
+                        <div style={{ fontSize: 10.5, marginTop: 3, color: moqOk ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
+                          {moqOk ? "✓ Within MOQ" : "▲ Below Required"}
                         </div>
                       )}
                     </div>
+
+                    {/* Total Cost */}
+                    <div style={{ textAlign: "right", paddingRight: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(lineTotal)}</div>
+                    </div>
+
+                    {/* Chevron */}
+                    <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 14 }}>∨</div>
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* Primary vendor details card */}
-          {primaryVendorInfo && (
-            <div style={{ margin: "14px 22px 0", border: "1px solid #e5e7eb", borderRadius: 9, padding: "14px 18px", background: "#fafafa" }}>
-              <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 10 }}>Primary Vendor Details</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 0" }}>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{primaryVendorInfo.name}</div>
-                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>GSTIN : {primaryVendorInfo.taxId || (primaryVendorInfo as any).pan || "—"}</div>
-                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Location : {primaryVendorInfo.city || (primaryVendorInfo as any).address}</div>
-                  <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>Contact : {primaryVendorInfo.primaryContact}</div>
+          {/* ── Selected Vendors summary ── */}
+          {selectedComps.length > 0 && (
+            <div style={{ padding: "16px 20px 0" }}>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#2563eb", marginBottom: 10 }}>Selected Vendors</div>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 1fr 130px", padding: "8px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.3 }}>
+                  {["#", "Vendor", "Allocate Qty", "Client Selling Price (Per Unit)", "Total Cost (₹)"].map(h => <div key={h}>{h}</div>)}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                  <div style={{ fontSize: 12.5, color: "#374151" }}>Rating : <b>{primaryVendorInfo.rating.toFixed(1)} / 5</b></div>
-                  <div style={{ fontSize: 12.5, color: "#374151" }}>Category : <b>{primaryVendorInfo.category}</b></div>
-                  {primaryComp && <div style={{ fontSize: 12.5, color: "#374151" }}>MOQ : <b>{primaryComp.moq} units</b></div>}
-                  {primaryComp && <div style={{ fontSize: 12.5, color: "#374151" }}>Payment Terms : <b>{primaryComp.paymentTerms || "—"}</b></div>}
+                {selectedComps.map((c, i) => {
+                  const q = rowQtys[c.vendorId] || 0;
+                  return (
+                    <div key={c.vendorId} style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 1fr 130px", padding: "10px 16px", alignItems: "center", borderBottom: i < selectedComps.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                      <div style={{ fontSize: 12.5, color: "#6b7280" }}>{i + 1}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{c.vendorName}</div>
+                      <div style={{ fontSize: 13, color: "#374151" }}>{q} Nos</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(c.landedCostPerUnit * q)}</div>
+                    </div>
+                  );
+                })}
+                {/* Total row */}
+                <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 1fr 130px", padding: "10px 16px", background: "#f9fafb", borderTop: "2px solid #e5e7eb" }}>
+                  <div />
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>Total</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{totalAllocated} Nos</div>
+                  <div />
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
+                    {fmt(selectedComps.reduce((s, c) => s + c.landedCostPerUnit * (rowQtys[c.vendorId] || 0), 0))}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          <div style={{ height: 16 }} />
+          {/* ── Vendor Details ── */}
+          {detailVendorInfo && (
+            <div style={{ padding: "14px 20px" }}>
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "14px 18px" }}>
+                <div style={{ fontSize: 11.5, color: "#6b7280", fontWeight: 600, letterSpacing: 0.5, marginBottom: 6 }}>Vendor Details</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#111827", marginBottom: 10 }}>{detailVendorInfo.name}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 40px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {[
+                      ["GSTIN", detailVendorInfo.taxId || (detailVendorInfo as any).pan || "—"],
+                      ["Location", detailVendorInfo.city || "—"],
+                      ["Contact", detailVendorInfo.primaryContact || "—"],
+                    ].map(([k, v]) => (
+                      <div key={k} style={{ fontSize: 12.5, color: "#374151", display: "flex", gap: 6 }}>
+                        <span style={{ minWidth: 56, color: "#6b7280" }}>{k}</span>
+                        <span>:</span>
+                        <span style={{ color: "#111827" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {[
+                      ["Rating", `${detailVendorInfo.rating.toFixed(1)} / 5`],
+                      ["Category", detailVendorInfo.category || "—"],
+                      ["MOQ", detailComp ? `${detailComp.moq} units` : "—"],
+                      ["Payment Terms", detailComp?.paymentTerms || "—"],
+                    ].map(([k, v]) => (
+                      <div key={k} style={{ fontSize: 12.5, color: "#374151", display: "flex", gap: 6 }}>
+                        <span style={{ minWidth: 90, color: "#6b7280" }}>{k}</span>
+                        <span>:</span>
+                        <span style={{ color: "#111827", fontWeight: k === "Category" || k === "Payment Terms" ? 600 : 400 }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 22px 18px", borderTop: "1px solid hsl(var(--border))" }}>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>
-            {allocations.length > 1 && <span>Split across <b>{allocations.length} vendors</b> · {allocations.length} POs will be created</span>}
-          </div>
+        {/* ── Footer ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 24px", borderTop: "1px solid #e5e7eb" }}>
+          <button
+            onClick={onClose}
+            style={{ padding: "9px 26px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
+          >
+            Cancel
+          </button>
           <button
             onClick={handleConfirm}
-            disabled={allocations.length === 0}
-            style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: allocations.length > 0 ? "#2563eb" : "#93c5fd", color: "#fff", cursor: allocations.length > 0 ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+            disabled={!canConfirm}
+            style={{ padding: "10px 30px", border: "none", borderRadius: 8, background: canConfirm ? "#2563eb" : "#93c5fd", color: "#fff", cursor: canConfirm ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
           >
             Confirm Selection
           </button>
