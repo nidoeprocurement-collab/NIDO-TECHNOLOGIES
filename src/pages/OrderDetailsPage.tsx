@@ -153,11 +153,8 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Full vendor capacity: live stock + everything the shop has reserved across all
-  // active orders for this product from this vendor. This restores the original
-  // stock as entered in vendor product assignment, independent of shop deductions.
-  const getVendorStock = (c: VendorComparisonRow): number =>
-    getFullVendorStock(c.vendorId, sub.productCode, c.stock);
+  // Use the stock value exactly as entered in vendor product assignment.
+  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -594,14 +591,13 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 // ── Vendor Selection Tab ──────────────────────────────────────────────────────
 function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, onOpenModal }) {
   // Returns [{vendorId, vendorName, stock}] per vendor for this product.
-  // Uses getFullVendorStock so shop deductions are reversed and the original
-  // vendor capacity is shown — same stock management logic as the shop page.
+  // Use the stock value exactly as entered in vendor product assignment.
   const getVendorStockBreakdown = (productCode: string) => {
     if (!productCode) return [];
     return computeVendorComparisons(productCode).map(c => ({
       vendorId: c.vendorId,
       vendorName: c.vendorName,
-      stock: getFullVendorStock(c.vendorId, productCode, c.stock),
+      stock: c.stock,
     }));
   };
 
