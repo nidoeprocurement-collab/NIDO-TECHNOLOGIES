@@ -1,5 +1,12 @@
 // Stock Engine — reserves and releases vendor stock as items move in and out of the cart.
 //
+// Enterprise Stock Flow:
+//   • reserveStock / releaseStock / releasePartial / reserveExtra all operate on
+//     reservedStock only — the physical currentStock (stock field) is NOT touched.
+//   • currentStock is only reduced when a Purchase Order is raised, via consumeStockForPO().
+//   • Available stock = currentStock − reservedStock — this is what the shop shows clients.
+//   • Cancellations before a PO automatically restore available stock (reservedStock drops).
+//
 // Strategy: cheapest vendor fills first (same order as the price engine's vendor ranking).
 // When releasing a partial reduction, we give stock back to the most-expensive vendor
 // first (reverse order) so the cheap vendor's stock is consumed last and released last.
@@ -8,7 +15,7 @@
 // so every listener (CartPage vendorMatchMap, ShopPage product list) sees fresh numbers
 // after each cart action.
 
-import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
+import { getAllVendorProducts, updateVendorProduct, getAvailableStock } from './vendorStore';
 import { computeVendorComparisons } from './priceEngineStore';
 
 export interface StockAllocation {
@@ -22,9 +29,12 @@ export interface StockAllocation {
 // ─── Reserve ─────────────────────────────────────────────────────────────────
 
 /**
- * Reserve `qty` units for `masterProductCode` by deducting from vendor stocks
- * cheapest-first.  Returns the allocation list to store on the CartItem so the
- * exact same units can be released later.
+ * Reserve `qty` units for `masterProductCode` by incrementing reservedStock on
+ * vendors cheapest-first. Does NOT reduce currentStock (stock field) — that only
+ * happens when a PO is raised via consumeStockForPO().
+ *
+ * Returns the allocation list to store on the CartItem so the exact same units
+ * can be released later.
  *
  * If total available stock < qty (partial fill), reserves only what's available
  * and returns the partial allocation.
@@ -55,11 +65,16 @@ export function reserveStock(
     );
     if (!match) continue;
 
-    const available = parseInt(match.stock) || 0;
+    // Use availableStock (current − reserved) to determine how much can be reserved.
+    const available = getAvailableStock(match);
     if (available <= 0) continue;
 
     const take = Math.min(remaining, available);
-    updateVendorProduct(comp.vendorId, match.id, { stock: String(available - take) });
+    const newReserved = (parseInt(match.reservedStock || '0') || 0) + take;
+    updateVendorProduct(comp.vendorId, match.id, {
+      reservedStock: String(newReserved),
+      lastStockUpdate: new Date().toISOString(),
+    });
 
     allocations.push({
       vendorId: comp.vendorId,
@@ -76,8 +91,9 @@ export function reserveStock(
 // ─── Release (full) ──────────────────────────────────────────────────────────
 
 /**
- * Return all units in `allocations` back to their vendors.
- * Call this when an item is removed from the cart or the cart is cleared.
+ * Return all units in `allocations` back to their vendors by decrementing
+ * reservedStock. Call this when an item is removed from the cart, the cart is
+ * cleared, or an order is cancelled before a PO has been raised.
  */
 export function releaseStock(allocations: StockAllocation[]): void {
   if (!allocations?.length) return;
@@ -89,9 +105,10 @@ export function releaseStock(allocations: StockAllocation[]): void {
     const match = vendorProducts.find(p => p.id === alloc.vendorProductId);
     if (!match) continue;
 
-    const current = parseInt(match.stock) || 0;
+    const reserved = parseInt(match.reservedStock || '0') || 0;
     updateVendorProduct(alloc.vendorId, alloc.vendorProductId, {
-      stock: String(current + alloc.allocated),
+      reservedStock: String(Math.max(0, reserved - alloc.allocated)),
+      lastStockUpdate: new Date().toISOString(),
     });
   }
 }
@@ -100,7 +117,8 @@ export function releaseStock(allocations: StockAllocation[]): void {
 
 /**
  * Release `qtyToRelease` units back to vendors from an existing allocation,
- * starting from the most-expensive vendor (end of the list).
+ * starting from the most-expensive vendor (end of the list), by decrementing
+ * reservedStock.
  *
  * Returns the updated allocation (with reduced allocated values).
  */
@@ -123,9 +141,10 @@ export function releasePartial(
     const vendorProducts = storeMap[alloc.vendorId] || [];
     const match = vendorProducts.find(p => p.id === alloc.vendorProductId);
     if (match) {
-      const current = parseInt(match.stock) || 0;
+      const reserved = parseInt(match.reservedStock || '0') || 0;
       updateVendorProduct(alloc.vendorId, alloc.vendorProductId, {
-        stock: String(current + toReturn),
+        reservedStock: String(Math.max(0, reserved - toReturn)),
+        lastStockUpdate: new Date().toISOString(),
       });
     }
 
@@ -163,4 +182,38 @@ export function reserveExtra(
     }
   }
   return merged;
+}
+
+// ─── Consume for PO ──────────────────────────────────────────────────────────
+
+/**
+ * Called when a Purchase Order is raised. Reduces the vendor's physical
+ * currentStock (stock) AND releases the corresponding reservedStock, so the
+ * net effect on availableStock is zero — the product simply moves from
+ * "reserved" to "physically consumed by PO".
+ *
+ * allocations: array of { vendorId, masterProductCode, qty } for each PO line.
+ */
+export function consumeStockForPO(
+  allocations: Array<{ vendorId: string; masterProductCode: string; qty: number }>,
+): void {
+  const storeMap = getAllVendorProducts();
+
+  for (const { vendorId, masterProductCode, qty } of allocations) {
+    if (qty <= 0) continue;
+    const vendorProducts = storeMap[vendorId] || [];
+    const match = vendorProducts.find(
+      p => p.masterProductCode === masterProductCode && p.status === 'Active',
+    );
+    if (!match) continue;
+
+    const currentStock = parseInt(match.stock || '0') || 0;
+    const reservedStock = parseInt(match.reservedStock || '0') || 0;
+
+    updateVendorProduct(vendorId, match.id, {
+      stock: String(Math.max(0, currentStock - qty)),
+      reservedStock: String(Math.max(0, reservedStock - qty)),
+      lastStockUpdate: new Date().toISOString(),
+    });
+  }
 }

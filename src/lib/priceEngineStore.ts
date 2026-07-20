@@ -9,7 +9,7 @@
 // changes in Tax Settings flow through immediately to all price calculations.
 
 import { getCatalogProducts } from './catalogStore';
-import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
+import { getAllVendorProducts, updateVendorProduct, getAvailableStock } from './vendorStore';
 import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
 import { getClientCatalog, saveClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
@@ -408,7 +408,14 @@ export interface VendorComparisonRow {
   basePrice: number;
   moq: number;
   leadTime: number;
+  /** Available stock = currentStock − reservedStock. This is what clients see in the shop. */
   stock: number;
+  /** Physical stock held by vendor (only reduced when a PO is raised). */
+  currentStock: number;
+  /** Units reserved by client orders not yet converted to a PO. */
+  reservedStock: number;
+  /** Incoming / on-order stock. */
+  incomingStock: number;
   rating: number;
   paymentTerms: string;
   landedCostPerUnit: number;
@@ -427,6 +434,9 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
     const rawTerms = info?.paymentTerms || '';
     const basePrice = parseFloat(match.price) || 0;
     const vendorSettings = getVendorCommonSettings(vendorId);
+    const currentStock = parseInt(match.stock || '0') || 0;
+    const reservedStock = parseInt(match.reservedStock || '0') || 0;
+    const availableStock = getAvailableStock(match);
     rows.push({
       vendorId,
       vendorName: info?.name || vendorId,
@@ -434,7 +444,11 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
-      stock: parseInt(match.stock) || 0,
+      /** stock = availableStock (what clients/shop see) */
+      stock: availableStock,
+      currentStock,
+      reservedStock,
+      incomingStock: parseInt(match.incomingStock || '0') || 0,
       rating: info?.rating || 0,
       paymentTerms: TERMS_MAP[rawTerms] || rawTerms || '—',
       // Pass category to Tax Engine for accurate, category-specific vendor tax rates

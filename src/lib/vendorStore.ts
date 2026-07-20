@@ -12,10 +12,27 @@ export interface VendorProduct {
   price: string;
   moq: string;
   leadTime: string;
+  /** Physical stock at vendor (currentStock). Only reduced when a PO is raised. */
   stock: string;
+  /** Units reserved by client orders not yet converted to a PO. */
+  reservedStock: string;
+  /** Incoming / on-order stock (informational). */
+  incomingStock: string;
+  /** ISO timestamp of the last stock update. */
+  lastStockUpdate: string;
   vendorProductCode: string;
   addedAt: string;
   status: 'Active' | 'Inactive';
+}
+
+/**
+ * Available stock = currentStock − reservedStock.
+ * This is what the client shop should display.
+ */
+export function getAvailableStock(product: VendorProduct): number {
+  const current = parseInt(product.stock || '0') || 0;
+  const reserved = parseInt(product.reservedStock || '0') || 0;
+  return Math.max(0, current - reserved);
 }
 
 type Store = Record<string, VendorProduct[]>;

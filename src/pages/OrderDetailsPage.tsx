@@ -11,7 +11,7 @@ import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
-import { releaseStock } from "@/lib/stockEngine";
+import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -188,6 +188,33 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     selectedVendorId || comparisons[0]?.vendorId || ""
   );
 
+  // ── Auto Allocate ─────────────────────────────────────────────────────────
+  const handleAutoAllocate = () => {
+    // Sort vendors by score descending (highest score fills first)
+    const sorted = [...comparisons].sort((a, b) => b.score - a.score);
+    const newQtys: Record<string, number> = {};
+    const newChecked = new Set<string>();
+    let remaining = sub.qty;
+
+    for (const c of sorted) {
+      if (remaining <= 0) break;
+      const avail = c.stock; // c.stock = availableStock
+      if (avail <= 0) continue;
+      const take = Math.min(remaining, avail);
+      newQtys[c.vendorId] = take;
+      newChecked.add(c.vendorId);
+      remaining -= take;
+    }
+
+    // Zero out vendors not allocated
+    for (const c of comparisons) {
+      if (!newQtys[c.vendorId]) newQtys[c.vendorId] = 0;
+    }
+
+    setRowQtys(newQtys);
+    setCheckedSet(newChecked);
+  };
+
   const handleToggleCheck = (vendorId: string) => {
     setCheckedSet(prev => {
       const next = new Set(prev);
@@ -256,8 +283,8 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const detailVendorInfo = detailVendorId ? getVendorById(detailVendorId) : undefined;
   const canConfirm = selectedComps.length > 0 && totalAllocated === sub.qty;
 
-  // 13-column grid: cb | # | Vendor | Price | Stock | LeadTime | Rating | OnTime | PayTerms | MOQ | AllocQty | Total | chevron
-  const GRID = "36px 32px 1fr 100px 88px 110px 62px 72px 106px 66px 106px 98px 28px";
+  // 15-column grid: cb | # | Vendor | Price | Current | Reserved | Available | LeadTime | Rating | OnTime | PayTerms | MOQ | Score | AllocQty | Total
+  const GRID = "36px 32px 1fr 100px 72px 72px 72px 110px 62px 72px 106px 56px 60px 106px 90px";
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.48)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
@@ -327,13 +354,13 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                 <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }} />
                 <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }}>#</div>
                 <div style={{ padding: "9px 12px", textAlign: "left", borderRight: "1px solid #e5e7eb" }}>Vendor</div>
-                <div style={{ padding: "9px 6px", background: "#fffbeb", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Price Summary (₹)</div>
-                <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Availability &amp; Delivery</div>
+                <div style={{ padding: "9px 6px", background: "#fffbeb", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Price (₹)</div>
+                <div style={{ padding: "9px 6px", gridColumn: "span 4", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Stock Breakdown &amp; Delivery</div>
                 <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#f0fdf4", color: "#15803d", borderRight: "1px solid #e5e7eb" }}>Vendor Performance</div>
                 <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#faf5ff", color: "#7e22ce", borderRight: "1px solid #e5e7eb" }}>Commercial Terms</div>
+                <div style={{ padding: "9px 6px", background: "#fef3c7", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Score</div>
                 <div style={{ padding: "9px 6px", borderRight: "1px solid #e5e7eb" }}>Allocate Qty</div>
-                <div style={{ padding: "9px 6px" }}>Total Cost (₹)</div>
-                <div />
+                <div style={{ padding: "9px 6px" }}>Total (₹)</div>
               </div>
 
               {/* Sub-header row */}
@@ -341,16 +368,18 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                 <div style={{ padding: "6px 0" }} />
                 <div style={{ padding: "6px 0" }} />
                 <div style={{ padding: "6px 12px", textAlign: "left" }} />
-                <div style={{ padding: "6px 4px", background: "#fffef5" }}>Client Selling Price<br />(Per Unit)</div>
-                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Available<br />Stock</div>
+                <div style={{ padding: "6px 4px", background: "#fffef5" }}>Client Price<br />(Per Unit)</div>
+                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Current<br />Stock</div>
+                <div style={{ padding: "6px 4px", background: "#fff7ed", color: "#c2410c" }}>Already<br />Reserved</div>
+                <div style={{ padding: "6px 4px", background: "#f0fdf4", color: "#166534" }}>Available<br />Stock</div>
                 <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Lead Time<br />(Dispatch + Transit)</div>
                 <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>Rating</div>
                 <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>On-Time<br />Delivery</div>
                 <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>Payment Terms</div>
                 <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>MOQ</div>
+                <div style={{ padding: "6px 4px", background: "#fef9c3" }} />
                 <div style={{ padding: "6px 4px" }} />
                 <div style={{ padding: "6px 4px" }} />
-                <div />
               </div>
 
               {/* Data rows */}
@@ -397,16 +426,28 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
                     </div>
 
+                    {/* Current Stock */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{c.currentStock}</div>
+                      <div style={{ fontSize: 10, color: "#9ca3af" }}>Physical</div>
+                    </div>
+
+                    {/* Already Reserved */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: c.reservedStock > 0 ? "#c2410c" : "#6b7280" }}>{c.reservedStock}</div>
+                      <div style={{ fontSize: 10, color: "#9ca3af" }}>Reserved</div>
+                    </div>
+
                     {/* Available Stock */}
                     <div style={{ textAlign: "center" }}>
-                      <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
-                        {`${stock} Nos`}
+                      <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
+                        {stock}
                       </span>
                     </div>
 
                     {/* Lead Time */}
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t} Days</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t}d</div>
                       <div style={{ fontSize: 11, color: "#6b7280" }}>({lt.total} Days)</div>
                     </div>
 
@@ -428,11 +469,18 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
                     {/* MOQ */}
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal} Nos` : "—"}</div>
+                      <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal}` : "—"}</div>
+                    </div>
+
+                    {/* Score */}
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#fef9c3", color: "#92400e" }}>
+                        {Math.round(c.score)}
+                      </span>
                     </div>
 
                     {/* Allocate Qty — stepper input capped to vendor available stock */}
-                    <div style={{ padding: "10px 8px" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ padding: "10px 6px" }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: "flex", alignItems: "center", border: `1px solid ${qty > stock ? "#f87171" : "#d1d5db"}`, borderRadius: 6, overflow: "hidden", background: "#fff" }}>
                         <input
                           type="number"
@@ -447,23 +495,16 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                           <button onClick={() => handleQtyChange(c.vendorId, Math.max(0, qty - 1))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151" }}>▼</button>
                         </div>
                       </div>
-                      <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", flexDirection: "column", gap: 1 }}>
-                        <span style={{ color: "#9ca3af" }}>Max: {stock} Nos</span>
-                        {isChecked && moqVal > 0 && (
-                          <span style={{ color: moqOk ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
-                            {moqOk ? "✓ Within MOQ" : "▲ Below Required"}
-                          </span>
-                        )}
-                      </div>
+                      <div style={{ fontSize: 10, marginTop: 3, color: "#9ca3af" }}>Max: {stock}</div>
+                      {isChecked && moqVal > 0 && !moqOk && (
+                        <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 600 }}>▲ Below MOQ</div>
+                      )}
                     </div>
 
                     {/* Total Cost */}
                     <div style={{ textAlign: "right", paddingRight: 8 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(lineTotal)}</div>
                     </div>
-
-                    {/* Chevron */}
-                    <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 14 }}>∨</div>
                   </div>
                 );
               })}
@@ -551,6 +592,15 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
             style={{ padding: "9px 26px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
           >
             Cancel
+          </button>
+
+          {/* Auto Allocate button */}
+          <button
+            onClick={handleAutoAllocate}
+            title="Fills quantities automatically: highest-scored vendor fills first, then next, until the required qty is met."
+            style={{ padding: "9px 20px", border: "1px solid #7c3aed", borderRadius: 8, background: "#f5f3ff", color: "#7c3aed", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+          >
+            ⚡ Auto Allocate
           </button>
 
           {/* Allocation progress */}
@@ -1931,6 +1981,16 @@ export default function MyOrderPage() {
       }
 
       savePO(po);
+
+      // Reduce vendor currentStock and reservedStock now that a PO has been raised.
+      // This is the only point where physical stock is actually consumed.
+      consumeStockForPO(
+        lines.map(({ sub, qty }) => ({
+          vendorId,
+          masterProductCode: sub.productCode,
+          qty,
+        }))
+      );
 
       for (const { sub } of lines) {
         const li = lineItems.find(x => x.subOrderId === sub.id)!;
