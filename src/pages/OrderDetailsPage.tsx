@@ -154,7 +154,10 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   }, [sub.productCode]);
 
   // Use the stock value exactly as entered in vendor product assignment.
-  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
+  // getFullVendorStock adds back all quantities reserved by active orders so we
+  // see the original assigned capacity, not the post-reservation live stock.
+  const getVendorStock = (c: VendorComparisonRow): number =>
+    getFullVendorStock(c.vendorId, sub.productCode, c.stock);
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
