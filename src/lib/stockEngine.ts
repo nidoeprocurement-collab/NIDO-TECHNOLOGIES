@@ -1,14 +1,15 @@
-// Stock Engine — reserves and releases vendor stock as items move in and out of the cart.
+// Stock Engine — computes vendor allocation records for cart items.
 //
-// Strategy: cheapest vendor fills first (same order as the price engine's vendor ranking).
-// When releasing a partial reduction, we give stock back to the most-expensive vendor
-// first (reverse order) so the cheap vendor's stock is consumed last and released last.
+// Stock is NO LONGER deducted when items enter the cart.  Vendor stock is only
+// modified when a Purchase Order is raised (deducted) or cancelled (restored).
+// This means the stock shown on the Shop page and in Vendor Selection always
+// reflects the vendor's true available quantity, reduced only by confirmed POs.
 //
-// All mutations go through updateVendorProduct → writeStore → fires 'vendorProductsUpdated'
-// so every listener (CartPage vendorMatchMap, ShopPage product list) sees fresh numbers
-// after each cart action.
+// reserveStock / releaseStock / releasePartial are kept for API compatibility
+// (they still compute allocation records the order-details flow depends on)
+// but they no longer mutate the vendorStore stock field.
 
-import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
+import { getAllVendorProducts } from './vendorStore';
 import { computeVendorComparisons } from './priceEngineStore';
 
 export interface StockAllocation {
@@ -36,8 +37,9 @@ export function reserveStock(
 ): StockAllocation[] {
   if (qty <= 0) return [];
 
-  // Re-read live vendor products at call time (not cached) so we see the
-  // latest stock numbers even if another call just updated them.
+  // Read live vendor products to compute which vendors cover this qty.
+  // NOTE: we intentionally do NOT deduct from vendor stock here.
+  // Stock is only deducted when a PO is raised (see OrderDetailsPage handleRaisePOs).
   const storeMap = getAllVendorProducts();
 
   // Vendor comparisons sorted cheapest-first — defines fill order.
@@ -59,7 +61,7 @@ export function reserveStock(
     if (available <= 0) continue;
 
     const take = Math.min(remaining, available);
-    updateVendorProduct(comp.vendorId, match.id, { stock: String(available - take) });
+    // Stock field is NOT modified here — deduction happens at PO creation.
 
     allocations.push({
       vendorId: comp.vendorId,
@@ -76,24 +78,11 @@ export function reserveStock(
 // ─── Release (full) ──────────────────────────────────────────────────────────
 
 /**
- * Return all units in `allocations` back to their vendors.
- * Call this when an item is removed from the cart or the cart is cleared.
+ * No-op: stock is no longer reserved at cart time, so there is nothing to
+ * release.  Kept for API compatibility with CartContext / MyOrdersContext.
  */
-export function releaseStock(allocations: StockAllocation[]): void {
-  if (!allocations?.length) return;
-
-  const storeMap = getAllVendorProducts();
-
-  for (const alloc of allocations) {
-    const vendorProducts = storeMap[alloc.vendorId] || [];
-    const match = vendorProducts.find(p => p.id === alloc.vendorProductId);
-    if (!match) continue;
-
-    const current = parseInt(match.stock) || 0;
-    updateVendorProduct(alloc.vendorId, alloc.vendorProductId, {
-      stock: String(current + alloc.allocated),
-    });
-  }
+export function releaseStock(_allocations: StockAllocation[]): void {
+  // Intentional no-op — vendor stock is only modified at PO raise / cancel.
 }
 
 // ─── Release (partial) ───────────────────────────────────────────────────────
@@ -110,8 +99,8 @@ export function releasePartial(
 ): StockAllocation[] {
   if (qtyToRelease <= 0 || !allocations?.length) return allocations;
 
-  const storeMap = getAllVendorProducts();
-  // Work on a copy; release from most-expensive (last) vendor first.
+  // Work on a copy; adjust allocated counts from most-expensive (last) vendor first.
+  // NOTE: vendor stock field is NOT modified — only the allocation records are updated.
   const updated = allocations.map(a => ({ ...a }));
   let remaining = qtyToRelease;
 
@@ -119,16 +108,6 @@ export function releasePartial(
     const alloc = updated[i];
     const toReturn = Math.min(remaining, alloc.allocated);
     if (toReturn <= 0) continue;
-
-    const vendorProducts = storeMap[alloc.vendorId] || [];
-    const match = vendorProducts.find(p => p.id === alloc.vendorProductId);
-    if (match) {
-      const current = parseInt(match.stock) || 0;
-      updateVendorProduct(alloc.vendorId, alloc.vendorProductId, {
-        stock: String(current + toReturn),
-      });
-    }
-
     alloc.allocated -= toReturn;
     remaining -= toReturn;
   }

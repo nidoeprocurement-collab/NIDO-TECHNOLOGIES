@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllVendorProducts, updateVendorProduct } from "@/lib/vendorStore";
 import { downloadPOPdf } from "@/lib/generatePO";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -1083,7 +1084,26 @@ export default function VendorOrderDetailPage() {
       {showCancelPO && (
         <CancelPOModal
           poNumber={initialData.poNumber}
-          onConfirm={() => { setCancelled(true); setOrderStatus("Cancelled"); }}
+          onConfirm={() => {
+            // Restore vendor stock for all line items on this PO
+            const po = getPOByNumber(poKey);
+            if (po) {
+              const storeMap = getAllVendorProducts();
+              const vendorProducts = storeMap[po.vendorId] || [];
+              for (const li of (po.items || [])) {
+                if (!li.productCode) continue;
+                const match = vendorProducts.find(
+                  p => p.masterProductCode === li.productCode && p.status === 'Active'
+                );
+                if (match) {
+                  const current = parseInt(match.stock) || 0;
+                  updateVendorProduct(po.vendorId, match.id, { stock: String(current + li.qty) });
+                }
+              }
+            }
+            setCancelled(true);
+            setOrderStatus("Cancelled");
+          }}
           onClose={() => setShowCancelPO(false)}
         />
       )}

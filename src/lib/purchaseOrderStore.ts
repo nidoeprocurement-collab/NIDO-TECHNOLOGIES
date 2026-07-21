@@ -38,6 +38,8 @@ export interface POLineItem {
   subOrderId: string;
   item: string;
   sku: string;
+  /** Master product code — used to deduct / restore vendor stock when PO is raised / cancelled */
+  productCode?: string;
   category: string;
   hsnCode: string;
   specs: string[];

@@ -11,7 +11,7 @@ import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
-import { releaseStock } from "@/lib/stockEngine";
+import { getAllVendorProducts, updateVendorProduct } from "@/lib/vendorStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -153,11 +153,9 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
     return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // Use the stock value exactly as entered in vendor product assignment.
-  // getFullVendorStock adds back all quantities reserved by active orders so we
-  // see the original assigned capacity, not the post-reservation live stock.
-  const getVendorStock = (c: VendorComparisonRow): number =>
-    getFullVendorStock(c.vendorId, sub.productCode, c.stock);
+  // Stock is now only deducted when a PO is raised, so c.stock is the vendor's
+  // true available quantity (assigned stock minus raised-PO quantities).
+  const getVendorStock = (c: VendorComparisonRow): number => c.stock;
 
   const fmt = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1662,16 +1660,11 @@ export default function MyOrderPage() {
   const [showStatusDd, setShowStatusDd] = useState(false);
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
 
-  // Cancels the order: releases all reserved stock back to vendors, then marks
-  // the master order as Cancelled (which cascades to all sub-orders via context).
+  // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
+  // Stock is no longer reserved at cart time, so no stock release is needed here.
+  // Stock restoration (if any POs were already raised) is handled when the PO itself
+  // is cancelled from the Vendor Orders page.
   const handleCancelOrder = () => {
-    if (order?.cartItems?.length) {
-      for (const item of order.cartItems) {
-        if (item.vendorAllocations?.length) {
-          releaseStock(item.vendorAllocations);
-        }
-      }
-    }
     setMasterStatus("Cancelled");
   };
   // Per-item overrides (status, tracking) are persisted separately from the
@@ -1859,6 +1852,7 @@ export default function MyOrderPage() {
           subOrderId: sub.id,
           item: sub.itemName,
           sku: sub.sku,
+          productCode: sub.productCode || "",
           category: sub.category,
           hsnCode: "",
           specs: sub.specs,
@@ -1934,6 +1928,26 @@ export default function MyOrderPage() {
       }
 
       savePO(po);
+
+      // Deduct vendor stock now that the PO is raised.
+      // This is the single point where vendor stock decreases.
+      {
+        const storeMap = getAllVendorProducts();
+        for (const { sub, qty: lineQty } of lines) {
+          if (!sub.productCode) continue;
+          const vendorProducts = storeMap[vendorId] || [];
+          const match = vendorProducts.find(
+            p => p.masterProductCode === sub.productCode && p.status === 'Active'
+          );
+          if (match) {
+            const current = parseInt(match.stock) || 0;
+            const updated = Math.max(0, current - lineQty);
+            updateVendorProduct(vendorId, match.id, { stock: String(updated) });
+            // Refresh so subsequent iterations in the same PO see the new value
+            storeMap[vendorId] = (getAllVendorProducts())[vendorId] || [];
+          }
+        }
+      }
 
       for (const { sub } of lines) {
         const li = lineItems.find(x => x.subOrderId === sub.id)!;
