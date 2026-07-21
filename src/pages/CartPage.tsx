@@ -73,9 +73,6 @@ function QtyInput({
           <Plus size={12} />
         </button>
       </div>
-      {max !== undefined && max > 0 && (
-        <p className="text-[10px] text-gray-400 pl-1">Max: {max.toLocaleString("en-IN")}</p>
-      )}
     </div>
   );
 }
