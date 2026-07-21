@@ -919,55 +919,77 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
               const totalQty = pi.allocations.reduce((s, a) => s + a.qty, 0);
               const estTotal = pi.allocations.reduce((s, a) => s + a.unitPrice * a.qty, 0);
               const primaryAlloc = pi.allocations[0];
+              const VENDOR_COLORS = ["#2563eb", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
               return (
                 <div key={pi.sub.id} style={{ borderBottom: idx < pendingItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "14px 20px", alignItems: "start" }}>
-                    {/* Item */}
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}</div>
-                      {pi.sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{pi.sub.category}</div>}
-                    </div>
-                    {/* Vendor(s) */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      {isMulti
-                        ? pi.allocations.map((a, ai) => (
-                          <div key={ai} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: ai === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                              {(a.vendorName[0] || "V").toUpperCase()}
+                  {isMulti ? (
+                    /* ── Multi-vendor: item header + one sub-row per vendor ── */
+                    <>
+                      {/* Item header */}
+                      <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "12px 20px 8px", alignItems: "start", borderBottom: "1px dashed #f3f4f6" }}>
+                        <div style={{ gridColumn: "1 / 3" }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}{pi.sub.category ? ` · ${pi.sub.category}` : ""}</div>
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{totalQty} Nos</div>
+                        <div style={{ fontSize: 11.5, color: "#6b7280" }}>Split across {pi.allocations.length} vendors</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>{fmtINR(estTotal)}</div>
+                      </div>
+                      {/* Per-vendor sub-rows */}
+                      {pi.allocations.map((a, ai) => {
+                        const vendorColor = VENDOR_COLORS[ai % VENDOR_COLORS.length];
+                        const lineTotal = a.unitPrice * a.qty;
+                        return (
+                          <div key={ai} style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "9px 20px 9px 32px", alignItems: "center", background: ai % 2 === 0 ? "#fafafa" : "#fff", borderBottom: ai < pi.allocations.length - 1 ? "1px dashed #f3f4f6" : "none" }}>
+                            {/* Item sub-label */}
+                            <div style={{ fontSize: 11, color: "#9ca3af" }}>└ Vendor {ai + 1}</div>
+                            {/* Vendor */}
+                            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                              <div style={{ width: 22, height: 22, borderRadius: "50%", background: vendorColor, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                {(a.vendorName[0] || "V").toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{a.vendorName}</div>
+                                {a.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{a.location}</div>}
+                              </div>
                             </div>
-                            <div>
-                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{a.vendorName}</div>
-                              <div style={{ fontSize: 11, color: "#6b7280" }}>{a.qty} Nos</div>
-                            </div>
+                            {/* Qty for this vendor */}
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{a.qty} Nos</div>
+                            {/* Unit price */}
+                            <div style={{ fontSize: 13, color: "#374151" }}>{fmtINR(a.unitPrice)}</div>
+                            {/* Est. total for this vendor */}
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{fmtINR(lineTotal)}</div>
                           </div>
-                        ))
-                        : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                              {(primaryAlloc.vendorName[0] || "V").toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{primaryAlloc.vendorName}</div>
-                              {primaryAlloc.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{primaryAlloc.location}</div>}
-                            </div>
-                          </div>
-                        )
-                      }
-                      {isMulti && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{pi.allocations.length} vendors · {pi.allocations.length} POs will be raised</div>}
+                        );
+                      })}
+                    </>
+                  ) : (
+                    /* ── Single vendor: original grid row ── */
+                    <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "14px 20px", alignItems: "start" }}>
+                      {/* Item */}
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
+                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}</div>
+                        {pi.sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{pi.sub.category}</div>}
+                      </div>
+                      {/* Vendor */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                          {(primaryAlloc.vendorName[0] || "V").toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{primaryAlloc.vendorName}</div>
+                          {primaryAlloc.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{primaryAlloc.location}</div>}
+                        </div>
+                      </div>
+                      {/* Ordered Qty */}
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", paddingTop: 2 }}>{totalQty} Nos</div>
+                      {/* Unit Price */}
+                      <div style={{ fontSize: 13, color: "#374151", paddingTop: 2 }}>{fmtINR(primaryAlloc.unitPrice)}</div>
+                      {/* Est. Total */}
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827", paddingTop: 2 }}>{fmtINR(estTotal)}</div>
                     </div>
-                    {/* Ordered Qty */}
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", paddingTop: 2 }}>{totalQty} Nos</div>
-                    {/* Unit Price */}
-                    <div style={{ fontSize: 13, color: "#374151", paddingTop: 2 }}>
-                      {isMulti
-                        ? <span style={{ fontSize: 12, color: "#6b7280" }}>Split</span>
-                        : fmtINR(primaryAlloc.unitPrice)
-                      }
-                    </div>
-                    {/* Est. Total */}
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827", paddingTop: 2 }}>{fmtINR(estTotal)}</div>
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -2225,6 +2247,8 @@ export default function MyOrderPage() {
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
+                  const subAllocs = vendorAllocations?.[sub.id];
+                  const isMultiVendor = subAllocs && subAllocs.length > 1;
                   return (
                     <div key={sub.id} style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
@@ -2285,13 +2309,32 @@ export default function MyOrderPage() {
                             </div>
                           ) : selVendor ? (
                             <div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                  {(selVendor.name?.[0] || "V").toUpperCase()}
+                              {isMultiVendor ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                                  {subAllocs.map((a: any, ai: number) => (
+                                    <div key={ai} style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
+                                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: ai === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>
+                                        {(a.meta?.vendorName?.[0] || "V").toUpperCase()}
+                                      </div>
+                                      <div>
+                                        <div style={{ fontSize: 11.5, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{a.meta?.vendorName || a.vendorId}</div>
+                                        <div style={{ fontSize: 10.5, color: "#6b7280" }}>{a.qty} Nos</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0, textAlign: "left" }}>Change ›</button>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
-                              </div>
-                              <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                              ) : (
+                                <div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                      {(selVendor.name?.[0] || "V").toUpperCase()}
+                                    </div>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
+                                  </div>
+                                  <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <button
