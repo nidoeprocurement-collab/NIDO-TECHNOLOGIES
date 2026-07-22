@@ -239,9 +239,18 @@ export function releaseVendorReservation(
 }
 
 /**
- * Deduct `qty` units from physicalStock AND reservedStock when a PO is raised.
- * This is the ONLY point where physical inventory actually decreases.
- * Available stock (physical − reserved) does not change because both drop equally.
+ * Deduct `qty` units of physicalStock from the PO vendor, and release `qty`
+ * units of reservedStock from whichever vendor(s) actually hold the reservation.
+ *
+ * Why cross-vendor release?  The checkout reservation is placed on the cheapest
+ * vendor at cart time.  The admin may later select a *different* vendor when
+ * raising the PO.  If we only released the reservation on the PO vendor, and
+ * that vendor held 0 reserved, the total reserved would stay unchanged while
+ * total physical dropped — so available would fall incorrectly.
+ *
+ * By scanning all vendors and releasing exactly `qty` of reserved (greedily,
+ * largest reservation first), totalPhysical − totalReserved stays the same
+ * before and after the PO, keeping the shop display unchanged.
  */
 export function deductPhysicalStock(
   vendorId: string,
@@ -250,20 +259,51 @@ export function deductPhysicalStock(
   reference = 'PO Raised',
 ): void {
   if (qty <= 0) return;
+
+  // ── 1. Deduct physicalStock from the PO vendor ────────────────────────────
   const products = getVendorProducts(vendorId);
   const product = products.find(
     p => p.masterProductCode === masterProductCode && p.status === 'Active',
   );
   if (!product) return;
   const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
-  const reserved = parseInt(product.reservedStock ?? '0') || 0;
   const newPhysical = Math.max(0, physical - qty);
-  const newReserved = Math.max(0, reserved - qty);
+  // Only update physicalStock here; reservedStock is released cross-vendor below.
   updateVendorProduct(vendorId, product.id, {
     physicalStock: String(newPhysical),
     stock: String(newPhysical),
-    reservedStock: String(newReserved),
   }, true);
+
+  // ── 2. Release `qty` of reservedStock across all vendors ──────────────────
+  // Scan all vendors that hold reserved stock for this product and release
+  // up to `qty` total, greedy (most-reserved vendor first), so the total
+  // reserved drops by exactly qty regardless of which vendor supplied the PO.
+  let toRelease = qty;
+  const store = getAllVendorProducts();
+  // Sort vendors: most reserved first so we drain large reservations first.
+  const vendorEntries = Object.entries(store)
+    .map(([vId, vProducts]) => ({
+      vId,
+      vp: vProducts.find(
+        p => p.masterProductCode === masterProductCode && p.status === 'Active',
+      ),
+    }))
+    .filter((e): e is { vId: string; vp: VendorProduct } => !!e.vp)
+    .sort((a, b) => {
+      const ra = parseInt(a.vp.reservedStock ?? '0') || 0;
+      const rb = parseInt(b.vp.reservedStock ?? '0') || 0;
+      return rb - ra; // descending
+    });
+
+  for (const { vId, vp } of vendorEntries) {
+    if (toRelease <= 0) break;
+    const reserved = parseInt(vp.reservedStock ?? '0') || 0;
+    if (reserved <= 0) continue;
+    const release = Math.min(reserved, toRelease);
+    updateVendorProduct(vId, vp.id, { reservedStock: String(reserved - release) }, true);
+    toRelease -= release;
+  }
+
   recordStockEvent({
     masterProductCode,
     productName: product.productName,
@@ -280,8 +320,12 @@ export function deductPhysicalStock(
 }
 
 /**
- * Restore `qty` units to physicalStock when a PO is cancelled.
- * reservedStock is NOT changed — the reservation was already cleared at PO creation.
+ * Restore `qty` units to physicalStock AND reservedStock on the PO vendor
+ * when a PO is cancelled.
+ *
+ * Both physical and reserved are restored to the PO vendor so that
+ * totalPhysical − totalReserved (= available stock) stays the same before
+ * and after the cancellation, matching the state just before the PO was raised.
  */
 export function restorePhysicalStock(
   vendorId: string,
@@ -294,10 +338,15 @@ export function restorePhysicalStock(
   const product = products.find(p => p.masterProductCode === masterProductCode);
   if (!product) return;
   const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+  const reserved = parseInt(product.reservedStock ?? '0') || 0;
   const newPhysical = physical + qty;
+  // Restore reserved on the PO vendor so available = totalPhysical − totalReserved
+  // remains unchanged through the cancel (mirrors the cross-vendor release done at raise).
+  const newReserved = reserved + qty;
   updateVendorProduct(vendorId, product.id, {
     physicalStock: String(newPhysical),
     stock: String(newPhysical),
+    reservedStock: String(newReserved),
   }, true);
   recordStockEvent({
     masterProductCode,
@@ -305,7 +354,7 @@ export function restorePhysicalStock(
     vendorId,
     vendorName: getVendorById(vendorId)?.name || vendorId,
     action: 'PO Cancelled',
-    field: 'physicalStock',
+    field: 'both',
     qtyBefore: physical,
     qtyChanged: qty,
     qtyAfter: newPhysical,
