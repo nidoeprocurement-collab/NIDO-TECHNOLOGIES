@@ -11,7 +11,7 @@ import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
-import { getAllVendorProducts, updateVendorProduct } from "@/lib/vendorStore";
+import { deductPhysicalStock, restorePhysicalStock } from "@/lib/vendorStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -1951,29 +1951,18 @@ export default function MyOrderPage() {
 
       savePO(po);
 
-      // Deduct vendor stock now that the PO is raised.
-      // This is the single point where vendor stock decreases.
-      {
-        const storeMap = getAllVendorProducts();
-        for (const { sub, qty: lineQty } of lines) {
-          if (!sub.productCode) continue;
-          const vendorProducts = storeMap[vendorId] || [];
-          const match = vendorProducts.find(
-            p => p.masterProductCode === sub.productCode && p.status === 'Active'
-          );
-          if (match) {
-            const current = parseInt(match.stock) || 0;
-            const updated = Math.max(0, current - lineQty);
-            updateVendorProduct(vendorId, match.id, { stock: String(updated) });
-            // Refresh so subsequent iterations in the same PO see the new value
-            storeMap[vendorId] = (getAllVendorProducts())[vendorId] || [];
-          }
-        }
+      // Deduct physicalStock AND release reservedStock now that the PO is raised.
+      // This is the ONLY point where physical inventory decreases.
+      // Available stock (physical − reserved) stays the same because both drop equally,
+      // so the shop display does not change at this moment (reservation already did that).
+      for (const { sub, qty: lineQty } of lines) {
+        if (!sub.productCode) continue;
+        deductPhysicalStock(vendorId, sub.productCode, lineQty);
       }
 
       for (const { sub } of lines) {
         const li = lineItems.find(x => x.subOrderId === sub.id)!;
-        newPOs[sub.id] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
+        newPOs[sub.id] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, productCode: sub.productCode, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
       }
     }
 
@@ -1983,6 +1972,12 @@ export default function MyOrderPage() {
   };
 
   const handleCancelPO = (subId: string) => {
+    // Restore physicalStock so vendor inventory returns to its pre-PO level.
+    // reservedStock is NOT touched — it was already cleared when the PO was raised.
+    const po = createdPOs[subId];
+    if (po?.vendorId && po?.productCode && po?.qty > 0) {
+      restorePhysicalStock(po.vendorId, po.productCode, po.qty);
+    }
     setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendors(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendorMeta(prev => { const n = { ...prev }; delete n[subId]; return n; });

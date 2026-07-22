@@ -9,7 +9,7 @@
 // changes in Tax Settings flow through immediately to all price calculations.
 
 import { getCatalogProducts } from './catalogStore';
-import { getAllVendorProducts, updateVendorProduct } from './vendorStore';
+import { getAllVendorProducts, updateVendorProduct, getAvailableStock } from './vendorStore';
 import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
 import { getClientCatalog, saveClientCatalog, updateClientCatalogProductPrice } from './clientCatalogStore';
@@ -434,7 +434,7 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
-      stock: parseInt(match.stock) || 0,
+      stock: getAvailableStock(match),
       rating: info?.rating || 0,
       paymentTerms: TERMS_MAP[rawTerms] || rawTerms || '—',
       // Pass category to Tax Engine for accurate, category-specific vendor tax rates

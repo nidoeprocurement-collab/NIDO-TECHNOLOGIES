@@ -9,7 +9,7 @@
 // (they still compute allocation records the order-details flow depends on)
 // but they no longer mutate the vendorStore stock field.
 
-import { getAllVendorProducts } from './vendorStore';
+import { getAllVendorProducts, getAvailableStock } from './vendorStore';
 import { computeVendorComparisons } from './priceEngineStore';
 
 export interface StockAllocation {
@@ -57,7 +57,7 @@ export function reserveStock(
     );
     if (!match) continue;
 
-    const available = parseInt(match.stock) || 0;
+    const available = getAvailableStock(match);
     if (available <= 0) continue;
 
     const take = Math.min(remaining, available);

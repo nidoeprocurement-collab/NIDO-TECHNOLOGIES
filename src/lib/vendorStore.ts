@@ -12,7 +12,12 @@ export interface VendorProduct {
   price: string;
   moq: string;
   leadTime: string;
+  /** Physical inventory with vendor. Keep in sync with physicalStock. */
   stock: string;
+  /** Actual physical inventory with vendor (source of truth). */
+  physicalStock: string;
+  /** Qty reserved by pending client orders (never manually edited). */
+  reservedStock: string;
   vendorProductCode: string;
   addedAt: string;
   status: 'Active' | 'Inactive';
@@ -20,9 +25,24 @@ export interface VendorProduct {
 
 type Store = Record<string, VendorProduct[]>;
 
+/** Ensure every product has physicalStock / reservedStock populated. */
+function migrateProduct(p: VendorProduct): VendorProduct {
+  if (p.physicalStock !== undefined && p.reservedStock !== undefined) return p;
+  return {
+    ...p,
+    physicalStock: p.physicalStock ?? p.stock ?? '0',
+    reservedStock: p.reservedStock ?? '0',
+  };
+}
+
 function readStore(): Store {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    const migrated: Store = {};
+    for (const [vendorId, products] of Object.entries(raw)) {
+      migrated[vendorId] = (products as VendorProduct[]).map(migrateProduct);
+    }
+    return migrated;
   } catch {
     return {};
   }
@@ -51,10 +71,119 @@ export function addVendorProducts(vendorId: string, newProducts: VendorProduct[]
 }
 
 export function updateVendorProduct(vendorId: string, productId: string, updates: Partial<VendorProduct>): void {
-  const products = getVendorProducts(vendorId).map(p =>
-    p.id === productId ? { ...p, ...updates } : p
-  );
+  const products = getVendorProducts(vendorId).map(p => {
+    if (p.id !== productId) return p;
+    const merged = { ...p, ...updates };
+    // Admin manually edited stock only → sync to physicalStock so both stay in step.
+    if (updates.stock !== undefined && updates.physicalStock === undefined) {
+      merged.physicalStock = updates.stock;
+    }
+    // physicalStock explicitly provided → keep legacy stock field in sync.
+    if (updates.physicalStock !== undefined) {
+      merged.stock = updates.physicalStock;
+    }
+    return merged;
+  });
   saveVendorProducts(vendorId, products);
+}
+
+// ─── Available stock helper ───────────────────────────────────────────────────
+
+/** Available stock = physicalStock − reservedStock (never negative). */
+export function getAvailableStock(product: VendorProduct): number {
+  const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+  const reserved = parseInt(product.reservedStock ?? '0') || 0;
+  return Math.max(0, physical - reserved);
+}
+
+// ─── Enterprise stock reservation functions ──────────────────────────────────
+
+/**
+ * Reserve `qty` units for `masterProductCode` from `vendorId`.
+ * Called when a client places an order (checkout).
+ * Only increases reservedStock — physicalStock is unchanged.
+ */
+export function reserveVendorStock(
+  vendorId: string,
+  masterProductCode: string,
+  qty: number,
+): void {
+  if (qty <= 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(
+    p => p.masterProductCode === masterProductCode && p.status === 'Active',
+  );
+  if (!product) return;
+  const current = parseInt(product.reservedStock ?? '0') || 0;
+  updateVendorProduct(vendorId, product.id, { reservedStock: String(current + qty) });
+}
+
+/**
+ * Release `qty` units of reserved stock for `masterProductCode` from `vendorId`.
+ * Called when an order is cancelled before a PO is raised.
+ * Only decreases reservedStock — physicalStock is unchanged.
+ */
+export function releaseVendorReservation(
+  vendorId: string,
+  masterProductCode: string,
+  qty: number,
+): void {
+  if (qty <= 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(p => p.masterProductCode === masterProductCode);
+  if (!product) return;
+  const current = parseInt(product.reservedStock ?? '0') || 0;
+  updateVendorProduct(vendorId, product.id, {
+    reservedStock: String(Math.max(0, current - qty)),
+  });
+}
+
+/**
+ * Deduct `qty` units from physicalStock AND reservedStock when a PO is raised.
+ * This is the ONLY point where physical inventory actually decreases.
+ * Available stock (physical − reserved) does not change because both drop equally.
+ */
+export function deductPhysicalStock(
+  vendorId: string,
+  masterProductCode: string,
+  qty: number,
+): void {
+  if (qty <= 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(
+    p => p.masterProductCode === masterProductCode && p.status === 'Active',
+  );
+  if (!product) return;
+  const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+  const reserved = parseInt(product.reservedStock ?? '0') || 0;
+  const newPhysical = Math.max(0, physical - qty);
+  const newReserved = Math.max(0, reserved - qty);
+  updateVendorProduct(vendorId, product.id, {
+    physicalStock: String(newPhysical),
+    stock: String(newPhysical),
+    reservedStock: String(newReserved),
+  });
+}
+
+/**
+ * Restore `qty` units to physicalStock when a PO is cancelled.
+ * reservedStock is NOT changed — the reservation was already cleared at PO creation.
+ */
+export function restorePhysicalStock(
+  vendorId: string,
+  masterProductCode: string,
+  qty: number,
+): void {
+  if (qty <= 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(p => p.masterProductCode === masterProductCode);
+  if (!product) return;
+  const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+  const newPhysical = physical + qty;
+  updateVendorProduct(vendorId, product.id, {
+    physicalStock: String(newPhysical),
+    stock: String(newPhysical),
+  });
 }
 
 export function removeVendorProduct(vendorId: string, productId: string): void {

@@ -81,43 +81,9 @@ function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number; totalStock: number };
 
-/**
- * Returns total qty ordered by clients (non-cancelled orders) keyed by productCode.
- */
-function getClientOrderedQtyMap(): Map<string, number> {
-  const map = new Map<string, number>();
-  try {
-    const orders: any[] = JSON.parse(localStorage.getItem("nido_my_orders") || "[]");
-    for (const order of orders) {
-      if (order.status === "Cancelled") continue;
-      for (const item of (order.cartItems || [])) {
-        if (!item.productCode) continue;
-        map.set(item.productCode, (map.get(item.productCode) || 0) + (item.quantity || 0));
-      }
-    }
-  } catch { /* ignore */ }
-  return map;
-}
-
-/**
- * Returns total qty already covered by raised POs (non-cancelled) keyed by productCode.
- * Vendor stock is deducted when a PO is raised, so this qty must NOT be
- * subtracted again from the shop page display stock.
- */
-function getPOdQtyMap(): Map<string, number> {
-  const map = new Map<string, number>();
-  try {
-    const pos: any[] = JSON.parse(localStorage.getItem("nido_all_purchase_orders") || "[]");
-    for (const po of pos) {
-      if (po.status === "Cancelled") continue;
-      for (const item of (po.items || [])) {
-        if (!item.productCode) continue;
-        map.set(item.productCode, (map.get(item.productCode) || 0) + (item.qty || 0));
-      }
-    }
-  } catch { /* ignore */ }
-  return map;
-}
+// getClientOrderedQtyMap and getPOdQtyMap removed — available stock is now
+// calculated directly from physicalStock − reservedStock in vendorStore, so
+// no manual order/PO scanning is needed here.
 
 function getVendorMatchMap(): Map<string, VendorMatch> {
   const map = new Map<string, VendorMatch>();
@@ -669,45 +635,22 @@ export default function ShopPage() {
 
   // Load client catalog whenever selectedClientId changes, merging in the
   // live winning-vendor Lead Time / MOQ from the Vendor Product List for every product.
+  // Available stock is now physicalStock − reservedStock, maintained directly
+  // in vendorStore. No order/PO scanning needed — the vendorProductsUpdated
+  // event fires whenever reservedStock or physicalStock changes.
   const loadClientProducts = () => {
     if (!selectedClientId) { setCatalogProducts([]); return; }
     const entries = getClientCatalog(selectedClientId);
     const vendorMatches = getVendorMatchMap();
-    const orderedQty = getClientOrderedQtyMap();
-    const podQty = getPOdQtyMap();
-    setCatalogProducts(entries.map(e => {
-      const p = entryToProduct(e, vendorMatches);
-      const ordered = orderedQty.get(e.productCode) || 0;
-      const pod     = podQty.get(e.productCode) || 0;
-      // Only subtract qty that clients ordered but no PO has been raised for yet.
-      // Once a PO is raised, vendor stock already dropped — subtracting again would double-count.
-      const pendingReserved = Math.max(0, ordered - pod);
-      if (pendingReserved === 0) return p;
-      const displayStock = Math.max(0, p.totalStock - pendingReserved);
-      return {
-        ...p,
-        totalStock: displayStock,
-        inStock: e.availability !== "Out of Stock" && displayStock > 0,
-      };
-    }));
+    setCatalogProducts(entries.map(e => entryToProduct(e, vendorMatches)));
   };
 
   useEffect(() => {
     loadClientProducts();
     const events = ['clientCatalogUpdated', 'vendorProductsUpdated', 'nidoVendorsUpdated', 'catalogUpdated', 'priceEngineSettingsUpdated'];
     events.forEach(ev => window.addEventListener(ev, loadClientProducts));
-    // Refresh when orders change (cross-tab: storage event; same-tab: custom events)
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "nido_my_orders" || e.key === "nido_all_purchase_orders") loadClientProducts();
-    };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('nidoOrdersUpdated', loadClientProducts);
-    window.addEventListener('poCreated', loadClientProducts);
     return () => {
       events.forEach(ev => window.removeEventListener(ev, loadClientProducts));
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('nidoOrdersUpdated', loadClientProducts);
-      window.removeEventListener('poCreated', loadClientProducts);
     };
   }, [selectedClientId]);
 

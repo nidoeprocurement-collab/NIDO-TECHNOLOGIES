@@ -7,6 +7,7 @@ import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
+import { reserveVendorStock } from "@/lib/vendorStore";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -162,6 +163,17 @@ export default function ReviewPage() {
         vendorAllocations: i.vendorAllocations,
       })) satisfies OrderCartItem[],
     });
+
+    // Reserve stock immediately so the shop shows reduced available qty.
+    // physicalStock stays unchanged; only reservedStock increases.
+    for (const item of itemsSnapshot) {
+      if (!item.productCode) continue;
+      for (const alloc of (item.vendorAllocations || [])) {
+        if (alloc.vendorId && alloc.allocated > 0) {
+          reserveVendorStock(alloc.vendorId, item.productCode, alloc.allocated);
+        }
+      }
+    }
 
     consumeCart();
     navigate(`/shop/order-confirmation/${orderNumber}`, {

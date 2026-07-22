@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
+import { releaseVendorReservation } from "../lib/vendorStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -178,6 +179,20 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
+      // Release reserved stock when an order is cancelled before a PO is raised.
+      // If a PO was already raised for some qty, that qty's reservedStock was
+      // already cleared at PO-creation time, so the Math.max(0, ...) floor in
+      // releaseVendorReservation makes this safe to call unconditionally.
+      if (status === "Cancelled") {
+        for (const item of (target.cartItems || [])) {
+          if (!item.productCode) continue;
+          for (const alloc of (item.vendorAllocations || [])) {
+            if (alloc.vendorId && alloc.allocated > 0) {
+              releaseVendorReservation(alloc.vendorId, item.productCode, alloc.allocated);
+            }
+          }
+        }
+      }
       cascadeStatusToSubOrders(target, status);
       return prev.map((o) => (o.id === orderId ? { ...o, status } : o));
     });
