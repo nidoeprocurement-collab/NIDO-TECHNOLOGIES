@@ -7,6 +7,7 @@ import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
 import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,8 +91,11 @@ function getVendorMatchMap(): Map<string, VendorMatch> {
   getAllProductPricing().forEach(p => {
     const days = p.winningVendor?.leadTime ?? 0;
     const displayDays = days > 0 ? days * 2 : 0;
-    // Sum across ALL vendors so the shop knows the real combined capacity.
-    const totalStock = p.vendorComparisons.reduce((s, r) => s + (r.stock ?? 0), 0);
+    // Use sum(physicalStock) − sum(reservedStock) across all vendors — the
+    // same formula Stock Management uses — so the Shop always shows the
+    // correct available qty even when one vendor's reservation exceeds its
+    // physical stock (per-vendor clamping would over-report in that case).
+    const totalStock = getProductTotalAvailableStock(p.masterProductCode);
     map.set(p.masterProductCode, {
       leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
       moq: p.winningVendor?.moq ?? 0,

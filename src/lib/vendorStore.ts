@@ -134,13 +134,39 @@ export function updateVendorProduct(
   }
 }
 
-// ─── Available stock helper ───────────────────────────────────────────────────
+// ─── Available stock helpers ──────────────────────────────────────────────────
 
 /** Available stock = physicalStock − reservedStock (never negative). */
 export function getAvailableStock(product: VendorProduct): number {
   const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
   const reserved = parseInt(product.reservedStock ?? '0') || 0;
   return Math.max(0, physical - reserved);
+}
+
+/**
+ * Total available stock for a product across ALL vendors.
+ *
+ * Computed as  sum(physicalStock) − sum(reservedStock)  — the same formula
+ * that Stock Management uses for its summary row.  This is intentionally
+ * different from summing per-vendor getAvailableStock(), which clamps each
+ * vendor's value to 0 before adding.  When one vendor has
+ * reservedStock > physicalStock (e.g. reservation placed before a manual
+ * stock-out), the per-vendor sum over-reports available capacity.
+ * Subtracting the totals once gives the correct platform-wide figure.
+ */
+export function getProductTotalAvailableStock(masterProductCode: string): number {
+  const store = getAllVendorProducts();
+  let totalPhysical = 0;
+  let totalReserved = 0;
+  for (const products of Object.values(store)) {
+    for (const p of products) {
+      if (p.masterProductCode === masterProductCode && p.status === 'Active') {
+        totalPhysical += parseInt(p.physicalStock ?? p.stock ?? '0') || 0;
+        totalReserved += parseInt(p.reservedStock ?? '0') || 0;
+      }
+    }
+  }
+  return Math.max(0, totalPhysical - totalReserved);
 }
 
 // ─── Enterprise stock reservation functions ──────────────────────────────────
