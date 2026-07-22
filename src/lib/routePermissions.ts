@@ -57,6 +57,7 @@ export const ROUTE_MODULE_MAP: Array<{ prefix: string; moduleKey: string }> = [
 
   { prefix: '/configuration/master-catalogue', moduleKey: 'master_catalogue' },
   { prefix: '/configuration/nido-users', moduleKey: 'users' },
+  { prefix: '/configuration/stock-management', moduleKey: 'configuration' },
   { prefix: '/configuration', moduleKey: 'configuration' },
 
   { prefix: '/users/departments', moduleKey: 'departments' },

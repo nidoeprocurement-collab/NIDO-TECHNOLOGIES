@@ -12,6 +12,7 @@ import {
   Mail,
   Calculator,
   Gauge,
+  Boxes,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -94,6 +95,12 @@ const menuItems = [
     description: "Centralized SLA Engine — vendor, client, procurement & service SLAs",
     icon: Gauge,
     href: "/configuration/sla-settings",
+  },
+  {
+    title: "Stock Management",
+    description: "Centralized inventory — single source of truth for all vendor stock",
+    icon: Boxes,
+    href: "/configuration/stock-management",
   },
 ];
 

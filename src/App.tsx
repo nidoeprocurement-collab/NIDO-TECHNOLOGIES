@@ -528,6 +528,10 @@ function AppRoutes() {
             element={<SLASettingsPage />}
           />
           <Route
+            path="configuration/stock-management"
+            element={<StockManagementPage />}
+          />
+          <Route
             path="configuration/master-catalogue"
             element={<MasterCataloguePage />}
           />

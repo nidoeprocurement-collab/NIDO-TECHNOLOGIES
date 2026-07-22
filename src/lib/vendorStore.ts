@@ -1,3 +1,6 @@
+import { recordStockEvent } from './stockHistoryStore';
+import { getVendorById } from './vendorDataStore';
+
 const STORE_KEY = 'nido_vendor_products';
 
 export interface VendorProduct {
@@ -24,6 +27,14 @@ export interface VendorProduct {
 }
 
 type Store = Record<string, VendorProduct[]>;
+
+// ─── Current-user helper (for history) ───────────────────────────────────────
+function getCurrentUser(): string {
+  try {
+    const u = JSON.parse(localStorage.getItem('nido_user') || '{}');
+    return u.email || u.name || 'System';
+  } catch { return 'System'; }
+}
 
 /** Ensure every product has physicalStock / reservedStock populated. */
 function migrateProduct(p: VendorProduct): VendorProduct {
@@ -70,8 +81,22 @@ export function addVendorProducts(vendorId: string, newProducts: VendorProduct[]
   saveVendorProducts(vendorId, [...existing, ...toAdd]);
 }
 
-export function updateVendorProduct(vendorId: string, productId: string, updates: Partial<VendorProduct>): void {
-  const products = getVendorProducts(vendorId).map(p => {
+/**
+ * Update one or more fields on a vendor product.
+ * @param _skipHistory  Pass true from named stock-mutation functions so they
+ *                      can record a richer history entry themselves without
+ *                      triggering a duplicate 'Vendor Stock Updated' entry.
+ */
+export function updateVendorProduct(
+  vendorId: string,
+  productId: string,
+  updates: Partial<VendorProduct>,
+  _skipHistory = false,
+): void {
+  const products = getVendorProducts(vendorId);
+  const oldProduct = products.find(p => p.id === productId);
+
+  const newProducts = products.map(p => {
     if (p.id !== productId) return p;
     const merged = { ...p, ...updates };
     // Admin manually edited stock only → sync to physicalStock so both stay in step.
@@ -84,7 +109,29 @@ export function updateVendorProduct(vendorId: string, productId: string, updates
     }
     return merged;
   });
-  saveVendorProducts(vendorId, products);
+
+  saveVendorProducts(vendorId, newProducts);
+
+  // Record history for admin manual stock edits coming from Vendor Products page
+  if (!_skipHistory && oldProduct && (updates.stock !== undefined || updates.physicalStock !== undefined)) {
+    const newPhysical = parseInt(updates.physicalStock ?? updates.stock ?? oldProduct.physicalStock ?? '0') || 0;
+    const oldPhysical = parseInt(oldProduct.physicalStock ?? oldProduct.stock ?? '0') || 0;
+    if (newPhysical !== oldPhysical) {
+      recordStockEvent({
+        masterProductCode: oldProduct.masterProductCode,
+        productName: oldProduct.productName,
+        vendorId,
+        vendorName: getVendorById(vendorId)?.name || vendorId,
+        action: 'Vendor Stock Updated',
+        field: 'physicalStock',
+        qtyBefore: oldPhysical,
+        qtyChanged: newPhysical - oldPhysical,
+        qtyAfter: newPhysical,
+        reference: 'Admin Edit',
+        user: getCurrentUser(),
+      });
+    }
+  }
 }
 
 // ─── Available stock helper ───────────────────────────────────────────────────
@@ -107,6 +154,7 @@ export function reserveVendorStock(
   vendorId: string,
   masterProductCode: string,
   qty: number,
+  reference = 'Order',
 ): void {
   if (qty <= 0) return;
   const products = getVendorProducts(vendorId);
@@ -115,7 +163,20 @@ export function reserveVendorStock(
   );
   if (!product) return;
   const current = parseInt(product.reservedStock ?? '0') || 0;
-  updateVendorProduct(vendorId, product.id, { reservedStock: String(current + qty) });
+  updateVendorProduct(vendorId, product.id, { reservedStock: String(current + qty) }, true);
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: 'Order Reserved',
+    field: 'reservedStock',
+    qtyBefore: current,
+    qtyChanged: qty,
+    qtyAfter: current + qty,
+    reference,
+    user: getCurrentUser(),
+  });
 }
 
 /**
@@ -127,14 +188,27 @@ export function releaseVendorReservation(
   vendorId: string,
   masterProductCode: string,
   qty: number,
+  reference = 'Order Cancelled',
 ): void {
   if (qty <= 0) return;
   const products = getVendorProducts(vendorId);
   const product = products.find(p => p.masterProductCode === masterProductCode);
   if (!product) return;
   const current = parseInt(product.reservedStock ?? '0') || 0;
-  updateVendorProduct(vendorId, product.id, {
-    reservedStock: String(Math.max(0, current - qty)),
+  const newReserved = Math.max(0, current - qty);
+  updateVendorProduct(vendorId, product.id, { reservedStock: String(newReserved) }, true);
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: 'Reservation Released',
+    field: 'reservedStock',
+    qtyBefore: current,
+    qtyChanged: -(current - newReserved),
+    qtyAfter: newReserved,
+    reference,
+    user: getCurrentUser(),
   });
 }
 
@@ -147,6 +221,7 @@ export function deductPhysicalStock(
   vendorId: string,
   masterProductCode: string,
   qty: number,
+  reference = 'PO Raised',
 ): void {
   if (qty <= 0) return;
   const products = getVendorProducts(vendorId);
@@ -162,6 +237,19 @@ export function deductPhysicalStock(
     physicalStock: String(newPhysical),
     stock: String(newPhysical),
     reservedStock: String(newReserved),
+  }, true);
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: 'PO Raised',
+    field: 'both',
+    qtyBefore: physical,
+    qtyChanged: -(physical - newPhysical),
+    qtyAfter: newPhysical,
+    reference,
+    user: getCurrentUser(),
   });
 }
 
@@ -173,6 +261,7 @@ export function restorePhysicalStock(
   vendorId: string,
   masterProductCode: string,
   qty: number,
+  reference = 'PO Cancelled',
 ): void {
   if (qty <= 0) return;
   const products = getVendorProducts(vendorId);
@@ -183,6 +272,68 @@ export function restorePhysicalStock(
   updateVendorProduct(vendorId, product.id, {
     physicalStock: String(newPhysical),
     stock: String(newPhysical),
+  }, true);
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: 'PO Cancelled',
+    field: 'physicalStock',
+    qtyBefore: physical,
+    qtyChanged: qty,
+    qtyAfter: newPhysical,
+    reference,
+    user: getCurrentUser(),
+  });
+}
+
+/**
+ * Manual stock adjustment from the Stock Management module.
+ * Stock In / Stock Out affect physicalStock only (reservedStock is untouched).
+ * Stock Correction sets physicalStock to an exact value.
+ */
+export function manualStockAdjustment(
+  vendorId: string,
+  masterProductCode: string,
+  adjustType: 'Stock In' | 'Stock Out' | 'Stock Correction',
+  qty: number,
+  reference: string,
+): void {
+  if (qty < 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(p => p.masterProductCode === masterProductCode);
+  if (!product) return;
+  const physical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+
+  let newPhysical: number;
+  if (adjustType === 'Stock In') {
+    newPhysical = physical + qty;
+  } else if (adjustType === 'Stock Out') {
+    newPhysical = Math.max(0, physical - qty);
+  } else {
+    // Stock Correction — set to exact value
+    newPhysical = qty;
+  }
+
+  updateVendorProduct(vendorId, product.id, {
+    physicalStock: String(newPhysical),
+    stock: String(newPhysical),
+  }, true);
+
+  const changed = newPhysical - physical;
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: adjustType,
+    field: 'physicalStock',
+    qtyBefore: physical,
+    qtyChanged: changed,
+    qtyAfter: newPhysical,
+    reference,
+    user: getCurrentUser(),
   });
 }
 
