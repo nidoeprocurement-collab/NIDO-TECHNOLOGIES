@@ -205,6 +205,7 @@ const ArchivePage = lazy(() => import("@/pages/ArchivePage"));
 const TicketTrackingPage = lazy(() => import("@/pages/TicketTrackingPage"));
 const PricingDiscountsPage = lazy(() => import("@/pages/PricingDiscountsPage"));
 const MasterCataloguePage = lazy(() => import("@/pages/MasterCataloguePage"));
+const StockManagementPage = lazy(() => import("@/pages/StockManagementPage"));
 const AddMasterCatalogueItemWrapper = lazy(
   () => import("@/pages/AddMasterCatalogueItemWrapper"),
 );
