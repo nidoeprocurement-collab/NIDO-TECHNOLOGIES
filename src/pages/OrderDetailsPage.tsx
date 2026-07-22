@@ -150,14 +150,16 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
 function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
-    // usePhysicalStock=false (default): show available stock (physicalStock −
-    // reservedStock) so the displayed values always match Stock Management —
-    // the single source of truth for all inventory across the platform.
-    return computeVendorComparisons(sub.productCode, undefined, false);
+    // usePhysicalStock=true: the reservation for this order was already created
+    // at checkout time (reserveVendorStock). Showing available stock here would
+    // double-count that reservation and incorrectly cap the admin's allocation.
+    // The admin must see each vendor's full physical stock so they can allocate
+    // the ordered quantity without hitting an artificial limit.
+    return computeVendorComparisons(sub.productCode, undefined, true);
   }, [sub.productCode]);
 
-  // c.stock = availableStock (physicalStock − reservedStock), consistent with
-  // the centralized Stock Management module.
+  // c.stock = physicalStock (not available), because reservations are
+  // already accounted for at order creation; admin allocates against real stock.
   const getVendorStock = (c: VendorComparisonRow): number => c.stock;
 
   const fmt = (n: number) =>
