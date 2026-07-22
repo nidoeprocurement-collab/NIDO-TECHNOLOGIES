@@ -81,6 +81,26 @@ function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number; totalStock: number };
 
+/**
+ * Returns total qty already ordered by clients (across all non-cancelled orders)
+ * keyed by productCode. Used by the shop page to show reduced stock without
+ * touching vendor stock or the vendor selection tab.
+ */
+function getClientOrderedQtyMap(): Map<string, number> {
+  const map = new Map<string, number>();
+  try {
+    const orders: any[] = JSON.parse(localStorage.getItem("nido_my_orders") || "[]");
+    for (const order of orders) {
+      if (order.status === "Cancelled") continue;
+      for (const item of (order.cartItems || [])) {
+        if (!item.productCode) continue;
+        map.set(item.productCode, (map.get(item.productCode) || 0) + (item.quantity || 0));
+      }
+    }
+  } catch { /* ignore parse errors */ }
+  return map;
+}
+
 function getVendorMatchMap(): Map<string, VendorMatch> {
   const map = new Map<string, VendorMatch>();
   getAllProductPricing().forEach(p => {
@@ -635,14 +655,34 @@ export default function ShopPage() {
     if (!selectedClientId) { setCatalogProducts([]); return; }
     const entries = getClientCatalog(selectedClientId);
     const vendorMatches = getVendorMatchMap();
-    setCatalogProducts(entries.map(e => entryToProduct(e, vendorMatches)));
+    const orderedQty = getClientOrderedQtyMap();
+    setCatalogProducts(entries.map(e => {
+      const p = entryToProduct(e, vendorMatches);
+      const reserved = orderedQty.get(e.productCode) || 0;
+      if (reserved === 0) return p;
+      const displayStock = Math.max(0, p.totalStock - reserved);
+      return {
+        ...p,
+        totalStock: displayStock,
+        // Mark out-of-stock when all vendor stock is consumed by existing orders
+        inStock: e.availability !== "Out of Stock" && displayStock > 0,
+      };
+    }));
   };
 
   useEffect(() => {
     loadClientProducts();
     const events = ['clientCatalogUpdated', 'vendorProductsUpdated', 'nidoVendorsUpdated', 'catalogUpdated', 'priceEngineSettingsUpdated'];
     events.forEach(ev => window.addEventListener(ev, loadClientProducts));
-    return () => events.forEach(ev => window.removeEventListener(ev, loadClientProducts));
+    // Refresh when orders change in any tab (storage event) or same tab (custom event)
+    const onStorage = (e: StorageEvent) => { if (e.key === "nido_my_orders") loadClientProducts(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('nidoOrdersUpdated', loadClientProducts);
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, loadClientProducts));
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('nidoOrdersUpdated', loadClientProducts);
+    };
   }, [selectedClientId]);
 
   // Reset page on filter change
