@@ -150,7 +150,10 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
 function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
-    return computeVendorComparisons(sub.productCode).slice(0, 4);
+    // usePhysicalStock=true: show assigned stock from Vendor Products table,
+    // not the post-reservation available qty. Reservations are a shop-page
+    // concern; the admin must see all vendors and their real stock values.
+    return computeVendorComparisons(sub.productCode, undefined, true);
   }, [sub.productCode]);
 
   // Stock is now only deducted when a PO is raised, so c.stock is the vendor's

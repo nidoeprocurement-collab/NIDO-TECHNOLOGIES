@@ -415,7 +415,14 @@ export interface VendorComparisonRow {
   score: number;
 }
 
-export function computeVendorComparisons(masterProductCode: string, productCategory?: string): VendorComparisonRow[] {
+export function computeVendorComparisons(
+  masterProductCode: string,
+  productCategory?: string,
+  /** When true, returns physicalStock (assigned qty) instead of availableStock
+   *  (physicalStock − reservedStock).  Use this in the admin Vendor Selection
+   *  popup so reservations made at checkout do not hide real vendor stock. */
+  usePhysicalStock?: boolean,
+): VendorComparisonRow[] {
   const storeMap = getAllVendorProducts();
   const allVendors = getVendors();
   const rows: VendorComparisonRow[] = [];
@@ -427,6 +434,9 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
     const rawTerms = info?.paymentTerms || '';
     const basePrice = parseFloat(match.price) || 0;
     const vendorSettings = getVendorCommonSettings(vendorId);
+    const stockValue = usePhysicalStock
+      ? (parseInt(match.physicalStock ?? match.stock ?? '0') || 0)
+      : getAvailableStock(match);
     rows.push({
       vendorId,
       vendorName: info?.name || vendorId,
@@ -434,7 +444,7 @@ export function computeVendorComparisons(masterProductCode: string, productCateg
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
-      stock: getAvailableStock(match),
+      stock: stockValue,
       rating: info?.rating || 0,
       paymentTerms: TERMS_MAP[rawTerms] || rawTerms || '—',
       // Pass category to Tax Engine for accurate, category-specific vendor tax rates
