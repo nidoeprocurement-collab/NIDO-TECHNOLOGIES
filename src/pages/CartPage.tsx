@@ -443,15 +443,6 @@ export default function CartPage() {
                             Only {liveRemaining} more available
                           </p>
                         )}
-                        {allocation.length > 1 && (
-                          <div className="mt-2 space-y-0.5">
-                            {allocation.map(a => (
-                              <p key={a.vendorId} className="text-[10px] text-gray-400 leading-tight">
-                                {a.allocated.toLocaleString("en-IN")} × {a.vendorName}
-                              </p>
-                            ))}
-                          </div>
-                        )}
                       </td>
 
                       {/* GST Amount */}
