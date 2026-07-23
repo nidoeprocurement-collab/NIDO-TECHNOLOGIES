@@ -236,6 +236,85 @@ function storedPOToOrder(po: StoredPO): Order {
   };
 }
 
+// ─── Bulk Notes Modal ─────────────────────────────────────────────────────────
+function BulkNotesModal({ selectedCount, onApply, onClose }: {
+  selectedCount: number;
+  onApply: (note: string, visibility: string) => void;
+  onClose: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [visibility, setVisibility] = useState("Internal Note");
+  const visibilityOptions = [
+    { label: "Internal Note", icon: "🔒", sub: "Only visible to internal users" },
+    { label: "External Note", icon: "🌐", sub: "Visible to the client on the portal" },
+  ];
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
+        width: 560, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
+        border: "1px solid hsl(var(--border))",
+      }}>
+        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Notes</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
+          Add a note to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
+        </p>
+
+        {/* Note composer */}
+        <div style={{ border: "1px solid hsl(var(--border))", borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 210px" }}>
+            {/* Left: textarea */}
+            <div style={{ padding: "14px 16px", borderRight: "1px solid hsl(var(--border))" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "hsl(var(--foreground))" }}>Add Note</div>
+              <textarea
+                value={note}
+                onChange={e => { if (e.target.value.length <= 500) setNote(e.target.value); }}
+                placeholder="Write your note here..."
+                rows={4}
+                style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "hsl(var(--foreground))", boxSizing: "border-box", background: "transparent", lineHeight: 1.5 }}
+              />
+              <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 4 }}>{note.length} / 500</div>
+            </div>
+
+            {/* Right: visibility */}
+            <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column" }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: "hsl(var(--foreground))", marginBottom: 12 }}>Visibility</div>
+              {visibilityOptions.map(({ label, icon, sub }) => (
+                <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                  <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "hsl(var(--border))"}`, background: visibility === label ? "#2563eb" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                    {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "hsl(var(--foreground))", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                    <div style={{ fontSize: 11.5, color: "hsl(var(--muted-foreground))", marginTop: 1 }}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
+            background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+          }}>Cancel</button>
+          <button
+            onClick={() => { if (note.trim()) { onApply(note.trim(), visibility); onClose(); } }}
+            disabled={!note.trim()}
+            style={{
+              flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
+              background: note.trim() ? "#2563eb" : "#93c5fd", color: "#fff",
+              cursor: note.trim() ? "pointer" : "not-allowed",
+              fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+            }}>Save Note</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function VendorOrderList() {
   const navigate = useNavigate();
@@ -360,8 +439,7 @@ export default function VendorOrderList() {
     setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false); setBulkCancelReason("");
   };
 
-  const applyBulkNotes = () => {
-    if (!bulkNote.trim()) { toast.show("Please enter a note"); return; }
+  const applyBulkNotes = (note: string, _visibility: string) => {
     if (selected.size === 0) { toast.show("Select at least one order first"); return; }
     toast.show(`Notes added to ${selected.size} order(s)`);
     setNotesModal(false); setBulkNote("");
@@ -460,9 +538,13 @@ export default function VendorOrderList() {
           {(["Draft","Processing","Confirmed","Shipped","Delivered","Closed","Cancelled"] as OrderStatus[]).map(st => <option key={st}>{st}</option>)}
         </select>
       </Modal>
-      <Modal open={notesModal} title="Bulk update notes" onClose={() => setNotesModal(false)} onApply={applyBulkNotes}>
-        <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Enter notes for selected orders..." style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", resize: "vertical", minHeight: 80, background: card, color: fg }} />
-      </Modal>
+      {notesModal && (
+        <BulkNotesModal
+          selectedCount={selected.size}
+          onApply={(note, visibility) => applyBulkNotes(note, visibility)}
+          onClose={() => { setNotesModal(false); setBulkNote(""); }}
+        />
+      )}
 
       {confirmBulkCancel && (
         <div onClick={e => { if (e.target === e.currentTarget) { setConfirmBulkCancel(false); setBulkCancelReason(""); } }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>

@@ -796,9 +796,46 @@ function ViewItemsModal({ group, onClose }) {
   );
 }
 
+// ── Cancel PO Modal (Summary Tab) ─────────────────────────────────────────────
+function CancelPOModal({ poNumber, onConfirm, onClose }: { poNumber: string; onConfirm: (reason: string) => void; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const ok = reason.trim().length > 0;
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#dc2626" }}>Cancel Purchase Order</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+        </div>
+        <div style={{ padding: "20px 22px" }}>
+          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, marginBottom: 16 }}>
+            Are you sure you want to cancel <strong>{poNumber}</strong>? This action cannot be undone and the vendor will be notified.
+          </div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+            Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
+          </label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            placeholder="Enter reason for cancellation..."
+            style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+          />
+          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep PO</button>
+          <button onClick={() => { if (!ok) return; onConfirm(reason.trim()); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: ok ? "#dc2626" : "#fca5a5", color: "#fff", cursor: ok ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit", transition: "background 0.15s" }}>Cancel PO</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Vendor Selected Summary Tab ───────────────────────────────────────────────
 // Simplified: shows ordered qty only. No checkboxes, no stock column, no custom qty input.
 function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMeta, vendorAllocations, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
+  const [cancelPOTarget, setCancelPOTarget] = useState<{ poNumber: string; subOrderId: string } | null>(null);
   const fmtINR = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
   // ── Pending items: vendor selected but PO not yet raised ──
@@ -903,7 +940,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
                 </div>
                 <div>
                   <button
-                    onClick={() => { if (window.confirm(`Cancel ${po.poNumber}? This will remove the PO and allow vendor re-selection.`)) onCancelPO(po.subOrderId); }}
+                    onClick={() => setCancelPOTarget({ poNumber: po.poNumber, subOrderId: po.subOrderId })}
                     style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 6, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", fontFamily: "inherit" }}
                   >Cancel PO</button>
                 </div>
@@ -1049,6 +1086,14 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
             <strong>What's next?</strong> The vendors will receive their POs shortly and confirm delivery timelines. Track each order's status under the <strong>Sub Orders / Items</strong> tab.
           </div>
         </div>
+      )}
+
+      {cancelPOTarget && (
+        <CancelPOModal
+          poNumber={cancelPOTarget.poNumber}
+          onConfirm={(reason) => { onCancelPO(cancelPOTarget.subOrderId, reason); }}
+          onClose={() => setCancelPOTarget(null)}
+        />
       )}
     </div>
   );
