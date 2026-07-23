@@ -53,7 +53,7 @@ export default function SalesQuotesPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Create and manage client quotations</p>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{quotes.length} Quotes</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quotes</h1>
         </div>
 
         <div className="flex items-center gap-2">
