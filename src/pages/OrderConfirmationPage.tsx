@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, Copy, Check, Mail, Phone, MapPin, CreditCard } from "lucide-react";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { useOrgConfig } from "@/contexts/ConfigContext";
+import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ type ConfirmationState = {
     quantity: number;
     category?: string;
     specs?: string[];
+    clientId?: string;
   }[];
   subtotal: number;
   gst: number;
@@ -247,7 +249,11 @@ export default function OrderConfirmationPage() {
                       )}
                     </span>
                     <span className="text-gray-800 font-medium shrink-0">
-                      {formatPrice(item.priceNum * item.quantity)}
+                      {(() => {
+                        const discountPct = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
+                        const effectivePrice = discountPct > 0 ? item.priceNum * (1 - discountPct / 100) : item.priceNum;
+                        return formatPrice(effectivePrice * item.quantity);
+                      })()}
                     </span>
                   </div>
                 ))
