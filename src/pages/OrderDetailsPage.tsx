@@ -179,14 +179,40 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const [rowQtys, setRowQtys] = useState<Record<string, number>>(() => {
     const q: Record<string, number> = {};
     for (const c of comparisons) q[c.vendorId] = 0;
-    const pre = selectedVendorId || comparisons[0]?.vendorId;
-    if (pre) q[pre] = sub.qty;
+    if (selectedVendorId) {
+      // Re-opening after a prior selection — keep that vendor at full qty.
+      q[selectedVendorId] = sub.qty;
+    } else {
+      // Auto-select cheapest vendor first; if its stock is insufficient,
+      // spill the remaining qty to the next cheapest, and so on.
+      let remaining = sub.qty;
+      for (const c of comparisons) {
+        if (remaining <= 0) break;
+        const assign = Math.min(remaining, c.stock);
+        if (assign > 0) {
+          q[c.vendorId] = assign;
+          remaining -= assign;
+        }
+      }
+    }
     return q;
   });
   const [checkedSet, setCheckedSet] = useState<Set<string>>(() => {
     const s = new Set<string>();
-    const pre = selectedVendorId || comparisons[0]?.vendorId;
-    if (pre) s.add(pre);
+    if (selectedVendorId) {
+      s.add(selectedVendorId);
+    } else {
+      // Check every vendor that received an auto-allocated qty above.
+      let remaining = sub.qty;
+      for (const c of comparisons) {
+        if (remaining <= 0) break;
+        const assign = Math.min(remaining, c.stock);
+        if (assign > 0) {
+          s.add(c.vendorId);
+          remaining -= assign;
+        }
+      }
+    }
     return s;
   });
   // Which vendor's details are shown at the bottom
