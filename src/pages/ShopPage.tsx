@@ -8,6 +8,7 @@ import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogSt
 import { getClients as getStoredClients } from "@/lib/clientStore";
 import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { getProductTotalAvailableStock } from "@/lib/vendorStore";
+import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,7 +202,12 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   if (!product) return null;
 
   const dialogDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
-  const dialogEffectivePrice = dialogDiscountPct > 0 ? product.priceNum * (1 - dialogDiscountPct / 100) : product.priceNum;
+  const dialogGstRate = getEffectiveTaxPctForCategory(product.category);
+  // priceNum is GST-inclusive; convert to excl. GST for display
+  const dialogBasePriceExcl = product.priceNum * 100 / (100 + dialogGstRate);
+  const dialogEffectivePrice = dialogDiscountPct > 0
+    ? dialogBasePriceExcl * (1 - dialogDiscountPct / 100)
+    : dialogBasePriceExcl;
 
   const handleAdd = () => {
     if (added) return;
@@ -313,7 +319,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price (Excl. GST)</p>
                 {dialogDiscountPct > 0 ? (
                   <>
-                    <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(product.priceNum)}</p>
+                    <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(dialogBasePriceExcl)}</p>
                     <p className="text-3xl font-bold text-green-600 mt-0.5">
                       {formatPrice(dialogEffectivePrice)}
                       {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
@@ -322,10 +328,11 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                   </>
                 ) : (
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {formatPrice(product.priceNum)}
+                    {formatPrice(dialogBasePriceExcl)}
                     {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
                   </p>
                 )}
+                <p className="text-[10px] text-gray-400 mt-1">+ {dialogGstRate}% GST extra</p>
 
                 <div className="flex items-center gap-3 mt-5">
                   <button
@@ -432,7 +439,9 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                   {related.map(rp => {
                     const rpDiscountPct = clientId ? getSlabDiscountPct(clientId, rp.category, Math.max(1, rp.moq)) : 0;
-                    const rpPrice = rpDiscountPct > 0 ? rp.priceNum * (1 - rpDiscountPct / 100) : rp.priceNum;
+                    const rpGstRate = getEffectiveTaxPctForCategory(rp.category);
+                    const rpBasePriceExcl = rp.priceNum * 100 / (100 + rpGstRate);
+                    const rpPrice = rpDiscountPct > 0 ? rpBasePriceExcl * (1 - rpDiscountPct / 100) : rpBasePriceExcl;
                     return (
                       <div
                         key={rp.id}
@@ -496,7 +505,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   };
 
   const cardDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
-  const cardEffectivePrice = cardDiscountPct > 0 ? product.priceNum * (1 - cardDiscountPct / 100) : product.priceNum;
+  const cardGstRate = getEffectiveTaxPctForCategory(product.category);
+  const cardBasePriceExcl = product.priceNum * 100 / (100 + cardGstRate);
+  const cardEffectivePrice = cardDiscountPct > 0 ? cardBasePriceExcl * (1 - cardDiscountPct / 100) : cardBasePriceExcl;
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -553,7 +564,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         <div className="flex items-center justify-between mb-2">
           {cardDiscountPct > 0 ? (
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 line-through leading-tight">{formatPrice(product.priceNum)}</span>
+              <span className="text-[10px] text-gray-400 line-through leading-tight">{formatPrice(cardBasePriceExcl)}</span>
               <span className="font-bold text-green-600 text-base leading-tight">
                 {formatPrice(cardEffectivePrice)}
                 <span className="text-xs font-normal text-gray-500"> / each</span>
@@ -562,9 +573,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             </div>
           ) : (
             <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
-              {formatPrice(product.priceNum)}
+              {formatPrice(cardBasePriceExcl)}
               {product.priceNum > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
             </span>
+          )}
+          {product.priceNum > 0 && (
+            <span className="text-[10px] text-gray-400">excl. GST</span>
           )}
         </div>
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
