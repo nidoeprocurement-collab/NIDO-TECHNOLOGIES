@@ -783,7 +783,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
   const pendingItems: PendingItem[] = [];
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
-    if (!vid || createdPOs[sub.id]) continue;
+    if (!vid || Object.values(createdPOs).some((p: any) => p.subOrderId === sub.id)) continue;
     const allocs = vendorAllocations?.[sub.id];
     if (allocs && allocs.length > 0) {
       pendingItems.push({
@@ -1824,7 +1824,7 @@ export default function MyOrderPage() {
   // Accepts an array of allocations from the modal (one per vendor split).
   // Primary vendor kept in selectedVendors/Meta for display in VendorSelectionTab.
   const handleSelectVendor = (subId: string, allocations: Array<{ vendorId: string; qty: number; meta: any }>) => {
-    if (createdPOs[subId]) return;
+    if (Object.values(createdPOs).some((p: any) => p.subOrderId === subId)) return;
     const primary = allocations[0];
     if (primary) {
       setSelectedVendors(prev => ({ ...prev, [subId]: primary.vendorId }));
@@ -1847,7 +1847,7 @@ export default function MyOrderPage() {
     const vendorLines = new Map<string, { meta: any; lines: LineEntry[] }>();
 
     for (const sub of subOrders) {
-      if (!selectedSet.has(sub.id) || createdPOs[sub.id]) continue;
+      if (!selectedSet.has(sub.id) || Object.values(createdPOs).some((p: any) => p.subOrderId === sub.id)) continue;
 
       // Get allocations: multi-vendor array or single-vendor fallback
       const allocs: Array<{ vendorId: string; qty: number; meta: any }> =
@@ -1967,7 +1967,7 @@ export default function MyOrderPage() {
 
       for (const { sub } of lines) {
         const li = lineItems.find(x => x.subOrderId === sub.id)!;
-        newPOs[sub.id] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, productCode: sub.productCode, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
+        newPOs[`${sub.id}__${vendorId}`] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, productCode: sub.productCode, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
       }
     }
 
@@ -1979,11 +1979,18 @@ export default function MyOrderPage() {
   const handleCancelPO = (subId: string) => {
     // Restore physicalStock so vendor inventory returns to its pre-PO level.
     // reservedStock is NOT touched — it was already cleared when the PO was raised.
-    const po = createdPOs[subId];
-    if (po?.vendorId && po?.productCode && po?.qty > 0) {
-      restorePhysicalStock(po.vendorId, po.productCode, po.qty);
+    // A sub-order may have multiple PO entries (split across vendors) — cancel all.
+    const matchingEntries = Object.entries(createdPOs).filter(([, p]: [string, any]) => p.subOrderId === subId);
+    for (const [, po] of matchingEntries as [string, any][]) {
+      if (po?.vendorId && po?.productCode && po?.qty > 0) {
+        restorePhysicalStock(po.vendorId, po.productCode, po.qty);
+      }
     }
-    setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
+    setCreatedPOs(prev => {
+      const n = { ...prev };
+      for (const [key] of matchingEntries) delete n[key];
+      return n;
+    });
     setSelectedVendors(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendorMeta(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setVendorAllocations(prev => { const n = { ...prev }; delete n[subId]; return n; });
@@ -2243,7 +2250,9 @@ export default function MyOrderPage() {
                   {subOrdersColumns.map(h => <div key={h} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{h}</div>)}
                 </div>
                 {filtered.map((sub, idx) => {
-                  const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub), hasPO = !!createdPOs[sub.id];
+                  const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub);
+                  const subPOs = Object.values(createdPOs).filter((p: any) => p.subOrderId === sub.id) as any[];
+                  const hasPO = subPOs.length > 0;
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
@@ -2274,12 +2283,17 @@ export default function MyOrderPage() {
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
                           {hasPO ? (
-                            <button
-                              onClick={() => navigate(`/vendor-orders/${createdPOs[sub.id].poNumber}`)}
-                              style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
-                            >
-                              {createdPOs[sub.id].poNumber} ↗
-                            </button>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              {subPOs.map((po: any) => (
+                                <button
+                                  key={po.poNumber}
+                                  onClick={() => navigate(`/vendor-orders/${po.poNumber}`)}
+                                  style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", textAlign: "left", overflowWrap: "break-word" }}
+                                >
+                                  {po.poNumber} ↗
+                                </button>
+                              ))}
+                            </div>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                           )}
@@ -2299,12 +2313,14 @@ export default function MyOrderPage() {
                           ) : hasPO ? (
                             // PO already issued — lock the vendor, no change allowed until PO is cancelled
                             <div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                  {(createdPOs[sub.id].vendorName?.[0] || "V").toUpperCase()}
+                              {subPOs.map((po: any, pi: number) => (
+                                <div key={po.poNumber} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: pi === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                    {(po.vendorName?.[0] || "V").toUpperCase()}
+                                  </div>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName}</span>
                                 </div>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{createdPOs[sub.id].vendorName}</span>
-                              </div>
+                              ))}
                               <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued · Cancel PO to change</span>
                             </div>
                           ) : selVendor ? (
