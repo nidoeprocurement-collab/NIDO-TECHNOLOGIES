@@ -434,8 +434,8 @@ export default function SalesQuoteFormPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full" style={{ minWidth: 880 }}>
+          <div>
+            <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                   {['ITEM NAME', 'DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISCOUNT', 'TAX %', 'AMOUNT', ''].map(h => (
