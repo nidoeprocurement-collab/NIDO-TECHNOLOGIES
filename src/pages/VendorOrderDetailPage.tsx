@@ -395,22 +395,35 @@ function EditAssignmentModal({ data, onSave, onClose }: { data: any; onSave: (d:
 }
 
 // ── Cancel Item Status Modal ──────────────────────────────────────────────────
-function CancelItemStatusModal({ itemName, onConfirm, onClose }: { itemName: string; onConfirm: () => void; onClose: () => void }) {
+function CancelItemStatusModal({ itemName, onConfirm, onClose }: { itemName: string; onConfirm: (reason: string) => void; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const ok = reason.trim().length > 0;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 420, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: "#dc2626" }}>Cancel Item</span>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ padding: "20px 22px" }}>
-          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, marginBottom: 16 }}>
             Are you sure you want to mark <strong>{itemName}</strong> as cancelled? Once cancelled, this item's status cannot be changed further.
           </div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+            Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
+          </label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            placeholder="Enter reason for cancellation..."
+            style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+          />
+          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Item</button>
-          <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Yes, Cancel Item</button>
+          <button onClick={() => { if (!ok) return; onConfirm(reason.trim()); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: ok ? "#dc2626" : "#fca5a5", color: "#fff", cursor: ok ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit", transition: "background 0.15s" }}>Yes, Cancel Item</button>
         </div>
       </div>
     </div>
@@ -418,22 +431,35 @@ function CancelItemStatusModal({ itemName, onConfirm, onClose }: { itemName: str
 }
 
 // ── Cancel PO Modal ───────────────────────────────────────────────────────────
-function CancelPOModal({ poNumber, onConfirm, onClose }: { poNumber: string; onConfirm: () => void; onClose: () => void }) {
+function CancelPOModal({ poNumber, onConfirm, onClose }: { poNumber: string; onConfirm: (reason: string) => void; onClose: () => void }) {
+  const [reason, setReason] = useState("");
+  const ok = reason.trim().length > 0;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 420, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: "#dc2626" }}>Cancel Purchase Order</span>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
         <div style={{ padding: "20px 22px" }}>
-          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, marginBottom: 16 }}>
             Are you sure you want to cancel <strong>{poNumber}</strong>? This action cannot be undone and the vendor will be notified.
           </div>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
+            Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
+          </label>
+          <textarea
+            value={reason}
+            onChange={e => setReason(e.target.value)}
+            rows={3}
+            placeholder="Enter reason for cancellation..."
+            style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+          />
+          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep PO</button>
-          <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel PO</button>
+          <button onClick={() => { if (!ok) return; onConfirm(reason.trim()); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: ok ? "#dc2626" : "#fca5a5", color: "#fff", cursor: ok ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit", transition: "background 0.15s" }}>Cancel PO</button>
         </div>
       </div>
     </div>
@@ -650,6 +676,7 @@ export default function VendorOrderDetailPage() {
   const [noteText, setNoteText] = useState("");
   const [noteVisibility, setNoteVisibility] = useState("Internal Note");
   const [cancelled, setCancelled] = useState(false);
+  const [poCancelReason, setPoCancelReason] = useState<string>(() => getPOByNumber(poKey)?.cancelReason || "");
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
   const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
@@ -673,6 +700,7 @@ export default function VendorOrderDetailPage() {
     setNotes(data.notes);
     setAssignment(data.assignment);
     setCancelled(false);
+    setPoCancelReason(po?.cancelReason || "");
   }, [poKey]);
 
   // Sync status changes back to the shared PO store (only for real POs)
@@ -695,9 +723,9 @@ export default function VendorOrderDetailPage() {
     }
     setItems(prev => prev.map(it => it.id === id ? { ...it, status } : it));
   };
-  const confirmItemCancel = () => {
+  const confirmItemCancel = (reason: string) => {
     if (!pendingItemCancel) return;
-    setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled" } : it));
+    setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled", cancelReason: reason } : it));
   };
   const handleReferenceNumberChange = (id: string, referenceNumber: string) => {
     if (isCancelled) return;
@@ -777,6 +805,17 @@ export default function VendorOrderDetailPage() {
             </button>
           )}
         </div>
+
+        {/* Cancellation Reason Banner */}
+        {isCancelled && poCancelReason && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 9, padding: "12px 18px", marginTop: 14, marginBottom: 4, display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <span style={{ color: "#dc2626", fontSize: 16, flexShrink: 0, marginTop: 1 }}>ℹ</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#991b1b", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>Cancellation Reason</div>
+              <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.5 }}>{poCancelReason}</div>
+            </div>
+          </div>
+        )}
 
         {/* Info Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginTop: 20, marginBottom: 20 }}>
@@ -901,6 +940,11 @@ export default function VendorOrderDetailPage() {
               <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
               <div>
                 <StatusDropdown status={item.status} onChange={s => handleItemStatusChange(item.id, s)} disabled={isCancelled || item.status === "Cancelled"} />
+                {item.status === "Cancelled" && (item as any).cancelReason && (
+                  <div style={{ fontSize: 11, color: "#991b1b", marginTop: 5, lineHeight: 1.4, fontStyle: "italic" }}>
+                    Reason: {(item as any).cancelReason}
+                  </div>
+                )}
               </div>
               <div style={{ fontSize: 12.5, color: "#374151" }}>{item.expectedDelivery}</div>
               <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
@@ -1084,7 +1128,7 @@ export default function VendorOrderDetailPage() {
       {showCancelPO && (
         <CancelPOModal
           poNumber={initialData.poNumber}
-          onConfirm={() => {
+          onConfirm={(reason) => {
             // Restore vendor stock for all line items on this PO
             const po = getPOByNumber(poKey);
             if (po) {
@@ -1100,9 +1144,11 @@ export default function VendorOrderDetailPage() {
                   updateVendorProduct(po.vendorId, match.id, { stock: String(current + li.qty) });
                 }
               }
+              updatePO(poKey, { cancelReason: reason });
             }
             setCancelled(true);
             setOrderStatus("Cancelled");
+            setPoCancelReason(reason);
           }}
           onClose={() => setShowCancelPO(false)}
         />

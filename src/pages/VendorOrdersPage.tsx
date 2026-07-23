@@ -273,6 +273,7 @@ export default function VendorOrderList() {
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | "">("");
   const [bulkNote, setBulkNote] = useState("");
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
+  const [bulkCancelReason, setBulkCancelReason] = useState("");
   const toast = useToast();
 
   // Close dropdowns on outside click
@@ -341,18 +342,22 @@ export default function VendorOrderList() {
     performBulkStatusUpdate(bulkStatus as OrderStatus);
   };
 
-  const performBulkStatusUpdate = (status: OrderStatus) => {
+  const performBulkStatusUpdate = (status: OrderStatus, cancelReason?: string) => {
     // Orders already Cancelled are a terminal state and are skipped — they
     // can no longer be edited or processed further.
     const eligible = [...selected].filter(id => orders.find(o => o.id === id)?.status !== "Cancelled");
-    setOrders(prev => prev.map(r => eligible.includes(r.id) ? { ...r, status } : r));
+    setOrders(prev => prev.map(r => {
+      if (!eligible.includes(r.id)) return r;
+      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      return { ...r, status, ...extra };
+    }));
     const skipped = selected.size - eligible.length;
     toast.show(
       skipped > 0
         ? `Status updated to "${status}" for ${eligible.length} order(s). ${skipped} already-cancelled order(s) were skipped.`
         : `Status updated to "${status}" for ${eligible.length} order(s)`
     );
-    setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false);
+    setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false); setBulkCancelReason("");
   };
 
   const applyBulkNotes = () => {
@@ -460,15 +465,27 @@ export default function VendorOrderList() {
       </Modal>
 
       {confirmBulkCancel && (
-        <div onClick={e => { if (e.target === e.currentTarget) setConfirmBulkCancel(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: card, borderRadius: 14, padding: 24, width: 380, boxShadow: "0 16px 48px rgba(0,0,0,.2)", border: `1px solid ${bdr}` }}>
+        <div onClick={e => { if (e.target === e.currentTarget) { setConfirmBulkCancel(false); setBulkCancelReason(""); } }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: card, borderRadius: 14, padding: 24, width: 420, boxShadow: "0 16px 48px rgba(0,0,0,.2)", border: `1px solid ${bdr}` }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, color: "#dc2626" }}>Cancel {selected.size} order{selected.size !== 1 ? "s" : ""}?</h3>
-            <p style={{ fontSize: 13, color: fg, marginBottom: 18, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: fg, marginBottom: 12, lineHeight: 1.5 }}>
               This action cannot be undone. Once cancelled, these orders can no longer be edited, have their status changed, or be processed further.
             </p>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: fg, marginBottom: 5 }}>
+              Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
+            </label>
+            <textarea
+              value={bulkCancelReason}
+              onChange={e => setBulkCancelReason(e.target.value)}
+              rows={3}
+              placeholder="Enter reason for cancellation..."
+              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${bulkCancelReason.trim() ? bdr : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none", marginBottom: 4, background: card, color: fg }}
+            />
+            {!bulkCancelReason.trim() && <div style={{ fontSize: 11.5, color: "#dc2626", marginBottom: 14 }}>Reason is required before confirming cancellation.</div>}
+            {bulkCancelReason.trim() && <div style={{ marginBottom: 14 }} />}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmBulkCancel(false)} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${bdr}`, background: card, color: fg }}>Keep Orders</button>
-              <button onClick={() => performBulkStatusUpdate("Cancelled")} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #dc2626", background: "#dc2626", color: "#fff" }}>Yes, Cancel</button>
+              <button onClick={() => { setConfirmBulkCancel(false); setBulkCancelReason(""); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${bdr}`, background: card, color: fg }}>Keep Orders</button>
+              <button onClick={() => { if (!bulkCancelReason.trim()) return; performBulkStatusUpdate("Cancelled", bulkCancelReason.trim()); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: bulkCancelReason.trim() ? "pointer" : "not-allowed", border: "1px solid #dc2626", background: bulkCancelReason.trim() ? "#dc2626" : "#fca5a5", color: "#fff", transition: "background 0.15s" }}>Yes, Cancel</button>
             </div>
           </div>
         </div>

@@ -88,6 +88,7 @@ export interface StoredPO {
   requestedDelivery: string;
   documents: PODocument[];
   notes: PONote[];
+  cancelReason?: string;
 }
 
 const STORAGE_KEY = "nido_all_purchase_orders";

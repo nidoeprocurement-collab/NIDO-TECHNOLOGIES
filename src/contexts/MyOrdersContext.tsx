@@ -57,6 +57,7 @@ export interface MyOrder {
   paymentDetail?: string;
   paymentTerms?: string;
   deliveryAddress?: string;
+  cancelReason?: string;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -64,8 +65,8 @@ interface MyOrdersContextType {
   orders: MyOrder[];
   addOrder: (order: Omit<MyOrder, "id"> & { id?: string }) => string;
   setOrders: React.Dispatch<React.SetStateAction<MyOrder[]>>;
-  updateOrderStatus: (orderId: string, status: MyOrderStatus) => void;
-  updateOrdersStatus: (orderIds: string[], status: MyOrderStatus) => void;
+  updateOrderStatus: (orderId: string, status: MyOrderStatus, cancelReason?: string) => void;
+  updateOrdersStatus: (orderIds: string[], status: MyOrderStatus, cancelReason?: string) => void;
 }
 
 const MyOrdersContext = createContext<MyOrdersContextType | undefined>(undefined);
@@ -175,7 +176,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // guarding here (the single source of truth) protects every entry point
   // (order detail page, list bulk update) without relying on each caller
   // to re-check.
-  const updateOrderStatus = (orderId: string, status: MyOrderStatus) => {
+  const updateOrderStatus = (orderId: string, status: MyOrderStatus, cancelReason?: string) => {
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
@@ -194,17 +195,19 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
         }
       }
       cascadeStatusToSubOrders(target, status);
-      return prev.map((o) => (o.id === orderId ? { ...o, status } : o));
+      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      return prev.map((o) => (o.id === orderId ? { ...o, status, ...extra } : o));
     });
   };
 
-  const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus) => {
+  const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus, cancelReason?: string) => {
     const idSet = new Set(orderIds);
     setOrders((prev) => {
       prev.forEach((o) => {
         if (idSet.has(o.id) && o.status !== "Cancelled") cascadeStatusToSubOrders(o, status);
       });
-      return prev.map((o) => (idSet.has(o.id) && o.status !== "Cancelled" ? { ...o, status } : o));
+      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      return prev.map((o) => (idSet.has(o.id) && o.status !== "Cancelled" ? { ...o, status, ...extra } : o));
     });
   };
 
