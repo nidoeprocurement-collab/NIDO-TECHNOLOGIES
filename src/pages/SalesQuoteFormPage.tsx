@@ -285,6 +285,7 @@ export default function SalesQuoteFormPage() {
               <input
                 type="date"
                 value={validTill}
+                min={quoteDate}
                 onChange={e => setValidTill(e.target.value)}
                 className={inputCls}
               />
