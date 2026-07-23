@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMyOrders, type MyOrder as Order, type MyOrderStatus as OrderStatus } from "@/contexts/MyOrdersContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
@@ -286,37 +287,71 @@ function BulkStatusModal({ selectedCount, onApply, onClose }: {
 // ─── Bulk Notes Modal ──────────────────────────────────────────────────────────
 function BulkNotesModal({ selectedCount, onApply, onClose }: {
   selectedCount: number;
-  onApply: (note: string) => void;
+  onApply: (note: string, visibility: string) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState("");
+  const [visibility, setVisibility] = useState("Internal Note");
+  const visibilityOptions = [
+    { label: "Internal Note", icon: "🔒", sub: "Only visible to internal users" },
+    { label: "External Note", icon: "🌐", sub: "Visible to the client on the portal" },
+  ];
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
       <div style={{
         position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
-        width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
+        width: 560, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
         border: "1px solid hsl(var(--border))",
       }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Notes</h2>
         <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
           Add a note to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
         </p>
-        <label style={labelSt}>Note</label>
-        <textarea
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          placeholder="Enter note to append to selected orders..."
-          rows={4}
-          style={{ ...inputSt, resize: "vertical", marginBottom: 24, lineHeight: 1.5 }}
-        />
+
+        {/* Note composer — same layout as OrderDetailsPage */}
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 210px" }}>
+            {/* Left: textarea */}
+            <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "hsl(var(--foreground))" }}>Add Note</div>
+              <textarea
+                value={note}
+                onChange={e => { if (e.target.value.length <= 500) setNote(e.target.value); }}
+                placeholder="Write your note here..."
+                rows={4}
+                style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent", lineHeight: 1.5 }}
+              />
+              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{note.length} / 500</div>
+            </div>
+
+            {/* Right: visibility */}
+            <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                {visibilityOptions.map(({ label, icon, sub }) => (
+                  <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                      {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                      <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{
             flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
             background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
           }}>Cancel</button>
           <button
-            onClick={() => { if (note.trim()) { onApply(note.trim()); onClose(); } }}
+            onClick={() => { if (note.trim()) { onApply(note.trim(), visibility); onClose(); } }}
             disabled={!note.trim()}
             style={{
               flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
@@ -360,6 +395,7 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrdersStatus } = useMyOrders();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
@@ -473,9 +509,23 @@ export default function MyOrderPage() {
     setPendingBulkCancel(false);
   };
 
-  // ── Bulk update notes (acknowledged via toast) ──────────────────────────────
-  const handleBulkNotesApply = (note: string) => {
-    showToast(`Note added to ${totalSelected} order${totalSelected !== 1 ? "s" : ""}: "${note.slice(0, 40)}${note.length > 40 ? "…" : ""}"`);
+  // ── Bulk update notes ───────────────────────────────────────────────────────
+  const handleBulkNotesApply = (note: string, visibility: string) => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const author = user?.name || "System Owner";
+    const newNote = { id: "n" + Date.now(), author, date: dateStr, text: note, visibility };
+
+    // Append to each selected order's notes in localStorage (same key as OrderDetailsPage)
+    [...selected].forEach(orderId => {
+      const key = `nido_notes_${orderId}`;
+      let existing: typeof newNote[] = [];
+      try { existing = JSON.parse(localStorage.getItem(key) || "null") || []; } catch { existing = []; }
+      localStorage.setItem(key, JSON.stringify([newNote, ...existing]));
+    });
+
+    showToast(`Note added to ${totalSelected} order${totalSelected !== 1 ? "s" : ""}`);
   };
 
   const showToast = (msg: string) => {
