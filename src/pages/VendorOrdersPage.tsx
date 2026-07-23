@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
-import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
 import { getProcurementSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
@@ -439,9 +439,32 @@ export default function VendorOrderList() {
     setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false); setBulkCancelReason("");
   };
 
-  const applyBulkNotes = (note: string, _visibility: string) => {
+  const applyBulkNotes = (note: string, visibility: string) => {
     if (selected.size === 0) { toast.show("Select at least one order first"); return; }
-    toast.show(`Notes added to ${selected.size} order(s)`);
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const newNote = {
+      id: "n" + Date.now(),
+      author: "System Owner",
+      initials: "SO",
+      color: "#2563eb",
+      date: dateStr,
+      text: note,
+      visibility,
+    };
+    let persisted = 0;
+    [...selected].forEach(poNumber => {
+      const po = getPOByNumber(poNumber);
+      if (po) {
+        updatePO(poNumber, { notes: [newNote, ...(po.notes || [])] });
+        persisted++;
+      }
+    });
+    toast.show(persisted > 0
+      ? `Note added to ${persisted} order(s)`
+      : `Note saved (orders will show it when reopened)`
+    );
     setNotesModal(false); setBulkNote("");
   };
 
