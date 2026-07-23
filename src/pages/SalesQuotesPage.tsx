@@ -76,7 +76,7 @@ export default function SalesQuotesPage() {
       </div>
 
       {/* Quotes Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200">
         <div>
           <table className="w-full">
             <thead>
