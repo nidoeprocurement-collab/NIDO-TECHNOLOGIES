@@ -95,7 +95,7 @@ export default function SalesQuotesPage() {
       </div>
 
       {/* Quotes Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         {quotes.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-gray-400 dark:text-gray-500 mb-4">No quotes yet</p>
@@ -107,7 +107,7 @@ export default function SalesQuotesPage() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div>
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
