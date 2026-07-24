@@ -263,7 +263,9 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
 
   // ── LINE ITEMS TABLE ────────────────────────────────────────────────────────
   const tableBody = quote.lineItems.map((item, i) => {
-    const amt = item.qty * item.rate * (1 - item.discount / 100);
+    const taxable = Math.max(0, item.qty * item.rate - item.discount);
+    const gst = taxable * (item.taxPercent / 100);
+    const amt = taxable + gst;
     const cellContent = item.description ? `${item.name}\n${item.description}` : item.name;
     return [
       i + 1,
@@ -271,6 +273,10 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
       item.hsnSac || '',
       `${item.qty}`,
       fmt2(item.rate),
+      fmt2(item.discount),
+      fmt2(taxable),
+      `${item.taxPercent}%`,
+      fmt2(gst),
       fmt2(amt),
     ];
   });
@@ -278,37 +284,54 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [['#', 'Item & Description', 'HSN/SAC', 'Qty', 'Rate', 'Amount']],
+    head: [[
+      'Sl.No',
+      'ITEM / DESCRIPTION',
+      'HSN/SAC',
+      'QTY',
+      'RATE (₹)',
+      'DISC (₹)',
+      'TAXABLE (₹)',
+      'GST RATE',
+      'GST (₹)',
+      'AMOUNT (₹)',
+    ]],
     body: tableBody,
     headStyles: {
       fillColor: [240, 240, 240],
       textColor: [30, 30, 30],
       fontStyle: 'bold',
-      fontSize: 9,
-      cellPadding: { top: 7, bottom: 7, left: 6, right: 6 },
+      fontSize: 6.5,
+      cellPadding: { top: 7, bottom: 7, left: 3, right: 3 },
     },
     bodyStyles: {
-      fontSize: 9,
-      cellPadding: { top: 7, bottom: 7, left: 6, right: 6 },
+      fontSize: 7.5,
+      cellPadding: { top: 7, bottom: 7, left: 3, right: 3 },
       textColor: [40, 40, 40],
       valign: 'top',
     },
     columnStyles: {
-      0: { cellWidth: 24, halign: 'center' },
-      1: { cellWidth: 'auto' },
-      2: { cellWidth: 56, halign: 'center' },
-      3: { cellWidth: 36, halign: 'center' },
-      4: { cellWidth: 62, halign: 'right' },
-      5: { cellWidth: 68, halign: 'right' },
+      0: { cellWidth: 25, halign: 'center' },
+      1: { cellWidth: 111 },
+      2: { cellWidth: 44, halign: 'center' },
+      3: { cellWidth: 25, halign: 'center' },
+      4: { cellWidth: 51, halign: 'right' },
+      5: { cellWidth: 48, halign: 'right' },
+      6: { cellWidth: 60, halign: 'right' },
+      7: { cellWidth: 43, halign: 'center' },
+      8: { cellWidth: 50, halign: 'right' },
+      9: { cellWidth: 57, halign: 'right' },
     },
-    // Parse: keep both lines so autoTable allocates correct cell height;
-    // suppress the drawn text so we can redraw with two different styles.
+    // Parse the item name and description separately while keeping the
+    // built-in text hidden so the two lines can use the reference styling.
     didParseCell(data) {
       if (data.section === 'body' && data.column.index === 1) {
         const raw = String(data.cell.raw ?? '');
         const parts = raw.split('\n');
-        // Both lines visible to autoTable → correct cell height
-        data.cell.text = parts.length > 1 ? [parts[0], parts[1]] : [parts[0]];
+        const descriptionLines = parts.length > 1
+          ? doc.splitTextToSize(parts.slice(1).join(' '), data.cell.width - 12)
+          : [];
+        data.cell.text = [parts[0], ...descriptionLines];
         // Make autoTable's built-in text invisible; we draw manually in didDrawCell
         (data.cell.styles as any).textColor = [255, 255, 255];
       }
@@ -321,13 +344,17 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
         const py = data.cell.y + data.cell.padding('top') + 7;
 
         // Item name — bold, dark
-        doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(30, 30, 30);
+        doc.setFont('helvetica', 'bold').setFontSize(7.5).setTextColor(30, 30, 30);
         doc.text(parts[0], px, py);
 
-        // Description — normal, gray, on next line
-        if (parts.length > 1 && parts[1]) {
-          doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(110, 110, 110);
-          doc.text(parts[1], px, py + 13);
+        // Description — normal, gray, wrapped below the item name
+        if (parts.length > 1 && parts.slice(1).join(' ').trim()) {
+          const descriptionLines = doc.splitTextToSize(
+            parts.slice(1).join(' '),
+            data.cell.width - 12,
+          );
+          doc.setFont('helvetica', 'normal').setFontSize(7).setTextColor(110, 110, 110);
+          doc.text(descriptionLines, px, py + 11);
         }
       }
     },

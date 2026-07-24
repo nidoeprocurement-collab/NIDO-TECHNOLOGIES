@@ -4,3 +4,4 @@
 - [Transaction page shell style](transactions-page-style.md) — canonical Orders-page-matching shell/card pattern for Transactions pages; avoid slate-*/dark: classes.
 - [Multi-tenant Client Portal Architecture](portal-multitenancy.md) — userType in AuthContext, portalUserStore (localStorage), ClientPortalRoute guard, /portal/* routes, provisioning flow.
 - [RBAC single source of truth](rbac-single-source-of-truth.md) — NIDO Users/Roles/Permissions must stay one module at /configuration/nido-users; route-level PermissionGate enforces module permissions per navigation.
+- [Quote PDF reference fidelity](quote-pdf-reference-fidelity.md) — quote downloads must preserve the uploaded estimate’s A4 Helvetica shell while allowing only the requested item-table header/data changes.
