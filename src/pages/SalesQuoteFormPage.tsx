@@ -229,8 +229,7 @@ export default function SalesQuoteFormPage() {
   const shippingGst = shippingCharges * shippingGstRate / 100;
   const roundOff = adjustment;
   const grandTotal = totalTaxableValue + totalGst + shippingCharges + shippingGst + roundOff;
-  // legacy alias for buildQuote
-  const subtotal = grandTotal;
+  const subtotal = totalTaxableValue;
 
   // ── Build quote object ────────────────────────────────────────────────────────
   const buildQuote = (status: StoredQuote['status']): StoredQuote => {
@@ -251,7 +250,7 @@ export default function SalesQuoteFormPage() {
       lineItems,
       subtotal,
       gstSlabs,
-      totalTax,
+      totalTax: totalGst,
       adjustment,
       grandTotal,
       termsConditions,
