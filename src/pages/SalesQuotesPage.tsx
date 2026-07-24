@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Archive, FileDown, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getQuotes, deleteQuote, type StoredQuote } from '@/lib/quoteStore';
+import { downloadReferenceQuotePdf } from '@/lib/referenceQuotePdf';
 
 function statusBadge(status: StoredQuote['status']) {
   const map: Record<string, string> = {
@@ -144,9 +145,8 @@ export default function SalesQuotesPage() {
                                 <Edit size={15} /> Edit
                               </button>
                               <button
-                                disabled
-                                title="PDF downloads are unavailable"
-                                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => { downloadReferenceQuotePdf(); setRowMenuOpen(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                               >
                                 Download PDF
                               </button>

@@ -3,8 +3,27 @@
 // Falls back gracefully if RESEND_API_KEY is not set.
 
 import { Router } from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const router = Router();
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const referenceQuotePdfPath = path.join(
+  projectRoot,
+  'attached_assets',
+  'Nido_Tech_Estimate_EST-000011.pdf_(1)_1784916349699.pdf',
+);
+
+router.get('/reference-pdf', (_req, res) => {
+  res.download(referenceQuotePdfPath, 'Nido_Tech_Estimate_EST-000011.pdf', (err) => {
+    if (!err || res.headersSent) return;
+
+    console.error('[quotes/reference-pdf] Failed to send reference PDF:', err);
+    res.status(err.statusCode === 404 ? 404 : 500).json({
+      error: 'The reference estimate PDF is unavailable.',
+    });
+  });
+});
 
 router.post('/send-email', async (req, res) => {
   const { to, quoteNumber, clientName, grandTotal, pdfBase64, companyName, senderEmail } = req.body;
