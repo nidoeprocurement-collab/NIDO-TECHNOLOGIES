@@ -17,9 +17,14 @@ function addDays(dateStr: string, days: number): string {
 }
 
 // ── Line item helpers ─────────────────────────────────────────────────────────
+function taxableAmount(item: QuoteLineItem): number {
+  return Math.max(0, item.qty * item.rate - item.discount);
+}
+function gstAmount(item: QuoteLineItem): number {
+  return taxableAmount(item) * (item.taxPercent / 100);
+}
 function lineAmount(item: QuoteLineItem): number {
-  const base = item.qty * item.rate;
-  return base - base * (item.discount / 100);
+  return taxableAmount(item) + gstAmount(item);
 }
 
 function makeBlankItem(): QuoteLineItem {
@@ -460,31 +465,37 @@ export default function SalesQuoteFormPage() {
           <div>
             <table className="w-full">
               <colgroup>
+                <col style={{ width: '3%' }} />
                 <col style={{ width: '22%' }} />
-                <col style={{ width: '22%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '5%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '7%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '6%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '8%' }} />
                 <col style={{ width: '10%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '11%' }} />
                 <col style={{ width: '4%' }} />
               </colgroup>
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                  {['ITEM NAME', 'DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISCOUNT', 'TAX %', 'AMOUNT', ''].map(h => (
+                  {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)', ''].map(h => (
                     <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {lineItems.map(item => {
-                  const amt = lineAmount(item);
+                {lineItems.map((item, idx) => {
+                  const taxable = taxableAmount(item);
+                  const gst = gstAmount(item);
+                  const amt = taxable + gst;
                   const filteredProds = getFilteredProducts(item.id);
                   const displayName = productSearch[item.id] !== undefined ? productSearch[item.id] : item.name;
                   return (
                     <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
-                      {/* Item Name */}
+                      {/* Sl.No */}
+                      <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-center">{idx + 1}</td>
+                      {/* Item / Description — combined */}
                       <td className="px-3 py-2">
                         <div className="relative" ref={el => { productRefs.current[item.id] = el; }} onClick={e => e.stopPropagation()}>
                           <input
@@ -508,11 +519,9 @@ export default function SalesQuoteFormPage() {
                             </div>
                           )}
                         </div>
-                      </td>
-                      {/* Description — auto-filled from product */}
-                      <td className="px-3 py-2">
                         <input type="text" placeholder="Description" value={item.description}
-                          onChange={e => updateLineItem(item.id, 'description', e.target.value)} className={tdInputCls} />
+                          onChange={e => updateLineItem(item.id, 'description', e.target.value)}
+                          className={`${tdInputCls} mt-1`} />
                       </td>
                       {/* HSN/SAC */}
                       <td className="px-3 py-2">
@@ -523,27 +532,31 @@ export default function SalesQuoteFormPage() {
                       <td className="px-3 py-2">
                         <input type="number" value={item.qty} min={1}
                           onChange={e => updateLineItem(item.id, 'qty', Math.max(1, parseInt(e.target.value) || 1))}
-                          className={`${tdInputCls} w-16 text-center`} />
+                          className={`${tdInputCls} w-14 text-center`} />
                       </td>
-                      {/* Rate */}
+                      {/* Rate (₹) */}
                       <td className="px-3 py-2">
                         <input type="number" value={item.rate} min={0}
                           onChange={e => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                          className={`${tdInputCls} w-24 text-center`} />
+                          className={`${tdInputCls} w-20 text-center`} />
                       </td>
-                      {/* Discount */}
+                      {/* Disc (₹) */}
                       <td className="px-3 py-2">
-                        <input type="number" value={item.discount} min={0} max={100}
+                        <input type="number" value={item.discount} min={0}
                           onChange={e => updateLineItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
                           className={`${tdInputCls} w-16 text-center`} />
                       </td>
-                      {/* Tax % */}
+                      {/* Taxable (₹) — computed */}
+                      <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{fmt(taxable)}</td>
+                      {/* GST Rate */}
                       <td className="px-3 py-2">
                         <input type="number" value={item.taxPercent} min={0}
                           onChange={e => updateLineItem(item.id, 'taxPercent', parseFloat(e.target.value) || 0)}
-                          className={`${tdInputCls} w-16 text-center`} />
+                          className={`${tdInputCls} w-14 text-center`} />
                       </td>
-                      {/* Amount */}
+                      {/* GST (₹) — computed */}
+                      <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{fmt(gst)}</td>
+                      {/* Amount (₹) */}
                       <td className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-white text-right whitespace-nowrap">{fmt(amt)}</td>
                       {/* Delete */}
                       <td className="px-3 py-2 text-center">
