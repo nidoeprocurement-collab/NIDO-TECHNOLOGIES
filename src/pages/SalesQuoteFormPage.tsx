@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, ArrowLeft, Trash2, Save, Send, Paperclip, X, Loader2 } from 'lucide-react';
 import { getClients, type StoredClient } from '@/lib/clientStore';
@@ -89,8 +88,6 @@ export default function SalesQuoteFormPage() {
   const [productSearch, setProductSearch] = useState<Record<string, string>>({});
   const [showProductDd, setShowProductDd] = useState<Record<string, boolean>>({});
   const productRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [ddPos, setDdPos] = useState<Record<string, { top: number; left: number; width: number }>>({});
 
   // ── Notes & Summary ──────────────────────────────────────────────────────────
   const [adjustment, setAdjustment] = useState<number>(0);
@@ -177,15 +174,6 @@ export default function SalesQuoteFormPage() {
     const item = makeBlankItem();
     setLineItems(prev => [...prev, item]);
     setProductSearch(prev => ({ ...prev, [item.id]: '' }));
-  };
-
-  const openProductDd = (itemId: string) => {
-    const el = inputRefs.current[itemId];
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      setDdPos(prev => ({ ...prev, [itemId]: { top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: Math.max(rect.width, 288) } }));
-    }
-    setShowProductDd(prev => ({ ...prev, [itemId]: true }));
   };
 
   const addEmail = () => {
@@ -469,8 +457,8 @@ export default function SalesQuoteFormPage() {
               <Plus size={16} /> Add Item
             </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
+            <table className="w-full" style={{ minWidth: 780 }}>
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                   {['ITEM NAME', 'DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISCOUNT', 'TAX %', 'AMOUNT', ''].map(h => (
@@ -489,18 +477,13 @@ export default function SalesQuoteFormPage() {
                       <td className="px-3 py-2" style={{ minWidth: 170 }}>
                         <div className="relative" ref={el => { productRefs.current[item.id] = el; }} onClick={e => e.stopPropagation()}>
                           <input
-                            ref={el => { inputRefs.current[item.id] = el; }}
                             type="text" placeholder="Select item" value={displayName}
-                            onChange={e => { setProductSearch(prev => ({ ...prev, [item.id]: e.target.value })); openProductDd(item.id); }}
-                            onFocus={() => openProductDd(item.id)}
+                            onChange={e => { setProductSearch(prev => ({ ...prev, [item.id]: e.target.value })); setShowProductDd(prev => ({ ...prev, [item.id]: true })); }}
+                            onFocus={() => setShowProductDd(prev => ({ ...prev, [item.id]: true }))}
                             className={`${tdInputCls} pr-6`} />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▾</span>
-                          {showProductDd[item.id] && ddPos[item.id] && createPortal(
-                            <div
-                              style={{ position: 'absolute', top: ddPos[item.id].top + 4, left: ddPos[item.id].left, width: Math.max(ddPos[item.id].width, 288), zIndex: 9999 }}
-                              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto"
-                              onMouseDown={e => e.stopPropagation()}
-                            >
+                          {showProductDd[item.id] && (
+                            <div className="absolute top-full left-0 z-50 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                               {filteredProds.length === 0 ? (
                                 <div className="px-3 py-3 text-xs text-gray-500 text-center">{products.length === 0 ? 'No products in catalogue' : 'No matches found'}</div>
                               ) : filteredProds.map(p => (
@@ -511,8 +494,7 @@ export default function SalesQuoteFormPage() {
                                   {p.category && <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>}
                                 </button>
                               ))}
-                            </div>,
-                            document.body
+                            </div>
                           )}
                         </div>
                       </td>
