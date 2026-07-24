@@ -2,7 +2,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Download, Send, FileText, Edit, Paperclip } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getQuoteById, type StoredQuote } from '@/lib/quoteStore';
-import { downloadQuotePdf } from '@/lib/quotePdfGenerator';
 
 function statusBadge(status: StoredQuote['status']) {
   const map: Record<string, string> = {
@@ -36,19 +35,12 @@ export default function SalesQuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('details');
   const [quote, setQuote] = useState<StoredQuote | null>(null);
-  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const q = getQuoteById(id);
     setQuote(q || null);
   }, [id]);
-
-  const handleDownloadPdf = async () => {
-    if (!quote) return;
-    setDownloading(true);
-    try { await downloadQuotePdf(quote); } finally { setDownloading(false); }
-  };
 
   if (!quote) {
     return (
@@ -92,12 +84,12 @@ export default function SalesQuoteDetailPage() {
             <Edit size={16} /> Edit
           </button>
           <button
-            onClick={handleDownloadPdf}
-            disabled={downloading}
+            disabled
+            title="PDF downloads are unavailable"
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm disabled:opacity-60"
           >
             <FileText size={16} />
-            {downloading ? 'Generating…' : 'Download PDF'}
+            Download PDF
           </button>
         </div>
       </div>

@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, Download, Archive, FileDown, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Plus, Archive, FileDown, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getQuotes, deleteQuote, type StoredQuote } from '@/lib/quoteStore';
-import { downloadQuotePdf } from '@/lib/quotePdfGenerator';
 
 function statusBadge(status: StoredQuote['status']) {
   const map: Record<string, string> = {
@@ -19,7 +18,6 @@ export default function SalesQuotesPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<StoredQuote[]>([]);
-  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     setQuotes(getQuotes());
@@ -31,16 +29,6 @@ export default function SalesQuotesPage() {
   const handleDelete = (id: string) => {
     if (confirm('Delete this quote?')) {
       deleteQuote(id);
-      setRowMenuOpen(null);
-    }
-  };
-
-  const handleDownload = async (quote: StoredQuote) => {
-    setDownloading(quote.id);
-    try {
-      await downloadQuotePdf(quote);
-    } finally {
-      setDownloading(null);
       setRowMenuOpen(null);
     }
   };
@@ -156,12 +144,11 @@ export default function SalesQuotesPage() {
                                 <Edit size={15} /> Edit
                               </button>
                               <button
-                                onClick={() => handleDownload(quote)}
-                                disabled={downloading === quote.id}
-                                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors disabled:opacity-50"
+                                disabled
+                                title="PDF downloads are unavailable"
+                                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <Download size={15} />
-                                {downloading === quote.id ? 'Generating…' : 'Download PDF'}
+                                Download PDF
                               </button>
                               <button
                                 onClick={() => handleDelete(quote.id)}
