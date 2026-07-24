@@ -7,10 +7,10 @@ A modern procurement management frontend built with React, TypeScript, and Vite.
 The app starts automatically via the **Start application** workflow, which runs:
 
 ```bash
-npm run dev
+npm run dev:full
 ```
 
-The dev server listens on port **5000** and is accessible in the Replit preview pane.
+The full-stack dev server listens on port **5000** and is accessible in the Replit preview pane.
 
 ## Tech stack
 
