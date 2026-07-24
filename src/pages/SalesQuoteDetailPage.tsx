@@ -172,7 +172,7 @@ export default function SalesQuoteDetailPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-900 dark:bg-gray-950">
-                    {['Item Name', 'Description', 'HSN/SAC', 'Qty', 'Rate', 'Discount', 'Tax %', 'Amount'].map(h => (
+                    {['Sl.No', 'Item Name', 'Description', 'HSN/SAC', 'Qty', 'Rate', 'Discount', 'Tax %', 'Amount'].map(h => (
                       <th key={h} className="px-4 sm:px-5 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -182,6 +182,7 @@ export default function SalesQuoteDetailPage() {
                     const amt = item.qty * item.rate * (1 - item.discount / 100);
                     return (
                       <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-500 dark:text-gray-400">{quote.lineItems.indexOf(item) + 1}</td>
                         <td className="px-4 sm:px-5 py-2.5 text-sm font-medium text-gray-900 dark:text-white">{item.name}</td>
                         <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-500 dark:text-gray-400">{item.description}</td>
                         <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400">{item.hsnSac}</td>
