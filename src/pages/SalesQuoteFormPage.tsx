@@ -96,6 +96,7 @@ export default function SalesQuoteFormPage() {
 
   // ── Notes & Summary ──────────────────────────────────────────────────────────
   const [adjustment, setAdjustment] = useState<number>(0);
+  const [shippingCharges, setShippingCharges] = useState<number>(0);
   const [termsConditions, setTermsConditions] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
 
@@ -206,23 +207,30 @@ export default function SalesQuoteFormPage() {
   const removeDoc = (idx: number) => setSupportingDocs(prev => prev.filter((_, i) => i !== idx));
 
   // ── Totals ────────────────────────────────────────────────────────────────────
-  const subtotal = lineItems.reduce((s, item) => s + lineAmount(item), 0);
+  const grossSubtotal = lineItems.reduce((s, item) => s + item.qty * item.rate, 0);
+  const totalDiscount = lineItems.reduce((s, item) => s + item.discount, 0);
+  const totalTaxableValue = lineItems.reduce((s, item) => s + taxableAmount(item), 0);
   const gstSlabs = useMemo(() => {
     const map: Record<number, { taxable: number; cgst: number; sgst: number }> = {};
     for (const item of lineItems) {
-      const amt = lineAmount(item);
+      const taxable = taxableAmount(item);
       const rate = item.taxPercent;
       if (!map[rate]) map[rate] = { taxable: 0, cgst: 0, sgst: 0 };
-      map[rate].taxable += amt;
-      map[rate].cgst += amt * (rate / 2) / 100;
-      map[rate].sgst += amt * (rate / 2) / 100;
+      map[rate].taxable += taxable;
+      map[rate].cgst += taxable * (rate / 2) / 100;
+      map[rate].sgst += taxable * (rate / 2) / 100;
     }
     return Object.entries(map).filter(([, v]) => v.taxable > 0)
       .map(([rate, v]) => ({ rate: Number(rate), ...v }))
-      .sort((a, b) => b.rate - a.rate);
+      .sort((a, b) => a.rate - b.rate);
   }, [lineItems]);
-  const totalTax = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
-  const grandTotal = subtotal + totalTax + adjustment;
+  const totalGst = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
+  const shippingGstRate = 18;
+  const shippingGst = shippingCharges * shippingGstRate / 100;
+  const roundOff = adjustment;
+  const grandTotal = totalTaxableValue + totalGst + shippingCharges + shippingGst + roundOff;
+  // legacy alias for buildQuote
+  const subtotal = grandTotal;
 
   // ── Build quote object ────────────────────────────────────────────────────────
   const buildQuote = (status: StoredQuote['status']): StoredQuote => {
@@ -573,55 +581,73 @@ export default function SalesQuoteFormPage() {
           </div>
         </div>
 
-        {/* ── Notes + GST Summary ───────────────────────────────────────── */}
+        {/* ── Notes + Summary ───────────────────────────────────────────── */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <textarea rows={4} placeholder="Additional notes..." className={`${inputCls} resize-none`} />
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <tbody>
+                  {/* Gross Subtotal */}
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Subtotal</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(subtotal)}</td>
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Gross Subtotal</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(grossSubtotal)}</td>
                   </tr>
-                  {gstSlabs.length > 0 ? gstSlabs.map(slab => (
-                    <Fragment key={slab.rate}>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">CGST ({slab.rate / 2}%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(slab.cgst)}</td>
-                      </tr>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">SGST ({slab.rate / 2}%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(slab.sgst)}</td>
-                      </tr>
-                    </Fragment>
-                  )) : (
-                    <>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">CGST (9%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">0.00</td>
-                      </tr>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">SGST (9%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">0.00</td>
-                      </tr>
-                    </>
-                  )}
+                  {/* Item Level Discounts */}
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Adjustment</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(adjustment)}</td>
+                    <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Item Level Discounts (-)</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹ - {fmt(totalDiscount)}</td>
                   </tr>
-                  <tr className="bg-gray-50 dark:bg-gray-700">
-                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-white uppercase tracking-wide">TOTAL</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{fmt(grandTotal)}</td>
+                  {/* Total Taxable Value */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Total Taxable Value</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹{fmt(totalTaxableValue)}</td>
+                  </tr>
+                  {/* Total GST */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
+                      Total GST{gstSlabs.length > 0 ? ` (${gstSlabs.map(s => `${s.rate}%`).join(', ')})` : ''}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(totalGst)}</td>
+                  </tr>
+                  {/* Shipping & Handling */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingCharges)}</td>
+                  </tr>
+                  {/* GST on Shipping */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">GST on Shipping ({shippingGstRate}%)</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingGst)}</td>
+                  </tr>
+                  {/* Round Off */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{roundOff >= 0 ? '' : '-'}₹{fmt(Math.abs(roundOff))}</td>
+                  </tr>
+                  {/* Total Payable */}
+                  <tr className="border-t-2 border-gray-300 dark:border-gray-500">
+                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">Total Payable</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">₹{fmt(grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-          <div className="mt-5 max-w-xs">
-            <label className={labelCls}>Adjustment</label>
-            <input type="number" value={adjustment} onChange={e => setAdjustment(parseFloat(e.target.value) || 0)} className={inputCls} />
+          {/* Inputs below the grid */}
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+            <div>
+              <label className={labelCls}>Shipping &amp; Handling Charges (₹)</label>
+              <input type="number" min={0} value={shippingCharges}
+                onChange={e => setShippingCharges(parseFloat(e.target.value) || 0)}
+                className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Round Off Adjustment (₹)</label>
+              <input type="number" value={adjustment}
+                onChange={e => setAdjustment(parseFloat(e.target.value) || 0)}
+                className={inputCls} />
+            </div>
           </div>
         </div>
 
