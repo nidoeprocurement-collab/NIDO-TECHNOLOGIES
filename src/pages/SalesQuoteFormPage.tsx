@@ -457,8 +457,19 @@ export default function SalesQuoteFormPage() {
               <Plus size={16} /> Add Item
             </button>
           </div>
-          <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
-            <table className="w-full" style={{ minWidth: 780 }}>
+          <div>
+            <table className="w-full">
+              <colgroup>
+                <col style={{ width: '22%' }} />
+                <col style={{ width: '22%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '6%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '4%' }} />
+              </colgroup>
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                   {['ITEM NAME', 'DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISCOUNT', 'TAX %', 'AMOUNT', ''].map(h => (
@@ -474,7 +485,7 @@ export default function SalesQuoteFormPage() {
                   return (
                     <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
                       {/* Item Name */}
-                      <td className="px-3 py-2" style={{ minWidth: 170 }}>
+                      <td className="px-3 py-2">
                         <div className="relative" ref={el => { productRefs.current[item.id] = el; }} onClick={e => e.stopPropagation()}>
                           <input
                             type="text" placeholder="Select item" value={displayName}
@@ -499,12 +510,12 @@ export default function SalesQuoteFormPage() {
                         </div>
                       </td>
                       {/* Description — auto-filled from product */}
-                      <td className="px-3 py-2" style={{ minWidth: 140 }}>
+                      <td className="px-3 py-2">
                         <input type="text" placeholder="Description" value={item.description}
                           onChange={e => updateLineItem(item.id, 'description', e.target.value)} className={tdInputCls} />
                       </td>
                       {/* HSN/SAC */}
-                      <td className="px-3 py-2" style={{ minWidth: 90 }}>
+                      <td className="px-3 py-2">
                         <input type="text" placeholder="HSN/SAC" value={item.hsnSac}
                           onChange={e => updateLineItem(item.id, 'hsnSac', e.target.value)} className={tdInputCls} />
                       </td>
