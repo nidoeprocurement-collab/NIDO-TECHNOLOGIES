@@ -47,6 +47,7 @@ export interface StoredQuote {
   gstSlabs: QuoteGstSlab[];
   totalTax: number;
   adjustment: number;
+  shippingCharges?: number;
   grandTotal: number;
   termsConditions: string;
   customerNotes: string;

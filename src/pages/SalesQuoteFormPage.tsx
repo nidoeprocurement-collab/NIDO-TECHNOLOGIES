@@ -252,6 +252,7 @@ export default function SalesQuoteFormPage() {
       gstSlabs,
       totalTax: totalGst,
       adjustment,
+      shippingCharges,
       grandTotal,
       termsConditions,
       customerNotes,

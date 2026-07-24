@@ -169,27 +169,46 @@ export default function SalesQuoteDetailPage() {
           {/* Line Items Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
+                <colgroup>
+                  <col style={{ width: '3%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '5%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '10%' }} />
+                </colgroup>
                 <thead>
-                  <tr className="bg-gray-900 dark:bg-gray-950">
-                    {['Item Name', 'Description', 'HSN/SAC', 'Qty', 'Rate', 'Discount', 'Tax %', 'Amount'].map(h => (
-                      <th key={h} className="px-4 sm:px-5 py-2.5 text-left text-xs font-semibold text-white uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                    {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)'].map(h => (
+                      <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {quote.lineItems.map(item => {
-                    const amt = item.qty * item.rate * (1 - item.discount / 100);
+                  {quote.lineItems.map((item, idx) => {
+                    const taxable = Math.max(0, item.qty * item.rate - item.discount);
+                    const gst = taxable * (item.taxPercent / 100);
+                    const amt = taxable + gst;
                     return (
                       <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="px-4 sm:px-5 py-2.5 text-sm font-medium text-gray-900 dark:text-white">{item.name}</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-500 dark:text-gray-400">{item.description}</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-600 dark:text-gray-400">{item.hsnSac}</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-900 dark:text-white">{item.qty}</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-900 dark:text-white">{fmt(item.rate)}</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-900 dark:text-white">{item.discount}%</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm text-gray-900 dark:text-white">{item.taxPercent}%</td>
-                        <td className="px-4 sm:px-5 py-2.5 text-sm font-medium text-gray-900 dark:text-white text-right">{fmt(amt)}</td>
+                        <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 text-center">{idx + 1}</td>
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                          {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.description}</p>}
+                        </td>
+                        <td className="px-3 py-2.5 text-gray-600 dark:text-gray-400">{item.hsnSac}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-center">{item.qty}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(item.rate)}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(item.discount)}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(taxable)}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-center">{item.taxPercent}%</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(gst)}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-white text-right">{fmt(amt)}</td>
                       </tr>
                     );
                   })}
@@ -198,39 +217,64 @@ export default function SalesQuoteDetailPage() {
             </div>
           </div>
 
-          {/* Totals */}
-          <div className="flex justify-end">
-            <div className="w-full sm:w-80 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500 dark:text-gray-400">Subtotal</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{fmt(quote.subtotal)}</span>
-                </div>
-                {quote.gstSlabs.map(slab => (
-                  <div key={slab.rate}>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 dark:text-gray-400">CGST ({slab.rate / 2}%)</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{fmt(slab.cgst)}</span>
-                    </div>
-                    <div className="flex justify-between mt-3">
-                      <span className="text-gray-500 dark:text-gray-400">SGST ({slab.rate / 2}%)</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{fmt(slab.sgst)}</span>
-                    </div>
-                  </div>
-                ))}
-                {quote.adjustment !== 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Adjustment</span>
-                    <span className="font-medium text-gray-900 dark:text-white">{fmt(quote.adjustment)}</span>
-                  </div>
-                )}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between">
-                  <span className="font-bold text-gray-900 dark:text-white">Total</span>
-                  <span className="font-bold text-lg text-gray-900 dark:text-white">₹{fmt(quote.grandTotal)}</span>
+          {/* Totals — matches Create New Quote summary panel */}
+          {(() => {
+            const grossSubtotal = quote.lineItems.reduce((s, i) => s + i.qty * i.rate, 0);
+            const totalDiscount = quote.lineItems.reduce((s, i) => s + i.discount, 0);
+            const totalTaxableValue = quote.lineItems.reduce((s, i) => s + Math.max(0, i.qty * i.rate - i.discount), 0);
+            const totalGst = quote.totalTax;
+            const shippingCharges = quote.shippingCharges ?? 0;
+            const shippingGstRate = 18;
+            const shippingGst = shippingCharges * shippingGstRate / 100;
+            const roundOff = quote.adjustment;
+            const gstRateLabels = [...new Set(quote.lineItems.map(i => i.taxPercent))].sort((a,b)=>a-b).map(r=>`${r}%`).join(', ');
+            return (
+              <div className="flex justify-end">
+                <div className="w-full sm:w-96 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Gross Subtotal</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(grossSubtotal)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Item Level Discounts (-)</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹ - {fmt(totalDiscount)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Total Taxable Value</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹{fmt(totalTaxableValue)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
+                          Total GST{gstRateLabels ? ` (${gstRateLabels})` : ''}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(totalGst)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingCharges)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">GST on Shipping ({shippingGstRate}%)</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingGst)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">
+                          {roundOff >= 0 ? '' : '-'}₹{fmt(Math.abs(roundOff))}
+                        </td>
+                      </tr>
+                      <tr className="border-t-2 border-gray-300 dark:border-gray-500">
+                        <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">Total Payable</td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">₹{fmt(quote.grandTotal)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Terms / Notes */}
           {(quote.termsConditions || quote.customerNotes) && (
