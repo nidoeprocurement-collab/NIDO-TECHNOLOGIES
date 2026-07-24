@@ -89,9 +89,12 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
   let y = margin;
 
   // ── HEADER ─────────────────────────────────────────────────────────────────
-  // Logo (left side)
+  // Logo symbol + company name beside it (left side)
   const logoUrl = org.logoUrl;
+  const logoSize = 42;           // symbol-only square
+  const logoTextGap = 10;        // gap between symbol and text
   let logoLoaded = false;
+
   if (logoUrl) {
     try {
       let imgData = logoUrl;
@@ -101,7 +104,7 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
         else imgData = '';
       }
       if (imgData) {
-        doc.addImage(imgData, undefined as any, margin, y, 110, 55);
+        doc.addImage(imgData, undefined as any, margin, y, logoSize, logoSize);
         logoLoaded = true;
       }
     } catch {
@@ -109,10 +112,14 @@ export async function generateQuotePdfBase64(quote: StoredQuote): Promise<string
     }
   }
 
-  if (!logoLoaded) {
-    // Placeholder text logo
-    doc.setFontSize(18).setFont('helvetica', 'bold').setTextColor(220, 50, 50);
-    doc.text(org.displayName || org.companyName || 'Company', margin, y + 30);
+  // Display name + industry beside the logo (or alone if no logo)
+  const nameX = logoLoaded ? margin + logoSize + logoTextGap : margin;
+  const nameY = y + (logoLoaded ? 16 : 14);
+  doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(20, 20, 20);
+  doc.text(org.displayName || org.companyName || 'Company', nameX, nameY);
+  if (org.industry) {
+    doc.setFont('helvetica', 'normal').setFontSize(8.5).setTextColor(110, 110, 110);
+    doc.text(org.industry, nameX, nameY + 14);
   }
 
   // Company info (right side)
