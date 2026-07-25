@@ -69,7 +69,7 @@ export default function InvoiceDetails() {
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button onClick={() => navigate(`/sales/invoices/${invoice.id}/edit`)} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"><Edit size={16} /> Edit</button>
-          <button onClick={() => downloadInvoicePdf(invoice)} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><Download size={16} /> Download PDF</button>
+          <button onClick={() => { downloadInvoicePdf(invoice); }} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"><Download size={16} /> Download PDF</button>
           <button onClick={() => { const updated = { ...invoice, status: 'Sent' as const, activity: [...invoice.activity, { id: `${Date.now()}-activity`, date: new Date().toISOString().split('T')[0], title: 'Invoice sent', description: 'Invoice marked as sent to the client.' }] }; saveInvoice(updated); setInvoice(updated); }} className="inline-flex items-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"><Send size={16} /> Mark Sent</button>
         </div>
       </div>
