@@ -45,15 +45,7 @@ export default function SalesQuotesPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quotes</h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={e => { e.stopPropagation(); navigate('/sales/quotes/create'); }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
-          >
-            <Plus size={16} />
-            New Quote
-          </button>
-
+         <div className="flex items-center gap-2">
           <div className="relative" onClick={e => e.stopPropagation()}>
             <button
               onClick={() => setMenuOpen(v => !v)}
@@ -63,6 +55,13 @@ export default function SalesQuotesPage() {
             </button>
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
+                 <button
+                   onClick={() => { setMenuOpen(false); navigate('/sales/quotes/create'); }}
+                   className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                 >
+                   <Plus size={16} />
+                   New Quote
+                 </button>
                 <button
                   onClick={() => { setMenuOpen(false); }}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
