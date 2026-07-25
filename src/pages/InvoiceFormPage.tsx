@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Plus, Save, Trash2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   generateInvoiceNumber,
@@ -9,6 +9,7 @@ import {
   type InvoiceStatus,
   type StoredInvoice,
 } from '@/lib/invoiceStore';
+import { getActiveOrders } from '@/lib/salesOrderStore';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -45,6 +46,10 @@ export default function InvoiceFormPage() {
   const { id } = useParams<{ id: string }>();
   const existing = useMemo(() => (id ? getInvoiceById(id) : undefined), [id]);
 
+  // ── Sales orders for import dropdown ────────────────────────────────────
+  const salesOrders = useMemo(() => getActiveOrders(), []);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+
   // ── Header fields ────────────────────────────────────────────────────────
   const [invoiceNumber] = useState(existing?.invoiceNumber || generateInvoiceNumber());
   const [invoiceDate, setInvoiceDate] = useState(existing?.invoiceDate || today());
@@ -80,6 +85,50 @@ export default function InvoiceFormPage() {
   const [bankAccountNo, setBankAccountNo] = useState(existing?.bankAccountNo || '');
   const [bankIfsc, setBankIfsc] = useState(existing?.bankIfsc || '');
   const [bankBranch, setBankBranch] = useState(existing?.bankBranch || '');
+
+  // ── Import from sales order ──────────────────────────────────────────────
+  const handleOrderSelect = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    if (!orderId) return;
+    const order = salesOrders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    // Client & address fields
+    setClientName(order.clientName || '');
+    setContactPerson(order.contactPerson || '');
+    setClientGstin(order.clientGstin || '');
+    setBillingAddress(order.billingAddress || '');
+    setShippingAddress(order.shippingAddress || order.billingAddress || '');
+    setPlaceOfSupply(order.placeOfSupply || '');
+
+    // Order reference
+    setPoReference(order.orderNumber);
+
+    // Line items — map from sales order format to invoice format
+    if (order.lineItems && order.lineItems.length > 0) {
+      setLineItems(
+        order.lineItems.map((li) => ({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          description: li.name || '',
+          itemDetails: li.description || '',
+          hsnSac: li.hsnSac || '',
+          quantity: li.qty || 1,
+          rate: li.rate || 0,
+          discount: li.discount || 0,
+          taxPercent: li.taxPercent || 18,
+          taxType: 'IGST' as const,
+        }))
+      );
+    }
+
+    // Notes & terms
+    if (order.customerNotes) setNotes(order.customerNotes);
+    if (order.termsConditions) setTermsConditions(order.termsConditions);
+
+    // Charges
+    if (order.shippingCharges) setShippingCharges(order.shippingCharges);
+    if (order.adjustment) setAdjustment(order.adjustment);
+  };
 
   // ── Computed totals ──────────────────────────────────────────────────────
   const grossSubtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0);
@@ -163,6 +212,61 @@ export default function InvoiceFormPage() {
         </div>
       </div>
 
+      {/* ── Import from Sales Order ── */}
+      {!existing && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <ClipboardList size={20} className="text-blue-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-blue-900 mb-1">Import from Sales Order</p>
+              <p className="text-xs text-blue-700 mb-3">
+                Select a sales order to automatically fill in client details, line items, and other fields.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-[220px]">
+                  <select
+                    value={selectedOrderId}
+                    onChange={(e) => handleOrderSelect(e.target.value)}
+                    className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    style={{ position: 'relative', zIndex: 1 }}
+                  >
+                    <option value="">— Select a Sales Order —</option>
+                    {salesOrders.length === 0 ? (
+                      <option disabled>No sales orders found</option>
+                    ) : (
+                      salesOrders.map((order) => (
+                        <option key={order.id} value={order.id}>
+                          {order.orderNumber} — {order.clientName} (₹{order.grandTotal.toLocaleString('en-IN')})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+                {selectedOrderId && (
+                  <button
+                    type="button"
+                    onClick={() => handleOrderSelect('')}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline whitespace-nowrap"
+                  >
+                    Clear selection
+                  </button>
+                )}
+              </div>
+              {selectedOrderId && (
+                <p className="mt-2 text-xs text-blue-600 font-medium">
+                  ✓ Order data imported — review and edit the fields below before saving.
+                </p>
+              )}
+              {salesOrders.length === 0 && (
+                <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 inline-block">
+                  No confirmed sales orders yet. Create orders under Transactions → Sales → Orders first.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-gray-200 p-5 md:p-6 space-y-7">
 
         {/* ── Invoice Details ── */}
@@ -187,7 +291,7 @@ export default function InvoiceFormPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Label text="Order Reference">
-              <input value={poReference} onChange={(e) => setPoReference(e.target.value)} placeholder="e.g. PO-99482" className={inputCls} />
+              <input value={poReference} onChange={(e) => setPoReference(e.target.value)} placeholder="e.g. SO-000001" className={inputCls} />
             </Label>
             <Label text="Place of Supply">
               <input value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} placeholder="e.g. Telangana (36)" className={inputCls} />
