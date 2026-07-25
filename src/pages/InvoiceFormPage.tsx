@@ -186,7 +186,7 @@ export default function InvoiceFormPage() {
             </Label>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Label text="PO Reference">
+            <Label text="Order Reference">
               <input value={poReference} onChange={(e) => setPoReference(e.target.value)} placeholder="e.g. PO-99482" className={inputCls} />
             </Label>
             <Label text="Place of Supply">
