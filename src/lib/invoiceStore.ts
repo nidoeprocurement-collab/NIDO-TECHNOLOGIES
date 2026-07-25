@@ -30,6 +30,7 @@ export interface InvoiceActivity {
 export interface StoredInvoice {
   id: string;
   invoiceNumber: string;
+  archived?: boolean;
   // client
   clientName: string;
   contactPerson: string;
@@ -241,7 +242,11 @@ function seedInvoices(): StoredInvoice[] {
 }
 
 export function getInvoices(): StoredInvoice[] {
-  return seedInvoices();
+  return seedInvoices().filter((inv) => !inv.archived);
+}
+
+export function getArchivedInvoices(): StoredInvoice[] {
+  return seedInvoices().filter((inv) => inv.archived);
 }
 
 export function getInvoiceById(id: string): StoredInvoice | undefined {
@@ -257,8 +262,24 @@ export function saveInvoice(invoice: StoredInvoice): void {
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
 }
 
+export function archiveInvoice(id: string): void {
+  const all = seedInvoices();
+  const idx = all.findIndex((inv) => inv.id === id);
+  if (idx >= 0) { all[idx] = { ...all[idx], archived: true }; }
+  localStorage.setItem(STORE_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event('nidoInvoicesUpdated'));
+}
+
+export function unarchiveInvoice(id: string): void {
+  const all = seedInvoices();
+  const idx = all.findIndex((inv) => inv.id === id);
+  if (idx >= 0) { all[idx] = { ...all[idx], archived: false }; }
+  localStorage.setItem(STORE_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event('nidoInvoicesUpdated'));
+}
+
 export function deleteInvoice(id: string): void {
-  localStorage.setItem(STORE_KEY, JSON.stringify(getInvoices().filter((invoice) => invoice.id !== id)));
+  localStorage.setItem(STORE_KEY, JSON.stringify(seedInvoices().filter((invoice) => invoice.id !== id)));
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
 }
 
