@@ -141,7 +141,7 @@ export default function InvoiceFormPage() {
 
     setClientName(order.client || '');
     setContactPerson(order.requester || '');
-    setPoReference(order.poNumber || '');
+    setPoReference(order.id);          // use the Order ID (ORD-000001) as reference
     if (order.deliveryAddress) {
       setBillingAddress(order.deliveryAddress);
       setShippingAddress(order.deliveryAddress);
@@ -163,7 +163,7 @@ export default function InvoiceFormPage() {
       );
     }
 
-    setImportedRefLabel(order.poNumber);
+    setImportedRefLabel(order.id);
   }
 
   // ── Import from Quotation ────────────────────────────────────────────────
@@ -246,7 +246,7 @@ export default function InvoiceFormPage() {
         .filter((o) => o.status !== 'Cancelled')
         .map((o) => ({
           id:    o.id,
-          label: `${o.poNumber} — ${o.client} (${o.totalAmount})`,
+          label: `${o.id} — ${o.client} (${o.totalAmount})`,
         }));
     }
     if (importSource === 'quotation') {
