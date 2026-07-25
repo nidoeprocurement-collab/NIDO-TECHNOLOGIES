@@ -48,6 +48,8 @@ export interface StoredQuote {
   totalTax: number;
   adjustment: number;
   shippingCharges?: number;
+  /** False for quotes created without GST on shipping; undefined is a legacy quote. */
+  shippingGstIncluded?: boolean;
   grandTotal: number;
   termsConditions: string;
   customerNotes: string;
@@ -63,7 +65,24 @@ export interface StoredQuote {
 
 export function getQuotes(): StoredQuote[] {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    const quotes = JSON.parse(localStorage.getItem(STORE_KEY) || '[]') as StoredQuote[];
+    let normalizedLegacyQuote = false;
+    const normalizedQuotes = quotes.map((quote) => {
+      if (quote.shippingGstIncluded !== undefined) return quote;
+
+      normalizedLegacyQuote = true;
+      const shippingCharges = quote.shippingCharges ?? 0;
+      return {
+        ...quote,
+        shippingGstIncluded: false,
+        grandTotal: quote.grandTotal - shippingCharges * 0.18,
+      };
+    });
+
+    if (normalizedLegacyQuote) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(normalizedQuotes));
+    }
+    return normalizedQuotes;
   } catch {
     return [];
   }

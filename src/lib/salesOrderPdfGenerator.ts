@@ -40,6 +40,7 @@ export async function generateSalesOrderPdfBase64(order: StoredSalesOrder): Prom
     title: 'SALES ORDER',
     firstDateLabel: 'Order Date',
     secondDateLabel: 'Delivery Date',
+    includeShippingGst: true,
   });
 }
 

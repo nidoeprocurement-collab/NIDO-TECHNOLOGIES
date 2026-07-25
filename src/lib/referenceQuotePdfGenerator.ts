@@ -8,6 +8,7 @@ export interface ReferenceDocumentOptions {
   title?: string;
   firstDateLabel?: string;
   secondDateLabel?: string;
+  includeShippingGst?: boolean;
 }
 
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -119,9 +120,11 @@ function drawSummary(
   x: number,
   y: number,
   width: number,
+  options: { includeShippingGst?: boolean } = {},
 ): number {
   const shipping = quote.shippingCharges ?? 0;
-  const shippingGst = shipping * 0.18;
+  const includeShippingGst = options.includeShippingGst ?? false;
+  const shippingGst = includeShippingGst ? shipping * 0.18 : 0;
   const grossSubtotal = quote.lineItems.reduce((sum, item) => sum + item.qty * item.rate, 0);
   const discount = quote.lineItems.reduce((sum, item) => sum + item.discount, 0);
   const taxable = quote.lineItems.reduce(
@@ -139,7 +142,7 @@ function drawSummary(
     ['Total Taxable Value', `INR ${fmt2(taxable)}`],
     [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(quote.totalTax)}`],
     ['Shipping & Handling Charges', `INR ${fmt2(shipping)}`],
-    ['GST on Shipping (18%)', `INR ${fmt2(shippingGst)}`],
+    ...(includeShippingGst ? [['GST on Shipping (18%)', `INR ${fmt2(shippingGst)}`] as [string, string]] : []),
     ['Round Off Adjustment', `${quote.adjustment < 0 ? '-' : ''}INR ${fmt2(Math.abs(quote.adjustment))}`],
   ];
 
@@ -331,7 +334,7 @@ export async function generateReferenceQuotePdfBase64(
   y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
   const summaryWidth = 250;
   const summaryX = pageWidth - margin - summaryWidth;
-  const summaryHeight = drawSummary(doc, quote, summaryX, y, summaryWidth);
+  const summaryHeight = drawSummary(doc, quote, summaryX, y, summaryWidth, options);
 
   let leftY = y + 2;
   const leftWidth = summaryX - margin - 16;

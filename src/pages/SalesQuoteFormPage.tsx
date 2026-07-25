@@ -122,6 +122,7 @@ export default function SalesQuoteFormPage() {
     q.lineItems.forEach(item => { ps[item.id] = item.name; });
     setProductSearch(ps);
     setAdjustment(q.adjustment);
+    setShippingCharges(q.shippingCharges ?? 0);
     setTermsConditions(q.termsConditions);
     setCustomerNotes(q.customerNotes);
     setSupportingDocs(q.supportingDocs || []);
@@ -225,10 +226,8 @@ export default function SalesQuoteFormPage() {
       .sort((a, b) => a.rate - b.rate);
   }, [lineItems]);
   const totalGst = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
-  const shippingGstRate = 18;
-  const shippingGst = shippingCharges * shippingGstRate / 100;
   const roundOff = adjustment;
-  const grandTotal = totalTaxableValue + totalGst + shippingCharges + shippingGst + roundOff;
+  const grandTotal = totalTaxableValue + totalGst + shippingCharges + roundOff;
   const subtotal = totalTaxableValue;
 
   // ── Build quote object ────────────────────────────────────────────────────────
@@ -253,6 +252,7 @@ export default function SalesQuoteFormPage() {
       totalTax: totalGst,
       adjustment,
       shippingCharges,
+      shippingGstIncluded: false,
       grandTotal,
       termsConditions,
       customerNotes,
@@ -614,11 +614,6 @@ export default function SalesQuoteFormPage() {
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
                     <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingCharges)}</td>
-                  </tr>
-                  {/* GST on Shipping */}
-                  <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">GST on Shipping ({shippingGstRate}%)</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingGst)}</td>
                   </tr>
                   {/* Round Off */}
                   <tr className="border-b border-gray-200 dark:border-gray-700">

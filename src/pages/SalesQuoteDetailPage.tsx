@@ -216,8 +216,6 @@ export default function SalesQuoteDetailPage() {
             const totalTaxableValue = quote.lineItems.reduce((s, i) => s + Math.max(0, i.qty * i.rate - i.discount), 0);
             const totalGst = quote.totalTax;
             const shippingCharges = quote.shippingCharges ?? 0;
-            const shippingGstRate = 18;
-            const shippingGst = shippingCharges * shippingGstRate / 100;
             const roundOff = quote.adjustment;
             const gstRateLabels = [...new Set(quote.lineItems.map(i => i.taxPercent))].sort((a,b)=>a-b).map(r=>`${r}%`).join(', ');
             return (
@@ -246,10 +244,6 @@ export default function SalesQuoteDetailPage() {
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
                         <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingCharges)}</td>
-                      </tr>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">GST on Shipping ({shippingGstRate}%)</td>
-                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingGst)}</td>
                       </tr>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
