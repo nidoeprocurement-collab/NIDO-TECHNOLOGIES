@@ -192,6 +192,7 @@ const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
 const InvoicePage = lazy(() => import("@/pages/InvoicePage"));
 const InvoiceDetails = lazy(() => import("@/pages/InvoiceDetails"));
+const InvoiceFormPage = lazy(() => import("@/pages/InvoiceFormPage"));
 const SalesQuotesPage = lazy(() => import("@/pages/SalesQuotesPage"));
 const ArchivedQuotesPage = lazy(() => import("@/pages/ArchivedQuotesPage"));
 const SalesQuoteDetailPage = lazy(() => import("@/pages/SalesQuoteDetailPage"));
@@ -806,6 +807,8 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
+          <Route path="sales/invoices/new" element={<InvoiceFormPage />} />
+          <Route path="sales/invoices/:id/edit" element={<InvoiceFormPage />} />
           <Route
             path="sales/invoices/:id"
             element={
@@ -870,6 +873,7 @@ function AppRoutes() {
             path="invoices"
             element={<Navigate to="/sales/invoices" replace />}
           />
+          <Route path="invoices/new" element={<Navigate to="/sales/invoices/new" replace />} />
           <Route path="procure/requests" element={<MyOrderPage />} />
           <Route path="procure/approvals" element={<ApprovalWorkflowsPage />} />
           <Route path="organizations" element={<OrganizationsPage />} />
