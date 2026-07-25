@@ -4,6 +4,12 @@ import { loadConfig } from './configService';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredQuote } from './quoteStore';
 
+export interface ReferenceDocumentOptions {
+  title?: string;
+  firstDateLabel?: string;
+  secondDateLabel?: string;
+}
+
 const BLUE: [number, number, number] = [31, 95, 190];
 const DARK: [number, number, number] = [28, 39, 56];
 const TEXT: [number, number, number] = [55, 62, 72];
@@ -170,7 +176,10 @@ function drawSummary(
   return height;
 }
 
-export async function generateReferenceQuotePdfBase64(quote: StoredQuote): Promise<string> {
+export async function generateReferenceQuotePdfBase64(
+  quote: StoredQuote,
+  options: ReferenceDocumentOptions = {},
+): Promise<string> {
   const org = loadConfig().organization;
   const brandHeader = getBrandHeader(org.displayName, org.industry);
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
@@ -203,7 +212,7 @@ export async function generateReferenceQuotePdfBase64(quote: StoredQuote): Promi
   drawText(doc, brandHeader.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
   drawText(doc, brandHeader.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
-  drawText(doc, 'ESTIMATE', pageWidth - margin, 48, { size: 22, color: DARK, bold: true, align: 'right' });
+  drawText(doc, options.title || 'ESTIMATE', pageWidth - margin, 48, { size: 22, color: DARK, bold: true, align: 'right' });
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.roundedRect(pageWidth - margin - 102, 61, 102, 28, 4, 4, 'S');
    drawText(doc, '#', pageWidth - margin - 91, 79, { size: 11, color: BLUE });
@@ -221,8 +230,8 @@ export async function generateReferenceQuotePdfBase64(quote: StoredQuote): Promi
     companyY += 11;
   });
 
-  drawText(doc, `Estimate Date: ${fmtDate(quote.quoteDate)}`, pageWidth - margin, 112, { size: 8, color: TEXT, align: 'right' });
-  drawText(doc, `Valid Till: ${fmtDate(quote.validTill)}`, pageWidth - margin, 126, { size: 8, color: TEXT, align: 'right' });
+  drawText(doc, `${options.firstDateLabel || 'Estimate Date'}: ${fmtDate(quote.quoteDate)}`, pageWidth - margin, 112, { size: 8, color: TEXT, align: 'right' });
+  drawText(doc, `${options.secondDateLabel || 'Valid Till'}: ${fmtDate(quote.validTill)}`, pageWidth - margin, 126, { size: 8, color: TEXT, align: 'right' });
   if (quote.placeOfSupply) {
     drawText(doc, `Place of Supply: ${quote.placeOfSupply}`, pageWidth - margin, 140, { size: 8, color: TEXT, align: 'right' });
   }

@@ -94,6 +94,24 @@ export default function SalesOrderFormPage() {
   const [productRect, setProductRect] = useState<DOMRect | null>(null);
   const productInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  const getDropdownPosition = (rect: DOMRect, width: number, maxHeight = 320): React.CSSProperties => {
+    const gap = 4;
+    const viewportPadding = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const spaceAbove = rect.top - viewportPadding;
+    const openUpward = spaceBelow < 180 && spaceAbove > spaceBelow;
+    const availableHeight = Math.max(120, Math.min(maxHeight, openUpward ? spaceAbove : spaceBelow));
+    return {
+      position: 'fixed',
+      top: openUpward ? undefined : rect.bottom + gap,
+      bottom: openUpward ? window.innerHeight - rect.top + gap : undefined,
+      left: Math.min(rect.left, Math.max(viewportPadding, window.innerWidth - width - viewportPadding)),
+      width,
+      maxHeight: availableHeight,
+      zIndex: 100000,
+    };
+  };
+
   // ── Summary ────────────────────────────────────────────────────────────────
   const [adjustment, setAdjustment] = useState<number>(0);
   const [shippingCharges, setShippingCharges] = useState<number>(0);
@@ -616,7 +634,7 @@ export default function SalesOrderFormPage() {
       {/* ── Portal: Client dropdown ──────────────────────────────────────── */}
       {showClientDropdown && clientRect && createPortal(
         <div
-          style={{ position: 'fixed', top: clientRect.bottom + 4, left: clientRect.left, width: clientRect.width, zIndex: 9999 }}
+           style={getDropdownPosition(clientRect, clientRect.width, 260)}
           className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-52 overflow-y-auto"
           onMouseDown={e => e.stopPropagation()}
         >
@@ -638,7 +656,7 @@ export default function SalesOrderFormPage() {
           const filteredProds = getFilteredProducts(openProductId);
           return (
             <div
-              style={{ position: 'fixed', top: productRect.bottom + 4, left: productRect.left, width: 288, zIndex: 9999 }}
+               style={getDropdownPosition(productRect, 288, 300)}
               className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto"
               onMouseDown={e => e.stopPropagation()}
             >

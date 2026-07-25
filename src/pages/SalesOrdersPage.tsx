@@ -1,11 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useConfig } from "@/contexts/ConfigContext";
-import { Plus, Search, MoreVertical, Archive, FileDown, Eye, RotateCcw, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Plus, Search, MoreVertical, Archive, FileDown, FileText, Eye, RotateCcw, X } from "lucide-react";
 import {
   getActiveOrders, getArchivedOrders, archiveOrder, restoreOrder,
   type StoredSalesOrder,
 } from "@/lib/salesOrderStore";
+import { downloadSalesOrderPdf } from "@/lib/salesOrderPdfGenerator";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -31,6 +33,8 @@ export default function SalesOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [menuOpen, setMenuOpen] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
+  const [rowMenuRect, setRowMenuRect] = useState<DOMRect | null>(null);
+  const rowMenuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [showArchivedModal, setShowArchivedModal] = useState(false);
 
   useEffect(() => {
@@ -40,7 +44,15 @@ export default function SalesOrdersPage() {
     };
     refresh();
     window.addEventListener("nidoSalesOrdersUpdated", refresh);
-    return () => window.removeEventListener("nidoSalesOrdersUpdated", refresh);
+    const closeMenusOnScroll = () => {
+      setRowMenuOpen(null);
+      setRowMenuRect(null);
+    };
+    window.addEventListener("scroll", closeMenusOnScroll, true);
+    return () => {
+      window.removeEventListener("nidoSalesOrdersUpdated", refresh);
+      window.removeEventListener("scroll", closeMenusOnScroll, true);
+    };
   }, []);
 
   const displayedOrders = useMemo(
@@ -66,7 +78,25 @@ export default function SalesOrdersPage() {
     if (confirm("Move this order to Archived Orders?")) {
       archiveOrder(id);
       setRowMenuOpen(null);
+      setRowMenuRect(null);
     }
+  };
+
+  const toggleRowMenu = (id: string) => {
+    if (rowMenuOpen === id) {
+      setRowMenuOpen(null);
+      setRowMenuRect(null);
+      return;
+    }
+    const rect = rowMenuButtonRefs.current[id]?.getBoundingClientRect();
+    if (!rect) return;
+    setRowMenuOpen(id);
+    setRowMenuRect(rect);
+  };
+
+  const closeRowMenu = () => {
+    setRowMenuOpen(null);
+    setRowMenuRect(null);
   };
 
   const exportCsv = () => {
@@ -220,33 +250,50 @@ export default function SalesOrdersPage() {
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <div className="relative">
                           <button
-                            onClick={() => setRowMenuOpen(rowMenuOpen === o.id ? null : o.id)}
+                             ref={button => { rowMenuButtonRefs.current[o.id] = button; }}
+                             onClick={() => toggleRowMenu(o.id)}
                             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                           >
                             <MoreVertical size={16} className="text-gray-600 dark:text-gray-400" />
                           </button>
-                          {rowMenuOpen === o.id && (
-                            <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
+                           {rowMenuOpen === o.id && rowMenuRect && createPortal(
+                             <div
+                               style={{
+                                 position: "fixed",
+                                 top: Math.min(rowMenuRect.bottom + 4, window.innerHeight - 220),
+                                 left: Math.max(8, rowMenuRect.right - 176),
+                                 zIndex: 100000,
+                               }}
+                               className="w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-2"
+                               onClick={e => e.stopPropagation()}
+                             >
                               <button
-                                onClick={() => { navigate(`/sales/orders/${o.id}`); setRowMenuOpen(null); }}
+                                 onClick={() => { navigate(`/sales/orders/${o.id}`); closeRowMenu(); }}
                                 className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                               >
                                 <Eye size={15} /> View
                               </button>
                               <button
-                                onClick={() => { navigate(`/sales/orders/${o.id}/edit`); setRowMenuOpen(null); }}
+                                 onClick={() => { navigate(`/sales/orders/${o.id}/edit`); closeRowMenu(); }}
                                 className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                               >
                                 Edit
                               </button>
+                               <button
+                                 onClick={() => { void downloadSalesOrderPdf(o); closeRowMenu(); }}
+                                 className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+                               >
+                                 <FileText size={15} /> Download PDF
+                               </button>
                               <button
                                 onClick={() => handleArchive(o.id)}
                                 className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                               >
                                 <Archive size={15} /> Archive
                               </button>
-                            </div>
-                          )}
+                             </div>,
+                             document.body,
+                           )}
                         </div>
                       </div>
                     </td>
