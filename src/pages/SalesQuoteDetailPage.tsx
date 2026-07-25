@@ -85,7 +85,7 @@ export default function SalesQuoteDetailPage() {
             <Edit size={16} /> Edit
           </button>
           <button
-            onClick={downloadReferenceQuotePdf}
+            onClick={() => { void downloadReferenceQuotePdf(quote); }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
           >
             <FileText size={16} />
