@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, Archive, FileDown, MoreVertical, Edit } from 'lucide-react';
+import { Plus, Archive, FileDown, MoreVertical, Edit, X, RotateCcw } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { archiveQuote, getActiveQuotes, type StoredQuote } from '@/lib/quoteStore';
+import { archiveQuote, getActiveQuotes, getArchivedQuotes, restoreQuote, type StoredQuote } from '@/lib/quoteStore';
 import { downloadReferenceQuotePdf } from '@/lib/referenceQuotePdf';
 
 function statusBadge(status: StoredQuote['status']) {
@@ -19,10 +19,16 @@ export default function SalesQuotesPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<StoredQuote[]>([]);
+  const [showArchivedModal, setShowArchivedModal] = useState(false);
+  const [archivedQuotes, setArchivedQuotes] = useState<StoredQuote[]>([]);
 
   useEffect(() => {
     setQuotes(getActiveQuotes());
-    const refresh = () => setQuotes(getActiveQuotes());
+    setArchivedQuotes(getArchivedQuotes());
+    const refresh = () => {
+      setQuotes(getActiveQuotes());
+      setArchivedQuotes(getArchivedQuotes());
+    };
     window.addEventListener('nidoQuotesUpdated', refresh);
     return () => window.removeEventListener('nidoQuotesUpdated', refresh);
   }, []);
@@ -91,7 +97,7 @@ export default function SalesQuotesPage() {
                   Export CSV
                 </button>
                 <button
-                  onClick={() => { setMenuOpen(false); window.open('/sales/quotes/archived', '_blank'); }}
+                  onClick={() => { setMenuOpen(false); setShowArchivedModal(true); }}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                 >
                   <Archive size={16} />
@@ -188,6 +194,91 @@ export default function SalesQuotesPage() {
           </div>
         )}
       </div>
+
+      {/* Archived Quotes Modal */}
+      {showArchivedModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowArchivedModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col mx-4"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <Archive size={20} className="text-gray-500 dark:text-gray-400" />
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900 dark:text-white">Archived Quotes</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Quotes moved out of the active list</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500 dark:text-gray-400">{archivedQuotes.length} archived</span>
+                <button
+                  onClick={() => setShowArchivedModal(false)}
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X size={18} className="text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-auto flex-1">
+              {archivedQuotes.length === 0 ? (
+                <div className="py-16 text-center text-gray-500 dark:text-gray-400">
+                  No archived quotes
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                      {['DATE', 'QUOTE #', 'CUSTOMER', 'STATUS', 'VALID TILL', 'TOTAL', 'ACTIONS'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archivedQuotes.map(quote => (
+                      <tr key={quote.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{quote.quoteDate}</td>
+                        <td className="px-4 py-3 text-sm font-medium">
+                          <button
+                            onClick={() => { setShowArchivedModal(false); navigate(`/sales/quotes/${quote.id}`); }}
+                            className="text-blue-600 hover:underline font-semibold px-2 py-1 rounded transition-colors"
+                          >
+                            {quote.quoteNumber}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{quote.clientName}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusBadge(quote.status)}`}>
+                            {quote.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{quote.validTill}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{fmt(quote.grandTotal)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <button
+                            onClick={() => restoreQuote(quote.id)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          >
+                            <RotateCcw size={15} /> Restore
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
