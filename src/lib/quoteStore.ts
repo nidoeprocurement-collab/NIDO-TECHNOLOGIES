@@ -57,6 +57,8 @@ export interface StoredQuote {
   placeOfSupply?: string;
   createdAt: string;
   updatedAt: string;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export function getQuotes(): StoredQuote[] {
@@ -65,6 +67,14 @@ export function getQuotes(): StoredQuote[] {
   } catch {
     return [];
   }
+}
+
+export function getActiveQuotes(): StoredQuote[] {
+  return getQuotes().filter(quote => !quote.archived);
+}
+
+export function getArchivedQuotes(): StoredQuote[] {
+  return getQuotes().filter(quote => quote.archived === true);
 }
 
 export function getQuoteById(id: string): StoredQuote | undefined {
@@ -83,8 +93,22 @@ export function saveQuote(quote: StoredQuote): void {
   window.dispatchEvent(new Event('nidoQuotesUpdated'));
 }
 
-export function deleteQuote(id: string): void {
-  const quotes = getQuotes().filter(q => q.id !== id);
+export function archiveQuote(id: string): void {
+  const quotes = getQuotes().map(quote =>
+    quote.id === id
+      ? { ...quote, archived: true, archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      : quote,
+  );
+  localStorage.setItem(STORE_KEY, JSON.stringify(quotes));
+  window.dispatchEvent(new Event('nidoQuotesUpdated'));
+}
+
+export function restoreQuote(id: string): void {
+  const quotes = getQuotes().map(quote =>
+    quote.id === id
+      ? { ...quote, archived: false, archivedAt: undefined, updatedAt: new Date().toISOString() }
+      : quote,
+  );
   localStorage.setItem(STORE_KEY, JSON.stringify(quotes));
   window.dispatchEvent(new Event('nidoQuotesUpdated'));
 }

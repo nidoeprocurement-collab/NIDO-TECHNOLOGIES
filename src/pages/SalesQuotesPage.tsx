@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Plus, Archive, FileDown, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Plus, Archive, FileDown, MoreVertical, Edit } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getQuotes, deleteQuote, type StoredQuote } from '@/lib/quoteStore';
+import { archiveQuote, getActiveQuotes, type StoredQuote } from '@/lib/quoteStore';
 import { downloadReferenceQuotePdf } from '@/lib/referenceQuotePdf';
 
 function statusBadge(status: StoredQuote['status']) {
@@ -21,20 +21,41 @@ export default function SalesQuotesPage() {
   const [quotes, setQuotes] = useState<StoredQuote[]>([]);
 
   useEffect(() => {
-    setQuotes(getQuotes());
-    const refresh = () => setQuotes(getQuotes());
+    setQuotes(getActiveQuotes());
+    const refresh = () => setQuotes(getActiveQuotes());
     window.addEventListener('nidoQuotesUpdated', refresh);
     return () => window.removeEventListener('nidoQuotesUpdated', refresh);
   }, []);
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this quote?')) {
-      deleteQuote(id);
+  const handleArchive = (id: string) => {
+    if (confirm('Move this quote to Archived Quotes?')) {
+      archiveQuote(id);
       setRowMenuOpen(null);
     }
   };
 
   const fmt = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const exportCsv = () => {
+    const headers = ['Date', 'Quote #', 'Customer', 'Status', 'Valid Till', 'Total'];
+    const escapeCsv = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const rows = quotes.map(quote => [
+      quote.quoteDate,
+      quote.quoteNumber,
+      quote.clientName,
+      quote.status,
+      quote.validTill,
+      quote.grandTotal.toFixed(2),
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(escapeCsv).join(',')).join('\n');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    link.download = 'quotes.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
+  };
 
   return (
     <div className="space-y-6" onClick={() => { setMenuOpen(false); setRowMenuOpen(null); }}>
@@ -63,14 +84,14 @@ export default function SalesQuotesPage() {
                    New Quote
                  </button>
                 <button
-                  onClick={() => { setMenuOpen(false); }}
+                  onClick={() => { setMenuOpen(false); exportCsv(); }}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                 >
                   <FileDown size={16} />
                   Export CSV
                 </button>
                 <button
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => { setMenuOpen(false); window.open('/sales/quotes/archived', '_blank'); }}
                   className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                 >
                   <Archive size={16} />
@@ -150,10 +171,10 @@ export default function SalesQuotesPage() {
                                 Download PDF
                               </button>
                               <button
-                                onClick={() => handleDelete(quote.id)}
-                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+                                onClick={() => handleArchive(quote.id)}
+                                className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
                               >
-                                <Trash2 size={15} /> Delete
+                                <Archive size={15} /> Archive
                               </button>
                             </div>
                           )}

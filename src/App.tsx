@@ -193,6 +193,7 @@ const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
 const InvoicePage = lazy(() => import("@/pages/InvoicePage"));
 const InvoiceDetails = lazy(() => import("@/pages/InvoiceDetails"));
 const SalesQuotesPage = lazy(() => import("@/pages/SalesQuotesPage"));
+const ArchivedQuotesPage = lazy(() => import("@/pages/ArchivedQuotesPage"));
 const SalesQuoteDetailPage = lazy(() => import("@/pages/SalesQuoteDetailPage"));
 const SalesOrdersPage = lazy(() => import("@/pages/SalesOrdersPage"));
 const SalesOrderDetails = lazy(() => import("@/pages/SalesOrderDetails"));
@@ -742,6 +743,17 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <SalesQuotesPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="sales/quotes/archived"
+            element={
+              <PageErrorBoundary
+                title="Archived quotes failed to load"
+                resetKey={location.pathname}
+              >
+                <ArchivedQuotesPage />
               </PageErrorBoundary>
             }
           />
