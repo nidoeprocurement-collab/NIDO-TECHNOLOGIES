@@ -31,6 +31,16 @@ function lines(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function getBrandHeader(displayName: string, industry: string): { name: string; subtitle: string } {
+  const value = displayName.trim();
+  const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+
+  return {
+    name: (match?.[1] || value || 'Nido Tech').trim(),
+    subtitle: (match?.[2] || industry || 'Corporate Essentials & Integrated Services').trim(),
+  };
+}
+
 function drawText(
   doc: jsPDF,
   value: string,
@@ -162,6 +172,7 @@ function drawSummary(
 
 export async function generateReferenceQuotePdfBase64(quote: StoredQuote): Promise<string> {
   const org = loadConfig().organization;
+  const brandHeader = getBrandHeader(org.displayName, org.industry);
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -189,8 +200,8 @@ export async function generateReferenceQuotePdfBase64(quote: StoredQuote): Promi
     drawText(doc, 'N', margin + 27, 53, { size: 22, color: [255, 255, 255], bold: true, align: 'center' });
   }
 
-  drawText(doc, org.displayName || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
-  drawText(doc, org.industry || 'Corporate Essentials & Integrated Services', margin + 60, 64, { size: 7, color: MUTED });
+  drawText(doc, brandHeader.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
+  drawText(doc, brandHeader.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
   drawText(doc, 'ESTIMATE', pageWidth - margin, 48, { size: 22, color: DARK, bold: true, align: 'right' });
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
