@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Edit, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getOrderById, type StoredSalesOrder } from '@/lib/salesOrderStore';
+import { downloadSalesOrderPdf } from '@/lib/salesOrderPdfGenerator';
 
 function statusBadge(status: StoredSalesOrder['status']) {
   const map: Record<string, string> = {
@@ -81,11 +82,11 @@ export default function SalesOrderDetails() {
             <Edit size={16} /> Edit
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => { void downloadSalesOrderPdf(order); }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
           >
             <FileText size={16} />
-            Print / PDF
+            Download PDF
           </button>
         </div>
       </div>

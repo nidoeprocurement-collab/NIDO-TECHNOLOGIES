@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, ArrowLeft, Trash2, Save, Send } from 'lucide-react';
 import { getClients, type StoredClient } from '@/lib/clientStore';
@@ -70,8 +71,10 @@ export default function SalesOrderFormPage() {
   // ── Customer Details ───────────────────────────────────────────────────────
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [clientRect, setClientRect] = useState<DOMRect | null>(null);
   const [selectedClient, setSelectedClient] = useState<StoredClient | null>(null);
   const [contactPerson, setContactPerson] = useState('');
+  const clientInputRef = useRef<HTMLInputElement>(null);
   const clientRef = useRef<HTMLDivElement>(null);
 
   // ── Addresses ─────────────────────────────────────────────────────────────
@@ -87,8 +90,9 @@ export default function SalesOrderFormPage() {
   // ── Line Items ─────────────────────────────────────────────────────────────
   const [lineItems, setLineItems] = useState<OrderLineItem[]>([makeBlankItem()]);
   const [productSearch, setProductSearch] = useState<Record<string, string>>({});
-  const [showProductDd, setShowProductDd] = useState<Record<string, boolean>>({});
-  const productRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [openProductId, setOpenProductId] = useState<string | null>(null);
+  const [productRect, setProductRect] = useState<DOMRect | null>(null);
+  const productInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // ── Summary ────────────────────────────────────────────────────────────────
   const [adjustment, setAdjustment] = useState<number>(0);
@@ -119,24 +123,37 @@ export default function SalesOrderFormPage() {
     setCustomerNotes(o.customerNotes);
   }, [isEdit, id]);
 
-  // ── Close dropdowns on outside click ──────────────────────────────────────
+  // ── Close dropdowns on outside click / scroll ─────────────────────────────
+  const closeAllDropdowns = useCallback(() => {
+    setShowClientDropdown(false);
+    setOpenProductId(null);
+    setProductRect(null);
+    setClientRect(null);
+  }, []);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (clientRef.current && !clientRef.current.contains(e.target as Node)) setShowClientDropdown(false);
-      setShowProductDd(prev => {
-        const next = { ...prev };
-        let changed = false;
-        for (const itemId of Object.keys(prev)) {
-          if (prev[itemId] && productRefs.current[itemId] && !productRefs.current[itemId]!.contains(e.target as Node)) {
-            next[itemId] = false; changed = true;
-          }
+      if (clientRef.current && !clientRef.current.contains(e.target as Node)) {
+        setShowClientDropdown(false);
+        setClientRect(null);
+      }
+      // Close product dropdown if click is outside the input
+      const target = e.target as Node;
+      if (openProductId) {
+        const inputEl = productInputRefs.current[openProductId];
+        if (inputEl && !inputEl.contains(target)) {
+          setOpenProductId(null);
+          setProductRect(null);
         }
-        return changed ? next : prev;
-      });
+      }
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    window.addEventListener('scroll', closeAllDropdowns, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('scroll', closeAllDropdowns, true);
+    };
+  }, [openProductId, closeAllDropdowns]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleSelectClient = (client: StoredClient) => {
@@ -161,7 +178,8 @@ export default function SalesOrderFormPage() {
         : item
     ));
     setProductSearch(prev => ({ ...prev, [itemId]: product.productName }));
-    setShowProductDd(prev => ({ ...prev, [itemId]: false }));
+    setOpenProductId(null);
+    setProductRect(null);
   };
 
   const updateLineItem = <K extends keyof OrderLineItem>(id: string, field: K, value: OrderLineItem[K]) => {
@@ -332,24 +350,13 @@ export default function SalesOrderFormPage() {
               <label className={labelCls}>Client Name *</label>
               <div className="relative" ref={clientRef} onClick={e => e.stopPropagation()}>
                 <input
+                  ref={clientInputRef}
                   type="text" placeholder="Select customer" value={clientSearch}
-                  onChange={e => { setClientSearch(e.target.value); setShowClientDropdown(true); }}
-                  onFocus={() => setShowClientDropdown(true)}
+                  onChange={e => { setClientSearch(e.target.value); setShowClientDropdown(true); if (clientInputRef.current) setClientRect(clientInputRef.current.getBoundingClientRect()); }}
+                  onFocus={() => { setShowClientDropdown(true); if (clientInputRef.current) setClientRect(clientInputRef.current.getBoundingClientRect()); }}
                   className={`${inputCls} pr-8`}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▾</span>
-                {showClientDropdown && (
-                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                    {filteredClients.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-gray-500">No clients found</div>
-                    ) : filteredClients.map(c => (
-                      <button key={c.id} onMouseDown={e => { e.preventDefault(); handleSelectClient(c); }}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                        {c.name}{c.category && <span className="ml-2 text-xs text-gray-400">{c.category}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
             <div>
@@ -443,27 +450,23 @@ export default function SalesOrderFormPage() {
                     <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
                       <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-center">{idx + 1}</td>
                       <td className="px-3 py-2">
-                        <div className="relative" ref={el => { productRefs.current[item.id] = el; }} onClick={e => e.stopPropagation()}>
+                        <div className="relative">
                           <input
+                            ref={el => { productInputRefs.current[item.id] = el; }}
                             type="text" placeholder="Select item" value={displayName}
-                            onChange={e => { setProductSearch(prev => ({ ...prev, [item.id]: e.target.value })); setShowProductDd(prev => ({ ...prev, [item.id]: true })); }}
-                            onFocus={() => setShowProductDd(prev => ({ ...prev, [item.id]: true }))}
+                            onChange={e => {
+                              setProductSearch(prev => ({ ...prev, [item.id]: e.target.value }));
+                              const el = productInputRefs.current[item.id];
+                              if (el) setProductRect(el.getBoundingClientRect());
+                              setOpenProductId(item.id);
+                            }}
+                            onFocus={() => {
+                              const el = productInputRefs.current[item.id];
+                              if (el) setProductRect(el.getBoundingClientRect());
+                              setOpenProductId(item.id);
+                            }}
                             className={`${tdInputCls} pr-6`} />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▾</span>
-                          {showProductDd[item.id] && (
-                            <div className="absolute top-full left-0 z-50 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                              {filteredProds.length === 0 ? (
-                                <div className="px-3 py-3 text-xs text-gray-500 text-center">{products.length === 0 ? 'No products in catalogue' : 'No matches found'}</div>
-                              ) : filteredProds.map(p => (
-                                <button key={p.id} onMouseDown={e => { e.preventDefault(); handleSelectProduct(item.id, p); }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0">
-                                  <div className="text-xs font-medium text-gray-900 dark:text-white">{p.productName}</div>
-                                  {p.description && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.description}</div>}
-                                  {p.category && <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>}
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
                         <input type="text" placeholder="Description" value={item.description}
                           onChange={e => updateLineItem(item.id, 'description', e.target.value)}
@@ -609,6 +612,53 @@ export default function SalesOrderFormPage() {
           </button>
         </div>
       </div>
+
+      {/* ── Portal: Client dropdown ──────────────────────────────────────── */}
+      {showClientDropdown && clientRect && createPortal(
+        <div
+          style={{ position: 'fixed', top: clientRect.bottom + 4, left: clientRect.left, width: clientRect.width, zIndex: 9999 }}
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {filteredClients.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-500">No clients found</div>
+          ) : filteredClients.map(c => (
+            <button key={c.id} onMouseDown={e => { e.preventDefault(); handleSelectClient(c); }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0">
+              {c.name}{c.category && <span className="ml-2 text-xs text-gray-400">{c.category}</span>}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+
+      {/* ── Portal: Product dropdown ─────────────────────────────────────── */}
+      {openProductId && productRect && createPortal(
+        (() => {
+          const filteredProds = getFilteredProducts(openProductId);
+          return (
+            <div
+              style={{ position: 'fixed', top: productRect.bottom + 4, left: productRect.left, width: 288, zIndex: 9999 }}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+              onMouseDown={e => e.stopPropagation()}
+            >
+              {filteredProds.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-gray-500 text-center">
+                  {products.length === 0 ? 'No products in catalogue' : 'No matches found'}
+                </div>
+              ) : filteredProds.map(p => (
+                <button key={p.id} onMouseDown={e => { e.preventDefault(); handleSelectProduct(openProductId, p); }}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div className="text-xs font-medium text-gray-900 dark:text-white">{p.productName}</div>
+                  {p.description && <div className="text-xs text-gray-400 mt-0.5 truncate">{p.description}</div>}
+                  {p.category && <div className="text-xs text-gray-400 mt-0.5">{p.category}</div>}
+                </button>
+              ))}
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 }
