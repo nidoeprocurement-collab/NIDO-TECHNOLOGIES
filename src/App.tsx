@@ -197,6 +197,7 @@ const ArchivedQuotesPage = lazy(() => import("@/pages/ArchivedQuotesPage"));
 const SalesQuoteDetailPage = lazy(() => import("@/pages/SalesQuoteDetailPage"));
 const SalesOrdersPage = lazy(() => import("@/pages/SalesOrdersPage"));
 const SalesOrderDetails = lazy(() => import("@/pages/SalesOrderDetails"));
+const SalesOrderFormPage = lazy(() => import("@/pages/SalesOrderFormPage"));
 const ExpensesPage = lazy(() => import("@/pages/ExpensesPage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
@@ -791,6 +792,8 @@ function AppRoutes() {
             }
           />
           <Route path="sales/orders" element={<SalesOrdersPage />} />
+          <Route path="sales/orders/create" element={<SalesOrderFormPage />} />
+          <Route path="sales/orders/:id/edit" element={<SalesOrderFormPage />} />
           <Route path="sales/orders/:id" element={<SalesOrderDetails />} />
           <Route
             path="sales/invoices"
