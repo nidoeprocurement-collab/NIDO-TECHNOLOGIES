@@ -2,10 +2,14 @@ export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 
 
 export interface InvoiceLineItem {
   id: string;
-  description: string;
+  description: string;      // item name (bold in PDF)
+  itemDetails?: string;     // sub-description (lighter text below name)
+  hsnSac?: string;
   quantity: number;
   rate: number;
+  discount?: number;        // item-level discount amount
   taxPercent: number;
+  taxType?: string;         // e.g. 'IGST' or 'CGST+SGST'
 }
 
 export interface InvoicePayment {
@@ -26,18 +30,43 @@ export interface InvoiceActivity {
 export interface StoredInvoice {
   id: string;
   invoiceNumber: string;
+  // client
   clientName: string;
   contactPerson: string;
+  clientGstin?: string;
+  clientContact?: string;
+  // addresses
   billingAddress: string;
   shippingAddress: string;
+  shippingStateCode?: string;
+  shippingAttn?: string;
+  // dates & refs
   invoiceDate: string;
   dueDate: string;
+  poReference?: string;
+  placeOfSupply?: string;
+  // status
   status: InvoiceStatus;
+  // line items
   lineItems: InvoiceLineItem[];
-  subtotal: number;
+  // totals
+  grossSubtotal: number;    // sum of (qty * rate)
+  totalDiscount: number;    // sum of item discounts
+  subtotal: number;         // taxable value = grossSubtotal - totalDiscount
   totalTax: number;
+  shippingCharges: number;
+  adjustment: number;       // round-off
   grandTotal: number;
+  // text sections
   notes: string;
+  termsConditions?: string;
+  // bank remittance
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNo?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
+  // meta
   payments: InvoicePayment[];
   activity: InvoiceActivity[];
   createdAt: string;
@@ -49,29 +78,86 @@ const STORE_KEY = 'nido_sales_invoices';
 const SEED_INVOICES: StoredInvoice[] = [
   {
     id: 'inv_001',
-    invoiceNumber: 'INV-001',
-    clientName: 'Tech Solutions Inc',
-    contactPerson: 'Aarav Mehta',
-    billingAddress: '14 Business Park, Bengaluru, Karnataka',
-    shippingAddress: '14 Business Park, Bengaluru, Karnataka',
-    invoiceDate: '2024-01-10',
-    dueDate: '2024-02-10',
-    status: 'Paid',
+    invoiceNumber: 'INV-2026-0092',
+    clientName: 'Express IT Solutions Pvt Ltd',
+    contactPerson: 'Accounts Team',
+    clientGstin: '36AAACE9876B1ZS',
+    clientContact: 'accounts@expressit.com',
+    billingAddress: '321 Cyber Towers, HITEC City\nHyderabad, Telangana - 500081',
+    shippingAddress: '321 Cyber Towers, HITEC City\nHyderabad, Telangana - 500081',
+    shippingStateCode: '36 (Telangana)',
+    shippingAttn: 'Operations Team',
+    invoiceDate: '2026-07-24',
+    dueDate: '2026-08-08',
+    poReference: 'PO-99482',
+    placeOfSupply: 'Telangana (36)',
+    status: 'Sent',
     lineItems: [
-      { id: 'inv-001-1', description: 'Managed IT support services', quantity: 1, rate: 12000, taxPercent: 18 },
-      { id: 'inv-001-2', description: 'Network monitoring setup', quantity: 1, rate: 3000, taxPercent: 18 },
+      {
+        id: 'inv-001-1',
+        description: 'Enterprise Cloud Workstation Setup',
+        itemDetails: 'Hardware procurement & corporate installation.',
+        hsnSac: '84713010',
+        quantity: 2,
+        rate: 65000,
+        discount: 5000,
+        taxPercent: 18,
+        taxType: 'IGST',
+      },
+      {
+        id: 'inv-001-2',
+        description: 'Network Infrastructure Consulting',
+        itemDetails: 'IT architecture advisory and setup support.',
+        hsnSac: '998313',
+        quantity: 1,
+        rate: 40000,
+        discount: 2000,
+        taxPercent: 18,
+        taxType: 'IGST',
+      },
+      {
+        id: 'inv-001-3',
+        description: 'Commercial Computer Manuals & Printware',
+        itemDetails: 'Printed documentation and operating guides.',
+        hsnSac: '49011010',
+        quantity: 10,
+        rate: 1200,
+        discount: 1000,
+        taxPercent: 12,
+        taxType: 'IGST',
+      },
+      {
+        id: 'inv-001-4',
+        description: 'Logitech Corporate Desktop Bundles',
+        itemDetails: 'High-grade mouse and keyboard accessories.',
+        hsnSac: '84716040',
+        quantity: 5,
+        rate: 5000,
+        discount: 2000,
+        taxPercent: 28,
+        taxType: 'IGST',
+      },
     ],
-    subtotal: 15000,
-    totalTax: 2700,
-    grandTotal: 17700,
-    notes: 'Thank you for your business.',
-    payments: [{ id: 'pay-001', date: '2024-01-28', amount: 17700, method: 'Bank Transfer', reference: 'TXN-84721' }],
+    grossSubtotal: 207000,
+    totalDiscount: 10000,
+    subtotal: 197000,
+    totalTax: 37100,
+    shippingCharges: 2500,
+    adjustment: 0,
+    grandTotal: 236600,
+    notes: '',
+    termsConditions: 'Payment is due within 15 days of invoice issue date.\nOverdue balances are subject to interest charges of 1.5% per month.\nPlease quote invoice number #INV-2026-0092 in wire transfer notes.',
+    bankName: 'HDFC Bank Ltd',
+    bankAccountName: 'Nido-Tech Corporate Essentials',
+    bankAccountNo: '50200012345678',
+    bankIfsc: 'HDFC0001234',
+    bankBranch: 'Guindy Branch, Chennai',
+    payments: [],
     activity: [
-      { id: 'act-001-1', date: '2024-01-10', title: 'Invoice created', description: 'Invoice was created and issued to the client.' },
-      { id: 'act-001-2', date: '2024-01-28', title: 'Payment received', description: 'Full payment received by bank transfer.' },
+      { id: 'act-001-1', date: '2026-07-24', title: 'Invoice created', description: 'Invoice was created and issued to the client.' },
     ],
-    createdAt: '2024-01-10T09:00:00.000Z',
-    updatedAt: '2024-01-28T09:00:00.000Z',
+    createdAt: '2026-07-24T09:00:00.000Z',
+    updatedAt: '2026-07-24T09:00:00.000Z',
   },
   {
     id: 'inv_002',
@@ -84,10 +170,14 @@ const SEED_INVOICES: StoredInvoice[] = [
     dueDate: '2024-02-15',
     status: 'Pending',
     lineItems: [
-      { id: 'inv-002-1', description: 'Corporate procurement services', quantity: 1, rate: 8500, taxPercent: 18 },
+      { id: 'inv-002-1', description: 'Corporate procurement services', quantity: 1, rate: 8500, discount: 0, taxPercent: 18, taxType: 'IGST' },
     ],
+    grossSubtotal: 8500,
+    totalDiscount: 0,
     subtotal: 8500,
     totalTax: 1530,
+    shippingCharges: 0,
+    adjustment: 0,
     grandTotal: 10030,
     notes: 'Payment is due within 30 days.',
     payments: [],
@@ -109,10 +199,14 @@ const SEED_INVOICES: StoredInvoice[] = [
     dueDate: '2024-01-20',
     status: 'Overdue',
     lineItems: [
-      { id: 'inv-003-1', description: 'Annual procurement support plan', quantity: 1, rate: 22000, taxPercent: 18 },
+      { id: 'inv-003-1', description: 'Annual procurement support plan', quantity: 1, rate: 22000, discount: 0, taxPercent: 18, taxType: 'IGST' },
     ],
+    grossSubtotal: 22000,
+    totalDiscount: 0,
     subtotal: 22000,
     totalTax: 3960,
+    shippingCharges: 0,
+    adjustment: 0,
     grandTotal: 25960,
     notes: 'Please contact accounts for payment queries.',
     payments: [],
@@ -128,7 +222,17 @@ const SEED_INVOICES: StoredInvoice[] = [
 function seedInvoices(): StoredInvoice[] {
   try {
     const stored = localStorage.getItem(STORE_KEY);
-    if (stored) return JSON.parse(stored) as StoredInvoice[];
+    if (stored) {
+      const parsed = JSON.parse(stored) as StoredInvoice[];
+      // migrate old invoices that lack new fields
+      return parsed.map((inv) => ({
+        grossSubtotal: inv.grossSubtotal ?? inv.subtotal,
+        totalDiscount: inv.totalDiscount ?? 0,
+        shippingCharges: inv.shippingCharges ?? 0,
+        adjustment: inv.adjustment ?? 0,
+        ...inv,
+      }));
+    }
     localStorage.setItem(STORE_KEY, JSON.stringify(SEED_INVOICES));
   } catch {
     // The app also renders in environments without localStorage.
