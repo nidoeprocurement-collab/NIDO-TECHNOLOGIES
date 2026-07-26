@@ -429,17 +429,18 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   drawText(doc, 'TOTAL PO VALUE IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
   drawText(doc, numberToWords(po.grandTotal), margin, y + 15, { size: 8.5, color: DARK, bold: true });
 
+  // Signature sits below the words line (words at y+15, so signature line at y+42)
   const signatureX = pageWidth - margin - 160;
   doc.setDrawColor(...MUTED).setLineWidth(0.6);
-  doc.line(signatureX, y + 10, pageWidth - margin, y + 10);
-  drawText(doc, 'Authorized Purchase Manager', (signatureX + pageWidth - margin) / 2, y + 25, {
+  doc.line(signatureX, y + 42, pageWidth - margin, y + 42);
+  drawText(doc, 'Authorized Person', (signatureX + pageWidth - margin) / 2, y + 55, {
     size: 7.5,
     color: MUTED,
     align: 'center',
   });
 
   // ── Footer ────────────────────────────────────────────────────────────────
-  const footerY = Math.min(pageHeight - 22, y + 72);
+  const footerY = Math.min(pageHeight - 22, y + 95);
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(margin, footerY - 18, pageWidth - margin, footerY - 18);
   drawText(
