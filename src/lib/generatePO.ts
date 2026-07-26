@@ -135,12 +135,12 @@ function drawPOSummary(
     .join(', ');
 
   const rows: Array<[string, string, boolean?]> = [
-    ['Gross Subtotal', `INR ${fmt2(po.subtotal)}`],
-    ['Item Level Discounts (-)', 'INR - 0.00', true],
-    ['Total Taxable Value', `INR ${fmt2(po.subtotal)}`, true],
-    [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(totalTax)}`],
-    ['Shipping & Handling Charges', 'INR 0.00'],
-    ['Round Off Adjustment', 'INR 0.00'],
+    ['Gross Subtotal', `₹${fmt2(po.subtotal)}`],
+    ['Item Level Discounts (-)', '-₹0.00', true],
+    ['Total Taxable Value', `₹${fmt2(po.subtotal)}`, true],
+    [`Total GST${rates ? ` (${rates})` : ''}`, `₹${fmt2(totalTax)}`],
+    ['Shipping & Handling Charges', '₹0.00'],
+    ['Round Off Adjustment', '-₹0.00'],
   ];
 
   const rowHeight = 20;
@@ -170,8 +170,8 @@ function drawPOSummary(
   doc.rect(x + 0.5, totalY, width - 1, totalHeight - 0.5, 'F');
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
-  drawText(doc, 'Total Payable', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `INR ${fmt2(po.grandTotal)}`, x + width - 10, totalY + 17, {
+  drawText(doc, 'Total Order Value', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
+  drawText(doc, `₹${fmt2(po.grandTotal)}`, x + width - 10, totalY + 17, {
     size: 8.5,
     color: DARK,
     bold: true,
@@ -180,22 +180,12 @@ function drawPOSummary(
   return height;
 }
 
-// ── Standard Terms & Conditions ───────────────────────────────────────────────
-const TERMS = [
-  "Payment of 30% will released post approval of the PO, once PO signed copy release, and 40% to be released against approval of trail Component, rest 30% to be released on trail of 1000 components within 30 days from the Tool Submission date.",
-  "The tool design shall be reviewed, optimum strip utilization to be ensured and the tool should be robust in construction.",
-  "Fool proofing of assembly.",
-  "The tool should be using inserts, including pillar bush sets that can be changed after it is worn out or damaged.",
-  "Samples to be submitted by 28-06-21, along with the CMM and manual reports of quality.",
-  "Please plan RM in advance to meet EDT.",
-  "Post approval from the client any thing will be cleared",
-  "PO should be accepted within 2 days, pending will be considered as cancelled.",
+// ── PO Instructions ───────────────────────────────────────────────────────────
+const PO_INSTRUCTIONS = [
+  (poNumber: string) => `Please reference PO number #${poNumber} on all invoices and delivery notes.`,
+  () => 'Deliveries are accepted Monday to Friday between 9:00 AM and 5:00 PM.',
+  () => 'Notify procurement immediately if delivery date cannot be met.',
 ];
-
-const NOTE_TEXT =
-  "Delivery Time for this project is 17 Days from the PO date; delay in submission " +
-  "will impact to penalty of 1% from Grand total amount per day. Daily Progress " +
-  "update is mandatory. Consider all verbal changes as per the conversation's.";
 
 // ── Main generator ─────────────────────────────────────────────────────────────
 export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
@@ -294,8 +284,8 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   if (org.gstNumber) deliverExtras.push(`GSTIN: ${org.gstNumber}`);
 
   const cardHeight = Math.max(
-    drawCard(doc, margin, y, cardWidth, 'Vendor Address', po.vendorName, vendorAddr, vendorExtras),
-    drawCard(doc, margin + cardWidth + cardGap, y, cardWidth, 'Deliver To', org.companyName || org.displayName || 'Nido Tech', deliverAddr, deliverExtras),
+    drawCard(doc, margin, y, cardWidth, 'Vendor Details', po.vendorName, vendorAddr, vendorExtras),
+    drawCard(doc, margin + cardWidth + cardGap, y, cardWidth, 'Ship To Location', org.companyName || org.displayName || 'Nido Tech', deliverAddr, deliverExtras),
   );
   y += cardHeight + 16;
 
@@ -311,10 +301,15 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
     const taxable = li.lineSubtotal;
     const gst = taxable * (gstRate / 100);
     const amount = taxable + gst;
-    const taxRateLabel = `${gstRate}%\nSGST+CGST`;
+    const taxRateLabel = `${gstRate}%\nIGST`;
+    // Build item cell: name, optional description from specs, optional ref number
+    const specLine = li.specs && li.specs.length > 0 ? li.specs[0] : '';
+    let itemCell = li.item;
+    if (specLine) itemCell += `\n${specLine}`;
+    if (li.referenceNumber) itemCell += `\nRef/Model No: ${li.referenceNumber}`;
     return [
       String(index + 1),
-      li.referenceNumber ? `${li.item}\nRef/Model No: ${li.referenceNumber}` : li.item,
+      itemCell,
       li.hsnCode || '',
       String(li.qty),
       fmt2(li.unitPrice),
@@ -322,7 +317,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       fmt2(taxable),     // TAXABLE
       taxRateLabel,      // GST RATE
       fmt2(gst),         // GST
-      fmt2(amount),      // AMOUNT
+      fmt2(amount),      // NET AMOUNT
     ];
   });
 
@@ -331,15 +326,15 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
     margin: { left: margin, right: margin },
     head: [[
       '#',
-      'ITEM / DESCRIPTION',
+      'ITEM / SPECIFICATION',
       'HSN/SAC',
       'QTY',
-      'RATE',
-      'DISC',
-      'TAXABLE',
+      'UNIT RATE (₹)',
+      'DISC (₹)',
+      'TAXABLE (₹)',
       'GST RATE',
-      'GST',
-      'AMOUNT',
+      'GST (₹)',
+      'NET AMOUNT (₹)',
     ]],
     body: tableBody,
     theme: 'grid',
@@ -389,50 +384,52 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawPOSummary(doc, po, summaryX, y, summaryWidth);
 
-  // Left side: Note then Terms & Conditions
+  // Left side: PO Instructions + Invoicing & Payment Terms
   let leftY = y + 2;
   const leftWidth = summaryX - margin - 14;
 
-  // Note
-  const noteWrapped = doc.splitTextToSize(NOTE_TEXT, leftWidth);
-  drawText(doc, 'NOTE', margin, leftY + 9, { size: 8, color: BLUE, bold: true });
+  // Purchase Order Instructions
+  drawText(doc, 'PURCHASE ORDER INSTRUCTIONS', margin, leftY + 9, { size: 8, color: BLUE, bold: true });
   leftY += 23;
-  drawText(doc, noteWrapped.join('\n'), margin, leftY, { size: 7.5, color: TEXT });
-  leftY += noteWrapped.length * 11 + 10;
+  PO_INSTRUCTIONS.forEach((instrFn, index) => {
+    const text = instrFn(po.poNumber);
+    const wrapped = doc.splitTextToSize(`${index + 1}. ${text}`, leftWidth);
+    drawText(doc, wrapped.join('\n'), margin, leftY, { size: 7.5, color: TEXT });
+    leftY += wrapped.length * 11 + 4;
+  });
 
-  // Terms & Conditions
+  // Invoicing & Payment Terms
+  leftY += 8;
+  drawText(doc, 'INVOICING & PAYMENT TERMS', margin, leftY, { size: 8, color: BLUE, bold: true });
+  leftY += 14;
+  const invoicingLines = [
+    `Payment Terms: ${po.paymentTerms || 'Net 30 Days from receipt of invoice & goods inspection'}`,
+    `Billing Contact: ${org.email || 'accounts.payable@nido-tech.com'}`,
+    org.gstNumber ? `Tax Registration: GSTIN ${org.gstNumber}` : '',
+    'Dispatch Mode: Express Road Freight',
+  ].filter(Boolean);
+  invoicingLines.forEach((line) => {
+    drawText(doc, line, margin, leftY, { size: 7.5, color: TEXT });
+    leftY += 12;
+  });
+
   if (leftY < y + summaryHeight) leftY = y + summaryHeight + 10;
 
   // ── Total in Words + Authorized Signature ────────────────────────────────
   y = Math.max(leftY + 8, y + summaryHeight) + 20;
 
-  // Terms & Conditions (full-width below)
-  drawText(doc, 'TERMS & CONDITIONS', margin, y, { size: 8, color: BLUE, bold: true });
-  y += 14;
-  TERMS.forEach((term, index) => {
-    const wrapped = doc.splitTextToSize(`${index + 1}. ${term}`, contentWidth);
-    // New page if needed
-    if (y + wrapped.length * 11 > pageHeight - 60) {
-      doc.addPage();
-      y = margin + 20;
-    }
-    drawText(doc, wrapped.join('\n'), margin, y, { size: 7.5, color: TEXT });
-    y += wrapped.length * 11 + 4;
-  });
-
-  y += 14;
   if (y > pageHeight - 80) {
     doc.addPage();
     y = margin + 20;
   }
 
-  drawText(doc, 'TOTAL IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
+  drawText(doc, 'TOTAL PO VALUE IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
   drawText(doc, numberToWords(po.grandTotal), margin, y + 15, { size: 8.5, color: DARK, bold: true });
 
-  const signatureX = pageWidth - margin - 135;
+  const signatureX = pageWidth - margin - 160;
   doc.setDrawColor(...MUTED).setLineWidth(0.6);
   doc.line(signatureX, y + 10, pageWidth - margin, y + 10);
-  drawText(doc, 'Authorized Signatory', (signatureX + pageWidth - margin) / 2, y + 25, {
+  drawText(doc, 'Authorized Purchase Manager', (signatureX + pageWidth - margin) / 2, y + 25, {
     size: 7.5,
     color: MUTED,
     align: 'center',
@@ -444,10 +441,10 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   doc.line(margin, footerY - 18, pageWidth - margin, footerY - 18);
   drawText(
     doc,
-    `Thank you for choosing ${org.displayName || org.companyName || 'Nido Tech'} as your procurement partner!`,
+    'This is a computer-generated Purchase Order. Please send acknowledgment upon receipt.',
     pageWidth / 2,
     footerY,
-    { size: 8, color: BLUE, bold: true, align: 'center' },
+    { size: 8, color: MUTED, align: 'center' },
   );
 
   return doc.output('datauristring');
