@@ -31,6 +31,8 @@ export interface StoredInvoice {
   id: string;
   invoiceNumber: string;
   archived?: boolean;
+  archiveReason?: string;
+  archivedAt?: string;
   // client
   clientName: string;
   contactPerson: string;
@@ -262,18 +264,17 @@ export function saveInvoice(invoice: StoredInvoice): void {
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
 }
 
-export function archiveInvoice(id: string): void {
+export function archiveInvoice(id: string, reason: string): void {
   const all = seedInvoices();
   const idx = all.findIndex((inv) => inv.id === id);
-  if (idx >= 0) { all[idx] = { ...all[idx], archived: true }; }
-  localStorage.setItem(STORE_KEY, JSON.stringify(all));
-  window.dispatchEvent(new Event('nidoInvoicesUpdated'));
-}
-
-export function unarchiveInvoice(id: string): void {
-  const all = seedInvoices();
-  const idx = all.findIndex((inv) => inv.id === id);
-  if (idx >= 0) { all[idx] = { ...all[idx], archived: false }; }
+  if (idx >= 0) {
+    all[idx] = {
+      ...all[idx],
+      archived: true,
+      archiveReason: reason.trim(),
+      archivedAt: new Date().toISOString(),
+    };
+  }
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
 }
