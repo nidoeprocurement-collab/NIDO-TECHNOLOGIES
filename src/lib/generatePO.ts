@@ -115,8 +115,9 @@ function drawCard(
 }
 
 /**
- * Draws the PO summary box (right side) — mirrors invoicePdf drawSummary.
- * Returns the box height.
+ * Draws the PO summary box using the exact same row structure as invoicePdf.
+ * POs do not currently store discounts, shipping, or round-off adjustments, so
+ * those invoice rows are rendered as zero to preserve the shared PDF layout.
  */
 function drawPOSummary(
   doc: jsPDF,
@@ -125,10 +126,21 @@ function drawPOSummary(
   y: number,
   width: number,
 ): number {
-  const rows: Array<[string, string]> = [
-    ['Sub Total', `INR ${fmt2(po.subtotal)}`],
-    [`SGST (${po.sgstPct}%)`, `INR ${fmt2(po.sgstAmt)}`],
-    [`CGST (${po.cgstPct}%)`, `INR ${fmt2(po.cgstAmt)}`],
+  const totalTax = (po.sgstAmt ?? 0) + (po.cgstAmt ?? 0);
+  const rates = [po.sgstPct, po.cgstPct]
+    .filter((rate) => Number.isFinite(rate))
+    .filter((rate, index, values) => values.indexOf(rate) === index)
+    .sort((a, b) => a - b)
+    .map((rate) => `${rate}%`)
+    .join(', ');
+
+  const rows: Array<[string, string, boolean?]> = [
+    ['Gross Subtotal', `INR ${fmt2(po.subtotal)}`],
+    ['Item Level Discounts (-)', 'INR - 0.00', true],
+    ['Total Taxable Value', `INR ${fmt2(po.subtotal)}`, true],
+    [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(totalTax)}`],
+    ['Shipping & Handling Charges', 'INR 0.00'],
+    ['Round Off Adjustment', 'INR 0.00'],
   ];
 
   const rowHeight = 20;
@@ -139,13 +151,17 @@ function drawPOSummary(
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(x, y, width, height, 5, 5, 'FD');
 
-  rows.forEach(([label, value], index) => {
+  rows.forEach(([label, value, bold], index) => {
     const rowY = y + index * rowHeight;
     if (index > 0) {
       doc.setDrawColor(...BORDER).setLineWidth(0.3);
       doc.line(x, rowY, x + width, rowY);
     }
-    drawText(doc, label, x + 10, rowY + 13, { size: 7.7, color: TEXT });
+    drawText(doc, label, x + 10, rowY + 13, {
+      size: 7.7,
+      color: bold ? DARK : TEXT,
+      bold: !!bold,
+    });
     drawText(doc, value, x + width - 10, rowY + 13, { size: 7.7, color: DARK, align: 'right' });
   });
 
