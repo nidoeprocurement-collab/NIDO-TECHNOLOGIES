@@ -136,12 +136,12 @@ function drawPOSummary(
     .join(', ');
 
   const rows: Array<[string, string, boolean?]> = [
-    ['Gross Subtotal', `₹${fmt2(po.subtotal)}`],
-    ['Item Level Discounts (-)', '-₹0.00', true],
-    ['Total Taxable Value', `₹${fmt2(po.subtotal)}`, true],
-    [`Total GST${rates ? ` (${rates})` : ''}`, `₹${fmt2(totalTax)}`],
-    ['Shipping & Handling Charges', '₹0.00'],
-    ['Round Off Adjustment', '-₹0.00'],
+    ['Gross Subtotal', `INR ${fmt2(po.subtotal)}`],
+    ['Item Level Discounts (-)', 'INR - 0.00', true],
+    ['Total Taxable Value', `INR ${fmt2(po.subtotal)}`, true],
+    [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(totalTax)}`],
+    ['Shipping & Handling Charges', 'INR 0.00'],
+    ['Round Off Adjustment', 'INR 0.00'],
   ];
 
   const rowHeight = 20;
@@ -172,7 +172,7 @@ function drawPOSummary(
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
   drawText(doc, 'Total Order Value', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `₹${fmt2(po.grandTotal)}`, x + width - 10, totalY + 17, {
+  drawText(doc, `INR ${fmt2(po.grandTotal)}`, x + width - 10, totalY + 17, {
     size: 8.5,
     color: DARK,
     bold: true,

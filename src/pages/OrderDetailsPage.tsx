@@ -2015,13 +2015,13 @@ export default function MyOrderPage() {
       });
 
       const subtotal = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-      const totalSgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * (li._taxRate / 2) / 100, 0);
-      const totalCgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * (li._taxRate / 2) / 100, 0);
+      const totalSgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0);
+      const totalCgstRaw = lineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0);
       const sgstAmt = Math.round(totalSgstRaw * 100) / 100;
       const cgstAmt = Math.round(totalCgstRaw * 100) / 100;
       const grandTotal = subtotal + sgstAmt + cgstAmt;
 
-      const primaryTaxRate = lineItems[0]?._taxRate ?? 18;
+      const primaryTaxRate = lineItems[0]?.gstPct ?? 18;
       const sgstPct = primaryTaxRate / 2;
       const cgstPct = primaryTaxRate / 2;
 
