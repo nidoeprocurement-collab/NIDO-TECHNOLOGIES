@@ -34,7 +34,7 @@ function fmtDate(iso?: string) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-interface RowMenuPos { top: number; right: number; invoiceId: string }
+interface RowMenuState { top: number; right: number; invoice: StoredInvoice }
 
 /* ─────────────────────────────────────────────────────────────────
    Archive Confirmation Dialog
@@ -285,7 +285,7 @@ export default function InvoicePage() {
   const prefix = config.prefixes.find((item) => item.key === 'invoice')?.value || 'INV-';
   const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
-  const [rowMenu, setRowMenu] = useState<RowMenuPos | null>(null);
+  const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
   const [showArchived, setShowArchived] = useState(false);
@@ -302,11 +302,15 @@ export default function InvoicePage() {
 
   useEffect(() => {
     if (!rowMenu) return;
-    const close = () => setRowMenu(null);
-    window.addEventListener('click', close, true);
+    const close = (e: MouseEvent) => {
+      // Don't close if the click is inside the menu panel itself
+      if (rowMenuRef.current?.contains(e.target as Node)) return;
+      setRowMenu(null);
+    };
+    window.addEventListener('mousedown', close, true);
     window.addEventListener('scroll', close, true);
     return () => {
-      window.removeEventListener('click', close, true);
+      window.removeEventListener('mousedown', close, true);
       window.removeEventListener('scroll', close, true);
     };
   }, [rowMenu]);
@@ -346,13 +350,11 @@ export default function InvoicePage() {
     setRowMenu(null);
   };
 
-  const openRowMenu = (e: React.MouseEvent<HTMLButtonElement>, invoiceId: string) => {
+  const openRowMenu = (e: React.MouseEvent<HTMLButtonElement>, invoice: StoredInvoice) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setRowMenu({ top: rect.bottom + 4, right: window.innerWidth - rect.right, invoiceId });
+    setRowMenu({ top: rect.bottom + 4, right: window.innerWidth - rect.right, invoice });
   };
-
-  const activeInvoice = rowMenu ? invoices.find((inv) => inv.id === rowMenu.invoiceId) ?? null : null;
 
   return (
     <div className="space-y-6" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
@@ -460,7 +462,7 @@ export default function InvoicePage() {
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{invoice.dueDate}</td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{fmt(invoice.grandTotal)}</td>
                     <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={(e) => openRowMenu(e, invoice.id)} className="p-1.5 hover:bg-gray-100 rounded">
+                      <button onClick={(e) => openRowMenu(e, invoice)} className="p-1.5 hover:bg-gray-100 rounded">
                         <MoreVertical size={16} className="text-gray-600" />
                       </button>
                     </td>
@@ -473,34 +475,33 @@ export default function InvoicePage() {
       </div>
 
       {/* Fixed-position row action menu */}
-      {rowMenu && activeInvoice && (
+      {rowMenu && (
         <div
           ref={rowMenuRef}
           className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-2 z-[9999]"
           style={{ top: rowMenu.top, right: rowMenu.right }}
-          onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={() => { navigate(`/sales/invoices/${activeInvoice.id}`); setRowMenu(null); }}
+            onClick={() => { navigate(`/sales/invoices/${rowMenu.invoice.id}`); setRowMenu(null); }}
             className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
           >
             <Eye size={15} /> View Details
           </button>
           <button
-            onClick={() => { navigate(`/sales/invoices/${activeInvoice.id}/edit`); setRowMenu(null); }}
+            onClick={() => { navigate(`/sales/invoices/${rowMenu.invoice.id}/edit`); setRowMenu(null); }}
             className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
           >
             <Edit size={15} /> Edit
           </button>
           <button
-            onClick={() => { downloadInvoicePdf(activeInvoice); setRowMenu(null); }}
+            onClick={() => { downloadInvoicePdf(rowMenu.invoice); setRowMenu(null); }}
             className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
           >
             <FileText size={15} /> Download PDF
           </button>
           <div className="my-1 border-t border-gray-100" />
           <button
-            onClick={() => { setArchiveTarget(activeInvoice); setRowMenu(null); }}
+            onClick={() => { setArchiveTarget(rowMenu.invoice); setRowMenu(null); }}
             className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2"
           >
             <Archive size={15} /> Archive
