@@ -289,19 +289,42 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       ? po.items
       : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal }];
 
-  const tableBody = tableItems.map((li, index) => [
-    String(index + 1),
-    li.referenceNumber ? `${li.item}\nRef/Model No: ${li.referenceNumber}` : li.item,
-    li.hsnCode || '',
-    String(li.qty),
-    fmt2(li.unitPrice),
-    fmt2(li.lineSubtotal),
-  ]);
+  const gstRate = po.sgstPct + po.cgstPct; // combined GST % for all PO items
+
+  const tableBody = tableItems.map((li, index) => {
+    const taxable = li.lineSubtotal;
+    const gst = taxable * (gstRate / 100);
+    const amount = taxable + gst;
+    const taxRateLabel = `${gstRate}%\nSGST+CGST`;
+    return [
+      String(index + 1),
+      li.referenceNumber ? `${li.item}\nRef/Model No: ${li.referenceNumber}` : li.item,
+      li.hsnCode || '',
+      String(li.qty),
+      fmt2(li.unitPrice),
+      fmt2(0),           // DISC — POs don't carry line-level discounts
+      fmt2(taxable),     // TAXABLE
+      taxRateLabel,      // GST RATE
+      fmt2(gst),         // GST
+      fmt2(amount),      // AMOUNT
+    ];
+  });
 
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'AMOUNT']],
+    head: [[
+      '#',
+      'ITEM / DESCRIPTION',
+      'HSN/SAC',
+      'QTY',
+      'RATE',
+      'DISC',
+      'TAXABLE',
+      'GST RATE',
+      'GST',
+      'AMOUNT',
+    ]],
     body: tableBody,
     theme: 'grid',
     tableWidth: contentWidth,
@@ -323,18 +346,22 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
     },
     columnStyles: {
       0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 200 },
-      2: { cellWidth: 60, halign: 'center' },
-      3: { cellWidth: 40, halign: 'center' },
-      4: { cellWidth: 85, halign: 'right' },
-      5: { cellWidth: 106, halign: 'right' },
+      1: { cellWidth: 105 },
+      2: { cellWidth: 42, halign: 'center' },
+      3: { cellWidth: 24, halign: 'center' },
+      4: { cellWidth: 55, halign: 'right' },
+      5: { cellWidth: 47, halign: 'right' },
+      6: { cellWidth: 58, halign: 'right' },
+      7: { cellWidth: 40, halign: 'center' },
+      8: { cellWidth: 52, halign: 'right' },
+      9: { cellWidth: 68, halign: 'right' },
     },
     didParseCell(data) {
       if (data.section === 'body' && data.column.index === 1) {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.textColor = DARK;
       }
-      if (data.section === 'body' && data.column.index === 5) {
+      if (data.section === 'body' && data.column.index === 9) {
         data.cell.styles.fontStyle = 'bold';
       }
     },
@@ -342,7 +369,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
 
   // ── Summary box (right) + Left text blocks ────────────────────────────────
   y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
-  const summaryWidth = 220;
+  const summaryWidth = 255;
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawPOSummary(doc, po, summaryX, y, summaryWidth);
 
