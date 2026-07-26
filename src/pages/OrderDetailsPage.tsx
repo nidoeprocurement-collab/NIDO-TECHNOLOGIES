@@ -1932,7 +1932,7 @@ export default function MyOrderPage() {
   };
 
   // One PO per unique vendor across all selected sub-orders (handles multi-vendor splits).
-  const handleCreatePurchaseOrders = (subIds: string[]) => {
+  const handleCreatePurchaseOrders = async (subIds: string[]) => {
     const selectedSet = new Set(subIds);
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, "0");
@@ -2045,9 +2045,9 @@ export default function MyOrderPage() {
       };
 
       try {
-        const dataUri = getPODataUri(po);
+        const dataUri = await getPODataUri(po);
         po.documents = [{ id: `doc-${poNumber}-pdf`, name: `${poNumber}.pdf`, ext: "pdf", type: "Purchase Order", uploadedBy: "System", uploadedOn: displayDate, dataUrl: dataUri }];
-        downloadPOPdf(po);
+        await downloadPOPdf(po);
       } catch (e) {
         console.warn("PDF generation failed:", e);
       }

@@ -1,28 +1,167 @@
 // ── Purchase Order PDF Generator ──────────────────────────────────────────────
-// Generates a PDF that matches the sample PO format exactly.
+// Generates a PDF that matches the Invoice PDF format exactly.
 // Uses jsPDF + jspdf-autotable (both already installed).
 
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import type { StoredPO } from "./purchaseOrderStore";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { loadConfig } from './configService';
+import { numberToWords } from './quotePdfGenerator';
+import type { StoredPO } from './purchaseOrderStore';
 
-// ── Company constants (buyer) — read live from config ─────────────────────────
-import { getConfig } from "./configService";
+// ── Colour palette (identical to invoicePdf) ─────────────────────────────────
+const BLUE: [number, number, number] = [31, 95, 190];
+const DARK: [number, number, number] = [28, 39, 56];
+const TEXT: [number, number, number] = [55, 62, 72];
+const MUTED: [number, number, number] = [105, 112, 123];
+const BORDER: [number, number, number] = [218, 222, 228];
+const LIGHT_BLUE: [number, number, number] = [239, 246, 255];
 
-function getCO() {
-  const cfg = getConfig();
-  const org = cfg.organization;
-  const addr = org.registeredAddress || "No address configured";
-  // Split address into lines for the PDF
-  const parts = addr.split(",").map(s => s.trim());
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmt2(value: number): string {
+  return value.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function splitLines(value: string | undefined): string[] {
+  return (value || '')
+    .split(/[,\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function getBrandHeader(displayName: string, industry: string): { name: string; subtitle: string } {
+  const value = displayName.trim();
+  const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
   return {
-    name: org.companyName || "Nido Technologies",
-    addr1: parts[0] ?? "",
-    addr2: parts.slice(1, 3).join(", "),
-    city:  parts.slice(3).join(", "),
-    country: "India",
-    gstin: org.gstNumber || "",
+    name: (match?.[1] || value || 'Nido Tech').trim(),
+    subtitle: (match?.[2] || industry || 'Corporate Essentials & Integrated Services').trim(),
   };
+}
+
+function drawText(
+  doc: jsPDF,
+  value: string,
+  x: number,
+  y: number,
+  options: { size?: number; color?: [number, number, number]; bold?: boolean; align?: 'left' | 'center' | 'right' } = {},
+) {
+  doc
+    .setFont('helvetica', options.bold ? 'bold' : 'normal')
+    .setFontSize(options.size ?? 8)
+    .setTextColor(...(options.color ?? TEXT));
+  doc.text(value, x, y, { align: options.align ?? 'left' });
+}
+
+async function loadImage(url: string): Promise<{ data: string; format: 'PNG' | 'JPEG' } | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    const data = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    return {
+      data,
+      format: blob.type.includes('jpeg') || blob.type.includes('jpg') ? 'JPEG' : 'PNG',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Draws a rounded address card (same as invoicePdf drawCard).
+ * Returns the card height so the caller can advance `y`.
+ */
+function drawCard(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  title: string,
+  name: string,
+  address: string,
+  extraLines: string[] = [],
+): number {
+  const addressLines = splitLines(address);
+  const totalLines = addressLines.length + extraLines.length;
+  const cardHeight = Math.max(92, 54 + totalLines * 12);
+
+  doc.setDrawColor(...BORDER).setLineWidth(0.7);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, width, cardHeight, 5, 5, 'FD');
+
+  drawText(doc, title.toUpperCase(), x + 13, y + 19, { size: 8, color: BLUE, bold: true });
+  doc.setDrawColor(...BORDER).setLineWidth(0.5);
+  doc.line(x + 13, y + 27, x + width - 13, y + 27);
+
+  let cursor = y + 48;
+  drawText(doc, name, x + 13, cursor, { size: 9, color: DARK, bold: true });
+  cursor += 13;
+  addressLines.forEach((line) => {
+    drawText(doc, line, x + 13, cursor, { size: 8.5 });
+    cursor += 12;
+  });
+  extraLines.forEach((line) => {
+    drawText(doc, line, x + 13, cursor, { size: 8.5 });
+    cursor += 12;
+  });
+  return cardHeight;
+}
+
+/**
+ * Draws the PO summary box (right side) — mirrors invoicePdf drawSummary.
+ * Returns the box height.
+ */
+function drawPOSummary(
+  doc: jsPDF,
+  po: StoredPO,
+  x: number,
+  y: number,
+  width: number,
+): number {
+  const rows: Array<[string, string]> = [
+    ['Sub Total', `INR ${fmt2(po.subtotal)}`],
+    [`SGST (${po.sgstPct}%)`, `INR ${fmt2(po.sgstAmt)}`],
+    [`CGST (${po.cgstPct}%)`, `INR ${fmt2(po.cgstAmt)}`],
+  ];
+
+  const rowHeight = 20;
+  const totalHeight = 27;
+  const height = rows.length * rowHeight + totalHeight;
+
+  doc.setDrawColor(...BORDER).setLineWidth(0.6);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, width, height, 5, 5, 'FD');
+
+  rows.forEach(([label, value], index) => {
+    const rowY = y + index * rowHeight;
+    if (index > 0) {
+      doc.setDrawColor(...BORDER).setLineWidth(0.3);
+      doc.line(x, rowY, x + width, rowY);
+    }
+    drawText(doc, label, x + 10, rowY + 13, { size: 7.7, color: TEXT });
+    drawText(doc, value, x + width - 10, rowY + 13, { size: 7.7, color: DARK, align: 'right' });
+  });
+
+  const totalY = y + rows.length * rowHeight;
+  doc.setFillColor(...LIGHT_BLUE);
+  doc.rect(x + 0.5, totalY, width - 1, totalHeight - 0.5, 'F');
+  doc.setDrawColor(...BORDER).setLineWidth(0.5);
+  doc.line(x, totalY, x + width, totalY);
+  drawText(doc, 'Total Payable', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
+  drawText(doc, `INR ${fmt2(po.grandTotal)}`, x + width - 10, totalY + 17, {
+    size: 8.5,
+    color: DARK,
+    bold: true,
+    align: 'right',
+  });
+  return height;
 }
 
 // ── Standard Terms & Conditions ───────────────────────────────────────────────
@@ -38,237 +177,257 @@ const TERMS = [
 ];
 
 const NOTE_TEXT =
-  "Delivery Time for this project is 17 Days from the PO date; delay in submission\n" +
-  "will impact to penalty of 1% from Grand total amount per day. Daily Progress\n" +
-  "update is mandatory.\n" +
-  "Consider all verbal changes as per the conversation's.";
+  "Delivery Time for this project is 17 Days from the PO date; delay in submission " +
+  "will impact to penalty of 1% from Grand total amount per day. Daily Progress " +
+  "update is mandatory. Consider all verbal changes as per the conversation's.";
 
-// Indian number formatting without ₹ symbol (font may not have the glyph)
-function fmt(n: number): string {
-  return n.toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+// ── Main generator ─────────────────────────────────────────────────────────────
+export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
+  const org = loadConfig().organization;
+  const brandHeader = getBrandHeader(org.displayName, org.industry);
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 42;
+  const contentWidth = pageWidth - margin * 2;
 
-// ── Main generator ────────────────────────────────────────────────────────────
-export function generatePOPdf(po: StoredPO): jsPDF {
-  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-  const W = 210;
-  const L = 14; // left margin
-  const R = W - L; // right edge
-
-  let y = 14;
-
-  // ── 1. Company header — right-aligned ──────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  const CO = getCO();
-  doc.text(CO.name, R, y, { align: "right" });
-  y += 5.5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  for (const line of [CO.addr1, CO.addr2, CO.city, CO.country, `GSTIN ${CO.gstin}`]) {
-    doc.text(line, R, y, { align: "right" });
-    y += 4.5;
+  // ── Logo + brand name (left) ──────────────────────────────────────────────
+  let logoLoaded = false;
+  if (org.logoUrl) {
+    const logo = org.logoUrl.startsWith('http')
+      ? await loadImage(org.logoUrl)
+      : { data: org.logoUrl, format: org.logoUrl.includes('jpeg') ? 'JPEG' as const : 'PNG' as const };
+    if (logo) {
+      try {
+        doc.addImage(logo.data, logo.format, margin + 8, 26, 45, 45);
+        logoLoaded = true;
+      } catch {
+        logoLoaded = false;
+      }
+    }
   }
-  y += 6;
+  if (!logoLoaded) {
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(margin + 8, 27, 38, 38, 9, 9, 'F');
+    drawText(doc, 'N', margin + 27, 53, { size: 22, color: [255, 255, 255], bold: true, align: 'center' });
+  }
 
-  // ── 2. "PURCHASE ORDER" title — centered ───────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.text("PURCHASE ORDER", W / 2, y, { align: "center" });
-  y += 9;
+  drawText(doc, brandHeader.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
+  drawText(doc, brandHeader.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
-  // ── 3. Vendor Address (left) | PO meta (right) ────────────────────────────
-  const metaLabelX = 128;
-  const metaValX   = R;
+  // ── PURCHASE ORDER label + number box (right) ─────────────────────────────
+  drawText(doc, 'PURCHASE ORDER', pageWidth - margin, 48, { size: 18, color: DARK, bold: true, align: 'right' });
+  doc.setDrawColor(...BORDER).setLineWidth(0.6);
+  doc.roundedRect(pageWidth - margin - 130, 61, 130, 28, 4, 4, 'S');
+  drawText(doc, '#', pageWidth - margin - 119, 79, { size: 11, color: BLUE });
+  drawText(doc, po.poNumber, pageWidth - margin - 10, 79, { size: 10, color: DARK, bold: true, align: 'right' });
 
-  // "Vendor Address" heading
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("Vendor Address", L, y);
+  // ── Company address block (left, below logo) ──────────────────────────────
+  const companyLines = [
+    org.companyName || org.displayName,
+    ...splitLines(org.registeredAddress || org.billingAddress),
+    [org.phone && `Phone: ${org.phone}`, org.email && `Email: ${org.email}`].filter(Boolean).join(' | '),
+    org.gstNumber ? `GSTIN: ${org.gstNumber}` : '',
+  ].filter(Boolean);
+  let companyY = 102;
+  companyLines.forEach((line, index) => {
+    drawText(doc, line, margin + 8, companyY, {
+      size: index === 0 ? 8.5 : 7.5,
+      color: index === 0 ? DARK : TEXT,
+      bold: index === 0,
+    });
+    companyY += 11;
+  });
 
-  // PO # label + value
-  doc.text("Purchase Order#", metaLabelX, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(po.poNumber, metaValX, y, { align: "right" });
-  y += 5;
+  // ── Dates + meta (right) ──────────────────────────────────────────────────
+  let dateY = 112;
+  drawText(doc, `PO Date: ${po.createdOnDisplay}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+  if (po.requestedDelivery) {
+    dateY += 14;
+    drawText(doc, `Delivery Date: ${po.requestedDelivery}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+  }
+  if (po.paymentTerms) {
+    dateY += 14;
+    drawText(doc, `Payment Terms: ${po.paymentTerms}`, pageWidth - margin, dateY, { size: 8, color: TEXT, align: 'right' });
+  }
 
-  // Vendor name (bold) + Date (right)
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("Date", metaLabelX, y);
-  doc.setFont("helvetica", "normal");
-  doc.text(po.createdOnDisplay, metaValX, y, { align: "right" });
+  // ── Vendor Address / Deliver To cards ─────────────────────────────────────
+  let y = Math.max(companyY + 12, 164);
+  const cardGap = 12;
+  const cardWidth = (contentWidth - cardGap) / 2;
 
-  // Vendor name on left
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.text(po.vendorName, L, y);
-  y += 5;
-
-  // Vendor address lines
-  const addrLines = [
+  // Build vendor address string
+  const vendorAddrParts = [
     po.vendorAddressLine1,
     po.vendorAddressLine2,
     po.vendorCity,
     po.vendorPincode ? `${po.vendorPincode} ${po.vendorState}` : po.vendorState,
-    "India",
-    po.vendorGstin ? `GSTIN ${po.vendorGstin}` : "",
+    'India',
   ].filter(Boolean);
+  const vendorAddr = vendorAddrParts.join(', ');
+  const vendorExtras: string[] = [];
+  if (po.vendorGstin) vendorExtras.push(`GSTIN: ${po.vendorGstin}`);
+  if (po.vendorPhone) vendorExtras.push(`Phone: ${po.vendorPhone}`);
+  if (po.vendorEmail) vendorExtras.push(`Email: ${po.vendorEmail}`);
 
-  for (const line of addrLines) {
-    doc.text(line, L, y);
-    y += 4.5;
-  }
-  y += 6;
+  // Build deliver-to address string
+  const deliverAddr = [
+    ...splitLines(org.registeredAddress || org.billingAddress),
+  ].join(', ');
+  const deliverExtras: string[] = [];
+  if (org.gstNumber) deliverExtras.push(`GSTIN: ${org.gstNumber}`);
 
-  // ── 4. Deliver To ──────────────────────────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("Deliver To", L, y);
-  y += 5;
+  const cardHeight = Math.max(
+    drawCard(doc, margin, y, cardWidth, 'Vendor Address', po.vendorName, vendorAddr, vendorExtras),
+    drawCard(doc, margin + cardWidth + cardGap, y, cardWidth, 'Deliver To', org.companyName || org.displayName || 'Nido Tech', deliverAddr, deliverExtras),
+  );
+  y += cardHeight + 16;
 
-  doc.setFont("helvetica", "normal");
-  for (const line of [CO.name, CO.addr1, CO.addr2, CO.city, CO.country, `GSTIN ${CO.gstin}`]) {
-    doc.text(line, L, y);
-    y += 4.5;
-  }
-  y += 6;
-
-  // ── 5. Items table ─────────────────────────────────────────────────────────
-  // Support both multi-item POs (po.items[]) and legacy single-item POs
-  const tableBody =
+  // ── Line items table ──────────────────────────────────────────────────────
+  const tableItems =
     po.items && po.items.length > 0
-      ? po.items.map((li, i) => [
-          String(i + 1),
-          li.referenceNumber ? `${li.item}\nRef/Model No: ${li.referenceNumber}` : li.item,
-          li.hsnCode || "",
-          `${li.qty.toFixed(2)}\nNos`,
-          fmt(li.unitPrice),
-          fmt(li.lineSubtotal),
-        ])
-      : [["1", po.referenceNumber ? `${po.item}\nRef/Model No: ${po.referenceNumber}` : po.item, po.hsnCode || "", `${po.qty.toFixed(2)}\nNos`, fmt(po.unitPrice), fmt(po.subtotal)]];
+      ? po.items
+      : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal }];
+
+  const tableBody = tableItems.map((li, index) => [
+    String(index + 1),
+    li.referenceNumber ? `${li.item}\nRef/Model No: ${li.referenceNumber}` : li.item,
+    li.hsnCode || '',
+    String(li.qty),
+    fmt2(li.unitPrice),
+    fmt2(li.lineSubtotal),
+  ]);
 
   autoTable(doc, {
     startY: y,
-    head: [["#", "Item & Description", "HSN/SAC", "Qty", "Rate", "Amount"]],
+    margin: { left: margin, right: margin },
+    head: [['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'AMOUNT']],
     body: tableBody,
-    margin: { left: L, right: L },
-    theme: "grid",
-    headStyles: {
-      fontSize: 8.5,
-      fontStyle: "bold",
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      lineWidth: 0.3,
-      lineColor: [180, 180, 180],
-      cellPadding: 3,
+    theme: 'grid',
+    tableWidth: contentWidth,
+    styles: {
+      font: 'helvetica',
+      fontSize: 7.5,
+      textColor: TEXT,
+      lineColor: BORDER,
+      lineWidth: 0.35,
+      cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
+      valign: 'middle',
     },
-    bodyStyles: {
-      fontSize: 8.5,
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-      lineWidth: 0.2,
-      lineColor: [200, 200, 200],
-      cellPadding: 3,
-      minCellHeight: 12,
+    headStyles: {
+      fillColor: [248, 250, 252],
+      textColor: DARK,
+      fontStyle: 'bold',
+      fontSize: 6.3,
+      halign: 'center',
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
-      1: { cellWidth: "auto" },
-      2: { cellWidth: 20, halign: "center" },
-      3: { cellWidth: 18, halign: "right" },
-      4: { cellWidth: 28, halign: "right" },
-      5: { cellWidth: 30, halign: "right" },
+      0: { cellWidth: 20, halign: 'center' },
+      1: { cellWidth: 200 },
+      2: { cellWidth: 60, halign: 'center' },
+      3: { cellWidth: 40, halign: 'center' },
+      4: { cellWidth: 85, halign: 'right' },
+      5: { cellWidth: 106, halign: 'right' },
+    },
+    didParseCell(data) {
+      if (data.section === 'body' && data.column.index === 1) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.textColor = DARK;
+      }
+      if (data.section === 'body' && data.column.index === 5) {
+        data.cell.styles.fontStyle = 'bold';
+      }
     },
   });
 
-  y = (doc as any).lastAutoTable.finalY + 6;
+  // ── Summary box (right) + Left text blocks ────────────────────────────────
+  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
+  const summaryWidth = 220;
+  const summaryX = pageWidth - margin - summaryWidth;
+  const summaryHeight = drawPOSummary(doc, po, summaryX, y, summaryWidth);
 
-  // ── 6. Note (left) + Sub-totals (right) ───────────────────────────────────
-  const noteLines = doc.splitTextToSize(NOTE_TEXT, 95);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
-  doc.text(noteLines, L, y);
+  // Left side: Note then Terms & Conditions
+  let leftY = y + 2;
+  const leftWidth = summaryX - margin - 14;
 
-  // Totals block — right side
-  const totLabelX = 130;
-  const totValX   = R;
-  let ty = y;
+  // Note
+  const noteWrapped = doc.splitTextToSize(NOTE_TEXT, leftWidth);
+  drawText(doc, 'NOTE', margin, leftY + 9, { size: 8, color: BLUE, bold: true });
+  leftY += 23;
+  drawText(doc, noteWrapped.join('\n'), margin, leftY, { size: 7.5, color: TEXT });
+  leftY += noteWrapped.length * 11 + 10;
 
-  const rows: [string, string][] = [
-    ["Sub Total",                    fmt(po.subtotal)],
-    [`SGST${po.sgstPct} (${po.sgstPct}%)`, fmt(po.sgstAmt)],
-    [`CGST${po.cgstPct} (${po.cgstPct}%)`, fmt(po.cgstAmt)],
-  ];
+  // Terms & Conditions
+  if (leftY < y + summaryHeight) leftY = y + summaryHeight + 10;
 
-  doc.setFontSize(8.5);
-  for (const [label, val] of rows) {
-    doc.setFont("helvetica", "normal");
-    doc.text(label, totLabelX, ty);
-    doc.text(val, totValX, ty, { align: "right" });
-    ty += 6;
-  }
+  // ── Total in Words + Authorized Signature ────────────────────────────────
+  y = Math.max(leftY + 8, y + summaryHeight) + 20;
 
-  // Grand Total (bold)
-  doc.setFont("helvetica", "bold");
-  doc.text("Total", totLabelX, ty);
-  doc.text(`Rs.${fmt(po.grandTotal)}`, totValX, ty, { align: "right" });
-  ty += 4;
-
-  // Move y past whichever block is taller
-  y = Math.max(y + noteLines.length * 4, ty) + 8;
-
-  // ── 7. Terms & Conditions ──────────────────────────────────────────────────
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("Terms & Conditions", L, y);
-  y += 5;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  for (let i = 0; i < TERMS.length; i++) {
-    const lines = doc.splitTextToSize(`${i + 1}. ${TERMS[i]}`, W - L * 2);
-    // Start a new page if we're running out of space
-    if (y + lines.length * 4.2 > 282) {
+  // Terms & Conditions (full-width below)
+  drawText(doc, 'TERMS & CONDITIONS', margin, y, { size: 8, color: BLUE, bold: true });
+  y += 14;
+  TERMS.forEach((term, index) => {
+    const wrapped = doc.splitTextToSize(`${index + 1}. ${term}`, contentWidth);
+    // New page if needed
+    if (y + wrapped.length * 11 > pageHeight - 60) {
       doc.addPage();
-      y = 20;
+      y = margin + 20;
     }
-    doc.text(lines, L, y);
-    y += lines.length * 4.2 + 1;
+    drawText(doc, wrapped.join('\n'), margin, y, { size: 7.5, color: TEXT });
+    y += wrapped.length * 11 + 4;
+  });
+
+  y += 14;
+  if (y > pageHeight - 80) {
+    doc.addPage();
+    y = margin + 20;
   }
 
-  y += 8;
+  drawText(doc, 'TOTAL IN WORDS', margin, y, { size: 8, color: BLUE, bold: true });
+  drawText(doc, numberToWords(po.grandTotal), margin, y + 15, { size: 8.5, color: DARK, bold: true });
 
-  // ── 8. Authorized Signature ────────────────────────────────────────────────
-  if (y > 270) { doc.addPage(); y = 20; }
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.text("Authorized Signature", L, y);
+  const signatureX = pageWidth - margin - 135;
+  doc.setDrawColor(...MUTED).setLineWidth(0.6);
+  doc.line(signatureX, y + 10, pageWidth - margin, y + 10);
+  drawText(doc, 'Authorized Signatory', (signatureX + pageWidth - margin) / 2, y + 25, {
+    size: 7.5,
+    color: MUTED,
+    align: 'center',
+  });
 
-  // Page number bottom-right
-  const totalPages = (doc as any).internal.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(String(p), R, 290, { align: "right" });
-  }
+  // ── Footer ────────────────────────────────────────────────────────────────
+  const footerY = Math.min(pageHeight - 22, y + 72);
+  doc.setDrawColor(...BORDER).setLineWidth(0.5);
+  doc.line(margin, footerY - 18, pageWidth - margin, footerY - 18);
+  drawText(
+    doc,
+    `Thank you for choosing ${org.displayName || org.companyName || 'Nido Tech'} as your procurement partner!`,
+    pageWidth / 2,
+    footerY,
+    { size: 8, color: BLUE, bold: true, align: 'center' },
+  );
 
-  return doc;
+  return doc.output('datauristring');
 }
 
 /** Trigger a browser download of the PO PDF. */
-export function downloadPOPdf(po: StoredPO): void {
-  const doc = generatePOPdf(po);
-  doc.save(`${po.poNumber}.pdf`);
+export async function downloadPOPdf(po: StoredPO): Promise<void> {
+  const dataUri = await generatePOPdfBase64(po);
+  const link = document.createElement('a');
+  link.href = dataUri;
+  link.download = `${po.poNumber}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
-/** Return the PDF as a base64 data-URI string (for storing in the document list). */
-export function getPODataUri(po: StoredPO): string {
-  const doc = generatePOPdf(po);
-  return doc.output("datauristring");
+/** Return the PDF as a base64 data-URI string. */
+export async function getPODataUri(po: StoredPO): Promise<string> {
+  return generatePOPdfBase64(po);
+}
+
+// ── Legacy sync shim (kept so old callers compile — prefer the async versions) ─
+/** @deprecated Use downloadPOPdf (async) instead. */
+export function generatePOPdf(po: StoredPO): never {
+  throw new Error('generatePOPdf is now async — use downloadPOPdf() or getPODataUri() instead.');
 }

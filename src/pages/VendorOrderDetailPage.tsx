@@ -1040,7 +1040,7 @@ export default function VendorOrderDetailPage() {
                           a.click();
                           document.body.removeChild(a);
                         } else if (realPO) {
-                          downloadPOPdf(realPO);
+                          downloadPOPdf(realPO).catch(console.warn);
                         } else {
                           alert(`Downloading: ${doc.name}`);
                         }
