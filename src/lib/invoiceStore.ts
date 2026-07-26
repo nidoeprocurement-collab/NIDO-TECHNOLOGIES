@@ -284,9 +284,12 @@ export function deleteInvoice(id: string): void {
 }
 
 export function generateInvoiceNumber(): string {
-  const numbers = getInvoices()
-    .map((invoice) => Number(invoice.invoiceNumber.replace(/\D/g, '')))
-    .filter(Number.isFinite);
-  const next = Math.max(0, ...numbers) + 1;
-  return `INV-${String(next).padStart(3, '0')}`;
+  const year = new Date().getFullYear();
+  // Match only numbers in the new format INV-YYYY##### to get the serial portion
+  const re = new RegExp(`^INV-${year}(\\d+)$`);
+  const serials = seedInvoices()
+    .map((inv) => { const m = inv.invoiceNumber.match(re); return m ? parseInt(m[1], 10) : 0; })
+    .filter((n) => n > 0);
+  const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
+  return `INV-${year}${String(next).padStart(5, '0')}`;
 }

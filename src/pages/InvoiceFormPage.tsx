@@ -469,7 +469,12 @@ export default function InvoiceFormPage() {
           {sectionHead('Invoice Details')}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Label text="Invoice Number">
-              <input value={invoiceNumber} readOnly className={`${inputCls} bg-gray-50`} />
+              <input
+                value={invoiceNumber}
+                readOnly
+                tabIndex={-1}
+                className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed select-none`}
+              />
             </Label>
             <Label text="Invoice Date">
               <input
