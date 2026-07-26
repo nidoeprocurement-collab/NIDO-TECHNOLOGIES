@@ -430,6 +430,15 @@ export default function VendorOrderList() {
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return { ...r, status, ...extra };
     }));
+    // Persist cancellations to the store so purchaseOrderStore dispatches the
+    // poCancelled event and OrderDetailsPage resets its vendor-selection state.
+    if (status === "Cancelled") {
+      for (const id of eligible) {
+        const changes: any = { status: "Cancelled" };
+        if (cancelReason) changes.cancelReason = cancelReason;
+        updatePO(id, changes);
+      }
+    }
     const skipped = selected.size - eligible.length;
     toast.show(
       skipped > 0

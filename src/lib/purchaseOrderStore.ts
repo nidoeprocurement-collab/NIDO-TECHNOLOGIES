@@ -124,6 +124,49 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
   if (idx >= 0) {
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+
+    // When a PO is cancelled, clean up the order-level PO and vendor-selection
+    // localStorage keys so OrderDetailsPage resets to its default (unselected) state.
+    if (changes.status === "Cancelled") {
+      const po = all[idx];
+      const orderId = po.orderId;
+      const subOrderIds: string[] = po.subOrderIds?.length
+        ? po.subOrderIds
+        : [po.subOrderId].filter(Boolean);
+
+      try {
+        // Remove createdPOs entries for these sub-orders
+        const posKey = `nido_pos_${orderId}`;
+        const createdPOs: Record<string, any> = JSON.parse(localStorage.getItem(posKey) || "{}");
+        let changed = false;
+        for (const key of Object.keys(createdPOs)) {
+          if (subOrderIds.includes(createdPOs[key]?.subOrderId)) {
+            delete createdPOs[key];
+            changed = true;
+          }
+        }
+        if (changed) localStorage.setItem(posKey, JSON.stringify(createdPOs));
+      } catch { /* storage unavailable */ }
+
+      try {
+        // Remove vendor selection entries for these sub-orders
+        const vendorsKey = `nido_vendors_${orderId}`;
+        const vendors: Record<string, string> = JSON.parse(localStorage.getItem(vendorsKey) || "{}");
+        let changed = false;
+        for (const subId of subOrderIds) {
+          if (subId in vendors) { delete vendors[subId]; changed = true; }
+        }
+        if (changed) localStorage.setItem(vendorsKey, JSON.stringify(vendors));
+      } catch { /* storage unavailable */ }
+
+      // Notify OrderDetailsPage (same tab) to sync its React state from localStorage
+      try {
+        window.dispatchEvent(new CustomEvent("poCancelled", {
+          detail: { poNumber, orderId, subOrderIds },
+        }));
+      } catch { /* SSR safe */ }
+    }
+
     try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber } })); } catch { /* SSR safe */ }
   }
 }

@@ -1909,6 +1909,31 @@ export default function MyOrderPage() {
     return () => window.removeEventListener("orderSubItemsUpdated", onSubItemsUpdated);
   }, [orderId]);
 
+  // When a PO is cancelled externally (e.g. from VendorOrderDetailPage or
+  // VendorOrdersPage), reset the relevant vendor-selection and createdPOs state
+  // so the item returns to its default (unselected) state and a new PO can be raised.
+  useEffect(() => {
+    const onPOCancelled = (e: Event) => {
+      const { orderId: cancelledOrderId, subOrderIds } = (e as CustomEvent).detail || {};
+      if (cancelledOrderId !== orderId || !Array.isArray(subOrderIds) || subOrderIds.length === 0) return;
+      // localStorage was already cleaned by purchaseOrderStore — reload from it
+      try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
+      try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
+      setSelectedVendorMeta(prev => {
+        const next = { ...prev };
+        for (const id of subOrderIds) delete next[id];
+        return next;
+      });
+      setVendorAllocations(prev => {
+        const next = { ...prev };
+        for (const id of subOrderIds) delete next[id];
+        return next;
+      });
+    };
+    window.addEventListener("poCancelled", onPOCancelled);
+    return () => window.removeEventListener("poCancelled", onPOCancelled);
+  }, [orderId]);
+
   const handleOpenVendorModal = (sub: any) => {
     // Vendor sourcing is not applicable once the order is Cancelled/Draft.
     if (isOrderInactive) return;
