@@ -31,6 +31,8 @@ export interface StoredInvoice {
   id: string;
   invoiceNumber: string;
   archived?: boolean;
+  archiveReason?: string;
+  archivedAt?: string;
   // client
   clientName: string;
   contactPerson: string;
@@ -262,18 +264,17 @@ export function saveInvoice(invoice: StoredInvoice): void {
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
 }
 
-export function archiveInvoice(id: string): void {
+export function archiveInvoice(id: string, reason: string): void {
   const all = seedInvoices();
   const idx = all.findIndex((inv) => inv.id === id);
-  if (idx >= 0) { all[idx] = { ...all[idx], archived: true }; }
-  localStorage.setItem(STORE_KEY, JSON.stringify(all));
-  window.dispatchEvent(new Event('nidoInvoicesUpdated'));
-}
-
-export function unarchiveInvoice(id: string): void {
-  const all = seedInvoices();
-  const idx = all.findIndex((inv) => inv.id === id);
-  if (idx >= 0) { all[idx] = { ...all[idx], archived: false }; }
+  if (idx >= 0) {
+    all[idx] = {
+      ...all[idx],
+      archived: true,
+      archiveReason: reason.trim(),
+      archivedAt: new Date().toISOString(),
+    };
+  }
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
 }
@@ -284,9 +285,12 @@ export function deleteInvoice(id: string): void {
 }
 
 export function generateInvoiceNumber(): string {
-  const numbers = getInvoices()
-    .map((invoice) => Number(invoice.invoiceNumber.replace(/\D/g, '')))
-    .filter(Number.isFinite);
-  const next = Math.max(0, ...numbers) + 1;
-  return `INV-${String(next).padStart(3, '0')}`;
+  const year = new Date().getFullYear();
+  // Match only numbers in the new format INV-YYYY##### to get the serial portion
+  const re = new RegExp(`^INV-${year}(\\d+)$`);
+  const serials = seedInvoices()
+    .map((inv) => { const m = inv.invoiceNumber.match(re); return m ? parseInt(m[1], 10) : 0; })
+    .filter((n) => n > 0);
+  const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
+  return `INV-${year}${String(next).padStart(5, '0')}`;
 }

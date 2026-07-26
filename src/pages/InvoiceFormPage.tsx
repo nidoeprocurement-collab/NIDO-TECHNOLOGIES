@@ -12,6 +12,7 @@ import {
 import { getActiveQuotes } from '@/lib/quoteStore';
 import { getActiveOrders } from '@/lib/salesOrderStore';
 import { useMyOrders } from '@/contexts/MyOrdersContext';
+import { getEffectiveTaxPctForCategory } from '@/lib/taxEngine';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -149,17 +150,25 @@ export default function InvoiceFormPage() {
 
     if (order.cartItems && order.cartItems.length > 0) {
       setLineItems(
-        order.cartItems.map((ci) => ({
-          id:          `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          description: ci.name       || '',
-          itemDetails: ci.specs?.join(', ') || '',
-          hsnSac:      '',
-          quantity:    ci.quantity   || 1,
-          rate:        ci.priceNum   || 0,
-          discount:    0,
-          taxPercent:  18,
-          taxType:     'IGST' as const,
-        }))
+        order.cartItems.map((ci) => {
+          // priceNum is tax-inclusive; derive the correct GST rate from the
+          // item category, then back-calculate the pre-tax unit rate.
+          const gstRate    = getEffectiveTaxPctForCategory(ci.category || '');
+          const preTaxRate = gstRate > 0
+            ? Math.round((ci.priceNum * 100 / (100 + gstRate)) * 100) / 100
+            : (ci.priceNum || 0);
+          return {
+            id:          `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            description: ci.name         || '',
+            itemDetails: ci.specs?.join(', ') || '',
+            hsnSac:      '',
+            quantity:    ci.quantity     || 1,
+            rate:        preTaxRate,
+            discount:    0,
+            taxPercent:  gstRate,
+            taxType:     'IGST' as const,
+          };
+        })
       );
     }
 
@@ -460,7 +469,12 @@ export default function InvoiceFormPage() {
           {sectionHead('Invoice Details')}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Label text="Invoice Number">
-              <input value={invoiceNumber} readOnly className={`${inputCls} bg-gray-50`} />
+              <input
+                value={invoiceNumber}
+                readOnly
+                tabIndex={-1}
+                className={`${inputCls} bg-gray-50 text-gray-500 cursor-not-allowed select-none`}
+              />
             </Label>
             <Label text="Invoice Date">
               <input
