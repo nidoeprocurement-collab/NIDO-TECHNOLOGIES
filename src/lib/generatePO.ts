@@ -127,11 +127,12 @@ function drawPOSummary(
   width: number,
 ): number {
   const totalTax = (po.sgstAmt ?? 0) + (po.cgstAmt ?? 0);
-  const rates = [po.sgstPct, po.cgstPct]
-    .filter((rate) => Number.isFinite(rate))
-    .filter((rate, index, values) => values.indexOf(rate) === index)
-    .sort((a, b) => a - b)
-    .map((rate) => `${rate}%`)
+  // Collect unique FULL GST rates from individual line items (fall back to combined sgstPct+cgstPct)
+  const itemsList = po.items?.length > 0 ? po.items : [{ gstPct: po.sgstPct + po.cgstPct } as any];
+  const rates = [...new Set(itemsList.map((li: any) => li.gstPct ?? (po.sgstPct + po.cgstPct)))]
+    .filter((r) => Number.isFinite(r))
+    .sort((a: number, b: number) => a - b)
+    .map((r: number) => `${r}%`)
     .join(', ');
 
   const rows: Array<[string, string, boolean?]> = [
@@ -298,10 +299,12 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   const gstRate = po.sgstPct + po.cgstPct; // combined GST % for all PO items
 
   const tableBody = tableItems.map((li, index) => {
+    // Use per-item rate if stored; fall back to PO-level combined rate
+    const itemGstRate = li.gstPct ?? gstRate;
     const taxable = li.lineSubtotal;
-    const gst = taxable * (gstRate / 100);
+    const gst = taxable * (itemGstRate / 100);
     const amount = taxable + gst;
-    const taxRateLabel = `${gstRate}%\nIGST`;
+    const taxRateLabel = `${itemGstRate}%\nIGST`;
     // Build item cell: name, optional description from specs, optional ref number
     const specLine = li.specs && li.specs.length > 0 ? li.specs[0] : '';
     let itemCell = li.item;
@@ -329,12 +332,12 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       'ITEM / SPECIFICATION',
       'HSN/SAC',
       'QTY',
-      'UNIT RATE (₹)',
-      'DISC (₹)',
-      'TAXABLE (₹)',
+      'UNIT RATE',
+      'DISC',
+      'TAXABLE',
       'GST RATE',
-      'GST (₹)',
-      'NET AMOUNT (₹)',
+      'GST',
+      'NET AMOUNT',
     ]],
     body: tableBody,
     theme: 'grid',
@@ -357,7 +360,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
     },
     columnStyles: {
       0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 105 },
+      1: { cellWidth: 104 },
       2: { cellWidth: 42, halign: 'center' },
       3: { cellWidth: 24, halign: 'center' },
       4: { cellWidth: 55, halign: 'right' },
@@ -365,7 +368,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
       6: { cellWidth: 58, halign: 'right' },
       7: { cellWidth: 40, halign: 'center' },
       8: { cellWidth: 52, halign: 'right' },
-      9: { cellWidth: 68, halign: 'right' },
+      9: { cellWidth: 69, halign: 'right' },
     },
     didParseCell(data) {
       if (data.section === 'body' && data.column.index === 1) {

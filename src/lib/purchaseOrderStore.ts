@@ -47,6 +47,8 @@ export interface POLineItem {
   qty: number;
   unitPrice: number;
   lineSubtotal: number;
+  /** Full GST rate for this line item (e.g. 18 for 18%). Stored so the PDF can show per-item rates. */
+  gstPct?: number;
 }
 
 export interface StoredPO {

@@ -2010,7 +2010,7 @@ export default function MyOrderPage() {
           qty,
           unitPrice,
           lineSubtotal,
-          _taxRate: taxRate,
+          gstPct: taxRate,
         };
       });
 
