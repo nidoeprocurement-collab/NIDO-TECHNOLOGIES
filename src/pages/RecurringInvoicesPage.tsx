@@ -45,7 +45,7 @@ import {
 } from "@/lib/invoiceStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { toast } from "sonner";
-import { MoreHorizontal, Pencil, Plus, X } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
 
 // ── safeReadJson ──────────────────────────────────────────────────────────────
 function safeReadJson<T>(key: string, fallback: T): T {
@@ -63,6 +63,18 @@ type Frequency = "weekly" | "monthly" | "quarterly";
 type RecurringStatus = "active" | "stopped";
 
 interface RecurringItem {
+  itemName: string;
+  description: string;
+  hsnSac: string;
+  quantity: number;
+  rate: number;
+  discount: number;
+  taxRate: number;
+}
+
+// Multi-line item (used in the form)
+interface RecurringLineItem {
+  id: string;
   itemName: string;
   description: string;
   hsnSac: string;
@@ -91,7 +103,8 @@ interface RecurringInvoiceProfile {
   placeOfSupply: string;
   billingAddress: string;
   shippingAddress: string;
-  item: RecurringItem;
+  item: RecurringItem;           // kept for backward-compat / preview
+  items: RecurringLineItem[];    // new multi-row store
   shippingCharges: number;
   adjustment: number;
   tds: number;
@@ -123,9 +136,61 @@ const addByFrequency = (date: string, frequency: Frequency) => {
   return base.toISOString().slice(0, 10);
 };
 
-const lineAmount = (item: RecurringItem) =>
+const lineAmount = (item: RecurringItem | RecurringLineItem) =>
   Math.max(0, item.quantity * item.rate - item.discount);
 
+const blankLineItem = (): RecurringLineItem => ({
+  id: `rli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  itemName: "",
+  description: "",
+  hsnSac: "",
+  quantity: 1,
+  rate: 0,
+  discount: 0,
+  taxRate: 18,
+});
+
+// Compute totals from an array of line items
+const computeTotalsFromItems = (
+  items: RecurringLineItem[],
+  shippingCharges: number,
+  adjustment: number,
+  tds: number,
+  roundOff: number,
+) => {
+  const grossSubtotal = items.reduce((s, it) => s + it.quantity * it.rate, 0);
+  const totalDiscount = items.reduce((s, it) => s + it.discount, 0);
+  const subtotal = Math.max(0, grossSubtotal - totalDiscount);
+
+  // GST slabs grouped by rate
+  const slabMap: Record<number, { taxable: number; cgst: number; sgst: number }> = {};
+  for (const it of items) {
+    const taxable = Math.max(0, it.quantity * it.rate - it.discount);
+    const rate = it.taxRate;
+    if (!slabMap[rate]) slabMap[rate] = { taxable: 0, cgst: 0, sgst: 0 };
+    slabMap[rate].taxable += taxable;
+    slabMap[rate].cgst += taxable * (rate / 2) / 100;
+    slabMap[rate].sgst += taxable * (rate / 2) / 100;
+  }
+  const gstSlabs = Object.entries(slabMap)
+    .filter(([, v]) => v.taxable > 0)
+    .map(([rate, v]) => ({ rate: Number(rate), ...v }))
+    .sort((a, b) => a.rate - b.rate);
+
+  const totalTax = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
+  const total = subtotal + totalTax + shippingCharges + adjustment - tds + roundOff;
+
+  return {
+    grossSubtotal: Math.round(grossSubtotal * 100) / 100,
+    totalDiscount: Math.round(totalDiscount * 100) / 100,
+    subtotal: Math.round(subtotal * 100) / 100,
+    gstSlabs,
+    totalTax: Math.round(totalTax * 100) / 100,
+    total: Math.round(total * 100) / 100,
+  };
+};
+
+// Legacy single-item helper kept for profile backward compat
 const computeTotals = (
   item: RecurringItem,
   shippingCharges: number,
@@ -172,6 +237,18 @@ const defaultProfile: RecurringInvoiceProfile = {
     discount: 0,
     taxRate: 18,
   },
+  items: [
+    {
+      id: "rli-default-1",
+      itemName: "3D Design Model",
+      description: "3D Model Mould Designs for Handel.",
+      hsnSac: "9983",
+      quantity: 1,
+      rate: 400,
+      discount: 0,
+      taxRate: 18,
+    },
+  ],
   shippingCharges: 0,
   adjustment: 0,
   tds: 0,
@@ -212,6 +289,33 @@ const normalizeProfile = (
     discount: toNumber(raw.item?.discount, 0),
     taxRate: toNumber(raw.item?.taxRate, 18),
   };
+
+  // Migrate from old single `item` to `items` array
+  let items: RecurringLineItem[];
+  if (Array.isArray(raw.items) && raw.items.length > 0) {
+    items = raw.items.map((it) => ({
+      id: it.id || `rli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      itemName: it.itemName || "",
+      description: it.description || "",
+      hsnSac: it.hsnSac || "",
+      quantity: toNumber(it.quantity, 1),
+      rate: toNumber(it.rate, 0),
+      discount: toNumber(it.discount, 0),
+      taxRate: toNumber(it.taxRate, 18),
+    }));
+  } else {
+    items = [{
+      id: `rli-migrated-${Date.now()}`,
+      itemName: item.itemName,
+      description: item.description,
+      hsnSac: item.hsnSac,
+      quantity: item.quantity,
+      rate: item.rate,
+      discount: item.discount,
+      taxRate: item.taxRate,
+    }];
+  }
+
   const shippingCharges = toNumber(raw.shippingCharges, 0);
   const adjustment = toNumber(raw.adjustment, 0);
   const tds = toNumber(raw.tds, 0);
@@ -222,6 +326,7 @@ const normalizeProfile = (
     ...defaultProfile,
     ...raw,
     item,
+    items,
     shippingCharges,
     adjustment,
     tds,
@@ -257,6 +362,7 @@ const emptyForm = (): Omit<RecurringInvoiceProfile, "id" | "recentActivities" | 
     discount: 0,
     taxRate: 18,
   },
+  items: [blankLineItem()],
   shippingCharges: 0,
   adjustment: 0,
   tds: 0,
@@ -492,7 +598,13 @@ export default function RecurringInvoicesPage() {
   const selected = profiles.find((entry) => entry.id === selectedId) || profiles[0] || null;
 
   const totals = useMemo(
-    () => computeTotals(form.item, toNumber(form.shippingCharges), toNumber(form.adjustment), toNumber(form.tds), toNumber(form.roundOff)),
+    () => computeTotalsFromItems(
+      (form.items && form.items.length > 0) ? form.items : [{ ...form.item, id: "tmp" }],
+      toNumber(form.shippingCharges),
+      toNumber(form.adjustment),
+      toNumber(form.tds),
+      toNumber(form.roundOff),
+    ),
     [form],
   );
 
@@ -544,12 +656,26 @@ export default function RecurringInvoicesPage() {
       return;
     }
 
+    const activeItems = (form.items && form.items.length > 0) ? form.items : [{ ...form.item, id: "tmp" }];
     const nextInvoiceDate = addByFrequency(form.startOn, form.frequency);
-    const computed = computeTotals(form.item, form.shippingCharges, form.adjustment, form.tds, form.roundOff);
+    const computed = computeTotalsFromItems(activeItems, form.shippingCharges, form.adjustment, form.tds, form.roundOff);
+    // Sync legacy `item` field from first row
+    const firstItem = activeItems[0];
+    const syncedItem: RecurringItem = {
+      itemName: firstItem.itemName,
+      description: firstItem.description,
+      hsnSac: firstItem.hsnSac,
+      quantity: firstItem.quantity,
+      rate: firstItem.rate,
+      discount: firstItem.discount,
+      taxRate: firstItem.taxRate,
+    };
 
     if (editingId) {
       const next = profiles.map((entry) =>
-        entry.id === editingId ? { ...entry, ...form, amount: computed.total, nextInvoiceDate } : entry,
+        entry.id === editingId
+          ? { ...entry, ...form, item: syncedItem, items: activeItems, amount: computed.total, nextInvoiceDate }
+          : entry,
       );
       const withActivity = upsertActivity(editingId, "Recurring invoice profile updated", next);
       persist(withActivity);
@@ -562,6 +688,8 @@ export default function RecurringInvoicesPage() {
     const created: RecurringInvoiceProfile = {
       id: `ri-${Date.now()}`,
       ...form,
+      item: syncedItem,
+      items: activeItems,
       amount: computed.total,
       nextInvoiceDate,
       lastInvoiceDate: form.startOn,
@@ -586,12 +714,9 @@ export default function RecurringInvoicesPage() {
   const handleCreateChildInvoice = () => {
     if (!selected) return;
 
-    const subtotal = lineAmount(selected.item);
-    const tax = (subtotal * selected.item.taxRate) / 100;
-    const cgst = Math.round((tax / 2) * 100) / 100;
-    const sgst = Math.round((tax / 2) * 100) / 100;
-    const grandTotal =
-      Math.round((subtotal + tax + selected.shippingCharges + selected.adjustment - selected.tds + selected.roundOff) * 100) / 100;
+    const activeItems = (selected.items && selected.items.length > 0) ? selected.items : [{ ...selected.item, id: "tmp" }];
+    const ct = computeTotalsFromItems(activeItems, selected.shippingCharges, selected.adjustment, selected.tds, selected.roundOff);
+    const grandTotal = Math.round(ct.total * 100) / 100;
 
     const now = new Date().toISOString();
     const invNumber = generateInvoiceNumber();
@@ -611,23 +736,21 @@ export default function RecurringInvoicesPage() {
       poReference: `recurring:${selected.id}`,
       placeOfSupply: selected.placeOfSupply,
       status: selected.createAsDraft ? "Draft" : "Sent",
-      lineItems: [
-        {
-          id: `rli-${Date.now()}`,
-          description: selected.item.itemName,
-          itemDetails: selected.item.description,
-          hsnSac: selected.item.hsnSac,
-          quantity: selected.item.quantity,
-          rate: selected.item.rate,
-          discount: selected.item.discount,
-          taxPercent: selected.item.taxRate,
-          taxType: "CGST+SGST",
-        },
-      ],
-      grossSubtotal: subtotal + selected.item.discount,
-      totalDiscount: selected.item.discount,
-      subtotal,
-      totalTax: cgst + sgst,
+      lineItems: activeItems.map((it, idx) => ({
+        id: `rli-${Date.now()}-${idx}`,
+        description: it.itemName,
+        itemDetails: it.description,
+        hsnSac: it.hsnSac,
+        quantity: it.quantity,
+        rate: it.rate,
+        discount: it.discount,
+        taxPercent: it.taxRate,
+        taxType: "CGST+SGST" as const,
+      })),
+      grossSubtotal: ct.grossSubtotal,
+      totalDiscount: ct.totalDiscount,
+      subtotal: ct.subtotal,
+      totalTax: ct.totalTax,
       shippingCharges: selected.shippingCharges,
       adjustment: selected.adjustment + selected.roundOff,
       grandTotal,
@@ -1020,201 +1143,323 @@ export default function RecurringInvoicesPage() {
           </DialogHeader>
 
           <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              {/* Customer Name */}
-              <div>
-                <Label>Customer Name*</Label>
-                <Select
-                  value={form.customerName}
-                  onValueChange={(value) => {
-                    const selectedClient = clients.find((c) => c.name === value);
-                    const addr = selectedClient
-                      ? [selectedClient.billingAddress, selectedClient.billingCity, selectedClient.billingState, selectedClient.billingPincode].filter(Boolean).join(", ")
-                      : "";
-                    setForm((cur) => ({
-                      ...cur,
-                      customerName: value,
-                      customerEmail: selectedClient?.email || cur.customerEmail,
-                      customerPhone: selectedClient?.phone || cur.customerPhone,
-                      billingAddress: addr || cur.billingAddress,
-                      shippingAddress: addr || cur.shippingAddress,
-                    }));
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.name}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
 
-              {/* Profile Name */}
-              <div>
-                <Label>Profile Name*</Label>
-                <Input
-                  value={form.profileName}
-                  onChange={(e) => setForm((cur) => ({ ...cur, profileName: e.target.value }))}
-                />
-              </div>
+            {/* ── Section 1: Profile & Schedule ── */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">Profile &amp; Schedule</p>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                {/* Customer Name */}
+                <div className="lg:col-span-2">
+                  <Label>Customer Name *</Label>
+                  <Select
+                    value={form.customerName}
+                    onValueChange={(value) => {
+                      const cl = clients.find((c) => c.name === value);
+                      const addr = cl
+                        ? [cl.billingAddress, cl.billingCity, cl.billingState, cl.billingPincode]
+                            .filter(Boolean).join(", ")
+                        : "";
+                      setForm((cur) => ({
+                        ...cur,
+                        customerName: value,
+                        customerEmail:  cl?.email       || cur.customerEmail,
+                        customerPhone:  cl?.phone || cl?.mobile || cur.customerPhone,
+                        customerGstin:  cl?.gstin       || cur.customerGstin,
+                        customerPan:    cl?.pan_number  || cur.customerPan,
+                        placeOfSupply:  cl?.billingState ? `${cl.billingState}` : cur.placeOfSupply,
+                        billingAddress:  addr || cur.billingAddress,
+                        shippingAddress: addr || cur.shippingAddress,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.name}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              {/* Order Number */}
-              <div>
-                <Label>Order Number</Label>
-                <Input
-                  value={form.orderNumber}
-                  onChange={(e) => setForm((cur) => ({ ...cur, orderNumber: e.target.value }))}
-                />
-              </div>
-
-              {/* Frequency */}
-              <div>
-                <Label>Repeat Every*</Label>
-                <Select
-                  value={form.frequency}
-                  onValueChange={(value: Frequency) => setForm((cur) => ({ ...cur, frequency: value }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="weekly">Week</SelectItem>
-                    <SelectItem value="monthly">Month</SelectItem>
-                    <SelectItem value="quarterly">Quarter</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Start On */}
-              <div>
-                <Label>Start On</Label>
-                <Input
-                  type="date"
-                  value={form.startOn}
-                  onChange={(e) => setForm((cur) => ({ ...cur, startOn: e.target.value }))}
-                />
-              </div>
-
-              {/* Ends On */}
-              <div className="space-y-2">
-                <Label>Ends On</Label>
-                <Input
-                  type="date"
-                  value={form.endsOn}
-                  disabled={form.neverExpires}
-                  onChange={(e) => setForm((cur) => ({ ...cur, endsOn: e.target.value }))}
-                />
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Checkbox
-                    checked={form.neverExpires}
-                    onCheckedChange={(checked) => setForm((cur) => ({ ...cur, neverExpires: !!checked }))}
-                  />
-                  Never Expires
-                </label>
-              </div>
-
-              {/* Payment Terms */}
-              <div>
-                <Label>Payment Terms</Label>
-                <Select
-                  value={form.paymentTerms}
-                  onValueChange={(value) => setForm((cur) => ({ ...cur, paymentTerms: value }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                    <SelectItem value="Net 15">Net 15</SelectItem>
-                    <SelectItem value="Net 30">Net 30</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Place of Supply */}
-              <div>
-                <Label>Place of Supply</Label>
-                <Input
-                  value={form.placeOfSupply}
-                  onChange={(e) => setForm((cur) => ({ ...cur, placeOfSupply: e.target.value }))}
-                  placeholder="[KA] - Karnataka"
-                />
-              </div>
-            </div>
-
-            {/* Item Table */}
-            <div className="rounded-xl border bg-white">
-              <div className="border-b px-4 py-3">
-                <p className="font-semibold">Item Table</p>
-              </div>
-              <div className="p-4">
-                <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr]">
+                {/* Profile Name */}
+                <div className="lg:col-span-2">
+                  <Label>Profile Name *</Label>
                   <Input
-                    placeholder="Type or click to select an item"
-                    value={form.item.itemName}
-                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, itemName: e.target.value } }))}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Qty"
-                    value={form.item.quantity}
-                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, quantity: toNumber(e.target.value, 1) } }))}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Rate"
-                    value={form.item.rate}
-                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, rate: toNumber(e.target.value) } }))}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Discount"
-                    value={form.item.discount}
-                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, discount: toNumber(e.target.value) } }))}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Tax %"
-                    value={form.item.taxRate}
-                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, taxRate: toNumber(e.target.value) } }))}
-                  />
-                  <Input
-                    value={lineAmount(form.item).toFixed(2)}
-                    readOnly
-                    className="bg-muted text-right"
+                    value={form.profileName}
+                    onChange={(e) => setForm((cur) => ({ ...cur, profileName: e.target.value }))}
+                    placeholder="e.g. Monthly Maintenance"
                   />
                 </div>
-                <Input
-                  className="mt-3"
-                  placeholder="Description"
-                  value={form.item.description}
-                  onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, description: e.target.value } }))}
-                />
+
+                {/* Auto-filled customer details (read-only display) */}
+                {(form.customerEmail || form.customerPhone || form.customerGstin || form.customerPan) && (
+                  <div className="lg:col-span-4 rounded-lg border bg-blue-50/60 px-4 py-3 grid gap-x-6 gap-y-1 sm:grid-cols-2 md:grid-cols-4 text-xs">
+                    {form.customerEmail && <p><span className="text-muted-foreground">Email:</span> <b>{form.customerEmail}</b></p>}
+                    {form.customerPhone && <p><span className="text-muted-foreground">Phone:</span> <b>{form.customerPhone}</b></p>}
+                    {form.customerGstin && <p><span className="text-muted-foreground">GSTIN:</span> <b>{form.customerGstin}</b></p>}
+                    {form.customerPan   && <p><span className="text-muted-foreground">PAN:</span> <b>{form.customerPan}</b></p>}
+                  </div>
+                )}
+
+                {/* Repeat Every */}
+                <div>
+                  <Label>Repeat Every *</Label>
+                  <Select
+                    value={form.frequency}
+                    onValueChange={(value: Frequency) => setForm((cur) => ({ ...cur, frequency: value }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Week</SelectItem>
+                      <SelectItem value="monthly">Month</SelectItem>
+                      <SelectItem value="quarterly">Quarter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Start On */}
+                <div>
+                  <Label>Start On</Label>
+                  <Input
+                    type="date"
+                    value={form.startOn}
+                    onChange={(e) => setForm((cur) => ({ ...cur, startOn: e.target.value }))}
+                  />
+                </div>
+
+                {/* Ends On */}
+                <div className="space-y-1.5">
+                  <Label>Ends On</Label>
+                  <Input
+                    type="date"
+                    value={form.endsOn}
+                    disabled={form.neverExpires}
+                    onChange={(e) => setForm((cur) => ({ ...cur, endsOn: e.target.value }))}
+                  />
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                    <Checkbox
+                      checked={form.neverExpires}
+                      onCheckedChange={(checked) => setForm((cur) => ({ ...cur, neverExpires: !!checked }))}
+                    />
+                    Never Expires
+                  </label>
+                </div>
+
+                {/* Payment Terms */}
+                <div>
+                  <Label>Payment Terms</Label>
+                  <Select
+                    value={form.paymentTerms}
+                    onValueChange={(value) => setForm((cur) => ({ ...cur, paymentTerms: value }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
+                      <SelectItem value="Net 15">Net 15</SelectItem>
+                      <SelectItem value="Net 30">Net 30</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Place of Supply */}
+                <div>
+                  <Label>Place of Supply</Label>
+                  <Input
+                    value={form.placeOfSupply}
+                    onChange={(e) => setForm((cur) => ({ ...cur, placeOfSupply: e.target.value }))}
+                    placeholder="e.g. Karnataka (29)"
+                  />
+                </div>
+
+                {/* Order Number */}
+                <div>
+                  <Label>Order Number</Label>
+                  <Input
+                    value={form.orderNumber}
+                    onChange={(e) => setForm((cur) => ({ ...cur, orderNumber: e.target.value }))}
+                    placeholder="PO / Reference number"
+                  />
+                </div>
+
+                {/* Billing Address */}
+                <div className="lg:col-span-2">
+                  <Label>Billing Address</Label>
+                  <Textarea
+                    rows={3}
+                    value={form.billingAddress}
+                    onChange={(e) => setForm((cur) => ({ ...cur, billingAddress: e.target.value }))}
+                    placeholder="Full billing address"
+                  />
+                </div>
+
+                {/* Shipping Address */}
+                <div className="lg:col-span-2">
+                  <Label>Shipping Address</Label>
+                  <Textarea
+                    rows={3}
+                    value={form.shippingAddress}
+                    onChange={(e) => setForm((cur) => ({ ...cur, shippingAddress: e.target.value }))}
+                    placeholder="Leave blank to use billing address"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-              {/* Notes / T&C / preferences */}
+            {/* ── Section 2: Item Table ── */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Item Details</p>
+                <button
+                  type="button"
+                  onClick={() => setForm((cur) => ({ ...cur, items: [...(cur.items || []), blankLineItem()] }))}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700"
+                >
+                  <Plus size={13} /> Add Item
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full text-sm min-w-[900px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      {["#", "ITEM / DESCRIPTION", "HSN/SAC", "QTY", "RATE (₹)", "DISC (₹)", "TAXABLE (₹)", "GST %", "GST (₹)", "AMOUNT (₹)", ""].map((h) => (
+                        <th key={h} className="px-2 py-2.5 text-left text-[11px] font-semibold text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(form.items && form.items.length > 0 ? form.items : []).map((it, idx) => {
+                      const disc    = it.discount ?? 0;
+                      const taxable = Math.max(0, it.quantity * it.rate - disc);
+                      const gst     = taxable * (it.taxRate / 100);
+                      const amt     = taxable + gst;
+                      const updateLineItem = <K extends keyof RecurringLineItem>(id: string, field: K, value: RecurringLineItem[K]) => {
+                        setForm((cur) => ({
+                          ...cur,
+                          items: (cur.items || []).map((li) => li.id === id ? { ...li, [field]: value } : li),
+                        }));
+                      };
+                      return (
+                        <tr key={it.id} className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
+                          {/* # */}
+                          <td className="px-2 py-2 text-xs text-gray-400 text-center pt-3">{idx + 1}</td>
+                          {/* Item / Description */}
+                          <td className="px-2 py-2 min-w-[200px]">
+                            <input
+                              value={it.itemName}
+                              onChange={(e) => updateLineItem(it.id, "itemName", e.target.value)}
+                              placeholder="Item name"
+                              className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm mb-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <input
+                              value={it.description}
+                              onChange={(e) => updateLineItem(it.id, "description", e.target.value)}
+                              placeholder="Description (optional)"
+                              className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            />
+                          </td>
+                          {/* HSN/SAC */}
+                          <td className="px-2 py-2">
+                            <input
+                              value={it.hsnSac}
+                              onChange={(e) => updateLineItem(it.id, "hsnSac", e.target.value)}
+                              placeholder="HSN/SAC"
+                              className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </td>
+                          {/* Qty */}
+                          <td className="px-2 py-2">
+                            <input
+                              type="number" min={1} value={it.quantity}
+                              onChange={(e) => updateLineItem(it.id, "quantity", Math.max(1, toNumber(e.target.value, 1)))}
+                              className="w-16 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </td>
+                          {/* Rate */}
+                          <td className="px-2 py-2">
+                            <input
+                              type="number" min={0} value={it.rate}
+                              onChange={(e) => updateLineItem(it.id, "rate", toNumber(e.target.value))}
+                              className="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </td>
+                          {/* Discount */}
+                          <td className="px-2 py-2">
+                            <input
+                              type="number" min={0} value={it.discount}
+                              onChange={(e) => updateLineItem(it.id, "discount", toNumber(e.target.value))}
+                              className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </td>
+                          {/* Taxable */}
+                          <td className="px-2 py-2 text-sm text-gray-700 text-right whitespace-nowrap pt-3 font-medium">
+                            {taxable.toFixed(2)}
+                          </td>
+                          {/* GST % */}
+                          <td className="px-2 py-2">
+                            <input
+                              type="number" min={0} max={100} value={it.taxRate}
+                              onChange={(e) => updateLineItem(it.id, "taxRate", toNumber(e.target.value))}
+                              className="w-14 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </td>
+                          {/* GST ₹ */}
+                          <td className="px-2 py-2 text-sm text-gray-700 text-right whitespace-nowrap pt-3">
+                            {gst.toFixed(2)}
+                          </td>
+                          {/* Amount */}
+                          <td className="px-2 py-2 text-sm font-semibold text-gray-900 text-right whitespace-nowrap pt-3">
+                            {amt.toFixed(2)}
+                          </td>
+                          {/* Delete */}
+                          <td className="px-2 py-2 text-center pt-2.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setForm((cur) => ({
+                                  ...cur,
+                                  items: cur.items.length === 1 ? cur.items : cur.items.filter((li) => li.id !== it.id),
+                                }))
+                              }
+                              className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── Section 3: Summary + Notes ── */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+              {/* Left: Notes / T&C / preferences */}
               <div className="space-y-4">
                 <div>
                   <Label>Customer Notes</Label>
                   <Textarea
+                    rows={3}
                     value={form.notes}
                     onChange={(e) => setForm((cur) => ({ ...cur, notes: e.target.value }))}
+                    placeholder="Notes visible on the invoice..."
                   />
                 </div>
                 <div>
                   <Label>Terms &amp; Conditions</Label>
                   <Textarea
+                    rows={3}
                     value={form.termsAndConditions}
                     onChange={(e) => setForm((cur) => ({ ...cur, termsAndConditions: e.target.value }))}
                   />
                 </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700">
-                  Configure payment gateways and receive payments online. Set up Payment Gateway.
-                </div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                   <Checkbox
                     checked={form.createAsDraft}
                     onCheckedChange={(checked) => setForm((cur) => ({ ...cur, createAsDraft: !!checked }))}
@@ -1223,60 +1468,109 @@ export default function RecurringInvoicesPage() {
                 </label>
               </div>
 
-              {/* Totals panel */}
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span>Sub Total</span>
-                    <span>{totals.subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Shipping Charges</span>
-                    <Input
-                      className="w-28 text-right"
-                      type="number"
-                      value={form.shippingCharges}
-                      onChange={(e) => setForm((cur) => ({ ...cur, shippingCharges: toNumber(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span>TDS</span>
-                    <Input
-                      className="w-28 text-right"
-                      type="number"
-                      value={form.tds}
-                      onChange={(e) => setForm((cur) => ({ ...cur, tds: toNumber(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Adjustment</span>
-                    <Input
-                      className="w-28 text-right"
-                      type="number"
-                      value={form.adjustment}
-                      onChange={(e) => setForm((cur) => ({ ...cur, adjustment: toNumber(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Round Off</span>
-                    <Input
-                      className="w-28 text-right"
-                      type="number"
-                      value={form.roundOff}
-                      onChange={(e) => setForm((cur) => ({ ...cur, roundOff: toNumber(e.target.value) }))}
-                    />
-                  </div>
-                  <div className="border-t pt-3 text-base font-semibold">
-                    <div className="flex items-center justify-between">
-                      <span>Total (Rs)</span>
-                      <span>{totals.total.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
+              {/* Right: Totals panel */}
+              <div className="rounded-xl border bg-white overflow-hidden text-sm">
+                <table className="w-full">
+                  <tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 text-gray-600">Gross Subtotal</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">₹ {totals.grossSubtotal.toFixed(2)}</td>
+                    </tr>
+                    {totals.totalDiscount > 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-4 py-2.5 text-gray-600">Item Level Discounts (−)</td>
+                        <td className="px-4 py-2.5 text-right text-red-600">− ₹ {totals.totalDiscount.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹ {totals.subtotal.toFixed(2)}</td>
+                    </tr>
+
+                    {/* GST slab rows */}
+                    {totals.gstSlabs.map((sl) => (
+                      <>
+                        <tr key={`cgst-${sl.rate}`} className="border-b border-gray-100">
+                          <td className="px-4 py-2 text-gray-500">CGST @ {sl.rate / 2}%</td>
+                          <td className="px-4 py-2 text-right text-gray-700">₹ {sl.cgst.toFixed(2)}</td>
+                        </tr>
+                        <tr key={`sgst-${sl.rate}`} className="border-b border-gray-100">
+                          <td className="px-4 py-2 text-gray-500">SGST @ {sl.rate / 2}%</td>
+                          <td className="px-4 py-2 text-right text-gray-700">₹ {sl.sgst.toFixed(2)}</td>
+                        </tr>
+                      </>
+                    ))}
+                    {totals.gstSlabs.length === 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-4 py-2 text-gray-500">Total GST</td>
+                        <td className="px-4 py-2 text-right text-gray-700">₹ 0.00</td>
+                      </tr>
+                    )}
+
+                    {/* Shipping */}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2 text-gray-600">Shipping &amp; Handling</td>
+                      <td className="px-4 py-2 text-right">
+                        <input
+                          type="number" min={0}
+                          value={form.shippingCharges}
+                          onChange={(e) => setForm((cur) => ({ ...cur, shippingCharges: toNumber(e.target.value) }))}
+                          className="w-28 rounded border border-gray-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* TDS */}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2 text-gray-600">TDS (−)</td>
+                      <td className="px-4 py-2 text-right">
+                        <input
+                          type="number" min={0}
+                          value={form.tds}
+                          onChange={(e) => setForm((cur) => ({ ...cur, tds: toNumber(e.target.value) }))}
+                          className="w-28 rounded border border-gray-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* Adjustment */}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2 text-gray-600">Adjustment</td>
+                      <td className="px-4 py-2 text-right">
+                        <input
+                          type="number"
+                          value={form.adjustment}
+                          onChange={(e) => setForm((cur) => ({ ...cur, adjustment: toNumber(e.target.value) }))}
+                          placeholder="e.g. -0.50"
+                          className="w-28 rounded border border-gray-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* Round Off */}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2 text-gray-600">Round Off</td>
+                      <td className="px-4 py-2 text-right">
+                        <input
+                          type="number"
+                          value={form.roundOff}
+                          onChange={(e) => setForm((cur) => ({ ...cur, roundOff: toNumber(e.target.value) }))}
+                          className="w-28 rounded border border-gray-300 px-2 py-1 text-sm text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* Grand Total */}
+                    <tr className="border-t-2 border-gray-300 bg-gray-50">
+                      <td className="px-4 py-3 font-bold text-gray-900 text-base">Total Payable (₹)</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900 text-base">₹ {totals.total.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 border-t pt-4">
               <Button variant="outline" onClick={closeDialog}>Cancel</Button>
               <Button onClick={saveProfile}>{editingId ? "Update" : "Save"}</Button>
             </div>
