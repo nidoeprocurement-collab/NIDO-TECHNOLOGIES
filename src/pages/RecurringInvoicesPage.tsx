@@ -712,283 +712,293 @@ export default function RecurringInvoicesPage() {
   };
 
   return (
-    <div>
-      <div className="space-y-4 p-6">
-        {/* Top card */}
-        <Card>
-          <CardContent className="flex items-center justify-between pt-6">
-            <div>
-              <p className="text-sm text-muted-foreground">All Recurring Invoices</p>
-              <p className="text-xl font-semibold">{profiles.length} Profiles</p>
-            </div>
-            <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4" /> New
-            </Button>
-          </CardContent>
-        </Card>
+    <>
+    <div className="p-6 space-y-4">
+      {/* Top card */}
+      <div className="rounded-xl border bg-white px-6 py-5 flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">All Recurring Invoices</p>
+          <p className="text-2xl font-bold leading-tight">{profiles.length} Profiles</p>
+        </div>
+        <Button onClick={openCreate} className="gap-1.5">
+          <Plus className="h-4 w-4" /> New
+        </Button>
+      </div>
 
-        {/* Profiles table */}
-        <Card>
-          <CardContent className="pt-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Profile Name</TableHead>
-                  <TableHead>Frequency</TableHead>
-                  <TableHead>Last Invoice Date</TableHead>
-                  <TableHead>Next Invoice Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {profiles.map((profile) => (
-                  <TableRow
-                    key={profile.id}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      setSelectedId(profile.id);
-                      navigate(`/sales/recurring-invoices/${profile.id}/edit`);
+      {/* Profiles table */}
+      <div className="rounded-xl border bg-white">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Customer</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Profile Name</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Frequency</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Last Invoice Date</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Next Invoice Date</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Status</TableHead>
+              <TableHead className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground text-right">Amount</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {profiles.map((profile) => (
+              <TableRow
+                key={profile.id}
+                className="cursor-pointer"
+                onClick={() => {
+                  setSelectedId(profile.id);
+                  navigate(`/sales/recurring-invoices/${profile.id}/edit`);
+                }}
+              >
+                <TableCell className="text-sm">{profile.customerName}</TableCell>
+                <TableCell className="text-sm font-medium text-blue-600">{profile.profileName}</TableCell>
+                <TableCell className="text-sm">{frequencyLabel[profile.frequency]}</TableCell>
+                <TableCell className="text-sm">{profile.lastInvoiceDate}</TableCell>
+                <TableCell className="text-sm">{profile.nextInvoiceDate}</TableCell>
+                <TableCell>
+                  <Badge
+                    className={
+                      profile.status === "active"
+                        ? "bg-blue-600 text-white border-transparent hover:bg-blue-700 text-[11px] px-3 py-0.5 rounded-full font-semibold uppercase tracking-wide"
+                        : "bg-gray-100 text-gray-500 border-transparent text-[11px] px-3 py-0.5 rounded-full font-semibold uppercase tracking-wide"
+                    }
+                  >
+                    {profile.status.toUpperCase()}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-right">Rs.{profile.amount.toFixed(2)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Selected profile detail — borderless, flat */}
+      {selected && (
+        <div className="rounded-xl border bg-white">
+          {/* Header row */}
+          <div className="px-6 pt-6 pb-0 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-5xl font-light tracking-tight">{selected.profileName}</h3>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={openEdit}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" onClick={handleCreateChildInvoice}>
+                Create Invoice
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-1">
+                    More <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setConfirmState({
+                        open: true,
+                        title: "Stop Recurring Profile",
+                        description: "Stop this recurring profile from generating future invoices?",
+                        confirmLabel: "Stop",
+                        tone: "default",
+                        onConfirm: handleStop,
+                      });
                     }}
                   >
-                    <TableCell>{profile.customerName}</TableCell>
-                    <TableCell className="font-medium text-primary">{profile.profileName}</TableCell>
-                    <TableCell>{frequencyLabel[profile.frequency]}</TableCell>
-                    <TableCell>{profile.lastInvoiceDate}</TableCell>
-                    <TableCell>{profile.nextInvoiceDate}</TableCell>
-                    <TableCell>
-                      <Badge variant={profile.status === "active" ? "default" : "secondary"}>
-                        {profile.status.toUpperCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">Rs.{profile.amount.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Selected profile detail */}
-        {selected && (
-          <Card>
-            <CardContent className="pt-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-4xl font-light">{selected.profileName}</h3>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" onClick={openEdit}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" onClick={handleCreateChildInvoice}>
-                    Create Invoice
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline">
-                        More <MoreHorizontal className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          setConfirmState({
-                            open: true,
-                            title: "Stop Recurring Profile",
-                            description: "Stop this recurring profile from generating future invoices?",
-                            confirmLabel: "Stop",
-                            tone: "default",
-                            onConfirm: handleStop,
-                          });
-                        }}
-                      >
-                        Stop
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={handleClone}>Clone</DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={(event) => {
-                          event.preventDefault();
-                          setConfirmState({
-                            open: true,
-                            title: "Delete Recurring Profile",
-                            description: "Delete this recurring profile? This action cannot be undone.",
-                            confirmLabel: "Delete",
-                            tone: "destructive",
-                            onConfirm: handleDelete,
-                          });
-                        }}
-                      >
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate("/sales/recurring-invoices", { replace: true })}
+                    Stop
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={handleClone}>Clone</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setConfirmState({
+                        open: true,
+                        title: "Delete Recurring Profile",
+                        description: "Delete this recurring profile? This action cannot be undone.",
+                        confirmLabel: "Delete",
+                        tone: "destructive",
+                        onConfirm: handleDelete,
+                      });
+                    }}
                   >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/sales/recurring-invoices", { replace: true })}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
 
-              <Tabs defaultValue="overview">
-                <TabsList>
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="next">Next Invoice</TabsTrigger>
-                  <TabsTrigger value="activities">Recent Activities</TabsTrigger>
-                </TabsList>
+          {/* Tabs */}
+          <div className="px-6 pt-4">
+            <Tabs defaultValue="overview">
+              <TabsList className="bg-transparent border-0 p-0 h-auto gap-0">
+                <TabsTrigger
+                  value="overview"
+                  className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent"
+                >
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger
+                  value="next"
+                  className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent"
+                >
+                  Next Invoice
+                </TabsTrigger>
+                <TabsTrigger
+                  value="activities"
+                  className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-1 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:shadow-none bg-transparent"
+                >
+                  Recent Activities
+                </TabsTrigger>
+              </TabsList>
 
-                {/* Overview tab */}
-                <TabsContent value="overview" className="pt-4">
-                  <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-                    {/* Left sidebar */}
-                    <div className="space-y-4 rounded-xl border bg-muted/20 p-4 text-sm">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Details</p>
-                        <p className="mt-2">
-                          Profile Status: <b>{selected.status === "active" ? "Active" : "Stopped"}</b>
-                        </p>
-                        <p>Start Date: <b>{selected.startOn}</b></p>
-                        <p>
-                          End Date:{" "}
-                          <b>{selected.neverExpires ? "Never Expires" : selected.endsOn || "-"}</b>
-                        </p>
-                        <p>Payment Terms: <b>{selected.paymentTerms}</b></p>
-                        <p>Manually Created Invoices: <b>{profileInvoices.length}</b></p>
-                      </div>
-                      <div className="rounded-lg border bg-white p-3">
-                        <p className="font-medium">Recurring Invoice preference has been set to</p>
-                        <p className="text-muted-foreground">
-                          "{selected.createAsDraft ? "Create Invoices as Drafts" : "Create and Send"}"
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Address</p>
-                        <p className="mt-2 whitespace-pre-wrap">
-                          Billing Address{"\n"}
-                          {selected.billingAddress}
-                        </p>
-                        <p className="mt-3 whitespace-pre-wrap">
-                          Shipping Address{"\n"}
-                          {selected.shippingAddress}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Customer Notes</p>
-                        <p className="mt-2 whitespace-pre-wrap">{selected.notes || "-"}</p>
-                      </div>
+              {/* Overview tab */}
+              <TabsContent value="overview" className="pt-4 pb-6">
+                <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
+                  {/* Left sidebar */}
+                  <div className="space-y-4 rounded-xl border bg-gray-50 p-4 text-sm">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-2">Details</p>
+                      <p>Profile Status: <b>{selected.status === "active" ? "Active" : "Stopped"}</b></p>
+                      <p>Start Date: <b>{selected.startOn}</b></p>
+                      <p>End Date: <b>{selected.neverExpires ? "Never Expires" : selected.endsOn || "-"}</b></p>
+                      <p>Payment Terms: <b>{selected.paymentTerms}</b></p>
+                      <p>Manually Created Invoices: <b>{profileInvoices.length}</b></p>
                     </div>
-
-                    {/* Right section */}
-                    <div className="space-y-4">
-                      <div className="grid gap-3 rounded-xl border bg-white p-4 md:grid-cols-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Invoice Amount</p>
-                          <p className="text-3xl font-semibold">Rs.{selected.amount.toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Next Invoice Date</p>
-                          <p className="text-2xl font-semibold text-blue-600">{selected.nextInvoiceDate}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recurring Period</p>
-                          <p className="text-2xl font-semibold">{frequencyLabel[selected.frequency]}</p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border bg-white p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <p className="text-lg font-semibold">All Child Invoices</p>
-                          <p className="text-sm text-muted-foreground">
-                            Unpaid Invoices: Rs.
-                            {profileInvoices
-                              .filter((entry) => entry.status !== "Paid")
-                              .reduce((sum, entry) => sum + entry.grandTotal, 0)
-                              .toFixed(2)}
-                          </p>
-                        </div>
-                        <div className="space-y-3">
-                          {profileInvoices.length === 0 && (
-                            <p className="text-sm text-muted-foreground">No child invoices created yet.</p>
-                          )}
-                          {profileInvoices.map((entry) => (
-                            <div
-                              key={entry.id}
-                              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
-                            >
-                              <div>
-                                <p className="font-medium">{entry.clientName}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {entry.invoiceNumber} | {entry.invoiceDate}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{entry.status}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-lg font-semibold">Rs.{entry.grandTotal.toFixed(2)}</p>
-                                <Button
-                                  size="sm"
-                                  className="mt-2"
-                                  onClick={() =>
-                                    navigate("/sales/payment-receipts/create", {
-                                      state: {
-                                        fromInvoiceId: entry.id,
-                                        customerName: entry.clientName,
-                                        invoiceNumber: entry.invoiceNumber,
-                                        amount: entry.grandTotal,
-                                        email: entry.clientContact || "",
-                                      },
-                                    })
-                                  }
-                                >
-                                  Record Payment
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    <div className="rounded-lg border bg-white p-3 text-sm">
+                      <p className="font-medium leading-snug">Recurring Invoice preference has been set to</p>
+                      <p className="text-muted-foreground mt-0.5">"{selected.createAsDraft ? "Create Invoices as Drafts" : "Create and Send"}"</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-2">Address</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Billing Address</p>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed">{selected.billingAddress}</p>
+                      <p className="text-xs text-muted-foreground mt-3 mb-0.5">Shipping Address</p>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed">{selected.shippingAddress}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-2">Customer Notes</p>
+                      <p className="whitespace-pre-wrap text-xs">{selected.notes || "-"}</p>
                     </div>
                   </div>
-                </TabsContent>
 
-                {/* Next Invoice tab */}
-                <TabsContent value="next" className="pt-4">
-                  <div className="overflow-x-auto rounded-xl border bg-white p-2">
-                    <NextInvoicePreview profile={selected} />
-                  </div>
-                </TabsContent>
-
-                {/* Recent Activities tab */}
-                <TabsContent value="activities" className="pt-4">
+                  {/* Right section */}
                   <div className="space-y-4">
-                    {selected.recentActivities.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No recent activities.</p>
-                    )}
-                    {selected.recentActivities.map((entry) => (
-                      <div
-                        key={entry.id}
-                        className="grid gap-3 rounded-lg border p-4 md:grid-cols-[160px_minmax(0,1fr)]"
-                      >
-                        <div className="text-sm text-muted-foreground">
-                          {new Date(entry.timestamp).toLocaleDateString()}
-                          <br />
-                          {new Date(entry.timestamp).toLocaleTimeString()}
-                        </div>
-                        <div>
-                          <p className="font-medium">{entry.message}</p>
-                          <p className="text-sm text-muted-foreground">by {entry.by}</p>
-                        </div>
+                    {/* 3 stat cards */}
+                    <div className="grid gap-0 rounded-xl border bg-white divide-x md:grid-cols-3 overflow-hidden">
+                      <div className="p-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-1">Invoice Amount</p>
+                        <p className="text-3xl font-semibold">Rs.{selected.amount.toFixed(2)}</p>
                       </div>
-                    ))}
+                      <div className="p-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-1">Next Invoice Date</p>
+                        <p className="text-2xl font-semibold text-blue-600">{selected.nextInvoiceDate}</p>
+                      </div>
+                      <div className="p-5">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-1">Recurring Period</p>
+                        <p className="text-2xl font-semibold">{frequencyLabel[selected.frequency]}</p>
+                      </div>
+                    </div>
+
+                    {/* Child invoices */}
+                    <div className="rounded-xl border bg-white p-5">
+                      <div className="mb-4 flex items-center justify-between">
+                        <p className="text-base font-semibold">All Child Invoices</p>
+                        <p className="text-sm text-muted-foreground">
+                          Unpaid Invoices: Rs.
+                          {profileInvoices
+                            .filter((entry) => entry.status !== "Paid")
+                            .reduce((sum, entry) => sum + entry.grandTotal, 0)
+                            .toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        {profileInvoices.length === 0 && (
+                          <p className="text-sm text-muted-foreground">No child invoices created yet.</p>
+                        )}
+                        {profileInvoices.map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
+                          >
+                            <div>
+                              <p className="font-medium text-sm">{entry.clientName}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {entry.invoiceNumber} | {entry.invoiceDate}
+                              </p>
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide mt-0.5">{entry.status}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-semibold">Rs.{entry.grandTotal.toFixed(2)}</p>
+                              <Button
+                                size="sm"
+                                className="mt-2"
+                                onClick={() =>
+                                  navigate("/sales/payment-receipts/create", {
+                                    state: {
+                                      fromInvoiceId: entry.id,
+                                      customerName: entry.clientName,
+                                      invoiceNumber: entry.invoiceNumber,
+                                      amount: entry.grandTotal,
+                                      email: entry.clientContact || "",
+                                    },
+                                  })
+                                }
+                              >
+                                Record Payment
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                </div>
+              </TabsContent>
+
+              {/* Next Invoice tab */}
+              <TabsContent value="next" className="pt-4 pb-6">
+                <div className="overflow-x-auto rounded-xl border bg-white p-2">
+                  <NextInvoicePreview profile={selected} />
+                </div>
+              </TabsContent>
+
+              {/* Recent Activities tab */}
+              <TabsContent value="activities" className="pt-4 pb-6">
+                <div className="space-y-3">
+                  {selected.recentActivities.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No recent activities.</p>
+                  )}
+                  {selected.recentActivities.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="grid gap-3 rounded-lg border bg-white p-4 md:grid-cols-[160px_minmax(0,1fr)]"
+                    >
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(entry.timestamp).toLocaleDateString()}
+                        <br />
+                        {new Date(entry.timestamp).toLocaleTimeString()}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{entry.message}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">by {entry.by}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      )}
+    </div>
 
       {/* Confirmation dialog */}
       <ConfirmationDialog
@@ -1002,7 +1012,7 @@ export default function RecurringInvoicesPage() {
 
       {/* Create / Edit dialog */}
       <Dialog open={formOpen} onOpenChange={(open) => (!open ? closeDialog() : setFormOpen(open))}>
-        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+        <DialogContent className="max-h-[96vh] w-[95vw] max-w-[95vw] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingId ? "Edit Recurring Invoice" : "New Recurring Invoice"}
@@ -1273,6 +1283,6 @@ export default function RecurringInvoicesPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
