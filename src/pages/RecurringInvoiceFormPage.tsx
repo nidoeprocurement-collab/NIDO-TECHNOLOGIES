@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus, Save, Search, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ import {
   type StoredInvoice,
 } from "@/lib/invoiceStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
+import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { toast } from "sonner";
 
 // ── types ─────────────────────────────────────────────────────────────────────
