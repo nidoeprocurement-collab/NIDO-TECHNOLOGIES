@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, Plus, Save, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus, Save, Search, Tag, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import {
 } from "@/lib/invoiceStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { getSlabDiscountPct, getClientPriceSlabs, type PriceSlab } from "@/lib/priceEngineStore";
 import { toast } from "sonner";
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -195,9 +196,29 @@ export default function RecurringInvoiceFormPage() {
 
   const [clients, setClients] = useState<StoredClient[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [clientCatalog, setClientCatalog] = useState<ClientCatalogEntry[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
 
   // Load clients
   useEffect(() => { setClients(getClients()); }, []);
+
+  // Helper: compute slab discount amount for a line item
+  const computeSlabDiscountAmt = (clientId: string, category: string, qty: number, rate: number): number => {
+    if (!clientId) return 0;
+    const pct = getSlabDiscountPct(clientId, category, qty);
+    return Math.round(qty * rate * pct) / 100;
+  };
+
+  // Helper: get the active slab info for display
+  const getActiveSlab = (clientId: string, category: string, qty: number): PriceSlab | null => {
+    if (!clientId) return null;
+    const slabs = getClientPriceSlabs(clientId).filter(
+      (s) => s.status === "Active" && qty >= s.minQty && qty <= s.maxQty
+    );
+    if (!slabs.length) return null;
+    const catMatch = slabs.find((s) => s.applyTo !== "All Products" && s.applyTo.toLowerCase() === category.toLowerCase());
+    return catMatch || slabs.find((s) => s.applyTo === "All Products") || null;
+  };
 
   // If editing, load profile
   useEffect(() => {
@@ -220,6 +241,14 @@ export default function RecurringInvoiceFormPage() {
       }];
     }
     setForm(payload);
+
+    // Hydrate catalog + slab state so edit mode works the same as create mode
+    const allClients = getClients();
+    const cl = allClients.find((c) => c.name === payload.customerName);
+    if (cl) {
+      setSelectedClientId(cl.id);
+      setClientCatalog(getClientCatalog(cl.id));
+    }
   }, [id]);
 
   // Computed totals
@@ -356,6 +385,10 @@ export default function RecurringInvoiceFormPage() {
                   const addr = cl
                     ? [cl.billingAddress, cl.billingCity, cl.billingState, cl.billingPincode].filter(Boolean).join(", ")
                     : "";
+                  // Load this client's catalog
+                  const catalog = cl ? getClientCatalog(cl.id) : [];
+                  setClientCatalog(catalog);
+                  setSelectedClientId(cl?.id || "");
                   setForm((cur) => ({
                     ...cur,
                     customerName:   value,
@@ -366,6 +399,9 @@ export default function RecurringInvoiceFormPage() {
                     placeOfSupply:  cl?.billingState           || cur.placeOfSupply,
                     billingAddress:  addr || cur.billingAddress,
                     shippingAddress: addr || cur.shippingAddress,
+                    // Reset line items so stale prices/discounts from a
+                    // previously selected client's catalog are never carried over
+                    items: [blankLineItem()],
                   }));
                 }}
               >
@@ -539,25 +575,86 @@ export default function RecurringInvoiceFormPage() {
                   const taxable = Math.max(0, it.quantity * it.rate - disc);
                   const gst     = taxable * (it.taxRate / 100);
                   const amt     = taxable + gst;
+
+                  // Catalog entry matched to this row (for slab + price badge)
+                  const catalogEntry = clientCatalog.find((c) => c.name === it.itemName);
+                  const itemCategory = catalogEntry?.category || "";
+                  const activeSlab   = getActiveSlab(selectedClientId, itemCategory, it.quantity);
+
                   return (
                     <tr key={it.id} className="border-b border-gray-100 hover:bg-gray-50/50 align-top">
                       {/* # */}
                       <td className="px-3 py-3 text-xs text-gray-400 text-center">{idx + 1}</td>
+
                       {/* Item / Description */}
-                      <td className="px-3 py-3 min-w-[220px]">
-                        <input
-                          value={it.itemName}
-                          onChange={(e) => updateLineItem(it.id, "itemName", e.target.value)}
-                          placeholder="Item name"
-                          className="w-full rounded border border-gray-300 px-2.5 py-1.5 text-sm mb-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
+                      <td className="px-3 py-3 min-w-[260px]">
+                        {clientCatalog.length > 0 ? (
+                          /* Radix Select portals its content → not clipped by overflow-x-auto */
+                          <Select
+                            value={it.itemName}
+                            onValueChange={(val) => {
+                              const entry = clientCatalog.find((c) => c.name === val);
+                              if (!entry) return;
+                              const baseRate = (entry.priceNum ?? parseFloat(String(entry.price).replace(/[^0-9.]/g, ""))) || 0;
+                              const slabDiscAmt = computeSlabDiscountAmt(selectedClientId, entry.category || "", it.quantity, baseRate);
+                              setForm((cur) => ({
+                                ...cur,
+                                items: cur.items.map((li) =>
+                                  li.id !== it.id ? li : {
+                                    ...li,
+                                    itemName:    entry.name,
+                                    description: entry.description || "",
+                                    rate:        baseRate,
+                                    discount:    slabDiscAmt,
+                                  }
+                                ),
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="h-9 w-full text-sm mb-1.5 bg-white border-gray-300">
+                              <SelectValue placeholder="Select product from catalog…" />
+                            </SelectTrigger>
+                            <SelectContent className="z-[9999] max-h-64 overflow-y-auto">
+                              {clientCatalog.map((c) => (
+                                <SelectItem key={c.productCode} value={c.name}>
+                                  <div className="flex flex-col py-0.5">
+                                    <span className="font-medium text-sm leading-tight">{c.name}</span>
+                                    <span className="text-xs text-gray-400 leading-tight">{c.productCode} · ₹{c.priceNum ?? c.price}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <input
+                            value={it.itemName}
+                            onChange={(e) => updateLineItem(it.id, "itemName", e.target.value)}
+                            placeholder="Item name"
+                            className="w-full rounded border border-gray-300 px-2.5 py-1.5 text-sm mb-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        )}
                         <input
                           value={it.description}
                           onChange={(e) => updateLineItem(it.id, "description", e.target.value)}
                           placeholder="Description (optional)"
                           className="w-full rounded border border-gray-200 px-2.5 py-1 text-xs text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
                         />
+                        {/* Price + active slab badges */}
+                        {catalogEntry && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className="inline-flex items-center rounded bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 font-medium">
+                              Client Price: ₹{catalogEntry.priceNum ?? catalogEntry.price}
+                            </span>
+                            {activeSlab && activeSlab.discountPct > 0 && (
+                              <span className="inline-flex items-center gap-0.5 rounded bg-green-50 border border-green-200 px-1.5 py-0.5 text-[10px] text-green-700 font-medium">
+                                <Tag size={9} />
+                                {activeSlab.name} · {activeSlab.discountPct}% off (Qty {activeSlab.minQty}–{activeSlab.maxQty})
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
+
                       {/* HSN/SAC */}
                       <td className="px-3 py-3">
                         <input
@@ -567,14 +664,31 @@ export default function RecurringInvoiceFormPage() {
                           className="w-24 rounded border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </td>
-                      {/* Qty */}
+
+                      {/* Qty — re-applies slab discount on change */}
                       <td className="px-3 py-3">
                         <input
                           type="number" min={1} value={it.quantity}
-                          onChange={(e) => updateLineItem(it.id, "quantity", Math.max(1, toNumber(e.target.value, 1)))}
+                          onChange={(e) => {
+                            const newQty = Math.max(1, toNumber(e.target.value, 1));
+                            const entry  = clientCatalog.find((c) => c.name === it.itemName);
+                            const cat    = entry?.category || "";
+                            const slabDisc = computeSlabDiscountAmt(selectedClientId, cat, newQty, it.rate);
+                            setForm((cur) => ({
+                              ...cur,
+                              items: cur.items.map((li) =>
+                                li.id !== it.id ? li : {
+                                  ...li,
+                                  quantity: newQty,
+                                  discount: entry ? slabDisc : li.discount,
+                                }
+                              ),
+                            }));
+                          }}
                           className="w-16 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </td>
+
                       {/* Rate */}
                       <td className="px-3 py-3">
                         <input
@@ -583,18 +697,26 @@ export default function RecurringInvoiceFormPage() {
                           className="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </td>
-                      {/* Discount */}
+
+                      {/* Discount — auto-filled from slab, still manually editable */}
                       <td className="px-3 py-3">
                         <input
                           type="number" min={0} value={it.discount}
                           onChange={(e) => updateLineItem(it.id, "discount", toNumber(e.target.value))}
                           className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        {activeSlab && activeSlab.discountPct > 0 && (
+                          <div className="text-[10px] text-green-600 font-medium text-center mt-0.5 whitespace-nowrap">
+                            {activeSlab.discountPct}% slab
+                          </div>
+                        )}
                       </td>
+
                       {/* Taxable */}
                       <td className="px-3 py-3 text-sm text-gray-700 text-right font-medium whitespace-nowrap">
                         {taxable.toFixed(2)}
                       </td>
+
                       {/* GST % */}
                       <td className="px-3 py-3">
                         <input
@@ -603,14 +725,17 @@ export default function RecurringInvoiceFormPage() {
                           className="w-14 rounded border border-gray-300 px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </td>
+
                       {/* GST ₹ */}
                       <td className="px-3 py-3 text-sm text-gray-600 text-right whitespace-nowrap">
                         {gst.toFixed(2)}
                       </td>
+
                       {/* Amount */}
                       <td className="px-3 py-3 text-sm font-bold text-gray-900 text-right whitespace-nowrap">
                         {amt.toFixed(2)}
                       </td>
+
                       {/* Delete */}
                       <td className="px-3 py-3 text-center">
                         <button
