@@ -1,832 +1,1278 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Plus, Search, MoreVertical, X, RefreshCw, PauseCircle, PlayCircle,
-  Trash2, Edit2, ChevronRight, Calendar, FileText, TrendingUp, Clock,
-  CheckCircle2, AlertCircle, User, IndianRupee,
-} from 'lucide-react';
-import { toast } from 'sonner';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  getAllRecurring, saveRecurring, deleteRecurring, toggleStatus, seedIfEmpty, buildNewId,
-  type RecurringInvoice, type RecurringFrequency, type RecurringStatus, type GeneratedStatus,
-} from '@/lib/recurringInvoiceStore';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  getInvoices,
+  saveInvoice,
+  generateInvoiceNumber,
+  type StoredInvoice,
+} from "@/lib/invoiceStore";
+import { getClients, type StoredClient } from "@/lib/clientStore";
+import { toast } from "sonner";
+import { MoreHorizontal, Pencil, Plus, X } from "lucide-react";
 
-// ── formatting ─────────────────────────────────────────────────────────────────
-function fmt(v: number) {
-  return `₹${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-function fmtDate(iso?: string) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-// ── badge colours ──────────────────────────────────────────────────────────────
-const statusStyles: Record<RecurringStatus, string> = {
-  active:    'bg-green-100 text-green-700',
-  paused:    'bg-yellow-100 text-yellow-700',
-  completed: 'bg-blue-100 text-blue-700',
-  expired:   'bg-gray-100 text-gray-500',
-};
-const genStatusStyles: Record<GeneratedStatus, string> = {
-  Draft:   'bg-gray-100 text-gray-600',
-  Sent:    'bg-blue-100 text-blue-700',
-  Paid:    'bg-green-100 text-green-700',
-  Overdue: 'bg-red-100 text-red-700',
-};
-const freqLabel: Record<RecurringFrequency, string> = {
-  daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly',
-  quarterly: 'Quarterly', yearly: 'Yearly',
-};
-
-// ── empty state ────────────────────────────────────────────────────────────────
-function EmptyState({ onNew }: { onNew: () => void }) {
-  return (
-    <div className="py-20 flex flex-col items-center gap-4 text-center">
-      <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center">
-        <RefreshCw size={24} className="text-blue-500" />
-      </div>
-      <div>
-        <p className="text-gray-900 font-semibold text-base">No recurring invoices yet</p>
-        <p className="text-gray-500 text-sm mt-1">Set up a profile to auto-generate invoices on a schedule.</p>
-      </div>
-      <button
-        onClick={onNew}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-      >
-        <Plus size={16} /> New Recurring Invoice
-      </button>
-    </div>
-  );
-}
-
-// ── create / edit drawer ────────────────────────────────────────────────────────
-interface DrawerProps {
-  editing: RecurringInvoice | null;
-  onSave: (rec: RecurringInvoice) => void;
-  onClose: () => void;
-}
-
-const FREQ_OPTIONS: RecurringFrequency[] = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
-
-function RecurringDrawer({ editing, onSave, onClose }: DrawerProps) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
-    profileName: editing?.profileName ?? '',
-    clientName:  editing?.clientName  ?? '',
-    clientGstin: editing?.clientGstin ?? '',
-    billingAddress: editing?.billingAddress ?? '',
-    grandTotal:  editing ? String(editing.grandTotal) : '',
-    taxAmount:   editing ? String(editing.taxAmount)  : '',
-    frequency:   editing?.frequency   ?? 'monthly' as RecurringFrequency,
-    startDate:   editing?.startDate   ?? today,
-    endDate:     editing?.endDate     ?? '',
-    paymentTerms: editing?.paymentTerms ?? 'Net 30',
-    notes:       editing?.notes ?? '',
-  });
-
-  function set(k: keyof typeof form, v: string) { setForm(f => ({ ...f, [k]: v })); }
-
-  function handleSave() {
-    if (!form.profileName.trim()) { toast.error('Profile name is required'); return; }
-    if (!form.clientName.trim())  { toast.error('Client name is required');  return; }
-    const grand = parseFloat(form.grandTotal) || 0;
-    const tax   = parseFloat(form.taxAmount)  || 0;
-    if (grand <= 0) { toast.error('Amount must be greater than zero'); return; }
-
-    const now = new Date().toISOString();
-    const rec: RecurringInvoice = {
-      id:              editing?.id ?? buildNewId(),
-      profileName:     form.profileName.trim(),
-      clientName:      form.clientName.trim(),
-      clientGstin:     form.clientGstin.trim() || undefined,
-      billingAddress:  form.billingAddress.trim() || undefined,
-      subtotal:        grand - tax,
-      taxAmount:       tax,
-      grandTotal:      grand,
-      frequency:       form.frequency,
-      status:          editing?.status ?? 'active',
-      startDate:       form.startDate,
-      endDate:         form.endDate || undefined,
-      nextInvoiceDate: editing?.nextInvoiceDate ?? form.startDate,
-      lastInvoiceDate: editing?.lastInvoiceDate,
-      paymentTerms:    form.paymentTerms,
-      notes:           form.notes.trim() || undefined,
-      invoicesSent:    editing?.invoicesSent ?? 0,
-      generatedInvoices: editing?.generatedInvoices ?? [],
-      createdAt:       editing?.createdAt ?? now,
-      updatedAt:       now,
-    };
-    onSave(rec);
+// ── safeReadJson ──────────────────────────────────────────────────────────────
+function safeReadJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw) as T;
+  } catch {
+    /* ignore */
   }
+  return fallback;
+}
 
+// ── types ─────────────────────────────────────────────────────────────────────
+type Frequency = "weekly" | "monthly" | "quarterly";
+type RecurringStatus = "active" | "stopped";
+
+interface RecurringItem {
+  itemName: string;
+  description: string;
+  hsnSac: string;
+  quantity: number;
+  rate: number;
+  discount: number;
+  taxRate: number;
+}
+
+interface RecurringInvoiceProfile {
+  id: string;
+  profileName: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  customerPan: string;
+  customerGstin: string;
+  frequency: Frequency;
+  startOn: string;
+  endsOn: string;
+  neverExpires: boolean;
+  paymentTerms: string;
+  orderNumber: string;
+  nextInvoiceDate: string;
+  lastInvoiceDate: string;
+  placeOfSupply: string;
+  billingAddress: string;
+  shippingAddress: string;
+  item: RecurringItem;
+  shippingCharges: number;
+  adjustment: number;
+  tds: number;
+  roundOff: number;
+  amount: number;
+  status: RecurringStatus;
+  notes: string;
+  termsAndConditions: string;
+  createAsDraft: boolean;
+  childInvoiceIds: string[];
+  recentActivities: {
+    id: string;
+    message: string;
+    by: string;
+    timestamp: string;
+  }[];
+}
+
+// ── constants ─────────────────────────────────────────────────────────────────
+const STORAGE_KEY = "nido_recurring_invoices_v3";
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+const addByFrequency = (date: string, frequency: Frequency) => {
+  const base = new Date(`${date}T00:00:00`);
+  if (frequency === "weekly") base.setDate(base.getDate() + 7);
+  if (frequency === "monthly") base.setMonth(base.getMonth() + 1);
+  if (frequency === "quarterly") base.setMonth(base.getMonth() + 3);
+  return base.toISOString().slice(0, 10);
+};
+
+const lineAmount = (item: RecurringItem) =>
+  Math.max(0, item.quantity * item.rate - item.discount);
+
+const computeTotals = (
+  item: RecurringItem,
+  shippingCharges: number,
+  adjustment: number,
+  tds: number,
+  roundOff: number,
+) => {
+  const subtotal = lineAmount(item);
+  const tax = (subtotal * item.taxRate) / 100;
+  const total = subtotal + tax + shippingCharges + adjustment - tds + roundOff;
+  return {
+    subtotal: Math.round(subtotal * 100) / 100,
+    tax: Math.round(tax * 100) / 100,
+    total: Math.round(total * 100) / 100,
+  };
+};
+
+// ── default / seed data ───────────────────────────────────────────────────────
+const defaultProfile: RecurringInvoiceProfile = {
+  id: "ri-1",
+  profileName: "Design",
+  customerName: "Nido Technologies",
+  customerEmail: "pavannido@gmail.com",
+  customerPhone: "9844440412",
+  customerPan: "BPAPP1867G",
+  customerGstin: "29BPAPP1867G1ZN",
+  frequency: "weekly",
+  startOn: "2026-04-02",
+  endsOn: "",
+  neverExpires: true,
+  paymentTerms: "Due on Receipt",
+  orderNumber: "",
+  placeOfSupply: "Karnataka (29)",
+  billingAddress:
+    "Nido Technologies\n41/1, 2nd Floor, 10th Cross,\n11th Main, Wilsongarden,\nBangalore\nKarnataka 560027\nIndia\nPhone: 9844440412",
+  shippingAddress:
+    "Nido Technologies\n41/1, 2nd Floor, 10th Cross,\n11th Main, Wilsongarden,\nBangalore\nKarnataka 560027\nIndia\nPhone: 9844440412",
+  item: {
+    itemName: "3D Design Model",
+    description: "3D Model Mould Designs for Handel.",
+    hsnSac: "9983",
+    quantity: 1,
+    rate: 400,
+    discount: 0,
+    taxRate: 18,
+  },
+  shippingCharges: 0,
+  adjustment: 0,
+  tds: 0,
+  roundOff: 0,
+  amount: 472,
+  status: "active",
+  notes: "Thanks for your business.",
+  termsAndConditions:
+    "1. The particulars shown in the tax invoice are true and correct.\n2. Any changes/re-work in the manufactured gauge should be intimated before 20 days.",
+  createAsDraft: true,
+  childInvoiceIds: [],
+  recentActivities: [
+    {
+      id: "ra-1",
+      message: "Recurring invoice created for Rs.472.00",
+      by: "nidotechnologies",
+      timestamp: "2026-04-02T20:07:00.000Z",
+    },
+  ],
+  nextInvoiceDate: "2026-04-09",
+  lastInvoiceDate: "2026-04-02",
+};
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const normalizeProfile = (
+  raw: Partial<RecurringInvoiceProfile>,
+): RecurringInvoiceProfile => {
+  const item: RecurringItem = {
+    itemName: raw.item?.itemName || "3D Design Model",
+    description: raw.item?.description || "",
+    hsnSac: raw.item?.hsnSac || "",
+    quantity: toNumber(raw.item?.quantity, 1),
+    rate: toNumber(raw.item?.rate, 0),
+    discount: toNumber(raw.item?.discount, 0),
+    taxRate: toNumber(raw.item?.taxRate, 18),
+  };
+  const shippingCharges = toNumber(raw.shippingCharges, 0);
+  const adjustment = toNumber(raw.adjustment, 0);
+  const tds = toNumber(raw.tds, 0);
+  const roundOff = toNumber(raw.roundOff, 0);
+  const totals = computeTotals(item, shippingCharges, adjustment, tds, roundOff);
+
+  return {
+    ...defaultProfile,
+    ...raw,
+    item,
+    shippingCharges,
+    adjustment,
+    tds,
+    roundOff,
+    amount: toNumber(raw.amount, totals.total),
+    childInvoiceIds: Array.isArray(raw.childInvoiceIds) ? raw.childInvoiceIds : [],
+    recentActivities: Array.isArray(raw.recentActivities) ? raw.recentActivities : [],
+  };
+};
+
+const emptyForm = (): Omit<RecurringInvoiceProfile, "id" | "recentActivities" | "childInvoiceIds"> => ({
+  profileName: "",
+  customerName: "",
+  customerEmail: "",
+  customerPhone: "",
+  customerPan: "",
+  customerGstin: "",
+  frequency: "weekly",
+  startOn: todayStr(),
+  endsOn: "",
+  neverExpires: true,
+  paymentTerms: "Due on Receipt",
+  orderNumber: "",
+  placeOfSupply: "",
+  billingAddress: "",
+  shippingAddress: "",
+  item: {
+    itemName: "",
+    description: "",
+    hsnSac: "",
+    quantity: 1,
+    rate: 0,
+    discount: 0,
+    taxRate: 18,
+  },
+  shippingCharges: 0,
+  adjustment: 0,
+  tds: 0,
+  roundOff: 0,
+  amount: 0,
+  status: "active",
+  notes: "Thanks for your business.",
+  termsAndConditions:
+    "1. The particulars shown in the tax invoice are true and correct.\n2. Any changes/re-work in the manufactured gauge should be intimated before 20 days.",
+  createAsDraft: true,
+  nextInvoiceDate: "",
+  lastInvoiceDate: "",
+});
+
+const frequencyLabel: Record<Frequency, string> = {
+  weekly: "Weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+};
+
+// ── ConfirmationDialog (inline) ───────────────────────────────────────────────
+interface ConfirmState {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: "default" | "destructive";
+  onConfirm: () => void;
+}
+
+function ConfirmationDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  tone,
+  onOpenChange,
+  onConfirm,
+}: ConfirmState & { onOpenChange: (open: boolean) => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" style={{ backgroundColor: 'rgba(0,0,0,0.35)' }} onClick={onClose}>
-      <div
-        className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">
-              {editing ? 'Edit Recurring Invoice' : 'New Recurring Invoice'}
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">Set up a profile to auto-generate invoices.</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* body */}
-        <div className="flex-1 px-6 py-5 space-y-5">
-          {/* profile */}
-          <section>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile</p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Profile Name <span className="text-red-500">*</span></label>
-                <input
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="e.g. Monthly Retainer – Acme Corp"
-                  value={form.profileName}
-                  onChange={e => set('profileName', e.target.value)}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* client */}
-          <section>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Client Details</p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Name <span className="text-red-500">*</span></label>
-                <input
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Client or company name"
-                  value={form.clientName}
-                  onChange={e => set('clientName', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN</label>
-                <input
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="15-digit GSTIN (optional)"
-                  value={form.clientGstin}
-                  onChange={e => set('clientGstin', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Billing Address</label>
-                <textarea
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  placeholder="Street, City, State – PIN"
-                  value={form.billingAddress}
-                  onChange={e => set('billingAddress', e.target.value)}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* amounts */}
-          <section>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Invoice Amount</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Grand Total (₹) <span className="text-red-500">*</span></label>
-                <input
-                  type="number" min="0" step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="0.00"
-                  value={form.grandTotal}
-                  onChange={e => set('grandTotal', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tax Amount (₹)</label>
-                <input
-                  type="number" min="0" step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="0.00"
-                  value={form.taxAmount}
-                  onChange={e => set('taxAmount', e.target.value)}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* schedule */}
-          <section>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Schedule</p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Repeats</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  value={form.frequency}
-                  onChange={e => set('frequency', e.target.value as RecurringFrequency)}
-                >
-                  {FREQ_OPTIONS.map(f => <option key={f} value={f}>{freqLabel[f]}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.startDate}
-                    onChange={e => set('startDate', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date <span className="text-gray-400 font-normal">(optional)</span></label>
-                  <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.endDate}
-                    onChange={e => set('endDate', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  value={form.paymentTerms}
-                  onChange={e => set('paymentTerms', e.target.value)}
-                >
-                  {['Net 7', 'Net 15', 'Net 30', 'Net 45', 'Net 60', 'Due on Receipt'].map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-
-          {/* notes */}
-          <section>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
-            <textarea
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Internal notes about this recurring profile…"
-              value={form.notes}
-              onChange={e => set('notes', e.target.value)}
-            />
-          </section>
-        </div>
-
-        {/* footer */}
-        <div className="sticky bottom-0 px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">{description}</p>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          </Button>
+          <Button
+            variant={tone === "destructive" ? "destructive" : "default"}
+            onClick={onConfirm}
           >
-            {editing ? 'Save Changes' : 'Create Profile'}
-          </button>
-        </div>
-      </div>
-    </div>
+            {confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-// ── detail panel ───────────────────────────────────────────────────────────────
-function DetailPanel({
-  rec,
-  onEdit,
-  onToggle,
-  onDelete,
-  onClose,
-}: {
-  rec: RecurringInvoice;
-  onEdit: () => void;
-  onToggle: () => void;
-  onDelete: () => void;
-  onClose: () => void;
-}) {
-  const [tab, setTab] = useState<'overview' | 'history'>('overview');
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!moreOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (!moreRef.current?.contains(e.target as Node)) setMoreOpen(false);
-    };
-    window.addEventListener('mousedown', handler, true);
-    return () => window.removeEventListener('mousedown', handler, true);
-  }, [moreOpen]);
+// ── Next Invoice Preview ──────────────────────────────────────────────────────
+function NextInvoicePreview({ profile }: { profile: RecurringInvoiceProfile }) {
+  const subtotal = lineAmount(profile.item);
+  const tax = (subtotal * profile.item.taxRate) / 100;
+  const halfTax = Math.round((tax / 2) * 100) / 100;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* header */}
-      <div className="px-5 pt-4 pb-3 border-b border-gray-100">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-              <RefreshCw size={16} className="text-blue-600" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-base font-bold text-gray-900 truncate">{rec.profileName}</h2>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyles[rec.status]}`}>
-                  {capitalize(rec.status)}
-                </span>
-                <span className="text-xs text-gray-500">{freqLabel[rec.frequency]}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={onEdit}
-              title="Edit"
-              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            >
-              <Edit2 size={15} />
-            </button>
-            <button
-              onClick={onToggle}
-              title={rec.status === 'active' ? 'Pause' : 'Resume'}
-              className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
-            >
-              {rec.status === 'active' ? <PauseCircle size={15} /> : <PlayCircle size={15} />}
-            </button>
-            <div className="relative" ref={moreRef}>
-              <button
-                onClick={() => setMoreOpen(v => !v)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <MoreVertical size={15} />
-              </button>
-              {moreOpen && (
-                <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20">
-                  <button
-                    onClick={() => { onDelete(); setMoreOpen(false); }}
-                    className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
-                </div>
-              )}
-            </div>
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <X size={15} />
-            </button>
-          </div>
+    <div className="rounded-xl border bg-white p-6 space-y-6 text-sm">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Tax Invoice (Preview)</p>
+          <p className="text-2xl font-bold text-primary">Will be generated automatically</p>
+          <p className="text-muted-foreground mt-1">Next Invoice Date: <b>{profile.nextInvoiceDate || "—"}</b></p>
         </div>
-
-        {/* tabs */}
-        <div className="flex gap-1 mt-3">
-          {(['overview', 'history'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                tab === t ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {t === 'overview' ? 'Overview' : 'Invoice History'}
-            </button>
-          ))}
+        <div className="text-right">
+          <p className="font-semibold text-base">Nido Technologies</p>
+          <p className="text-muted-foreground text-xs">GSTIN: 29BPAPP1867G1ZN</p>
         </div>
       </div>
 
-      {tab === 'overview' ? (
-        <div className="p-5 space-y-5">
-          {/* summary cards */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <IndianRupee size={13} className="text-gray-400" />
-                <p className="text-xs text-gray-500">Invoice Amount</p>
-              </div>
-              <p className="text-lg font-bold text-gray-900">{fmt(rec.grandTotal)}</p>
-              <p className="text-xs text-gray-400 mt-1.5">Tax</p>
-              <p className="text-xs text-gray-600">{fmt(rec.taxAmount)}</p>
-            </div>
-
-            <div className="bg-gray-50 rounded-xl p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <RefreshCw size={13} className="text-gray-400" />
-                <p className="text-xs text-gray-500">Repeats</p>
-              </div>
-              <p className="text-lg font-bold text-gray-900">{freqLabel[rec.frequency]}</p>
-              <p className="text-xs text-gray-400 mt-1.5">Payment Terms</p>
-              <p className="text-xs text-gray-600">{rec.paymentTerms}</p>
-            </div>
-
-            <div className="bg-gray-50 rounded-xl p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Calendar size={13} className="text-gray-400" />
-                <p className="text-xs text-gray-500">Next Invoice</p>
-              </div>
-              <p className="text-base font-bold text-gray-900">{fmtDate(rec.nextInvoiceDate)}</p>
-              <p className="text-xs text-gray-400 mt-1.5">Started On</p>
-              <p className="text-xs text-gray-600">{fmtDate(rec.startDate)}</p>
-              {rec.endDate && (
-                <>
-                  <p className="text-xs text-gray-400 mt-1">Ends On</p>
-                  <p className="text-xs text-gray-600">{fmtDate(rec.endDate)}</p>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* other details */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3">Other Details</p>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Client</p>
-                <p className="font-medium text-blue-600">{rec.clientName}</p>
-              </div>
-              {rec.clientGstin && (
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">GSTIN</p>
-                  <p className="font-mono text-gray-700 text-xs">{rec.clientGstin}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Invoices Sent</p>
-                <p className="font-semibold text-gray-800">{rec.invoicesSent}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-0.5">Last Invoice</p>
-                <p className="text-gray-700">{rec.lastInvoiceDate ? fmtDate(rec.lastInvoiceDate) : '—'}</p>
-              </div>
-              {rec.billingAddress && (
-                <div className="col-span-2">
-                  <p className="text-xs text-gray-400 mb-0.5">Billing Address</p>
-                  <p className="text-gray-700">{rec.billingAddress}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* notes */}
-          {rec.notes && (
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">Notes</p>
-              <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-sm text-gray-700">
-                {rec.notes}
-              </div>
-            </div>
-          )}
-
-          {/* history log */}
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">History</p>
-            <div className="border border-gray-100 rounded-lg divide-y divide-gray-100 text-xs text-gray-500">
-              <div className="px-3 py-2">
-                {fmtDate(rec.createdAt)} — Recurring profile created for {fmt(rec.grandTotal)}
-              </div>
-              {rec.lastInvoiceDate && (
-                <div className="px-3 py-2">
-                  {fmtDate(rec.lastInvoiceDate)} — Invoice generated for {fmt(rec.grandTotal)}
-                </div>
-              )}
-              {rec.status === 'paused' && (
-                <div className="px-3 py-2">
-                  {fmtDate(rec.updatedAt)} — Profile paused
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Bill to / Ship to */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Bill To</p>
+          <p className="font-medium">{profile.customerName}</p>
+          <p className="text-muted-foreground whitespace-pre-wrap">{profile.billingAddress}</p>
+          {profile.customerGstin && <p className="text-xs mt-1">GSTIN: {profile.customerGstin}</p>}
         </div>
-      ) : (
-        /* invoice history tab */
-        <div className="p-5">
-          {rec.generatedInvoices.length === 0 ? (
-            <div className="py-10 text-center text-gray-400 text-sm">No invoices generated yet.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    {['DATE', 'INVOICE #', 'DUE DATE', 'AMOUNT', 'STATUS'].map(h => (
-                      <th key={h} className="pb-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pr-4 whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rec.generatedInvoices.map(gi => (
-                    <tr key={gi.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{fmtDate(gi.date)}</td>
-                      <td className="py-2.5 pr-4 font-semibold text-blue-600">{gi.invoiceNumber}</td>
-                      <td className="py-2.5 pr-4 text-gray-600 whitespace-nowrap">{fmtDate(gi.dueDate)}</td>
-                      <td className="py-2.5 pr-4 font-medium text-gray-800 whitespace-nowrap">{fmt(gi.grandTotal)}</td>
-                      <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${genStatusStyles[gi.status]}`}>
-                          {gi.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Details</p>
+          <p>Payment Terms: <b>{profile.paymentTerms}</b></p>
+          <p>Place of Supply: <b>{profile.placeOfSupply || "—"}</b></p>
+          <p>Frequency: <b>{frequencyLabel[profile.frequency]}</b></p>
+        </div>
+      </div>
+
+      {/* Item table */}
+      <div className="rounded-lg border overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/30">
+            <tr>
+              <th className="text-left px-3 py-2">Item</th>
+              <th className="text-left px-3 py-2">HSN/SAC</th>
+              <th className="text-right px-3 py-2">Qty</th>
+              <th className="text-right px-3 py-2">Rate</th>
+              <th className="text-right px-3 py-2">Discount</th>
+              <th className="text-right px-3 py-2">Tax ({profile.item.taxRate}%)</th>
+              <th className="text-right px-3 py-2">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t">
+              <td className="px-3 py-3">
+                <p className="font-medium">{profile.item.itemName}</p>
+                {profile.item.description && (
+                  <p className="text-xs text-muted-foreground">{profile.item.description}</p>
+                )}
+              </td>
+              <td className="px-3 py-3 text-muted-foreground">{profile.item.hsnSac || "—"}</td>
+              <td className="px-3 py-3 text-right">{profile.item.quantity}</td>
+              <td className="px-3 py-3 text-right">Rs.{profile.item.rate.toFixed(2)}</td>
+              <td className="px-3 py-3 text-right">Rs.{profile.item.discount.toFixed(2)}</td>
+              <td className="px-3 py-3 text-right">Rs.{tax.toFixed(2)}</td>
+              <td className="px-3 py-3 text-right font-semibold">Rs.{(subtotal + tax).toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Summary */}
+      <div className="flex justify-end">
+        <div className="w-64 space-y-1 text-sm">
+          <div className="flex justify-between"><span>Sub Total</span><span>Rs.{subtotal.toFixed(2)}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>CGST ({profile.item.taxRate / 2}%)</span><span>Rs.{halfTax.toFixed(2)}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>SGST ({profile.item.taxRate / 2}%)</span><span>Rs.{halfTax.toFixed(2)}</span></div>
+          {profile.shippingCharges > 0 && (
+            <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>Rs.{profile.shippingCharges.toFixed(2)}</span></div>
           )}
+          {profile.tds > 0 && (
+            <div className="flex justify-between text-muted-foreground"><span>TDS</span><span>-Rs.{profile.tds.toFixed(2)}</span></div>
+          )}
+          {profile.adjustment !== 0 && (
+            <div className="flex justify-between text-muted-foreground"><span>Adjustment</span><span>Rs.{profile.adjustment.toFixed(2)}</span></div>
+          )}
+          <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Total (Rs)</span><span>Rs.{profile.amount.toFixed(2)}</span></div>
+        </div>
+      </div>
+
+      {/* Notes */}
+      {profile.notes && (
+        <div>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Customer Notes</p>
+          <p className="text-muted-foreground">{profile.notes}</p>
         </div>
       )}
     </div>
   );
 }
 
-// ── main page ──────────────────────────────────────────────────────────────────
+// ── main component ────────────────────────────────────────────────────────────
 export default function RecurringInvoicesPage() {
-  const [items, setItems] = useState<RecurringInvoice[]>([]);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<RecurringStatus | 'all'>('all');
-  const [freqFilter, setFreqFilter] = useState<RecurringFrequency | 'all'>('all');
-  const [selected, setSelected] = useState<RecurringInvoice | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editing, setEditing] = useState<RecurringInvoice | null>(null);
-  const [rowMenu, setRowMenu] = useState<{ top: number; right: number; rec: RecurringInvoice } | null>(null);
-  const rowMenuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
 
-  const refresh = () => {
-    const all = getAllRecurring();
-    setItems(all);
-    // keep selected in sync
-    setSelected(prev => prev ? (all.find(r => r.id === prev.id) ?? null) : null);
-  };
+  const [clients, setClients] = useState<StoredClient[]>([]);
+  const [allInvoices, setAllInvoices] = useState<StoredInvoice[]>([]);
 
   useEffect(() => {
-    seedIfEmpty();
-    refresh();
-    window.addEventListener('recurringInvoicesUpdated', refresh);
-    return () => window.removeEventListener('recurringInvoicesUpdated', refresh);
+    setClients(getClients());
+    setAllInvoices(getInvoices());
+    const handler = () => setAllInvoices(getInvoices());
+    window.addEventListener("nidoInvoicesUpdated", handler);
+    return () => window.removeEventListener("nidoInvoicesUpdated", handler);
   }, []);
 
-  // close row menu on outside click
+  const createMode = location.pathname.endsWith("/create");
+  const editMode = location.pathname.endsWith("/edit") && !!params.id;
+
+  const [profiles, setProfiles] = useState<RecurringInvoiceProfile[]>(() => {
+    const stored = safeReadJson<RecurringInvoiceProfile[]>(STORAGE_KEY, [defaultProfile]);
+    const list = Array.isArray(stored) && stored.length > 0 ? stored : [defaultProfile];
+    return list.map((entry) => normalizeProfile(entry));
+  });
+
+  const [selectedId, setSelectedId] = useState<string>(
+    params.id || profiles[0]?.id || "",
+  );
+
+  const [confirmState, setConfirmState] = useState<ConfirmState>({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Confirm",
+    tone: "default",
+    onConfirm: () => {},
+  });
+
+  const [formOpen, setFormOpen] = useState(createMode);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const persist = (next: RecurringInvoiceProfile[]) => {
+    setProfiles(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  };
+
   useEffect(() => {
-    if (!rowMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (!rowMenuRef.current?.contains(e.target as Node)) setRowMenu(null);
+    if (params.id) setSelectedId(params.id);
+  }, [params.id]);
+
+  useEffect(() => {
+    if (createMode) {
+      setEditingId(null);
+      setForm(emptyForm());
+      setFormOpen(true);
+    }
+  }, [createMode]);
+
+  useEffect(() => {
+    if (!editMode) return;
+    const current = profiles.find((entry) => entry.id === params.id);
+    if (!current) return;
+    setEditingId(current.id);
+    const { id: _id, recentActivities: _ra, childInvoiceIds: _ci, ...payload } = current;
+    setForm(payload);
+    setFormOpen(true);
+  }, [editMode, params.id]);
+
+  const selected = profiles.find((entry) => entry.id === selectedId) || profiles[0] || null;
+
+  const totals = useMemo(
+    () => computeTotals(form.item, toNumber(form.shippingCharges), toNumber(form.adjustment), toNumber(form.tds), toNumber(form.roundOff)),
+    [form],
+  );
+
+  // child invoices: stored invoices whose poReference is `recurring:<profileId>`
+  const profileInvoices = useMemo(() => {
+    if (!selected) return [] as StoredInvoice[];
+    return allInvoices.filter((entry) => entry.poReference === `recurring:${selected.id}`);
+  }, [allInvoices, selected]);
+
+  const upsertActivity = (profileId: string, message: string, nextProfiles: RecurringInvoiceProfile[]) => {
+    return nextProfiles.map((entry) =>
+      entry.id === profileId
+        ? {
+            ...entry,
+            recentActivities: [
+              { id: `ra-${Date.now()}`, message, by: "System", timestamp: new Date().toISOString() },
+              ...entry.recentActivities,
+            ],
+          }
+        : entry,
+    );
+  };
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormOpen(true);
+    navigate("/sales/recurring-invoices/create");
+  };
+
+  const openEdit = () => {
+    if (!selected) return;
+    const { id: _id, recentActivities: _ra, childInvoiceIds: _ci, ...payload } = selected;
+    setEditingId(selected.id);
+    setForm(payload);
+    setFormOpen(true);
+    navigate(`/sales/recurring-invoices/${selected.id}/edit`);
+  };
+
+  const closeDialog = () => {
+    setFormOpen(false);
+    setEditingId(null);
+    navigate("/sales/recurring-invoices", { replace: true });
+  };
+
+  const saveProfile = () => {
+    if (!form.customerName.trim() || !form.profileName.trim()) {
+      toast.error("Customer Name and Profile Name are required");
+      return;
+    }
+
+    const nextInvoiceDate = addByFrequency(form.startOn, form.frequency);
+    const computed = computeTotals(form.item, form.shippingCharges, form.adjustment, form.tds, form.roundOff);
+
+    if (editingId) {
+      const next = profiles.map((entry) =>
+        entry.id === editingId ? { ...entry, ...form, amount: computed.total, nextInvoiceDate } : entry,
+      );
+      const withActivity = upsertActivity(editingId, "Recurring invoice profile updated", next);
+      persist(withActivity);
+      setSelectedId(editingId);
+      toast.success("Recurring profile updated");
+      closeDialog();
+      return;
+    }
+
+    const created: RecurringInvoiceProfile = {
+      id: `ri-${Date.now()}`,
+      ...form,
+      amount: computed.total,
+      nextInvoiceDate,
+      lastInvoiceDate: form.startOn,
+      childInvoiceIds: [],
+      recentActivities: [
+        {
+          id: `ra-${Date.now()}`,
+          message: `Recurring invoice created for Rs.${computed.total.toFixed(2)}`,
+          by: "System",
+          timestamp: new Date().toISOString(),
+        },
+      ],
     };
-    window.addEventListener('mousedown', handler, true);
-    return () => window.removeEventListener('mousedown', handler, true);
-  }, [rowMenu]);
 
-  const filtered = useMemo(() => items.filter(r => {
-    const q = search.toLowerCase();
-    const matchSearch = r.profileName.toLowerCase().includes(q) || r.clientName.toLowerCase().includes(q);
-    const matchStatus = statusFilter === 'all' || r.status === statusFilter;
-    const matchFreq = freqFilter === 'all' || r.frequency === freqFilter;
-    return matchSearch && matchStatus && matchFreq;
-  }), [items, search, statusFilter, freqFilter]);
-
-  // stats
-  const stats = useMemo(() => ({
-    active:    items.filter(r => r.status === 'active').length,
-    paused:    items.filter(r => r.status === 'paused').length,
-    monthlyValue: items
-      .filter(r => r.status === 'active')
-      .reduce((sum, r) => {
-        const monthly: Record<RecurringFrequency, number> = {
-          daily: 30, weekly: 4.33, monthly: 1, quarterly: 1/3, yearly: 1/12,
-        };
-        return sum + r.grandTotal * monthly[r.frequency];
-      }, 0),
-    totalSent: items.reduce((s, r) => s + r.invoicesSent, 0),
-  }), [items]);
-
-  const openRowMenu = (e: React.MouseEvent, rec: RecurringInvoice) => {
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setRowMenu({ top: rect.bottom + 4, right: window.innerWidth - rect.right, rec });
+    const next = [created, ...profiles];
+    persist(next);
+    setSelectedId(created.id);
+    toast.success("Recurring invoice profile created");
+    closeDialog();
   };
 
-  const handleSave = (rec: RecurringInvoice) => {
-    saveRecurring(rec);
-    setDrawerOpen(false);
-    setEditing(null);
-    toast.success(editing ? 'Profile updated' : 'Recurring invoice created');
-    refresh();
+  const handleCreateChildInvoice = () => {
+    if (!selected) return;
+
+    const subtotal = lineAmount(selected.item);
+    const tax = (subtotal * selected.item.taxRate) / 100;
+    const cgst = Math.round((tax / 2) * 100) / 100;
+    const sgst = Math.round((tax / 2) * 100) / 100;
+    const grandTotal =
+      Math.round((subtotal + tax + selected.shippingCharges + selected.adjustment - selected.tds + selected.roundOff) * 100) / 100;
+
+    const now = new Date().toISOString();
+    const invNumber = generateInvoiceNumber();
+    const invId = `rinv-${Date.now()}`;
+
+    const newInvoice: StoredInvoice = {
+      id: invId,
+      invoiceNumber: invNumber,
+      clientName: selected.customerName,
+      contactPerson: selected.customerName,
+      clientGstin: selected.customerGstin,
+      clientContact: selected.customerEmail,
+      billingAddress: selected.billingAddress,
+      shippingAddress: selected.shippingAddress,
+      invoiceDate: todayStr(),
+      dueDate: selected.nextInvoiceDate || todayStr(),
+      poReference: `recurring:${selected.id}`,
+      placeOfSupply: selected.placeOfSupply,
+      status: selected.createAsDraft ? "Draft" : "Sent",
+      lineItems: [
+        {
+          id: `rli-${Date.now()}`,
+          description: selected.item.itemName,
+          itemDetails: selected.item.description,
+          hsnSac: selected.item.hsnSac,
+          quantity: selected.item.quantity,
+          rate: selected.item.rate,
+          discount: selected.item.discount,
+          taxPercent: selected.item.taxRate,
+          taxType: "CGST+SGST",
+        },
+      ],
+      grossSubtotal: subtotal + selected.item.discount,
+      totalDiscount: selected.item.discount,
+      subtotal,
+      totalTax: cgst + sgst,
+      shippingCharges: selected.shippingCharges,
+      adjustment: selected.adjustment + selected.roundOff,
+      grandTotal,
+      notes: selected.notes,
+      termsConditions: selected.termsAndConditions,
+      payments: [],
+      activity: [
+        { id: `act-${Date.now()}`, date: todayStr(), title: "Invoice created", description: `Generated from recurring profile: ${selected.profileName}` },
+      ],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    saveInvoice(newInvoice);
+
+    const next = profiles.map((entry) =>
+      entry.id === selected.id
+        ? {
+            ...entry,
+            lastInvoiceDate: todayStr(),
+            nextInvoiceDate: addByFrequency(todayStr(), entry.frequency),
+            childInvoiceIds: [invId, ...entry.childInvoiceIds],
+            recentActivities: [
+              {
+                id: `ra-${Date.now()}`,
+                message: `Invoice created - ${invNumber}. Saved as ${selected.createAsDraft ? "draft" : "sent"}`,
+                by: "System",
+                timestamp: now,
+              },
+              ...entry.recentActivities,
+            ],
+          }
+        : entry,
+    );
+
+    persist(next);
+    toast.success("Child invoice generated");
+    navigate(`/sales/invoices/${invId}`);
   };
 
-  const handleToggle = (rec: RecurringInvoice) => {
-    toggleStatus(rec.id);
-    toast.success(rec.status === 'active' ? 'Profile paused' : 'Profile resumed');
-    refresh();
+  const handleClone = () => {
+    if (!selected) return;
+    const cloned: RecurringInvoiceProfile = {
+      ...selected,
+      id: `ri-${Date.now()}`,
+      profileName: `${selected.profileName} Copy`,
+      childInvoiceIds: [],
+      recentActivities: [
+        { id: `ra-${Date.now()}`, message: "Cloned from existing recurring profile", by: "System", timestamp: new Date().toISOString() },
+      ],
+    };
+    persist([cloned, ...profiles]);
+    setSelectedId(cloned.id);
+    toast.success("Recurring profile cloned");
   };
 
-  const handleDelete = (rec: RecurringInvoice) => {
-    if (!window.confirm(`Delete "${rec.profileName}"? This cannot be undone.`)) return;
-    deleteRecurring(rec.id);
-    if (selected?.id === rec.id) setSelected(null);
-    toast.success('Profile deleted');
-    refresh();
+  const handleStop = () => {
+    if (!selected) return;
+    const next = profiles.map((entry) =>
+      entry.id === selected.id
+        ? {
+            ...entry,
+            status: "stopped" as const,
+            recentActivities: [
+              { id: `ra-${Date.now()}`, message: "Recurring profile stopped", by: "System", timestamp: new Date().toISOString() },
+              ...entry.recentActivities,
+            ],
+          }
+        : entry,
+    );
+    persist(next);
+    toast.success("Recurring profile stopped");
+  };
+
+  const handleDelete = () => {
+    if (!selected) return;
+    const next = profiles.filter((entry) => entry.id !== selected.id);
+    persist(next);
+    setSelectedId(next[0]?.id || "");
+    navigate("/sales/recurring-invoices", { replace: true });
+    toast.success("Recurring profile deleted");
   };
 
   return (
-    <div className="space-y-5" onClick={() => setRowMenu(null)}>
-      {/* ── page header ── */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-gray-500 mb-1">Auto-generate invoices on a fixed schedule</p>
-          <h1 className="text-2xl font-bold text-gray-900">Recurring Invoices</h1>
-        </div>
-        <button
-          onClick={() => { setEditing(null); setDrawerOpen(true); }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shrink-0"
-        >
-          <Plus size={16} /> New Recurring
-        </button>
-      </div>
-
-      {/* ── stats cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Active Profiles', value: stats.active, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Paused',          value: stats.paused,  icon: PauseCircle,  color: 'text-yellow-600', bg: 'bg-yellow-50' },
-          { label: 'Invoices Sent',   value: stats.totalSent, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
-          {
-            label: 'Est. Monthly Revenue',
-            value: `₹${Math.round(stats.monthlyValue).toLocaleString('en-IN')}`,
-            icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50',
-          },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
-              <Icon size={17} className={color} />
+    <div>
+      <div className="space-y-4 p-6">
+        {/* Top card */}
+        <Card>
+          <CardContent className="flex items-center justify-between pt-6">
+            <div>
+              <p className="text-sm text-muted-foreground">All Recurring Invoices</p>
+              <p className="text-xl font-semibold">{profiles.length} Profiles</p>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500 truncate">{label}</p>
-              <p className="text-xl font-bold text-gray-900">{value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" /> New
+            </Button>
+          </CardContent>
+        </Card>
 
-      {/* ── filters ── */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by profile name or client…"
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as RecurringStatus | 'all')}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="paused">Paused</option>
-          <option value="completed">Completed</option>
-          <option value="expired">Expired</option>
-        </select>
-        <select
-          value={freqFilter}
-          onChange={e => setFreqFilter(e.target.value as RecurringFrequency | 'all')}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All frequencies</option>
-          {FREQ_OPTIONS.map(f => <option key={f} value={f}>{freqLabel[f]}</option>)}
-        </select>
-      </div>
-
-      {/* ── table ── */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {filtered.length === 0 ? (
-          items.length === 0
-            ? <EmptyState onNew={() => { setEditing(null); setDrawerOpen(true); }} />
-            : <div className="py-16 text-center text-gray-400 text-sm">No profiles match your search.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  {['PROFILE NAME', 'CLIENT', 'AMOUNT', 'FREQUENCY', 'NEXT INVOICE', 'LAST SENT', 'SENT', 'STATUS', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(rec => (
-                  <tr
-                    key={rec.id}
-                    onClick={() => setSelected(s => s?.id === rec.id ? null : rec)}
-                    className={`border-b border-gray-100 cursor-pointer transition-colors ${
-                      selected?.id === rec.id ? 'bg-blue-50' : 'hover:bg-gray-50/60'
-                    }`}
+        {/* Profiles table */}
+        <Card>
+          <CardContent className="pt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Profile Name</TableHead>
+                  <TableHead>Frequency</TableHead>
+                  <TableHead>Last Invoice Date</TableHead>
+                  <TableHead>Next Invoice Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {profiles.map((profile) => (
+                  <TableRow
+                    key={profile.id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      setSelectedId(profile.id);
+                      navigate(`/sales/recurring-invoices/${profile.id}/edit`);
+                    }}
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {selected?.id === rec.id && <ChevronRight size={14} className="text-blue-500 shrink-0" />}
-                        <span className="font-semibold text-blue-600 text-sm">{rec.profileName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 max-w-[140px] truncate">{rec.clientName}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{fmt(rec.grandTotal)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      <span className="flex items-center gap-1">
-                        <Clock size={13} className="text-gray-400" />
-                        {freqLabel[rec.frequency]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtDate(rec.nextInvoiceDate)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{fmtDate(rec.lastInvoiceDate)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700 text-center font-medium">{rec.invoicesSent}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusStyles[rec.status]}`}>
-                        {capitalize(rec.status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={e => openRowMenu(e, rec)}
-                        className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600"
-                      >
-                        <MoreVertical size={15} />
-                      </button>
-                    </td>
-                  </tr>
+                    <TableCell>{profile.customerName}</TableCell>
+                    <TableCell className="font-medium text-primary">{profile.profileName}</TableCell>
+                    <TableCell>{frequencyLabel[profile.frequency]}</TableCell>
+                    <TableCell>{profile.lastInvoiceDate}</TableCell>
+                    <TableCell>{profile.nextInvoiceDate}</TableCell>
+                    <TableCell>
+                      <Badge variant={profile.status === "active" ? "default" : "secondary"}>
+                        {profile.status.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">Rs.{profile.amount.toFixed(2)}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* Selected profile detail */}
+        {selected && (
+          <Card>
+            <CardContent className="pt-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-4xl font-light">{selected.profileName}</h3>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" onClick={openEdit}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" onClick={handleCreateChildInvoice}>
+                    Create Invoice
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        More <MoreHorizontal className="ml-2 h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setConfirmState({
+                            open: true,
+                            title: "Stop Recurring Profile",
+                            description: "Stop this recurring profile from generating future invoices?",
+                            confirmLabel: "Stop",
+                            tone: "default",
+                            onConfirm: handleStop,
+                          });
+                        }}
+                      >
+                        Stop
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleClone}>Clone</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setConfirmState({
+                            open: true,
+                            title: "Delete Recurring Profile",
+                            description: "Delete this recurring profile? This action cannot be undone.",
+                            confirmLabel: "Delete",
+                            tone: "destructive",
+                            onConfirm: handleDelete,
+                          });
+                        }}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate("/sales/recurring-invoices", { replace: true })}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+
+              <Tabs defaultValue="overview">
+                <TabsList>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="next">Next Invoice</TabsTrigger>
+                  <TabsTrigger value="activities">Recent Activities</TabsTrigger>
+                </TabsList>
+
+                {/* Overview tab */}
+                <TabsContent value="overview" className="pt-4">
+                  <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+                    {/* Left sidebar */}
+                    <div className="space-y-4 rounded-xl border bg-muted/20 p-4 text-sm">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Details</p>
+                        <p className="mt-2">
+                          Profile Status: <b>{selected.status === "active" ? "Active" : "Stopped"}</b>
+                        </p>
+                        <p>Start Date: <b>{selected.startOn}</b></p>
+                        <p>
+                          End Date:{" "}
+                          <b>{selected.neverExpires ? "Never Expires" : selected.endsOn || "-"}</b>
+                        </p>
+                        <p>Payment Terms: <b>{selected.paymentTerms}</b></p>
+                        <p>Manually Created Invoices: <b>{profileInvoices.length}</b></p>
+                      </div>
+                      <div className="rounded-lg border bg-white p-3">
+                        <p className="font-medium">Recurring Invoice preference has been set to</p>
+                        <p className="text-muted-foreground">
+                          "{selected.createAsDraft ? "Create Invoices as Drafts" : "Create and Send"}"
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Address</p>
+                        <p className="mt-2 whitespace-pre-wrap">
+                          Billing Address{"\n"}
+                          {selected.billingAddress}
+                        </p>
+                        <p className="mt-3 whitespace-pre-wrap">
+                          Shipping Address{"\n"}
+                          {selected.shippingAddress}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Customer Notes</p>
+                        <p className="mt-2 whitespace-pre-wrap">{selected.notes || "-"}</p>
+                      </div>
+                    </div>
+
+                    {/* Right section */}
+                    <div className="space-y-4">
+                      <div className="grid gap-3 rounded-xl border bg-white p-4 md:grid-cols-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Invoice Amount</p>
+                          <p className="text-3xl font-semibold">Rs.{selected.amount.toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Next Invoice Date</p>
+                          <p className="text-2xl font-semibold text-blue-600">{selected.nextInvoiceDate}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Recurring Period</p>
+                          <p className="text-2xl font-semibold">{frequencyLabel[selected.frequency]}</p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border bg-white p-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-lg font-semibold">All Child Invoices</p>
+                          <p className="text-sm text-muted-foreground">
+                            Unpaid Invoices: Rs.
+                            {profileInvoices
+                              .filter((entry) => entry.status !== "Paid")
+                              .reduce((sum, entry) => sum + entry.grandTotal, 0)
+                              .toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="space-y-3">
+                          {profileInvoices.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No child invoices created yet.</p>
+                          )}
+                          {profileInvoices.map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                            >
+                              <div>
+                                <p className="font-medium">{entry.clientName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {entry.invoiceNumber} | {entry.invoiceDate}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{entry.status}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-semibold">Rs.{entry.grandTotal.toFixed(2)}</p>
+                                <Button
+                                  size="sm"
+                                  className="mt-2"
+                                  onClick={() =>
+                                    navigate("/sales/payment-receipts/create", {
+                                      state: {
+                                        fromInvoiceId: entry.id,
+                                        customerName: entry.clientName,
+                                        invoiceNumber: entry.invoiceNumber,
+                                        amount: entry.grandTotal,
+                                        email: entry.clientContact || "",
+                                      },
+                                    })
+                                  }
+                                >
+                                  Record Payment
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Next Invoice tab */}
+                <TabsContent value="next" className="pt-4">
+                  <div className="overflow-x-auto rounded-xl border bg-white p-2">
+                    <NextInvoicePreview profile={selected} />
+                  </div>
+                </TabsContent>
+
+                {/* Recent Activities tab */}
+                <TabsContent value="activities" className="pt-4">
+                  <div className="space-y-4">
+                    {selected.recentActivities.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No recent activities.</p>
+                    )}
+                    {selected.recentActivities.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="grid gap-3 rounded-lg border p-4 md:grid-cols-[160px_minmax(0,1fr)]"
+                      >
+                        <div className="text-sm text-muted-foreground">
+                          {new Date(entry.timestamp).toLocaleDateString()}
+                          <br />
+                          {new Date(entry.timestamp).toLocaleTimeString()}
+                        </div>
+                        <div>
+                          <p className="font-medium">{entry.message}</p>
+                          <p className="text-sm text-muted-foreground">by {entry.by}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         )}
       </div>
 
-      {/* ── detail panel ── */}
-      {selected && (
-        <DetailPanel
-          rec={selected}
-          onEdit={() => { setEditing(selected); setDrawerOpen(true); }}
-          onToggle={() => handleToggle(selected)}
-          onDelete={() => handleDelete(selected)}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      {/* Confirmation dialog */}
+      <ConfirmationDialog
+        {...confirmState}
+        onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
+        onConfirm={() => {
+          confirmState.onConfirm();
+          setConfirmState((prev) => ({ ...prev, open: false }));
+        }}
+      />
 
-      {/* ── row context menu ── */}
-      {rowMenu && (
-        <div
-          ref={rowMenuRef}
-          className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-1 z-[9999]"
-          style={{ top: rowMenu.top, right: rowMenu.right }}
-          onClick={e => e.stopPropagation()}
-        >
-          <button
-            onClick={() => { setSelected(rowMenu.rec); setRowMenu(null); }}
-            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-          >
-            <User size={14} /> View Details
-          </button>
-          <button
-            onClick={() => { setEditing(rowMenu.rec); setDrawerOpen(true); setRowMenu(null); }}
-            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-          >
-            <Edit2 size={14} /> Edit Profile
-          </button>
-          <button
-            onClick={() => { handleToggle(rowMenu.rec); setRowMenu(null); }}
-            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-          >
-            {rowMenu.rec.status === 'active'
-              ? <><PauseCircle size={14} /> Pause</>
-              : <><PlayCircle size={14} /> Resume</>
-            }
-          </button>
-          <div className="my-1 border-t border-gray-100" />
-          <button
-            onClick={() => { handleDelete(rowMenu.rec); setRowMenu(null); }}
-            className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-          >
-            <Trash2 size={14} /> Delete
-          </button>
-        </div>
-      )}
+      {/* Create / Edit dialog */}
+      <Dialog open={formOpen} onOpenChange={(open) => (!open ? closeDialog() : setFormOpen(open))}>
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? "Edit Recurring Invoice" : "New Recurring Invoice"}
+            </DialogTitle>
+          </DialogHeader>
 
-      {/* ── create / edit drawer ── */}
-      {drawerOpen && (
-        <RecurringDrawer
-          editing={editing}
-          onSave={handleSave}
-          onClose={() => { setDrawerOpen(false); setEditing(null); }}
-        />
-      )}
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Customer Name */}
+              <div>
+                <Label>Customer Name*</Label>
+                <Select
+                  value={form.customerName}
+                  onValueChange={(value) => {
+                    const selectedClient = clients.find((c) => c.name === value);
+                    const addr = selectedClient
+                      ? [selectedClient.billingAddress, selectedClient.billingCity, selectedClient.billingState, selectedClient.billingPincode].filter(Boolean).join(", ")
+                      : "";
+                    setForm((cur) => ({
+                      ...cur,
+                      customerName: value,
+                      customerEmail: selectedClient?.email || cur.customerEmail,
+                      customerPhone: selectedClient?.phone || cur.customerPhone,
+                      billingAddress: addr || cur.billingAddress,
+                      shippingAddress: addr || cur.shippingAddress,
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.name}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Profile Name */}
+              <div>
+                <Label>Profile Name*</Label>
+                <Input
+                  value={form.profileName}
+                  onChange={(e) => setForm((cur) => ({ ...cur, profileName: e.target.value }))}
+                />
+              </div>
+
+              {/* Order Number */}
+              <div>
+                <Label>Order Number</Label>
+                <Input
+                  value={form.orderNumber}
+                  onChange={(e) => setForm((cur) => ({ ...cur, orderNumber: e.target.value }))}
+                />
+              </div>
+
+              {/* Frequency */}
+              <div>
+                <Label>Repeat Every*</Label>
+                <Select
+                  value={form.frequency}
+                  onValueChange={(value: Frequency) => setForm((cur) => ({ ...cur, frequency: value }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Week</SelectItem>
+                    <SelectItem value="monthly">Month</SelectItem>
+                    <SelectItem value="quarterly">Quarter</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Start On */}
+              <div>
+                <Label>Start On</Label>
+                <Input
+                  type="date"
+                  value={form.startOn}
+                  onChange={(e) => setForm((cur) => ({ ...cur, startOn: e.target.value }))}
+                />
+              </div>
+
+              {/* Ends On */}
+              <div className="space-y-2">
+                <Label>Ends On</Label>
+                <Input
+                  type="date"
+                  value={form.endsOn}
+                  disabled={form.neverExpires}
+                  onChange={(e) => setForm((cur) => ({ ...cur, endsOn: e.target.value }))}
+                />
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Checkbox
+                    checked={form.neverExpires}
+                    onCheckedChange={(checked) => setForm((cur) => ({ ...cur, neverExpires: !!checked }))}
+                  />
+                  Never Expires
+                </label>
+              </div>
+
+              {/* Payment Terms */}
+              <div>
+                <Label>Payment Terms</Label>
+                <Select
+                  value={form.paymentTerms}
+                  onValueChange={(value) => setForm((cur) => ({ ...cur, paymentTerms: value }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
+                    <SelectItem value="Net 15">Net 15</SelectItem>
+                    <SelectItem value="Net 30">Net 30</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Place of Supply */}
+              <div>
+                <Label>Place of Supply</Label>
+                <Input
+                  value={form.placeOfSupply}
+                  onChange={(e) => setForm((cur) => ({ ...cur, placeOfSupply: e.target.value }))}
+                  placeholder="[KA] - Karnataka"
+                />
+              </div>
+            </div>
+
+            {/* Item Table */}
+            <div className="rounded-xl border bg-white">
+              <div className="border-b px-4 py-3">
+                <p className="font-semibold">Item Table</p>
+              </div>
+              <div className="p-4">
+                <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr]">
+                  <Input
+                    placeholder="Type or click to select an item"
+                    value={form.item.itemName}
+                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, itemName: e.target.value } }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Qty"
+                    value={form.item.quantity}
+                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, quantity: toNumber(e.target.value, 1) } }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Rate"
+                    value={form.item.rate}
+                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, rate: toNumber(e.target.value) } }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Discount"
+                    value={form.item.discount}
+                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, discount: toNumber(e.target.value) } }))}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Tax %"
+                    value={form.item.taxRate}
+                    onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, taxRate: toNumber(e.target.value) } }))}
+                  />
+                  <Input
+                    value={lineAmount(form.item).toFixed(2)}
+                    readOnly
+                    className="bg-muted text-right"
+                  />
+                </div>
+                <Input
+                  className="mt-3"
+                  placeholder="Description"
+                  value={form.item.description}
+                  onChange={(e) => setForm((cur) => ({ ...cur, item: { ...cur.item, description: e.target.value } }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+              {/* Notes / T&C / preferences */}
+              <div className="space-y-4">
+                <div>
+                  <Label>Customer Notes</Label>
+                  <Textarea
+                    value={form.notes}
+                    onChange={(e) => setForm((cur) => ({ ...cur, notes: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Terms &amp; Conditions</Label>
+                  <Textarea
+                    value={form.termsAndConditions}
+                    onChange={(e) => setForm((cur) => ({ ...cur, termsAndConditions: e.target.value }))}
+                  />
+                </div>
+                <div className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700">
+                  Configure payment gateways and receive payments online. Set up Payment Gateway.
+                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Checkbox
+                    checked={form.createAsDraft}
+                    onCheckedChange={(checked) => setForm((cur) => ({ ...cur, createAsDraft: !!checked }))}
+                  />
+                  Preferences: Create Invoices as Drafts
+                </label>
+              </div>
+
+              {/* Totals panel */}
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span>Sub Total</span>
+                    <span>{totals.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Shipping Charges</span>
+                    <Input
+                      className="w-28 text-right"
+                      type="number"
+                      value={form.shippingCharges}
+                      onChange={(e) => setForm((cur) => ({ ...cur, shippingCharges: toNumber(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>TDS</span>
+                    <Input
+                      className="w-28 text-right"
+                      type="number"
+                      value={form.tds}
+                      onChange={(e) => setForm((cur) => ({ ...cur, tds: toNumber(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Adjustment</span>
+                    <Input
+                      className="w-28 text-right"
+                      type="number"
+                      value={form.adjustment}
+                      onChange={(e) => setForm((cur) => ({ ...cur, adjustment: toNumber(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span>Round Off</span>
+                    <Input
+                      className="w-28 text-right"
+                      type="number"
+                      value={form.roundOff}
+                      onChange={(e) => setForm((cur) => ({ ...cur, roundOff: toNumber(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="border-t pt-3 text-base font-semibold">
+                    <div className="flex items-center justify-between">
+                      <span>Total (Rs)</span>
+                      <span>{totals.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+              <Button onClick={saveProfile}>{editingId ? "Update" : "Save"}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
