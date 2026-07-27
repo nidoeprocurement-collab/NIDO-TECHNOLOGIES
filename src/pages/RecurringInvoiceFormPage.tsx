@@ -22,6 +22,7 @@ import {
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getSlabDiscountPct, getClientPriceSlabs, type PriceSlab } from "@/lib/priceEngineStore";
+import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { toast } from "sonner";
 
 // ── types ─────────────────────────────────────────────────────────────────────
@@ -597,6 +598,7 @@ export default function RecurringInvoiceFormPage() {
                               if (!entry) return;
                               const baseRate = (entry.priceNum ?? parseFloat(String(entry.price).replace(/[^0-9.]/g, ""))) || 0;
                               const slabDiscAmt = computeSlabDiscountAmt(selectedClientId, entry.category || "", it.quantity, baseRate);
+                              const actualTaxRate = getEffectiveTaxPctForCategory(entry.category || "");
                               setForm((cur) => ({
                                 ...cur,
                                 items: cur.items.map((li) =>
@@ -606,6 +608,7 @@ export default function RecurringInvoiceFormPage() {
                                     description: entry.description || "",
                                     rate:        baseRate,
                                     discount:    slabDiscAmt,
+                                    taxRate:     actualTaxRate,
                                   }
                                 ),
                               }));
