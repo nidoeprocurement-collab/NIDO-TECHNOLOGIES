@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   getInvoices,
   saveInvoice,
   generateInvoiceNumber,
   type StoredInvoice,
 } from "@/lib/invoiceStore";
+import { getClients, type StoredClient } from "@/lib/clientStore";
 import { toast } from "sonner";
 import { MoreHorizontal, Pencil, Plus, X } from "lucide-react";
 
