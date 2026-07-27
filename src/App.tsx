@@ -217,6 +217,9 @@ const SalesQuoteFormPage = lazy(() => import("@/pages/SalesQuoteFormPage"));
 const RecurringInvoicesPage = lazy(
   () => import("@/pages/RecurringInvoicesPage"),
 );
+const RecurringInvoiceFormPage = lazy(
+  () => import("@/pages/RecurringInvoiceFormPage"),
+);
 const DeliveryChallansPage = lazy(() => import("@/pages/DeliveryChallansPage"));
 const PaymentReceiptsPage = lazy(() => import("@/pages/PaymentReceiptsPage"));
 const CreditNotesPage = lazy(() => import("@/pages/CreditNotesPage"));
@@ -826,11 +829,11 @@ function AppRoutes() {
           />
           <Route
             path="sales/recurring-invoices/create"
-            element={<RecurringInvoicesPage />}
+            element={<RecurringInvoiceFormPage />}
           />
           <Route
             path="sales/recurring-invoices/:id/edit"
-            element={<RecurringInvoicesPage />}
+            element={<RecurringInvoiceFormPage />}
           />
           <Route
             path="sales/delivery-challans"
