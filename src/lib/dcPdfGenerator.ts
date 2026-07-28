@@ -167,7 +167,6 @@ function drawDCSummary(
 
   const rows: Array<[string, string, boolean?]> = [
     ['Gross Subtotal', `INR ${fmt2(grossSubtotal)}`],
-    totalDiscount > 0 ? ['Item Level Discounts (-)', `INR - ${fmt2(totalDiscount)}`, true] : null,
     ['Total Taxable Value', `INR ${fmt2(totalTaxable)}`, true],
     hasGST ? [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(totalGST)}`] : null,
     shipping !== 0 ? ['Shipping & Handling Charges', `INR ${fmt2(shipping)}`] : null,
@@ -295,19 +294,24 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
   y += Math.max(leftCardH, rightCardH) + 16;
 
   // ── Item table ────────────────────────────────────────────────────────────
-  const tableBody = dc.lineItems.map((it, idx) => [
-    String(idx + 1),
-    it.itemName + (it.description ? `\n${it.description}` : ''),
-    it.hsnCode,
-    String(it.qty),
-    it.unit,
-    fmt2(it.taxableValue),
-  ]);
+  const tableBody = dc.lineItems.map((it, idx) => {
+    const gstAmt = it.taxPercent != null ? it.taxableValue * (it.taxPercent / 100) : 0;
+    return [
+      String(idx + 1),
+      it.itemName + (it.description ? `\n${it.description}` : ''),
+      it.hsnCode,
+      String(it.qty),
+      it.unit,
+      fmt2(it.taxableValue),
+      it.taxPercent != null ? `${it.taxPercent}%` : '-',
+      it.taxPercent != null ? fmt2(gstAmt) : '-',
+    ];
+  });
 
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [['#', 'ITEM / DESCRIPTION', 'HSN CODE', 'QTY', 'UNIT', 'TAXABLE VAL (₹)']],
+    head: [['#', 'ITEM / DESCRIPTION', 'HSN CODE', 'QTY', 'UNIT', 'TAXABLE VAL (INR)', 'GST %', 'GST AMT (INR)']],
     body: tableBody,
     theme: 'grid',
     tableWidth: contentWidth,
@@ -317,30 +321,33 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
       textColor: TEXT,
       lineColor: BORDER,
       lineWidth: 0.35,
-      cellPadding: { top: 7, bottom: 7, left: 6, right: 6 },
+      cellPadding: { top: 7, bottom: 7, left: 5, right: 5 },
       valign: 'middle',
     },
     headStyles: {
       fillColor: [248, 250, 252],
       textColor: DARK,
       fontStyle: 'bold',
-      fontSize: 6.5,
+      fontSize: 6.8,
       halign: 'center',
+      cellPadding: { top: 6, bottom: 6, left: 5, right: 5 },
     },
     columnStyles: {
-      0: { cellWidth: 24, halign: 'center' },
+      0: { cellWidth: 22, halign: 'center' },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: 70, halign: 'center' },
-      3: { cellWidth: 36, halign: 'center' },
-      4: { cellWidth: 44, halign: 'center' },
-      5: { cellWidth: 90, halign: 'right' },
+      2: { cellWidth: 62, halign: 'center' },
+      3: { cellWidth: 30, halign: 'center' },
+      4: { cellWidth: 36, halign: 'center' },
+      5: { cellWidth: 72, halign: 'right' },
+      6: { cellWidth: 38, halign: 'center' },
+      7: { cellWidth: 72, halign: 'right' },
     },
     didParseCell(data) {
       if (data.section === 'body' && data.column.index === 1) {
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.textColor = DARK;
       }
-      if (data.section === 'body' && data.column.index === 5) {
+      if (data.section === 'body' && (data.column.index === 5 || data.column.index === 7)) {
         data.cell.styles.fontStyle = 'bold';
       }
     },

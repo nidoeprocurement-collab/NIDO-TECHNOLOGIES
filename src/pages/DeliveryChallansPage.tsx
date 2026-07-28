@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { generateDCPdfBase64, downloadDCPdf, type DeliveryChallanData } from "@/lib/dcPdfGenerator";
+import NewDCModal from "@/components/NewDCModal";
 
 // ── Rich DC data (from the uploaded PDF) ─────────────────────────────────────
 const DC_DETAILS: Record<string, DeliveryChallanData> = {
@@ -238,9 +239,11 @@ function PreviewModal({ dataUri, challanNo, onClose }: { dataUri: string; challa
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DeliveryChallansPage() {
   const [challans, setChallans] = useState(MOCK_CHALLANS);
+  const [dcDetails, setDcDetails] = useState<Record<string, DeliveryChallanData>>(DC_DETAILS);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [previewChallanNo, setPreviewChallanNo] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [showNewDC, setShowNewDC] = useState(false);
 
   const handleArchive = (id: string) => {
     setChallans((prev) => prev.filter((c) => c.id !== id));
@@ -248,7 +251,7 @@ export default function DeliveryChallansPage() {
   };
 
   const handleDownload = async (challan: Challan) => {
-    const dc = DC_DETAILS[challan.id];
+    const dc = dcDetails[challan.id];
     if (!dc) { toast.error("DC data not found"); return; }
     setLoadingId(challan.id + "_dl");
     try {
@@ -262,7 +265,7 @@ export default function DeliveryChallansPage() {
   };
 
   const handlePreview = async (challan: Challan) => {
-    const dc = DC_DETAILS[challan.id];
+    const dc = dcDetails[challan.id];
     if (!dc) { toast.error("DC data not found"); return; }
     setLoadingId(challan.id + "_pr");
     try {
@@ -274,6 +277,27 @@ export default function DeliveryChallansPage() {
     } finally {
       setLoadingId(null);
     }
+  };
+
+  const handleNewDCSaved = (dc: DeliveryChallanData, id: string) => {
+    const totalTaxable = dc.lineItems.reduce((s, it) => s + it.taxableValue, 0);
+    const totalGST = dc.lineItems.reduce((s, it) =>
+      s + (it.taxPercent != null ? it.taxableValue * (it.taxPercent / 100) : 0), 0);
+    const amount = totalTaxable + totalGST + (dc.shippingCharges ?? 0) + (dc.adjustment ?? 0);
+    setDcDetails((prev) => ({ ...prev, [id]: dc }));
+    setChallans((prev) => [
+      {
+        id,
+        date: new Date().toISOString().split("T")[0],
+        number: dc.challanNo,
+        referenceNumber: dc.invoiceRef || dc.poReference || "—",
+        customerName: dc.consigneeName.toUpperCase(),
+        status: "OPEN" as const,
+        invoiceStatus: "NOT INVOICED" as const,
+        amount,
+      },
+      ...prev,
+    ]);
   };
 
   const statusBadge = (status: string) => (
@@ -297,6 +321,14 @@ export default function DeliveryChallansPage() {
         />
       )}
 
+      {/* New DC slide-over */}
+      {showNewDC && (
+        <NewDCModal
+          onClose={() => setShowNewDC(false)}
+          onSaved={handleNewDCSaved}
+        />
+      )}
+
       <div className="min-h-screen bg-white">
         {/* ── Header ── */}
         <div className="border-b border-gray-200/70">
@@ -306,7 +338,10 @@ export default function DeliveryChallansPage() {
               <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 <Upload size={15} /> Export
               </button>
-              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+              <button
+                onClick={() => setShowNewDC(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
                 <Plus size={15} /> New
               </button>
               <button className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
