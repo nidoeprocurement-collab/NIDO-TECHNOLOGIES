@@ -408,10 +408,10 @@ export default function NewDeliveryChallanPage() {
         />
       )}
 
-      <div className="min-h-screen bg-gray-50">
-        {/* ── Sticky header ── */}
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-          <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+      <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
+        {/* ── Fixed header ── */}
+        <div className="shrink-0 z-40 bg-white border-b border-gray-200 shadow-sm">
+          <div className="w-full px-6 py-3 flex items-center justify-between gap-4">
             {/* Left: back + title */}
             <div className="flex items-center gap-3 min-w-0">
               <button
@@ -458,7 +458,7 @@ export default function NewDeliveryChallanPage() {
         </div>
 
         {/* ── Scrollable body ── */}
-        <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
 
           {/* ── 1. Invoice Reference (auto-fill) ── */}
           <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl mb-5 p-5">
