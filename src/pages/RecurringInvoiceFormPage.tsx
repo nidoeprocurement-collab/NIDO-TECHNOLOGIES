@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, Plus, Save, Search, Tag, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronDown, Plus, Save, Search, Tag, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,13 @@ import {
   generateInvoiceNumber,
   type StoredInvoice,
 } from "@/lib/invoiceStore";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getSlabDiscountPct, getClientPriceSlabs, type PriceSlab } from "@/lib/priceEngineStore";
@@ -199,6 +206,8 @@ export default function RecurringInvoiceFormPage() {
   const [form, setForm] = useState(emptyForm);
   const [clientCatalog, setClientCatalog] = useState<ClientCatalogEntry[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
 
   // Load clients
   useEffect(() => { setClients(getClients()); }, []);
@@ -265,12 +274,43 @@ export default function RecurringInvoiceFormPage() {
   );
 
   const handleSave = () => {
-    if (!form.customerName.trim() || !form.profileName.trim()) {
-      toast.error("Customer Name and Profile Name are required");
-      return;
+    const errors: string[] = [];
+    const fe: Record<string, boolean> = {};
+
+    if (!form.customerName.trim()) {
+      errors.push("Customer Name is required");
+      fe.customerName = true;
+    }
+    if (!form.profileName.trim()) {
+      errors.push("Profile Name is required");
+      fe.profileName = true;
+    }
+    if (!form.startOn) {
+      errors.push("Start On date is required");
+      fe.startOn = true;
     }
 
     const activeItems = form.items?.length > 0 ? form.items : [{ ...form.item, id: "tmp" }];
+    const emptyItemRows = activeItems.filter((it) => !it.itemName?.trim());
+    if (emptyItemRows.length === activeItems.length) {
+      errors.push("At least one line item with an Item Name is required");
+      fe.items = true;
+    }
+    const zeroRateRows = activeItems.filter((it) => it.itemName?.trim() && it.rate <= 0);
+    if (zeroRateRows.length > 0) {
+      errors.push(`Rate must be greater than 0 for: ${zeroRateRows.map((r) => r.itemName).join(", ")}`);
+      fe.itemRate = true;
+    }
+
+    if (errors.length > 0) {
+      setFieldErrors(fe);
+      setValidationErrors(errors);
+      return;
+    }
+
+    setFieldErrors({});
+    setValidationErrors([]);
+
     const computed = computeTotalsFromItems(activeItems, form.shippingCharges, form.adjustment, form.tds, form.roundOff);
     const nextInvoiceDate = addByFrequency(form.startOn, form.frequency);
     const firstItem = activeItems[0];
@@ -341,6 +381,30 @@ export default function RecurringInvoiceFormPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
+
+      {/* ── Validation error dialog ── */}
+      <Dialog open={validationErrors.length > 0} onOpenChange={(open) => { if (!open) setValidationErrors([]); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle size={18} className="shrink-0" />
+              Please fill in all required fields
+            </DialogTitle>
+          </DialogHeader>
+          <ul className="mt-2 space-y-2">
+            {validationErrors.map((err, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500 mt-1.5" />
+                {err}
+              </li>
+            ))}
+          </ul>
+          <DialogFooter className="mt-4">
+            <Button onClick={() => setValidationErrors([])}>OK, let me fix it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Sticky header ── */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -378,10 +442,13 @@ export default function RecurringInvoiceFormPage() {
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {/* Customer Name */}
             <div className="lg:col-span-2">
-              <Label className="text-sm font-medium text-gray-700 mb-1 block">Customer Name *</Label>
+              <Label className={`text-sm font-medium mb-1 block ${fieldErrors.customerName ? "text-red-600" : "text-gray-700"}`}>
+                Customer Name *
+              </Label>
               <Select
                 value={form.customerName}
                 onValueChange={(value) => {
+                  setFieldErrors((fe) => ({ ...fe, customerName: false }));
                   const cl = clients.find((c) => c.name === value);
                   const addr = cl
                     ? [cl.billingAddress, cl.billingCity, cl.billingState, cl.billingPincode].filter(Boolean).join(", ")
@@ -406,7 +473,7 @@ export default function RecurringInvoiceFormPage() {
                   }));
                 }}
               >
-                <SelectTrigger className="h-10">
+                <SelectTrigger className={`h-10 ${fieldErrors.customerName ? "border-red-500 ring-1 ring-red-500" : ""}`}>
                   <SelectValue placeholder="Select a customer…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -419,12 +486,17 @@ export default function RecurringInvoiceFormPage() {
 
             {/* Profile Name */}
             <div className="lg:col-span-2">
-              <Label className="text-sm font-medium text-gray-700 mb-1 block">Profile Name *</Label>
+              <Label className={`text-sm font-medium mb-1 block ${fieldErrors.profileName ? "text-red-600" : "text-gray-700"}`}>
+                Profile Name *
+              </Label>
               <Input
                 value={form.profileName}
-                onChange={(e) => setForm((cur) => ({ ...cur, profileName: e.target.value }))}
+                onChange={(e) => {
+                  setFieldErrors((fe) => ({ ...fe, profileName: false }));
+                  setForm((cur) => ({ ...cur, profileName: e.target.value }));
+                }}
                 placeholder="e.g. Monthly Maintenance"
-                className="h-10"
+                className={`h-10 ${fieldErrors.profileName ? "border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500" : ""}`}
               />
             </div>
 
@@ -456,11 +528,17 @@ export default function RecurringInvoiceFormPage() {
 
             {/* Start On */}
             <div>
-              <Label className="text-sm font-medium text-gray-700 mb-1 block">Start On</Label>
+              <Label className={`text-sm font-medium mb-1 block ${fieldErrors.startOn ? "text-red-600" : "text-gray-700"}`}>
+                Start On *
+              </Label>
               <Input
-                type="date" className="h-10"
+                type="date"
                 value={form.startOn}
-                onChange={(e) => setForm((cur) => ({ ...cur, startOn: e.target.value }))}
+                onChange={(e) => {
+                  setFieldErrors((fe) => ({ ...fe, startOn: false }));
+                  setForm((cur) => ({ ...cur, startOn: e.target.value }));
+                }}
+                className={`h-10 ${fieldErrors.startOn ? "border-red-500 ring-1 ring-red-500 focus-visible:ring-red-500" : ""}`}
               />
             </div>
 
@@ -547,9 +625,16 @@ export default function RecurringInvoiceFormPage() {
         </div>
 
         {/* ── Card 2: Item Table ── */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className={`bg-white rounded-xl border p-6 space-y-4 ${fieldErrors.items || fieldErrors.itemRate ? "border-red-400 ring-1 ring-red-400" : "border-gray-200"}`}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Item Details</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Item Details</h2>
+              {(fieldErrors.items || fieldErrors.itemRate) && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                  <AlertCircle size={11} /> Required
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setForm((cur) => ({ ...cur, items: [...(cur.items || []), blankLineItem()] }))}
