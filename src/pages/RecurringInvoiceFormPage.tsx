@@ -796,106 +796,73 @@ export default function RecurringInvoiceFormPage() {
 
           {/* Totals */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Summary</h2>
-            </div>
             <table className="w-full text-sm">
               <tbody>
-                <tr className="border-b border-gray-100">
+                {/* Gross Subtotal */}
+                <tr className="border-b border-gray-200">
                   <td className="px-5 py-3 text-gray-600">Gross Subtotal</td>
-                  <td className="px-5 py-3 text-right text-gray-900">₹ {totals.grossSubtotal.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right text-gray-900">₹{totals.grossSubtotal.toFixed(2)}</td>
                 </tr>
-                {totals.totalDiscount > 0 && (
-                  <tr className="border-b border-gray-100">
-                    <td className="px-5 py-3 text-gray-600">Item Discounts (−)</td>
-                    <td className="px-5 py-3 text-right text-red-600 font-medium">− ₹ {totals.totalDiscount.toFixed(2)}</td>
-                  </tr>
-                )}
-                <tr className="border-b border-gray-100 bg-gray-50/50">
+
+                {/* Item Level Discounts — always shown */}
+                <tr className="border-b border-gray-200">
+                  <td className="px-5 py-3 font-semibold text-gray-900">Item Level Discounts (-)</td>
+                  <td className="px-5 py-3 text-right font-semibold text-gray-900">₹ - {totals.totalDiscount.toFixed(2)}</td>
+                </tr>
+
+                {/* Total Taxable Value */}
+                <tr className="border-b border-gray-200">
                   <td className="px-5 py-3 font-semibold text-gray-900">Total Taxable Value</td>
-                  <td className="px-5 py-3 text-right font-semibold text-gray-900">₹ {totals.subtotal.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right font-semibold text-gray-900">₹{totals.subtotal.toFixed(2)}</td>
                 </tr>
 
-                {/* GST slab rows */}
-                {totals.gstSlabs.length === 0 && (
-                  <tr className="border-b border-gray-100">
-                    <td className="px-5 py-2.5 text-gray-500">Total GST</td>
-                    <td className="px-5 py-2.5 text-right text-gray-700">₹ 0.00</td>
-                  </tr>
-                )}
-                {totals.gstSlabs.map((sl) => (
-                  <>
-                    <tr key={`cgst-${sl.rate}`} className="border-b border-gray-100">
-                      <td className="px-5 py-2.5 text-gray-500">CGST @ {sl.rate / 2}%</td>
-                      <td className="px-5 py-2.5 text-right text-gray-700">₹ {sl.cgst.toFixed(2)}</td>
-                    </tr>
-                    <tr key={`sgst-${sl.rate}`} className="border-b border-gray-100">
-                      <td className="px-5 py-2.5 text-gray-500">SGST @ {sl.rate / 2}%</td>
-                      <td className="px-5 py-2.5 text-right text-gray-700">₹ {sl.sgst.toFixed(2)}</td>
-                    </tr>
-                  </>
-                ))}
-
-                {/* Shipping */}
-                <tr className="border-b border-gray-100">
-                  <td className="px-5 py-2.5 text-gray-600">Shipping &amp; Handling</td>
-                  <td className="px-5 py-2.5 text-right">
-                    <input
-                      type="number" min={0}
-                      value={form.shippingCharges}
-                      onChange={(e) => setForm((cur) => ({ ...cur, shippingCharges: toNumber(e.target.value) }))}
-                      className="w-28 rounded border border-gray-300 px-2.5 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </td>
+                {/* Total GST — single combined row */}
+                <tr className="border-b border-gray-200">
+                  <td className="px-5 py-3 text-gray-600">Total GST</td>
+                  <td className="px-5 py-3 text-right text-gray-700">₹{totals.totalTax.toFixed(2)}</td>
                 </tr>
 
-                {/* TDS */}
-                <tr className="border-b border-gray-100">
-                  <td className="px-5 py-2.5 text-gray-600">TDS (−)</td>
-                  <td className="px-5 py-2.5 text-right">
-                    <input
-                      type="number" min={0}
-                      value={form.tds}
-                      onChange={(e) => setForm((cur) => ({ ...cur, tds: toNumber(e.target.value) }))}
-                      className="w-28 rounded border border-gray-300 px-2.5 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </td>
+                {/* Shipping & Handling — display only */}
+                <tr className="border-b border-gray-200">
+                  <td className="px-5 py-3 text-gray-600">Shipping &amp; Handling Charges</td>
+                  <td className="px-5 py-3 text-right text-gray-700">₹{toNumber(form.shippingCharges).toFixed(2)}</td>
                 </tr>
 
-                {/* Adjustment */}
-                <tr className="border-b border-gray-100">
-                  <td className="px-5 py-2.5 text-gray-600">Adjustment</td>
-                  <td className="px-5 py-2.5 text-right">
-                    <input
-                      type="number"
-                      value={form.adjustment}
-                      onChange={(e) => setForm((cur) => ({ ...cur, adjustment: toNumber(e.target.value) }))}
-                      placeholder="e.g. −0.50"
-                      className="w-28 rounded border border-gray-300 px-2.5 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </td>
+                {/* Round Off Adjustment — display only */}
+                <tr className="border-b border-gray-200">
+                  <td className="px-5 py-3 text-gray-600">Round Off Adjustment</td>
+                  <td className="px-5 py-3 text-right text-gray-700">₹{toNumber(form.roundOff).toFixed(2)}</td>
                 </tr>
 
-                {/* Round Off */}
-                <tr className="border-b border-gray-100">
-                  <td className="px-5 py-2.5 text-gray-600">Round Off</td>
-                  <td className="px-5 py-2.5 text-right">
-                    <input
-                      type="number"
-                      value={form.roundOff}
-                      onChange={(e) => setForm((cur) => ({ ...cur, roundOff: toNumber(e.target.value) }))}
-                      className="w-28 rounded border border-gray-300 px-2.5 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </td>
-                </tr>
-
-                {/* Grand Total */}
-                <tr className="border-t-2 border-gray-200 bg-blue-50">
-                  <td className="px-5 py-4 font-bold text-gray-900 text-base">Total Payable</td>
-                  <td className="px-5 py-4 text-right font-bold text-blue-700 text-xl">₹ {totals.total.toFixed(2)}</td>
+                {/* Total Payable */}
+                <tr>
+                  <td className="px-5 py-4 font-bold text-gray-900">Total Payable</td>
+                  <td className="px-5 py-4 text-right font-bold text-gray-900">₹{totals.total.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* ── Shipping & Round-off inputs (below summary grid) ── */}
+        <div className="flex flex-wrap gap-6">
+          <div className="space-y-1">
+            <Label className="text-sm font-medium text-gray-700">Shipping &amp; Handling Charges (₹)</Label>
+            <Input
+              type="number" min={0}
+              value={form.shippingCharges}
+              onChange={(e) => setForm((cur) => ({ ...cur, shippingCharges: toNumber(e.target.value) }))}
+              className="h-10 w-52"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-sm font-medium text-gray-700">Round Off Adjustment (₹)</Label>
+            <Input
+              type="number"
+              value={form.roundOff}
+              onChange={(e) => setForm((cur) => ({ ...cur, roundOff: toNumber(e.target.value) }))}
+              className="h-10 w-52"
+            />
           </div>
         </div>
 

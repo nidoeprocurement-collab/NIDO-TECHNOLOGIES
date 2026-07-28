@@ -558,12 +558,18 @@ export default function RecurringInvoicesPage() {
     if (params.id) setSelectedId(params.id);
   }, [params.id]);
 
-  // Reload profiles when returning from the form page
+  // Reload profiles whenever the pathname changes (e.g. returning from create/edit form)
+  // and when a custom event is dispatched by the form page after saving.
   useEffect(() => {
-    const stored = safeReadJson<RecurringInvoiceProfile[]>(STORAGE_KEY, [defaultProfile]);
-    const list = Array.isArray(stored) && stored.length > 0 ? stored : [defaultProfile];
-    setProfiles(list.map((entry) => normalizeProfile(entry)));
-  }, [params.id]);
+    const reload = () => {
+      const stored = safeReadJson<RecurringInvoiceProfile[]>(STORAGE_KEY, [defaultProfile]);
+      const list = Array.isArray(stored) && stored.length > 0 ? stored : [defaultProfile];
+      setProfiles(list.map((entry) => normalizeProfile(entry)));
+    };
+    reload();
+    window.addEventListener("recurringInvoicesUpdated", reload);
+    return () => window.removeEventListener("recurringInvoicesUpdated", reload);
+  }, [location.pathname]);
 
   const selected = profiles.find((entry) => entry.id === selectedId) || profiles[0] || null;
 
