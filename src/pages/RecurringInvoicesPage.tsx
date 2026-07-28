@@ -752,34 +752,39 @@ export default function RecurringInvoicesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {profiles.map((profile) => (
-              <TableRow
-                key={profile.id}
-                className="cursor-pointer"
-                onClick={() => {
-                  setSelectedId(profile.id);
-                  navigate(`/sales/recurring-invoices/${profile.id}/edit`);
-                }}
-              >
-                <TableCell className="text-sm">{profile.customerName}</TableCell>
-                <TableCell className="text-sm font-medium text-blue-600">{profile.profileName}</TableCell>
-                <TableCell className="text-sm">{frequencyLabel[profile.frequency]}</TableCell>
-                <TableCell className="text-sm">{profile.lastInvoiceDate}</TableCell>
-                <TableCell className="text-sm">{profile.nextInvoiceDate}</TableCell>
-                <TableCell>
-                  <Badge
-                    className={
-                      profile.status === "active"
-                        ? "bg-blue-600 text-white border-transparent hover:bg-blue-700 text-[11px] px-3 py-0.5 rounded-full font-semibold uppercase tracking-wide"
-                        : "bg-gray-100 text-gray-500 border-transparent text-[11px] px-3 py-0.5 rounded-full font-semibold uppercase tracking-wide"
-                    }
-                  >
-                    {profile.status.toUpperCase()}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-right">Rs.{profile.amount.toFixed(2)}</TableCell>
-              </TableRow>
-            ))}
+            {profiles.map((profile) => {
+              const isActive = profile.id === selectedId;
+              return (
+                <TableRow
+                  key={profile.id}
+                  className={`cursor-pointer transition-colors ${isActive ? "bg-blue-50 hover:bg-blue-50" : ""}`}
+                  onClick={() => setSelectedId(profile.id)}
+                >
+                  <TableCell className="text-sm">
+                    {isActive && (
+                      <span className="inline-block w-1 h-4 rounded-full bg-blue-600 mr-2 align-middle" />
+                    )}
+                    {profile.customerName}
+                  </TableCell>
+                  <TableCell className={`text-sm font-medium ${isActive ? "text-blue-700" : "text-blue-600"}`}>{profile.profileName}</TableCell>
+                  <TableCell className="text-sm">{frequencyLabel[profile.frequency]}</TableCell>
+                  <TableCell className="text-sm">{profile.lastInvoiceDate}</TableCell>
+                  <TableCell className="text-sm">{profile.nextInvoiceDate}</TableCell>
+                  <TableCell>
+                    <Badge
+                      className={
+                        profile.status === "active"
+                          ? "bg-blue-600 text-white border-transparent hover:bg-blue-700 text-[11px] px-3 py-0.5 rounded-full font-semibold uppercase tracking-wide"
+                          : "bg-gray-100 text-gray-500 border-transparent text-[11px] px-3 py-0.5 rounded-full font-semibold uppercase tracking-wide"
+                      }
+                    >
+                      {profile.status.toUpperCase()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-right">Rs.{profile.amount.toFixed(2)}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
