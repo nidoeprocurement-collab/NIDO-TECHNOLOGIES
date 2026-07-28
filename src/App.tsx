@@ -295,6 +295,16 @@ function AppRoutes() {
         <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
         <Route path="/preview-product" element={<ProductPreviewPage />} />
         <Route
+          path="/sales/delivery-challans/create"
+          element={
+            isAuthenticated ? (
+              <NewDeliveryChallanPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
           path="/support/track/:ticketId"
           element={<TicketTrackingPage />}
         />
@@ -839,10 +849,6 @@ function AppRoutes() {
           <Route
             path="sales/delivery-challans"
             element={<DeliveryChallansPage />}
-          />
-          <Route
-            path="sales/delivery-challans/create"
-            element={<NewDeliveryChallanPage />}
           />
           <Route
             path="sales/delivery-challans/:id"
