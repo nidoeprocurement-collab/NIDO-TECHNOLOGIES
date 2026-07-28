@@ -90,6 +90,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ConfigProvider } from "@/contexts/ConfigContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { PageMetaProvider } from "@/contexts/PageMetaContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import { Suspense, lazy, useState } from "react";
@@ -1074,7 +1075,9 @@ const App = () => (
                         <OrdersProvider>
                           <MyOrdersProvider>
                             <OrganizationProvider>
-                              <AppRoutes />
+                              <PageMetaProvider>
+                                <AppRoutes />
+                              </PageMetaProvider>
                             </OrganizationProvider>
                           </MyOrdersProvider>
                         </OrdersProvider>
