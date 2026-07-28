@@ -33,6 +33,9 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "84713010",
         qty: 2,
         unit: "Nos",
+        unitRate: 65000,
+        discount: 5000,
+        taxPercent: 18,
         taxableValue: 125000,
       },
       {
@@ -41,6 +44,8 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "49011010",
         qty: 10,
         unit: "Nos",
+        unitRate: 1100,
+        taxPercent: 5,
         taxableValue: 11000,
       },
       {
@@ -49,9 +54,13 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "84716040",
         qty: 5,
         unit: "Sets",
+        unitRate: 4700,
+        discount: 500,
+        taxPercent: 18,
         taxableValue: 23000,
       },
     ],
+    shippingCharges: 2000,
     transportationNote:
       "This Delivery Challan accompanies the movement of physical goods specified above under Rule 55 of CGST Rules, 2017. Service items (e.g., Network Infrastructure Consulting) are excluded from physical dispatch.",
     modeOfTransport: "Surface Express Cargo",
@@ -85,6 +94,8 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "84715010",
         qty: 4,
         unit: "Nos",
+        unitRate: 80000,
+        taxPercent: 18,
         taxableValue: 320000,
       },
       {
@@ -93,6 +104,8 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "85176200",
         qty: 2,
         unit: "Nos",
+        unitRate: 42500,
+        taxPercent: 18,
         taxableValue: 85000,
       },
     ],
@@ -128,6 +141,8 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "85286200",
         qty: 3,
         unit: "Nos",
+        unitRate: 30000,
+        taxPercent: 18,
         taxableValue: 90000,
       },
       {
@@ -136,6 +151,8 @@ const DC_DETAILS: Record<string, DeliveryChallanData> = {
         hsnCode: "85176900",
         qty: 12,
         unit: "Nos",
+        unitRate: 1200,
+        taxPercent: 18,
         taxableValue: 14400,
       },
     ],
@@ -331,7 +348,12 @@ export default function DeliveryChallansPage() {
                   return (
                     <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors last:border-0">
                       <td className="px-4 py-3 text-gray-600">{c.date}</td>
-                      <td className="px-4 py-3 font-medium text-blue-600 cursor-pointer hover:underline">{c.number}</td>
+                      <td
+                        className="px-4 py-3 font-medium text-blue-600 cursor-pointer hover:underline"
+                        onClick={() => handlePreview(c)}
+                      >
+                        {c.number}
+                      </td>
                       <td className="px-4 py-3 text-gray-700">{c.referenceNumber}</td>
                       <td className="px-4 py-3 text-gray-700">{c.customerName}</td>
                       <td className="px-4 py-3">{statusBadge(c.status)}</td>

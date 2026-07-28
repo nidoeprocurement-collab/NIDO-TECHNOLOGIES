@@ -16,6 +16,9 @@ export interface DCLineItem {
   hsnCode: string;
   qty: number;
   unit: string;
+  unitRate?: number;    // per-unit rate before discount
+  discount?: number;   // total item-level discount amount
+  taxPercent?: number; // GST %
   taxableValue: number;
 }
 
@@ -37,6 +40,9 @@ export interface DeliveryChallanData {
   shippedToAttn?: string;
   // Items
   lineItems: DCLineItem[];
+  // Totals (optional — auto-computed if omitted)
+  shippingCharges?: number;
+  adjustment?: number;
   // Transport
   transportationNote?: string;
   modeOfTransport?: string;
@@ -125,6 +131,82 @@ function drawAddressCard(
   addressLines.forEach((line) => { drawText(doc, line, x + 13, cursor, { size: 8.5 }); cursor += 12; });
   extras.forEach((line) => { drawText(doc, line, x + 13, cursor, { size: 8.5 }); cursor += 12; });
   return cardHeight;
+}
+
+// ── Summary box (mirrors invoice drawSummary) ─────────────────────────────────
+function drawDCSummary(
+  doc: jsPDF,
+  dc: DeliveryChallanData,
+  x: number,
+  y: number,
+  width: number,
+): number {
+  const LIGHT_BLUE: [number, number, number] = [239, 246, 255];
+
+  // Compute totals from line items
+  const grossSubtotal = dc.lineItems.reduce((s, it) => {
+    const gross = it.unitRate != null ? it.qty * it.unitRate : it.taxableValue;
+    return s + gross;
+  }, 0);
+  const totalDiscount = dc.lineItems.reduce((s, it) => s + (it.discount ?? 0), 0);
+  const totalTaxable = dc.lineItems.reduce((s, it) => s + it.taxableValue, 0);
+  const totalGST = dc.lineItems.reduce((s, it) => {
+    return s + (it.taxPercent != null ? it.taxableValue * (it.taxPercent / 100) : 0);
+  }, 0);
+  const hasGST = dc.lineItems.some((it) => it.taxPercent != null);
+  const shipping = dc.shippingCharges ?? 0;
+  const adjustment = dc.adjustment ?? 0;
+  const grandTotal = totalTaxable + totalGST + shipping + adjustment;
+
+  // Unique GST rates label
+  const rates = hasGST
+    ? [...new Set(dc.lineItems.filter((it) => it.taxPercent != null).map((it) => `${it.taxPercent}%`))]
+        .sort()
+        .join(', ')
+    : '';
+
+  const rows: Array<[string, string, boolean?]> = [
+    ['Gross Subtotal', `INR ${fmt2(grossSubtotal)}`],
+    totalDiscount > 0 ? ['Item Level Discounts (-)', `INR - ${fmt2(totalDiscount)}`, true] : null,
+    ['Total Taxable Value', `INR ${fmt2(totalTaxable)}`, true],
+    hasGST ? [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(totalGST)}`] : null,
+    shipping !== 0 ? ['Shipping & Handling Charges', `INR ${fmt2(shipping)}`] : null,
+    adjustment !== 0
+      ? [`Round Off Adjustment`, `${adjustment < 0 ? '-' : ''}INR ${fmt2(Math.abs(adjustment))}`]
+      : null,
+  ].filter(Boolean) as Array<[string, string, boolean?]>;
+
+  const rowHeight = 20;
+  const totalHeight = 27;
+  const height = rows.length * rowHeight + totalHeight;
+
+  doc.setDrawColor(...BORDER).setLineWidth(0.6);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(x, y, width, height, 5, 5, 'FD');
+
+  rows.forEach(([label, value, bold], index) => {
+    const rowY = y + index * rowHeight;
+    if (index > 0) {
+      doc.setDrawColor(...BORDER).setLineWidth(0.3);
+      doc.line(x, rowY, x + width, rowY);
+    }
+    drawText(doc, label, x + 10, rowY + 13, { size: 7.7, color: bold ? DARK : TEXT, bold: !!bold });
+    drawText(doc, value, x + width - 10, rowY + 13, { size: 7.7, color: DARK, align: 'right' });
+  });
+
+  const totalY = y + rows.length * rowHeight;
+  doc.setFillColor(...LIGHT_BLUE);
+  doc.rect(x + 0.5, totalY, width - 1, totalHeight - 0.5, 'F');
+  doc.setDrawColor(...BORDER).setLineWidth(0.5);
+  doc.line(x, totalY, x + width, totalY);
+  drawText(doc, 'Total Amount', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
+  drawText(doc, `INR ${fmt2(grandTotal)}`, x + width - 10, totalY + 17, {
+    size: 8.5,
+    color: DARK,
+    bold: true,
+    align: 'right',
+  });
+  return height;
 }
 
 // ── Main generator ────────────────────────────────────────────────────────────
@@ -266,26 +348,24 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
 
   y = ((doc as any).lastAutoTable?.finalY ?? y) + 14;
 
-  // ── Total taxable value row ───────────────────────────────────────────────
-  const totalTaxable = dc.lineItems.reduce((s, it) => s + it.taxableValue, 0);
-  const totalsRowHeight = 26;
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(...BORDER).setLineWidth(0.4);
-  doc.rect(margin, y, contentWidth, totalsRowHeight, 'FD');
-  drawText(doc, 'Total Taxable Value', margin + 10, y + 16, { size: 8, color: DARK, bold: true });
-  drawText(doc, `₹ ${fmt2(totalTaxable)}`, pageWidth - margin - 6, y + 16, { size: 8, color: DARK, bold: true, align: 'right' });
-  y += totalsRowHeight + 16;
+  // ── Summary box (right) + Transportation note (left) ─────────────────────
+  const summaryWidth = 255;
+  const summaryX = pageWidth - margin - summaryWidth;
+  const summaryHeight = drawDCSummary(doc, dc, summaryX, y, summaryWidth);
 
-  // ── Transportation note ───────────────────────────────────────────────────
+  // Transportation note on the left, vertically centred with summary
   if (dc.transportationNote) {
-    const noteText = doc.splitTextToSize(dc.transportationNote, contentWidth - 20);
-    const noteH = noteText.length * 12 + 20;
+    const leftNoteWidth = summaryX - margin - 14;
+    const noteText = doc.splitTextToSize(dc.transportationNote, leftNoteWidth - 18);
+    const noteH = Math.max(noteText.length * 12 + 24, summaryHeight);
     doc.setDrawColor(...BORDER).setLineWidth(0.4);
     doc.setFillColor(252, 252, 253);
-    doc.roundedRect(margin, y, contentWidth, noteH, 4, 4, 'FD');
-    drawText(doc, noteText.join('\n'), margin + 10, y + 14, { size: 7.5, color: MUTED });
-    y += noteH + 16;
+    doc.roundedRect(margin, y, leftNoteWidth, noteH, 4, 4, 'FD');
+    drawText(doc, 'TRANSPORTATION NOTE', margin + 10, y + 16, { size: 7, color: BLUE, bold: true });
+    drawText(doc, noteText.join('\n'), margin + 10, y + 30, { size: 7.5, color: MUTED });
   }
+
+  y += Math.max(summaryHeight, 60) + 16;
 
   // ── Bottom two-column section ─────────────────────────────────────────────
   const colGap = 14;
