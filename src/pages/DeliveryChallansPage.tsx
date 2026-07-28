@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Archive, Download, Eye, MoreHorizontal, Pencil, Plus, Upload, X } from "lucide-react";
+import { Archive, Download, Eye, MoreHorizontal, Pencil, Plus, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,43 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { generateDCPdfBase64, downloadDCPdf } from "@/lib/dcPdfGenerator";
+import { downloadDCPdf } from "@/lib/dcPdfGenerator";
 import { getChallans, getDCDetail, removeChallan, type DCListItem } from "@/lib/dcStore";
-
-// ── Preview modal ─────────────────────────────────────────────────────────────
-function PreviewModal({
-  dataUri,
-  challanNo,
-  onClose,
-}: {
-  dataUri: string;
-  challanNo: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 flex flex-col bg-white rounded-xl shadow-2xl w-[90vw] max-w-4xl h-[90vh]">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 shrink-0">
-          <p className="text-sm font-semibold text-gray-800">Preview — {challanNo}</p>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="flex-1 overflow-hidden rounded-b-xl">
-          <iframe
-            src={dataUri}
-            title={`Preview ${challanNo}`}
-            className="w-full h-full border-0"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function DeliveryChallansPage() {
@@ -53,8 +18,6 @@ export default function DeliveryChallansPage() {
 
   // Always read fresh from store on mount (picks up newly created challans)
   const [challans, setChallans] = useState<DCListItem[]>(() => getChallans());
-  const [previewUri, setPreviewUri] = useState<string | null>(null);
-  const [previewChallanNo, setPreviewChallanNo] = useState("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleArchive = (id: string) => {
@@ -77,19 +40,8 @@ export default function DeliveryChallansPage() {
     }
   };
 
-  const handlePreview = async (challan: DCListItem) => {
-    const dc = getDCDetail(challan.id);
-    if (!dc) { toast.error("DC data not found"); return; }
-    setLoadingId(challan.id + "_pr");
-    try {
-      const uri = await generateDCPdfBase64(dc);
-      setPreviewChallanNo(dc.challanNo);
-      setPreviewUri(uri);
-    } catch {
-      toast.error("Failed to generate preview");
-    } finally {
-      setLoadingId(null);
-    }
+  const handlePreview = (challan: DCListItem) => {
+    navigate(`/sales/delivery-challans/${challan.id}/preview`);
   };
 
   const statusBadge = (status: string) => (
@@ -104,14 +56,6 @@ export default function DeliveryChallansPage() {
 
   return (
     <>
-      {previewUri && (
-        <PreviewModal
-          dataUri={previewUri}
-          challanNo={previewChallanNo}
-          onClose={() => { setPreviewUri(null); setPreviewChallanNo(""); }}
-        />
-      )}
-
       <div className="min-h-screen bg-white">
         {/* ── Header ── */}
         <div className="border-b border-gray-200/70">

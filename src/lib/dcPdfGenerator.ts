@@ -451,12 +451,24 @@ export async function generateDCPdfBase64(dc: DeliveryChallanData): Promise<stri
   return doc.output('datauristring');
 }
 
-export async function downloadDCPdf(dc: DeliveryChallanData, filename: string): Promise<void> {
+export async function generateDCPdfBlob(dc: DeliveryChallanData): Promise<Blob> {
+  // Re-use the same generator but return a Blob (avoids Chrome data: URI block)
   const dataUri = await generateDCPdfBase64(dc);
+  const base64 = dataUri.split(',')[1];
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
+export async function downloadDCPdf(dc: DeliveryChallanData, filename: string): Promise<void> {
+  const blob = await generateDCPdfBlob(dc);
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = dataUri;
+  link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }

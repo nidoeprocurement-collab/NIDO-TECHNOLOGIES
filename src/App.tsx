@@ -222,6 +222,7 @@ const RecurringInvoiceFormPage = lazy(
 );
 const DeliveryChallansPage = lazy(() => import("@/pages/DeliveryChallansPage"));
 const NewDeliveryChallanPage = lazy(() => import("@/pages/NewDeliveryChallanPage"));
+const DCPreviewPage = lazy(() => import("@/pages/DCPreviewPage"));
 const PaymentReceiptsPage = lazy(() => import("@/pages/PaymentReceiptsPage"));
 const CreditNotesPage = lazy(() => import("@/pages/CreditNotesPage"));
 const EWayBillsPage = lazy(() => import("@/pages/EWayBillsPage"));
@@ -299,6 +300,16 @@ function AppRoutes() {
           element={
             isAuthenticated ? (
               <NewDeliveryChallanPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/sales/delivery-challans/:id/preview"
+          element={
+            isAuthenticated ? (
+              <DCPreviewPage />
             ) : (
               <Navigate to="/login" replace />
             )
