@@ -415,9 +415,19 @@ function ConfirmationDialog({
 
 // ── Next Invoice Preview ──────────────────────────────────────────────────────
 function NextInvoicePreview({ profile }: { profile: RecurringInvoiceProfile }) {
-  const subtotal = lineAmount(profile.item);
-  const tax = (subtotal * profile.item.taxRate) / 100;
-  const halfTax = Math.round((tax / 2) * 100) / 100;
+  // Use the multi-item array when available; fall back to the legacy single item
+  const activeItems: RecurringLineItem[] =
+    Array.isArray(profile.items) && profile.items.length > 0
+      ? profile.items
+      : [{ ...profile.item, id: "legacy" }];
+
+  const totals = computeTotalsFromItems(
+    activeItems,
+    toNumber(profile.shippingCharges),
+    toNumber(profile.adjustment),
+    toNumber(profile.tds),
+    toNumber(profile.roundOff),
+  );
 
   return (
     <div className="rounded-xl border bg-white p-6 space-y-6 text-sm">
@@ -455,30 +465,40 @@ function NextInvoicePreview({ profile }: { profile: RecurringInvoiceProfile }) {
         <table className="w-full text-sm">
           <thead className="bg-muted/30">
             <tr>
+              <th className="text-left px-3 py-2">#</th>
               <th className="text-left px-3 py-2">Item</th>
               <th className="text-left px-3 py-2">HSN/SAC</th>
               <th className="text-right px-3 py-2">Qty</th>
               <th className="text-right px-3 py-2">Rate</th>
               <th className="text-right px-3 py-2">Discount</th>
-              <th className="text-right px-3 py-2">Tax ({profile.item.taxRate}%)</th>
+              <th className="text-right px-3 py-2">GST %</th>
+              <th className="text-right px-3 py-2">Tax (₹)</th>
               <th className="text-right px-3 py-2">Amount</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="border-t">
-              <td className="px-3 py-3">
-                <p className="font-medium">{profile.item.itemName}</p>
-                {profile.item.description && (
-                  <p className="text-xs text-muted-foreground">{profile.item.description}</p>
-                )}
-              </td>
-              <td className="px-3 py-3 text-muted-foreground">{profile.item.hsnSac || "—"}</td>
-              <td className="px-3 py-3 text-right">{profile.item.quantity}</td>
-              <td className="px-3 py-3 text-right">Rs.{profile.item.rate.toFixed(2)}</td>
-              <td className="px-3 py-3 text-right">Rs.{profile.item.discount.toFixed(2)}</td>
-              <td className="px-3 py-3 text-right">Rs.{tax.toFixed(2)}</td>
-              <td className="px-3 py-3 text-right font-semibold">Rs.{(subtotal + tax).toFixed(2)}</td>
-            </tr>
+            {activeItems.map((it, idx) => {
+              const taxable = Math.max(0, it.quantity * it.rate - it.discount);
+              const tax = (taxable * it.taxRate) / 100;
+              return (
+                <tr key={it.id} className="border-t">
+                  <td className="px-3 py-3 text-muted-foreground text-center">{idx + 1}</td>
+                  <td className="px-3 py-3">
+                    <p className="font-medium">{it.itemName}</p>
+                    {it.description && (
+                      <p className="text-xs text-muted-foreground">{it.description}</p>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-muted-foreground">{it.hsnSac || "—"}</td>
+                  <td className="px-3 py-3 text-right">{it.quantity}</td>
+                  <td className="px-3 py-3 text-right">Rs.{toNumber(it.rate).toFixed(2)}</td>
+                  <td className="px-3 py-3 text-right">Rs.{toNumber(it.discount).toFixed(2)}</td>
+                  <td className="px-3 py-3 text-right">{it.taxRate}%</td>
+                  <td className="px-3 py-3 text-right">Rs.{tax.toFixed(2)}</td>
+                  <td className="px-3 py-3 text-right font-semibold">Rs.{(taxable + tax).toFixed(2)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -486,19 +506,27 @@ function NextInvoicePreview({ profile }: { profile: RecurringInvoiceProfile }) {
       {/* Summary */}
       <div className="flex justify-end">
         <div className="w-64 space-y-1 text-sm">
-          <div className="flex justify-between"><span>Sub Total</span><span>Rs.{subtotal.toFixed(2)}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>CGST ({profile.item.taxRate / 2}%)</span><span>Rs.{halfTax.toFixed(2)}</span></div>
-          <div className="flex justify-between text-muted-foreground"><span>SGST ({profile.item.taxRate / 2}%)</span><span>Rs.{halfTax.toFixed(2)}</span></div>
+          <div className="flex justify-between"><span>Gross Subtotal</span><span>Rs.{totals.grossSubtotal.toFixed(2)}</span></div>
+          {totals.totalDiscount > 0 && (
+            <div className="flex justify-between text-muted-foreground"><span>Discounts (-)</span><span>Rs.{totals.totalDiscount.toFixed(2)}</span></div>
+          )}
+          <div className="flex justify-between"><span>Taxable Value</span><span>Rs.{totals.subtotal.toFixed(2)}</span></div>
+          {totals.gstSlabs.map((sl) => (
+            <div key={sl.rate} className="flex justify-between text-muted-foreground">
+              <span>GST {sl.rate}% (CGST+SGST)</span>
+              <span>Rs.{(sl.cgst + sl.sgst).toFixed(2)}</span>
+            </div>
+          ))}
           {profile.shippingCharges > 0 && (
-            <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>Rs.{profile.shippingCharges.toFixed(2)}</span></div>
+            <div className="flex justify-between text-muted-foreground"><span>Shipping</span><span>Rs.{toNumber(profile.shippingCharges).toFixed(2)}</span></div>
           )}
           {profile.tds > 0 && (
-            <div className="flex justify-between text-muted-foreground"><span>TDS</span><span>-Rs.{profile.tds.toFixed(2)}</span></div>
+            <div className="flex justify-between text-muted-foreground"><span>TDS (-)</span><span>Rs.{toNumber(profile.tds).toFixed(2)}</span></div>
           )}
           {profile.adjustment !== 0 && (
-            <div className="flex justify-between text-muted-foreground"><span>Adjustment</span><span>Rs.{profile.adjustment.toFixed(2)}</span></div>
+            <div className="flex justify-between text-muted-foreground"><span>Adjustment</span><span>Rs.{toNumber(profile.adjustment).toFixed(2)}</span></div>
           )}
-          <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Total (Rs)</span><span>Rs.{profile.amount.toFixed(2)}</span></div>
+          <div className="flex justify-between font-semibold border-t pt-2 text-base"><span>Total (Rs)</span><span>Rs.{totals.total.toFixed(2)}</span></div>
         </div>
       </div>
 
