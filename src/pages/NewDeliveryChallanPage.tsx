@@ -11,7 +11,7 @@ import {
   type DeliveryChallanData,
   type DCLineItem,
 } from "@/lib/dcPdfGenerator";
-import { addChallan } from "@/lib/dcStore";
+import { addChallan, generateDCNumber } from "@/lib/dcStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface FormLineItem {
@@ -68,7 +68,7 @@ function todayDMY(): string {
 }
 
 function genDCNo(): string {
-  return `DC-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+  return generateDCNumber();
 }
 
 function computeTaxable(it: FormLineItem): number {
@@ -511,7 +511,12 @@ export default function NewDeliveryChallanPage() {
             <div className="grid grid-cols-4 gap-4">
               <div className="col-span-1">
                 <Label required>Challan Number</Label>
-                <input className={inp} value={form.challanNo} onChange={setF("challanNo")} placeholder="DC-2026-0001" />
+                <input
+                  className={`${inp} bg-gray-50 text-gray-500 cursor-not-allowed select-none`}
+                  value={form.challanNo}
+                  readOnly
+                  tabIndex={-1}
+                />
               </div>
               <div className="col-span-1">
                 <Label required>Challan Date</Label>

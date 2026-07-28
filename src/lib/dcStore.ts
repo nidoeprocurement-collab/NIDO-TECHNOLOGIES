@@ -129,3 +129,13 @@ export function removeChallan(id: string): void {
   if (idx >= 0) _challans.splice(idx, 1);
   delete _details[id];
 }
+
+export function generateDCNumber(): string {
+  const year = new Date().getFullYear();
+  const re = new RegExp(`^DC-${year}-(\\d+)$`);
+  const serials = _challans
+    .map((c) => { const m = c.number.match(re); return m ? parseInt(m[1], 10) : 0; })
+    .filter((n) => n > 0);
+  const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
+  return `DC-${year}-${String(next).padStart(5, '0')}`;
+}
