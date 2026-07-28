@@ -58,7 +58,7 @@ function LineItemsTable({ items }: { items: DCLineItem[] }) {
   return (
     <table className="w-full text-xs border-collapse">
       <thead>
-        <tr className="bg-blue-600 text-white">
+        <tr className="bg-blue-50 text-gray-700 border-b border-blue-100">
           <th className="px-3 py-2 text-left font-semibold w-8">#</th>
           <th className="px-3 py-2 text-left font-semibold">Item Name</th>
           <th className="px-3 py-2 text-left font-semibold w-24">HSN / SAC</th>
@@ -186,27 +186,27 @@ export default function DCPreviewPage() {
           style={{ maxWidth: 860, fontFamily: "Helvetica, Arial, sans-serif" }}
         >
           {/* ── Header band ── */}
-          <div className="bg-[#1f5fbe] text-white px-8 py-5 flex items-start justify-between gap-6">
+          <div className="bg-white border-b border-gray-200 px-8 py-5 flex items-start justify-between gap-6">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-blue-200 mb-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-blue-500 mb-1">
                 {org.industry || "Corporate Essentials"}
               </p>
-              <h2 className="text-2xl font-bold leading-tight">{companyName}</h2>
+              <h2 className="text-2xl font-bold leading-tight text-gray-900">{companyName}</h2>
               {org.registeredAddress && (
-                <p className="text-xs text-blue-200 mt-1 max-w-xs leading-relaxed">
+                <p className="text-xs text-gray-500 mt-1 max-w-xs leading-relaxed">
                   {org.registeredAddress}
                 </p>
               )}
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-2">
-                {org.gstNumber && <p className="text-xs text-blue-100">GSTIN: {org.gstNumber}</p>}
-                {org.phone && <p className="text-xs text-blue-100">Ph: {org.phone}</p>}
-                {org.email && <p className="text-xs text-blue-100">{org.email}</p>}
+                {org.gstNumber && <p className="text-xs text-gray-500">GSTIN: {org.gstNumber}</p>}
+                {org.phone && <p className="text-xs text-gray-500">Ph: {org.phone}</p>}
+                {org.email && <p className="text-xs text-gray-500">{org.email}</p>}
               </div>
             </div>
             <div className="text-right shrink-0">
-              <div className="inline-block bg-white/20 rounded-lg px-5 py-3">
-                <p className="text-[10px] uppercase tracking-widest text-blue-200 mb-0.5">Document</p>
-                <p className="text-lg font-bold">DELIVERY CHALLAN</p>
+              <div className="inline-block bg-blue-50 border border-blue-100 rounded-lg px-5 py-3">
+                <p className="text-[10px] uppercase tracking-widest text-blue-400 mb-0.5">Document</p>
+                <p className="text-lg font-bold text-gray-800">DELIVERY CHALLAN</p>
               </div>
             </div>
           </div>
@@ -260,7 +260,7 @@ export default function DCPreviewPage() {
                       <span className="font-medium tabular-nums">{value}</span>
                     </div>
                   ))}
-                  <div className="flex justify-between px-4 py-3 bg-blue-600 text-white text-sm font-bold">
+                  <div className="flex justify-between px-4 py-3 bg-blue-50 text-gray-900 text-sm font-bold border-t border-blue-100">
                     <span>Grand Total</span>
                     <span className="tabular-nums">₹{fmt(grandTotal)}</span>
                   </div>
