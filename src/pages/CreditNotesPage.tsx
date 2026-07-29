@@ -8,6 +8,7 @@ import {
   Filter,
   Hash,
   Mail,
+  MessageSquare,
   MoreHorizontal,
   Plus,
   ReceiptIndianRupee,
@@ -42,14 +43,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useData } from "@/contexts/DataContext";
 import { safeReadJson } from "@/lib/utils";
@@ -250,81 +243,297 @@ const STATUS_STYLES: Record<CreditStatus, string> = {
   draft: "bg-yellow-100 text-yellow-700",
 };
 
+// ── Credit Note Document (light-color HTML preview) ────────────────────────────
+function CreditNoteDocument({
+  note,
+  companyLogoUrl,
+}: {
+  note: CreditNoteEntry;
+  companyLogoUrl?: string;
+}) {
+  return (
+    <div className="relative mx-auto bg-white border border-blue-100 rounded-xl p-6 text-gray-800 text-[12px]">
+      {/* Draft watermark */}
+      {note.status === "draft" && (
+        <div className="pointer-events-none absolute right-5 top-5 rotate-12 border-2 border-yellow-400 text-yellow-500 text-[10px] font-bold px-2 py-0.5 rounded tracking-widest uppercase opacity-60">
+          Draft
+        </div>
+      )}
+
+      {/* Header: logo + company left, CREDIT NOTE + number right */}
+      <div className="flex items-start justify-between gap-4 pb-5 border-b border-blue-100">
+        <div className="flex items-start gap-3">
+          {companyLogoUrl ? (
+            <img src={companyLogoUrl} alt="Logo" className="h-12 w-12 object-contain rounded-lg border border-gray-100" />
+          ) : (
+            <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-lg font-extrabold">N</span>
+            </div>
+          )}
+          <div>
+            <p className="font-bold text-gray-900 text-[13px]">Nido Technologies</p>
+            <p className="text-gray-500 text-[11px] leading-5">
+              No. 41/1, 2nd Floor, 10th Cross,<br />
+              11th Main, Wilsongarden,<br />
+              Bangalore Karnataka 560027, India<br />
+              GSTIN 29BPAPP1867G1ZN
+            </p>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[18px] font-bold text-blue-700 tracking-tight">Credit Note</p>
+          <p className="text-[11px] font-semibold text-gray-700 mt-1">#{note.creditNoteNumber}</p>
+          <div className="mt-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            <p className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">Credits Remaining</p>
+            <p className="text-[15px] font-bold text-blue-700 tabular-nums">₹{fmt(note.creditsRemaining)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Bill To + Dates row */}
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+          <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest mb-1.5">Bill To</p>
+          <p className="font-bold text-blue-600 text-[12px]">{note.customerName}</p>
+          <p className="whitespace-pre-wrap text-gray-600 mt-1 text-[11px] leading-5">{note.customerAddress}</p>
+          {note.customerGstin && <p className="text-gray-500 mt-1 text-[11px]">GSTIN {note.customerGstin}</p>}
+          {note.placeOfSupply && <p className="text-gray-500 mt-0.5 text-[11px]">Place of Supply: {note.placeOfSupply}</p>}
+        </div>
+        <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 space-y-1.5 text-[11px]">
+          <div className="flex justify-between">
+            <span className="font-semibold text-gray-600">Credit Date</span>
+            <span className="text-gray-800">{fmtDate(note.issueDate)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-semibold text-gray-600">Reference #</span>
+            <span className="text-gray-800">{note.referenceNumber || "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-semibold text-gray-600">Invoice #</span>
+            <span className="text-gray-800">{note.invoiceNumber || "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-semibold text-gray-600">Invoice Date</span>
+            <span className="text-gray-800">{fmtDate(note.invoiceDate) || "—"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-semibold text-gray-600">Reason</span>
+            <span className="text-gray-800">{note.reason}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Items table */}
+      <div className="mt-4 rounded-xl border border-blue-100 overflow-hidden">
+        <table className="w-full text-[11px]">
+          <thead>
+            <tr className="bg-blue-600 text-white">
+              <th className="px-3 py-2 text-left font-semibold w-6">#</th>
+              <th className="px-3 py-2 text-left font-semibold">Item & Description</th>
+              <th className="px-3 py-2 text-center font-semibold">HSN/SAC</th>
+              <th className="px-3 py-2 text-right font-semibold">Qty</th>
+              <th className="px-3 py-2 text-right font-semibold">Rate</th>
+              <th className="px-3 py-2 text-right font-semibold">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-blue-50">
+              <td className="px-3 py-3 text-gray-500">1</td>
+              <td className="px-3 py-3">
+                <p className="font-semibold text-gray-800">{note.item.itemName}</p>
+                {note.item.description && (
+                  <p className="text-gray-500 text-[10px] mt-0.5">{note.item.description}</p>
+                )}
+              </td>
+              <td className="px-3 py-3 text-center text-gray-600">{note.item.hsnSac || "—"}</td>
+              <td className="px-3 py-3 text-right text-gray-700">{note.item.quantity.toFixed(2)}</td>
+              <td className="px-3 py-3 text-right text-gray-700">{note.item.rate.toFixed(2)}</td>
+              <td className="px-3 py-3 text-right font-semibold text-gray-800">{note.subtotal.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Totals */}
+      <div className="mt-3 flex justify-end">
+        <div className="w-60 space-y-1.5 text-[11px]">
+          <div className="flex justify-between text-gray-600">
+            <span>Sub Total</span>
+            <span className="tabular-nums">{note.subtotal.toFixed(2)}</span>
+          </div>
+          {note.shippingCharges > 0 && (
+            <div className="flex justify-between text-gray-600">
+              <span>Shipping Charges</span>
+              <span className="tabular-nums">{note.shippingCharges.toFixed(2)}</span>
+            </div>
+          )}
+          {note.adjustment !== 0 && (
+            <div className="flex justify-between text-gray-600">
+              <span>Adjustment</span>
+              <span className="tabular-nums">{note.adjustment.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-gray-900 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
+            <span>Total</span>
+            <span className="text-blue-700 tabular-nums">₹{fmt(note.total)}</span>
+          </div>
+          <div className="flex justify-between font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded px-2 py-1.5">
+            <span>Credits Remaining</span>
+            <span className="tabular-nums">₹{fmt(note.creditsRemaining)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Total in Words */}
+      <div className="mt-3 text-[11px] text-right">
+        <span className="text-gray-500">Total In Words: </span>
+        <span className="italic font-semibold text-gray-700">{note.totalInWords}</span>
+      </div>
+
+      {/* Notes & Terms */}
+      {note.notes && (
+        <div className="mt-4 rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
+          <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest mb-1">Notes</p>
+          <p className="whitespace-pre-wrap text-gray-700 text-[11px] leading-5">{note.notes}</p>
+        </div>
+      )}
+      {note.terms && (
+        <div className="mt-3 rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+          <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mb-1">Terms & Conditions</p>
+          <p className="whitespace-pre-wrap text-gray-600 text-[11px] leading-5">{note.terms}</p>
+        </div>
+      )}
+
+      {/* Signature */}
+      <div className="mt-5 text-[11px] text-gray-600">
+        <div className="inline-block w-48 border-b border-gray-400 mb-1" />
+        <p>Authorized Signature</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Credit Note Preview Drawer ────────────────────────────────────────────────
 function CreditNotePreviewDrawer({
   note,
+  companyLogoUrl,
   onClose,
   onEdit,
   onDownload,
   onConvertToOpen,
+  onSendEmail,
   downloading,
 }: {
   note: CreditNoteEntry;
+  companyLogoUrl?: string;
   onClose: () => void;
   onEdit: () => void;
   onDownload: () => void;
   onConvertToOpen: () => void;
+  onSendEmail: () => void;
   downloading: boolean;
 }) {
+  const [tab, setTab] = useState<"document" | "details">("document");
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* backdrop */}
       <div className="absolute inset-0 bg-black/20" onClick={onClose} />
 
       {/* panel */}
-      <div className="relative z-10 w-full max-w-xl bg-white h-full flex flex-col shadow-2xl border-l border-gray-200">
+      <div className="relative z-10 w-full max-w-2xl bg-white h-full flex flex-col shadow-2xl border-l border-gray-200">
 
         {/* ── Header ── */}
-        <div className="shrink-0 px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-              <FileText size={18} className="text-blue-600" />
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                <FileText size={18} className="text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">{note.creditNoteNumber}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{note.customerName}</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold text-gray-900">{note.creditNoteNumber}</h2>
-              <p className="text-xs text-gray-500 mt-0.5">{note.customerName}</p>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <button
+                onClick={onEdit}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={onDownload}
+                disabled={downloading}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+              >
+                <Download size={12} />
+                {downloading ? "Generating…" : "Download PDF"}
+              </button>
+              <button
+                onClick={onSendEmail}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Mail size={12} /> Email
+              </button>
+              <button
+                onClick={() => toast.info("Refund flow available")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <ReceiptIndianRupee size={12} /> Refund
+              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors">
+                    <MoreHorizontal size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  {note.status === "draft" && (
+                    <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={onConvertToOpen}>
+                      Convert to Open
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={() => toast.info("Credit note archived")}>
+                    <Archive size={13} /> Archive
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={() => toast.info("Activity log coming soon")}>
+                    <MessageSquare size={13} /> Activity
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Edit
-            </button>
-            <button
-              onClick={onDownload}
-              disabled={downloading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
-            >
-              <Download size={12} />
-              {downloading ? "…" : "PDF"}
-            </button>
-            <button
-              onClick={() => toast.info("Email queued")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Mail size={12} /> Email
-            </button>
-            <button
-              onClick={() => toast.info("Refund flow available")}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <ReceiptIndianRupee size={12} /> Refund
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              <X size={16} />
-            </button>
+
+          {/* Tab bar */}
+          <div className="flex items-center gap-1 mt-3 border border-gray-200 rounded-lg bg-gray-50 p-1 w-fit">
+            {(["document", "details"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-colors capitalize ${
+                  tab === t
+                    ? "bg-white text-blue-700 shadow-sm border border-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {t === "document" ? "Document Preview" : "Details"}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* ── Body ── */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
-          {/* What's Next banner */}
+          {/* What's Next banner — always visible */}
           {note.status === "draft" && (
             <div className="rounded-xl bg-blue-50 border border-blue-100 px-5 py-4">
               <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-1">WHAT'S NEXT?</p>
@@ -333,7 +542,7 @@ function CreditNotePreviewDrawer({
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={() => toast.info("Credit note send queued")}
+                  onClick={onSendEmail}
                   className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Send Credit Note
@@ -348,134 +557,159 @@ function CreditNotePreviewDrawer({
             </div>
           )}
 
-          {/* Credits Remaining hero */}
-          <div className="rounded-xl bg-blue-50 border border-blue-100 px-6 py-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-1">Credits Remaining</p>
-              <p className="text-3xl font-bold text-blue-700 tabular-nums">₹{fmt(note.creditsRemaining)}</p>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${STATUS_STYLES[note.status]}`}>
-              {note.status}
-            </span>
-          </div>
-
-          {/* Meta grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: Calendar, label: "Credit Date", value: fmtDate(note.issueDate) },
-              { icon: Hash, label: "Credit Note #", value: note.creditNoteNumber },
-              { icon: Hash, label: "Reference #", value: note.referenceNumber || "—" },
-              { icon: FileText, label: "Invoice #", value: note.invoiceNumber || "—" },
-              { icon: Calendar, label: "Invoice Date", value: fmtDate(note.invoiceDate) },
-              { icon: Tag, label: "Reason", value: note.reason },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <Icon size={11} className="text-gray-400" />
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
-                </div>
-                <p className="text-sm font-semibold text-gray-800 truncate">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Bill To */}
-          <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
-            <div className="flex items-center gap-1.5 mb-2">
-              <User size={11} className="text-gray-400" />
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Bill To</p>
-            </div>
-            <p className="text-sm font-semibold text-blue-600">{note.customerName}</p>
-            <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{note.customerAddress}</p>
-            {note.customerGstin && <p className="text-xs text-gray-500 mt-1">GSTIN: {note.customerGstin}</p>}
-            {note.placeOfSupply && <p className="text-xs text-gray-500 mt-0.5">Place of Supply: {note.placeOfSupply}</p>}
-          </div>
-
-          {/* Item table */}
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Items</p>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Item</th>
-                  <th className="px-4 py-2 text-center text-[10px] font-semibold text-gray-500 uppercase">Qty</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">Rate</th>
-                  <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-800">{note.item.itemName}</p>
-                    {note.item.description && <p className="text-xs text-gray-500 mt-0.5">{note.item.description}</p>}
-                    {note.item.hsnSac && <p className="text-xs text-gray-400 mt-0.5">HSN/SAC: {note.item.hsnSac}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-center text-gray-700">{note.item.quantity}</td>
-                  <td className="px-4 py-3 text-right text-gray-700">₹{fmt(note.item.rate)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-800">₹{fmt(note.subtotal)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Totals summary */}
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Summary</p>
-            </div>
-            <div className="divide-y divide-gray-100">
-              <div className="flex items-center justify-between px-4 py-2.5">
-                <span className="text-sm text-gray-600">Sub Total</span>
-                <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.subtotal)}</span>
-              </div>
-              {note.shippingCharges > 0 && (
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-sm text-gray-600">Shipping Charges</span>
-                  <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.shippingCharges)}</span>
-                </div>
-              )}
-              {note.adjustment !== 0 && (
-                <div className="flex items-center justify-between px-4 py-2.5">
-                  <span className="text-sm text-gray-600">Adjustment</span>
-                  <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.adjustment)}</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between px-4 py-3 bg-blue-50/60">
-                <span className="text-sm font-bold text-gray-800">Total</span>
-                <span className="text-base font-bold text-blue-700 tabular-nums">₹{fmt(note.total)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Total in Words */}
-          <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Total in Words</p>
-            <p className="text-sm text-gray-700 italic">{note.totalInWords}</p>
-          </div>
-
-          {/* Notes */}
-          {note.notes && (
-            <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
-              <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest mb-1">Customer Notes</p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.notes}</p>
-            </div>
+          {/* ── Document Preview tab ── */}
+          {tab === "document" && (
+            <CreditNoteDocument note={note} companyLogoUrl={companyLogoUrl} />
           )}
 
-          {/* Terms */}
-          {note.terms && (
-            <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Terms & Conditions</p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.terms}</p>
-            </div>
+          {/* ── Details tab ── */}
+          {tab === "details" && (
+            <>
+              {/* Credits Remaining hero */}
+              <div className="rounded-xl bg-blue-50 border border-blue-100 px-6 py-5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-1">Credits Remaining</p>
+                  <p className="text-3xl font-bold text-blue-700 tabular-nums">₹{fmt(note.creditsRemaining)}</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${STATUS_STYLES[note.status]}`}>
+                  {note.status}
+                </span>
+              </div>
+
+              {/* Meta grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: Calendar, label: "Credit Date", value: fmtDate(note.issueDate) },
+                  { icon: Hash, label: "Credit Note #", value: note.creditNoteNumber },
+                  { icon: Hash, label: "Reference #", value: note.referenceNumber || "—" },
+                  { icon: FileText, label: "Invoice #", value: note.invoiceNumber || "—" },
+                  { icon: Calendar, label: "Invoice Date", value: fmtDate(note.invoiceDate) },
+                  { icon: Tag, label: "Reason", value: note.reason },
+                ].map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Icon size={11} className="text-gray-400" />
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
+                    </div>
+                    <p className="text-sm font-semibold text-gray-800 truncate">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bill To */}
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <User size={11} className="text-gray-400" />
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Bill To</p>
+                </div>
+                <p className="text-sm font-semibold text-blue-600">{note.customerName}</p>
+                <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{note.customerAddress}</p>
+                {note.customerGstin && <p className="text-xs text-gray-500 mt-1">GSTIN: {note.customerGstin}</p>}
+                {note.placeOfSupply && <p className="text-xs text-gray-500 mt-0.5">Place of Supply: {note.placeOfSupply}</p>}
+              </div>
+
+              {/* Item table */}
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Items</p>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-blue-50/50">
+                      <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Item</th>
+                      <th className="px-4 py-2 text-center text-[10px] font-semibold text-gray-500 uppercase">Qty</th>
+                      <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">Rate</th>
+                      <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-800">{note.item.itemName}</p>
+                        {note.item.description && <p className="text-xs text-gray-500 mt-0.5">{note.item.description}</p>}
+                        {note.item.hsnSac && <p className="text-xs text-gray-400 mt-0.5">HSN/SAC: {note.item.hsnSac}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-center text-gray-700">{note.item.quantity}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">₹{fmt(note.item.rate)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-800">₹{fmt(note.subtotal)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals summary */}
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Summary</p>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <span className="text-sm text-gray-600">Sub Total</span>
+                    <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.subtotal)}</span>
+                  </div>
+                  {note.shippingCharges > 0 && (
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-sm text-gray-600">Shipping Charges</span>
+                      <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.shippingCharges)}</span>
+                    </div>
+                  )}
+                  {note.adjustment !== 0 && (
+                    <div className="flex items-center justify-between px-4 py-2.5">
+                      <span className="text-sm text-gray-600">Adjustment</span>
+                      <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.adjustment)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between px-4 py-3 bg-blue-50/60">
+                    <span className="text-sm font-bold text-gray-800">Total</span>
+                    <span className="text-base font-bold text-blue-700 tabular-nums">₹{fmt(note.total)}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50/40">
+                    <span className="text-sm font-semibold text-blue-700">Credits Remaining</span>
+                    <span className="text-sm font-bold text-blue-700 tabular-nums">₹{fmt(note.creditsRemaining)}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total in Words */}
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Total in Words</p>
+                <p className="text-sm text-gray-700 italic">{note.totalInWords}</p>
+              </div>
+
+              {/* Notes */}
+              {note.notes && (
+                <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
+                  <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest mb-1">Customer Notes</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.notes}</p>
+                </div>
+              )}
+
+              {/* Terms */}
+              {note.terms && (
+                <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Terms & Conditions</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.terms}</p>
+                </div>
+              )}
+
+              {/* More info */}
+              <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">More Information</p>
+                <p className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Associated Invoice: </span>{note.invoiceNumber || "—"}
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  <span className="font-medium text-gray-700">Tax Mode: </span>{note.taxMode.toUpperCase()}
+                </p>
+              </div>
+            </>
           )}
         </div>
 
         {/* ── Footer ── */}
         <div className="shrink-0 px-6 py-3 border-t border-gray-100 bg-gray-50/60">
           <p className="text-xs text-gray-400 text-center">
-            Credit Note · {fmtDate(note.issueDate)}
+            Credit Note · {note.creditNoteNumber} · {fmtDate(note.issueDate)}
           </p>
         </div>
       </div>
@@ -575,8 +809,12 @@ export default function CreditNotesPage() {
   };
 
   const convertToOpen = (note: CreditNoteEntry) => {
-    persist(notes.map((e) => e.id === note.id ? { ...e, status: "open" } : e));
-    if (previewNote?.id === note.id) setPreviewNote((prev) => prev ? { ...prev, status: "open" } : prev);
+    const updated = notes.map((e) => e.id === note.id ? { ...e, status: "open" as CreditStatus } : e);
+    persist(updated);
+    // update preview note too so the "What's Next" banner disappears
+    if (previewNote?.id === note.id) {
+      setPreviewNote((prev) => prev ? { ...prev, status: "open" } : prev);
+    }
     toast.success("Credit note converted to open");
   };
 
@@ -590,6 +828,10 @@ export default function CreditNotesPage() {
     } finally {
       setDownloadingId(null);
     }
+  };
+
+  const handleSendEmail = (note: CreditNoteEntry) => {
+    toast.success(`Email queued for ${note.creditNoteNumber}`);
   };
 
   const bindCustomer = (name: string) => {
@@ -792,7 +1034,7 @@ export default function CreditNotesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="gap-2 cursor-pointer"
-                              onSelect={() => toast.info("Email queued")}
+                              onSelect={() => handleSendEmail(note)}
                             >
                               <Mail size={14} /> Send Email
                             </DropdownMenuItem>
@@ -827,6 +1069,7 @@ export default function CreditNotesPage() {
       {previewNote && (
         <CreditNotePreviewDrawer
           note={previewNote}
+          companyLogoUrl={companyLogoUrl}
           onClose={() => setPreviewNote(null)}
           onEdit={() => {
             setPreviewNote(null);
@@ -834,6 +1077,7 @@ export default function CreditNotesPage() {
           }}
           onDownload={() => handleDownload(previewNote)}
           onConvertToOpen={() => convertToOpen(previewNote)}
+          onSendEmail={() => handleSendEmail(previewNote)}
           downloading={downloadingId === previewNote.id}
         />
       )}
@@ -904,6 +1148,12 @@ export default function CreditNotesPage() {
               />
             </div>
 
+            {/* Customer GSTIN */}
+            <div>
+              <Label>Customer GSTIN</Label>
+              <Input value={form.customerGstin} onChange={(e) => setForm((c) => ({ ...c, customerGstin: e.target.value }))} />
+            </div>
+
             {/* Item Table */}
             <div className="rounded-xl border bg-white">
               <div className="border-b px-4 py-3">
@@ -927,6 +1177,22 @@ export default function CreditNotesPage() {
                   </div>
                   <Input className="mt-2" placeholder="Description (optional)" value={form.item.description} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, description: e.target.value } }))} />
                   <Input className="mt-2" placeholder="HSN/SAC code" value={form.item.hsnSac} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, hsnSac: e.target.value } }))} />
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toast.info("Add row — coming soon")}
+                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      + Add New Row
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toast.info("Bulk import — coming soon")}
+                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      + Add Items in Bulk
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rounded-lg border bg-gray-50/70 p-4 text-sm space-y-3">
