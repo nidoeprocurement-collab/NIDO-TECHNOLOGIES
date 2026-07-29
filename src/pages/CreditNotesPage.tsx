@@ -722,7 +722,9 @@ export default function CreditNotesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
-  const { clients, generalSettings } = useData();
+  const { clients: rawClients, generalSettings: rawSettings } = useData();
+  const clients = rawClients ?? [];
+  const generalSettings = rawSettings ?? {};
 
   const createMode = location.pathname.endsWith("/create");
   const editMode = location.pathname.endsWith("/edit") && !!params.id;
