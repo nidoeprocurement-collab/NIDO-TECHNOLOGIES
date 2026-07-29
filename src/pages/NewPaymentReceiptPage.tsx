@@ -1,25 +1,12 @@
-import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X, Download } from "lucide-react";
 import { toast } from "sonner";
-import { safeReadJson } from "@/lib/utils";
 import { getClients } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-interface PaymentReceipt {
-  id: string;
-  paymentNumber: string;
-  customerName: string;
-  invoiceNumber: string;
-  paymentDate: string;
-  paymentMode: string;
-  amountReceived: number;
-  taxDeducted: "no" | "tds";
-  status: "draft" | "paid";
-}
-
-const STORAGE_KEY = "nido_payment_receipts_v3";
+import { saveReceipt, getReceiptById } from "@/lib/paymentReceiptStore";
+import type { PaymentReceipt } from "@/lib/paymentReceiptStore";
+import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 const inp =
@@ -71,10 +58,37 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
   );
 }
 
+// ── Default form state ────────────────────────────────────────────────────────
+function makeDefaultForm(overrides?: Partial<ReturnType<typeof defaultForm>>) {
+  return {
+    customerName: "",
+    placeOfSupply: "[KA] - Karnataka",
+    descriptionOfSupply: "",
+    amountReceived: "",
+    paymentDate: new Date().toISOString().slice(0, 10),
+    paymentNumber: `PR-${Date.now().toString().slice(-5)}`,
+    paymentMode: "Cash",
+    depositTo: "Petty Cash",
+    reference: "",
+    invoiceNumber: "",
+    bankCharges: "",
+    taxCode: "",
+    taxDeducted: "no" as "no" | "tds",
+    note: "",
+    sendThankYou: true,
+    recipients: [] as string[],
+    ...overrides,
+  };
+}
+type FormState = ReturnType<typeof makeDefaultForm>;
+function defaultForm() { return makeDefaultForm(); }
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function NewPaymentReceiptPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = !!id;
 
   const locationState = (location.state || {}) as {
     customerName?: string;
@@ -88,27 +102,49 @@ export default function NewPaymentReceiptPage() {
 
   const [tab, setTab] = useState<"invoice" | "advance">("invoice");
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [attachmentDraft, setAttachmentDraft] = useState("");
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [editingReceipt, setEditingReceipt] = useState<PaymentReceipt | null>(null);
 
-  const [form, setForm] = useState({
-    customerName: locationState.customerName || "",
-    placeOfSupply: "[KA] - Karnataka",
-    descriptionOfSupply: "",
-    amountReceived: String(locationState.amount ?? ""),
-    paymentDate: new Date().toISOString().slice(0, 10),
-    paymentNumber: `PR-${Date.now().toString().slice(-5)}`,
-    paymentMode: "Cash",
-    depositTo: "Petty Cash",
-    reference: "",
-    invoiceNumber: locationState.invoiceNumber || "",
-    bankCharges: "",
-    taxCode: "",
-    taxDeducted: "no" as "no" | "tds",
-    note: "",
-    sendThankYou: true,
-    recipients: [locationState.email || ""].filter(Boolean),
-  });
+  const [form, setForm] = useState<FormState>(() =>
+    makeDefaultForm({
+      customerName: locationState.customerName || "",
+      amountReceived: String(locationState.amount ?? ""),
+      invoiceNumber: locationState.invoiceNumber || "",
+      recipients: [locationState.email || ""].filter(Boolean),
+    })
+  );
+
+  // Load existing receipt when in edit mode
+  useEffect(() => {
+    if (!isEditMode || !id) return;
+    const existing = getReceiptById(id);
+    if (!existing) {
+      toast.error("Receipt not found");
+      navigate("/sales/payment-receipts", { replace: true });
+      return;
+    }
+    setEditingReceipt(existing);
+    setForm(makeDefaultForm({
+      customerName: existing.customerName,
+      amountReceived: String(existing.amountReceived),
+      paymentDate: existing.paymentDate,
+      paymentNumber: existing.paymentNumber,
+      paymentMode: existing.paymentMode,
+      depositTo: existing.depositTo || "Petty Cash",
+      reference: existing.reference || "",
+      invoiceNumber: existing.invoiceNumber || "",
+      bankCharges: existing.bankCharges || "",
+      taxCode: existing.taxCode || "",
+      taxDeducted: existing.taxDeducted,
+      note: existing.note || "",
+      placeOfSupply: existing.placeOfSupply || "[KA] - Karnataka",
+      descriptionOfSupply: existing.descriptionOfSupply || "",
+      sendThankYou: false,
+      recipients: [],
+    }));
+  }, [id, isEditMode, navigate]);
 
   const setF = (field: string, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -129,6 +165,26 @@ export default function NewPaymentReceiptPage() {
     setAttachmentDraft("");
   };
 
+  const buildReceipt = (): PaymentReceipt => ({
+    id: isEditMode && editingReceipt ? editingReceipt.id : `pr-${Date.now()}`,
+    paymentNumber: form.paymentNumber.trim() || `PR-${Date.now().toString().slice(-5)}`,
+    customerName: form.customerName.trim(),
+    invoiceNumber: form.invoiceNumber.trim(),
+    paymentDate: form.paymentDate,
+    paymentMode: form.paymentMode,
+    amountReceived: amountValue,
+    taxDeducted: form.taxDeducted,
+    status: "paid",
+    bankCharges: form.bankCharges,
+    depositTo: form.depositTo,
+    reference: form.reference,
+    note: form.note,
+    placeOfSupply: form.placeOfSupply,
+    descriptionOfSupply: form.descriptionOfSupply,
+    taxCode: form.taxCode,
+    archived: isEditMode && editingReceipt ? editingReceipt.archived : false,
+  });
+
   const handleSave = () => {
     if (!form.customerName.trim()) {
       toast.error("Customer name is required");
@@ -141,27 +197,35 @@ export default function NewPaymentReceiptPage() {
 
     setSaving(true);
     try {
-      const existing = safeReadJson<PaymentReceipt[]>(STORAGE_KEY, []);
-      const receipt: PaymentReceipt = {
-        id: `pr-${Date.now()}`,
-        paymentNumber: form.paymentNumber.trim() || `PR-${Date.now().toString().slice(-5)}`,
-        customerName: form.customerName.trim(),
-        invoiceNumber: form.invoiceNumber.trim(),
-        paymentDate: form.paymentDate,
-        paymentMode: form.paymentMode,
-        amountReceived: amountValue,
-        taxDeducted: form.taxDeducted,
-        status: "paid",
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([receipt, ...existing]));
-      toast.success(`Receipt ${receipt.paymentNumber} saved`);
-      if (form.sendThankYou && form.recipients.length > 0) {
+      const receipt = buildReceipt();
+      saveReceipt(receipt);
+      toast.success(
+        isEditMode
+          ? `Receipt ${receipt.paymentNumber} updated`
+          : `Receipt ${receipt.paymentNumber} saved`
+      );
+      if (!isEditMode && form.sendThankYou && form.recipients.length > 0) {
         toast.info(`Thank you note queued for ${form.recipients.join(", ")}`);
       }
       navigate("/sales/payment-receipts", { replace: true });
     } catch {
       toast.error("Failed to save receipt");
       setSaving(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!form.customerName.trim() || amountValue <= 0) {
+      toast.error("Fill in customer and amount before downloading");
+      return;
+    }
+    setDownloading(true);
+    try {
+      await downloadReceiptPdf(buildReceipt());
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -178,9 +242,22 @@ export default function NewPaymentReceiptPage() {
               <ArrowLeft size={16} /> Back
             </button>
             <span className="text-gray-300">|</span>
-            <h1 className="text-sm font-bold text-gray-900 truncate">New Payment Receipt</h1>
+            <h1 className="text-sm font-bold text-gray-900 truncate">
+              {isEditMode ? `Edit Receipt — ${form.paymentNumber}` : "New Payment Receipt"}
+            </h1>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {isEditMode && (
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={downloading}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <Download size={14} />
+                {downloading ? "Generating…" : "Download PDF"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigate("/sales/payment-receipts")}
@@ -195,7 +272,7 @@ export default function NewPaymentReceiptPage() {
               className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
               <Save size={14} />
-              {saving ? "Saving…" : "Save Receipt"}
+              {saving ? "Saving…" : isEditMode ? "Update Receipt" : "Save Receipt"}
             </button>
           </div>
         </div>
@@ -502,20 +579,29 @@ export default function NewPaymentReceiptPage() {
 
               <div>
                 <FieldLabel>Payment Mode</FieldLabel>
-                <input
-                  className={inp}
+                <select
+                  className={sel}
                   value={form.paymentMode}
                   onChange={(e) => setF("paymentMode", e.target.value)}
-                />
+                >
+                  {["Cash", "Bank Transfer", "UPI", "Cheque", "NEFT", "RTGS", "IMPS", "Credit Card", "Debit Card", "Other"].map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <FieldLabel required>Deposit To</FieldLabel>
-                <input
-                  className={inp}
+                <select
+                  className={sel}
                   value={form.depositTo}
                   onChange={(e) => setF("depositTo", e.target.value)}
-                />
+                >
+                  <option value="Petty Cash">Petty Cash</option>
+                  <option value="Main Bank">Main Bank</option>
+                  <option value="HDFC Current Account">HDFC Current Account</option>
+                  <option value="ICICI Savings Account">ICICI Savings Account</option>
+                </select>
               </div>
 
               <div>
@@ -585,35 +671,37 @@ export default function NewPaymentReceiptPage() {
           )}
         </Section>
 
-        {/* ── Thank You ── */}
-        <Section title="Thank You Note" icon={Heart}>
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-0.5 accent-blue-600 w-4 h-4"
-              checked={form.sendThankYou}
-              onChange={(e) => setF("sendThankYou", e.target.checked)}
-            />
-            <div>
-              <p className="text-sm font-medium text-gray-800">
-                Send a "Thank you" note for this payment
-              </p>
-              {form.sendThankYou && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {form.recipients.length === 0 ? (
-                    <p className="text-xs text-gray-400">No recipients — add customer email to send.</p>
-                  ) : (
-                    form.recipients.map((r) => (
-                      <span key={r} className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
-                        {r}
-                      </span>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </label>
-        </Section>
+        {/* ── Thank You (create mode only) ── */}
+        {!isEditMode && (
+          <Section title="Thank You Note" icon={Heart}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5 accent-blue-600 w-4 h-4"
+                checked={form.sendThankYou}
+                onChange={(e) => setF("sendThankYou", e.target.checked)}
+              />
+              <div>
+                <p className="text-sm font-medium text-gray-800">
+                  Send a "Thank you" note for this payment
+                </p>
+                {form.sendThankYou && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {form.recipients.length === 0 ? (
+                      <p className="text-xs text-gray-400">No recipients — add customer email to send.</p>
+                    ) : (
+                      form.recipients.map((r) => (
+                        <span key={r} className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full border border-blue-100">
+                          {r}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </label>
+          </Section>
+        )}
 
         {/* ── Footer action bar ── */}
         <div className="flex justify-end gap-3 pt-2 pb-8">
@@ -624,6 +712,17 @@ export default function NewPaymentReceiptPage() {
           >
             Cancel
           </button>
+          {isEditMode && (
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloading}
+              className="flex items-center gap-1.5 px-5 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <Download size={14} />
+              {downloading ? "Generating…" : "Download PDF"}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSave}
@@ -631,7 +730,7 @@ export default function NewPaymentReceiptPage() {
             className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
           >
             <Save size={14} />
-            {saving ? "Saving…" : "Save Receipt"}
+            {saving ? "Saving…" : isEditMode ? "Update Receipt" : "Save Receipt"}
           </button>
         </div>
       </div>

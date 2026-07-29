@@ -877,7 +877,7 @@ function AppRoutes() {
           />
           <Route
             path="sales/payment-receipts/:id"
-            element={<PaymentReceiptsPage />}
+            element={<NewPaymentReceiptPage />}
           />
           <Route path="sales/credit-notes" element={<CreditNotesPage />} />
           <Route
