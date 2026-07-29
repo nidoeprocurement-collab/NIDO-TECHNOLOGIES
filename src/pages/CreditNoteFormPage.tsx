@@ -14,6 +14,8 @@ import {
 import { toast } from "sonner";
 import { getClients } from "@/lib/clientStore";
 import type { StoredClient } from "@/lib/clientStore";
+import { getInvoices } from "@/lib/invoiceStore";
+import type { StoredInvoice } from "@/lib/invoiceStore";
 import { safeReadJson } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -211,16 +213,22 @@ export default function CreditNoteFormPage() {
   const { id } = useParams<{ id?: string }>();
   const isEdit = !!id;
 
-  const [clients, setClients]           = useState<StoredClient[]>([]);
+  const [clients, setClients]               = useState<StoredClient[]>([]);
   const [selectedClient, setSelectedClient] = useState<StoredClient | null>(null);
-  const [allNotes, setAllNotes]         = useState<CreditNoteEntry[]>([]);
-  const [form, setForm]                 = useState<CreditNoteEntry | null>(null);
-  const [saving, setSaving]             = useState(false);
+  const [allInvoices, setAllInvoices]       = useState<StoredInvoice[]>([]);
+  const [clientInvoices, setClientInvoices] = useState<StoredInvoice[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<StoredInvoice | null>(null);
+  const [allNotes, setAllNotes]             = useState<CreditNoteEntry[]>([]);
+  const [form, setForm]                     = useState<CreditNoteEntry | null>(null);
+  const [saving, setSaving]                 = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const allClients = getClients();
     setClients(allClients);
+
+    const invoices = getInvoices();
+    setAllInvoices(invoices);
 
     const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, []);
     const list: CreditNoteEntry[] = Array.isArray(stored) ? stored : [];
@@ -231,7 +239,17 @@ export default function CreditNoteFormPage() {
       if (existing) {
         setForm(existing);
         const match = allClients.find((c) => c.name === existing.customerName);
-        if (match) setSelectedClient(match);
+        if (match) {
+          setSelectedClient(match);
+          const filtered = invoices.filter(
+            (inv) => inv.clientName.toLowerCase() === match.name.toLowerCase()
+          );
+          setClientInvoices(filtered);
+          if (existing.invoiceNumber) {
+            const inv = filtered.find((i) => i.invoiceNumber === existing.invoiceNumber);
+            if (inv) setSelectedInvoice(inv);
+          }
+        }
       } else {
         toast.error("Credit note not found");
         navigate("/sales/credit-notes", { replace: true });
@@ -246,6 +264,12 @@ export default function CreditNoteFormPage() {
     const client = clients.find((c) => c.id === clientId);
     if (!client) return;
     setSelectedClient(client);
+    // Filter invoices for this client
+    const filtered = allInvoices.filter(
+      (inv) => inv.clientName.toLowerCase() === client.name.toLowerCase()
+    );
+    setClientInvoices(filtered);
+    setSelectedInvoice(null);
     setForm((prev) => {
       if (!prev) return prev;
       return {
@@ -256,6 +280,42 @@ export default function CreditNoteFormPage() {
         customerEmail:   client.email || "",
         customerPhone:   client.phone || client.mobile || "",
         placeOfSupply:   client.billingState || client.locationDetails?.state || prev.placeOfSupply,
+        invoiceNumber:   "",
+        invoiceDate:     "",
+      };
+    });
+  };
+
+  const handleInvoiceSelect = (invoiceId: string) => {
+    if (!invoiceId) {
+      setSelectedInvoice(null);
+      setForm((prev) => prev ? { ...prev, invoiceNumber: "", invoiceDate: "" } : prev);
+      return;
+    }
+    const inv = clientInvoices.find((i) => i.id === invoiceId);
+    if (!inv) return;
+    setSelectedInvoice(inv);
+    // Auto-populate from the first line item (or blank item if none)
+    const firstLine = inv.lineItems[0];
+    setForm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        invoiceNumber:  inv.invoiceNumber,
+        invoiceDate:    inv.invoiceDate,
+        placeOfSupply:  inv.placeOfSupply || prev.placeOfSupply,
+        shippingCharges: inv.shippingCharges ?? prev.shippingCharges,
+        adjustment:     inv.adjustment ?? prev.adjustment,
+        item: firstLine ? {
+          itemName:    firstLine.description,
+          account:     "Sales",
+          description: firstLine.itemDetails || "",
+          hsnSac:      firstLine.hsnSac || "",
+          quantity:    firstLine.quantity,
+          rate:        firstLine.rate,
+          discount:    firstLine.discount ?? 0,
+          taxRate:     firstLine.taxPercent,
+        } : prev.item,
       };
     });
   };
@@ -460,19 +520,46 @@ export default function CreditNoteFormPage() {
 
                 <div>
                   <FieldLabel>Invoice #</FieldLabel>
-                  <input
-                    className={inp}
-                    placeholder="e.g. INV-001"
-                    value={form.invoiceNumber}
-                    onChange={(e) => setField("invoiceNumber", e.target.value)}
-                  />
+                  {selectedClient ? (
+                    clientInvoices.length > 0 ? (
+                      <select
+                        className={`${inp} ${!selectedInvoice ? "text-gray-400" : "text-gray-900"}`}
+                        value={selectedInvoice?.id || ""}
+                        onChange={(e) => handleInvoiceSelect(e.target.value)}
+                      >
+                        <option value="">Select an invoice…</option>
+                        {clientInvoices.map((inv) => (
+                          <option key={inv.id} value={inv.id}>
+                            {inv.invoiceNumber} — ₹{inv.grandTotal.toLocaleString("en-IN")}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          className={inp}
+                          placeholder="No invoices found for this client"
+                          value={form.invoiceNumber}
+                          onChange={(e) => setField("invoiceNumber", e.target.value)}
+                        />
+                        <p className="text-[11px] text-amber-500">No invoices found for {selectedClient.name}. You can type manually.</p>
+                      </div>
+                    )
+                  ) : (
+                    <input
+                      className={`${inp} bg-gray-50 text-gray-400 cursor-not-allowed`}
+                      placeholder="Select a customer first…"
+                      value={form.invoiceNumber}
+                      readOnly
+                    />
+                  )}
                 </div>
 
                 <div>
                   <FieldLabel>Invoice Date</FieldLabel>
                   <input
                     type="date"
-                    className={inp}
+                    className={`${inp} ${selectedInvoice ? "bg-gray-50 text-gray-500" : ""}`}
                     value={form.invoiceDate}
                     onChange={(e) => setField("invoiceDate", e.target.value)}
                   />
@@ -559,6 +646,37 @@ export default function CreditNoteFormPage() {
 
             {/* ── Section 3: Item Details ── */}
             <Section title="Item Details" icon={FileText}>
+
+              {/* Invoice auto-fill banner */}
+              {selectedInvoice && (
+                <div className="mb-4 px-3 sm:px-4 py-3 bg-green-50 border border-green-100 rounded-lg flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-green-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <FileText size={14} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-green-800">
+                      Auto-filled from {selectedInvoice.invoiceNumber}
+                    </p>
+                    <p className="text-xs text-green-600 mt-0.5">
+                      {selectedInvoice.lineItems.length} line item{selectedInvoice.lineItems.length !== 1 ? "s" : ""} on invoice
+                      {" "}·{" "}Grand Total ₹{selectedInvoice.grandTotal.toLocaleString("en-IN")}
+                    </p>
+                    {selectedInvoice.lineItems.length > 1 && (
+                      <p className="text-[11px] text-green-500 mt-0.5 italic">
+                        First item loaded — you can edit below or add more items.
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleInvoiceSelect("")}
+                    className="shrink-0 p-1 rounded-md hover:bg-green-100 text-green-500 transition-colors"
+                    title="Clear invoice selection"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
 
               {/* Desktop table view */}
               <div className="hidden md:block overflow-x-auto">
