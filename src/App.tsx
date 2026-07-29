@@ -227,6 +227,7 @@ const DCPreviewPage = lazy(() => import("@/pages/DCPreviewPage"));
 const PaymentReceiptsPage = lazy(() => import("@/pages/PaymentReceiptsPage"));
 const NewPaymentReceiptPage = lazy(() => import("@/pages/NewPaymentReceiptPage"));
 const CreditNotesPage = lazy(() => import("@/pages/CreditNotesPage"));
+const CreditNoteFormPage = lazy(() => import("@/pages/CreditNoteFormPage"));
 const EWayBillsPage = lazy(() => import("@/pages/EWayBillsPage"));
 const RecurringExpensesPage = lazy(
   () => import("@/pages/RecurringExpensesPage"),
@@ -882,12 +883,12 @@ function AppRoutes() {
           <Route path="sales/credit-notes" element={<CreditNotesPage />} />
           <Route
             path="sales/credit-notes/create"
-            element={<CreditNotesPage />}
+            element={<CreditNoteFormPage />}
           />
           <Route path="sales/credit-notes/:id" element={<CreditNotesPage />} />
           <Route
             path="sales/credit-notes/:id/edit"
-            element={<CreditNotesPage />}
+            element={<CreditNoteFormPage />}
           />
           <Route path="sales/e-way-bills" element={<EWayBillsPage />} />
           <Route path="sales/e-way-bills/create" element={<EWayBillsPage />} />

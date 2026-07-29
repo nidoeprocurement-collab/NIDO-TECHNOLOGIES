@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Archive,
   Calendar,
@@ -20,13 +20,6 @@ import {
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,16 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useData } from "@/contexts/DataContext";
 import { safeReadJson } from "@/lib/utils";
 import { downloadCreditNotePdf } from "@/lib/creditNotePdf";
@@ -720,14 +703,8 @@ function CreditNotePreviewDrawer({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CreditNotesPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const params = useParams();
-  const { clients: rawClients, generalSettings: rawSettings } = useData();
-  const clients = rawClients ?? [];
+  const { generalSettings: rawSettings } = useData();
   const generalSettings = rawSettings ?? {};
-
-  const createMode = location.pathname.endsWith("/create");
-  const editMode = location.pathname.endsWith("/edit") && !!params.id;
 
   const [notes, setNotes] = useState<CreditNoteEntry[]>(() => {
     const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, defaultNotes);
@@ -735,79 +712,16 @@ export default function CreditNotesPage() {
     return list.map((e) => normalize(e));
   });
 
-  const [selectedId, setSelectedId] = useState(params.id || notes[0]?.id || "");
-  const [open, setOpen] = useState(createMode);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<CreditNoteEntry>(() => normalize(defaultNotes[0]));
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CreditStatus>("all");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [previewNote, setPreviewNote] = useState<CreditNoteEntry | null>(null);
 
   const companyLogoUrl = Object.values(generalSettings).find((s) => s.companyLogo)?.companyLogo;
-  const creditNotePrefix = Object.values(generalSettings)[0]?.creditNotePrefix?.trim() || "CN";
 
   const persist = (next: CreditNoteEntry[]) => {
     setNotes(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
-
-  useEffect(() => {
-    if (createMode) {
-      setEditingId(null);
-      const seed = normalize({
-        ...defaultNotes[0],
-        id: `cn-${Date.now()}`,
-        issueDate: today(),
-        creditNoteNumber: nextCode(creditNotePrefix, notes.map((e) => e.creditNoteNumber), 5),
-      });
-      setForm(seed);
-      setOpen(true);
-    }
-  }, [createMode]);
-
-  useEffect(() => {
-    if (!editMode) return;
-    const target = notes.find((e) => e.id === params.id);
-    if (!target) return;
-    setEditingId(target.id);
-    setForm(target);
-    setOpen(true);
-  }, [editMode, params.id]);
-
-  useEffect(() => {
-    if (params.id) setSelectedId(params.id);
-  }, [params.id]);
-
-  const computed = useMemo(
-    () => computeTotals(form.item, form.shippingCharges, form.adjustment),
-    [form.item, form.shippingCharges, form.adjustment],
-  );
-
-  const closeDialog = () => {
-    setOpen(false);
-    setEditingId(null);
-    navigate("/sales/credit-notes", { replace: true });
-  };
-
-  const save = (status: CreditStatus) => {
-    if (!form.customerName.trim()) {
-      toast.error("Customer Name is required");
-      return;
-    }
-    const payload = normalize({ ...form, status, subtotal: computed.subtotal, total: computed.total, creditsRemaining: computed.creditsRemaining, totalInWords: computed.totalInWords });
-    if (editingId) {
-      persist(notes.map((e) => e.id === editingId ? { ...payload, id: editingId } : e));
-      setSelectedId(editingId);
-      toast.success("Credit note updated");
-      closeDialog();
-      return;
-    }
-    const created = { ...payload, id: `cn-${Date.now()}` };
-    persist([created, ...notes]);
-    setSelectedId(created.id);
-    toast.success("Credit note created");
-    closeDialog();
   };
 
   const convertToOpen = (note: CreditNoteEntry) => {
@@ -834,17 +748,6 @@ export default function CreditNotesPage() {
 
   const handleSendEmail = (note: CreditNoteEntry) => {
     toast.success(`Email queued for ${note.creditNoteNumber}`);
-  };
-
-  const bindCustomer = (name: string) => {
-    const match = clients.find((c) => c.name === name);
-    setForm((cur) => normalize({
-      ...cur,
-      customerName: name,
-      customerAddress: match?.locationDetails?.address || match?.address || cur.customerAddress,
-      customerGstin: match?.gst || cur.customerGstin,
-      placeOfSupply: match?.locationDetails?.state || cur.placeOfSupply,
-    }));
   };
 
   // ── Filtered list ──────────────────────────────────────────────────────────
@@ -1083,170 +986,6 @@ export default function CreditNotesPage() {
           downloading={downloadingId === previewNote.id}
         />
       )}
-
-      {/* ── Create / Edit Dialog ── */}
-      <Dialog open={open} onOpenChange={(isOpen) => (!isOpen ? closeDialog() : setOpen(isOpen))}>
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingId ? "Edit Credit Note" : "New Credit Note"}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-5">
-            {/* Row 1 */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label>Customer Name *</Label>
-                <Select value={form.customerName} onValueChange={bindCustomer}>
-                  <SelectTrigger><SelectValue placeholder="Select or add a customer" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Reason</Label>
-                <Select value={form.reason} onValueChange={(v: Reason) => setForm((c) => ({ ...c, reason: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {reasons.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Credit Note # *</Label>
-                <Input value={form.creditNoteNumber} onChange={(e) => setForm((c) => ({ ...c, creditNoteNumber: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Reference #</Label>
-                <Input value={form.referenceNumber} onChange={(e) => setForm((c) => ({ ...c, referenceNumber: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Invoice #</Label>
-                <Input value={form.invoiceNumber} onChange={(e) => setForm((c) => ({ ...c, invoiceNumber: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Invoice Date</Label>
-                <Input type="date" value={form.invoiceDate} onChange={(e) => setForm((c) => ({ ...c, invoiceDate: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Place of Supply</Label>
-                <Input value={form.placeOfSupply} onChange={(e) => setForm((c) => ({ ...c, placeOfSupply: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Credit Note Date *</Label>
-                <Input type="date" value={form.issueDate} onChange={(e) => setForm((c) => ({ ...c, issueDate: e.target.value }))} />
-              </div>
-            </div>
-
-            {/* Customer Address */}
-            <div>
-              <Label>Customer Address</Label>
-              <Textarea
-                rows={3}
-                value={form.customerAddress}
-                onChange={(e) => setForm((c) => ({ ...c, customerAddress: e.target.value }))}
-              />
-            </div>
-
-            {/* Customer GSTIN */}
-            <div>
-              <Label>Customer GSTIN</Label>
-              <Input value={form.customerGstin} onChange={(e) => setForm((c) => ({ ...c, customerGstin: e.target.value }))} />
-            </div>
-
-            {/* Item Table */}
-            <div className="rounded-xl border bg-white">
-              <div className="border-b px-4 py-3">
-                <p className="font-semibold text-sm">Item Table</p>
-              </div>
-              <div className="grid gap-4 p-4 lg:grid-cols-[1fr_320px]">
-                <div>
-                  <div className="grid gap-3 grid-cols-7 text-xs font-semibold text-gray-500 mb-1 px-1">
-                    {["Item Name","Account","Qty","Rate","Discount","Tax %","Amount"].map((h) => (
-                      <span key={h}>{h}</span>
-                    ))}
-                  </div>
-                  <div className="grid gap-3 grid-cols-7">
-                    <Input placeholder="Item name" value={form.item.itemName} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, itemName: e.target.value } }))} />
-                    <Input placeholder="Account" value={form.item.account} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, account: e.target.value } }))} />
-                    <Input type="number" value={form.item.quantity} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, quantity: toNumber(e.target.value, 1) } }))} />
-                    <Input type="number" value={form.item.rate} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, rate: toNumber(e.target.value) } }))} />
-                    <Input type="number" value={form.item.discount} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, discount: toNumber(e.target.value) } }))} />
-                    <Input type="number" value={form.item.taxRate} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, taxRate: toNumber(e.target.value) } }))} />
-                    <Input readOnly value={computed.total.toFixed(2)} className="text-right bg-gray-50" />
-                  </div>
-                  <Input className="mt-2" placeholder="Description (optional)" value={form.item.description} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, description: e.target.value } }))} />
-                  <Input className="mt-2" placeholder="HSN/SAC code" value={form.item.hsnSac} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, hsnSac: e.target.value } }))} />
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toast.info("Add row — coming soon")}
-                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      + Add New Row
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toast.info("Bulk import — coming soon")}
-                      className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-                    >
-                      + Add Items in Bulk
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-gray-50/70 p-4 text-sm space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Sub Total</span>
-                    <span className="font-semibold">₹{computed.subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-gray-500">Shipping</span>
-                    <Input className="w-28 text-right h-8" type="number" value={form.shippingCharges} onChange={(e) => setForm((c) => ({ ...c, shippingCharges: toNumber(e.target.value) }))} />
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {(["tds", "tcs"] as const).map((mode) => (
-                      <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-gray-600">
-                        <input type="radio" checked={form.taxMode === mode} onChange={() => setForm((c) => ({ ...c, taxMode: mode }))} />
-                        {mode.toUpperCase()}
-                      </label>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-gray-500">Adjustment</span>
-                    <Input className="w-28 text-right h-8" type="number" value={form.adjustment} onChange={(e) => setForm((c) => ({ ...c, adjustment: toNumber(e.target.value) }))} />
-                  </div>
-                  <div className="border-t pt-3 flex justify-between font-bold text-base">
-                    <span>Total</span>
-                    <span className="text-blue-700">₹{computed.total.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <Label>Customer Notes</Label>
-              <Textarea rows={3} value={form.notes} onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))} />
-            </div>
-
-            <div>
-              <Label>Terms & Conditions</Label>
-              <Textarea rows={3} value={form.terms} onChange={(e) => setForm((c) => ({ ...c, terms: e.target.value }))} />
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t">
-              <p className="text-xs text-gray-400">PDF Template: Standard Template</p>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => save("draft")}>Save as Draft</Button>
-                <Button onClick={() => save("open")} className="bg-blue-600 hover:bg-blue-700 text-white">Save as Open</Button>
-                <Button variant="outline" onClick={closeDialog}>Cancel</Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
