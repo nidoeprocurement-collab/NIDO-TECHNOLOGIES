@@ -1,4 +1,13 @@
 const STORE_KEY = "nido_payment_receipts_v3";
+const COUNTER_KEY = "nido_payment_receipt_counter";
+
+/** Returns the next serial payment number like PR-000001 and increments the counter. */
+export function getNextReceiptNumber(): string {
+  const current = parseInt(localStorage.getItem(COUNTER_KEY) ?? "0", 10);
+  const next = current + 1;
+  localStorage.setItem(COUNTER_KEY, String(next));
+  return `PR-${String(next).padStart(6, "0")}`;
+}
 
 export interface PaymentReceipt {
   id: string;

@@ -4,7 +4,7 @@ import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X,
 import { toast } from "sonner";
 import { getClients } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
-import { saveReceipt, getReceiptById } from "@/lib/paymentReceiptStore";
+import { saveReceipt, getReceiptById, getNextReceiptNumber } from "@/lib/paymentReceiptStore";
 import type { PaymentReceipt } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
 
@@ -66,7 +66,7 @@ function makeDefaultForm(overrides?: Partial<ReturnType<typeof defaultForm>>) {
     descriptionOfSupply: "",
     amountReceived: "",
     paymentDate: new Date().toISOString().slice(0, 10),
-    paymentNumber: `PR-${Date.now().toString().slice(-5)}`,
+    paymentNumber: "",   // filled at mount or from existing record
     paymentMode: "Cash",
     depositTo: "Petty Cash",
     reference: "",
@@ -113,6 +113,8 @@ export default function NewPaymentReceiptPage() {
       amountReceived: String(locationState.amount ?? ""),
       invoiceNumber: locationState.invoiceNumber || "",
       recipients: [locationState.email || ""].filter(Boolean),
+      // Generate serial number only for new receipts; edit mode overwrites via useEffect
+      paymentNumber: isEditMode ? "" : getNextReceiptNumber(),
     })
   );
 
@@ -352,11 +354,11 @@ export default function NewPaymentReceiptPage() {
                 </div>
 
                 <div>
-                  <FieldLabel required>Payment #</FieldLabel>
+                  <FieldLabel>Payment #</FieldLabel>
                   <input
-                    className={inp}
+                    className={`${inp} bg-gray-50 text-gray-500 cursor-default select-all`}
                     value={form.paymentNumber}
-                    onChange={(e) => setF("paymentNumber", e.target.value)}
+                    readOnly
                   />
                 </div>
 
@@ -569,11 +571,11 @@ export default function NewPaymentReceiptPage() {
               </div>
 
               <div>
-                <FieldLabel required>Payment #</FieldLabel>
+                <FieldLabel>Payment #</FieldLabel>
                 <input
-                  className={inp}
+                  className={`${inp} bg-gray-50 text-gray-500 cursor-default select-all`}
                   value={form.paymentNumber}
-                  onChange={(e) => setF("paymentNumber", e.target.value)}
+                  readOnly
                 />
               </div>
 
