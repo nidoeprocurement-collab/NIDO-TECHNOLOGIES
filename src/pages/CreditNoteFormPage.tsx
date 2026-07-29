@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  ChevronDown,
   FileText,
   Plus,
   ReceiptIndianRupee,
   Save,
   StickyNote,
   User,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getClients } from "@/lib/clientStore";
@@ -130,7 +132,7 @@ function buildAddress(c: StoredClient): string {
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 const inp = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white placeholder-gray-400 transition-colors";
-const ta = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white placeholder-gray-400 transition-colors resize-none";
+const ta  = "w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-white placeholder-gray-400 transition-colors resize-none";
 
 function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -141,20 +143,39 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
   );
 }
 
-function Section({ title, icon: Icon, children }: { title: string; icon?: React.ElementType; children: React.ReactNode }) {
+function Section({
+  title,
+  icon: Icon,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  icon?: React.ElementType;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-white border border-gray-200 rounded-xl mb-5 overflow-hidden">
-      <div className="flex items-center gap-2.5 px-6 py-3.5 border-b border-gray-100 bg-gray-50/70">
+    <div className="bg-white border border-gray-200 rounded-xl mb-4 overflow-hidden">
+      {/* Header — tappable on mobile to collapse */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2.5 px-4 sm:px-6 py-3 sm:py-3.5 border-b border-gray-100 bg-gray-50/70 text-left"
+      >
         <div className="w-1 h-4 bg-blue-600 rounded-full shrink-0" />
-        {Icon && <Icon size={14} className="text-blue-600 shrink-0" />}
-        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-700">{title}</h3>
-      </div>
-      <div className="px-6 py-5">{children}</div>
+        {Icon && <Icon size={13} className="text-blue-600 shrink-0" />}
+        <h3 className="flex-1 text-xs font-bold uppercase tracking-widest text-gray-700">{title}</h3>
+        <ChevronDown
+          size={14}
+          className={`text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="px-4 sm:px-6 py-4 sm:py-5">{children}</div>}
     </div>
   );
 }
 
-// ── Default blank form ────────────────────────────────────────────────────────
 function blankForm(creditNoteNumber: string): CreditNoteEntry {
   return {
     id: `cn-${Date.now()}`,
@@ -190,26 +211,25 @@ export default function CreditNoteFormPage() {
   const { id } = useParams<{ id?: string }>();
   const isEdit = !!id;
 
-  const [clients, setClients] = useState<StoredClient[]>([]);
+  const [clients, setClients]           = useState<StoredClient[]>([]);
   const [selectedClient, setSelectedClient] = useState<StoredClient | null>(null);
-  const [notes, setNotes] = useState<CreditNoteEntry[]>([]);
-  const [form, setForm] = useState<CreditNoteEntry | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [allNotes, setAllNotes]         = useState<CreditNoteEntry[]>([]);
+  const [form, setForm]                 = useState<CreditNoteEntry | null>(null);
+  const [saving, setSaving]             = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Load clients and existing notes from localStorage on mount
   useEffect(() => {
     const allClients = getClients();
     setClients(allClients);
 
     const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, []);
     const list: CreditNoteEntry[] = Array.isArray(stored) ? stored : [];
-    setNotes(list);
+    setAllNotes(list);
 
     if (isEdit && id) {
       const existing = list.find((n) => n.id === id);
       if (existing) {
         setForm(existing);
-        // pre-select matching client
         const match = allClients.find((c) => c.name === existing.customerName);
         if (match) setSelectedClient(match);
       } else {
@@ -217,14 +237,11 @@ export default function CreditNoteFormPage() {
         navigate("/sales/credit-notes", { replace: true });
       }
     } else {
-      // generate next credit note number
-      const prefix = "CN";
-      const cn = nextCode(prefix, list.map((n) => n.creditNoteNumber), 5);
+      const cn = nextCode("CN", list.map((n) => n.creditNoteNumber), 5);
       setForm(blankForm(cn));
     }
   }, []);
 
-  // Handle customer selection — fetch and auto-fill all related fields
   const handleCustomerSelect = (clientId: string) => {
     const client = clients.find((c) => c.id === clientId);
     if (!client) return;
@@ -233,12 +250,12 @@ export default function CreditNoteFormPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        customerName: client.name,
+        customerName:    client.name,
         customerAddress: buildAddress(client),
-        customerGstin: client.gst || client.gstin || client.locationDetails?.gstin || "",
-        customerEmail: client.email || "",
-        customerPhone: client.phone || client.mobile || "",
-        placeOfSupply: client.billingState || client.locationDetails?.state || prev.placeOfSupply,
+        customerGstin:   client.gst || client.gstin || client.locationDetails?.gstin || "",
+        customerEmail:   client.email || "",
+        customerPhone:   client.phone || client.mobile || "",
+        placeOfSupply:   client.billingState || client.locationDetails?.state || prev.placeOfSupply,
       };
     });
   };
@@ -260,16 +277,15 @@ export default function CreditNoteFormPage() {
     if (!form.creditNoteNumber.trim()) { toast.error("Credit Note # is required"); return; }
     setSaving(true);
     const payload: CreditNoteEntry = {
-      ...form,
-      status,
+      ...form, status,
       subtotal: computed.subtotal,
       total: computed.total,
       creditsRemaining: computed.creditsRemaining,
       totalInWords: computed.totalInWords,
     };
     const updated = isEdit
-      ? notes.map((n) => n.id === id ? payload : n)
-      : [payload, ...notes];
+      ? allNotes.map((n) => n.id === id ? payload : n)
+      : [payload, ...allNotes];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     toast.success(isEdit ? "Credit note updated" : `Credit note ${payload.creditNoteNumber} created`);
     navigate("/sales/credit-notes");
@@ -278,347 +294,523 @@ export default function CreditNoteFormPage() {
   if (!form) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-400 text-sm">Loading…</div>
+        <div className="w-8 h-8 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   const itemAmount = Math.max(0, form.item.quantity * form.item.rate - form.item.discount);
-  const taxAmt = Math.round(itemAmount * (form.item.taxRate / 100) * 100) / 100;
+  const taxAmt     = Math.round(itemAmount * (form.item.taxRate / 100) * 100) / 100;
 
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* ── Top Bar ── */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      {/* ── Sticky Top Bar ─────────────────────────────────────────────────── */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
+        <div className="px-3 sm:px-5 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+
+          {/* Left: back + title */}
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => navigate("/sales/credit-notes")}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+              className="shrink-0 p-1.5 sm:p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} className="sm:hidden" />
+              <ArrowLeft size={18} className="hidden sm:block" />
             </button>
-            <div>
-              <p className="text-[11px] text-gray-400 font-medium">Sales › Credit Notes</p>
-              <h1 className="text-base font-bold text-gray-900 leading-tight">
+            <div className="min-w-0">
+              <p className="hidden sm:block text-[11px] text-gray-400 font-medium leading-none mb-0.5">
+                Sales › Credit Notes
+              </p>
+              <h1 className="text-sm sm:text-base font-bold text-gray-900 truncate leading-tight">
                 {isEdit ? `Edit ${form.creditNoteNumber}` : "New Credit Note"}
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Right: actions — desktop */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
             <button
               onClick={() => navigate("/sales/credit-notes")}
-              className="px-4 py-2 text-sm font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 text-sm font-semibold border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={() => handleSave("draft")}
               disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
-              <Save size={15} /> Save as Draft
+              <Save size={14} />
+              <span className="hidden md:inline">Save as </span>Draft
             </button>
             <button
               onClick={() => handleSave("open")}
               disabled={saving}
-              className="flex items-center gap-1.5 px-5 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              <Save size={15} /> Save as Open
+              <Save size={14} />
+              <span className="hidden md:inline">Save as </span>Open
             </button>
           </div>
-        </div>
-      </div>
 
-      {/* ── Body ── */}
-      <div className="max-w-7xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
-
-        {/* ── Left column ── */}
-        <div>
-
-          {/* Customer & Reference */}
-          <Section title="Customer & Reference Details" icon={User}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-
-              {/* Customer Name dropdown */}
-              <div className="sm:col-span-2 lg:col-span-1">
-                <FieldLabel required>Customer Name</FieldLabel>
-                <select
-                  className={`${inp} ${!form.customerName ? "text-gray-400" : "text-gray-900"}`}
-                  value={selectedClient?.id || ""}
-                  onChange={(e) => handleCustomerSelect(e.target.value)}
-                >
-                  <option value="">Select a customer…</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <FieldLabel required>Credit Note #</FieldLabel>
-                <input className={inp} value={form.creditNoteNumber} onChange={(e) => setField("creditNoteNumber", e.target.value)} />
-              </div>
-
-              <div>
-                <FieldLabel>Reference #</FieldLabel>
-                <input className={inp} placeholder="e.g. 142012681" value={form.referenceNumber} onChange={(e) => setField("referenceNumber", e.target.value)} />
-              </div>
-
-              <div>
-                <FieldLabel required>Credit Note Date</FieldLabel>
-                <input type="date" className={inp} value={form.issueDate} onChange={(e) => setField("issueDate", e.target.value)} />
-              </div>
-
-              <div>
-                <FieldLabel>Reason</FieldLabel>
-                <select className={inp} value={form.reason} onChange={(e) => setField("reason", e.target.value as Reason)}>
-                  {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <FieldLabel>Invoice #</FieldLabel>
-                <input className={inp} placeholder="e.g. INV-001" value={form.invoiceNumber} onChange={(e) => setField("invoiceNumber", e.target.value)} />
-              </div>
-
-              <div>
-                <FieldLabel>Invoice Date</FieldLabel>
-                <input type="date" className={inp} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
-              </div>
-
-              <div>
-                <FieldLabel>Place of Supply</FieldLabel>
-                <input className={inp} placeholder="e.g. Karnataka" value={form.placeOfSupply} onChange={(e) => setField("placeOfSupply", e.target.value)} />
-              </div>
-            </div>
-          </Section>
-
-          {/* Customer Details (auto-filled, editable) */}
-          <Section title="Customer Details" icon={User}>
-            {selectedClient ? (
-              <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-white text-xs font-bold">{selectedClient.name.charAt(0)}</span>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-blue-800">{selectedClient.name}</p>
-                  {selectedClient.email && <p className="text-xs text-blue-600 mt-0.5">{selectedClient.email}</p>}
-                  {selectedClient.phone && <p className="text-xs text-blue-500">{selectedClient.phone}</p>}
-                  <p className="text-[11px] text-blue-400 mt-1">Fields below are auto-filled — you can edit them.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-4 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-400 italic">
-                Select a customer above to auto-fill billing details.
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <FieldLabel>Billing Address</FieldLabel>
-                <textarea
-                  className={ta}
-                  rows={4}
-                  placeholder="Enter billing address"
-                  value={form.customerAddress}
-                  onChange={(e) => setField("customerAddress", e.target.value)}
-                />
-              </div>
-              <div>
-                <FieldLabel>GSTIN</FieldLabel>
-                <input className={inp} placeholder="e.g. 29AABCP1234R1Z0" value={form.customerGstin} onChange={(e) => setField("customerGstin", e.target.value)} />
-              </div>
-              <div>
-                <FieldLabel>Email</FieldLabel>
-                <input type="email" className={inp} placeholder="customer@email.com" value={form.customerEmail} onChange={(e) => setField("customerEmail", e.target.value)} />
-              </div>
-              <div>
-                <FieldLabel>Phone</FieldLabel>
-                <input className={inp} placeholder="+91 98765 43210" value={form.customerPhone} onChange={(e) => setField("customerPhone", e.target.value)} />
-              </div>
-            </div>
-          </Section>
-
-          {/* Item Table */}
-          <Section title="Item Details" icon={FileText}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[700px]">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    {["Item Name", "Account", "HSN/SAC", "Qty", "Rate (₹)", "Disc (₹)", "Tax %", "Amount (₹)"].map((h) => (
-                      <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 last:pr-0 last:text-right">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="align-top">
-                    <td className="pt-3 pr-3">
-                      <input className={inp} placeholder="Item name" value={form.item.itemName} onChange={(e) => setItemField("itemName", e.target.value)} />
-                    </td>
-                    <td className="pt-3 pr-3 w-28">
-                      <input className={inp} placeholder="Account" value={form.item.account} onChange={(e) => setItemField("account", e.target.value)} />
-                    </td>
-                    <td className="pt-3 pr-3 w-24">
-                      <input className={inp} placeholder="HSN/SAC" value={form.item.hsnSac} onChange={(e) => setItemField("hsnSac", e.target.value)} />
-                    </td>
-                    <td className="pt-3 pr-3 w-20">
-                      <input type="number" min="0" className={inp} value={form.item.quantity} onChange={(e) => setItemField("quantity", toNumber(e.target.value, 1))} />
-                    </td>
-                    <td className="pt-3 pr-3 w-24">
-                      <input type="number" min="0" className={inp} value={form.item.rate} onChange={(e) => setItemField("rate", toNumber(e.target.value))} />
-                    </td>
-                    <td className="pt-3 pr-3 w-24">
-                      <input type="number" min="0" className={inp} value={form.item.discount} onChange={(e) => setItemField("discount", toNumber(e.target.value))} />
-                    </td>
-                    <td className="pt-3 pr-3 w-20">
-                      <input type="number" min="0" max="100" className={inp} value={form.item.taxRate} onChange={(e) => setItemField("taxRate", toNumber(e.target.value))} />
-                    </td>
-                    <td className="pt-3 w-28">
-                      <input readOnly className={`${inp} text-right bg-gray-50 font-semibold text-gray-700 cursor-default`} value={(itemAmount + taxAmt).toFixed(2)} />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            {/* Description */}
-            <div className="mt-4">
-              <FieldLabel>Description</FieldLabel>
-              <input className={inp} placeholder="Item description (optional)" value={form.item.description} onChange={(e) => setItemField("description", e.target.value)} />
-            </div>
-
-            {/* Add row placeholder */}
-            <button
-              type="button"
-              onClick={() => toast.info("Multiple line items coming soon")}
-              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
-            >
-              <Plus size={13} /> Add Another Item
-            </button>
-          </Section>
-
-          {/* Notes & Terms */}
-          <Section title="Notes & Terms" icon={StickyNote}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Customer Notes</FieldLabel>
-                <textarea className={ta} rows={4} placeholder="e.g. Clarification will be made on the post quality check…" value={form.notes} onChange={(e) => setField("notes", e.target.value)} />
-              </div>
-              <div>
-                <FieldLabel>Terms & Conditions</FieldLabel>
-                <textarea className={ta} rows={4} placeholder="e.g. Price mentioned are excluding Taxes." value={form.terms} onChange={(e) => setField("terms", e.target.value)} />
-              </div>
-            </div>
-          </Section>
-
-        </div>
-
-        {/* ── Right column — Summary ── */}
-        <div className="space-y-4 sticky top-20">
-
-          {/* Totals card */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-gray-100 bg-gray-50/70">
-              <div className="w-1 h-4 bg-blue-600 rounded-full shrink-0" />
-              <ReceiptIndianRupee size={14} className="text-blue-600" />
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-700">Amount Summary</h3>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Sub Total</span>
-                <span className="font-semibold text-gray-800">₹{computed.subtotal.toFixed(2)}</span>
-              </div>
-              {form.item.taxRate > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Tax ({form.item.taxRate}%)</span>
-                  <span className="font-semibold text-gray-800">₹{computed.taxAmount.toFixed(2)}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-gray-500">Shipping</span>
-                <input
-                  type="number"
-                  min="0"
-                  className="w-28 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-                  value={form.shippingCharges}
-                  onChange={(e) => setField("shippingCharges", toNumber(e.target.value))}
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-gray-500">Adjustment</span>
-                <input
-                  type="number"
-                  className="w-28 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-                  value={form.adjustment}
-                  onChange={(e) => setField("adjustment", toNumber(e.target.value))}
-                />
-              </div>
-
-              <div className="pt-3 border-t border-gray-100">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-gray-900">Total</span>
-                  <span className="text-xl font-bold text-blue-700">₹{computed.total.toFixed(2)}</span>
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-blue-600">
-                  <span>Credits Remaining</span>
-                  <span className="font-semibold">₹{computed.creditsRemaining.toFixed(2)}</span>
-                </div>
-              </div>
-
-              {computed.total > 0 && (
-                <div className="text-[11px] text-gray-400 italic pt-1 border-t border-gray-100">
-                  {computed.totalInWords}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Tax Mode */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Tax Mode</h3>
-            <div className="flex gap-4">
-              {(["tds", "tcs"] as const).map((mode) => (
-                <label key={mode} className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border transition-colors ${form.taxMode === mode ? "border-blue-400 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-                  <input
-                    type="radio"
-                    className="accent-blue-600"
-                    checked={form.taxMode === mode}
-                    onChange={() => setField("taxMode", mode)}
-                  />
-                  <span className="text-sm font-semibold">{mode.toUpperCase()}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Actions</h3>
+          {/* Right: actions — mobile (sheet toggle) */}
+          <div className="flex sm:hidden items-center gap-1.5 shrink-0">
             <button
               onClick={() => handleSave("open")}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              <Save size={15} /> Save as Open
+              <Save size={13} /> Save
             </button>
             <button
-              onClick={() => handleSave("draft")}
+              onClick={() => setMobileMenuOpen((v) => !v)}
+              className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+            >
+              {mobileMenuOpen ? <X size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile expanded action strip */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t border-gray-100 px-3 py-2 flex gap-2 bg-gray-50/80">
+            <button
+              onClick={() => { handleSave("draft"); setMobileMenuOpen(false); }}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex-1 py-2 text-xs font-semibold border border-gray-300 rounded-lg text-gray-700 hover:bg-white transition-colors disabled:opacity-50"
             >
               Save as Draft
             </button>
             <button
-              onClick={() => navigate("/sales/credit-notes")}
-              className="w-full px-4 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={() => { navigate("/sales/credit-notes"); }}
+              className="flex-1 py-2 text-xs font-semibold border border-gray-200 rounded-lg text-gray-500 hover:bg-white transition-colors"
             >
               Cancel
             </button>
           </div>
+        )}
+      </div>
+
+      {/* ── Page Body ──────────────────────────────────────────────────────── */}
+      <div className="px-3 sm:px-5 lg:px-8 py-4 sm:py-6 max-w-screen-xl mx-auto">
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px] gap-4 lg:gap-6 items-start">
+
+          {/* ── Main form column ─────────────────────────────────────────── */}
+          <div className="w-full min-w-0">
+
+            {/* ── Section 1: Customer & Reference ── */}
+            <Section title="Customer & Reference Details" icon={User}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+
+                {/* Customer dropdown — full width on mobile, 2 cols on sm */}
+                <div className="sm:col-span-2 xl:col-span-1">
+                  <FieldLabel required>Customer Name</FieldLabel>
+                  <select
+                    className={`${inp} ${!form.customerName ? "text-gray-400" : "text-gray-900"}`}
+                    value={selectedClient?.id || ""}
+                    onChange={(e) => handleCustomerSelect(e.target.value)}
+                  >
+                    <option value="">Select a customer…</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <FieldLabel required>Credit Note #</FieldLabel>
+                  <input
+                    className={inp}
+                    value={form.creditNoteNumber}
+                    onChange={(e) => setField("creditNoteNumber", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Reference #</FieldLabel>
+                  <input
+                    className={inp}
+                    placeholder="e.g. 142012681"
+                    value={form.referenceNumber}
+                    onChange={(e) => setField("referenceNumber", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel required>Credit Note Date</FieldLabel>
+                  <input
+                    type="date"
+                    className={inp}
+                    value={form.issueDate}
+                    onChange={(e) => setField("issueDate", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Reason</FieldLabel>
+                  <select
+                    className={inp}
+                    value={form.reason}
+                    onChange={(e) => setField("reason", e.target.value as Reason)}
+                  >
+                    {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <FieldLabel>Invoice #</FieldLabel>
+                  <input
+                    className={inp}
+                    placeholder="e.g. INV-001"
+                    value={form.invoiceNumber}
+                    onChange={(e) => setField("invoiceNumber", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Invoice Date</FieldLabel>
+                  <input
+                    type="date"
+                    className={inp}
+                    value={form.invoiceDate}
+                    onChange={(e) => setField("invoiceDate", e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <FieldLabel>Place of Supply</FieldLabel>
+                  <input
+                    className={inp}
+                    placeholder="e.g. Karnataka"
+                    value={form.placeOfSupply}
+                    onChange={(e) => setField("placeOfSupply", e.target.value)}
+                  />
+                </div>
+              </div>
+            </Section>
+
+            {/* ── Section 2: Customer Details ── */}
+            <Section title="Customer Details" icon={User}>
+              {/* Auto-fill banner */}
+              {selectedClient ? (
+                <div className="mb-4 px-3 sm:px-4 py-3 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-white text-xs font-bold">{selectedClient.name.charAt(0)}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-blue-800 truncate">{selectedClient.name}</p>
+                    {selectedClient.email && (
+                      <p className="text-xs text-blue-600 mt-0.5 truncate">{selectedClient.email}</p>
+                    )}
+                    {selectedClient.phone && (
+                      <p className="text-xs text-blue-500 truncate">{selectedClient.phone}</p>
+                    )}
+                    <p className="text-[11px] text-blue-400 mt-1">Auto-filled — you can still edit below.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4 px-3 sm:px-4 py-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-sm text-gray-400 italic text-center">
+                  Select a customer above to auto-fill billing details.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="sm:col-span-2">
+                  <FieldLabel>Billing Address</FieldLabel>
+                  <textarea
+                    className={ta}
+                    rows={3}
+                    placeholder="Enter billing address"
+                    value={form.customerAddress}
+                    onChange={(e) => setField("customerAddress", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>GSTIN</FieldLabel>
+                  <input
+                    className={inp}
+                    placeholder="e.g. 29AABCP1234R1Z0"
+                    value={form.customerGstin}
+                    onChange={(e) => setField("customerGstin", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Email</FieldLabel>
+                  <input
+                    type="email"
+                    className={inp}
+                    placeholder="customer@email.com"
+                    value={form.customerEmail}
+                    onChange={(e) => setField("customerEmail", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Phone</FieldLabel>
+                  <input
+                    className={inp}
+                    placeholder="+91 98765 43210"
+                    value={form.customerPhone}
+                    onChange={(e) => setField("customerPhone", e.target.value)}
+                  />
+                </div>
+              </div>
+            </Section>
+
+            {/* ── Section 3: Item Details ── */}
+            <Section title="Item Details" icon={FileText}>
+
+              {/* Desktop table view */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm" style={{ minWidth: 680 }}>
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      {["Item Name","Account","HSN/SAC","Qty","Rate (₹)","Disc (₹)","Tax %","Amount (₹)"].map((h) => (
+                        <th key={h} className="pb-2 pr-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-400 last:pr-0 last:text-right">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="align-top">
+                      <td className="pt-3 pr-3">
+                        <input className={inp} placeholder="Item name" value={form.item.itemName} onChange={(e) => setItemField("itemName", e.target.value)} />
+                      </td>
+                      <td className="pt-3 pr-3 w-28">
+                        <input className={inp} placeholder="Account" value={form.item.account} onChange={(e) => setItemField("account", e.target.value)} />
+                      </td>
+                      <td className="pt-3 pr-3 w-24">
+                        <input className={inp} placeholder="HSN/SAC" value={form.item.hsnSac} onChange={(e) => setItemField("hsnSac", e.target.value)} />
+                      </td>
+                      <td className="pt-3 pr-3 w-20">
+                        <input type="number" min="0" className={inp} value={form.item.quantity} onChange={(e) => setItemField("quantity", toNumber(e.target.value, 1))} />
+                      </td>
+                      <td className="pt-3 pr-3 w-24">
+                        <input type="number" min="0" className={inp} value={form.item.rate} onChange={(e) => setItemField("rate", toNumber(e.target.value))} />
+                      </td>
+                      <td className="pt-3 pr-3 w-24">
+                        <input type="number" min="0" className={inp} value={form.item.discount} onChange={(e) => setItemField("discount", toNumber(e.target.value))} />
+                      </td>
+                      <td className="pt-3 pr-3 w-20">
+                        <input type="number" min="0" max="100" className={inp} value={form.item.taxRate} onChange={(e) => setItemField("taxRate", toNumber(e.target.value))} />
+                      </td>
+                      <td className="pt-3 w-28">
+                        <input readOnly className={`${inp} text-right bg-gray-50 font-semibold text-gray-700 cursor-default`} value={(itemAmount + taxAmt).toFixed(2)} />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile card view */}
+              <div className="md:hidden space-y-3">
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <FieldLabel>Item Name</FieldLabel>
+                    <input className={inp} placeholder="Item name" value={form.item.itemName} onChange={(e) => setItemField("itemName", e.target.value)} />
+                  </div>
+                  <div>
+                    <FieldLabel>Account</FieldLabel>
+                    <input className={inp} placeholder="Account" value={form.item.account} onChange={(e) => setItemField("account", e.target.value)} />
+                  </div>
+                  <div>
+                    <FieldLabel>HSN/SAC</FieldLabel>
+                    <input className={inp} placeholder="HSN/SAC" value={form.item.hsnSac} onChange={(e) => setItemField("hsnSac", e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FieldLabel>Quantity</FieldLabel>
+                    <input type="number" min="0" className={inp} value={form.item.quantity} onChange={(e) => setItemField("quantity", toNumber(e.target.value, 1))} />
+                  </div>
+                  <div>
+                    <FieldLabel>Rate (₹)</FieldLabel>
+                    <input type="number" min="0" className={inp} value={form.item.rate} onChange={(e) => setItemField("rate", toNumber(e.target.value))} />
+                  </div>
+                  <div>
+                    <FieldLabel>Discount (₹)</FieldLabel>
+                    <input type="number" min="0" className={inp} value={form.item.discount} onChange={(e) => setItemField("discount", toNumber(e.target.value))} />
+                  </div>
+                  <div>
+                    <FieldLabel>Tax %</FieldLabel>
+                    <input type="number" min="0" max="100" className={inp} value={form.item.taxRate} onChange={(e) => setItemField("taxRate", toNumber(e.target.value))} />
+                  </div>
+                </div>
+                {/* Amount badge */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-lg">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</span>
+                  <span className="text-base font-bold text-blue-700">₹{(itemAmount + taxAmt).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Description — shared */}
+              <div className="mt-4">
+                <FieldLabel>Description</FieldLabel>
+                <input
+                  className={inp}
+                  placeholder="Item description (optional)"
+                  value={form.item.description}
+                  onChange={(e) => setItemField("description", e.target.value)}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => toast.info("Multiple line items coming soon")}
+                className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+              >
+                <Plus size={13} /> Add Another Item
+              </button>
+            </Section>
+
+            {/* ── Section 4: Notes & Terms ── */}
+            <Section title="Notes & Terms" icon={StickyNote} defaultOpen={false}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <FieldLabel>Customer Notes</FieldLabel>
+                  <textarea
+                    className={ta}
+                    rows={4}
+                    placeholder="e.g. Clarification will be made on the post quality check…"
+                    value={form.notes}
+                    onChange={(e) => setField("notes", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Terms & Conditions</FieldLabel>
+                  <textarea
+                    className={ta}
+                    rows={4}
+                    placeholder="e.g. Price mentioned are excluding Taxes."
+                    value={form.terms}
+                    onChange={(e) => setField("terms", e.target.value)}
+                  />
+                </div>
+              </div>
+            </Section>
+
+            {/* ── Mobile-only bottom save bar ── */}
+            <div className="lg:hidden mt-2 mb-4 bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-2">
+              <button
+                onClick={() => handleSave("open")}
+                disabled={saving}
+                className="w-full py-3 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                Save as Open
+              </button>
+              <button
+                onClick={() => handleSave("draft")}
+                disabled={saving}
+                className="w-full py-2.5 text-sm font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Save as Draft
+              </button>
+            </div>
+
+          </div>{/* end main column */}
+
+          {/* ── Sidebar (desktop only sticky) ─────────────────────────────── */}
+          <div className="hidden lg:flex flex-col gap-4 sticky top-[60px]">
+
+            {/* Amount Summary */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50/70">
+                <div className="w-1 h-4 bg-blue-600 rounded-full shrink-0" />
+                <ReceiptIndianRupee size={13} className="text-blue-600" />
+                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-700">Summary</h3>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Sub Total</span>
+                  <span className="font-semibold text-gray-800">₹{computed.subtotal.toFixed(2)}</span>
+                </div>
+                {form.item.taxRate > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Tax ({form.item.taxRate}%)</span>
+                    <span className="font-semibold text-gray-800">₹{computed.taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-gray-500">Shipping</span>
+                  <input
+                    type="number" min="0"
+                    className="w-24 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    value={form.shippingCharges}
+                    onChange={(e) => setField("shippingCharges", toNumber(e.target.value))}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-gray-500">Adjustment</span>
+                  <input
+                    type="number"
+                    className="w-24 px-2 py-1 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    value={form.adjustment}
+                    onChange={(e) => setField("adjustment", toNumber(e.target.value))}
+                  />
+                </div>
+                <div className="pt-3 border-t border-gray-100">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-900">Total</span>
+                    <span className="text-lg font-bold text-blue-700">₹{computed.total.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1.5 flex justify-between text-xs text-blue-600">
+                    <span>Credits Remaining</span>
+                    <span className="font-semibold">₹{computed.creditsRemaining.toFixed(2)}</span>
+                  </div>
+                </div>
+                {computed.total > 0 && (
+                  <p className="text-[11px] text-gray-400 italic pt-1 border-t border-gray-100 leading-snug">
+                    {computed.totalInWords}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Tax Mode */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Tax Mode</h3>
+              <div className="flex gap-2">
+                {(["tds", "tcs"] as const).map((mode) => (
+                  <label
+                    key={mode}
+                    className={`flex-1 flex items-center justify-center gap-2 cursor-pointer py-2 rounded-lg border transition-colors text-sm font-semibold ${
+                      form.taxMode === mode
+                        ? "border-blue-400 bg-blue-50 text-blue-700"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    <input type="radio" className="accent-blue-600" checked={form.taxMode === mode} onChange={() => setField("taxMode", mode)} />
+                    {mode.toUpperCase()}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Actions</h3>
+              <button
+                onClick={() => handleSave("open")}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                <Save size={14} /> Save as Open
+              </button>
+              <button
+                onClick={() => handleSave("draft")}
+                disabled={saving}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Save as Draft
+              </button>
+              <button
+                onClick={() => navigate("/sales/credit-notes")}
+                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+
+          </div>{/* end sidebar */}
 
         </div>
       </div>
