@@ -309,6 +309,8 @@ export default function App() {
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
 
   useEffect(() => {
+    // Re-read on mount to always pick up latest store data
+    setVendors(getVendors());
     const onUpdate = () => setVendors(getVendors());
     window.addEventListener('nidoVendorsUpdated', onUpdate);
     return () => window.removeEventListener('nidoVendorsUpdated', onUpdate);

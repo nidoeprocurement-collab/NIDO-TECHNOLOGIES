@@ -83,6 +83,8 @@ export default function ClientsPageUI() {
   }
 
   useEffect(() => {
+    // Re-read on mount to always pick up latest store data
+    setAllClientsState(getStoredClients())
     const onUpdate = () => setAllClientsState(getStoredClients())
     window.addEventListener('nidoClientsUpdated', onUpdate)
     return () => window.removeEventListener('nidoClientsUpdated', onUpdate)
