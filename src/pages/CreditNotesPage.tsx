@@ -1,256 +1,984 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  Archive,
+  Calendar,
   Download,
-  Plus,
-  Search,
+  FileText,
   Filter,
-  MoreVertical,
+  Hash,
+  Mail,
+  MoreHorizontal,
+  Plus,
+  ReceiptIndianRupee,
+  Search,
+  Tag,
+  User,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 
-export default function CreditNotesDashboard() {
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { useData } from "@/contexts/DataContext";
+import { safeReadJson } from "@/lib/utils";
+import { downloadCreditNotePdf } from "@/lib/creditNotePdf";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type Reason =
+  | "Sales Return"
+  | "Post Sale Discount"
+  | "Deficiency in service"
+  | "Correction in invoice"
+  | "Change in POS"
+  | "Finalization of Provisional assessment"
+  | "Others";
+
+type CreditStatus = "draft" | "open";
+
+interface CreditItem {
+  itemName: string;
+  account: string;
+  description: string;
+  hsnSac: string;
+  quantity: number;
+  rate: number;
+  discount: number;
+  taxRate: number;
+}
+
+interface CreditNoteEntry {
+  id: string;
+  creditNoteNumber: string;
+  referenceNumber: string;
+  customerName: string;
+  customerAddress: string;
+  customerGstin: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  issueDate: string;
+  reason: Reason;
+  placeOfSupply: string;
+  status: CreditStatus;
+  item: CreditItem;
+  shippingCharges: number;
+  adjustment: number;
+  subtotal: number;
+  total: number;
+  creditsRemaining: number;
+  totalInWords: string;
+  notes: string;
+  terms: string;
+  taxMode: "tds" | "tcs";
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const STORAGE_KEY = "nido_credit_notes_v3";
+
+const reasons: Reason[] = [
+  "Sales Return",
+  "Post Sale Discount",
+  "Deficiency in service",
+  "Correction in invoice",
+  "Change in POS",
+  "Finalization of Provisional assessment",
+  "Others",
+];
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const numberToWordsLocal = (value: number) => {
+  const units = ["Zero","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  const convert = (num: number): string => {
+    if (num < 20) return units[num];
+    if (num < 100) return `${tens[Math.floor(num / 10)]}${num % 10 ? ` ${units[num % 10]}` : ""}`;
+    if (num < 1000) { const rem = num % 100; return `${units[Math.floor(num / 100)]} Hundred${rem ? ` ${convert(rem)}` : ""}`; }
+    if (num < 100000) { const rem = num % 1000; return `${convert(Math.floor(num / 1000))} Thousand${rem ? ` ${convert(rem)}` : ""}`; }
+    return String(num);
+  };
+  return `Indian Rupee ${convert(Math.max(0, Math.round(value)))} Only`;
+};
+
+const computeTotals = (item: CreditItem, shippingCharges: number, adjustment: number) => {
+  const base = Math.max(0, item.quantity * item.rate - item.discount);
+  const total = Math.round((base + shippingCharges + adjustment) * 100) / 100;
+  return {
+    subtotal: Math.round(base * 100) / 100,
+    total,
+    creditsRemaining: total,
+    totalInWords: numberToWordsLocal(total),
+  };
+};
+
+function nextCode(prefix: string, existing: string[], pad = 5): string {
+  const nums = existing
+    .map((s) => { const m = s.match(/(\d+)$/); return m ? parseInt(m[1], 10) : 0; })
+    .filter((n) => Number.isFinite(n));
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return `${prefix}-${String(next).padStart(pad, "0")}`;
+}
+
+const defaultNotes: CreditNoteEntry[] = [
+  {
+    id: "cn-1",
+    creditNoteNumber: "CN-God-00002",
+    referenceNumber: "142012681",
+    customerName: "Godrej & Boyce",
+    customerAddress: "Godrej & Boyce Mfg. Co. Ltd.\nMADKAI\nD6 MADKAI INDUSTRIAL ESTATE\nPonda\n403404 Goa\nIndia",
+    customerGstin: "30AAACG1395D1Z7",
+    invoiceNumber: "18/GB/050715",
+    invoiceDate: "2018-12-02",
+    issueDate: "2019-11-07",
+    reason: "Sales Return",
+    placeOfSupply: "Goa (30)",
+    status: "draft",
+    item: { itemName: "MRT-113-24-G1", account: "Sales", description: "Gauge Manufacturing & Inspection", hsnSac: "90173021", quantity: 1, rate: 3380, discount: 0, taxRate: 0 },
+    shippingCharges: 0,
+    adjustment: 0,
+    subtotal: 3380,
+    total: 3380,
+    creditsRemaining: 3380,
+    totalInWords: "Indian Rupee Three Thousand Three Hundred Eighty Only",
+    notes: "1. Clarification will be made on the post quality check mutually.",
+    terms: "1. As per the debit note, credit note raised for the correction of the product.\n2. Quality check will be made as on F2F on the dated supply, post confirmation by mutual understanding.\n3. Price mentioned are excluding Taxes.",
+    taxMode: "tds",
+  },
+  {
+    id: "cn-2",
+    creditNoteNumber: "CN-God-00006",
+    referenceNumber: "142012684",
+    customerName: "Godrej & Boyce",
+    customerAddress: "Godrej & Boyce Mfg. Co. Ltd.\nMADKAI\nD6 MADKAI INDUSTRIAL ESTATE\nPonda\n403404 Goa\nIndia",
+    customerGstin: "30AAACG1395D1Z7",
+    invoiceNumber: "INV-18/GB/050761",
+    invoiceDate: "2019-11-07",
+    issueDate: "2019-11-07",
+    reason: "Sales Return",
+    placeOfSupply: "Goa (30)",
+    status: "open",
+    item: { itemName: "MRT-113-24-G1", account: "Sales", description: "Gauge Manufacturing & Inspection", hsnSac: "90173021", quantity: 1, rate: 3380, discount: 0, taxRate: 0 },
+    shippingCharges: 0,
+    adjustment: 0,
+    subtotal: 3380,
+    total: 3380,
+    creditsRemaining: 3380,
+    totalInWords: "Indian Rupee Three Thousand Three Hundred Eighty Only",
+    notes: "1. Clarification will be made on the post quality check mutually.",
+    terms: "1. As per the debit note, credit note raised for the correction of the product.\n2. Quality check will be made as on F2F on the dated supply, post confirmation by mutual understanding.\n3. Price mentioned are excluding Taxes.",
+    taxMode: "tds",
+  },
+];
+
+const normalize = (entry: Partial<CreditNoteEntry>): CreditNoteEntry => {
+  const item: CreditItem = {
+    itemName: entry.item?.itemName || "",
+    account: entry.item?.account || "Sales",
+    description: entry.item?.description || "",
+    hsnSac: entry.item?.hsnSac || "",
+    quantity: toNumber(entry.item?.quantity, 1),
+    rate: toNumber(entry.item?.rate, 0),
+    discount: toNumber(entry.item?.discount, 0),
+    taxRate: toNumber(entry.item?.taxRate, 0),
+  };
+  const shippingCharges = toNumber(entry.shippingCharges, 0);
+  const adjustment = toNumber(entry.adjustment, 0);
+  const computed = computeTotals(item, shippingCharges, adjustment);
+  return {
+    ...defaultNotes[0],
+    ...entry,
+    item,
+    shippingCharges,
+    adjustment,
+    subtotal: toNumber(entry.subtotal, computed.subtotal),
+    total: toNumber(entry.total, computed.total),
+    creditsRemaining: toNumber(entry.creditsRemaining, computed.creditsRemaining),
+    totalInWords: entry.totalInWords || computed.totalInWords,
+    status: entry.status === "open" ? "open" : "draft",
+    taxMode: entry.taxMode === "tcs" ? "tcs" : "tds",
+  };
+};
+
+function fmt(n: number) {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(v: string) {
+  if (!v) return "—";
+  const [y, m, d] = v.split("-");
+  return y && m && d ? `${d}/${m}/${y}` : v;
+}
+
+const STATUS_STYLES: Record<CreditStatus, string> = {
+  open: "bg-green-100 text-green-700",
+  draft: "bg-yellow-100 text-yellow-700",
+};
+
+// ── Credit Note Preview Drawer ────────────────────────────────────────────────
+function CreditNotePreviewDrawer({
+  note,
+  onClose,
+  onEdit,
+  onDownload,
+  onConvertToOpen,
+  downloading,
+}: {
+  note: CreditNoteEntry;
+  onClose: () => void;
+  onEdit: () => void;
+  onDownload: () => void;
+  onConvertToOpen: () => void;
+  downloading: boolean;
+}) {
   return (
-    <div className="max-w-[1280px]space-y-6">
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-gray-500">
-              Sales &gt; Credit Notes
-            </p>
-            <h1 className="text-2xl font-bold text-gray-900">Credit Notes</h1>
-            <p className="text-gray-500 mt-1 text-sm">
-              Create, manage and track customer credit notes.
-            </p>
-          </div>
+      {/* panel */}
+      <div className="relative z-10 w-full max-w-xl bg-white h-full flex flex-col shadow-2xl border-l border-gray-200">
 
-          <div className="flex gap-3">
-            <button className="border border-gray-200 rounded-lg px-2 py-2 flex items-center gap-2 text-sm">
-              <Download size={16} />
-              Export
-            </button>
-
-            <button className="bg-blue-600 text-white px-2 py-2 rounded-lg flex items-center gap-2 text-sm">
-              <Plus size={16} />
-              New Credit Note
-            </button>
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-5 gap-4">
-          <SummaryCard
-            title="Total Credits"
-            value="₹45,000.00"
-          />
-
-          <SummaryCard
-            title="Total Credit Notes"
-            value="12"
-          />
-
-          <SummaryCard
-            title="Draft"
-            value="6"
-          />
-
-          <SummaryCard
-            title="Open"
-            value="6"
-          />
-
-          <SummaryCard
-            title="Credit Value"
-            value="₹45,000.00"
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className="grid grid-cols-12 gap-6">
-
-          {/* Table */}
-          <div className="col-span-7 bg-white rounded-xl border border-gray-200">
-
-            {/* Filters */}
-            <div className="p-4 border-b flex gap-3">
-              <div className="relative flex-1">
-                <Search
-                  size={18}
-                  className="absolute left-3 top-3 text-gray-400"
-                />
-
-                <input
-                  placeholder="Search credit notes..."
-                  className="w-full border rounded-lg pl-10 pr-3 py-2"
-                />
-              </div>
-
-              <button className="border px-2 rounded-lg flex items-center gap-2">
-                <Filter size={16} />
-                Filter
-              </button>
-
-              <input
-                type="text"
-                value="01/01/2024 - 31/12/2024"
-                readOnly
-                className="border rounded-lg px-4"
-              />
+        {/* ── Header ── */}
+        <div className="shrink-0 px-6 py-4 border-b border-gray-100 flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <FileText size={18} className="text-blue-600" />
             </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">{note.creditNoteNumber}</h2>
+              <p className="text-xs text-gray-500 mt-0.5">{note.customerName}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={onDownload}
+              disabled={downloading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+            >
+              <Download size={12} />
+              {downloading ? "…" : "PDF"}
+            </button>
+            <button
+              onClick={() => toast.info("Email queued")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Mail size={12} /> Email
+            </button>
+            <button
+              onClick={() => toast.info("Refund flow available")}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <ReceiptIndianRupee size={12} /> Refund
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
 
-            {/* Table */}
-            <table className="w-full">
+        {/* ── Body ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+          {/* What's Next banner */}
+          {note.status === "draft" && (
+            <div className="rounded-xl bg-blue-50 border border-blue-100 px-5 py-4">
+              <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-1">WHAT'S NEXT?</p>
+              <p className="text-sm text-blue-600 mb-3">
+                Email this credit note to your customer or convert it to open.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => toast.info("Credit note send queued")}
+                  className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Send Credit Note
+                </button>
+                <button
+                  onClick={onConvertToOpen}
+                  className="px-3 py-1.5 text-xs font-semibold text-blue-700 border border-blue-300 bg-white rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Convert to Open
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Credits Remaining hero */}
+          <div className="rounded-xl bg-blue-50 border border-blue-100 px-6 py-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-1">Credits Remaining</p>
+              <p className="text-3xl font-bold text-blue-700 tabular-nums">₹{fmt(note.creditsRemaining)}</p>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${STATUS_STYLES[note.status]}`}>
+              {note.status}
+            </span>
+          </div>
+
+          {/* Meta grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { icon: Calendar, label: "Credit Date", value: fmtDate(note.issueDate) },
+              { icon: Hash, label: "Credit Note #", value: note.creditNoteNumber },
+              { icon: Hash, label: "Reference #", value: note.referenceNumber || "—" },
+              { icon: FileText, label: "Invoice #", value: note.invoiceNumber || "—" },
+              { icon: Calendar, label: "Invoice Date", value: fmtDate(note.invoiceDate) },
+              { icon: Tag, label: "Reason", value: note.reason },
+            ].map(({ icon: Icon, label, value }) => (
+              <div key={label} className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Icon size={11} className="text-gray-400" />
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">{label}</p>
+                </div>
+                <p className="text-sm font-semibold text-gray-800 truncate">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Bill To */}
+          <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <User size={11} className="text-gray-400" />
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Bill To</p>
+            </div>
+            <p className="text-sm font-semibold text-blue-600">{note.customerName}</p>
+            <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{note.customerAddress}</p>
+            {note.customerGstin && <p className="text-xs text-gray-500 mt-1">GSTIN: {note.customerGstin}</p>}
+            {note.placeOfSupply && <p className="text-xs text-gray-500 mt-0.5">Place of Supply: {note.placeOfSupply}</p>}
+          </div>
+
+          {/* Item table */}
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Items</p>
+            </div>
+            <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="p-4">Date</th>
-                  <th>Credit Note #</th>
-                  <th>Reference #</th>
-                  <th>Customer</th>
-                  <th>Invoice #</th>
-                  <th>Status</th>
-                  <th>Amount</th>
-                  <th></th>
+                <tr className="border-b border-gray-100">
+                  <th className="px-4 py-2 text-left text-[10px] font-semibold text-gray-500 uppercase">Item</th>
+                  <th className="px-4 py-2 text-center text-[10px] font-semibold text-gray-500 uppercase">Qty</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">Rate</th>
+                  <th className="px-4 py-2 text-right text-[10px] font-semibold text-gray-500 uppercase">Amount</th>
                 </tr>
               </thead>
-
               <tbody>
-                {[1, 2, 3, 4, 5].map((row) => (
-                  <tr
-                    key={row}
-                    className="border-t hover:bg-gray-50"
-                  >
-                    <td className="p-4">07-Nov-2019</td>
-                    <td className="text-blue-600">
-                      CN-God-0000{row}
-                    </td>
-                    <td>14201268{row}</td>
-                    <td>Godrej & Boyce</td>
-                    <td>18/GB/050715</td>
-
-                    <td>
-                      <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded">
-                        DRAFT
-                      </span>
-                    </td>
-
-                    <td>₹3,380.00</td>
-
-                    <td>
-                      <MoreVertical size={18} />
-                    </td>
-                  </tr>
-                ))}
+                <tr>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-gray-800">{note.item.itemName}</p>
+                    {note.item.description && <p className="text-xs text-gray-500 mt-0.5">{note.item.description}</p>}
+                    {note.item.hsnSac && <p className="text-xs text-gray-400 mt-0.5">HSN/SAC: {note.item.hsnSac}</p>}
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-700">{note.item.quantity}</td>
+                  <td className="px-4 py-3 text-right text-gray-700">₹{fmt(note.item.rate)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-gray-800">₹{fmt(note.subtotal)}</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
-          {/* Preview Panel */}
-          <div className="col-span-5 bg-white rounded-xl border border-gray-200 p-5">
-
-            <h2 className="font-semibold text-xl mb-5">
-              Credit Note Preview
-            </h2>
-
-            <div className="border rounded-lg p-5">
-
-              <div className="flex justify-between">
-                <div>
-                  <h3 className="text-3xl font-bold text-blue-600">
-                    nido
-                  </h3>
-
-                  <p className="text-sm text-gray-600 mt-2">
-                    Nido Technologies Pvt. Ltd.
-                  </p>
-
-                  <p className="text-sm text-gray-500">
-                    Bengaluru, India
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <h3 className="font-bold text-2xl">
-                    CREDIT NOTE
-                  </h3>
-
-                  <p className="mt-2">
-                    CN-God-00002
-                  </p>
-                </div>
+          {/* Totals summary */}
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Summary</p>
+            </div>
+            <div className="divide-y divide-gray-100">
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-sm text-gray-600">Sub Total</span>
+                <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.subtotal)}</span>
               </div>
-
-              <div className="mt-6 border-t pt-4">
-                <h4 className="font-semibold">
-                  BILL TO
-                </h4>
-
-                <p className="mt-2">
-                  Godrej & Boyce Mfg. Co. Ltd.
-                </p>
-
-                <p className="text-sm text-gray-500">
-                  Goa, India
-                </p>
-              </div>
-
-              <div className="mt-6 border rounded">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="p-2">Item</th>
-                      <th>Qty</th>
-                      <th>Rate</th>
-                      <th>Amount</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    <tr>
-                      <td className="p-2">
-                        MRT-113-24-G1
-                      </td>
-                      <td>1</td>
-                      <td>3380</td>
-                      <td>3380</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-5 space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>₹3,380.00</span>
+              {note.shippingCharges > 0 && (
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-sm text-gray-600">Shipping Charges</span>
+                  <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.shippingCharges)}</span>
                 </div>
-
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>₹3,380.00</span>
+              )}
+              {note.adjustment !== 0 && (
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-sm text-gray-600">Adjustment</span>
+                  <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(note.adjustment)}</span>
                 </div>
+              )}
+              <div className="flex items-center justify-between px-4 py-3 bg-blue-50/60">
+                <span className="text-sm font-bold text-gray-800">Total</span>
+                <span className="text-base font-bold text-blue-700 tabular-nums">₹{fmt(note.total)}</span>
               </div>
-
             </div>
           </div>
 
+          {/* Total in Words */}
+          <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Total in Words</p>
+            <p className="text-sm text-gray-700 italic">{note.totalInWords}</p>
+          </div>
+
+          {/* Notes */}
+          {note.notes && (
+            <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
+              <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest mb-1">Customer Notes</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.notes}</p>
+            </div>
+          )}
+
+          {/* Terms */}
+          {note.terms && (
+            <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">Terms & Conditions</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.terms}</p>
+            </div>
+          )}
         </div>
+
+        {/* ── Footer ── */}
+        <div className="shrink-0 px-6 py-3 border-t border-gray-100 bg-gray-50/60">
+          <p className="text-xs text-gray-400 text-center">
+            Credit Note · {fmtDate(note.issueDate)}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
-function SummaryCard({
-  title,
-  value,
-}: {
-  title: string;
-  value: string;
-}) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
-      <p className="text-sm text-gray-500">
-        {title}
-      </p>
+// ── Main Page ─────────────────────────────────────────────────────────────────
+export default function CreditNotesPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams();
+  const { clients, generalSettings } = useData();
 
-      <h3 className="text-3xl font-bold mt-2">
-        {value}
-      </h3>
+  const createMode = location.pathname.endsWith("/create");
+  const editMode = location.pathname.endsWith("/edit") && !!params.id;
+
+  const [notes, setNotes] = useState<CreditNoteEntry[]>(() => {
+    const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, defaultNotes);
+    const list = Array.isArray(stored) && stored.length ? stored : defaultNotes;
+    return list.map((e) => normalize(e));
+  });
+
+  const [selectedId, setSelectedId] = useState(params.id || notes[0]?.id || "");
+  const [open, setOpen] = useState(createMode);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<CreditNoteEntry>(() => normalize(defaultNotes[0]));
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | CreditStatus>("all");
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [previewNote, setPreviewNote] = useState<CreditNoteEntry | null>(null);
+
+  const companyLogoUrl = Object.values(generalSettings).find((s) => s.companyLogo)?.companyLogo;
+  const creditNotePrefix = Object.values(generalSettings)[0]?.creditNotePrefix?.trim() || "CN";
+
+  const persist = (next: CreditNoteEntry[]) => {
+    setNotes(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  };
+
+  useEffect(() => {
+    if (createMode) {
+      setEditingId(null);
+      const seed = normalize({
+        ...defaultNotes[0],
+        id: `cn-${Date.now()}`,
+        issueDate: today(),
+        creditNoteNumber: nextCode(creditNotePrefix, notes.map((e) => e.creditNoteNumber), 5),
+      });
+      setForm(seed);
+      setOpen(true);
+    }
+  }, [createMode]);
+
+  useEffect(() => {
+    if (!editMode) return;
+    const target = notes.find((e) => e.id === params.id);
+    if (!target) return;
+    setEditingId(target.id);
+    setForm(target);
+    setOpen(true);
+  }, [editMode, params.id]);
+
+  useEffect(() => {
+    if (params.id) setSelectedId(params.id);
+  }, [params.id]);
+
+  const computed = useMemo(
+    () => computeTotals(form.item, form.shippingCharges, form.adjustment),
+    [form.item, form.shippingCharges, form.adjustment],
+  );
+
+  const closeDialog = () => {
+    setOpen(false);
+    setEditingId(null);
+    navigate("/sales/credit-notes", { replace: true });
+  };
+
+  const save = (status: CreditStatus) => {
+    if (!form.customerName.trim()) {
+      toast.error("Customer Name is required");
+      return;
+    }
+    const payload = normalize({ ...form, status, subtotal: computed.subtotal, total: computed.total, creditsRemaining: computed.creditsRemaining, totalInWords: computed.totalInWords });
+    if (editingId) {
+      persist(notes.map((e) => e.id === editingId ? { ...payload, id: editingId } : e));
+      setSelectedId(editingId);
+      toast.success("Credit note updated");
+      closeDialog();
+      return;
+    }
+    const created = { ...payload, id: `cn-${Date.now()}` };
+    persist([created, ...notes]);
+    setSelectedId(created.id);
+    toast.success("Credit note created");
+    closeDialog();
+  };
+
+  const convertToOpen = (note: CreditNoteEntry) => {
+    persist(notes.map((e) => e.id === note.id ? { ...e, status: "open" } : e));
+    if (previewNote?.id === note.id) setPreviewNote((prev) => prev ? { ...prev, status: "open" } : prev);
+    toast.success("Credit note converted to open");
+  };
+
+  const handleDownload = async (note: CreditNoteEntry) => {
+    setDownloadingId(note.id);
+    try {
+      await downloadCreditNotePdf(note, `${note.creditNoteNumber}.pdf`);
+      toast.success(`${note.creditNoteNumber}.pdf downloaded`);
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const bindCustomer = (name: string) => {
+    const match = clients.find((c) => c.name === name);
+    setForm((cur) => normalize({
+      ...cur,
+      customerName: name,
+      customerAddress: match?.locationDetails?.address || match?.address || cur.customerAddress,
+      customerGstin: match?.gst || cur.customerGstin,
+      placeOfSupply: match?.locationDetails?.state || cur.placeOfSupply,
+    }));
+  };
+
+  // ── Filtered list ──────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return notes.filter((n) => {
+      if (statusFilter !== "all" && n.status !== statusFilter) return false;
+      if (q) return (
+        n.creditNoteNumber.toLowerCase().includes(q) ||
+        n.customerName.toLowerCase().includes(q) ||
+        n.referenceNumber.toLowerCase().includes(q) ||
+        n.invoiceNumber.toLowerCase().includes(q)
+      );
+      return true;
+    });
+  }, [notes, search, statusFilter]);
+
+  // ── Summary stats ──────────────────────────────────────────────────────────
+  const totalCredits = notes.reduce((s, n) => s + n.creditsRemaining, 0);
+  const draftCount = notes.filter((n) => n.status === "draft").length;
+  const openCount = notes.filter((n) => n.status === "open").length;
+  const totalAmount = notes.reduce((s, n) => s + n.total, 0);
+
+  return (
+    <div className="min-h-screen bg-white">
+
+      {/* ── Header ── */}
+      <div className="border-b border-gray-200/70">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Sales › Credit Notes</p>
+            <h1 className="text-xl font-bold text-gray-900">Credit Notes</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Create, manage and track customer credit notes.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              onClick={() => toast.info("Export coming soon")}
+            >
+              <Download size={15} /> Export
+            </button>
+            <button
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+              onClick={() => navigate("/sales/credit-notes/create")}
+            >
+              <Plus size={15} /> New Credit Note
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Summary Cards ── */}
+      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+        <div className="grid grid-cols-5 gap-3">
+          {[
+            { label: "Total Credits", value: `₹${fmt(totalCredits)}`, color: "text-blue-700" },
+            { label: "Total Credit Notes", value: String(notes.length), color: "text-gray-900" },
+            { label: "Draft", value: String(draftCount), color: "text-yellow-600" },
+            { label: "Open", value: String(openCount), color: "text-green-600" },
+            { label: "Credit Value", value: `₹${fmt(totalAmount)}`, color: "text-gray-900" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-white rounded-xl border border-gray-200 px-4 py-4">
+              <p className="text-xs text-gray-500">{label}</p>
+              <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="px-6 py-5">
+
+        {/* Search + Filter bar */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1 max-w-xs">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              placeholder="Search credit notes…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+          </div>
+          <div className="flex items-center gap-1 border border-gray-200 rounded-lg bg-gray-50 p-1">
+            {(["all", "draft", "open"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors capitalize ${
+                  statusFilter === s
+                    ? "bg-white text-blue-700 shadow-sm border border-gray-200"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s !== "all" && (
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${s === "draft" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"}`}>
+                    {s === "draft" ? draftCount : openCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <button className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors ml-auto">
+            <Filter size={14} /> Filter
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50/70">
+                {["Date", "Credit Note #", "Reference #", "Customer", "Invoice #", "Status", "Amount", ""].map((h, i) => (
+                  <th
+                    key={h + i}
+                    className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-gray-500 ${
+                      i === 6 ? "text-right" : i === 7 ? "text-center" : "text-left"
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-14 text-center text-sm text-gray-400">
+                    No credit notes found.{" "}
+                    <button
+                      onClick={() => navigate("/sales/credit-notes/create")}
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      + Create one
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((note) => {
+                  const isActive = previewNote?.id === note.id;
+                  const isLoading = downloadingId === note.id;
+                  return (
+                    <tr
+                      key={note.id}
+                      onClick={() => setPreviewNote(isActive ? null : note)}
+                      className={`border-b border-gray-100 last:border-0 cursor-pointer transition-colors ${
+                        isActive ? "bg-blue-50/60" : "hover:bg-gray-50/60"
+                      }`}
+                    >
+                      <td className="px-4 py-3 text-gray-600">{fmtDate(note.issueDate)}</td>
+                      <td className="px-4 py-3 font-medium text-blue-600">{note.creditNoteNumber}</td>
+                      <td className="px-4 py-3 text-gray-500">{note.referenceNumber}</td>
+                      <td className="px-4 py-3 text-gray-700 font-medium">{note.customerName}</td>
+                      <td className="px-4 py-3 text-gray-500">{note.invoiceNumber || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[note.status]}`}>
+                          {note.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
+                        ₹{fmt(note.total)}
+                      </td>
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              disabled={isLoading}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-40"
+                            >
+                              {isLoading ? (
+                                <span className="block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                              ) : (
+                                <MoreHorizontal size={16} />
+                              )}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              className="gap-2 cursor-pointer"
+                              onSelect={() => navigate(`/sales/credit-notes/${note.id}/edit`)}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2 cursor-pointer"
+                              onSelect={() => handleDownload(note)}
+                            >
+                              <Download size={14} /> Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2 cursor-pointer"
+                              onSelect={() => toast.info("Email queued")}
+                            >
+                              <Mail size={14} /> Send Email
+                            </DropdownMenuItem>
+                            {note.status === "draft" && (
+                              <DropdownMenuItem
+                                className="gap-2 cursor-pointer"
+                                onSelect={() => convertToOpen(note)}
+                              >
+                                Convert to Open
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="gap-2 cursor-pointer"
+                              onSelect={() => toast.info("Refund flow available")}
+                            >
+                              <ReceiptIndianRupee size={14} /> Refund
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Preview Drawer ── */}
+      {previewNote && (
+        <CreditNotePreviewDrawer
+          note={previewNote}
+          onClose={() => setPreviewNote(null)}
+          onEdit={() => {
+            setPreviewNote(null);
+            navigate(`/sales/credit-notes/${previewNote.id}/edit`);
+          }}
+          onDownload={() => handleDownload(previewNote)}
+          onConvertToOpen={() => convertToOpen(previewNote)}
+          downloading={downloadingId === previewNote.id}
+        />
+      )}
+
+      {/* ── Create / Edit Dialog ── */}
+      <Dialog open={open} onOpenChange={(isOpen) => (!isOpen ? closeDialog() : setOpen(isOpen))}>
+        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Edit Credit Note" : "New Credit Note"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            {/* Row 1 */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>Customer Name *</Label>
+                <Select value={form.customerName} onValueChange={bindCustomer}>
+                  <SelectTrigger><SelectValue placeholder="Select or add a customer" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Reason</Label>
+                <Select value={form.reason} onValueChange={(v: Reason) => setForm((c) => ({ ...c, reason: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {reasons.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Credit Note # *</Label>
+                <Input value={form.creditNoteNumber} onChange={(e) => setForm((c) => ({ ...c, creditNoteNumber: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Reference #</Label>
+                <Input value={form.referenceNumber} onChange={(e) => setForm((c) => ({ ...c, referenceNumber: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Invoice #</Label>
+                <Input value={form.invoiceNumber} onChange={(e) => setForm((c) => ({ ...c, invoiceNumber: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Invoice Date</Label>
+                <Input type="date" value={form.invoiceDate} onChange={(e) => setForm((c) => ({ ...c, invoiceDate: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Place of Supply</Label>
+                <Input value={form.placeOfSupply} onChange={(e) => setForm((c) => ({ ...c, placeOfSupply: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Credit Note Date *</Label>
+                <Input type="date" value={form.issueDate} onChange={(e) => setForm((c) => ({ ...c, issueDate: e.target.value }))} />
+              </div>
+            </div>
+
+            {/* Customer Address */}
+            <div>
+              <Label>Customer Address</Label>
+              <Textarea
+                rows={3}
+                value={form.customerAddress}
+                onChange={(e) => setForm((c) => ({ ...c, customerAddress: e.target.value }))}
+              />
+            </div>
+
+            {/* Item Table */}
+            <div className="rounded-xl border bg-white">
+              <div className="border-b px-4 py-3">
+                <p className="font-semibold text-sm">Item Table</p>
+              </div>
+              <div className="grid gap-4 p-4 lg:grid-cols-[1fr_320px]">
+                <div>
+                  <div className="grid gap-3 grid-cols-7 text-xs font-semibold text-gray-500 mb-1 px-1">
+                    {["Item Name","Account","Qty","Rate","Discount","Tax %","Amount"].map((h) => (
+                      <span key={h}>{h}</span>
+                    ))}
+                  </div>
+                  <div className="grid gap-3 grid-cols-7">
+                    <Input placeholder="Item name" value={form.item.itemName} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, itemName: e.target.value } }))} />
+                    <Input placeholder="Account" value={form.item.account} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, account: e.target.value } }))} />
+                    <Input type="number" value={form.item.quantity} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, quantity: toNumber(e.target.value, 1) } }))} />
+                    <Input type="number" value={form.item.rate} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, rate: toNumber(e.target.value) } }))} />
+                    <Input type="number" value={form.item.discount} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, discount: toNumber(e.target.value) } }))} />
+                    <Input type="number" value={form.item.taxRate} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, taxRate: toNumber(e.target.value) } }))} />
+                    <Input readOnly value={computed.total.toFixed(2)} className="text-right bg-gray-50" />
+                  </div>
+                  <Input className="mt-2" placeholder="Description (optional)" value={form.item.description} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, description: e.target.value } }))} />
+                  <Input className="mt-2" placeholder="HSN/SAC code" value={form.item.hsnSac} onChange={(e) => setForm((c) => ({ ...c, item: { ...c.item, hsnSac: e.target.value } }))} />
+                </div>
+
+                <div className="rounded-lg border bg-gray-50/70 p-4 text-sm space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Sub Total</span>
+                    <span className="font-semibold">₹{computed.subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-500">Shipping</span>
+                    <Input className="w-28 text-right h-8" type="number" value={form.shippingCharges} onChange={(e) => setForm((c) => ({ ...c, shippingCharges: toNumber(e.target.value) }))} />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {(["tds", "tcs"] as const).map((mode) => (
+                      <label key={mode} className="flex items-center gap-1.5 cursor-pointer text-gray-600">
+                        <input type="radio" checked={form.taxMode === mode} onChange={() => setForm((c) => ({ ...c, taxMode: mode }))} />
+                        {mode.toUpperCase()}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-500">Adjustment</span>
+                    <Input className="w-28 text-right h-8" type="number" value={form.adjustment} onChange={(e) => setForm((c) => ({ ...c, adjustment: toNumber(e.target.value) }))} />
+                  </div>
+                  <div className="border-t pt-3 flex justify-between font-bold text-base">
+                    <span>Total</span>
+                    <span className="text-blue-700">₹{computed.total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label>Customer Notes</Label>
+              <Textarea rows={3} value={form.notes} onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))} />
+            </div>
+
+            <div>
+              <Label>Terms & Conditions</Label>
+              <Textarea rows={3} value={form.terms} onChange={(e) => setForm((c) => ({ ...c, terms: e.target.value }))} />
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <p className="text-xs text-gray-400">PDF Template: Standard Template</p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => save("draft")}>Save as Draft</Button>
+                <Button onClick={() => save("open")} className="bg-blue-600 hover:bg-blue-700 text-white">Save as Open</Button>
+                <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
