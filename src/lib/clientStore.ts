@@ -1,4 +1,4 @@
-const STORE_KEY = 'nido_clients';
+const STORE_KEY = 'nido_clients_v2';
 
 export interface StoredClient {
   id: string;
@@ -26,8 +26,6 @@ const DEFAULT_CLIENTS: StoredClient[] = [
   { id: "CI-00017", name: "Global Exports", category: "Office Supplies", tier: "Basic", rep: "Priya Sharma", email: "priya@gmail.com", phone: "+91 76543 21098", mobile: "+91 77654 32109", website: "www.globalexp.com", contractStartDate: "2024-03-01", contractEndDate: "2025-03-01", status: "pending", billingAddress: "789 Export Plaza", billingCity: "Delhi", billingState: "Delhi", billingPincode: "110001" },
   { id: "CI-00016", name: "Express IT Services", category: "IT Hardware", tier: "Premium", rep: "Vikram Patel", email: "vikram@gmail.com", phone: "+91 65432 10987", mobile: "+91 66543 21098", website: "www.expressit.com", contractStartDate: "2024-04-01", contractEndDate: "2025-04-01", status: "active", billingAddress: "321 Tech Hub", billingCity: "Hyderabad", billingState: "Telangana", billingPincode: "500001" },
   { id: "CI-00015", name: "Digital Innovations", category: "Cloud Servers", tier: "Standard", rep: "Anita Desai", email: "anita@gmail.com", phone: "+91 54321 09876", mobile: "+91 55432 10987", website: "www.diginnovate.com", contractStartDate: "2024-05-01", contractEndDate: "2025-05-01", status: "active", billingAddress: "654 Innovation Drive", billingCity: "Pune", billingState: "Maharashtra", billingPincode: "411001" },
-  { id: "CI-00021", name: "Mohan Textiles", category: "Office Supplies", tier: "Basic", rep: "Mohan Bhat", email: "mohanbhat@gmail.com", phone: "+91 43210 98765", mobile: "+91 44321 09876", website: "www.mohantex.com", contractStartDate: "2024-06-01", contractEndDate: "2025-06-01", status: "active", billingAddress: "987 Textile Park", billingCity: "Surat", billingState: "Gujarat", billingPincode: "395001" },
-  { id: "CI-00008", name: "Naveen Solutions", category: "IT Hardware", tier: "Standard", rep: "Naveen Kumar", email: "naveenkumar@gmail.com", phone: "+91 32109 87654", mobile: "+91 33210 98765", website: "www.naveensol.com", contractStartDate: "2024-07-01", contractEndDate: "2025-07-01", status: "active", billingAddress: "147 Business Plaza", billingCity: "Ahmedabad", billingState: "Gujarat", billingPincode: "380001" },
 ];
 
 export function getClients(): StoredClient[] {
