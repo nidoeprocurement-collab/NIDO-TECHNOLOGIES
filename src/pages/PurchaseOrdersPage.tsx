@@ -178,11 +178,13 @@ const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
 };
 
 const nextBillNumber = (entries: any[]) => {
+  const prefix = loadConfig().prefixes.find((p) => p.key === "bill")?.value ?? "BL-";
   const max = entries.reduce((c, e) => {
-    const n = Number(e.billNumber?.replace(/\D/g, "") ?? 0);
-    return Number.isFinite(n) ? Math.max(c, n) : c;
-  }, 103);
-  return String(max + 1);
+    const raw = String(e.billNumber ?? "").replace(/\D/g, "");
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.max(c, n) : c;
+  }, 0);
+  return `${prefix}${String(max + 1).padStart(5, "0")}`;
 };
 
 const emptyForm = (): PurchaseOrderForm => ({
