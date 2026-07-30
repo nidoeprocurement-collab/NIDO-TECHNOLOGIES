@@ -237,7 +237,7 @@ export default function ExpensesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-screen-xl mx-auto space-y-5 p-6">
+      <div className="w-full space-y-5 p-6">
 
         {/* ── Header card with tabs ── */}
         <Card className="border-gray-200 shadow-sm">
