@@ -1,4 +1,5 @@
 const STORE_KEY = 'nido_clients_v2';
+const ARCHIVED_STORE_KEY = 'nido_clients_archived_v1';
 
 export interface StoredClient {
   id: string;
@@ -52,4 +53,20 @@ export function addClient(client: StoredClient): void {
     existing.push(client);
   }
   saveClients(existing);
+}
+
+export interface ArchivedClient extends StoredClient {
+  archivedOn: string;
+}
+
+export function getArchivedClients(): ArchivedClient[] {
+  try {
+    const raw = localStorage.getItem(ARCHIVED_STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+export function saveArchivedClients(clients: ArchivedClient[]): void {
+  localStorage.setItem(ARCHIVED_STORE_KEY, JSON.stringify(clients));
 }
