@@ -277,6 +277,7 @@ export default function PurchaseOrdersPage() {
   const [search, setSearch] = useState("");
   const [showPdfView, setShowPdfView] = useState(true);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmConvert, setConfirmConvert] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -327,7 +328,7 @@ export default function PurchaseOrdersPage() {
   }, [createMode, editMode, params.id]);
 
   // Reset cancel confirm when navigating away
-  useEffect(() => { setConfirmCancel(false); }, [params.id]);
+  useEffect(() => { setConfirmCancel(false); setConfirmConvert(false); }, [params.id]);
 
   const persist = (next: PurchaseOrderEntry[]) => {
     setManualOrders(next);
@@ -757,6 +758,25 @@ export default function PurchaseOrdersPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="w-full space-y-5 p-6">
+          {/* Convert to Bill confirmation banner */}
+          {confirmConvert && (
+            <div className="bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-200 rounded-xl p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white shrink-0">
+                  <ReceiptText className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900">Convert {selectedManual.poNumber} to a Bill?</p>
+                  <p className="text-xs text-gray-500 mt-0.5">A new bill will be created from this purchase order and you'll be taken to it immediately.</p>
+                  <div className="flex gap-3 mt-4">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => { setConfirmConvert(false); convertToBill(); }}>Yes, Convert to Bill</Button>
+                    <Button variant="outline" size="sm" onClick={() => setConfirmConvert(false)}>Cancel</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Cancel confirmation banner */}
           {confirmCancel && (
             <div className="bg-gradient-to-r from-rose-50 to-orange-50 border border-rose-200 rounded-xl p-5">
@@ -792,7 +812,7 @@ export default function PurchaseOrdersPage() {
                       <DropdownMenuItem onSelect={handleDownloadPdf} disabled={pdfLoading}>
                         <Download size={13} className="mr-2" />{pdfLoading ? "Generating…" : "Download PDF"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={convertToBill} disabled={selectedManual.status === "CANCELLED"}>
+                      <DropdownMenuItem onSelect={() => setConfirmConvert(true)} disabled={selectedManual.status === "CANCELLED"}>
                         <ReceiptText size={13} className="mr-2" /> Convert to Bill
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setConfirmCancel(true)} disabled={selectedManual.status === "CANCELLED"} className="text-red-600 focus:text-red-600">
