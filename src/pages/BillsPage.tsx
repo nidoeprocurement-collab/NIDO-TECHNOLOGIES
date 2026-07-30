@@ -137,19 +137,43 @@ const isoToIndian = toIndianDate;
 const indianToIso = toIsoDate;
 
 const getBillTotals = (entry: Pick<BillEntry, "items" | "adjustment">) => {
-  const subtotal = entry.items.reduce((sum, item) => {
+  const grossSubtotal = entry.items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
+  const totalDiscount = entry.items.reduce((sum, item) => {
     const base = item.quantity * item.rate;
-    const discountAmount = (base * item.discount) / 100;
-    return sum + (base - discountAmount);
+    return sum + (base * item.discount) / 100;
   }, 0);
-  const tax = entry.items.reduce((sum, item) => {
+  const totalTaxableValue = grossSubtotal - totalDiscount;
+
+  // GST slab breakdown (grouped by rate, same as invoice)
+  const slabMap: Record<number, { taxable: number; cgst: number; sgst: number }> = {};
+  entry.items.forEach((item) => {
     const base = item.quantity * item.rate;
-    const discountAmount = (base * item.discount) / 100;
-    const taxable = base - discountAmount;
-    return sum + (taxable * item.taxPercent) / 100;
-  }, 0);
-  const total = subtotal + tax + entry.adjustment;
-  return { subtotal, tax, cgst: tax / 2, sgst: tax / 2, total };
+    const disc = (base * item.discount) / 100;
+    const taxable = base - disc;
+    const rate = item.taxPercent;
+    if (!slabMap[rate]) slabMap[rate] = { taxable: 0, cgst: 0, sgst: 0 };
+    slabMap[rate].taxable += taxable;
+    slabMap[rate].cgst += taxable * (rate / 2) / 100;
+    slabMap[rate].sgst += taxable * (rate / 2) / 100;
+  });
+  const gstSlabs = Object.entries(slabMap)
+    .filter(([, v]) => v.taxable > 0)
+    .map(([rate, v]) => ({ rate: Number(rate), ...v }))
+    .sort((a, b) => a.rate - b.rate);
+
+  const totalGst = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
+  const total = totalTaxableValue + totalGst + entry.adjustment;
+
+  return {
+    grossSubtotal,
+    totalDiscount,
+    subtotal: totalTaxableValue,
+    tax: totalGst,
+    cgst: totalGst / 2,
+    sgst: totalGst / 2,
+    gstSlabs,
+    total,
+  };
 };
 
 const nextBillNumber = (entries: BillEntry[]) => {
@@ -765,7 +789,9 @@ export default function BillsPage() {
                         </td>
                         <td className="px-2 py-2 text-right text-gray-700 font-medium">{taxable.toFixed(2)}</td>
                         <td className="px-2 py-2">
-                          <input className={inp + " text-center"} value={String(item.taxPercent)} onChange={(e) => handleItemChange(item.id, "taxPercent", e.target.value)} />
+                          <select className={sel + " text-center"} value={String(item.taxPercent)} onChange={(e) => handleItemChange(item.id, "taxPercent", e.target.value)}>
+                            {[0, 5, 12, 18, 28].map((r) => <option key={r} value={r}>{r}%</option>)}
+                          </select>
                         </td>
                         <td className="px-2 py-2 text-right text-gray-700">{gst.toFixed(2)}</td>
                         <td className="px-2 py-2 text-right font-semibold text-gray-900">{netAmount.toFixed(2)}</td>
@@ -790,27 +816,51 @@ export default function BillsPage() {
                 <FieldLabel>Notes to Vendor</FieldLabel>
                 <textarea className={textareaClass} rows={4} value={form.notes} onChange={(e) => setF("notes", e.target.value)} placeholder="Add notes" />
               </div>
-              <div className="border border-gray-200 rounded-xl p-4 space-y-2 bg-gray-50/40">
-                <div className="flex items-center gap-3 py-1 text-sm text-gray-600">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" className="accent-blue-600" checked={form.tdsType === "TDS"} onChange={() => setF("tdsType", "TDS")} />
-                    TDS
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" className="accent-blue-600" checked={form.tdsType === "TCS"} onChange={() => setF("tdsType", "TCS")} />
-                    TCS
-                  </label>
-                </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Sub Total</span><span>{formTotals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span>Adjustment</span>
-                  <input type="number" className="w-24 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.adjustment} onChange={(e) => setF("adjustment", toNumber(e.target.value))} />
-                </div>
-                <div className="flex justify-between pt-2 border-t border-gray-200 text-sm font-bold text-gray-900">
-                  <span>Total</span><span>{money(formTotals.total)}</span>
-                </div>
+              <div className="border border-gray-200 rounded-lg overflow-hidden text-sm">
+                <table className="w-full">
+                  <tbody>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 text-gray-600">Gross Subtotal</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">₹{formTotals.grossSubtotal.toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">Item Level Discounts (−)</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹ − {formTotals.totalDiscount.toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹{formTotals.subtotal.toFixed(2)}</td>
+                    </tr>
+                    {formTotals.gstSlabs.map((slab) => (
+                      <>
+                        <tr key={`cgst-${slab.rate}`} className="border-b border-gray-100">
+                          <td className="px-4 py-2 text-gray-500 pl-6">CGST @ {slab.rate / 2}%</td>
+                          <td className="px-4 py-2 text-right text-gray-700">₹{slab.cgst.toFixed(2)}</td>
+                        </tr>
+                        <tr key={`sgst-${slab.rate}`} className="border-b border-gray-100">
+                          <td className="px-4 py-2 text-gray-500 pl-6">SGST @ {slab.rate / 2}%</td>
+                          <td className="px-4 py-2 text-right text-gray-700">₹{slab.sgst.toFixed(2)}</td>
+                        </tr>
+                      </>
+                    ))}
+                    {formTotals.gstSlabs.length === 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-4 py-2.5 text-gray-500">Total GST</td>
+                        <td className="px-4 py-2.5 text-right text-gray-700">₹0.00</td>
+                      </tr>
+                    )}
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 text-gray-600">Adjustment</td>
+                      <td className="px-4 py-2 text-right">
+                        <input type="number" className="w-24 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.adjustment} onChange={(e) => setF("adjustment", toNumber(e.target.value))} />
+                      </td>
+                    </tr>
+                    <tr className="border-t-2 border-gray-300 bg-blue-50/40">
+                      <td className="px-4 py-3 font-bold text-gray-900">Total</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">₹{formTotals.total.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </Section>
