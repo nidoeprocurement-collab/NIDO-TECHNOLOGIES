@@ -16,6 +16,12 @@ import { safeReadJson } from "@/lib/utils";
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ExpenseType = "Goods" | "Services";
 
+export interface ReceiptFile {
+  name: string;
+  dataUrl: string;
+  type: string;
+}
+
 interface ExpenseEntry {
   id: string;
   date: string;
@@ -39,7 +45,7 @@ interface ExpenseEntry {
   invoiceNumber: string;
   notes: string;
   reportingTags: string[];
-  receipts: string[];
+  receipts: ReceiptFile[];
 }
 
 const STORAGE_KEY = "nido_expenses_v1";
@@ -142,7 +148,7 @@ export default function NewExpensePage() {
   const [expenseTab, setExpenseTab] = useState<"expense" | "mileage">(
     "expense",
   );
-  const [receipts, setReceipts] = useState<string[]>([]);
+  const [receipts, setReceipts] = useState<ReceiptFile[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -183,8 +189,20 @@ export default function NewExpensePage() {
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    setReceipts((c) => [...c, ...files.map((f) => f.name)]);
-    toast({ title: `${files.length} receipt(s) attached` });
+    let loaded = 0;
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setReceipts((c) => [
+          ...c,
+          { name: file.name, dataUrl: reader.result as string, type: file.type },
+        ]);
+        loaded += 1;
+        if (loaded === files.length)
+          toast({ title: `${files.length} receipt(s) attached` });
+      };
+      reader.readAsDataURL(file);
+    });
     e.target.value = "";
   };
 
@@ -728,16 +746,16 @@ export default function NewExpensePage() {
 
                 {receipts.length > 0 && (
                   <div className="mt-4 space-y-2 text-left">
-                    {receipts.map((name) => (
+                    {receipts.map((file) => (
                       <div
-                        key={name}
+                        key={file.name}
                         className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
                       >
-                        <span className="truncate text-gray-700">{name}</span>
+                        <span className="truncate text-gray-700">{file.name}</span>
                         <button
                           type="button"
                           onClick={() =>
-                            setReceipts((c) => c.filter((v) => v !== name))
+                            setReceipts((c) => c.filter((v) => v.name !== file.name))
                           }
                           className="text-gray-400 hover:text-red-500 shrink-0"
                         >

@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useReactToPrint } from "react-to-print";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,8 +21,15 @@ import {
 } from "@/components/ui/table";
 import { safeReadJson } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
-import { Ellipsis, ImageUp, Plus } from "lucide-react";
+import { generateExpensePdf } from "@/lib/expensePdf";
+import {
+  Download,
+  Ellipsis,
+  FileText,
+  Plus,
+} from "lucide-react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import type { ReceiptFile } from "./NewExpensePage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type BillableStatus = "BILLABLE" | "NON-BILLABLE";
@@ -51,7 +57,8 @@ interface ExpenseEntry {
   invoiceNumber: string;
   notes: string;
   reportingTags: string[];
-  receipts: string[];
+  // receipts can be ReceiptFile objects (new) or legacy strings
+  receipts: (ReceiptFile | string)[];
 }
 
 const STORAGE_KEY = "nido_expenses_v1";
@@ -105,7 +112,7 @@ const defaultExpenses: ExpenseEntry[] = [
     invoiceNumber: "160",
     notes: "1. Clarification will be made post quality check mutually.",
     reportingTags: ["Materials"],
-    receipts: ["bill-materials-june.pdf"],
+    receipts: [],
   },
   {
     id: "ex-3",
@@ -141,80 +148,18 @@ const fmtCurrency = (value: number) =>
     minimumFractionDigits: 2,
   }).format(value);
 
-// ── Print sheet ───────────────────────────────────────────────────────────────
-function ExpensePrintSheet({ entry }: { entry: ExpenseEntry }) {
+// Normalise a receipt entry to a ReceiptFile (handles legacy string entries)
+function toReceiptFile(r: ReceiptFile | string): ReceiptFile {
+  if (typeof r === "string") return { name: r, dataUrl: "", type: "" };
+  return r;
+}
+
+// ── Field row helper ──────────────────────────────────────────────────────────
+function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="mx-auto w-[794px] border border-slate-200 bg-white px-8 py-8 text-slate-900">
-      <h1 className="text-2xl font-semibold">Expense Detail</h1>
-      <div className="mt-4 flex items-start justify-between gap-6">
-        <div>
-          <p className="text-xs text-muted-foreground">Expense Amount</p>
-          <p className="text-4xl font-semibold text-rose-500">
-            {fmtCurrency(entry.amount)}
-          </p>
-          <p className="text-xs text-muted-foreground">on {entry.date}</p>
-          <p className="mt-1 text-xs font-medium">{entry.status}</p>
-          <Badge className="mt-2" variant="secondary">
-            {entry.expenseAccount}
-          </Badge>
-        </div>
-        <div className="w-[220px] rounded-xl border border-dashed p-4 text-center">
-          <ImageUp className="mx-auto h-10 w-10 text-slate-500" />
-          <p className="mt-3 text-sm font-medium">Receipt</p>
-          <p className="text-xs text-muted-foreground">Attached in app</p>
-        </div>
-      </div>
-      <div className="mt-6 grid gap-3 text-sm md:grid-cols-2">
-        <div><p className="text-xs text-muted-foreground">Paid Through</p><p>{entry.paidThrough}</p></div>
-        <div><p className="text-xs text-muted-foreground">Tax</p><p>{entry.taxLabel} ({entry.taxPercent}%)</p></div>
-        <div><p className="text-xs text-muted-foreground">Tax Amount</p><p>{fmtCurrency(entry.taxAmount)} ({entry.amountIs})</p></div>
-        <div><p className="text-xs text-muted-foreground">Ref #</p><p>{entry.referenceNumber}</p></div>
-        <div><p className="text-xs text-muted-foreground">Customer</p><p>{entry.customerName}</p></div>
-        <div><p className="text-xs text-muted-foreground">Paid To</p><p>{entry.vendorName}</p></div>
-        <div><p className="text-xs text-muted-foreground">GST Treatment</p><p>{entry.gstTreatment}</p></div>
-        <div><p className="text-xs text-muted-foreground">HSN Code</p><p>{entry.sac || "-"}</p></div>
-        <div><p className="text-xs text-muted-foreground">Source of Supply</p><p>{entry.sourceOfSupply}</p></div>
-        <div><p className="text-xs text-muted-foreground">Destination of Supply</p><p>{entry.destinationOfSupply}</p></div>
-      </div>
-      <div className="mt-8 border-t pt-4">
-        <p className="text-sm font-semibold">Journal</p>
-        <Table className="mt-3">
-          <TableHeader>
-            <TableRow>
-              <TableHead>ACCOUNT</TableHead>
-              <TableHead className="text-right">DEBIT</TableHead>
-              <TableHead className="text-right">CREDIT</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell>{entry.expenseAccount}</TableCell>
-              <TableCell className="text-right">{(entry.amount - entry.taxAmount).toFixed(2)}</TableCell>
-              <TableCell className="text-right">0.00</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>{entry.paidThrough}</TableCell>
-              <TableCell className="text-right">0.00</TableCell>
-              <TableCell className="text-right">{entry.amount.toFixed(2)}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Input SGST</TableCell>
-              <TableCell className="text-right">{(entry.taxAmount / 2).toFixed(2)}</TableCell>
-              <TableCell className="text-right">0.00</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Input CGST</TableCell>
-              <TableCell className="text-right">{(entry.taxAmount / 2).toFixed(2)}</TableCell>
-              <TableCell className="text-right">0.00</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell className="font-semibold">Total</TableCell>
-              <TableCell className="text-right font-semibold">{entry.amount.toFixed(2)}</TableCell>
-              <TableCell className="text-right font-semibold">{entry.amount.toFixed(2)}</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className="text-sm font-medium text-gray-800">{value || "—"}</p>
     </div>
   );
 }
@@ -234,8 +179,7 @@ export default function ExpensesPage() {
     params.id || expenses[0]?.id || "",
   );
   const [activeTab, setActiveTab] = useState<"all" | "receipts">("all");
-  const detailUploadRef = useRef<HTMLInputElement>(null);
-  const printRef = useRef<HTMLDivElement>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     if (params.id) setSelectedId(params.id);
@@ -251,12 +195,18 @@ export default function ExpensesPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
 
-  const reactToPrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: "Expense-Detail",
-    pageStyle:
-      "@page { size: A4; margin: 12mm; } @media print { body * { visibility: hidden; } #expense-print-area, #expense-print-area * { visibility: visible; } #expense-print-area { position: absolute; top: 0; left: 0; width: 100%; background: white; } }",
-  });
+  const handleDownloadPdf = async () => {
+    if (!selected) return;
+    setPdfLoading(true);
+    try {
+      await generateExpensePdf(selected);
+    } catch (err) {
+      console.error(err);
+      toast({ title: "PDF generation failed", description: String(err) });
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const deleteSelected = () => {
     if (!selected) return;
@@ -268,42 +218,38 @@ export default function ExpensesPage() {
 
   const duplicateSelected = () => {
     if (!selected) return;
-    const clone = { ...selected, id: `ex-${Date.now()}`, referenceNumber: `${selected.referenceNumber}-COPY` };
+    const clone = {
+      ...selected,
+      id: `ex-${Date.now()}`,
+      referenceNumber: `${selected.referenceNumber}-COPY`,
+    };
     persist([clone, ...expenses]);
     setSelectedId(clone.id);
     toast({ title: "Expense duplicated" });
   };
 
-  const onDetailUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selected) return;
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    const names = files.map((f) => f.name);
-    persist(expenses.map((entry) =>
-      entry.id === selected.id
-        ? { ...entry, receipts: [...entry.receipts, ...names] }
-        : entry,
-    ));
-    toast({ title: `${files.length} receipt(s) attached` });
-    e.target.value = "";
-  };
+  const detailTaxLabel = selected
+    ? `${selected.taxLabel} (${selected.taxPercent}%)`
+    : "—";
 
-  const detailTaxLabel = selected ? `${selected.taxLabel} (${selected.taxPercent}%)` : "-";
+  // Receipts for selected expense, normalised
+  const selectedReceipts = (selected?.receipts || []).map(toReceiptFile);
 
   return (
-    <div>
-      <div className="space-y-4 p-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-screen-xl mx-auto space-y-5 p-6">
+
         {/* ── Header card with tabs ── */}
-        <Card>
-          <CardContent className="pt-5">
+        <Card className="border-gray-200 shadow-sm">
+          <CardContent className="px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-5">
+              <div className="flex items-center gap-6">
                 <button
                   type="button"
-                  className={`pb-2 text-lg font-medium transition-colors ${
+                  className={`pb-2 text-sm font-semibold transition-colors ${
                     activeTab === "receipts"
-                      ? "border-b-2 border-blue-500 text-slate-900"
-                      : "text-muted-foreground hover:text-slate-700"
+                      ? "border-b-2 border-blue-500 text-gray-900"
+                      : "text-gray-400 hover:text-gray-700"
                   }`}
                   onClick={() => setActiveTab("receipts")}
                 >
@@ -311,10 +257,10 @@ export default function ExpensesPage() {
                 </button>
                 <button
                   type="button"
-                  className={`pb-2 text-3xl font-semibold leading-none transition-colors ${
+                  className={`pb-2 text-2xl font-bold transition-colors ${
                     activeTab === "all"
-                      ? "border-b-2 border-blue-500 text-slate-900"
-                      : "text-muted-foreground hover:text-slate-700"
+                      ? "border-b-2 border-blue-500 text-gray-900"
+                      : "text-gray-400 hover:text-gray-700"
                   }`}
                   onClick={() => setActiveTab("all")}
                 >
@@ -322,8 +268,11 @@ export default function ExpensesPage() {
                 </button>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => navigate("/transactions/purchase/expenses/create")}>
-                  <Plus className="mr-2 h-4 w-4" /> New
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => navigate("/transactions/purchase/expenses/create")}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> New Expense
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -350,39 +299,45 @@ export default function ExpensesPage() {
 
         {/* ── All Expenses table ── */}
         {activeTab === "all" ? (
-          <Card>
-            <CardContent className="pt-4">
+          <Card className="border-gray-200 shadow-sm">
+            <CardContent className="px-6 py-5">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8"><Checkbox checked={false} /></TableHead>
-                    <TableHead>DATE</TableHead>
-                    <TableHead>EXPENSE ACCOUNT</TableHead>
-                    <TableHead>REFERENCE#</TableHead>
-                    <TableHead>VENDOR NAME</TableHead>
-                    <TableHead>PAID THROUGH</TableHead>
-                    <TableHead>CUSTOMER NAME</TableHead>
-                    <TableHead>STATUS</TableHead>
+                  <TableRow className="border-gray-200">
+                    <TableHead className="w-10 pl-2">
+                      <Checkbox checked={false} />
+                    </TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Date</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Expense Account</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Reference #</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Vendor Name</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Paid Through</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Customer Name</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {expenses.map((entry) => (
                     <TableRow
                       key={entry.id}
-                      className={`cursor-pointer ${selected?.id === entry.id ? "bg-blue-50" : ""}`}
+                      className={`cursor-pointer border-gray-100 transition-colors ${
+                        selected?.id === entry.id
+                          ? "bg-blue-50 hover:bg-blue-50"
+                          : "hover:bg-gray-50"
+                      }`}
                       onClick={() => {
                         setSelectedId(entry.id);
                         navigate(`/transactions/purchase/expenses/${entry.id}`);
                       }}
                     >
-                      <TableCell>
+                      <TableCell className="pl-2">
                         <Checkbox checked={false} onClick={(e) => e.stopPropagation()} />
                       </TableCell>
-                      <TableCell>{entry.date}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-sm text-gray-600 whitespace-nowrap py-3.5">{entry.date}</TableCell>
+                      <TableCell className="py-3.5">
                         <button
                           type="button"
-                          className="text-left font-medium text-blue-600 hover:underline"
+                          className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedId(entry.id);
@@ -392,10 +347,10 @@ export default function ExpensesPage() {
                           {entry.expenseAccount}
                         </button>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-3.5">
                         <button
                           type="button"
-                          className="text-blue-600 hover:underline"
+                          className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedId(entry.id);
@@ -405,17 +360,17 @@ export default function ExpensesPage() {
                           {entry.referenceNumber}
                         </button>
                       </TableCell>
-                      <TableCell>{entry.vendorName}</TableCell>
-                      <TableCell>{entry.paidThrough}</TableCell>
-                      <TableCell>{entry.customerName}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-sm text-gray-700 py-3.5 max-w-[180px] truncate">{entry.vendorName}</TableCell>
+                      <TableCell className="text-sm text-gray-600 py-3.5">{entry.paidThrough}</TableCell>
+                      <TableCell className="text-sm text-gray-600 py-3.5">{entry.customerName}</TableCell>
+                      <TableCell className="py-3.5">
                         <Badge
-                          variant="secondary"
-                          className={
+                          className={`text-xs font-semibold ${
                             entry.status === "BILLABLE"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-purple-100 text-purple-700"
-                          }
+                              ? "bg-green-100 text-green-700 border-green-200"
+                              : "bg-purple-100 text-purple-700 border-purple-200"
+                          }`}
+                          variant="outline"
                         >
                           {entry.status}
                         </Badge>
@@ -428,32 +383,35 @@ export default function ExpensesPage() {
           </Card>
         ) : (
           /* ── Receipts Inbox ── */
-          <Card>
-            <CardContent className="pt-4">
+          <Card className="border-gray-200 shadow-sm">
+            <CardContent className="px-6 py-5">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>DATE</TableHead>
-                    <TableHead>EXPENSE ACCOUNT</TableHead>
-                    <TableHead>REFERENCE#</TableHead>
-                    <TableHead>RECEIPTS</TableHead>
+                  <TableRow className="border-gray-200">
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Date</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Expense Account</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Reference #</TableHead>
+                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide">Receipts</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {expenses
                     .filter((e) => e.receipts.length > 0)
                     .map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.date}</TableCell>
-                        <TableCell>{entry.expenseAccount}</TableCell>
-                        <TableCell>{entry.referenceNumber}</TableCell>
-                        <TableCell>
+                      <TableRow key={entry.id} className="border-gray-100">
+                        <TableCell className="text-sm text-gray-600 py-3.5">{entry.date}</TableCell>
+                        <TableCell className="text-sm text-gray-700 font-medium py-3.5">{entry.expenseAccount}</TableCell>
+                        <TableCell className="text-sm text-gray-600 py-3.5">{entry.referenceNumber}</TableCell>
+                        <TableCell className="py-3.5">
                           <div className="flex flex-wrap gap-2">
-                            {entry.receipts.map((name) => (
-                              <Badge key={`${entry.id}-${name}`} variant="secondary">
-                                {name}
-                              </Badge>
-                            ))}
+                            {entry.receipts.map((r, i) => {
+                              const file = toReceiptFile(r);
+                              return (
+                                <Badge key={`${entry.id}-${i}`} variant="secondary" className="text-xs">
+                                  {file.name}
+                                </Badge>
+                              );
+                            })}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -461,8 +419,8 @@ export default function ExpensesPage() {
                 </TableBody>
               </Table>
               {expenses.filter((e) => e.receipts.length > 0).length === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No uploaded receipts yet. Upload files from New Expense or Expense Detail.
+                <p className="py-10 text-center text-sm text-gray-400">
+                  No receipts uploaded yet. Attach files when creating a new expense.
                 </p>
               )}
             </CardContent>
@@ -471,164 +429,222 @@ export default function ExpensesPage() {
 
         {/* ── Selected Expense Detail panel ── */}
         {selected && (
-          <Card>
-            <CardContent className="pt-5">
-              <h3 className="text-lg font-semibold">Expense Details</h3>
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-b pb-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate("/transactions/purchase/expenses/create")}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => toast({ title: "Recurring rule created" })}
-                >
-                  Make Recurring
-                </Button>
-                <Button variant="outline" size="sm" onClick={reactToPrint}>
-                  Print
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon">
-                      <Ellipsis className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={duplicateSelected}>
-                      Duplicate Expense
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => toast({ title: "Marked as billable" })}>
-                      Mark as Billable
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={deleteSelected}>
-                      Delete Expense
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+          <Card className="border-gray-200 shadow-sm">
+            <CardContent className="px-6 py-6">
 
-              <div className="mt-4 grid gap-5 xl:grid-cols-[1fr_220px]">
-                <div className="space-y-4 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Expense Amount</p>
-                    <p className="text-3xl font-semibold text-rose-500">{fmtCurrency(selected.amount)}</p>
-                    <p className="text-xs text-muted-foreground">on {selected.date}</p>
-                    <p className="mt-1 text-xs font-medium">{selected.status}</p>
-                    <Badge className="mt-2" variant="secondary">{selected.expenseAccount}</Badge>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div><p className="text-xs text-muted-foreground">Paid Through</p><p>{selected.paidThrough}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Tax</p><p>{detailTaxLabel}</p></div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Tax Amount</p>
-                      <p>{fmtCurrency(selected.taxAmount)} ({selected.amountIs})</p>
-                    </div>
-                    <div><p className="text-xs text-muted-foreground">Ref #</p><p>{selected.referenceNumber}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Customer</p><p className="text-blue-600">{selected.customerName}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Paid To</p><p className="text-blue-600">{selected.vendorName}</p></div>
-                    <div><p className="text-xs text-muted-foreground">GST Treatment</p><p>{selected.gstTreatment}</p></div>
-                    <div><p className="text-xs text-muted-foreground">GSTIN / UIN</p><p>29BAAPR5775A1ZL</p></div>
-                    <div><p className="text-xs text-muted-foreground">HSN Code</p><p>{selected.sac || "-"}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Source of Supply</p><p>{selected.sourceOfSupply}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Destination of Supply</p><p>{selected.destinationOfSupply}</p></div>
-                  </div>
-                </div>
-
-                {/* Receipt upload */}
-                <div className="rounded-xl border border-dashed p-4 text-center">
-                  <ImageUp className="mx-auto h-10 w-10 text-slate-500" />
-                  <p className="mt-3 text-sm font-medium">Drag or Drop your Receipts</p>
-                  <p className="text-xs text-muted-foreground">Maximum file size allowed is 10 MB</p>
+              {/* Action toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                <h3 className="text-base font-bold text-gray-900">Expense Details</h3>
+                <div className="flex items-center gap-2">
                   <Button
-                    className="mt-4"
                     variant="outline"
                     size="sm"
-                    onClick={() => detailUploadRef.current?.click()}
+                    className="h-8 text-xs border-gray-200 text-gray-600 hover:text-gray-900"
+                    onClick={() => navigate("/transactions/purchase/expenses/create")}
                   >
-                    Upload your Files
+                    Edit
                   </Button>
-                  <input ref={detailUploadRef} type="file" multiple className="hidden" onChange={onDetailUpload} />
-                  {selected.receipts.length > 0 && (
-                    <div className="mt-3 flex flex-wrap justify-center gap-2">
-                      {selected.receipts.map((name) => (
-                        <Badge key={`${selected.id}-${name}`} variant="secondary" className="gap-2">
-                          {name}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              persist(expenses.map((entry) =>
-                                entry.id === selected.id
-                                  ? { ...entry, receipts: entry.receipts.filter((v) => v !== name) }
-                                  : entry,
-                              ))
-                            }
-                          >
-                            ×
-                          </button>
-                        </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs border-gray-200 text-gray-600 hover:text-gray-900"
+                    onClick={() => toast({ title: "Recurring rule created" })}
+                  >
+                    Make Recurring
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pdfLoading}
+                    className="h-8 text-xs border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700 gap-1.5"
+                    onClick={handleDownloadPdf}
+                  >
+                    <Download size={13} />
+                    {pdfLoading ? "Generating…" : "Download PDF"}
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-8 w-8 border-gray-200">
+                        <Ellipsis className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={duplicateSelected}>
+                        Duplicate Expense
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => toast({ title: "Marked as billable" })}>
+                        Mark as Billable
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={deleteSelected}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        Delete Expense
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+
+              {/* Amount hero */}
+              <div className="bg-gradient-to-br from-rose-50 to-pink-50 border border-rose-100 rounded-xl px-6 py-5 mb-6">
+                <p className="text-xs font-semibold text-rose-400 uppercase tracking-wide mb-1">Expense Amount</p>
+                <p className="text-4xl font-bold text-rose-600 leading-none">
+                  {fmtCurrency(selected.amount)}
+                </p>
+                <div className="flex flex-wrap items-center gap-3 mt-3">
+                  <span className="text-sm text-gray-500">on {selected.date}</span>
+                  <Badge
+                    className={`text-xs font-semibold ${
+                      selected.status === "BILLABLE"
+                        ? "bg-green-100 text-green-700 border-green-200"
+                        : "bg-purple-100 text-purple-700 border-purple-200"
+                    }`}
+                    variant="outline"
+                  >
+                    {selected.status}
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs font-medium">
+                    {selected.expenseAccount}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Details grid + receipts */}
+              <div className="grid gap-6 xl:grid-cols-[1fr_260px]">
+
+                {/* Left: field grid */}
+                <div className="grid grid-cols-2 gap-x-8 gap-y-5 md:grid-cols-3">
+                  <DetailField label="Paid Through" value={selected.paidThrough} />
+                  <DetailField label="Tax" value={detailTaxLabel} />
+                  <DetailField
+                    label="Tax Amount"
+                    value={`${fmtCurrency(selected.taxAmount)} (${selected.amountIs})`}
+                  />
+                  <DetailField label="Ref #" value={selected.referenceNumber} />
+                  <DetailField
+                    label="Customer"
+                    value={
+                      <span className="text-blue-600">{selected.customerName}</span>
+                    }
+                  />
+                  <DetailField
+                    label="Paid To"
+                    value={
+                      <span className="text-blue-600">{selected.vendorName}</span>
+                    }
+                  />
+                  <DetailField label="GST Treatment" value={selected.gstTreatment} />
+                  <DetailField label="GSTIN / UIN" value="29BAAPR5775A1ZL" />
+                  <DetailField label="HSN Code" value={selected.sac || "—"} />
+                  <DetailField label="Source of Supply" value={selected.sourceOfSupply} />
+                  <DetailField label="Destination of Supply" value={selected.destinationOfSupply} />
+                  <DetailField label="Invoice #" value={selected.invoiceNumber} />
+                </div>
+
+                {/* Right: receipts panel */}
+                <div className="border border-gray-200 rounded-xl p-5 bg-gray-50/60">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText size={15} className="text-blue-600" />
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-600">
+                      Attached Receipts
+                    </p>
+                  </div>
+
+                  {selectedReceipts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <FileText size={32} className="text-gray-300 mb-3" />
+                      <p className="text-sm text-gray-400">No receipts attached</p>
+                      <p className="text-xs text-gray-300 mt-1">
+                        Upload receipts when creating an expense
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedReceipts.map((file, i) => (
+                        <div
+                          key={`${selected.id}-${i}`}
+                          className="flex items-center gap-3 px-3 py-2.5 bg-white border border-gray-200 rounded-lg"
+                        >
+                          <FileText size={15} className="text-blue-500 shrink-0" />
+                          <span className="text-sm text-gray-700 truncate flex-1 min-w-0">
+                            {file.name}
+                          </span>
+                          {file.dataUrl ? (
+                            <a
+                              href={file.dataUrl}
+                              download={file.name}
+                              className="shrink-0 p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                              title={`Download ${file.name}`}
+                            >
+                              <Download size={14} />
+                            </a>
+                          ) : (
+                            <span className="shrink-0 text-xs text-gray-300 italic">legacy</span>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
               </div>
 
+              {/* Notes */}
+              {selected.notes && (
+                <div className="mt-6 pt-5 border-t border-gray-100">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Notes</p>
+                  <p className="text-sm text-gray-600 leading-relaxed">{selected.notes}</p>
+                </div>
+              )}
+
               {/* Journal */}
-              <div className="mt-6 border-t pt-4">
-                <p className="text-sm font-semibold">Journal</p>
-                <p className="mt-1 text-xs text-muted-foreground">Amount is displayed in your base currency</p>
-                <Table className="mt-3">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ACCOUNT</TableHead>
-                      <TableHead className="text-right">DEBIT</TableHead>
-                      <TableHead className="text-right">CREDIT</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>{selected.expenseAccount}</TableCell>
-                      <TableCell className="text-right">{(selected.amount - selected.taxAmount).toFixed(2)}</TableCell>
-                      <TableCell className="text-right">0.00</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>{selected.paidThrough}</TableCell>
-                      <TableCell className="text-right">0.00</TableCell>
-                      <TableCell className="text-right">{selected.amount.toFixed(2)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Input SGST</TableCell>
-                      <TableCell className="text-right">{(selected.taxAmount / 2).toFixed(2)}</TableCell>
-                      <TableCell className="text-right">0.00</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Input CGST</TableCell>
-                      <TableCell className="text-right">{(selected.taxAmount / 2).toFixed(2)}</TableCell>
-                      <TableCell className="text-right">0.00</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-semibold">Total</TableCell>
-                      <TableCell className="text-right font-semibold">{selected.amount.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-semibold">{selected.amount.toFixed(2)}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+              <div className="mt-6 pt-5 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-bold text-gray-800">Journal</p>
+                  <p className="text-xs text-gray-400">Amount in base currency (INR)</p>
+                </div>
+                <div className="rounded-xl border border-gray-200 overflow-hidden mt-3">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 border-gray-200">
+                        <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide pl-4">Account</TableHead>
+                        <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide text-right pr-4">Debit</TableHead>
+                        <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wide text-right pr-4">Credit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow className="border-gray-100">
+                        <TableCell className="pl-4 py-3 text-sm text-gray-700">{selected.expenseAccount}</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-800 font-medium">{(selected.amount - selected.taxAmount).toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-400">0.00</TableCell>
+                      </TableRow>
+                      <TableRow className="border-gray-100">
+                        <TableCell className="pl-4 py-3 text-sm text-gray-700">{selected.paidThrough}</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-400">0.00</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-800 font-medium">{selected.amount.toFixed(2)}</TableCell>
+                      </TableRow>
+                      <TableRow className="border-gray-100">
+                        <TableCell className="pl-4 py-3 text-sm text-gray-700">Input SGST</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-800 font-medium">{(selected.taxAmount / 2).toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-400">0.00</TableCell>
+                      </TableRow>
+                      <TableRow className="border-gray-100">
+                        <TableCell className="pl-4 py-3 text-sm text-gray-700">Input CGST</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-800 font-medium">{(selected.taxAmount / 2).toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm text-gray-400">0.00</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-gray-50 border-gray-200">
+                        <TableCell className="pl-4 py-3 text-sm font-bold text-gray-900">Total</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm font-bold text-gray-900">{selected.amount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right pr-4 py-3 text-sm font-bold text-gray-900">{selected.amount.toFixed(2)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
-      </div>
-
-      {/* Hidden print area */}
-      <div className="fixed left-[-10000px] top-0 w-[794px] bg-white">
-        <div ref={printRef} id="expense-print-area">
-          {selected ? <ExpensePrintSheet entry={selected} /> : null}
-        </div>
       </div>
     </div>
   );
