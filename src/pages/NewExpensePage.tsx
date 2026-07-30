@@ -74,20 +74,36 @@ const fmtCurrency = (v: number) =>
 
 const getVendorNames = (): string[] => {
   try {
-    const raw = localStorage.getItem("nido_vendors");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map((v: any) => v.name).filter(Boolean);
+    // Primary: nido_vendors_v2 (array of StoredVendor)
+    const raw = localStorage.getItem("nido_vendors_v2");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((v: any) => v.name || v.companyName).filter(Boolean);
+    }
+    // Fallback: legacy nido_vendors key
+    const raw2 = localStorage.getItem("nido_vendors");
+    if (raw2) {
+      const parsed2 = JSON.parse(raw2);
+      if (Array.isArray(parsed2)) return parsed2.map((v: any) => v.name).filter(Boolean);
+    }
   } catch { /* ignore */ }
   return [];
 };
 
 const getClientNames = (): string[] => {
   try {
-    const raw = localStorage.getItem("nido_clients");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.map((c: any) => c.name).filter(Boolean);
+    // Primary: nido_clients_v2 (array of StoredClient)
+    const raw = localStorage.getItem("nido_clients_v2");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((c: any) => c.name || c.companyName).filter(Boolean);
+    }
+    // Fallback: legacy nido_clients key
+    const raw2 = localStorage.getItem("nido_clients");
+    if (raw2) {
+      const parsed2 = JSON.parse(raw2);
+      if (Array.isArray(parsed2)) return parsed2.map((c: any) => c.name).filter(Boolean);
+    }
   } catch { /* ignore */ }
   return [];
 };
