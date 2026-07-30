@@ -728,19 +728,9 @@ export default function PurchaseOrdersPage() {
 
           {/* Section 3 — Terms */}
           <Section title="Terms & Conditions">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <FieldLabel>Terms & Conditions</FieldLabel>
-                <textarea className={textareaClass} rows={5} value={form.termsAndConditions} onChange={(e) => setF("termsAndConditions", e.target.value)} />
-              </div>
-              <div>
-                <FieldLabel>Attach Files</FieldLabel>
-                <select className={sel} value={form.attachmentType} onChange={(e) => setF("attachmentType", e.target.value)}>
-                  <option value="Upload File">Upload File</option>
-                  <option value="Attach from Drive">Attach from Drive</option>
-                </select>
-                <p className="mt-2 text-xs text-gray-400">Files up to 5 MB.</p>
-              </div>
+            <div>
+              <FieldLabel>Terms & Conditions</FieldLabel>
+              <textarea className={textareaClass} rows={5} value={form.termsAndConditions} onChange={(e) => setF("termsAndConditions", e.target.value)} />
             </div>
           </Section>
 
