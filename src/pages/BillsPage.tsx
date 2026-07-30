@@ -44,6 +44,7 @@ interface BillItem {
   id: string;
   itemDetails: string;
   account: string;
+  hsnSac: string;
   quantity: number;
   rate: number;
   discount: number;
@@ -163,6 +164,7 @@ const newItem = (id: string): BillItem => ({
   id,
   itemDetails: "",
   account: "",
+  hsnSac: "",
   quantity: 1,
   rate: 0,
   discount: 0,
@@ -234,6 +236,7 @@ const normalizeBill = (raw: Record<string, unknown>): BillEntry => {
       id: String(item.id ?? `item-${Date.now()}-${idx}`),
       itemDetails: String(item.itemDetails ?? item.description ?? item.itemName ?? ""),
       account: String(item.account ?? ""),
+      hsnSac: String(item.hsnSac ?? item.hsn_sac ?? ""),
       quantity: toNumber(item.quantity, 1),
       rate: toNumber(item.rate, 0),
       discount: toNumber(item.discount, 0),
@@ -455,7 +458,7 @@ export default function BillsPage() {
   }, [selectedBill]);
 
   useEffect(() => {
-    if (createMode) { setEditingId(null); setForm(blankForm()); return; }
+    if (createMode) { setEditingId(null); setForm({ ...blankForm(), billNumber: nextBillNumber(bills) }); return; }
     if (editMode && selectedBill) {
       setEditingId(selectedBill.id);
       setForm({
@@ -675,7 +678,7 @@ export default function BillsPage() {
               </div>
               <div>
                 <FieldLabel>Bill #</FieldLabel>
-                <input type="text" className={inp} value={form.billNumber} onChange={(e) => setF("billNumber", e.target.value)} placeholder="Auto generated if blank" />
+                <input type="text" className={inp + " bg-gray-50 text-gray-500 cursor-not-allowed"} value={form.billNumber} readOnly tabIndex={-1} />
               </div>
               <div>
                 <FieldLabel>Vendor Address</FieldLabel>
@@ -719,56 +722,53 @@ export default function BillsPage() {
           {/* Section 2 — Line Items */}
           <Section title="Line Items" icon={FileText}>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[900px]">
                 <thead>
-                  <tr className="bg-gray-50 border border-gray-200 rounded-lg">
-                    <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
-                    <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-36">Account</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">Qty</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Rate</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">Disc %</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-20">Tax %</th>
-                    <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-36">Customer</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Amount</th>
+                  <tr className="bg-gray-50 border border-gray-200">
+                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-10">#</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item / Specification</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">HSN/SAC</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-20">Qty</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Unit Rate</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">Disc</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Taxable</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">GST Rate</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">GST</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Net Amount</th>
                     <th className="w-10" />
                   </tr>
                 </thead>
                 <tbody>
-                  {form.items.map((item) => {
+                  {form.items.map((item, rowIdx) => {
                     const base = item.quantity * item.rate;
                     const discountAmount = (base * item.discount) / 100;
                     const taxable = base - discountAmount;
+                    const gst = (taxable * item.taxPercent) / 100;
+                    const netAmount = taxable + gst;
                     return (
                       <tr key={item.id} className="border-b border-gray-100">
+                        <td className="px-2 py-2 text-center text-gray-400 text-xs">{rowIdx + 1}</td>
                         <td className="px-2 py-2">
-                          <input className={inp} value={item.itemDetails} onChange={(e) => handleItemChange(item.id, "itemDetails", e.target.value)} placeholder="Item description" />
+                          <input className={inp} value={item.itemDetails} onChange={(e) => handleItemChange(item.id, "itemDetails", e.target.value)} placeholder="Item name / specification" />
                         </td>
                         <td className="px-2 py-2">
-                          <input className={inp} value={item.account} onChange={(e) => handleItemChange(item.id, "account", e.target.value)} placeholder="Account" />
+                          <input className={inp + " text-center"} value={item.hsnSac} onChange={(e) => handleItemChange(item.id, "hsnSac", e.target.value)} placeholder="HSN/SAC" />
                         </td>
                         <td className="px-2 py-2">
-                          <input className={inp + " text-right"} value={String(item.quantity)} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} />
+                          <input className={inp + " text-center"} value={String(item.quantity)} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} />
                         </td>
                         <td className="px-2 py-2">
                           <input className={inp + " text-right"} value={String(item.rate)} onChange={(e) => handleItemChange(item.id, "rate", e.target.value)} />
                         </td>
                         <td className="px-2 py-2">
-                          <input className={inp + " text-right"} value={String(item.discount)} onChange={(e) => handleItemChange(item.id, "discount", e.target.value)} />
+                          <input className={inp + " text-right"} value={String(item.discount)} onChange={(e) => handleItemChange(item.id, "discount", e.target.value)} placeholder="0" />
                         </td>
+                        <td className="px-2 py-2 text-right text-gray-700 font-medium">{taxable.toFixed(2)}</td>
                         <td className="px-2 py-2">
-                          <input className={inp + " text-right"} value={String(item.taxPercent)} onChange={(e) => handleItemChange(item.id, "taxPercent", e.target.value)} />
+                          <input className={inp + " text-center"} value={String(item.taxPercent)} onChange={(e) => handleItemChange(item.id, "taxPercent", e.target.value)} />
                         </td>
-                        <td className="px-2 py-2">
-                          <select
-                            className={sel + " text-sm"}
-                            value={item.customerName || ""}
-                            onChange={(e) => handleItemChange(item.id, "customerName", e.target.value)}
-                          >
-                            <option value="">Select Customer</option>
-                            {clients.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                          </select>
-                        </td>
-                        <td className="px-2 py-2 text-right font-medium text-gray-800">{taxable.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right text-gray-700">{gst.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right font-semibold text-gray-900">{netAmount.toFixed(2)}</td>
                         <td className="px-2 py-2 text-center">
                           <button type="button" onClick={() => handleRemoveRow(item.id)} className="text-gray-300 hover:text-red-500 transition-colors"><X size={14} /></button>
                         </td>
@@ -812,17 +812,6 @@ export default function BillsPage() {
                   <span>Total</span><span>{money(formTotals.total)}</span>
                 </div>
               </div>
-            </div>
-          </Section>
-
-          {/* Attachment */}
-          <Section title="Attachments">
-            <div className="max-w-xs">
-              <FieldLabel>Attach File(s) to Bill</FieldLabel>
-              <select className={sel} value={form.attachmentType} onChange={(e) => setF("attachmentType", e.target.value)}>
-                <option value="Upload File">Upload File</option>
-                <option value="Drive">Attach from Drive</option>
-              </select>
             </div>
           </Section>
 
