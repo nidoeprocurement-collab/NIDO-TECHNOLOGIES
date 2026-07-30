@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
+import { getVendorProducts, type VendorProduct } from "@/lib/vendorStore";
 import { loadConfig } from "@/lib/configService";
 import { generateManualPOPdf, downloadPOPdf } from "@/lib/generatePO";
 import {
@@ -500,6 +501,32 @@ export default function PurchaseOrdersPage() {
   };
 
   const vendorNames = useMemo(() => getVendors().filter((v) => !v.archived).map((v) => v.name), []);
+
+  // Products belonging to the currently-selected vendor
+  const vendorProducts = useMemo<VendorProduct[]>(() => {
+    if (!form.vendorName) return [];
+    const vendor = getVendors().find((v) => v.name === form.vendorName);
+    if (!vendor) return [];
+    return getVendorProducts(vendor.id).filter((p) => p.status === "Active");
+  }, [form.vendorName]);
+
+  const handlePickVendorProduct = (itemId: string, productId: string) => {
+    const product = vendorProducts.find((p) => p.id === productId);
+    if (!product) return;
+    setF("items", form.items.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            itemName: product.productName,
+            description: product.category || "",
+            hsnSac: "",
+            rate: parseFloat(product.price) || 0,
+            quantity: parseFloat(product.moq) || 1,
+          }
+        : item
+    ));
+  };
+
   const formTotals = getTotals({ items: form.items, discountPercent: form.discountPercent, adjustment: form.adjustment });
 
   // ── FORM PAGE ──────────────────────────────────────────────────────────────
@@ -632,6 +659,20 @@ export default function PurchaseOrdersPage() {
                     return (
                       <tr key={item.id} className="border-b border-gray-100">
                         <td className="px-2 py-2">
+                          {vendorProducts.length > 0 && (
+                            <select
+                              className={`${sel} mb-1 text-xs text-blue-700 border-blue-200 bg-blue-50`}
+                              value={item.itemName && vendorProducts.some(p => p.productName === item.itemName) ? vendorProducts.find(p => p.productName === item.itemName)?.id ?? "" : ""}
+                              onChange={(e) => e.target.value && handlePickVendorProduct(item.id, e.target.value)}
+                            >
+                              <option value="">— Pick from vendor catalog —</option>
+                              {vendorProducts.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.productName}{p.price ? ` · ₹${p.price}` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                           <input className={inp + " mb-1"} value={item.itemName} onChange={(e) => handleItemChange(item.id, "itemName", e.target.value)} placeholder="Item name" />
                           <input className={inp} value={item.description} onChange={(e) => handleItemChange(item.id, "description", e.target.value)} placeholder="Description" />
                         </td>
