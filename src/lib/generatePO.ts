@@ -475,3 +475,110 @@ export async function getPODataUri(po: StoredPO): Promise<string> {
 export function generatePOPdf(po: StoredPO): never {
   throw new Error('generatePOPdf is now async — use downloadPOPdf() or getPODataUri() instead.');
 }
+
+// ── Manual PO PDF (PurchaseOrderEntry shape from PurchaseOrdersPage) ──────────
+interface ManualPOItem {
+  id: string;
+  itemName: string;
+  description: string;
+  account: string;
+  hsnSac: string;
+  quantity: number;
+  rate: number;
+  taxPercent: number;
+}
+
+interface ManualPOEntry {
+  id: string;
+  poNumber: string;
+  referenceNumber: string;
+  vendorName: string;
+  vendorAddress: string;
+  deliveryAddressType: string;
+  deliveryAddress: string;
+  date: string;
+  deliveryDate: string;
+  paymentTerms: string;
+  shipmentPreference: string;
+  includeInterStateGst: boolean;
+  discountPercent: number;
+  adjustment: number;
+  notes: string;
+  termsAndConditions: string;
+  items: ManualPOItem[];
+}
+
+/** Download a PDF for a manually-created PurchaseOrderEntry. */
+export async function generateManualPOPdf(po: ManualPOEntry): Promise<void> {
+  // Map ManualPOEntry → StoredPO-compatible shape for the existing renderer
+  const subtotal = po.items.reduce((sum, li) => sum + li.quantity * li.rate, 0);
+  const discountAmt = subtotal * (po.discountPercent / 100);
+  const taxableAmt = subtotal - discountAmt;
+  // Compute blended tax (use first item's taxPercent as representative)
+  const blendedGstPct = po.items.length > 0 ? po.items[0].taxPercent : 18;
+  const halfGst = blendedGstPct / 2;
+  const sgstAmt = taxableAmt * (halfGst / 100);
+  const cgstAmt = taxableAmt * (halfGst / 100);
+  const grandTotal = taxableAmt + sgstAmt + cgstAmt + po.adjustment;
+
+  const isoToIndian = (v: string) => {
+    if (!v) return '';
+    const [y, m, d] = v.split('-');
+    return y && m && d ? `${d}/${m}/${y}` : v;
+  };
+
+  const adapted: StoredPO = {
+    poNumber: po.poNumber,
+    orderId: po.id,
+    subOrderId: po.id,
+    subOrderIds: [po.id],
+    vendorId: '',
+    vendorName: po.vendorName,
+    vendorContact: '',
+    vendorEmail: '',
+    vendorPhone: '',
+    vendorGstin: '',
+    vendorAddress: po.vendorAddress,
+    vendorAddressLine1: po.vendorAddress,
+    vendorAddressLine2: '',
+    vendorCity: '',
+    vendorState: '',
+    vendorPincode: '',
+    item: po.items[0]?.itemName || '',
+    sku: '',
+    category: '',
+    hsnCode: po.items[0]?.hsnSac || '',
+    specs: [],
+    referenceNumber: po.referenceNumber,
+    qty: po.items[0]?.quantity ?? 1,
+    unitPrice: po.items[0]?.rate ?? 0,
+    subtotal: taxableAmt,
+    sgstPct: halfGst,
+    cgstPct: halfGst,
+    sgstAmt,
+    cgstAmt,
+    grandTotal,
+    paymentTerms: po.paymentTerms,
+    status: 'ISSUED',
+    createdOn: po.date,
+    createdOnDisplay: isoToIndian(po.date),
+    requestedDelivery: po.deliveryDate ? isoToIndian(po.deliveryDate) : '',
+    documents: [],
+    notes: [],
+    items: po.items.map((li) => {
+      const lineSubtotal = li.quantity * li.rate;
+      return {
+        item: li.itemName,
+        hsnCode: li.hsnSac,
+        qty: li.quantity,
+        unitPrice: li.rate,
+        lineSubtotal,
+        gstPct: li.taxPercent,
+        specs: li.description ? [li.description] : [],
+        referenceNumber: '',
+      } as any;
+    }),
+  };
+
+  await downloadPOPdf(adapted);
+}

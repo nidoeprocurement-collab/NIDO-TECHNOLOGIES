@@ -21,10 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getAllPOs, downloadPOPdf, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore";
+import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { loadConfig } from "@/lib/configService";
-import { generateManualPOPdf } from "@/lib/generatePO";
+import { generateManualPOPdf, downloadPOPdf } from "@/lib/generatePO";
 import {
   ArrowLeft,
   Download,
