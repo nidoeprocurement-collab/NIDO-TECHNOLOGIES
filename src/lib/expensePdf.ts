@@ -338,6 +338,208 @@ export async function generateExpensePdf(expense: ExpenseForPdf): Promise<void> 
   doc.save(filename);
 }
 
+// ── Recurring Expense PDF ──────────────────────────────────────────────────────
+export interface RecurringExpenseProfileForPdf {
+  id: string;
+  profileName: string;
+  expenseAccount: string;
+  vendorName: string;
+  frequency: string;
+  lastExpenseDate: string;
+  nextExpenseDate: string;
+  status: string;
+  amount: number;
+  paidThrough: string;
+  startDate: string;
+  endDate: string;
+  neverExpires: boolean;
+  taxLabel: string;
+  amountIs: string;
+  notes: string;
+  customerName: string;
+  billable: boolean;
+  gstTreatment: string;
+  history: { id: string; timestamp: string; message: string; by: string }[];
+}
+
+export async function generateRecurringExpensePdf(profile: RecurringExpenseProfileForPdf): Promise<void> {
+  const org = loadConfig().organization;
+  const brand = getBrandHeader(org.displayName, org.industry);
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 42;
+  const contentWidth = pageWidth - margin * 2;
+
+  // Logo / brand
+  let logoLoaded = false;
+  if (org.logoUrl) {
+    const logo = org.logoUrl.startsWith('http')
+      ? await loadImage(org.logoUrl)
+      : { data: org.logoUrl, format: org.logoUrl.includes('jpeg') ? 'JPEG' as const : 'PNG' as const };
+    if (logo) {
+      try { doc.addImage(logo.data, logo.format, margin + 8, 26, 45, 45); logoLoaded = true; }
+      catch { logoLoaded = false; }
+    }
+  }
+  if (!logoLoaded) {
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(margin + 8, 27, 38, 38, 9, 9, 'F');
+    drawText(doc, 'N', margin + 27, 53, { size: 22, color: [255, 255, 255], bold: true, align: 'center' });
+  }
+
+  drawText(doc, brand.name || org.companyName || 'Nido Tech', margin + 60, 50, { size: 18, color: DARK, bold: true });
+  drawText(doc, brand.subtitle, margin + 60, 64, { size: 7, color: MUTED });
+
+  // RECURRING EXPENSE label + status box (right)
+  drawText(doc, 'RECURRING EXPENSE', pageWidth - margin, 48, { size: 16, color: DARK, bold: true, align: 'right' });
+  doc.setDrawColor(...BORDER).setLineWidth(0.6);
+  doc.roundedRect(pageWidth - margin - 110, 61, 110, 28, 4, 4, 'S');
+  const statusColor: [number, number, number] = profile.status === 'ACTIVE' ? [5, 150, 105] : [100, 100, 100];
+  drawText(doc, profile.status, pageWidth - margin - 10, 79, { size: 9, color: statusColor, bold: true, align: 'right' });
+
+  // Company address
+  const companyLines = [
+    org.companyName || org.displayName,
+    ...splitLines(org.registeredAddress || org.billingAddress),
+    [org.phone && `Phone: ${org.phone}`, org.email && `Email: ${org.email}`].filter(Boolean).join(' | '),
+    org.gstNumber ? `GSTIN: ${org.gstNumber}` : '',
+  ].filter(Boolean);
+  let companyY = 102;
+  companyLines.forEach((line, i) => {
+    drawText(doc, line, margin + 8, companyY, { size: i === 0 ? 8.5 : 7.5, color: i === 0 ? DARK : TEXT, bold: i === 0 });
+    companyY += 11;
+  });
+
+  // Profile meta (right)
+  let metaY = 112;
+  drawText(doc, `Frequency: ${profile.frequency}`, pageWidth - margin, metaY, { size: 8, color: TEXT, align: 'right' });
+  metaY += 14;
+  drawText(doc, `Start: ${fmtDate(profile.startDate)}`, pageWidth - margin, metaY, { size: 8, color: TEXT, align: 'right' });
+  metaY += 14;
+  const endsText = profile.neverExpires ? 'Never Expires' : `Ends: ${fmtDate(profile.endDate || '')}`;
+  drawText(doc, endsText, pageWidth - margin, metaY, { size: 8, color: TEXT, align: 'right' });
+  metaY += 14;
+  drawText(doc, `Next Expense: ${fmtDate(profile.nextExpenseDate)}`, pageWidth - margin, metaY, { size: 8, color: TEXT, align: 'right' });
+
+  // Profile name banner
+  let y = Math.max(companyY + 14, 175);
+  doc.setFillColor(...LIGHT_BLUE);
+  doc.roundedRect(margin, y, contentWidth, 42, 6, 6, 'F');
+  drawText(doc, profile.profileName, margin + 16, y + 26, { size: 13, color: DARK, bold: true });
+  y += 58;
+
+  // Vendor & Customer cards
+  const cardGap = 12;
+  const cardWidth = (contentWidth - cardGap) / 2;
+  const vendorLines: string[] = [];
+  if (profile.gstTreatment) vendorLines.push(`GST Treatment: ${profile.gstTreatment}`);
+  const customerLines: string[] = [];
+  if (profile.billable) customerLines.push('Billable: Yes');
+
+  const cardH = Math.max(
+    drawCard(doc, margin, y, cardWidth, 'Vendor', profile.vendorName === '-' ? '' : profile.vendorName, vendorLines),
+    drawCard(doc, margin + cardWidth + cardGap, y, cardWidth, 'Customer', profile.customerName === '-' ? '' : profile.customerName, customerLines),
+  );
+  y += cardH + 16;
+
+  // Expense breakdown table
+  const taxPercent = Number(profile.taxLabel.replace(/\D/g, '')) || 0;
+  const taxAmount = profile.amountIs === 'Tax Inclusive'
+    ? Math.round((profile.amount - profile.amount / (1 + taxPercent / 100)) * 100) / 100
+    : Math.round(((profile.amount * taxPercent) / 100) * 100) / 100;
+  const baseAmount = profile.amountIs === 'Tax Inclusive' ? profile.amount - taxAmount : profile.amount;
+  const totalAmount = profile.amountIs === 'Tax Inclusive' ? profile.amount : profile.amount + taxAmount;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [['EXPENSE ACCOUNT', 'FREQUENCY', 'PAID THROUGH', 'AMOUNT (BASE)', `TAX (${taxPercent}%)`, 'TOTAL AMOUNT']],
+    body: [[
+      profile.expenseAccount,
+      profile.frequency,
+      profile.paidThrough,
+      `INR ${fmt2(baseAmount)}`,
+      `INR ${fmt2(taxAmount)}`,
+      `INR ${fmt2(totalAmount)}`,
+    ]],
+    theme: 'grid',
+    tableWidth: contentWidth,
+    styles: { font: 'helvetica', fontSize: 7.5, textColor: TEXT, lineColor: BORDER, lineWidth: 0.35, cellPadding: { top: 7, bottom: 7, left: 4, right: 4 }, valign: 'middle' },
+    headStyles: { fillColor: [248, 250, 252], textColor: DARK, fontStyle: 'bold', fontSize: 6.5, halign: 'center' },
+    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right', fontStyle: 'bold' } },
+  });
+  y = (doc as any).lastAutoTable.finalY + 14;
+
+  // Summary box
+  const summaryWidth = 255;
+  const summaryX = margin + contentWidth - summaryWidth;
+  const rows: [string, string][] = [
+    ['Base Amount', `INR ${fmt2(baseAmount)}`],
+    [`Tax (${profile.taxLabel || `GST ${taxPercent}%`}) — ${profile.amountIs}`, `INR ${fmt2(taxAmount)}`],
+  ];
+  const rowH = 20;
+  const totalH = 27;
+  const summaryH = rows.length * rowH + totalH;
+  doc.setDrawColor(...BORDER).setLineWidth(0.6);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(summaryX, y, summaryWidth, summaryH, 5, 5, 'FD');
+  rows.forEach(([label, value], i) => {
+    const rowY = y + i * rowH;
+    if (i > 0) { doc.setDrawColor(...BORDER).setLineWidth(0.3); doc.line(summaryX, rowY, summaryX + summaryWidth, rowY); }
+    drawText(doc, label, summaryX + 10, rowY + 13, { size: 7.7, color: TEXT });
+    drawText(doc, value, summaryX + summaryWidth - 10, rowY + 13, { size: 7.7, color: DARK, align: 'right' });
+  });
+  const totalY = y + rows.length * rowH;
+  doc.setFillColor(...LIGHT_BLUE);
+  doc.rect(summaryX + 0.5, totalY, summaryWidth - 1, totalH - 0.5, 'F');
+  doc.setDrawColor(...BORDER).setLineWidth(0.5);
+  doc.line(summaryX, totalY, summaryX + summaryWidth, totalY);
+  drawText(doc, 'Amount per Cycle', summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
+  drawText(doc, `INR ${fmt2(totalAmount)}`, summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
+  y += summaryH + 18;
+
+  // Notes
+  if (profile.notes && profile.notes !== '-') {
+    drawText(doc, 'NOTES', margin, y, { size: 7.5, color: MUTED, bold: true });
+    y += 11;
+    const wrapped = doc.splitTextToSize(profile.notes, contentWidth);
+    wrapped.forEach((line: string) => { drawText(doc, line, margin, y, { size: 8, color: TEXT }); y += 12; });
+    y += 4;
+  }
+
+  // History table
+  if (profile.history.length > 0) {
+    if (y > pageHeight - 140) { doc.addPage(); y = margin + 20; }
+    drawText(doc, 'HISTORY', margin, y + 2, { size: 8, color: BLUE, bold: true });
+    y += 12;
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [['DATE & TIME', 'EVENT', 'BY']],
+      body: profile.history.map((h) => [
+        `${new Date(h.timestamp).toLocaleDateString()} ${new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        h.message,
+        h.by,
+      ]),
+      theme: 'grid',
+      tableWidth: contentWidth,
+      styles: { font: 'helvetica', fontSize: 7.5, textColor: TEXT, lineColor: BORDER, lineWidth: 0.35, cellPadding: { top: 5, bottom: 5, left: 8, right: 8 } },
+      headStyles: { fillColor: [248, 250, 252], textColor: DARK, fontStyle: 'bold', fontSize: 7 },
+      columnStyles: { 0: { cellWidth: 110 }, 2: { cellWidth: 90 } },
+    });
+    y = (doc as any).lastAutoTable.finalY + 14;
+  }
+
+  // Footer
+  const footerY = pageHeight - 30;
+  doc.setDrawColor(...BORDER).setLineWidth(0.5);
+  doc.line(margin, footerY - 8, pageWidth - margin, footerY - 8);
+  drawText(doc, 'Thank you for your business!', pageWidth / 2, footerY + 4, { size: 8, color: BLUE, bold: true, align: 'center' });
+
+  doc.save(`RecurringExpense-${profile.profileName.replace(/\s+/g, '-')}.pdf`);
+}
+
 // Simple INR number-to-words helper
 function numberToWordsINR(amount: number): string {
   const n = Math.round(amount);
