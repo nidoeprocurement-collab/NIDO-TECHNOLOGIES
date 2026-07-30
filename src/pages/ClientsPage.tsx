@@ -53,24 +53,6 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
   )
 }
 
-// ── Filter Select ──────────────────────────────────────────────────────────
-function FilterSelect({ label, value, options, onChange }: {
-  label: string; value: string; options: string[]; onChange: (v: string) => void
-}) {
-  return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="appearance-none pl-2.5 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:border-blue-400 cursor-pointer font-medium"
-      >
-        {options.map(o => <option key={o} value={o}>{o === "All" ? label : o}</option>)}
-      </select>
-      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-    </div>
-  )
-}
-
 // ── Row Actions Menu ───────────────────────────────────────────────────────
 function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
   client: StoredClient
@@ -355,11 +337,8 @@ export default function ClientsPageUI() {
   const [showBulkImport, setShowBulkImport] = useState(false)
   const [provisionResult, setProvisionResult] = useState<(ProvisionResult & { clientName: string }) | null>(null)
 
-  // Filters
-  const [filterCategory, setFilterCategory] = useState("All")
-  const [filterStatus, setFilterStatus] = useState("All")
-  const [filterTier, setFilterTier] = useState("All")
-  const [filterCity, setFilterCity] = useState("All")
+  // Tile filter
+  const [activeFilter, setActiveFilter] = useState("All")
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 10
 
@@ -374,39 +353,34 @@ export default function ClientsPageUI() {
     return () => window.removeEventListener("nidoClientsUpdated", onUpdate)
   }, [])
 
-  // Derived option lists for filters
-  const categories = useMemo(() => ["All", ...Array.from(new Set(clients.map(c => c.category).filter(Boolean)))], [clients])
-  const cities     = useMemo(() => ["All", ...Array.from(new Set(clients.map(c => c.billingCity).filter(Boolean)))], [clients])
-
-  // Stats computed from real data
-  const stats = useMemo(() => {
-    const totalBalance = clients.reduce((s, c) => s + (parseFloat(c.openingBalance) || 0), 0)
-    return [
-      { label: "Total Clients",   value: clients.length,                                                                color: "text-gray-900",   icon: <Building2    className="text-gray-400"   /> },
-      { label: "Active Clients",  value: clients.filter(c => (c.status || "").toLowerCase() === "active").length,       color: "text-green-600",  icon: <Users        className="text-green-400"  /> },
-      { label: "Pending",         value: clients.filter(c => (c.status || "").toLowerCase() === "pending").length,      color: "text-blue-600",   icon: <Clock        className="text-blue-400"   /> },
-      { label: "Inactive",        value: clients.filter(c => (c.status || "").toLowerCase() === "inactive").length,     color: "text-gray-500",   icon: <XCircle      className="text-gray-400"   /> },
-      { label: "Premium Clients", value: clients.filter(c => (c.tier || "").toLowerCase() === "premium").length,        color: "text-amber-600",  icon: <Star         className="text-amber-400"  /> },
-      { label: "Total Balance",   value: formatBalance(totalBalance) === "—" ? "₹0" : formatBalance(totalBalance),      color: "text-purple-700", icon: <IndianRupee  className="text-purple-400" /> },
-    ]
-  }, [clients])
+  // Stats computed from real data — each tile is a filter key
+  const stats = useMemo(() => [
+    { label: "Total Clients",   filterKey: "All",      value: clients.length,                                                            color: "text-gray-900",  icon: <Building2 className="text-gray-400"  /> },
+    { label: "Active Clients",  filterKey: "Active",   value: clients.filter(c => (c.status || "").toLowerCase() === "active").length,   color: "text-green-600", icon: <Users     className="text-green-400" /> },
+    { label: "Pending",         filterKey: "Pending",  value: clients.filter(c => (c.status || "").toLowerCase() === "pending").length,  color: "text-blue-600",  icon: <Clock     className="text-blue-400"  /> },
+    { label: "Inactive",        filterKey: "Inactive", value: clients.filter(c => (c.status || "").toLowerCase() === "inactive").length, color: "text-gray-500",  icon: <XCircle   className="text-gray-400"  /> },
+    { label: "Premium Clients", filterKey: "Premium",  value: clients.filter(c => (c.tier   || "").toLowerCase() === "premium").length,  color: "text-amber-600", icon: <Star      className="text-amber-400" /> },
+  ], [clients])
 
   // Filtering + pagination
   const filtered = useMemo(() => {
-    return clients.filter(c => {
-      if (filterCategory !== "All" && c.category !== filterCategory) return false
-      if (filterStatus   !== "All" && (c.status || "").toLowerCase() !== filterStatus.toLowerCase()) return false
-      if (filterTier     !== "All" && (c.tier   || "").toLowerCase() !== filterTier.toLowerCase())   return false
-      if (filterCity     !== "All" && c.billingCity !== filterCity) return false
-      return true
-    })
-  }, [clients, filterCategory, filterStatus, filterTier, filterCity])
+    switch (activeFilter) {
+      case "Active":   return clients.filter(c => (c.status || "").toLowerCase() === "active")
+      case "Pending":  return clients.filter(c => (c.status || "").toLowerCase() === "pending")
+      case "Inactive": return clients.filter(c => (c.status || "").toLowerCase() === "inactive")
+      case "Premium":  return clients.filter(c => (c.tier   || "").toLowerCase() === "premium")
+      default:         return clients
+    }
+  }, [clients, activeFilter])
 
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
-  const safePage    = Math.min(currentPage, totalPages)
-  const paged       = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
-  const setFilter   = (setter: (v: string) => void) => (val: string) => { setter(val); setCurrentPage(1) }
-  const clearFilters = () => { setFilterCategory("All"); setFilterStatus("All"); setFilterTier("All"); setFilterCity("All"); setCurrentPage(1) }
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+  const safePage   = Math.min(currentPage, totalPages)
+  const paged      = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  const handleTileClick = (filterKey: string) => {
+    setActiveFilter(prev => prev === filterKey ? "All" : filterKey)
+    setCurrentPage(1)
+  }
 
   // Actions
   const archiveClient = (client: StoredClient) => {
@@ -514,34 +488,40 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
       </div>
 
       <div className="w-full px-2 py-2">
-        {/* Stats — 6 tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-          {stats.map(s => (
-            <Card key={s.label}>
-              <CardContent className="p-2 flex justify-between items-start">
-                <div>
-                  <p className="text-xs text-gray-500">{s.label}</p>
-                  <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-                </div>
-                {s.icon}
-              </CardContent>
-            </Card>
-          ))}
+        {/* Stats — 5 tiles, each acts as a filter */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+          {stats.map(s => {
+            const isActive = activeFilter === s.filterKey
+            return (
+              <Card
+                key={s.label}
+                onClick={() => handleTileClick(s.filterKey)}
+                className={`cursor-pointer transition-all hover:shadow-md ${isActive ? "ring-2 ring-blue-500 shadow-md" : ""}`}
+              >
+                <CardContent className="p-2 flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+                  </div>
+                  {s.icon}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
         {/* Table Card */}
         <Card>
           <CardContent className="p-0">
-            {/* Filter bar */}
-            <div className="flex items-center gap-2 px-3 py-2.5 border-b flex-wrap">
-              <span className="text-xs font-semibold text-gray-400 mr-1">Filters:</span>
-              <FilterSelect label="Category" value={filterCategory} options={categories}                             onChange={setFilter(setFilterCategory)} />
-              <FilterSelect label="Status"   value={filterStatus}   options={["All", "Active", "Pending", "Inactive"]} onChange={setFilter(setFilterStatus)} />
-              <FilterSelect label="Tier"     value={filterTier}     options={["All", "Premium", "Standard", "Basic"]}  onChange={setFilter(setFilterTier)} />
-              <FilterSelect label="City"     value={filterCity}     options={cities}                                   onChange={setFilter(setFilterCity)} />
-              <button onClick={clearFilters} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Clear all</button>
-              <span className="ml-auto text-xs text-gray-400">{filtered.length} of {clients.length} clients</span>
-            </div>
+            {/* Active filter indicator */}
+            {activeFilter !== "All" && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b bg-blue-50">
+                <span className="text-xs text-blue-700 font-medium">Filtered: {activeFilter}</span>
+                <span className="text-xs text-gray-400">·</span>
+                <span className="text-xs text-gray-500">{filtered.length} of {clients.length} clients</span>
+                <button onClick={() => { setActiveFilter("All"); setCurrentPage(1) }} className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium">Clear ✕</button>
+              </div>
+            )}
 
             <table className="w-full table-fixed">
               <colgroup>
