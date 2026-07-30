@@ -782,25 +782,17 @@ export default function PurchaseOrdersPage() {
                   <button onClick={backToList} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mr-1">
                     <ArrowLeft size={15} /> Back
                   </button>
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => navigate(`/transactions/purchase/purchase-orders/${selectedManual.id}/edit`)}>
-                    <Pencil size={13} /> Edit
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => toast({ title: "Email sent to vendor" })}>
-                    <Mail size={13} /> Send Email
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={pdfLoading} className="h-8 text-xs gap-1.5 border-blue-200 text-blue-600 hover:bg-blue-50" onClick={handleDownloadPdf}>
-                    <Download size={13} />{pdfLoading ? "Generating…" : "Download PDF"}
-                  </Button>
-                  <Button size="sm" className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={convertToBill} disabled={selectedManual.status === "CANCELLED"}>
-                    <ReceiptText size={13} /> Convert to Bill
-                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="icon" className="h-8 w-8"><Ellipsis className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => toast({ title: "Receive items opened" })}>Receive Items</DropdownMenuItem>
-                      <DropdownMenuItem onSelect={convertToBill} disabled={selectedManual.status === "CANCELLED"}>Convert to Bill</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={handleDownloadPdf} disabled={pdfLoading}>
+                        <Download size={13} className="mr-2" />{pdfLoading ? "Generating…" : "Download PDF"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={convertToBill} disabled={selectedManual.status === "CANCELLED"}>
+                        <ReceiptText size={13} className="mr-2" /> Convert to Bill
+                      </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setConfirmCancel(true)} disabled={selectedManual.status === "CANCELLED"} className="text-red-600 focus:text-red-600">
                         Cancel Purchase Order
                       </DropdownMenuItem>
