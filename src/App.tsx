@@ -201,6 +201,7 @@ const SalesOrdersPage = lazy(() => import("@/pages/SalesOrdersPage"));
 const SalesOrderDetails = lazy(() => import("@/pages/SalesOrderDetails"));
 const SalesOrderFormPage = lazy(() => import("@/pages/SalesOrderFormPage"));
 const ExpensesPage = lazy(() => import("@/pages/ExpensesPage"));
+const NewExpensePage = lazy(() => import("@/pages/NewExpensePage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
 const CartPage = lazy(() => import("@/pages/CartPage"));
@@ -694,7 +695,7 @@ function AppRoutes() {
           />
           <Route
             path="transactions/purchase/expenses/create"
-            element={<ExpensesPage />}
+            element={<NewExpensePage />}
           />
           <Route
             path="transactions/purchase/expenses/:id"
