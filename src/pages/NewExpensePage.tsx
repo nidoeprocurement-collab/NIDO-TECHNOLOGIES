@@ -9,9 +9,12 @@ import {
   ImageUp,
   Search,
   X,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
+import { getVendors } from "@/lib/vendorDataStore";
+import { getClients } from "@/lib/clientStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ExpenseType = "Goods" | "Services";
@@ -72,41 +75,16 @@ const fmtCurrency = (v: number) =>
     minimumFractionDigits: 2,
   }).format(v);
 
-const getVendorNames = (): string[] => {
-  try {
-    // Primary: nido_vendors_v2 (array of StoredVendor)
-    const raw = localStorage.getItem("nido_vendors_v2");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.map((v: any) => v.name || v.companyName).filter(Boolean);
-    }
-    // Fallback: legacy nido_vendors key
-    const raw2 = localStorage.getItem("nido_vendors");
-    if (raw2) {
-      const parsed2 = JSON.parse(raw2);
-      if (Array.isArray(parsed2)) return parsed2.map((v: any) => v.name).filter(Boolean);
-    }
-  } catch { /* ignore */ }
-  return [];
-};
+const getVendorNames = (): string[] =>
+  getVendors()
+    .filter((v) => !v.archived)
+    .map((v) => v.name)
+    .filter(Boolean);
 
-const getClientNames = (): string[] => {
-  try {
-    // Primary: nido_clients_v2 (array of StoredClient)
-    const raw = localStorage.getItem("nido_clients_v2");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.map((c: any) => c.name || c.companyName).filter(Boolean);
-    }
-    // Fallback: legacy nido_clients key
-    const raw2 = localStorage.getItem("nido_clients");
-    if (raw2) {
-      const parsed2 = JSON.parse(raw2);
-      if (Array.isArray(parsed2)) return parsed2.map((c: any) => c.name).filter(Boolean);
-    }
-  } catch { /* ignore */ }
-  return [];
-};
+const getClientNames = (): string[] =>
+  getClients()
+    .map((c) => c.name)
+    .filter(Boolean);
 
 // ── Shared style tokens (match app-wide pattern) ──────────────────────────────
 const inp =
@@ -166,6 +144,9 @@ export default function NewExpensePage() {
   );
   const [receipts, setReceipts] = useState<ReceiptFile[]>([]);
   const [saving, setSaving] = useState(false);
+  // Right-column panel order (drag to reorder)
+  const [panelOrder, setPanelOrder] = useState<("receipts" | "summary")[]>(["receipts", "summary"]);
+  const dragPanelRef = useRef<"receipts" | "summary" | null>(null);
 
   const [form, setForm] = useState({
     date: today(),
@@ -335,7 +316,7 @@ export default function NewExpensePage() {
       </div>
 
       {/* ── Body ── */}
-      <div className="max-w-5xl mx-auto px-6 py-7">
+      <div className="w-full px-6 py-7">
         {/* Tab switcher */}
         <div className="flex items-center gap-1 mb-6 p-1 bg-white border border-gray-200 rounded-xl w-fit shadow-sm">
           <button
@@ -719,115 +700,146 @@ export default function NewExpensePage() {
             </Section>
           </div>
 
-          {/* ── Right column — Receipts ── */}
-          <div className="space-y-5">
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden sticky top-20">
-              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-gray-100 bg-gray-50/70">
-                <div className="w-1 h-4 bg-blue-600 rounded-full shrink-0" />
-                <ImageUp size={14} className="text-blue-600 shrink-0" />
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-700">
-                  Receipts
-                </h3>
-              </div>
-              <div className="p-5 text-center">
+          {/* ── Right column — draggable panels ── */}
+          <div className="space-y-3">
+            {panelOrder.map((panel) => {
+              const isReceipts = panel === "receipts";
+              return (
                 <div
-                  className="border-2 border-dashed border-gray-200 rounded-xl p-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors"
-                  onClick={() => uploadRef.current?.click()}
+                  key={panel}
+                  draggable
+                  onDragStart={() => { dragPanelRef.current = panel; }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    const from = dragPanelRef.current;
+                    if (!from || from === panel) return;
+                    setPanelOrder((prev) => {
+                      const next = [...prev];
+                      const fromIdx = next.indexOf(from);
+                      const toIdx = next.indexOf(panel);
+                      next[fromIdx] = panel;
+                      next[toIdx] = from;
+                      return next;
+                    });
+                    dragPanelRef.current = null;
+                  }}
+                  className="bg-white border border-gray-200 rounded-xl overflow-hidden cursor-grab active:cursor-grabbing select-none"
                 >
-                  <ImageUp className="mx-auto h-10 w-10 text-gray-400" />
-                  <p className="mt-3 text-sm font-medium text-gray-700">
-                    Drag or drop receipts
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Max file size 10 MB
-                  </p>
-                  <button
-                    type="button"
-                    className="mt-4 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      uploadRef.current?.click();
-                    }}
-                  >
-                    Browse Files
-                  </button>
-                </div>
-                <input
-                  ref={uploadRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleUpload}
-                />
+                  {/* Panel header with grip */}
+                  <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-gray-100 bg-gray-50/70">
+                    <GripVertical size={14} className="text-gray-400 shrink-0" />
+                    <div className="w-1 h-4 bg-blue-600 rounded-full shrink-0" />
+                    {isReceipts
+                      ? <ImageUp size={14} className="text-blue-600 shrink-0" />
+                      : null}
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-700">
+                      {isReceipts ? "Receipts" : "Summary"}
+                    </h3>
+                  </div>
 
-                {receipts.length > 0 && (
-                  <div className="mt-4 space-y-2 text-left">
-                    {receipts.map((file) => (
+                  {/* Panel body */}
+                  {isReceipts ? (
+                    <div className="p-5 text-center">
                       <div
-                        key={file.name}
-                        className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                        className="border-2 border-dashed border-gray-200 rounded-xl p-6 cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors"
+                        onClick={() => uploadRef.current?.click()}
                       >
-                        <span className="truncate text-gray-700">{file.name}</span>
+                        <ImageUp className="mx-auto h-10 w-10 text-gray-400" />
+                        <p className="mt-3 text-sm font-medium text-gray-700">
+                          Drag or drop receipts
+                        </p>
+                        <p className="mt-1 text-xs text-gray-400">
+                          Max file size 10 MB
+                        </p>
                         <button
                           type="button"
-                          onClick={() =>
-                            setReceipts((c) => c.filter((v) => v.name !== file.name))
-                          }
-                          className="text-gray-400 hover:text-red-500 shrink-0"
+                          className="mt-4 px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            uploadRef.current?.click();
+                          }}
                         >
-                          <X size={14} />
+                          Browse Files
                         </button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Quick summary card */}
-            {amountValue > 0 && (
-              <div className="bg-white border border-gray-200 rounded-xl p-5">
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">
-                  Summary
-                </p>
-                <div className="space-y-2 text-sm">
-                  {form.expenseAccount && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Account</span>
-                      <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">
-                        {form.expenseAccount}
-                      </span>
-                    </div>
-                  )}
-                  {form.paidThrough && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Paid Through</span>
-                      <span className="font-medium text-gray-800">
-                        {form.paidThrough}
-                      </span>
-                    </div>
-                  )}
-                  {taxPercent > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Tax</span>
-                      <span className="font-medium text-gray-800">
-                        {fmtCurrency(taxAmount)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between pt-2 border-t border-gray-100">
-                    <span className="font-semibold text-gray-700">Total</span>
-                    <span className="font-bold text-rose-600 text-base">
-                      {fmtCurrency(
-                        form.amountIs === "Tax Inclusive"
-                          ? amountValue
-                          : amountValue + taxAmount,
+                      <input
+                        ref={uploadRef}
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleUpload}
+                      />
+                      {receipts.length > 0 && (
+                        <div className="mt-4 space-y-2 text-left">
+                          {receipts.map((file) => (
+                            <div
+                              key={file.name}
+                              className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                            >
+                              <span className="truncate text-gray-700">{file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setReceipts((c) => c.filter((v) => v.name !== file.name))
+                                }
+                                className="text-gray-400 hover:text-red-500 shrink-0"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                    </span>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="p-5">
+                      {amountValue > 0 ? (
+                        <div className="space-y-2 text-sm">
+                          {form.expenseAccount && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Account</span>
+                              <span className="font-medium text-gray-800 text-right max-w-[60%] truncate">
+                                {form.expenseAccount}
+                              </span>
+                            </div>
+                          )}
+                          {form.paidThrough && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Paid Through</span>
+                              <span className="font-medium text-gray-800">
+                                {form.paidThrough}
+                              </span>
+                            </div>
+                          )}
+                          {taxPercent > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Tax</span>
+                              <span className="font-medium text-gray-800">
+                                {fmtCurrency(taxAmount)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex justify-between pt-2 border-t border-gray-100">
+                            <span className="font-semibold text-gray-700">Total</span>
+                            <span className="font-bold text-rose-600 text-base">
+                              {fmtCurrency(
+                                form.amountIs === "Tax Inclusive"
+                                  ? amountValue
+                                  : amountValue + taxAmount,
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 text-center py-2">
+                          Enter an amount to see summary
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </div>
 
