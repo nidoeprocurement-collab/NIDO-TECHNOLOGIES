@@ -4,6 +4,8 @@ import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { getVendors } from "@/lib/vendorDataStore";
+import { getVendorProducts } from "@/lib/vendorStore";
+import { getEffectiveVendorTaxPct, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { generateVendorCreditPdf } from "@/lib/vendorCreditPdf";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -568,6 +570,28 @@ export default function VendorCreditsPage() {
     [bills, form.vendorName],
   );
 
+  // Products for the selected vendor (same pattern as PurchaseOrdersPage)
+  const vendorProducts = useMemo(() => {
+    if (!form.vendorName) return [];
+    const vendor = vendors.find((v) => v.name === form.vendorName);
+    if (!vendor) return [];
+    return getVendorProducts(vendor.id).filter((p) => p.status === "Active");
+  }, [form.vendorName, vendors]);
+
+  // HSN lookup by category (same as PurchaseOrdersPage)
+  const hsnByCategory = useMemo(() => {
+    const map = new Map<string, string>();
+    getHsnCodes().forEach((h) => {
+      if (h.status === "Active" && h.productCategory)
+        map.set(h.productCategory.toLowerCase(), h.code);
+    });
+    getProductCategoryTaxMap().forEach((m) => {
+      if (m.defaultHsnCode && m.productCategory)
+        map.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
+    });
+    return map;
+  }, []);
+
   const filteredCredits = useMemo(() => {
     const q = search.toLowerCase();
     if (!q) return credits;
@@ -611,15 +635,6 @@ export default function VendorCreditsPage() {
         </div>
 
         <div className="w-full px-6 py-7">
-          {/* Numbering info banner */}
-          <div className="mb-5 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
-            <Info size={15} className="mt-0.5 shrink-0" />
-            <span>
-              Numbering: <strong>{pref.mode === "auto" ? "Auto-generate" : "Manual"}</strong>
-              {pref.mode === "auto" && ` — Prefix: ${pref.prefix}, Next: ${String(pref.nextNumber).padStart(5, "0")}`}
-            </span>
-          </div>
-
           {/* Section 1 — Vendor & Header */}
           <Section title="Vendor & Credit Header" icon={FileText}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -631,9 +646,32 @@ export default function VendorCreditsPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     const vendor = vendors.find((vd) => vd.name === v);
-                    setF("vendorName", v);
-                    setF("vendorAddress", vendor?.address || "");
-                    setF("associatedBillId", "");
+                    // Auto-populate line items from vendor's product catalog
+                    const products = vendor
+                      ? getVendorProducts(vendor.id).filter((p) => p.status === "Active")
+                      : [];
+                    const autoItems: CreditItem[] = products.map((p) => {
+                      const category = p.category || "";
+                      const hsnSac = hsnByCategory.get(category.toLowerCase()) || "";
+                      const taxPercent = getEffectiveVendorTaxPct(category) || 18;
+                      return {
+                        id: `ci-${Date.now()}-${p.id}`,
+                        itemDetails: p.productName,
+                        account: category,
+                        hsnSac,
+                        quantity: parseFloat(p.moq) || 1,
+                        rate: parseFloat(p.price) || 0,
+                        discount: 0,
+                        taxPercent,
+                      };
+                    });
+                    setForm((c) => ({
+                      ...c,
+                      vendorName: v,
+                      vendorAddress: vendor?.address || "",
+                      associatedBillId: "",
+                      items: autoItems.length ? autoItems : [newItem(`tmp-${Date.now()}`)],
+                    }));
                   }}
                 >
                   <option value="">Select a Vendor</option>
@@ -824,13 +862,6 @@ export default function VendorCreditsPage() {
                   <button onClick={backToList} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mr-1">
                     <ArrowLeft size={15} /> Back
                   </button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/transactions/purchase/vendor-credits/${selectedCredit.id}/edit`)}
-                  >
-                    Edit
-                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="icon" className="h-8 w-8"><Ellipsis className="h-4 w-4" /></Button>
