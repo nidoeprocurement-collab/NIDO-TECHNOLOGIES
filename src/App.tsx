@@ -751,6 +751,10 @@ function AppRoutes() {
             element={<PaymentsMadePage />}
           />
           <Route
+            path="transactions/purchase/payments-made/:id"
+            element={<PaymentsMadePage />}
+          />
+          <Route
             path="transactions/purchase/vendor-credits"
             element={<VendorCreditsPage />}
           />
