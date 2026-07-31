@@ -25,6 +25,7 @@ import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStor
 import { getVendors } from "@/lib/vendorDataStore";
 import { getVendorProducts, type VendorProduct } from "@/lib/vendorStore";
 import { loadConfig } from "@/lib/configService";
+import { getEffectiveVendorTaxPct, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { generateManualPOPdf, downloadPOPdf } from "@/lib/generatePO";
 import {
   ArrowLeft,
@@ -78,6 +79,7 @@ export interface PurchaseOrderEntry {
   billedStatus: BilledStatus;
   receiveStatus: ReceiveStatus;
   discountPercent: number;
+  shippingCharges: number;
   adjustment: number;
   notes: string;
   termsAndConditions: string;
@@ -97,6 +99,7 @@ interface PurchaseOrderForm {
   shipmentPreference: string;
   includeInterStateGst: boolean;
   discountPercent: number;
+  shippingCharges: number;
   adjustment: number;
   notes: string;
   termsAndConditions: string;
@@ -134,7 +137,7 @@ const fmtDate = (iso: string) => {
   } catch { return iso; }
 };
 
-const getTotals = (entry: Pick<PurchaseOrderEntry, "items" | "discountPercent" | "adjustment">) => {
+const getTotals = (entry: Pick<PurchaseOrderEntry, "items" | "discountPercent" | "shippingCharges" | "adjustment">) => {
   const subtotal = entry.items.reduce((s, i) => s + i.quantity * i.rate, 0);
   const discountAmount = (subtotal * entry.discountPercent) / 100;
   const taxableBase = subtotal - discountAmount;
@@ -155,7 +158,8 @@ const getTotals = (entry: Pick<PurchaseOrderEntry, "items" | "discountPercent" |
     .sort((a, b) => a.rate - b.rate);
 
   const taxAmount = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
-  const total = taxableBase + taxAmount + entry.adjustment;
+  const shipping = entry.shippingCharges ?? 0;
+  const total = taxableBase + taxAmount + shipping + entry.adjustment;
   return { subtotal, taxAmount, discountAmount, taxableBase, gstSlabs, cgst: taxAmount / 2, sgst: taxAmount / 2, total };
 };
 
@@ -178,12 +182,17 @@ const newItem = (id: string): PurchaseOrderItem => ({ id, itemName: "", descript
 const readStoredManualOrders = (): PurchaseOrderEntry[] => {
   const parsed = safeReadJson<unknown>(STORAGE_KEY, []);
   if (!Array.isArray(parsed)) return [];
-  return parsed.filter((e): e is PurchaseOrderEntry =>
-    !!e && typeof e === "object" &&
-    typeof (e as PurchaseOrderEntry).id === "string" &&
-    typeof (e as PurchaseOrderEntry).poNumber === "string" &&
-    Array.isArray((e as PurchaseOrderEntry).items),
-  );
+  return parsed
+    .filter((e): e is PurchaseOrderEntry =>
+      !!e && typeof e === "object" &&
+      typeof (e as PurchaseOrderEntry).id === "string" &&
+      typeof (e as PurchaseOrderEntry).poNumber === "string" &&
+      Array.isArray((e as PurchaseOrderEntry).items),
+    )
+    .map((e) => ({
+      ...e,
+      shippingCharges: (e as PurchaseOrderEntry).shippingCharges ?? 0,
+    }));
 };
 
 const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
@@ -216,6 +225,7 @@ const emptyForm = (): PurchaseOrderForm => ({
   shipmentPreference: "Any",
   includeInterStateGst: false,
   discountPercent: 0,
+  shippingCharges: 0,
   adjustment: 0,
   notes: "",
   termsAndConditions: "1. Payment terms will be released post approval at this PO.\n2. Packaging and Shipping are managed as actual cost.",
@@ -398,6 +408,7 @@ export default function PurchaseOrdersPage() {
             shipmentPreference: form.shipmentPreference,
             includeInterStateGst: form.includeInterStateGst,
             discountPercent: form.discountPercent,
+            shippingCharges: form.shippingCharges,
             adjustment: form.adjustment,
             notes: form.notes,
             termsAndConditions: form.termsAndConditions,
@@ -428,6 +439,7 @@ export default function PurchaseOrdersPage() {
           billedStatus: "YET TO BE BILLED",
           receiveStatus: "YET TO BE RECEIVED",
           discountPercent: form.discountPercent,
+          shippingCharges: form.shippingCharges,
           adjustment: form.adjustment,
           notes: form.notes,
           termsAndConditions: form.termsAndConditions,
@@ -530,24 +542,42 @@ export default function PurchaseOrdersPage() {
     return getVendorProducts(vendor.id).filter((p) => p.status === "Active");
   }, [form.vendorName]);
 
+  // Build HSN lookup map by category (same logic as CartPage)
+  const hsnByCategory = useMemo(() => {
+    const map = new Map<string, string>();
+    getHsnCodes().forEach((h) => {
+      if (h.status === "Active" && h.productCategory)
+        map.set(h.productCategory.toLowerCase(), h.code);
+    });
+    getProductCategoryTaxMap().forEach((m) => {
+      if (m.defaultHsnCode && m.productCategory)
+        map.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
+    });
+    return map;
+  }, []);
+
   const handlePickVendorProduct = (itemId: string, productId: string) => {
     const product = vendorProducts.find((p) => p.id === productId);
     if (!product) return;
+    const category = product.category || "";
+    const hsnSac = hsnByCategory.get(category.toLowerCase()) || "";
+    const taxPercent = getEffectiveVendorTaxPct(category, form.includeInterStateGst);
     setF("items", form.items.map((item) =>
       item.id === itemId
         ? {
             ...item,
             itemName: product.productName,
-            description: product.category || "",
-            hsnSac: "",
+            description: category,
+            hsnSac,
             rate: parseFloat(product.price) || 0,
             quantity: parseFloat(product.moq) || 1,
+            taxPercent: taxPercent || 18,
           }
         : item
     ));
   };
 
-  const formTotals = getTotals({ items: form.items, discountPercent: form.discountPercent, adjustment: form.adjustment });
+  const formTotals = getTotals({ items: form.items, discountPercent: form.discountPercent, shippingCharges: form.shippingCharges, adjustment: form.adjustment });
 
   // ── FORM PAGE ──────────────────────────────────────────────────────────────
   if (isFormMode) {
@@ -730,50 +760,42 @@ export default function PurchaseOrdersPage() {
                   <tbody>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-600">Gross Subtotal</td>
-                      <td className="px-4 py-2.5 text-right text-gray-900">₹{formTotals.subtotal.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">INR {formTotals.subtotal.toFixed(2)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
-                      <td className="px-4 py-2.5 text-gray-600">
-                        Discount
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">
+                        Item Level Discounts (−)
+                        <span className="ml-2 text-xs font-normal text-gray-400">
+                          <input type="number" min={0} max={100} className="w-12 px-1.5 py-0.5 text-right text-xs border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.discountPercent} onChange={(e) => setF("discountPercent", toNumber(e.target.value))} />%
+                        </span>
                       </td>
-                      <td className="px-4 py-2 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <input type="number" className="w-14 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.discountPercent} onChange={(e) => setF("discountPercent", toNumber(e.target.value))} />
-                          <span className="text-xs text-gray-400">%</span>
-                        </div>
-                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">INR − {formTotals.discountAmount.toFixed(2)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹{formTotals.taxableBase.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">INR {formTotals.taxableBase.toFixed(2)}</td>
                     </tr>
-                    {formTotals.gstSlabs.map((slab) => (
-                      <>
-                        <tr key={`cgst-${slab.rate}`} className="border-b border-gray-100">
-                          <td className="px-4 py-2 text-gray-500 pl-6">CGST @ {slab.rate / 2}%</td>
-                          <td className="px-4 py-2 text-right text-gray-700">₹{slab.cgst.toFixed(2)}</td>
-                        </tr>
-                        <tr key={`sgst-${slab.rate}`} className="border-b border-gray-100">
-                          <td className="px-4 py-2 text-gray-500 pl-6">SGST @ {slab.rate / 2}%</td>
-                          <td className="px-4 py-2 text-right text-gray-700">₹{slab.sgst.toFixed(2)}</td>
-                        </tr>
-                      </>
-                    ))}
-                    {formTotals.gstSlabs.length === 0 && (
-                      <tr className="border-b border-gray-100">
-                        <td className="px-4 py-2.5 text-gray-500">Total GST</td>
-                        <td className="px-4 py-2.5 text-right text-gray-700">₹0.00</td>
-                      </tr>
-                    )}
                     <tr className="border-b border-gray-100">
-                      <td className="px-4 py-2.5 text-gray-600">Adjustment</td>
+                      <td className="px-4 py-2.5 text-gray-600">
+                        Total GST{formTotals.gstSlabs.length > 0 ? ` (${formTotals.gstSlabs.map(s => `${s.rate}%`).join(", ")})` : ""}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">INR {formTotals.taxAmount.toFixed(2)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 text-gray-600">Shipping &amp; Handling Charges</td>
                       <td className="px-4 py-2 text-right">
-                        <input type="number" className="w-24 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.adjustment} onChange={(e) => setF("adjustment", toNumber(e.target.value))} />
+                        <input type="number" min={0} className="w-28 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.shippingCharges} onChange={(e) => setF("shippingCharges", toNumber(e.target.value))} />
                       </td>
                     </tr>
-                    <tr className="border-t-2 border-gray-300 bg-blue-50/40">
-                      <td className="px-4 py-3 font-bold text-gray-900">Total</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">₹{formTotals.total.toFixed(2)}</td>
+                    <tr className="border-b border-gray-100">
+                      <td className="px-4 py-2.5 text-gray-600">Round Off Adjustment</td>
+                      <td className="px-4 py-2 text-right">
+                        <input type="number" className="w-28 px-2 py-1 text-right text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" placeholder="e.g. -0.50" value={form.adjustment} onChange={(e) => setF("adjustment", toNumber(e.target.value))} />
+                      </td>
+                    </tr>
+                    <tr className="bg-blue-50">
+                      <td className="px-4 py-3 font-bold text-gray-900">Total Payable</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">INR {formTotals.total.toFixed(2)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1178,20 +1200,47 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
         </tbody>
       </table>
 
-      {/* Totals */}
+      {/* Totals — invoice PDF format */}
       <div className="flex justify-end mb-6">
-        <div className="w-72 space-y-1.5 text-sm">
-          <div className="flex justify-between text-gray-600"><span>Sub Total</span><span>{totals.subtotal.toFixed(2)}</span></div>
-          {order.discountPercent > 0 && <div className="flex justify-between text-gray-600"><span>Discount ({order.discountPercent}%)</span><span>-{totals.discountAmount.toFixed(2)}</span></div>}
-          <div className="flex justify-between text-gray-600 font-semibold"><span>Total Taxable Value</span><span>{totals.taxableBase.toFixed(2)}</span></div>
-          {totals.gstSlabs.map((slab) => (
-            <>
-              <div key={`cgst-${slab.rate}`} className="flex justify-between text-gray-600"><span className="pl-3">CGST @ {slab.rate / 2}%</span><span>{slab.cgst.toFixed(2)}</span></div>
-              <div key={`sgst-${slab.rate}`} className="flex justify-between text-gray-600"><span className="pl-3">SGST @ {slab.rate / 2}%</span><span>{slab.sgst.toFixed(2)}</span></div>
-            </>
-          ))}
-          {order.adjustment !== 0 && <div className="flex justify-between text-gray-600"><span>Adjustment</span><span>{order.adjustment.toFixed(2)}</span></div>}
-          <div className="flex justify-between pt-2 border-t border-gray-200 font-bold text-gray-900 text-base"><span>Total</span><span>{money(totals.total)}</span></div>
+        <div className="w-80 border border-gray-200 rounded-lg overflow-hidden text-sm">
+          <table className="w-full">
+            <tbody>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2 text-gray-600">Gross Subtotal</td>
+                <td className="px-4 py-2 text-right text-gray-900">INR {totals.subtotal.toFixed(2)}</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2 font-semibold text-gray-900">Item Level Discounts (−)</td>
+                <td className="px-4 py-2 text-right font-semibold text-gray-900">INR − {totals.discountAmount.toFixed(2)}</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2 font-semibold text-gray-900">Total Taxable Value</td>
+                <td className="px-4 py-2 text-right font-semibold text-gray-900">INR {totals.taxableBase.toFixed(2)}</td>
+              </tr>
+              <tr className="border-b border-gray-100">
+                <td className="px-4 py-2 text-gray-600">
+                  Total GST{totals.gstSlabs.length > 0 ? ` (${totals.gstSlabs.map(s => `${s.rate}%`).join(", ")})` : ""}
+                </td>
+                <td className="px-4 py-2 text-right text-gray-900">INR {totals.taxAmount.toFixed(2)}</td>
+              </tr>
+              {(order.shippingCharges ?? 0) > 0 && (
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-2 text-gray-600">Shipping &amp; Handling Charges</td>
+                  <td className="px-4 py-2 text-right text-gray-900">INR {(order.shippingCharges ?? 0).toFixed(2)}</td>
+                </tr>
+              )}
+              {order.adjustment !== 0 && (
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-2 text-gray-600">Round Off Adjustment</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{order.adjustment < 0 ? "−" : ""}INR {Math.abs(order.adjustment).toFixed(2)}</td>
+                </tr>
+              )}
+              <tr className="bg-blue-50">
+                <td className="px-4 py-3 font-bold text-gray-900">Total Payable</td>
+                <td className="px-4 py-3 text-right font-bold text-gray-900">{money(totals.total)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
