@@ -180,8 +180,8 @@ const nextBillNumber = (entries: BillEntry[]) => {
   const max = entries.reduce((current, entry) => {
     const parsed = Number(entry.billNumber.replace(/\D/g, ""));
     return Number.isFinite(parsed) ? Math.max(current, parsed) : current;
-  }, 103);
-  return String(max + 1);
+  }, 0);
+  return `BILL-${String(max + 1).padStart(5, "0")}`;
 };
 
 const newItem = (id: string): BillItem => ({
