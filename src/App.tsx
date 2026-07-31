@@ -657,10 +657,10 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
-          <Route path="services" element={<MyRequestsPage />} />
-          <Route path="services/requests/:requestId" element={<MyRequestDetailPage />} />
-          <Route path="services/catalogue" element={<ServicesPage />} />
+          <Route path="services" element={<ServicesPage />} />
           <Route path="services/amc/new" element={<NewAMCRequestPage />} />
+          <Route path="my-services" element={<MyRequestsPage />} />
+          <Route path="my-services/requests/:requestId" element={<MyRequestDetailPage />} />
           <Route path="support" element={<SupportPage />} />
           <Route
             path="transactions"
