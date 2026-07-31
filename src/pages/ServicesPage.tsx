@@ -115,9 +115,7 @@ export default function ServicesPage() {
               One Place for AMC, Repair Service, Recycle / Disposal, Rental Service and Regular Purchase
             </h1>
             <p className="max-w-xl text-sm text-slate-500 md:text-base">
-              Use the dedicated services workflow to open structured requests,
-              keep client details consistent, and move faster with cleaner
-              forms.
+              Manage all your service requests through a single platform with faster approvals, seamless tracking, and complete lifecycle management.
             </p>
           </div>
         </div>
