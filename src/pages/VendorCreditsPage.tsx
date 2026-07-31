@@ -564,6 +564,30 @@ export default function VendorCreditsPage() {
     }
   };
 
+  const handlePickVendorProduct = (itemId: string, productId: string) => {
+    const product = vendorProducts.find((p) => p.id === productId);
+    if (!product) return;
+    const category = product.category || "";
+    const hsnSac = hsnByCategory.get(category.toLowerCase()) || "";
+    const taxPercent = getEffectiveVendorTaxPct(category) || 18;
+    setF(
+      "items",
+      form.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              itemDetails: product.productName,
+              account: category,
+              hsnSac,
+              rate: parseFloat(product.price) || 0,
+              quantity: parseFloat(product.moq) || 1,
+              taxPercent,
+            }
+          : item,
+      ),
+    );
+  };
+
   const formTotals = getCreditTotals({ items: form.items, adjustment: form.adjustment });
   const vendorBills = useMemo(
     () => bills.filter((b) => b.vendorName === form.vendorName),
@@ -646,32 +670,9 @@ export default function VendorCreditsPage() {
                   onChange={(e) => {
                     const v = e.target.value;
                     const vendor = vendors.find((vd) => vd.name === v);
-                    // Auto-populate line items from vendor's product catalog
-                    const products = vendor
-                      ? getVendorProducts(vendor.id).filter((p) => p.status === "Active")
-                      : [];
-                    const autoItems: CreditItem[] = products.map((p) => {
-                      const category = p.category || "";
-                      const hsnSac = hsnByCategory.get(category.toLowerCase()) || "";
-                      const taxPercent = getEffectiveVendorTaxPct(category) || 18;
-                      return {
-                        id: `ci-${Date.now()}-${p.id}`,
-                        itemDetails: p.productName,
-                        account: category,
-                        hsnSac,
-                        quantity: parseFloat(p.moq) || 1,
-                        rate: parseFloat(p.price) || 0,
-                        discount: 0,
-                        taxPercent,
-                      };
-                    });
-                    setForm((c) => ({
-                      ...c,
-                      vendorName: v,
-                      vendorAddress: vendor?.address || "",
-                      associatedBillId: "",
-                      items: autoItems.length ? autoItems : [newItem(`tmp-${Date.now()}`)],
-                    }));
+                    setF("vendorName", v);
+                    setF("vendorAddress", vendor?.address || "");
+                    setF("associatedBillId", "");
                   }}
                 >
                   <option value="">Select a Vendor</option>
@@ -749,6 +750,20 @@ export default function VendorCreditsPage() {
                       <tr key={item.id} className="border-b border-gray-100">
                         <td className="px-2 py-2 text-center text-gray-400 text-xs">{rowIdx + 1}</td>
                         <td className="px-2 py-2">
+                          {vendorProducts.length > 0 && (
+                            <select
+                              className={`${sel} mb-1 text-xs text-blue-700 border-blue-200 bg-blue-50`}
+                              value={item.itemDetails && vendorProducts.some((p) => p.productName === item.itemDetails) ? (vendorProducts.find((p) => p.productName === item.itemDetails)?.id ?? "") : ""}
+                              onChange={(e) => e.target.value && handlePickVendorProduct(item.id, e.target.value)}
+                            >
+                              <option value="">— Pick from vendor catalog —</option>
+                              {vendorProducts.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.productName}{p.price ? ` · ₹${p.price}` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                           <input className={inp} value={item.itemDetails} onChange={(e) => handleItemChange(item.id, "itemDetails", e.target.value)} placeholder="Item name / specification" />
                         </td>
                         <td className="px-2 py-2">
