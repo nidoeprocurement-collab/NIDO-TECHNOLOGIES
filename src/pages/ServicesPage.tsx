@@ -3,39 +3,73 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowRight,
-  ClipboardList,
-  Recycle,
   ShieldCheck,
   Wrench,
+  Recycle,
+  CalendarDays,
+  ShoppingCart,
 } from "lucide-react";
 
 const SERVICE_CARDS = [
   {
-    title: "Annual Maintenance Contract",
-    description:
-      "Create AMC requests with mandatory client, category, duration, and authorization details.",
-    icon: Wrench,
+    title: "AMC",
+    subtitle: "Annual Maintenance Contract",
+    description: "Comprehensive maintenance coverage to ensure optimal performance and reliability.",
+    icon: ShieldCheck,
     href: "/services/amc/new",
-    tone: "from-blue-50 to-cyan-50 border-blue-200 dark:from-blue-950/40 dark:to-cyan-950/40 dark:border-blue-900/50",
-    badge: "Primary workflow",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    dotColor: "bg-blue-500",
+    tone: "border-slate-200 bg-white hover:shadow-md",
+    features: ["Preventive Maintenance", "Breakdown Support", "Parts & Labor Coverage", "Priority Support"],
   },
   {
-    title: "Recycle / Disposal",
-    description:
-      "Capture equipment recycling and disposal requests in a guided service flow.",
+    title: "Repair Service",
+    subtitle: "",
+    description: "On-demand repair services for quick resolution of equipment issues.",
+    icon: Wrench,
+    href: "/support",
+    iconBg: "bg-orange-100",
+    iconColor: "text-orange-500",
+    dotColor: "bg-orange-400",
+    tone: "border-slate-200 bg-white hover:shadow-md",
+    features: ["Diagnosis & Troubleshooting", "On-site / Off-site Repair", "Genuine Parts Replacement", "Service Report"],
+  },
+  {
+    title: "Recycle /\nDisposal",
+    subtitle: "",
+    description: "Environmentally responsible recycling and disposal of electronic equipment.",
     icon: Recycle,
     href: "/support",
-    tone: "from-emerald-50 to-teal-50 border-emerald-200 dark:from-emerald-950/40 dark:to-teal-950/40 dark:border-emerald-900/50",
-    badge: "Service desk",
+    iconBg: "bg-emerald-100",
+    iconColor: "text-emerald-600",
+    dotColor: "bg-emerald-500",
+    tone: "border-slate-200 bg-white hover:shadow-md",
+    features: ["Secure Data Destruction", "Environment Friendly", "Compliance & Certification", "Pickup & Disposal"],
   },
   {
-    title: "Service Desk Requests",
-    description:
-      "Raise supporting service tickets, track progress, and keep stakeholders aligned.",
-    icon: ClipboardList,
+    title: "Rental Service",
+    subtitle: "",
+    description: "Flexible rental solutions for short-term and long-term equipment needs.",
+    icon: CalendarDays,
     href: "/support",
-    tone: "from-slate-50 to-white border-slate-200 dark:from-slate-800/40 dark:to-slate-900/40 dark:border-slate-700",
-    badge: "Ticketing",
+    iconBg: "bg-violet-100",
+    iconColor: "text-violet-600",
+    dotColor: "bg-violet-500",
+    tone: "border-slate-200 bg-white hover:shadow-md",
+    features: ["Short-term Rentals", "Long-term Leasing", "Flexible Tenure", "Maintenance Included"],
+  },
+  {
+    title: "Regular Purchase",
+    subtitle: "",
+    description: "Daily essentials and consumables for smooth business operations.",
+    icon: ShoppingCart,
+    href: "/support",
+    iconBg: "bg-teal-100",
+    iconColor: "text-teal-600",
+    dotColor: "bg-teal-500",
+    tone: "border-slate-200 bg-white hover:shadow-md",
+    features: ["Pantry Items", "Water Cans", "Cleaning Supplies", "Other Daily Essentials"],
   },
 ];
 
@@ -70,34 +104,52 @@ export default function ServicesPage() {
       </div>
 
       {/* Service Cards */}
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {SERVICE_CARDS.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className={`overflow-hidden border bg-gradient-to-br ${card.tone} rounded-lg shadow-sm p-2 space-y-4`}
+              className={`flex flex-col rounded-2xl border ${card.tone} p-5 shadow-sm transition-all duration-200 cursor-pointer group`}
+              onClick={() => navigate(card.href)}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-slate-900 shadow-sm dark:bg-slate-900/60 dark:text-slate-100">
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-                  {card.badge}
-                </div>
+              {/* Icon */}
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${card.iconBg} mb-4`}>
+                <Icon className={`h-6 w-6 ${card.iconColor}`} />
               </div>
-              <div className="space-y-2">
-                <h2 className="text-xl font-semibold dark:text-slate-100">{card.title}</h2>
-                <p className="text-sm leading-6 text-slate-600">
-                  {card.description}
-                </p>
+
+              {/* Title */}
+              <div className="mb-3">
+                <h2 className="text-lg font-bold text-slate-900 leading-snug whitespace-pre-line">
+                  {card.title}
+                </h2>
+                {card.subtitle && (
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">({card.subtitle})</p>
+                )}
               </div>
-              <button
-                onClick={() => navigate(card.href)}
-                className="gap-2 rounded-full px-2 py-2 text-sm font-medium flex items-center border border-slate-300 hover:bg-white/50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800/50"
-              >
-                Open <ArrowRight className="h-4 w-4" />
-              </button>
+
+              {/* Description */}
+              <p className="text-sm text-slate-500 leading-relaxed mb-5">
+                {card.description}
+              </p>
+
+              {/* Divider */}
+              <div className="border-t border-slate-100 mb-4" />
+
+              {/* Feature list */}
+              <ul className="space-y-2 flex-1">
+                {card.features.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                    <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${card.dotColor}`} />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Open link */}
+              <div className="mt-5 flex items-center gap-1 text-sm font-medium text-slate-400 group-hover:text-slate-700 transition-colors">
+                Open <ArrowRight className="h-3.5 w-3.5" />
+              </div>
             </div>
           );
         })}
