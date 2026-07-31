@@ -164,11 +164,11 @@ export default function ServicesPage() {
                 ))}
               </ul>
 
-              {/* Open pill button */}
+              {/* Create pill button */}
               <button
                 className={`w-fit flex items-center gap-1.5 rounded-full border ${card.btnBorder} ${card.btnText} ${card.btnHover} px-4 py-1.5 text-xs font-semibold transition-colors`}
               >
-                Open <ArrowRight className="h-3.5 w-3.5" />
+                Create <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
           );

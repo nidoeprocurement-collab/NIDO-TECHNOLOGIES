@@ -189,6 +189,8 @@ const UserRolesTab = lazy(
 );
 const IntegrationsPage = lazy(() => import("@/pages/IntegrationsPage"));
 const SupportPage = lazy(() => import("@/pages/SupportPage"));
+const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
+const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
 const InvoicePage = lazy(() => import("@/pages/InvoicePage"));
@@ -655,7 +657,9 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
-          <Route path="services" element={<ServicesPage />} />
+          <Route path="services" element={<MyRequestsPage />} />
+          <Route path="services/requests/:requestId" element={<MyRequestDetailPage />} />
+          <Route path="services/catalogue" element={<ServicesPage />} />
           <Route path="services/amc/new" element={<NewAMCRequestPage />} />
           <Route path="support" element={<SupportPage />} />
           <Route
