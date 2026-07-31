@@ -767,6 +767,10 @@ function AppRoutes() {
             element={<VendorCreditsPage />}
           />
           <Route
+            path="transactions/purchase/vendor-credits/:id/edit"
+            element={<VendorCreditsPage />}
+          />
+          <Route
             path="sales"
             element={<Navigate to="/sales/quotes" replace />}
           />
