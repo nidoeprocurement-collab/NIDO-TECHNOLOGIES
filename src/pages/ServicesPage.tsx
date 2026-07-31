@@ -66,20 +66,6 @@ export default function ServicesPage() {
               forms.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate("/services/amc/new")}
-              className="gap-2 rounded-full bg-white px-2 py-2 text-slate-950 hover:bg-slate-100 flex items-center font-medium"
-            >
-              New AMC <ArrowRight className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => navigate("/support")}
-              className="gap-2 rounded-full border border-white/20 bg-transparent px-2 py-2 text-white hover:bg-white/10 flex items-center font-medium"
-            >
-              Open Service Desk
-            </button>
-          </div>
         </div>
       </div>
 
