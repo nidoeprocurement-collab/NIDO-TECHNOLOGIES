@@ -103,18 +103,18 @@ export default function ServicesPage() {
   return (
     <div className="space-y-8 p-6">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[32px] border border-blue-200/70 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-2 md:p-6 lg:p-8 text-white shadow-2xl">
-        <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-blue-500/25 blur-3xl" />
-        <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-cyan-400/15 blur-3xl" />
-        <div className="relative flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-4">
-            <div className="w-fit rounded-full border border-white/15 bg-white/10 px-2 py-2 text-white text-sm">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
+        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-blue-100 opacity-60 blur-3xl pointer-events-none" />
+        <div className="absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-teal-100 opacity-50 blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl space-y-3">
+            <div className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-blue-600 text-xs font-semibold">
               Services Hub
             </div>
-            <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
-              One place for AMC, recycling, and service requests.
+            <h1 className="text-3xl font-bold tracking-tight text-slate-800 md:text-4xl">
+              One Place for AMC, Repair Service, Recycle / Disposal, Rental Service and Regular Purchase
             </h1>
-            <p className="max-w-xl text-sm text-slate-200 md:text-base">
+            <p className="max-w-xl text-sm text-slate-500 md:text-base">
               Use the dedicated services workflow to open structured requests,
               keep client details consistent, and move faster with cleaner
               forms.
