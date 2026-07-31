@@ -902,35 +902,18 @@ export default function BillsPage() {
                   <button onClick={backToList} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mr-1">
                     <ArrowLeft size={15} /> Back
                   </button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/transactions/purchase/bills/${selectedBill.id}/edit`)}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" /> Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDownloadPdf}
-                    disabled={pdfLoading}
-                    className="text-blue-700 border-blue-200 hover:bg-blue-50"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    {pdfLoading ? "Generating…" : "Download PDF"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toast({ title: "Email sent to vendor" })}
-                  >
-                    <Mail className="mr-2 h-4 w-4" /> Send Email
-                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="icon" className="h-8 w-8"><Ellipsis className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={handleDownloadPdf} disabled={pdfLoading}>
+                        <Download className="mr-2 h-4 w-4" />
+                        {pdfLoading ? "Generating…" : "Download PDF"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => toast({ title: "Email sent to vendor" })}>
+                        <Mail className="mr-2 h-4 w-4" /> Send Email
+                      </DropdownMenuItem>
                       <DropdownMenuItem onSelect={markPaid} disabled={selectedBill.status === "PAID"}>
                         Mark as Paid
                       </DropdownMenuItem>
