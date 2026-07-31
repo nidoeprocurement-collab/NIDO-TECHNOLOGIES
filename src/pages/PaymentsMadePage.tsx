@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
 import { usePageMeta } from "@/contexts/PageMetaContext";
-import { useData } from "@/contexts/DataContext";
+import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -254,7 +254,7 @@ export default function PaymentsMadePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams<{ id?: string }>();
-  const { vendors = [] } = useData();
+  const vendors = useMemo(() => getVendors().filter((v) => !v.archived), []);
   const printRef = useRef<HTMLDivElement>(null);
 
   const routeState = (location.state || {}) as { vendorName?: string };
