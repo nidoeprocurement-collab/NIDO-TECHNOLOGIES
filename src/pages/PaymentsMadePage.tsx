@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useReactToPrint } from "react-to-print";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { downloadPaymentMadePdf } from "@/lib/paymentMadePdf";
 import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
@@ -34,10 +34,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
+  Download,
   Ellipsis,
   Mail,
   Plus,
-  Printer,
   Save,
   Search,
   Trash2,
@@ -255,8 +255,6 @@ export default function PaymentsMadePage() {
   const location = useLocation();
   const params = useParams<{ id?: string }>();
   const vendors = useMemo(() => getVendors().filter((v) => !v.archived), []);
-  const printRef = useRef<HTMLDivElement>(null);
-
   const routeState = (location.state || {}) as { vendorName?: string };
   const isCreateMode = location.pathname.endsWith("/create");
   const detailId = !isCreateMode ? params.id : undefined;
@@ -266,6 +264,7 @@ export default function PaymentsMadePage() {
   );
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [tab, setTab] = useState<"Bill Payment" | "Vendor Advance">("Bill Payment");
 
   const [form, setForm] = useState({
@@ -349,10 +348,15 @@ export default function PaymentsMadePage() {
     );
   }, [payments, search]);
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: selectedPayment ? `Payment-${selectedPayment.paymentNumber}` : "Payment",
-  });
+  const handleDownloadPdf = async () => {
+    if (!selectedPayment) return;
+    setPdfLoading(true);
+    try {
+      await downloadPaymentMadePdf(selectedPayment);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const persist = (next: PaymentEntry[]) => {
     setPayments(next);
@@ -505,9 +509,9 @@ export default function PaymentsMadePage() {
               <div>
                 <FieldLabel required>Payment #</FieldLabel>
                 <input
-                  className={inp}
+                  className={`${inp} bg-gray-50 text-gray-500 cursor-not-allowed`}
                   value={form.paymentNumber}
-                  onChange={(e) => setF("paymentNumber", e.target.value)}
+                  readOnly
                   placeholder="PAY-00001"
                 />
               </div>
@@ -733,6 +737,16 @@ export default function PaymentsMadePage() {
                   >
                     <ArrowLeft size={15} /> Back
                   </button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-sm"
+                    onClick={handleDownloadPdf}
+                    disabled={pdfLoading}
+                  >
+                    <Download className="h-4 w-4" />
+                    {pdfLoading ? "Generating…" : "Download PDF"}
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="icon" className="h-8 w-8">
@@ -740,9 +754,6 @@ export default function PaymentsMadePage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => handlePrint()}>
-                        <Printer className="mr-2 h-4 w-4" /> Print / PDF
-                      </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => toast({ title: "Email sent to vendor" })}>
                         <Mail className="mr-2 h-4 w-4" /> Send Email
                       </DropdownMenuItem>
@@ -803,9 +814,7 @@ export default function PaymentsMadePage() {
           {/* Voucher */}
           <Card className="border-gray-200 shadow-sm overflow-hidden">
             <CardContent className="p-0">
-              <div ref={printRef}>
-                <PaymentVoucher entry={selectedPayment} />
-              </div>
+              <PaymentVoucher entry={selectedPayment} />
             </CardContent>
           </Card>
         </div>
