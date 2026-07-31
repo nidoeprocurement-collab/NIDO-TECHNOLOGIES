@@ -17,10 +17,9 @@ const SERVICE_CARDS = [
     description: "Comprehensive maintenance coverage to ensure optimal performance and reliability.",
     icon: ShieldCheck,
     href: "/services/amc/new",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    dotColor: "bg-blue-500",
-    tone: "border-slate-200 bg-white hover:shadow-md",
+    iconBg: "bg-blue-500/20",
+    iconColor: "text-blue-400",
+    dotColor: "bg-blue-400",
     features: ["Preventive Maintenance", "Breakdown Support", "Parts & Labor Coverage", "Priority Support"],
   },
   {
@@ -29,22 +28,20 @@ const SERVICE_CARDS = [
     description: "On-demand repair services for quick resolution of equipment issues.",
     icon: Wrench,
     href: "/support",
-    iconBg: "bg-orange-100",
-    iconColor: "text-orange-500",
+    iconBg: "bg-orange-500/20",
+    iconColor: "text-orange-400",
     dotColor: "bg-orange-400",
-    tone: "border-slate-200 bg-white hover:shadow-md",
     features: ["Diagnosis & Troubleshooting", "On-site / Off-site Repair", "Genuine Parts Replacement", "Service Report"],
   },
   {
-    title: "Recycle /\nDisposal",
+    title: "Recycle / Disposal",
     subtitle: "",
     description: "Environmentally responsible recycling and disposal of electronic equipment.",
     icon: Recycle,
     href: "/support",
-    iconBg: "bg-emerald-100",
-    iconColor: "text-emerald-600",
-    dotColor: "bg-emerald-500",
-    tone: "border-slate-200 bg-white hover:shadow-md",
+    iconBg: "bg-emerald-500/20",
+    iconColor: "text-emerald-400",
+    dotColor: "bg-emerald-400",
     features: ["Secure Data Destruction", "Environment Friendly", "Compliance & Certification", "Pickup & Disposal"],
   },
   {
@@ -53,10 +50,9 @@ const SERVICE_CARDS = [
     description: "Flexible rental solutions for short-term and long-term equipment needs.",
     icon: CalendarDays,
     href: "/support",
-    iconBg: "bg-violet-100",
-    iconColor: "text-violet-600",
-    dotColor: "bg-violet-500",
-    tone: "border-slate-200 bg-white hover:shadow-md",
+    iconBg: "bg-violet-500/20",
+    iconColor: "text-violet-400",
+    dotColor: "bg-violet-400",
     features: ["Short-term Rentals", "Long-term Leasing", "Flexible Tenure", "Maintenance Included"],
   },
   {
@@ -65,10 +61,9 @@ const SERVICE_CARDS = [
     description: "Daily essentials and consumables for smooth business operations.",
     icon: ShoppingCart,
     href: "/support",
-    iconBg: "bg-teal-100",
-    iconColor: "text-teal-600",
-    dotColor: "bg-teal-500",
-    tone: "border-slate-200 bg-white hover:shadow-md",
+    iconBg: "bg-teal-500/20",
+    iconColor: "text-teal-400",
+    dotColor: "bg-teal-400",
     features: ["Pantry Items", "Water Cans", "Cleaning Supplies", "Other Daily Essentials"],
   },
 ];
@@ -110,36 +105,36 @@ export default function ServicesPage() {
           return (
             <div
               key={card.title}
-              className={`flex flex-col rounded-2xl border ${card.tone} p-5 shadow-sm transition-all duration-200 cursor-pointer group`}
               onClick={() => navigate(card.href)}
+              className="flex flex-col rounded-2xl border border-blue-900/40 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-5 shadow-md transition-all duration-200 cursor-pointer group hover:shadow-xl hover:border-blue-700/60 hover:-translate-y-0.5"
             >
               {/* Icon */}
-              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${card.iconBg} mb-4`}>
-                <Icon className={`h-6 w-6 ${card.iconColor}`} />
+              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconBg} mb-4`}>
+                <Icon className={`h-5 w-5 ${card.iconColor}`} />
               </div>
 
               {/* Title */}
-              <div className="mb-3">
-                <h2 className="text-lg font-bold text-slate-900 leading-snug whitespace-pre-line">
+              <div className="mb-2">
+                <h2 className="text-base font-bold text-white leading-snug">
                   {card.title}
                 </h2>
                 {card.subtitle && (
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">({card.subtitle})</p>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">({card.subtitle})</p>
                 )}
               </div>
 
               {/* Description */}
-              <p className="text-sm text-slate-500 leading-relaxed mb-5">
+              <p className="text-xs text-slate-400 leading-relaxed mb-4">
                 {card.description}
               </p>
 
               {/* Divider */}
-              <div className="border-t border-slate-100 mb-4" />
+              <div className="border-t border-white/10 mb-3" />
 
               {/* Feature list */}
               <ul className="space-y-2 flex-1">
                 {card.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
+                  <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
                     <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${card.dotColor}`} />
                     {f}
                   </li>
@@ -147,51 +142,12 @@ export default function ServicesPage() {
               </ul>
 
               {/* Open link */}
-              <div className="mt-5 flex items-center gap-1 text-sm font-medium text-slate-400 group-hover:text-slate-700 transition-colors">
-                Open <ArrowRight className="h-3.5 w-3.5" />
+              <div className="mt-4 flex items-center gap-1 text-xs font-medium text-slate-500 group-hover:text-blue-400 transition-colors">
+                Open <ArrowRight className="h-3 w-3" />
               </div>
             </div>
           );
         })}
-      </div>
-
-      {/* Info Section */}
-      <div className="border border-slate-200 rounded-lg shadow-sm p-6">
-        <div className="grid gap-2 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-slate-500">
-              Guided workflow
-            </p>
-            <h2 className="text-2xl font-semibold">
-              Standardized service capture
-            </h2>
-            <p className="text-sm text-slate-600">
-              The new AMC flow uses validated company selection, mandatory
-              client fields, and clean section ordering so submissions are
-              easier to approve.
-            </p>
-          </div>
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5">
-            <div className="flex items-center gap-3 text-sm text-slate-700">
-              <ShieldCheck className="h-5 w-5 text-emerald-600" />
-              Mandatory fields enforced
-            </div>
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-600">
-              <div className="rounded-2xl bg-white p-2 shadow-sm">
-                Company dropdown
-              </div>
-              <div className="rounded-2xl bg-white p-2 shadow-sm">
-                Client authorization
-              </div>
-              <div className="rounded-2xl bg-white p-2 shadow-sm">
-                AMC duration
-              </div>
-              <div className="rounded-2xl bg-white p-2 shadow-sm">
-                Scope & category
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
