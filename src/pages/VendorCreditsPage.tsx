@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type CreditStatus = "DRAFT" | "OPEN";
+type CreditStatus = "DRAFT" | "OPEN" | "APPLIED";
 
 interface CreditItem {
   id: string;
@@ -93,6 +93,7 @@ const BILLS_KEY = "nido_purchase_bills_v1";
 const STATUS_STYLE: Record<CreditStatus, string> = {
   DRAFT: "bg-gray-100 text-gray-600 border-gray-200",
   OPEN: "bg-blue-100 text-blue-700 border-blue-200",
+  APPLIED: "bg-green-100 text-green-700 border-green-200",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ const newItem = (id: string): CreditItem => ({
 });
 
 const normalizeCredit = (raw: Record<string, unknown>): VendorCreditEntry => {
-  const VALID: CreditStatus[] = ["DRAFT", "OPEN"];
+  const VALID: CreditStatus[] = ["DRAFT", "OPEN", "APPLIED"];
   const st = String(raw.status ?? "OPEN").toUpperCase();
   const status: CreditStatus = VALID.includes(st as CreditStatus) ? (st as CreditStatus) : "OPEN";
   const rawItems = Array.isArray(raw.items) ? raw.items : [];
@@ -501,19 +502,43 @@ export default function VendorCreditsPage() {
 
   const applyToBill = () => {
     if (!selectedCredit) return;
+    if (selectedCredit.status === "APPLIED") {
+      toast({ title: "This credit has already been applied", description: "It cannot be applied again." });
+      return;
+    }
     if (!selectedCredit.associatedBillId) {
-      toast({ title: "No associated bill found for this credit" });
+      toast({
+        title: "No bill linked",
+        description: "Edit this credit and select an associated bill first, then apply.",
+      });
       return;
     }
     const storedBills = safeReadJson<Record<string, unknown>[]>(BILLS_KEY, []);
-    const totals = getCreditTotals(selectedCredit);
+    const creditTotals = getCreditTotals(selectedCredit);
     const updatedBills = storedBills.map((bill) => {
       if (String(bill.id) !== selectedCredit.associatedBillId) return bill;
-      const paymentMade = toNumber(bill.paymentMade) + totals.total;
-      return { ...bill, paymentMade };
+      const newPaymentMade = toNumber(bill.paymentMade) + creditTotals.total;
+      // Compute bill's own total by summing its items
+      const billItems: { quantity?: unknown; rate?: unknown; taxPercent?: unknown }[] =
+        Array.isArray(bill.items) ? (bill.items as []) : [];
+      const billGross = billItems.reduce((sum, it) => {
+        const qty = toNumber(it.quantity, 1);
+        const rate = toNumber(it.rate, 0);
+        const tax = toNumber(it.taxPercent, 0);
+        return sum + qty * rate * (1 + tax / 100);
+      }, 0);
+      const billTotal = billGross + toNumber(bill.adjustment);
+      const isFullyPaid = newPaymentMade >= billTotal - 0.01;
+      return {
+        ...bill,
+        paymentMade: newPaymentMade,
+        ...(isFullyPaid ? { status: "PAID" } : {}),
+      };
     });
     localStorage.setItem(BILLS_KEY, JSON.stringify(updatedBills));
-    toast({ title: "Vendor credit applied to bill" });
+    // Mark the credit as APPLIED
+    persist(credits.map((c) => c.id === selectedCredit.id ? { ...c, status: "APPLIED" as CreditStatus } : c));
+    toast({ title: "Vendor credit applied to bill", description: `₹${creditTotals.total.toFixed(2)} credited against Bill #${selectedCredit.associatedBillNumber}` });
   };
 
   const deleteCredit = () => {
@@ -521,23 +546,6 @@ export default function VendorCreditsPage() {
     persist(credits.filter((c) => c.id !== selectedCredit.id));
     backToList();
     toast({ title: "Vendor credit deleted" });
-  };
-
-  const duplicateCredit = () => {
-    if (!selectedCredit) return;
-    const id = `vc-${Date.now()}`;
-    const newNumber = buildCreditNumber(pref.prefix, pref.nextNumber);
-    const cloned: VendorCreditEntry = {
-      ...selectedCredit,
-      id,
-      creditNoteNumber: newNumber,
-      status: "DRAFT",
-      items: selectedCredit.items.map((i) => ({ ...i, id: `ci-${Date.now()}-${Math.random()}` })),
-    };
-    persist([cloned, ...credits]);
-    if (pref.mode === "auto") persistPref({ ...pref, nextNumber: pref.nextNumber + 1 });
-    navigate(`/transactions/purchase/vendor-credits/${id}`);
-    toast({ title: "Vendor credit duplicated" });
   };
 
   const handleDownloadPdf = async () => {
@@ -894,11 +902,8 @@ export default function VendorCreditsPage() {
                           Convert to Open
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onSelect={applyToBill}>
+                      <DropdownMenuItem onSelect={applyToBill} disabled={selectedCredit.status === "APPLIED"}>
                         Apply to Bill
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={duplicateCredit}>
-                        Duplicate
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={deleteCredit} className="text-red-600 focus:text-red-600">
                         Delete
