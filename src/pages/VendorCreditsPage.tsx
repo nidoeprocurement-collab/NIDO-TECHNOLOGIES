@@ -1111,15 +1111,6 @@ export default function VendorCreditsPage() {
           </CardContent>
         </Card>
 
-        {/* Numbering info */}
-        <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
-          <Info size={14} className="shrink-0" />
-          <span>
-            Numbering mode: <strong>{pref.mode === "auto" ? "Auto-generate" : "Manual"}</strong>
-            {pref.mode === "auto" && ` — Prefix: ${pref.prefix}, Next: ${buildCreditNumber(pref.prefix, pref.nextNumber)}`}
-          </span>
-        </div>
-
         {/* Table */}
         <Card className="border-gray-200 shadow-sm">
           <CardContent className="p-0">
