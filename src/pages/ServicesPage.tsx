@@ -106,7 +106,7 @@ export default function ServicesPage() {
             <div
               key={card.title}
               onClick={() => navigate(card.href)}
-              className="flex flex-col rounded-2xl border border-blue-900/40 bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-5 shadow-md transition-all duration-200 cursor-pointer group hover:shadow-xl hover:border-blue-700/60 hover:-translate-y-0.5"
+              className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 cursor-pointer group hover:shadow-lg hover:border-slate-300 hover:-translate-y-0.5"
             >
               {/* Icon */}
               <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${card.iconBg} mb-4`}>
@@ -115,7 +115,7 @@ export default function ServicesPage() {
 
               {/* Title */}
               <div className="mb-2">
-                <h2 className="text-base font-bold text-white leading-snug">
+                <h2 className="text-base font-bold text-slate-800 leading-snug">
                   {card.title}
                 </h2>
                 {card.subtitle && (
@@ -124,17 +124,17 @@ export default function ServicesPage() {
               </div>
 
               {/* Description */}
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+              <p className="text-xs text-slate-500 leading-relaxed mb-4">
                 {card.description}
               </p>
 
               {/* Divider */}
-              <div className="border-t border-white/10 mb-3" />
+              <div className="border-t border-slate-100 mb-3" />
 
               {/* Feature list */}
               <ul className="space-y-2 flex-1">
                 {card.features.map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
+                  <li key={f} className="flex items-center gap-2 text-xs text-slate-600">
                     <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${card.dotColor}`} />
                     {f}
                   </li>
@@ -142,7 +142,7 @@ export default function ServicesPage() {
               </ul>
 
               {/* Open link */}
-              <div className="mt-4 flex items-center gap-1 text-xs font-medium text-slate-500 group-hover:text-blue-400 transition-colors">
+              <div className="mt-4 flex items-center gap-1 text-xs font-medium text-slate-400 group-hover:text-slate-700 transition-colors">
                 Open <ArrowRight className="h-3 w-3" />
               </div>
             </div>
