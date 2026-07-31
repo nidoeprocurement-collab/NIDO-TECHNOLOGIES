@@ -382,10 +382,6 @@ export default function App() {
             <p className="text-xs text-gray-500">Vendors / Vendor List</p>
             <h1 className="text-2xl font-bold">Vendors</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => navigate('/vendors/onboarding')} className="flex items-center gap-1.5">
-              <Plus className="h-4 w-4" /> Add Vendor
-            </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon" className="rounded-full">
@@ -412,7 +408,6 @@ export default function App() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          </div>
         </div>
       </div>
 

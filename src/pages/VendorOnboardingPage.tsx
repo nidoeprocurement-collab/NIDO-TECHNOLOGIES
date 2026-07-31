@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Cloud, Plus, Trash2, Star } from 'lucide-react';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
+import { addVendor, getVendors } from '@/lib/vendorDataStore';
 
 export default function AddVendorPage() {
+  const navigate = useNavigate();
+
   // Dropdown options data
   const categories = [...CATEGORY_LIST, '+ Add New Category'];
   
@@ -158,6 +162,65 @@ export default function AddVendorPage() {
       ...prev,
       [fieldName]: value
     }));
+  };
+
+  const handleSave = () => {
+    if (!formData.vendorName.trim()) {
+      alert('Vendor Name is required.');
+      return;
+    }
+
+    // Generate next vendor ID
+    const existing = getVendors();
+    const maxId = existing.reduce((max, v) => {
+      const num = parseInt(v.id.replace('VND-', ''), 10);
+      return isNaN(num) ? max : Math.max(max, num);
+    }, 1000);
+    const newId = `VND-${maxId + 1}`;
+
+    const avgRating = [formData.qualityRating, formData.deliveryRating, formData.serviceRating]
+      .filter(r => r > 0);
+    const rating = avgRating.length > 0
+      ? parseFloat((avgRating.reduce((a, b) => a + b, 0) / avgRating.length).toFixed(1))
+      : 0;
+
+    const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    addVendor({
+      id: newId,
+      name: formData.vendorName,
+      category: formData.category || 'Uncategorized',
+      primaryContact: formData.contactPerson,
+      email: formData.email,
+      phone: formData.phoneNumber ? `${formData.phone} ${formData.phoneNumber}` : '',
+      rating,
+      region: formData.state || formData.country || '',
+      status: 'Pending',
+      onboardedDate: today,
+      monthSpend: 0,
+      score: rating,
+      address: [formData.city, formData.state, formData.country].filter(Boolean).join(', '),
+      totalSpend: 0,
+      complianceIssues: 0,
+      archived: false,
+      website: formData.website,
+      pan: formData.pan,
+      paymentTerms: formData.paymentTerms,
+      bankName: formData.bankName,
+      bankAccount: formData.accountNumber,
+      ifscCode: formData.ifscCode,
+      city: formData.city,
+      state: formData.state,
+      country: formData.country,
+      addressLine1: formData.registeredAddress,
+      billingAddressLine1: formData.billingAddress,
+      performanceQuality: formData.qualityRating * 20,
+      performanceDelivery: formData.deliveryRating * 20,
+      performanceResponsiveness: formData.serviceRating * 20,
+      performanceCompliance: 0,
+    });
+
+    navigate('/vendors');
   };
 
   const StarRating = ({ value, onChange, name }) => {
@@ -901,10 +964,10 @@ export default function AddVendorPage() {
 
         {/* Bottom Actions */}
         <div className="flex gap-3 py-2 border-t border-gray-200">
-          <button className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+          <button onClick={() => navigate('/vendors')} className="px-6 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
             Cancel
           </button>
-          <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+          <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
             Save Vendor
           </button>
         </div>
