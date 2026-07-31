@@ -563,7 +563,7 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
                     {/* Client ID */}
                     <td
                       className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm truncate"
-                      onClick={() => setOverviewClient(c)}
+                      onClick={() => navigate(`/clients/${c.id}`)}
                     >
                       {c.id}
                     </td>
