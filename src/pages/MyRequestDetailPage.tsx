@@ -1,18 +1,24 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import AMCRequestDetailPage from "./AMCRequestDetailPage";
 
 export default function MyRequestDetailPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
 
+  // AMC request IDs → full AMC detail page
+  if (requestId?.startsWith("AMC-")) {
+    return <AMCRequestDetailPage requestId={requestId} />;
+  }
+
+  // All other types → empty placeholder (details added later)
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70">
         <div className="w-full px-4 py-3 flex items-center gap-3">
           <button
-            onClick={() => navigate("/services")}
+            onClick={() => navigate("/my-services")}
             className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -23,8 +29,6 @@ export default function MyRequestDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Empty body — details will be added later */}
       <div className="w-full px-4 py-6">
         <Card>
           <CardContent className="p-12 flex flex-col items-center justify-center text-center gap-3">
