@@ -199,16 +199,19 @@ export default function NewRepairServicePage() {
 
   // ── Validate & Submit ──
   const handleSubmit = () => {
-    if (!clientId || !location) { toast.error("Please fill in Client and Location."); return; }
-    if (!category || !brand || !model) { toast.error("Please fill in all required Equipment Details."); return; }
-    if (!issueSubject || !issueDesc || !priority) { toast.error("Please fill in all required Issue Details."); return; }
+    if (!clientId)     { toast.error("Please select a Client."); return; }
+    if (!location)     { toast.error("Please enter a Location."); return; }
+    if (!category)     { toast.error("Please select a Category in Equipment Details."); return; }
+    if (!issueSubject) { toast.error("Please enter an Issue Subject."); return; }
+    if (!issueDesc)    { toast.error("Please enter an Issue Description."); return; }
 
     setSubmitting(true);
     try {
       const clientName = selectedClient?.name ?? clientId;
+      const itemLabel  = [brand, model].filter(Boolean).join(" ") || category;
       addServiceRequest({
         requestType: "Repair Service",
-        itemAsset: `${brand} ${model}`,
+        itemAsset: itemLabel,
         assetTag: assetTag || "",
         location,
         requestDate: "",
@@ -381,13 +384,13 @@ export default function NewRepairServicePage() {
               options={categories} placeholder="Select Category"
             />
             <SelectField
-              label="Brand" required value={brand} onChange={setBrand}
+              label="Brand (Optional)" value={brand} onChange={setBrand}
               options={availableBrands}
               placeholder={category ? "Select Brand" : "Select Category first"}
               disabled={!category}
             />
             <SelectField
-              label="Model" required value={model} onChange={setModel}
+              label="Model (Optional)" value={model} onChange={setModel}
               options={availableModels}
               placeholder={brand ? "Select Model" : "Select Brand first"}
               disabled={!brand}
