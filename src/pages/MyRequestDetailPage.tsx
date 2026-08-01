@@ -2,17 +2,33 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import AMCRequestDetailPage from "./AMCRequestDetailPage";
+import RepairServiceDetailPage from "./RepairServiceDetailPage";
+import RecycleDisposalDetailPage from "./RecycleDisposalDetailPage";
+import RentalServiceDetailPage from "./RentalServiceDetailPage";
+import RegularPurchaseDetailPage from "./RegularPurchaseDetailPage";
 
 export default function MyRequestDetailPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
 
-  // AMC request IDs → full AMC detail page
+  // Route to the correct detail page based on ID prefix
   if (requestId?.startsWith("AMC-")) {
     return <AMCRequestDetailPage requestId={requestId} />;
   }
+  if (requestId?.startsWith("REP-")) {
+    return <RepairServiceDetailPage requestId={requestId} />;
+  }
+  if (requestId?.startsWith("REC-")) {
+    return <RecycleDisposalDetailPage requestId={requestId} />;
+  }
+  if (requestId?.startsWith("REN-")) {
+    return <RentalServiceDetailPage requestId={requestId} />;
+  }
+  if (requestId?.startsWith("PUR-")) {
+    return <RegularPurchaseDetailPage requestId={requestId} />;
+  }
 
-  // All other types → empty placeholder (details added later)
+  // Unknown type → placeholder
   return (
     <div className="min-h-screen bg-white">
       <div className="bg-transparent border-b border-gray-200/70">

@@ -66,6 +66,8 @@ const RAW: Omit<ServiceRequest, "requestDateTs">[] = [
   { id: "REP-2026-00012", requestType: "Repair Service",     itemAsset: "Lenovo IdeaCentre 510",     assetTag: "AST-1016", location: "Hyderabad - Branch",      requestDate: "12 May 2026", status: "Completed",   priority: "Low",    nextAppointment: "13 May 2026\n02:00 PM", requestedBy: "Suresh B."    },
   { id: "RET-2026-00008", requestType: "Return / Replace",   itemAsset: "Cisco Catalyst 2960-X",     assetTag: "AST-1017", location: "Pune - Branch Office",    requestDate: "08 May 2026", status: "Completed",   priority: "Medium", nextAppointment: "10 May 2026\n10:00 AM", requestedBy: "Priya Sharma" },
   { id: "REC-2026-00004", requestType: "Recycle / Disposal", itemAsset: "Old Servers (2 Items)",     assetTag: "",         location: "Bangalore - Main Office", requestDate: "03 May 2026", status: "Completed",   priority: "High",   nextAppointment: "05 May 2026\n09:00 AM", requestedBy: "Ramesh K."    },
+  { id: "REN-2026-00078", requestType: "Rental Service",    itemAsset: "Laptop - Dell Latitude 5420", assetTag: "",        location: "Bangalore - Main Office", requestDate: "12 Jul 2026", status: "Active",      priority: "Medium", nextAppointment: "-",                     requestedBy: "Ramesh K."    },
+  { id: "PUR-2026-00126", requestType: "Regular Purchase",  itemAsset: "20 Liter Water Can",          assetTag: "",        location: "Bangalore - Main Office", requestDate: "28 Jul 2026", status: "In Progress", priority: "Medium", nextAppointment: "01 Aug 2026\n11:00 AM", requestedBy: "Ramesh K."    },
 ];
 
 const ALL_REQUESTS: ServiceRequest[] = RAW.map(r => ({
