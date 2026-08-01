@@ -4,6 +4,7 @@ import {
   CheckCircle2, Clock, Wrench, Lock, Check, Phone, Mail,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 
 interface RepairData {
   id: string;
@@ -98,6 +99,91 @@ const REPAIR_DATA: Record<string, RepairData> = {
   },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtIsoRepair(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/** Build a RepairData object from a stored service request */
+function buildRepairFromStored(req: ReturnType<typeof getServiceRequests>[number]): RepairData {
+  const p = (req.payload ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => String(v ?? "");
+
+  const prefDate = str(p.prefDate);
+  let nextApptDisplay = "-";
+  let nextApptDay = "-", nextApptMonth = "", nextApptTime = "";
+  if (prefDate) {
+    const d = new Date(prefDate);
+    if (!isNaN(d.getTime())) {
+      nextApptDay   = String(d.getDate()).padStart(2, "0");
+      nextApptMonth = d.toLocaleDateString("en-IN", { month: "short", year: "numeric" }).toUpperCase();
+      nextApptTime  = "10:00 AM - 12:00 PM";
+      nextApptDisplay = fmtIsoRepair(prefDate) + ", 10:00 AM";
+    }
+  }
+
+  const VALID_STATUSES = ["In Progress", "Scheduled", "Completed", "Cancelled", "Closed"] as const;
+  const rawStatus = req.status || "Scheduled";
+  const status = (VALID_STATUSES as readonly string[]).includes(rawStatus)
+    ? rawStatus as RepairData["status"]
+    : "Scheduled";
+
+  return {
+    id:                    req.id,
+    status,
+    createdOn:             req.requestDate ? `${req.requestDate}, 10:00 AM` : "-",
+    requestType:           "Repair Service",
+    client:                str(p.client) || req.requestedBy || "-",
+    location:              req.location  || str(p.location) || "-",
+    requestDate:           req.requestDate ? `${req.requestDate}, 10:00 AM` : "-",
+    requestedBy:           req.requestedBy || str(p.client) || "-",
+    priority:              (req.priority as RepairData["priority"]) || "Medium",
+    preferredAppointment:  nextApptDisplay,
+    category:              str(p.category)     || "-",
+    brand:                 str(p.brand)        || "-",
+    model:                 str(p.model)        || "-",
+    serialNumber:          str(p.serialNumber) || "-",
+    assetTag:              req.assetTag || str(p.assetTag) || "-",
+    purchaseDate:          fmtIsoRepair(str(p.purchaseDate)),
+    warrantyStatus:        "Unknown",
+    assignedVendor:        "-",
+    assignedEngineer:      "-",
+    vendorContact:         "-",
+    email:                 "-",
+    sla:                   "48 Hours",
+    dueBy:                 "-",
+    timeRemaining:         status === "Completed" ? "Completed" : "-",
+    issueSubject:          str(p.issueSubject) || "-",
+    issueDescription:      str(p.issueDesc)    || "-",
+    stepsTaken:            "-",
+    attachments:           [],
+    activity: [
+      { label: "Request Raised", date: req.requestDate || "-", time: "10:00 AM",
+        note: "Request has been created successfully", done: true },
+      { label: "Scheduled", date: req.requestDate || "-", time: "",
+        note: prefDate ? `Appointment scheduled for ${nextApptDisplay}` : "-",
+        done: status !== "Request Raised" },
+      { label: "In Progress", date: "-", time: "", note: "Pending", done: false },
+      { label: "Completed",   date: "-", time: "", note: "Pending", done: false },
+    ],
+    nextAppointmentDay:      nextApptDay,
+    nextAppointmentMonth:    nextApptMonth,
+    nextAppointmentYear:     "",
+    nextAppointmentLabel:    "",
+    nextAppointmentTime:     nextApptTime,
+    nextAppointmentLocation: req.location || str(p.location) || "-",
+  };
+}
+
+function loadRepairData(id: string): RepairData | undefined {
+  const stored = getServiceRequests().find(r => r.id === id);
+  if (stored) return buildRepairFromStored(stored);
+  return REPAIR_DATA[id];
+}
+
 const STATUS_COLORS: Record<string, string> = {
   "In Progress": "bg-blue-100 text-blue-700",
   "Scheduled": "bg-purple-100 text-purple-700",
@@ -138,7 +224,7 @@ function InfoRow({ label, value, valueEl }: { label: string; value?: string; val
 export default function RepairServiceDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
   const id = requestId ?? "";
-  const data = REPAIR_DATA[id];
+  const data = loadRepairData(id);
 
   const activeStep = stepIndex(data?.status ?? "Request Raised");
 

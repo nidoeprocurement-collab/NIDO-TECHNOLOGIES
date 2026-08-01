@@ -4,6 +4,7 @@ import {
   Check, Lock, Download,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 
 interface RentalData {
   id: string;
@@ -69,6 +70,73 @@ const RENTAL_DATA: Record<string, RentalData> = {
   },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtIsoRnt(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function buildRentalFromStored(req: ReturnType<typeof getServiceRequests>[number]): RentalData {
+  const p = (req.payload ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => String(v ?? "");
+
+  const VALID_STATUSES = ["Active","Approved","Completed","Closed","Request Raised","Cancelled"] as const;
+  const rawStatus = req.status || "Request Raised";
+  const status = (VALID_STATUSES as readonly string[]).includes(rawStatus)
+    ? rawStatus as RentalData["status"]
+    : "Request Raised";
+
+  return {
+    id:                    req.id,
+    status,
+    createdOn:             req.requestDate ? `${req.requestDate}, 10:00 AM` : "-",
+    requestType:           "Rental Service",
+    client:                str(p.client)          || req.requestedBy || "-",
+    location:              req.location           || str(p.location) || "-",
+    requestDate:           req.requestDate        ? `${req.requestDate}, 10:00 AM` : "-",
+    requestedBy:           req.requestedBy        || str(p.client)   || "-",
+    priority:              (req.priority as RentalData["priority"]) || "Medium",
+    category:              str(p.category)        || "-",
+    itemAsset:             str(p.itemName)        || req.itemAsset   || "-",
+    quantity:              str(p.quantity)        ? `${str(p.quantity)} ${str(p.unit)}`.trim() : "-",
+    brand:                 str(p.brand)           || "-",
+    model:                 str(p.model)           || "-",
+    configuration:         "-",
+    accessories:           "-",
+    unit:                  str(p.unit)            || "Nos",
+    rentalPeriod:          str(p.duration)        || "-",
+    startDate:             fmtIsoRnt(str(p.startDate)),
+    endDate:               fmtIsoRnt(str(p.endDate)),
+    preferredDeliveryDate: fmtIsoRnt(str(p.deliveryDate)),
+    preferredTimeSlot:     str(p.timeSlot)        || "-",
+    purposeOfRental:       str(p.purpose)         || "-",
+    deliveryAddress:       req.location           || str(p.location) || "-",
+    contactPerson:         str(p.contactPerson)   || req.requestedBy || "-",
+    contactNumber:         str(p.contactNumber)   || "-",
+    email:                 "-",
+    invoiceRefNo:          "-",
+    paymentTerms:          "-",
+    notes:                 str(p.notes)           || "-",
+    attachments:           [],
+    activity: [
+      { label: "Request Raised", date: req.requestDate || "-", time: "10:00 AM",
+        note: "Request has been raised successfully", done: true },
+      { label: "Approved", date: "-", time: "", note: "Pending admin approval", done: false },
+      { label: "Active",   date: "-", time: "", note: "-", done: false, active: false },
+      { label: "Completed",date: "-", time: "", note: "-", done: false },
+      { label: "Closed",   date: "-", time: "", note: "-", done: false },
+    ],
+  };
+}
+
+function loadRentalData(id: string): RentalData | undefined {
+  const stored = getServiceRequests().find(r => r.id === id);
+  if (stored) return buildRentalFromStored(stored);
+  return RENTAL_DATA[id];
+}
+
 const STATUS_COLORS: Record<string, string> = {
   "Request Raised": "bg-yellow-100 text-yellow-700",
   "Approved": "bg-blue-100 text-blue-700",
@@ -117,7 +185,7 @@ function InfoRow({ label, value, valueEl }: { label: string; value?: string; val
 export default function RentalServiceDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
   const id = requestId ?? "";
-  const data = RENTAL_DATA[id];
+  const data = loadRentalData(id);
   const activeStep = stepIndex(data?.status ?? "Request Raised");
 
   if (!data) {

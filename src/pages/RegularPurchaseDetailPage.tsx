@@ -4,6 +4,7 @@ import {
   Check, Calendar, Download, MoreHorizontal,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 
 interface PurchaseItem {
   no: number;
@@ -72,6 +73,81 @@ const PURCHASE_DATA: Record<string, PurchaseData> = {
   },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtIsoPur(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function buildPurchaseFromStored(req: ReturnType<typeof getServiceRequests>[number]): PurchaseData {
+  const p = (req.payload ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => String(v ?? "");
+  const num = (v: unknown) => Number(v) || 0;
+
+  const VALID_STATUSES = ["Approved","Requested","Ordered","Completed","Cancelled"] as const;
+  const rawStatus = req.status || "Requested";
+  const status = (VALID_STATUSES as readonly string[]).includes(rawStatus)
+    ? rawStatus as PurchaseData["status"]
+    : "Requested";
+
+  const qty      = str(p.quantity);
+  const unit     = str(p.unit) || "Nos";
+  const unitPrice= num(p.unitPrice);
+  const total    = unitPrice && qty ? unitPrice * Number(qty) : 0;
+
+  return {
+    id:                req.id,
+    status,
+    requestedOn:       req.requestDate ? `${req.requestDate}, 10:00 AM` : "-",
+    requestType:       "Regular Purchase",
+    requestedBy:       req.requestedBy || str(p.client) || "-",
+    department:        "-",
+    priority:          (req.priority as PurchaseData["priority"]) || "Medium",
+    totalItems:        1,
+    totalQuantity:     qty ? `${qty} ${unit}` : "-",
+    estimatedTotal:    total ? `₹ ${total.toFixed(2)}` : "-",
+    purchaseFrequency: str(p.freqType) || "One-Time",
+    nextOrderDate:     fmtIsoPur(str(p.requiredBy)),
+    endDate:           fmtIsoPur(str(p.endDate)),
+    deliveryLocation:  req.location || str(p.location) || "-",
+    preferredTimeSlot: str(p.timeSlot) || "-",
+    contactPerson:     req.requestedBy || str(p.client) || "-",
+    contactNumber:     "-",
+    email:             "-",
+    items: [
+      {
+        no: 1,
+        name:     str(p.itemName)   || req.itemAsset || "-",
+        category: str(p.category)   || "-",
+        quantity: Number(qty)       || 1,
+        unit,
+        unitPrice,
+        total,
+      },
+    ],
+    purpose:         str(p.purpose)        || "-",
+    notes:           str(p.notes)          || "-",
+    preferredVendor: str(p.vendor)         || "-",
+    attachments:     [],
+    timeline: [
+      { label: "Requested", date: req.requestDate || "-", time: "10:00 AM",
+        note: "Request has been raised", done: true },
+      { label: "Approved",  date: "-", time: "", note: "Pending admin approval", done: false },
+      { label: "Ordered",   date: "-", time: "", note: "-", done: false },
+      { label: "Completed", date: "-", time: "", note: "-", done: false },
+      { label: "Cancelled", date: "-", time: "", note: "-", done: false },
+    ],
+  };
+}
+
+function loadPurchaseData(id: string): PurchaseData | undefined {
+  const stored = getServiceRequests().find(r => r.id === id);
+  if (stored) return buildPurchaseFromStored(stored);
+  return PURCHASE_DATA[id];
+}
+
 const STATUS_COLORS: Record<string, string> = {
   "Requested": "bg-yellow-100 text-yellow-700",
   "Approved": "bg-green-100 text-green-700",
@@ -119,7 +195,7 @@ function InfoRow({ label, value, valueEl }: { label: string; value?: string; val
 export default function RegularPurchaseDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
   const id = requestId ?? "";
-  const data = PURCHASE_DATA[id];
+  const data = loadPurchaseData(id);
   const activeStep = stepIndex(data?.status ?? "Requested");
 
   const orderedEntry = data?.timeline.find(t => t.label === "Ordered");

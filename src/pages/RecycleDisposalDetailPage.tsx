@@ -4,6 +4,7 @@ import {
   Check, Lock, Download,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 
 interface RecycleData {
   id: string;
@@ -93,6 +94,77 @@ const RECYCLE_DATA: Record<string, RecycleData> = {
   },
 };
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtIsoRcy(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function buildRecycleFromStored(req: ReturnType<typeof getServiceRequests>[number]): RecycleData {
+  const p = (req.payload ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => String(v ?? "");
+
+  const collectionDate = str(p.collectionDate);
+  const timeSlot       = str(p.timeSlot);
+
+  const VALID_STATUSES = ["Scheduled","In Progress","Completed","Cancelled","Request Raised"] as const;
+  const rawStatus = req.status || "Scheduled";
+  const status = (VALID_STATUSES as readonly string[]).includes(rawStatus)
+    ? rawStatus as RecycleData["status"]
+    : "Scheduled";
+
+  return {
+    id:                      req.id,
+    status,
+    createdOn:               req.requestDate ? `${req.requestDate}, 10:00 AM` : "-",
+    requestType:             "Recycle / Disposal",
+    client:                  str(p.client)         || req.requestedBy || "-",
+    location:                req.location          || str(p.location) || "-",
+    requestDate:             req.requestDate       ? `${req.requestDate}, 10:00 AM` : "-",
+    requestedBy:             req.requestedBy       || str(p.client)   || "-",
+    priority:                (req.priority as RecycleData["priority"]) || "Medium",
+    preferredCollectionDate: fmtIsoRcy(collectionDate),
+    preferredTimeSlot:       timeSlot || "-",
+    category:                str(p.category)       || "-",
+    subCategory:             str(p.subCategory)    || "-",
+    itemAssetName:           str(p.itemName)       || req.itemAsset || "-",
+    brand:                   str(p.brand)          || "-",
+    model:                   str(p.model)          || "-",
+    quantity:                str(p.quantity)       || "-",
+    unit:                    str(p.unit)           || "Nos",
+    conditionOfItems:        str(p.condition)      || "-",
+    reasonForDisposal:       str(p.reason)         || "-",
+    collectionLocation:      req.location          || str(p.location) || "-",
+    collectionAddress:       req.location          || str(p.location) || "-",
+    contactPerson:           str(p.contactPerson)  || req.requestedBy || "-",
+    contactNumber:           str(p.contactNumber)  || "-",
+    email:                   "-",
+    invoiceRefNo:            str(p.invoiceRef)     || "-",
+    purchaseDate:            fmtIsoRcy(str(p.purchaseDate)),
+    additionalNotes:         str(p.notes)          || "-",
+    attachments:             [],
+    activity: [
+      { label: "Request Raised", date: req.requestDate || "-", time: "10:00 AM",
+        note: "Request has been created successfully", done: true },
+      { label: "Scheduled", date: req.requestDate || "-", time: "",
+        note: collectionDate ? `Collection scheduled for ${fmtIsoRcy(collectionDate)}${timeSlot ? ", " + timeSlot : ""}` : "-",
+        done: status !== "Request Raised", active: status === "Scheduled" },
+      { label: "In Progress", date: "-", time: "", note: "-", done: false },
+      { label: "Completed",   date: "-", time: "", note: "-", done: false },
+    ],
+    nextAppointmentDate: fmtIsoRcy(collectionDate),
+    nextAppointmentTime: timeSlot || "-",
+  };
+}
+
+function loadRecycleData(id: string): RecycleData | undefined {
+  const stored = getServiceRequests().find(r => r.id === id);
+  if (stored) return buildRecycleFromStored(stored);
+  return RECYCLE_DATA[id];
+}
+
 const STATUS_COLORS: Record<string, string> = {
   "Request Raised": "bg-yellow-100 text-yellow-700",
   "Scheduled": "bg-purple-100 text-purple-700",
@@ -140,7 +212,7 @@ const STEP_ICONS = [
 export default function RecycleDisposalDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
   const id = requestId ?? "";
-  const data = RECYCLE_DATA[id];
+  const data = loadRecycleData(id);
   const activeStep = stepIndex(data?.status ?? "Request Raised");
 
   if (!data) {
