@@ -37,7 +37,7 @@ function save(requests: StoredServiceRequest[]) {
 
 function nextSeq(prefix: string): number {
   const raw = JSON.parse(localStorage.getItem(SEQ_KEY) || "{}") as Record<string, number>;
-  const next = (raw[prefix] ?? 200) + 1;
+  const next = (raw[prefix] ?? 0) + 1;
   raw[prefix] = next;
   localStorage.setItem(SEQ_KEY, JSON.stringify(raw));
   return next;
@@ -75,7 +75,7 @@ export function getServiceRequests(): StoredServiceRequest[] {
  */
 export function peekNextId(prefix: string): string {
   const raw = JSON.parse(localStorage.getItem(SEQ_KEY) || "{}") as Record<string, number>;
-  const next = (raw[prefix] ?? 200) + 1;
+  const next = (raw[prefix] ?? 0) + 1;
   const year = new Date().getFullYear();
   return `${prefix}-${year}-${String(next).padStart(5, "0")}`;
 }
