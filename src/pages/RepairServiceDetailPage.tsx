@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Pencil, XCircle, Plus, Calendar, Paperclip,
   CheckCircle2, Clock, Wrench, Lock, Check, Phone, Mail,
-  ChevronDown, Truck,
+  ChevronDown, Truck, X, Search, ChevronRight,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import { getVendors, StoredVendor } from "@/lib/vendorDataStore";
 
 interface RepairData {
   id: string;
@@ -223,11 +224,251 @@ function InfoRow({ label, value, valueEl }: { label: string; value?: string; val
   );
 }
 
+// ─── Assignment state type ────────────────────────────────────────────────────
+interface AssignmentState {
+  assignedVendor: string;
+  vendorId: string;
+  assignedEngineer: string;
+  vendorContact: string;
+  email: string;
+  sla: string;
+  dueBy: string;
+}
+
+// ─── Assignment Edit Modal ────────────────────────────────────────────────────
+function AssignmentEditModal({
+  initial,
+  onSave,
+  onClose,
+}: {
+  initial: AssignmentState;
+  onSave: (a: AssignmentState) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<AssignmentState>({ ...initial });
+  const [vendors, setVendors] = useState<StoredVendor[]>([]);
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorDropOpen, setVendorDropOpen] = useState(false);
+  const vendorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVendors(getVendors().filter(v => v.status === "Active"));
+  }, []);
+
+  // close vendor dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (vendorRef.current && !vendorRef.current.contains(e.target as Node)) {
+        setVendorDropOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filteredVendors = vendors.filter(v =>
+    v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
+    v.category.toLowerCase().includes(vendorSearch.toLowerCase())
+  );
+
+  function selectVendor(v: StoredVendor) {
+    setForm(f => ({
+      ...f,
+      vendorId: v.id,
+      assignedVendor: v.name,
+      assignedEngineer: v.primaryContact,
+      vendorContact: v.phone,
+      email: v.email,
+    }));
+    setVendorSearch(v.name);
+    setVendorDropOpen(false);
+  }
+
+  function set(key: keyof AssignmentState, val: string) {
+    setForm(f => ({ ...f, [key]: val }));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+              <Pencil className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">Edit Assignment</h2>
+              <p className="text-[11px] text-gray-400">Update vendor &amp; engineer details</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+          {/* Assigned Vendor */}
+          <div ref={vendorRef} className="relative">
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Assigned Vendor <span className="text-red-400">*</span>
+            </label>
+            <div
+              className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 cursor-pointer bg-white hover:border-blue-300 transition-colors"
+              onClick={() => setVendorDropOpen(o => !o)}
+            >
+              <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <input
+                className="flex-1 text-xs outline-none bg-transparent text-gray-800 placeholder-gray-400"
+                placeholder="Search vendors…"
+                value={vendorSearch}
+                onChange={e => { setVendorSearch(e.target.value); setVendorDropOpen(true); }}
+                onClick={e => { e.stopPropagation(); setVendorDropOpen(true); }}
+              />
+              <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${vendorDropOpen ? "rotate-180" : ""}`} />
+            </div>
+            {vendorDropOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                {filteredVendors.length === 0 ? (
+                  <p className="text-xs text-gray-400 px-4 py-3">No vendors found</p>
+                ) : (
+                  filteredVendors.map(v => (
+                    <button
+                      key={v.id}
+                      className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors group"
+                      onClick={() => selectVendor(v)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-800 group-hover:text-blue-700">{v.name}</p>
+                          <p className="text-[10px] text-gray-400">{v.category} &nbsp;·&nbsp; {v.id}</p>
+                        </div>
+                        <ChevronRight className="w-3 h-3 text-gray-300 group-hover:text-blue-400" />
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Auto-filled fields */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Assigned Engineer</label>
+              <input
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+                value={form.assignedEngineer}
+                onChange={e => set("assignedEngineer", e.target.value)}
+                placeholder="Engineer name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Vendor Contact</label>
+              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus-within:border-blue-300">
+                <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <input
+                  className="flex-1 text-xs text-gray-800 outline-none bg-transparent"
+                  value={form.vendorContact}
+                  onChange={e => set("vendorContact", e.target.value)}
+                  placeholder="+91 00000 00000"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Email</label>
+            <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus-within:border-blue-300">
+              <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <input
+                className="flex-1 text-xs text-gray-800 outline-none bg-transparent"
+                value={form.email}
+                onChange={e => set("email", e.target.value)}
+                placeholder="vendor@example.com"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">SLA</label>
+              <select
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+                value={form.sla}
+                onChange={e => set("sla", e.target.value)}
+              >
+                {["24 Hours", "48 Hours", "72 Hours", "5 Days", "7 Days"].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Due By</label>
+              <input
+                type="date"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+                value={form.dueBy}
+                onChange={e => set("dueBy", e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Auto-fill info banner */}
+          {form.vendorId && (
+            <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
+              <div className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Check className="w-2.5 h-2.5 text-white" />
+              </div>
+              <p className="text-[11px] text-blue-700 leading-relaxed">
+                Vendor details auto-filled from <strong>{form.assignedVendor}</strong>. You can still edit them manually.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-gray-100 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-medium border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(form)}
+            className="px-5 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RepairServiceDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
   const id = requestId ?? "";
   const data = loadRepairData(id);
+
+  const [assignment, setAssignment] = useState<AssignmentState>(() => ({
+    assignedVendor: data?.assignedVendor ?? "-",
+    vendorId: "",
+    assignedEngineer: data?.assignedEngineer ?? "-",
+    vendorContact: data?.vendorContact ?? "-",
+    email: data?.email ?? "-",
+    sla: data?.sla ?? "48 Hours",
+    dueBy: data?.dueBy ?? "-",
+  }));
 
   const activeStep = stepIndex(data?.status ?? "Request Raised");
 
@@ -423,27 +664,37 @@ export default function RepairServiceDetailPage({ requestId }: { requestId?: str
           {/* Assignment */}
           <Card>
             <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                  <span className="text-blue-600 text-xs">👤</span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                    <span className="text-blue-600 text-xs">👤</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-gray-800">Assignment</h3>
                 </div>
-                <h3 className="text-sm font-bold text-gray-800">Assignment</h3>
+                <button
+                  onClick={() => setAssignmentModalOpen(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-200 text-gray-400 hover:text-blue-600 transition-colors"
+                  title="Edit Assignment"
+                >
+                  <Pencil className="w-3 h-3" />
+                  <span className="text-[11px] font-medium">Edit</span>
+                </button>
               </div>
               <div className="divide-y divide-gray-50">
-                <InfoRow label="Assigned Vendor" value={data.assignedVendor} />
-                <InfoRow label="Assigned Engineer" value={data.assignedEngineer} />
+                <InfoRow label="Assigned Vendor" value={assignment.assignedVendor} />
+                <InfoRow label="Assigned Engineer" value={assignment.assignedEngineer} />
                 <InfoRow label="Vendor Contact" valueEl={
                   <span className="flex items-center gap-1 text-gray-800 font-medium text-xs">
-                    <Phone className="w-3 h-3 text-gray-400" /> {data.vendorContact}
+                    <Phone className="w-3 h-3 text-gray-400" /> {assignment.vendorContact}
                   </span>
                 } />
                 <InfoRow label="Email" valueEl={
                   <span className="flex items-center gap-1 text-gray-800 font-medium text-xs">
-                    <Mail className="w-3 h-3 text-gray-400" /> {data.email}
+                    <Mail className="w-3 h-3 text-gray-400" /> {assignment.email}
                   </span>
                 } />
-                <InfoRow label="SLA" value={data.sla} />
-                <InfoRow label="Due By" value={data.dueBy} />
+                <InfoRow label="SLA" value={assignment.sla} />
+                <InfoRow label="Due By" value={assignment.dueBy} />
               </div>
               {data.timeRemaining !== "Completed" && (
                 <div className="mt-3 rounded-xl bg-blue-50 border border-blue-100 p-3 flex items-center justify-between">
@@ -583,6 +834,18 @@ export default function RepairServiceDetailPage({ requestId }: { requestId?: str
           </button>
         </div>
       </div>
+
+      {/* ── Assignment Edit Modal ── */}
+      {assignmentModalOpen && (
+        <AssignmentEditModal
+          initial={assignment}
+          onSave={(updated) => {
+            setAssignment(updated);
+            setAssignmentModalOpen(false);
+          }}
+          onClose={() => setAssignmentModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
