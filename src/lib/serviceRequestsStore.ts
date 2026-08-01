@@ -67,3 +67,15 @@ export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "reques
 export function getServiceRequests(): StoredServiceRequest[] {
   return load();
 }
+
+/**
+ * Returns the ID that *would* be generated next for the given prefix
+ * without incrementing the sequence counter.
+ * Used by new-request forms to show a preview Request ID before submission.
+ */
+export function peekNextId(prefix: string): string {
+  const raw = JSON.parse(localStorage.getItem(SEQ_KEY) || "{}") as Record<string, number>;
+  const next = (raw[prefix] ?? 200) + 1;
+  const year = new Date().getFullYear();
+  return `${prefix}-${year}-${String(next).padStart(5, "0")}`;
+}

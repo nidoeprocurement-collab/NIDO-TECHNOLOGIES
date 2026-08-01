@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, CalendarDays, ListChecks, User, Phone, Mail, MapPin, Building2 } from "lucide-react";
 import { toast } from "sonner";
-import { addServiceRequest } from "@/lib/serviceRequestsStore";
+import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getHsnCodes, getSacCodes } from "@/lib/taxEngine";
 
@@ -250,6 +250,9 @@ export default function NewAMCRequestPage() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Preview Request ID (shown before submission) ──
+  const [previewId] = useState(() => peekNextId("AMC"));
+
   // ── Derived selected client object ──
   const selectedClient = clients.find(c => c.id === clientId) ?? null;
 
@@ -351,6 +354,25 @@ export default function NewAMCRequestPage() {
       </div>
 
       <div className="px-6 py-6 max-w-6xl mx-auto space-y-6">
+
+        {/* ── Request ID ── */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-base font-bold text-gray-800 mb-5">Request ID</h2>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-1 w-64">
+              <label className="text-sm font-medium text-gray-700">Request ID</label>
+              <input
+                type="text"
+                value={previewId}
+                readOnly
+                className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700 font-mono font-semibold cursor-not-allowed tracking-wide"
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-5">
+              This ID will be assigned to your request upon submission. It cannot be changed.
+            </p>
+          </div>
+        </div>
 
         {/* ── Request Details ── */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
