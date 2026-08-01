@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 
 // ─── Per-AMC data ─────────────────────────────────────────────────────────────
 interface AMCData {
@@ -61,8 +62,11 @@ interface AMCData {
   nextVisitLocation: string;
   // summary
   autoTicketCreation: "Enabled" | "Disabled";
+  // activity
+  createdDate: string;
 }
 
+// ─── Static fallback data (demo entries) ──────────────────────────────────────
 const AMC_DATA: Record<string, AMCData> = {
   "AMC-2026-00124": {
     id: "AMC-2026-00124", status: "Active",
@@ -80,7 +84,7 @@ const AMC_DATA: Record<string, AMCData> = {
     nextVisitDay: "15", nextVisitMonth: "AUG 2026", nextVisitYear: "",
     nextVisitCountdown: "In 23 days", nextVisitTime: "10:00 AM - 12:00 PM",
     nextVisitLocation: "Bangalore - Main Office",
-    autoTicketCreation: "Enabled",
+    autoTicketCreation: "Enabled", createdDate: "29 Jun 2026",
   },
   "AMC-2026-00110": {
     id: "AMC-2026-00110", status: "Active",
@@ -98,7 +102,7 @@ const AMC_DATA: Record<string, AMCData> = {
     nextVisitDay: "05", nextVisitMonth: "OCT 2026", nextVisitYear: "",
     nextVisitCountdown: "In 66 days", nextVisitTime: "09:00 AM - 11:00 AM",
     nextVisitLocation: "Hyderabad - Branch",
-    autoTicketCreation: "Enabled",
+    autoTicketCreation: "Enabled", createdDate: "03 Jul 2026",
   },
   "AMC-2026-00085": {
     id: "AMC-2026-00085", status: "Active",
@@ -116,7 +120,7 @@ const AMC_DATA: Record<string, AMCData> = {
     nextVisitDay: "01", nextVisitMonth: "AUG 2026", nextVisitYear: "",
     nextVisitCountdown: "In 9 days", nextVisitTime: "10:00 AM - 12:00 PM",
     nextVisitLocation: "Bangalore - Main Office",
-    autoTicketCreation: "Enabled",
+    autoTicketCreation: "Enabled", createdDate: "29 Jun 2026",
   },
   "AMC-2026-00061": {
     id: "AMC-2026-00061", status: "Active",
@@ -134,7 +138,7 @@ const AMC_DATA: Record<string, AMCData> = {
     nextVisitDay: "18", nextVisitMonth: "JUL 2026", nextVisitYear: "",
     nextVisitCountdown: "In 5 days", nextVisitTime: "09:30 AM - 11:30 AM",
     nextVisitLocation: "Bangalore - Main Office",
-    autoTicketCreation: "Enabled",
+    autoTicketCreation: "Enabled", createdDate: "16 Jun 2026",
   },
   "AMC-2026-00042": {
     id: "AMC-2026-00042", status: "Active",
@@ -152,7 +156,7 @@ const AMC_DATA: Record<string, AMCData> = {
     nextVisitDay: "06", nextVisitMonth: "SEP 2026", nextVisitYear: "",
     nextVisitCountdown: "In 37 days", nextVisitTime: "10:00 AM - 12:00 PM",
     nextVisitLocation: "Hyderabad - Branch",
-    autoTicketCreation: "Disabled",
+    autoTicketCreation: "Disabled", createdDate: "04 Jun 2026",
   },
   "AMC-2026-00019": {
     id: "AMC-2026-00019", status: "Active",
@@ -170,9 +174,139 @@ const AMC_DATA: Record<string, AMCData> = {
     nextVisitDay: "18", nextVisitMonth: "JUL 2026", nextVisitYear: "",
     nextVisitCountdown: "In 5 days", nextVisitTime: "09:00 AM - 11:00 AM",
     nextVisitLocation: "Bangalore - Main Office",
-    autoTicketCreation: "Enabled",
+    autoTicketCreation: "Enabled", createdDate: "16 May 2026",
   },
 };
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS_UPPER = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function fmtDateDisplay(iso: string): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso; // already formatted
+  return `${String(d.getDate()).padStart(2, "0")} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function freqNoteLabel(freq: string): string {
+  switch (freq) {
+    case "Monthly":     return "Auto ticket every 1 Month";
+    case "Quarterly":   return "Auto ticket every 3 Months";
+    case "Half-Yearly": return "Auto ticket every 6 Months";
+    case "Annually":    return "Auto ticket every 1 Year";
+    default:            return `Auto ticket — ${freq}`;
+  }
+}
+
+function freqIntervalDays(freq: string): number {
+  switch (freq) {
+    case "Monthly":     return 31;
+    case "Quarterly":   return 92;
+    case "Half-Yearly": return 183;
+    case "Annually":    return 365;
+    default:            return 31;
+  }
+}
+
+function daysUntil(iso: string): number {
+  if (!iso) return 0;
+  const now  = new Date();
+  const then = new Date(iso);
+  return Math.round((then.getTime() - now.getTime()) / 86400000);
+}
+
+/** Build an AMCData object from a live stored service request */
+function buildFromStored(req: ReturnType<typeof getServiceRequests>[number]): AMCData {
+  const p = (req.payload ?? {}) as Record<string, string | number>;
+
+  const startIso  = String(p.startDate  || "");
+  const endIso    = String(p.endDate    || "");
+  const amcPeriod = String(p.amcPeriod  || "1 Year");
+  const visitFreq = String(p.visitFreq  || "Monthly");
+  const totalV    = Number(p.totalVisits || 0);
+  const brand     = String(p.brand      || "");
+  const model     = String(p.model      || "");
+  const prefDate  = String(p.prefDate   || "");
+
+  // Compute next visit date
+  const nextVisitIso = prefDate || (startIso
+    ? addDays(new Date(startIso), freqIntervalDays(visitFreq)).toISOString().slice(0, 10)
+    : "");
+
+  let nextDay = "-", nextMonthUpper = "-", nextCountdown = "-", nextVisitTime = "10:00 AM - 12:00 PM";
+  if (nextVisitIso) {
+    const nd = new Date(nextVisitIso);
+    nextDay          = String(nd.getDate()).padStart(2, "0");
+    nextMonthUpper   = `${MONTHS_UPPER[nd.getMonth()]} ${nd.getFullYear()}`;
+    const diff       = daysUntil(nextVisitIso);
+    nextCountdown    = diff > 0 ? `In ${diff} days` : diff === 0 ? "Today" : `${Math.abs(diff)} days ago`;
+  }
+  if (prefDate) nextVisitTime = "10:00 AM - 12:00 PM";
+
+  const contractStart = fmtDateDisplay(startIso);
+  const contractEnd   = fmtDateDisplay(endIso);
+  const periodRange   = (contractStart !== "-" && contractEnd !== "-") ? `${contractStart} - ${contractEnd}` : "-";
+
+  // Status mapping
+  const rawStatus = req.status || "Scheduled";
+  const status: AMCData["status"] = rawStatus === "Completed" ? "Completed"
+    : rawStatus === "Cancelled" ? "Cancelled"
+    : "Active";
+
+  return {
+    id:                   req.id,
+    status,
+    assetName:            req.itemAsset || `${brand} ${model}`.trim() || "-",
+    location:             req.location  || String(p.location || "-"),
+    amcPeriod,
+    periodRange,
+    visitFrequency:       visitFreq,
+    visitFrequencyNote:   freqNoteLabel(visitFreq),
+    totalScheduledVisits: totalV,
+    visitType:            "Preventive Maintenance",
+    completedVisits:      0,
+    lastVisitDate:        "-",
+    remainingVisits:      totalV,
+    nextVisitDate:        nextVisitIso ? `Next on ${fmtDateDisplay(nextVisitIso)}` : "-",
+    client:               String(p.client    || req.requestedBy || "-"),
+    requestType:          "AMC",
+    category:             String(p.category  || "-"),
+    brand,
+    model,
+    serialNumber:         String(p.serialNumber || "-"),
+    assetTag:             req.assetTag || String(p.assetTag || "-"),
+    contractStartDate:    contractStart,
+    contractEndDate:      contractEnd,
+    amcType:              "Comprehensive",
+    sla:                  "48 Hours",
+    workingDays:          "Mon - Fri (9 AM - 6 PM)",
+    assignedVendor:       "-",
+    assignedEngineer:     req.requestedBy || "-",
+    reminderBeforeVisit:  "3 Days",
+    nextVisitDay:         nextDay,
+    nextVisitMonth:       nextMonthUpper,
+    nextVisitYear:        "",
+    nextVisitCountdown:   nextCountdown,
+    nextVisitTime,
+    nextVisitLocation:    req.location || String(p.location || "-"),
+    autoTicketCreation:   "Enabled",
+    createdDate:          req.requestDate || "-",
+  };
+}
+
+/** Load AMCData: stored requests take precedence, then static fallback */
+function loadAMCData(requestId: string): AMCData {
+  const stored = getServiceRequests().find(r => r.id === requestId);
+  if (stored) return buildFromStored(stored);
+  return AMC_DATA[requestId] ?? AMC_DATA["AMC-2026-00124"];
+}
 
 // ─── Visit row data ───────────────────────────────────────────────────────────
 interface VisitRow {
@@ -185,18 +319,53 @@ interface VisitRow {
   notes: string;
 }
 
-function getVisits(d: AMCData): VisitRow[] {
-  const base: VisitRow[] = [
-    { visitNo: 1, plannedDate: d.contractStartDate, status: "Completed", serviceTicket: "ST-2026-0156", completedOn: d.contractStartDate, engineer: d.assignedEngineer, notes: "Preventive maintenance completed." },
-    { visitNo: 2, plannedDate: d.nextVisitDay + " " + d.nextVisitMonth, status: "Scheduled", serviceTicket: "-", completedOn: "-", engineer: d.assignedEngineer, notes: "Scheduled visit" },
-  ];
-  const pending: VisitRow[] = Array.from({ length: 3 }, (_, i) => ({
-    visitNo: i + 3,
-    plannedDate: "-",
-    status: "Pending" as const,
-    serviceTicket: "-", completedOn: "-", engineer: "-", notes: "-",
-  }));
-  return [...base, ...pending];
+function buildVisitSchedule(d: AMCData): VisitRow[] {
+  const rows: VisitRow[] = [];
+  const total = d.totalScheduledVisits || 5;
+
+  // First visit: if completedVisits >= 1, mark as completed
+  if (d.completedVisits >= 1) {
+    rows.push({
+      visitNo: 1,
+      plannedDate: d.contractStartDate,
+      status: "Completed",
+      serviceTicket: "ST-" + d.id.replace("AMC-", ""),
+      completedOn: d.contractStartDate,
+      engineer: d.assignedEngineer !== "-" ? d.assignedEngineer : "-",
+      notes: "Preventive maintenance completed.",
+    });
+  }
+
+  // Next scheduled visit
+  const scheduledIdx = d.completedVisits;
+  if (scheduledIdx < total) {
+    rows.push({
+      visitNo: scheduledIdx + 1,
+      plannedDate: d.nextVisitDay !== "-" ? `${d.nextVisitDay} ${d.nextVisitMonth}` : "-",
+      status: "Scheduled",
+      serviceTicket: "-",
+      completedOn: "-",
+      engineer: d.assignedEngineer !== "-" ? d.assignedEngineer : "-",
+      notes: "Scheduled visit",
+    });
+  }
+
+  // Remaining visits as Pending
+  const pendingStart = rows.length + 1;
+  const pendingCount = Math.min(Math.max(0, total - rows.length), 10); // cap at 10 for display
+  for (let i = 0; i < pendingCount; i++) {
+    rows.push({
+      visitNo: pendingStart + i,
+      plannedDate: "-",
+      status: "Pending",
+      serviceTicket: "-",
+      completedOn: "-",
+      engineer: "-",
+      notes: "-",
+    });
+  }
+
+  return rows;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -218,7 +387,7 @@ function DetailRow({ label, value, bold }: { label: string; value: string; bold?
   return (
     <div className="flex py-2 border-b border-gray-50 last:border-0">
       <span className="text-xs text-gray-400 w-44 flex-shrink-0">{label}</span>
-      <span className={`text-xs ${bold ? "font-semibold text-gray-900" : "text-gray-700"}`}>{value}</span>
+      <span className={`text-xs ${bold ? "font-semibold text-gray-900" : "text-gray-700"}`}>{value || "-"}</span>
     </div>
   );
 }
@@ -227,7 +396,7 @@ function SummaryRow({ label, value, highlight }: { label: string; value: string;
   return (
     <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
       <span className="text-xs text-gray-500">{label}</span>
-      <span className={`text-xs font-semibold ${highlight ? "text-blue-600" : "text-gray-800"}`}>{value}</span>
+      <span className={`text-xs font-semibold ${highlight ? "text-blue-600" : "text-gray-800"}`}>{value || "-"}</span>
     </div>
   );
 }
@@ -237,9 +406,14 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"Visit Schedule" | "Service Requests" | "Documents" | "Notes & History">("Visit Schedule");
 
-  const d: AMCData = AMC_DATA[requestId] ?? AMC_DATA["AMC-2026-00124"];
-  const visits = getVisits(d);
+  // Live data: reload whenever store changes
+  const [d, setD] = useState<AMCData>(() => loadAMCData(requestId));
 
+  useEffect(() => {
+    setD(loadAMCData(requestId));
+  }, [requestId]);
+
+  const visits = buildVisitSchedule(d);
   const TABS = ["Visit Schedule", "Service Requests", "Documents", "Notes & History"] as const;
 
   return (
@@ -258,7 +432,7 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-gray-900">{d.id}</h1>
-                <Badge className={d.status === "Active" ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}>
+                <Badge className={d.status === "Active" ? "bg-emerald-100 text-emerald-700" : d.status === "Completed" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}>
                   {d.status}
                 </Badge>
               </div>
@@ -289,11 +463,11 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
       <div className="bg-white border-b border-gray-200">
         <div className="px-4 py-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-gray-100 gap-0">
           {[
-            { icon: <Calendar className="w-8 h-8 text-blue-400" />,   label: "AMC Period",              value: d.amcPeriod,               sub: d.periodRange },
-            { icon: <RefreshCw className="w-8 h-8 text-emerald-400" />, label: "Visit Frequency",         value: d.visitFrequency,          sub: d.visitFrequencyNote },
-            { icon: <CalendarDays className="w-8 h-8 text-orange-400" />, label: "Total Scheduled Visits", value: String(d.totalScheduledVisits), sub: d.visitType },
-            { icon: <CheckCircle2 className="w-8 h-8 text-green-500" />, label: "Completed Visits",       value: String(d.completedVisits), sub: d.lastVisitDate },
-            { icon: <Clock3 className="w-8 h-8 text-amber-400" />,    label: "Remaining Visits",        value: String(d.remainingVisits), sub: d.nextVisitDate },
+            { icon: <Calendar className="w-8 h-8 text-blue-400" />,      label: "AMC Period",              value: d.amcPeriod,                        sub: d.periodRange },
+            { icon: <RefreshCw className="w-8 h-8 text-emerald-400" />,  label: "Visit Frequency",         value: d.visitFrequency,                   sub: d.visitFrequencyNote },
+            { icon: <CalendarDays className="w-8 h-8 text-orange-400" />, label: "Total Scheduled Visits", value: String(d.totalScheduledVisits),     sub: d.visitType },
+            { icon: <CheckCircle2 className="w-8 h-8 text-green-500" />, label: "Completed Visits",        value: String(d.completedVisits),          sub: d.completedVisits > 0 ? d.lastVisitDate : "No visits yet" },
+            { icon: <Clock3 className="w-8 h-8 text-amber-400" />,       label: "Remaining Visits",        value: String(d.remainingVisits),          sub: d.nextVisitDate },
           ].map((s, i) => (
             <div key={i} className="flex items-start gap-3 px-4 first:pl-0 last:pr-0 py-1">
               <div className="flex-shrink-0 mt-0.5">{s.icon}</div>
@@ -320,24 +494,24 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
               <div className="grid grid-cols-2 gap-x-8">
                 {/* Left column */}
                 <div>
-                  <DetailRow label="Client"              value={d.client} bold />
-                  <DetailRow label="Location"            value={d.location} />
-                  <DetailRow label="Request Type"        value={d.requestType} />
-                  <DetailRow label="Category"            value={d.category} />
-                  <DetailRow label="Brand"               value={d.brand} />
-                  <DetailRow label="Model"               value={d.model} />
+                  <DetailRow label="Client"               value={d.client} bold />
+                  <DetailRow label="Location"             value={d.location} />
+                  <DetailRow label="Request Type"         value={d.requestType} />
+                  <DetailRow label="Category"             value={d.category} />
+                  <DetailRow label="Brand"                value={d.brand} />
+                  <DetailRow label="Model"                value={d.model} />
                   <DetailRow label="Serial Number / IMEI" value={d.serialNumber} />
-                  <DetailRow label="Asset Tag"           value={d.assetTag} />
+                  <DetailRow label="Asset Tag"            value={d.assetTag} />
                 </div>
                 {/* Right column */}
                 <div>
                   <DetailRow label="Contract Start Date"   value={d.contractStartDate} bold />
                   <DetailRow label="Contract End Date"     value={d.contractEndDate} bold />
-                  <DetailRow label="AMC Type"             value={d.amcType} />
-                  <DetailRow label="SLA"                  value={d.sla} />
-                  <DetailRow label="Working Days"         value={d.workingDays} />
-                  <DetailRow label="Assigned Vendor"      value={d.assignedVendor} bold />
-                  <DetailRow label="Assigned Engineer"    value={d.assignedEngineer} bold />
+                  <DetailRow label="AMC Type"              value={d.amcType} />
+                  <DetailRow label="SLA"                   value={d.sla} />
+                  <DetailRow label="Working Days"          value={d.workingDays} />
+                  <DetailRow label="Assigned Vendor"       value={d.assignedVendor} bold />
+                  <DetailRow label="Assigned Engineer"     value={d.assignedEngineer} bold />
                   <DetailRow label="Reminder Before Visit" value={d.reminderBeforeVisit} />
                 </div>
               </div>
@@ -411,11 +585,13 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
                     </table>
                   </div>
                   {/* View All */}
-                  <div className="flex items-center justify-center py-3 border-t border-gray-50">
-                    <button className="flex items-center gap-1.5 text-xs text-blue-600 font-semibold hover:text-blue-800 transition-colors">
-                      View All {d.totalScheduledVisits} Visits <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {d.totalScheduledVisits > visits.length && (
+                    <div className="flex items-center justify-center py-3 border-t border-gray-50">
+                      <button className="flex items-center gap-1.5 text-xs text-blue-600 font-semibold hover:text-blue-800 transition-colors">
+                        View All {d.totalScheduledVisits} Visits <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
 
@@ -451,28 +627,37 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
                 <CalendarDays className="w-4 h-4 text-blue-500" />
                 <h3 className="text-sm font-bold text-gray-800">Next Scheduled Visit</h3>
               </div>
-              <div className="bg-gray-50 rounded-xl p-3 flex items-start gap-4 mb-3">
-                {/* Date block */}
-                <div className="text-center flex-shrink-0">
-                  <p className="text-4xl font-bold text-gray-900 leading-none">{d.nextVisitDay}</p>
-                  <p className="text-xs font-semibold text-gray-500 uppercase mt-0.5">{d.nextVisitMonth}</p>
-                </div>
-                {/* Details */}
-                <div className="min-w-0">
-                  <span className="inline-block text-[11px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full mb-2">
-                    {d.nextVisitCountdown}
-                  </span>
-                  <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
-                    <Clock3 className="w-3 h-3 text-gray-400" /> {d.nextVisitTime}
+              {d.nextVisitDay !== "-" ? (
+                <>
+                  <div className="bg-gray-50 rounded-xl p-3 flex items-start gap-4 mb-3">
+                    {/* Date block */}
+                    <div className="text-center flex-shrink-0">
+                      <p className="text-4xl font-bold text-gray-900 leading-none">{d.nextVisitDay}</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase mt-0.5">{d.nextVisitMonth}</p>
+                    </div>
+                    {/* Details */}
+                    <div className="min-w-0">
+                      <span className="inline-block text-[11px] font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full mb-2">
+                        {d.nextVisitCountdown}
+                      </span>
+                      <div className="flex items-center gap-1 text-xs text-gray-600 mb-1">
+                        <Clock3 className="w-3 h-3 text-gray-400" /> {d.nextVisitTime}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-600">
+                        <MapPin className="w-3 h-3 text-gray-400" /> {d.nextVisitLocation}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                    <MapPin className="w-3 h-3 text-gray-400" /> {d.nextVisitLocation}
-                  </div>
+                  <button className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-600 border border-blue-100 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                    <ExternalLink className="w-3.5 h-3.5" /> View Full Schedule
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-gray-400">
+                  <Calendar className="w-7 h-7 mb-1 opacity-30" />
+                  <p className="text-xs">No visit scheduled yet</p>
                 </div>
-              </div>
-              <button className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-blue-600 border border-blue-100 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
-                <ExternalLink className="w-3.5 h-3.5" /> View Full Schedule
-              </button>
+              )}
             </CardContent>
           </Card>
 
@@ -493,8 +678,8 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
               </div>
               <div className="flex items-center justify-between py-2">
                 <span className="text-xs text-gray-500">Status</span>
-                <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                <span className={`flex items-center gap-1 text-xs font-semibold ${d.status === "Active" ? "text-emerald-600" : "text-gray-500"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full inline-block ${d.status === "Active" ? "bg-emerald-500" : "bg-gray-400"}`} />
                   {d.status}
                 </span>
               </div>
@@ -506,28 +691,32 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
             <CardContent className="p-4">
               <h3 className="text-sm font-bold text-gray-800 mb-3">Recent Activity</h3>
               <div className="space-y-3">
-                <div className="flex items-start gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-semibold text-gray-800">Visit completed</p>
-                      <p className="text-[11px] text-gray-400 whitespace-nowrap">{d.contractStartDate}</p>
+                {d.completedVisits > 0 && (
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-800">Visit completed</p>
+                        <p className="text-[11px] text-gray-400 whitespace-nowrap">{d.contractStartDate}</p>
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Visit #1 completed on {d.contractStartDate}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">By {d.assignedEngineer}</p>
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      Visit #1 completed on {d.contractStartDate}
-                    </p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">By {d.assignedEngineer}</p>
                   </div>
-                </div>
+                )}
                 <div className="flex items-start gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-xs font-semibold text-gray-800">AMC Contract Created</p>
-                      <p className="text-[11px] text-gray-400 whitespace-nowrap">29 Jun 2026</p>
+                      <p className="text-xs font-semibold text-gray-800">AMC Request Created</p>
+                      <p className="text-[11px] text-gray-400 whitespace-nowrap">{d.createdDate}</p>
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Contract created successfully</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">By System</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Request submitted successfully</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">
+                      {d.assignedEngineer !== "-" ? `By ${d.assignedEngineer}` : "By System"}
+                    </p>
                   </div>
                 </div>
               </div>
