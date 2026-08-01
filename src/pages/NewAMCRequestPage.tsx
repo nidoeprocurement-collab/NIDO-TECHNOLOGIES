@@ -391,7 +391,16 @@ export default function NewAMCRequestPage() {
               />
             </div>
 
-            <SelectField label="Request Type" required value={requestType} onChange={setRequestType} options={REQUEST_TYPES} />
+            {/* Request Type — single fixed value, shown as read-only */}
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">Request Type <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={requestType}
+                readOnly
+                className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+              />
+            </div>
           </div>
 
           {/* ── Client Details Card (shown after selection) ── */}
