@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Pencil, XCircle, Plus, Calendar, Paperclip,
   CheckCircle2, Clock, Wrench, Lock, Check, Phone, Mail,
-  ChevronDown, Truck, X, Search, ChevronRight,
+  ChevronDown, Truck, X, Search, ChevronRight, MapPin, AlertCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
@@ -108,6 +108,64 @@ function fmtIsoRepair(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+const MONTH_MAP: Record<string, number> = {
+  jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11
+};
+
+/** Parse "DD Mon YYYY, HH:MM AM/PM" or ISO strings into a Date */
+function parseDueDate(s: string): Date | null {
+  if (!s || s === "-") return null;
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  const m = s.match(/(\d{1,2})\s+(\w{3})\s+(\d{4}),?\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (m) {
+    const mon = MONTH_MAP[m[2].toLowerCase()];
+    if (mon === undefined) return null;
+    let h = parseInt(m[4]), min = parseInt(m[5]);
+    if (m[6]) {
+      if (m[6].toLowerCase() === "pm" && h !== 12) h += 12;
+      if (m[6].toLowerCase() === "am" && h === 12) h = 0;
+    }
+    return new Date(parseInt(m[3]), mon, parseInt(m[1]), h, min);
+  }
+  return null;
+}
+
+/** Compute human-readable time remaining from dueBy string */
+function computeTimeRemaining(dueBy: string, status: string): string {
+  if (["Completed", "Closed", "Cancelled"].includes(status)) return status;
+  const due = parseDueDate(dueBy);
+  if (!due) return "-";
+  const diff = due.getTime() - Date.now();
+  if (diff <= 0) return "Overdue";
+  const totalMins = Math.floor(diff / 60000);
+  const days  = Math.floor(totalMins / 1440);
+  const hours = Math.floor((totalMins % 1440) / 60);
+  const mins  = totalMins % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+/** Format a Date into display parts for the appointment card */
+function fmtApptDate(dateStr: string) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { day: "-", month: "" };
+  const day   = String(d.getDate()).padStart(2, "0");
+  const month = d.toLocaleDateString("en-IN", { month: "short", year: "numeric" }).toUpperCase();
+  return { day, month };
+}
+
+/** Convert "HH:MM" 24h to "HH:MM AM/PM" */
+function to12h(t: string) {
+  if (!t) return "";
+  const [hStr, mStr] = t.split(":");
+  let h = parseInt(hStr), m = parseInt(mStr);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
 /** Build a RepairData object from a stored service request */
@@ -453,12 +511,156 @@ function AssignmentEditModal({
   );
 }
 
+// ─── Appointment state ────────────────────────────────────────────────────────
+interface AppointmentState {
+  date: string;      // ISO date "YYYY-MM-DD"
+  timeFrom: string;  // "10:00"
+  timeTo: string;    // "12:00"
+  location: string;
+  label: string;
+}
+
+// ─── Reschedule Modal ─────────────────────────────────────────────────────────
+function RescheduleModal({
+  initial,
+  onSave,
+  onClose,
+}: {
+  initial: AppointmentState;
+  onSave: (a: AppointmentState) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState<AppointmentState>({ ...initial });
+  const set = (k: keyof AppointmentState, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const isValid = !!form.date && !!form.timeFrom && !!form.timeTo && !!form.location;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">Reschedule Appointment</h2>
+              <p className="text-[11px] text-gray-400">Update the next service appointment</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+
+          {/* Date */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Date <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="date"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+              value={form.date}
+              onChange={e => set("date", e.target.value)}
+            />
+          </div>
+
+          {/* Time From / To */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Time From <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="time"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+                value={form.timeFrom}
+                onChange={e => set("timeFrom", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Time To <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="time"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+                value={form.timeTo}
+                onChange={e => set("timeTo", e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+              Location <span className="text-red-400">*</span>
+            </label>
+            <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 focus-within:border-blue-300">
+              <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <input
+                className="flex-1 text-xs text-gray-800 outline-none bg-transparent"
+                placeholder="e.g. Bangalore – Main Office"
+                value={form.location}
+                onChange={e => set("location", e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Label (optional) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Label <span className="text-gray-400 font-normal">(optional)</span></label>
+            <input
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-800 outline-none focus:border-blue-300 bg-gray-50"
+              placeholder="e.g. Rescheduled, Follow-up…"
+              value={form.label}
+              onChange={e => set("label", e.target.value)}
+            />
+          </div>
+
+          {!isValid && (
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+              <p className="text-[11px] text-amber-700">Please fill in all required fields.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2.5 px-6 py-4 border-t border-gray-100 bg-gray-50">
+          <button onClick={onClose} className="px-4 py-2 text-xs font-medium border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-gray-700 transition-colors">
+            Cancel
+          </button>
+          <button
+            disabled={!isValid}
+            onClick={() => isValid && onSave(form)}
+            className="px-5 py-2 text-xs font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          >
+            Confirm Reschedule
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RepairServiceDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const id = requestId ?? "";
   const data = loadRepairData(id);
+
+  const [currentStatus, setCurrentStatus] = useState<RepairData["status"]>(
+    data?.status ?? "Request Raised" as RepairData["status"]
+  );
 
   const [assignment, setAssignment] = useState<AssignmentState>(() => ({
     assignedVendor: data?.assignedVendor ?? "-",
@@ -470,7 +672,50 @@ export default function RepairServiceDetailPage({ requestId }: { requestId?: str
     dueBy: data?.dueBy ?? "-",
   }));
 
-  const activeStep = stepIndex(data?.status ?? "Request Raised");
+  // Live time remaining — recomputes every 30 s
+  const [timeRemaining, setTimeRemaining] = useState(() =>
+    computeTimeRemaining(data?.dueBy ?? "-", data?.status ?? "-")
+  );
+  useEffect(() => {
+    setTimeRemaining(computeTimeRemaining(assignment.dueBy, currentStatus));
+    const id = setInterval(
+      () => setTimeRemaining(computeTimeRemaining(assignment.dueBy, currentStatus)),
+      30_000
+    );
+    return () => clearInterval(id);
+  }, [assignment.dueBy, currentStatus]);
+
+  // Appointment state
+  const initAppt = (): AppointmentState => {
+    if (!data) return { date: "", timeFrom: "10:00", timeTo: "12:00", location: "", label: "" };
+    // Try to derive initial ISO date from nextAppointmentDay + nextAppointmentMonth
+    let isoDate = "";
+    if (data.nextAppointmentDay !== "-" && data.nextAppointmentMonth) {
+      const parsed = new Date(`${data.nextAppointmentDay} ${data.nextAppointmentMonth}`);
+      if (!isNaN(parsed.getTime())) {
+        isoDate = parsed.toISOString().slice(0, 10);
+      }
+    }
+    const timeParts = (data.nextAppointmentTime ?? "").split(" - ");
+    const to12hRev = (t: string) => {
+      const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!m) return "";
+      let h = parseInt(m[1]);
+      if (m[3].toLowerCase() === "pm" && h !== 12) h += 12;
+      if (m[3].toLowerCase() === "am" && h === 12) h = 0;
+      return `${String(h).padStart(2,"0")}:${m[2]}`;
+    };
+    return {
+      date: isoDate,
+      timeFrom: to12hRev(timeParts[0] ?? "") || "10:00",
+      timeTo:   to12hRev(timeParts[1] ?? "") || "12:00",
+      location: data.nextAppointmentLocation ?? "",
+      label:    data.nextAppointmentLabel ?? "",
+    };
+  };
+  const [appointment, setAppointment] = useState<AppointmentState>(initAppt);
+
+  const activeStep = stepIndex(currentStatus);
 
   if (!data) {
     return (
