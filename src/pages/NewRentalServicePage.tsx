@@ -176,7 +176,7 @@ export default function NewRentalServicePage() {
       }, "RNT");
 
       toast.success("Rental service request submitted successfully!");
-      setTimeout(() => navigate("/my-services"), 800);
+      navigate("/my-services");
     } catch {
       toast.error("Failed to submit request. Please try again.");
       setSubmitting(false);
@@ -199,7 +199,7 @@ export default function NewRentalServicePage() {
         </div>
       </div>
 
-      <div className="px-6 py-6 max-w-6xl mx-auto space-y-6">
+      <div className="px-6 py-6 space-y-6">
 
         {/* ── Request Details ── */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
