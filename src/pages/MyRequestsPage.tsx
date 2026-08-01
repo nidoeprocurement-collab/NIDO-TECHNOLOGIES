@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type RequestStatus = "In Progress" | "Active" | "Scheduled" | "Completed" | "Cancelled" | "Pending";
@@ -70,10 +71,29 @@ const RAW: Omit<ServiceRequest, "requestDateTs">[] = [
   { id: "PUR-2026-00126", requestType: "Regular Purchase",  itemAsset: "20 Liter Water Can",          assetTag: "",        location: "Bangalore - Main Office", requestDate: "28 Jul 2026", status: "In Progress", priority: "Medium", nextAppointment: "01 Aug 2026\n11:00 AM", requestedBy: "Ramesh K."    },
 ];
 
-const ALL_REQUESTS: ServiceRequest[] = RAW.map(r => ({
+const STATIC_REQUESTS: ServiceRequest[] = RAW.map(r => ({
   ...r,
   requestDateTs: parseDate(r.requestDate),
 }));
+
+function loadAllRequests(): ServiceRequest[] {
+  const stored = getServiceRequests().map(s => ({
+    id:              s.id,
+    requestType:     s.requestType,
+    itemAsset:       s.itemAsset,
+    assetTag:        s.assetTag,
+    location:        s.location,
+    requestDate:     s.requestDate,
+    requestDateTs:   s.requestDateTs,
+    status:          (s.status as ServiceRequest["status"]),
+    priority:        (s.priority as ServiceRequest["priority"]),
+    nextAppointment: s.nextAppointment,
+    requestedBy:     s.requestedBy,
+  }));
+  // Deduplicate: stored entries take precedence over static ones
+  const storedIds = new Set(stored.map(r => r.id));
+  return [...stored, ...STATIC_REQUESTS.filter(r => !storedIds.has(r.id))];
+}
 
 // ─── Date-range options ───────────────────────────────────────────────────────
 const DATE_RANGES = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "This Year", "All Time"] as const;
@@ -179,10 +199,10 @@ function FilterPanel({
 
   if (!open) return null;
 
-  const requestTypes = ["All", ...Array.from(new Set(ALL_REQUESTS.map(r => r.requestType)))];
+  const requestTypes = ["All", ...Array.from(new Set(STATIC_REQUESTS.map(r => r.requestType)))];
   const priorities   = ["All", "High", "Medium", "Low"];
-  const locations    = ["All", ...Array.from(new Set(ALL_REQUESTS.map(r => r.location)))];
-  const requestedBys = ["All", ...Array.from(new Set(ALL_REQUESTS.map(r => r.requestedBy)))];
+  const locations    = ["All", ...Array.from(new Set(STATIC_REQUESTS.map(r => r.location)))];
+  const requestedBys = ["All", ...Array.from(new Set(STATIC_REQUESTS.map(r => r.requestedBy)))];
 
   const Field = ({ label, field, options }: { label: string; field: keyof Filters; options: string[] }) => (
     <div>
@@ -263,12 +283,18 @@ export default function MyRequestsPage() {
   const [dateRange,    setDateRange]     = useState<DateRange>("Last 30 Days");
   const [filters,      setFilters]       = useState<Filters>(EMPTY_FILTERS);
   const [filterOpen,   setFilterOpen]   = useState(false);
+  const [allRequests,  setAllRequests]  = useState<ServiceRequest[]>(() => loadAllRequests());
   const filterBtnRef = useRef<HTMLDivElement>(null);
+
+  // Refresh from localStorage whenever the page mounts (e.g. navigated back after a submission)
+  useEffect(() => {
+    setAllRequests(loadAllRequests());
+  }, []);
 
   // ── Apply all filters ──
   const cutoff = dateRangeCutoff(dateRange);
 
-  const filtered = ALL_REQUESTS.filter(r => {
+  const filtered = allRequests.filter(r => {
     if (tileFilter !== "All" && r.status !== tileFilter)              return false;
     if (r.requestDateTs < cutoff)                                     return false;
     if (filters.requestType !== "All" && r.requestType !== filters.requestType) return false;
@@ -296,13 +322,13 @@ export default function MyRequestsPage() {
     setCurrentPage(1);
   };
 
-  // ── Stats ──
+  // ── Stats (dynamic) ──
   const stats = [
-    { label: "Total Requests",      value: 24, filterKey: "All",        icon: <ClipboardList className="w-5 h-5 text-blue-500" />,   iconBg: "bg-blue-50",    border: "border-blue-100",    valueColor: "text-gray-900"    },
-    { label: "In Progress",         value: 7,  filterKey: "In Progress", icon: <CheckCircle2  className="w-5 h-5 text-emerald-500" />, iconBg: "bg-emerald-50", border: "border-emerald-100", valueColor: "text-emerald-600" },
-    { label: "Pending / Scheduled", value: 6,  filterKey: "Scheduled",   icon: <Clock         className="w-5 h-5 text-amber-500" />,   iconBg: "bg-amber-50",   border: "border-amber-100",   valueColor: "text-amber-600"   },
-    { label: "Completed",           value: 8,  filterKey: "Completed",   icon: <CheckSquare   className="w-5 h-5 text-purple-500" />,  iconBg: "bg-purple-50",  border: "border-purple-100",  valueColor: "text-purple-600"  },
-    { label: "Cancelled",           value: 3,  filterKey: "Cancelled",   icon: <XCircle       className="w-5 h-5 text-red-400" />,     iconBg: "bg-red-50",     border: "border-red-100",     valueColor: "text-red-500"     },
+    { label: "Total Requests",      value: allRequests.length,                                                       filterKey: "All",        icon: <ClipboardList className="w-5 h-5 text-blue-500" />,   iconBg: "bg-blue-50",    border: "border-blue-100",    valueColor: "text-gray-900"    },
+    { label: "In Progress",         value: allRequests.filter(r => r.status === "In Progress").length,               filterKey: "In Progress", icon: <CheckCircle2  className="w-5 h-5 text-emerald-500" />, iconBg: "bg-emerald-50", border: "border-emerald-100", valueColor: "text-emerald-600" },
+    { label: "Pending / Scheduled", value: allRequests.filter(r => r.status === "Scheduled" || r.status === "Active").length, filterKey: "Scheduled", icon: <Clock className="w-5 h-5 text-amber-500" />, iconBg: "bg-amber-50", border: "border-amber-100", valueColor: "text-amber-600" },
+    { label: "Completed",           value: allRequests.filter(r => r.status === "Completed").length,                 filterKey: "Completed",   icon: <CheckSquare   className="w-5 h-5 text-purple-500" />,  iconBg: "bg-purple-50",  border: "border-purple-100",  valueColor: "text-purple-600"  },
+    { label: "Cancelled",           value: allRequests.filter(r => r.status === "Cancelled").length,                 filterKey: "Cancelled",   icon: <XCircle       className="w-5 h-5 text-red-400" />,     iconBg: "bg-red-50",     border: "border-red-100",     valueColor: "text-red-500"     },
   ];
 
   return (
