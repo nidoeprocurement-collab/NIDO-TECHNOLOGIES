@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Pencil, XCircle, Plus, Calendar, Paperclip,
   CheckCircle2, Clock, Wrench, Lock, Check, Phone, Mail,
+  ChevronDown, Truck,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
@@ -199,11 +201,11 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 // Step definitions for the progress stepper
 const STEPS = [
-  { key: "Request Raised", icon: <Paperclip className="w-4 h-4" /> },
-  { key: "Scheduled", icon: <Calendar className="w-4 h-4" /> },
-  { key: "In Progress", icon: <Wrench className="w-4 h-4" /> },
-  { key: "Completed", icon: <CheckCircle2 className="w-4 h-4" /> },
-  { key: "Closed", icon: <Lock className="w-4 h-4" /> },
+  { key: "Request Raised" },
+  { key: "Scheduled" },
+  { key: "In Progress" },
+  { key: "Completed" },
+  { key: "Closed" },
 ];
 const STEP_ORDER = ["Request Raised", "Scheduled", "In Progress", "Completed", "Closed"];
 
@@ -223,6 +225,7 @@ function InfoRow({ label, value, valueEl }: { label: string; value?: string; val
 
 export default function RepairServiceDetailPage({ requestId }: { requestId?: string }) {
   const navigate = useNavigate();
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const id = requestId ?? "";
   const data = loadRepairData(id);
 
@@ -277,39 +280,101 @@ export default function RepairServiceDetailPage({ requestId }: { requestId?: str
       </div>
 
       <div className="px-6 py-5 space-y-4">
-        {/* ── Progress Stepper ── */}
+        {/* ── Service Status Bar ── */}
         <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center">
-              {STEPS.map((step, i) => {
-                const done = i < activeStep;
-                const active = i === activeStep;
-                const activityEntry = data.activity.find(a => a.label === step.key);
-                const dateStr = activityEntry?.date !== "-" ? activityEntry?.date : "";
-                const timeStr = activityEntry?.time ?? "";
-                return (
-                  <div key={step.key} className="flex items-center flex-1 min-w-0">
-                    <div className="flex flex-col items-center min-w-[90px]">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 transition-colors ${
-                        done ? "bg-blue-600 border-blue-600 text-white" :
-                        active ? "bg-white border-blue-500 text-blue-500" :
-                        "bg-white border-gray-200 text-gray-300"
-                      }`}>
-                        {done ? <Check className="w-4 h-4" /> : step.icon}
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+
+              {/* Left: current status panel */}
+              <div className="flex items-center gap-3 min-w-[170px] pr-4 border-r border-gray-100">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                  <Truck className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wide leading-tight">Service Status</p>
+                  <p className="text-sm font-bold text-gray-900 leading-snug">{data.status}</p>
+                  <p className="text-[10px] text-gray-400 leading-tight">{data.requestType}</p>
+                </div>
+              </div>
+
+              {/* Middle: horizontal stepper */}
+              <div className="flex items-center flex-1 min-w-0">
+                {STEPS.map((step, i) => {
+                  const done = i < activeStep;
+                  const active = i === activeStep;
+                  const activityEntry = data.activity.find(a => a.label === step.key);
+                  const dateStr = activityEntry?.date && activityEntry.date !== "-" ? activityEntry.date : "";
+
+                  let subLabel: string;
+                  let subColor: string;
+                  if (done) {
+                    subLabel = dateStr || "Done";
+                    subColor = "text-gray-400";
+                  } else if (active) {
+                    subLabel = dateStr || "In Progress";
+                    subColor = "text-blue-500";
+                  } else {
+                    subLabel = "Pending";
+                    subColor = "text-gray-300";
+                  }
+
+                  return (
+                    <div key={step.key} className="flex items-center flex-1 min-w-0">
+                      <div className="flex flex-col items-center">
+                        {/* Step circle with pencil icon */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${
+                          done
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : active
+                            ? "bg-white border-blue-500 text-blue-500"
+                            : "bg-white border-gray-200 text-gray-300"
+                        }`}>
+                          {done
+                            ? <Check className="w-3.5 h-3.5" />
+                            : <Pencil className="w-3 h-3" />}
+                        </div>
+                        {/* Step name */}
+                        <p className={`text-[11px] font-semibold mt-1 text-center whitespace-nowrap ${
+                          active ? "text-gray-900" : done ? "text-gray-600" : "text-gray-400"
+                        }`}>
+                          {step.key}
+                        </p>
+                        {/* Date or status label */}
+                        <p className={`text-[10px] text-center leading-tight mt-0.5 ${subColor}`}>
+                          {subLabel}
+                        </p>
                       </div>
-                      <p className={`text-xs font-semibold mt-1.5 text-center ${active ? "text-blue-600" : done ? "text-gray-700" : "text-gray-400"}`}>
-                        {step.key}
-                      </p>
-                      {dateStr ? (
-                        <p className="text-[10px] text-gray-400 text-center leading-tight mt-0.5">{dateStr}{timeStr ? `, ${timeStr}` : ""}</p>
-                      ) : <p className="text-[10px] text-gray-300 text-center mt-0.5">-</p>}
+                      {i < STEPS.length - 1 && (
+                        <div className={`flex-1 h-0.5 mx-1.5 mb-6 rounded ${i < activeStep ? "bg-blue-400" : "bg-gray-200"}`} />
+                      )}
                     </div>
-                    {i < STEPS.length - 1 && (
-                      <div className={`flex-1 h-0.5 mx-2 rounded ${i < activeStep ? "bg-blue-500" : "bg-gray-200"}`} />
-                    )}
+                  );
+                })}
+              </div>
+
+              {/* Right: Update Status button */}
+              <div className="relative flex-shrink-0 pl-4 border-l border-gray-100">
+                <button
+                  onClick={() => setStatusDropdownOpen(o => !o)}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-gray-700 transition-colors shadow-sm"
+                >
+                  Update Status <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+                {statusDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px]">
+                    {STEP_ORDER.map(s => (
+                      <button
+                        key={s}
+                        className="w-full text-left px-4 py-2 text-xs hover:bg-blue-50 text-gray-700 hover:text-blue-700"
+                        onClick={() => setStatusDropdownOpen(false)}
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
-                );
-              })}
+                )}
+              </div>
+
             </div>
           </CardContent>
         </Card>
