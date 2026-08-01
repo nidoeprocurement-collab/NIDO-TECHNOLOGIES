@@ -193,6 +193,7 @@ const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
 const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
+const NewRepairServicePage = lazy(() => import("@/pages/NewRepairServicePage"));
 const InvoicePage = lazy(() => import("@/pages/InvoicePage"));
 const InvoiceDetails = lazy(() => import("@/pages/InvoiceDetails"));
 const InvoiceFormPage = lazy(() => import("@/pages/InvoiceFormPage"));
@@ -659,6 +660,7 @@ function AppRoutes() {
           />
           <Route path="services" element={<ServicesPage />} />
           <Route path="services/amc/new" element={<NewAMCRequestPage />} />
+         <Route path="services/repair/new" element={<NewRepairServicePage />} />
           <Route path="my-services" element={<MyRequestsPage />} />
           <Route path="my-services/requests/:requestId" element={<MyRequestDetailPage />} />
           <Route path="support" element={<SupportPage />} />

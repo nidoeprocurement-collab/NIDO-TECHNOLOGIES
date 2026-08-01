@@ -32,7 +32,7 @@ const SERVICE_CARDS = [
     subtitle: "",
     description: "On-demand repair services for quick resolution of equipment issues.",
     icon: Wrench,
-    href: "/support",
+    href: "/services/repair/new",
     iconBg: "bg-orange-100",
     iconColor: "text-orange-500",
     titleColor: "text-orange-500",
