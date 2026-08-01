@@ -166,7 +166,7 @@ export default function NewRecycleDisposalPage() {
           collectionDate, timeSlot, contactPerson, contactNumber, notes,
           attachments: attachments.map(f => f.name),
         },
-      }, "RCY");
+      }, "REC");
 
       toast.success("Recycle / Disposal request submitted successfully!");
       navigate("/my-services");
