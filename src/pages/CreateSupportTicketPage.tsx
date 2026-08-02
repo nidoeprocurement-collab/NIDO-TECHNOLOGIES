@@ -12,12 +12,12 @@ import { saveSupportTickets } from "@/lib/supportTicketStore";
 // ── Static data ────────────────────────────────────────────────────────────────
 
 const TICKET_CATEGORIES: Record<string, string[]> = {
-  "Platform / System":   ["Login / Access", "Dashboard Issues", "Performance", "System Errors", "Feature Request"],
-  "Billing / Payments":  ["Invoice Issues", "Payment Failure", "Refund Request", "Credit Note"],
-  "Purchase Orders":     ["PO Creation", "PO Approval", "PO Delivery", "PO Amendment"],
-  "Vendor Management":   ["Vendor Onboarding", "Vendor Portal", "Vendor Payments", "Vendor Dispute"],
-  "User Management":     ["Account Setup", "Role / Permission", "Password Reset", "User Deactivation"],
+  "Platform / System":   ["Login / Access", "Dashboard Issues", "Performance", "System Errors", "Feature Request", "Other"],
+  "Billing / Payments":  ["Invoice Issues", "Payment Failure", "Refund Request", "Credit Note", "Other"],
+  "Purchase Orders":     ["PO Creation", "PO Approval", "PO Delivery", "PO Amendment", "Other"],
+  "User Management":     ["Account Setup", "Role / Permission", "Password Reset", "User Deactivation", "Other"],
   "General Enquiry":     ["Information Request", "Feedback", "Other"],
+  "Other":               ["Other"],
 };
 
 const DEPARTMENTS = ["IT Support", "Finance", "Operations", "Customer Success", "Management"];
