@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { getPrefix } from "@/lib/configService";
+import { useNavigate } from "react-router-dom";
 import { useConfig } from "@/contexts/ConfigContext";
-import { toast } from "sonner";
 import {
   Plus, Search, CheckCircle, Clock, AlertCircle,
   Phone, Mail, ChevronRight, Headphones, FileText,
@@ -28,6 +27,7 @@ const FAQ_ITEMS = [
 ];
 
 export default function SupportPage() {
+  const navigate = useNavigate();
   const { config } = useConfig();
   const tktPrefix = config.prefixes.find(p => p.key === "supportTicket")?.value || "TKT-";
   const [tickets, setTickets] = useState(MOCK_TICKETS);
@@ -37,10 +37,8 @@ export default function SupportPage() {
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showCreate, setShowCreate] = useState(false);
   const [showTickets, setShowTickets] = useState(false);
   const [showFaqs, setShowFaqs] = useState(false);
-  const [form, setForm] = useState({ subject: "", description: "", priority: "medium" });
 
   const filtered = displayedTickets.filter(t => {
     const match = t.number.includes(search) || t.subject.toLowerCase().includes(search.toLowerCase());
@@ -54,23 +52,6 @@ export default function SupportPage() {
       status: t.status, priority: t.priority, created: t.created,
     })));
   }, [tickets]);
-
-  const handleCreate = () => {
-    if (!form.subject) { toast.error("Please enter a subject"); return; }
-    const newTicket = {
-      id: `tkt_${Date.now()}`,
-      number: `${getPrefix("supportTicket") || "TKT-"}${String(tickets.length + 1).padStart(3, "0")}`,
-      subject: form.subject,
-      status: "open",
-      priority: form.priority,
-      created: new Date().toISOString().split("T")[0],
-      resolved: null,
-    };
-    setTickets([...tickets, newTicket]);
-    toast.success("Support ticket created");
-    setShowCreate(false);
-    setForm({ subject: "", description: "", priority: "medium" });
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -180,7 +161,7 @@ export default function SupportPage() {
 
             <div className="flex flex-col gap-3">
               <button
-                onClick={() => setShowCreate(true)}
+                onClick={() => navigate("/support/create")}
                 className="w-full py-3 rounded-xl bg-[#16a34a] hover:bg-[#15803d] text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 <Plus size={18} />
@@ -369,67 +350,6 @@ export default function SupportPage() {
         </div>
       )}
 
-      {/* ── Create Ticket Modal ── */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-foreground">Create Support Ticket</h2>
-              <button onClick={() => setShowCreate(false)} className="text-muted-foreground hover:text-foreground">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1 text-foreground">Subject *</label>
-                <input
-                  type="text"
-                  value={form.subject}
-                  onChange={e => setForm({ ...form, subject: e.target.value })}
-                  placeholder="Brief description of your issue"
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-foreground">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={e => setForm({ ...form, description: e.target.value })}
-                  placeholder="Provide more details about your issue..."
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground h-24 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1 text-foreground">Priority</label>
-                <select
-                  value={form.priority}
-                  onChange={e => setForm({ ...form, priority: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end mt-6">
-              <button
-                onClick={() => setShowCreate(false)}
-                className="px-4 py-2 border border-border rounded-lg hover:bg-muted text-foreground text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                className="px-4 py-2 bg-[#16a34a] hover:bg-[#15803d] text-white rounded-lg text-sm font-semibold flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Create Ticket
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
