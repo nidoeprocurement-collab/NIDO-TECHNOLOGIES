@@ -642,7 +642,14 @@ export default function SupportTicketsPage() {
                             )}
                           </td>
 
-                          <td className="px-4 py-3 font-medium text-primary whitespace-nowrap">{ticket.id}</td>
+                          <td className="px-4 py-3 font-medium text-primary whitespace-nowrap">
+                            <button
+                              onClick={() => navigate(`/support/ticket/${ticket.id}`)}
+                              className="hover:underline underline-offset-2"
+                            >
+                              {ticket.id}
+                            </button>
+                          </td>
                           <td className="px-4 py-3">
                             <span className="inline-flex px-2.5 py-0.5 rounded text-xs font-medium border border-blue-200 text-blue-700 dark:border-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20">
                               {ticket.type}
