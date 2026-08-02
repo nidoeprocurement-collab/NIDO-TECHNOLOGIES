@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Fragment } from "react";
 import {
@@ -32,6 +32,68 @@ interface Ticket {
   slaTargetLabel: string;
   lastUpdated: string;
   children: ChildTicket[];
+}
+
+// ─── Real ticket loader ───────────────────────────────────────────────────────
+
+function capitalise(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function mapStoredToTicket(raw: {
+  id: string; number: string; subject: string; status: string;
+  priority: string; created: string; clientName?: string; department?: string;
+  createdBy?: string;
+}): Ticket {
+  const statusMap: Record<string, Ticket["status"]> = {
+    open: "Open", in_progress: "In Progress", on_hold: "On Hold",
+    resolved: "Resolved", closed: "Closed",
+  };
+  const priMap: Record<string, Ticket["priority"]> = {
+    low: "Low", medium: "Medium", high: "High", critical: "High",
+  };
+  const status   = statusMap[raw.status]   ?? "Open";
+  const priority = priMap[raw.priority]    ?? "Medium";
+  const isDone   = status === "Resolved" || status === "Closed";
+
+  // SLA: High=12h, Medium=24h, Low=48h
+  const slaHours = priority === "High" ? 12 : priority === "Medium" ? 24 : 48;
+  let slaMinutesLeft: number | null = null;
+  if (!isDone) {
+    const elapsed = Math.floor((Date.now() - new Date(raw.created).getTime()) / 60000);
+    slaMinutesLeft = Math.max(0, slaHours * 60 - elapsed);
+  }
+
+  // Format lastUpdated from ISO date
+  const d = new Date(raw.created);
+  const lastUpdated = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    + "\n" + d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  return {
+    id:            raw.number || raw.id,
+    type:          "Parent",
+    subject:       raw.subject,
+    client:        raw.clientName || "—",
+    department:    raw.department || "Customer Relationship Manager",
+    priority,
+    status,
+    slaMinutesLeft,
+    slaTargetLabel: `${slaHours}h`,
+    lastUpdated,
+    children:      [],
+  };
+}
+
+function loadRealTickets(): Ticket[] {
+  try {
+    const raw = localStorage.getItem("nido_support_tickets_v1");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Parameters<typeof mapStoredToTicket>[0][];
+    // newest first
+    return [...parsed].reverse().map(mapStoredToTicket);
+  } catch {
+    return [];
+  }
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -265,14 +327,38 @@ function SLACell({ minutesLeft, targetLabel }: { minutesLeft: number | null; tar
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-const CLIENTS_LIST    = ["All Clients",    ...Array.from(new Set(MOCK_TICKETS.map(t => t.client)))];
-const DEPT_LIST       = ["All Departments",...Array.from(new Set(MOCK_TICKETS.map(t => t.department)))];
 const STATUS_LIST     = ["All Status", "Open", "In Progress", "On Hold", "Resolved", "Closed"];
 const PRIORITY_LIST   = ["All Priority", "High", "Medium", "Low"];
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 export default function SupportTicketsPage() {
   const navigate = useNavigate();
+
+  // Real tickets from localStorage (prepended, newest first)
+  const [realTickets, setRealTickets] = useState<Ticket[]>(() => loadRealTickets());
+
+  // Combined: real tickets first, then mock (deduplicated by id)
+  const allTickets = useMemo(() => {
+    const realIds = new Set(realTickets.map(t => t.id));
+    return [...realTickets, ...MOCK_TICKETS.filter(t => !realIds.has(t.id))];
+  }, [realTickets]);
+
+  // Reload whenever a ticket is saved from another page
+  useEffect(() => {
+    const handler = () => setRealTickets(loadRealTickets());
+    window.addEventListener("supportTicketsUpdated", handler);
+    return () => window.removeEventListener("supportTicketsUpdated", handler);
+  }, []);
+
+  // Dynamic filter dropdown options
+  const CLIENTS_LIST = useMemo(() =>
+    ["All Clients", ...Array.from(new Set(allTickets.map(t => t.client).filter(Boolean)))],
+    [allTickets]
+  );
+  const DEPT_LIST = useMemo(() =>
+    ["All Departments", ...Array.from(new Set(allTickets.map(t => t.department).filter(Boolean)))],
+    [allTickets]
+  );
 
   // Filters
   const [tab,        setTab]        = useState<"all" | "parent" | "child">("all");
@@ -290,19 +376,19 @@ export default function SupportTicketsPage() {
   // Expanded rows
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["TKT-2026-00077"]));
 
-  // ── Counts for tiles ──
+  // ── Counts for tiles (live) ──
   const counts = useMemo(() => ({
-    total:      MOCK_TICKETS.length,
-    open:       MOCK_TICKETS.filter(t => t.status === "Open").length,
-    inProgress: MOCK_TICKETS.filter(t => t.status === "In Progress").length,
-    onHold:     MOCK_TICKETS.filter(t => t.status === "On Hold").length,
-    resolved:   MOCK_TICKETS.filter(t => t.status === "Resolved").length,
-    closed:     MOCK_TICKETS.filter(t => t.status === "Closed").length,
-  }), []);
+    total:      allTickets.length,
+    open:       allTickets.filter(t => t.status === "Open").length,
+    inProgress: allTickets.filter(t => t.status === "In Progress").length,
+    onHold:     allTickets.filter(t => t.status === "On Hold").length,
+    resolved:   allTickets.filter(t => t.status === "Resolved").length,
+    closed:     allTickets.filter(t => t.status === "Closed").length,
+  }), [allTickets]);
 
   // ── Filter + search ──
   const filtered = useMemo(() => {
-    return MOCK_TICKETS.filter(t => {
+    return allTickets.filter(t => {
       if (tab === "parent" && t.type !== "Parent") return false;
       if (tab === "child")  return false; // child tickets live inside parent rows
 
