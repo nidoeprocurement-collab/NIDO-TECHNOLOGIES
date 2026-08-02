@@ -241,7 +241,7 @@ export default function CreateSupportTicketPage() {
               <label className="block text-sm font-medium text-foreground mb-1.5">Department</label>
               <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg bg-muted/30 text-sm text-muted-foreground">
                 <User size={15} className="text-muted-foreground flex-shrink-0" />
-                <span>{accountManager || "Customer Relationship Manager (Auto Assigned)"}</span>
+                <span>Customer Relationship Manager (Auto Assigned)</span>
               </div>
             </div>
 
