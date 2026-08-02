@@ -189,6 +189,7 @@ const UserRolesTab = lazy(
 );
 const IntegrationsPage = lazy(() => import("@/pages/IntegrationsPage"));
 const SupportPage = lazy(() => import("@/pages/SupportPage"));
+const SupportTicketsPage = lazy(() => import("@/pages/SupportTicketsPage"));
 const CreateSupportTicketPage = lazy(() => import("@/pages/CreateSupportTicketPage"));
 const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
 const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
@@ -671,6 +672,7 @@ function AppRoutes() {
           <Route path="my-services" element={<MyRequestsPage />} />
           <Route path="my-services/requests/:requestId" element={<MyRequestDetailPage />} />
           <Route path="support" element={<SupportPage />} />
+          <Route path="support/tickets" element={<SupportTicketsPage />} />
           <Route path="support/create" element={<CreateSupportTicketPage />} />
           <Route
             path="transactions"

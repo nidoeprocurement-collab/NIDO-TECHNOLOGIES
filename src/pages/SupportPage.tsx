@@ -168,7 +168,7 @@ export default function SupportPage() {
                 Create a New Ticket
               </button>
               <button
-                onClick={() => setShowTickets(true)}
+                onClick={() => navigate("/support/tickets")}
                 className="w-full py-2 flex items-center justify-center gap-2 text-sm font-medium text-[#16a34a] dark:text-green-500 hover:underline"
               >
                 <Ticket size={15} />
