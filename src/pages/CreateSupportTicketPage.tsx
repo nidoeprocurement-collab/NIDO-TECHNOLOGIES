@@ -238,10 +238,10 @@ export default function CreateSupportTicketPage() {
           {/* Row 2: Account Manager / Priority */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Account Manager</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Department</label>
               <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg bg-muted/30 text-sm text-muted-foreground">
                 <User size={15} className="text-muted-foreground flex-shrink-0" />
-                <span>{accountManager || "Account Manager (Auto Assigned)"}</span>
+                <span>{accountManager || "Customer Relationship Manager (Auto Assigned)"}</span>
               </div>
             </div>
 
@@ -343,33 +343,6 @@ export default function CreateSupportTicketPage() {
                 <span className={`text-xs ${description.length > 2800 ? "text-red-500" : "text-muted-foreground"}`}>
                   {description.length} / 3000
                 </span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Assignment section ── */}
-          <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Assignment</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">
-                  Department <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={department}
-                    onChange={e => setDepartment(e.target.value)}
-                    className="w-full appearance-none px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring pr-8"
-                  >
-                    {DEPARTMENTS.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                  <ChevronRight size={14} className="absolute right-2.5 top-2.5 text-muted-foreground rotate-90 pointer-events-none" />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Parent ticket will be assigned to the Account Manager of this client automatically.
-                </p>
               </div>
             </div>
           </div>
