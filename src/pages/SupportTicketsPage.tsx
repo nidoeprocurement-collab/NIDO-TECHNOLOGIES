@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { Fragment } from "react";
 import {
   Headphones, Plus, Search, RotateCcw, Download,
   ChevronLeft, ChevronRight, ChevronDown, MoreVertical,
@@ -530,8 +531,8 @@ export default function SupportTicketsPage() {
                     const isExpanded = expanded.has(ticket.id);
                     const hasChildren = ticket.children.length > 0;
                     return (
-                      <>
-                        <tr key={ticket.id} className="border-b border-border hover:bg-muted/20 transition-colors">
+                      <Fragment key={ticket.id}>
+                        <tr className="border-b border-border hover:bg-muted/20 transition-colors">
                           {/* Expand toggle */}
                           <td className="px-3 py-3 text-center">
                             {hasChildren ? (
@@ -633,7 +634,7 @@ export default function SupportTicketsPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>

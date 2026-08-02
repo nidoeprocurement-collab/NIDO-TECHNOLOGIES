@@ -4,10 +4,12 @@ import { toast } from "sonner";
 import {
   Home, ChevronRight, Headphones, User, Bold, Italic,
   Underline, List, ListOrdered, Link2, Upload, X, Send,
+  CheckCircle, Copy, Eye, AlignJustify, Tag, Layers,
+  Building2, Shield, Calendar, Info,
 } from "lucide-react";
 import { getClients, StoredClient } from "@/lib/clientStore";
-import { getPrefix } from "@/lib/configService";
 import { saveSupportTickets } from "@/lib/supportTicketStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Static data ────────────────────────────────────────────────────────────────
 
@@ -20,18 +22,21 @@ const TICKET_CATEGORIES: Record<string, string[]> = {
   "Other":               ["Other"],
 };
 
-const DEPARTMENTS = ["IT Support", "Finance", "Operations", "Customer Success", "Management"];
-
 const PRIORITY_OPTIONS = [
-  { value: "low",      label: "Low",      color: "bg-green-100 text-green-700"  },
-  { value: "medium",   label: "Medium",   color: "bg-amber-100 text-amber-700"  },
-  { value: "high",     label: "High",     color: "bg-orange-100 text-orange-700"},
-  { value: "critical", label: "Critical", color: "bg-red-100 text-red-700"      },
+  { value: "low",      label: "Low",      color: "bg-green-100 text-green-700",  dot: "bg-green-500"  },
+  { value: "medium",   label: "Medium",   color: "bg-amber-100 text-amber-700",  dot: "bg-amber-500"  },
+  { value: "high",     label: "High",     color: "bg-orange-100 text-orange-700",dot: "bg-orange-500" },
+  { value: "critical", label: "Critical", color: "bg-red-100 text-red-700",      dot: "bg-red-500"    },
 ];
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Ticket number helpers ──────────────────────────────────────────────────────
 
-function getExistingTickets(): { id: string; number: string; subject: string; status: string; priority: string; created: string }[] {
+function getExistingTickets(): {
+  id: string; number: string; subject: string; status: string;
+  priority: string; created: string; clientId?: string; clientName?: string;
+  category?: string; subCategory?: string; department?: string;
+  description?: string; ccEmail?: string; createdBy?: string;
+}[] {
   try {
     const raw = localStorage.getItem("nido_support_tickets_v1");
     if (raw) return JSON.parse(raw);
@@ -39,49 +44,237 @@ function getExistingTickets(): { id: string; number: string; subject: string; st
   return [];
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+function generateTicketNumber(): string {
+  const year = new Date().getFullYear();
+  const prefix = `TKT-${year}-`;
+  const existing = getExistingTickets();
+  let maxSerial = 0;
+  for (const t of existing) {
+    if (t.number && t.number.startsWith(prefix)) {
+      const serial = parseInt(t.number.slice(prefix.length), 10);
+      if (!isNaN(serial) && serial > maxSerial) maxSerial = serial;
+    }
+  }
+  return `${prefix}${String(maxSerial + 1).padStart(6, "0")}`;
+}
+
+// ── Confetti dots (decorative, static) ────────────────────────────────────────
+
+const CONFETTI = [
+  { x: "38%",  y: "4%",  size: 8,  color: "#f97316" },
+  { x: "60%",  y: "3%",  size: 6,  color: "#3b82f6" },
+  { x: "70%",  y: "8%",  size: 5,  color: "#22c55e" },
+  { x: "32%",  y: "10%", size: 7,  color: "#eab308" },
+  { x: "25%",  y: "5%",  size: 5,  color: "#ef4444" },
+  { x: "65%",  y: "15%", size: 4,  color: "#a855f7" },
+  { x: "72%",  y: "4%",  size: 6,  color: "#f97316" },
+  { x: "28%",  y: "16%", size: 4,  color: "#3b82f6" },
+  { x: "76%",  y: "12%", size: 5,  color: "#22c55e" },
+  { x: "34%",  y: "18%", size: 3,  color: "#eab308" },
+];
+
+// ── Success screen ─────────────────────────────────────────────────────────────
+
+interface CreatedTicket {
+  number: string;
+  clientName: string;
+  category: string;
+  subCategory: string;
+  subject: string;
+  department: string;
+  priority: string;
+  status: string;
+  createdOn: string;
+  createdBy: string;
+}
+
+function SuccessScreen({ ticket }: { ticket: CreatedTicket }) {
+  const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(ticket.number).catch(() => {
+      const el = document.createElement("textarea");
+      el.value = ticket.number;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const priorityOpt = PRIORITY_OPTIONS.find(p => p.value === ticket.priority);
+  const priorityLabel = priorityOpt?.label || ticket.priority;
+  const priorityDot   = priorityOpt?.dot   || "bg-gray-400";
+
+  const summaryItems = [
+    { icon: <User size={16} className="text-primary" />,       label: "Client",       value: ticket.clientName, isLink: true },
+    { icon: <Tag size={16} className="text-primary" />,        label: "Sub Category", value: ticket.subCategory },
+    { icon: <AlignJustify size={16} className="text-primary" />,label: "Subject",     value: ticket.subject },
+    { icon: <Layers size={16} className="text-primary" />,     label: "Category",     value: ticket.category },
+    { icon: <Building2 size={16} className="text-primary" />,  label: "Department",   value: ticket.department },
+    { icon: <Shield size={16} className="text-primary" />,     label: "Status",       isStatus: true },
+    { icon: <CheckCircle size={16} className="text-primary" />,label: "Priority",     isPriority: true },
+    { icon: <Calendar size={16} className="text-primary" />,   label: "Created On",   value: ticket.createdOn },
+    { icon: <User size={16} className="text-primary" />,       label: "Created By",   value: ticket.createdBy },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Breadcrumb */}
+      <div className="border-b border-border bg-background">
+        <div className="px-4 md:px-6 py-3">
+          <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link to="/" className="hover:text-foreground flex items-center"><Home size={13} /></Link>
+            <ChevronRight size={11} />
+            <Link to="/support" className="hover:text-foreground">Support</Link>
+            <ChevronRight size={11} />
+            <button onClick={() => navigate("/support/tickets")} className="hover:text-foreground">Tickets</button>
+            <ChevronRight size={11} />
+            <span className="text-primary font-medium">Create Ticket</span>
+          </nav>
+        </div>
+      </div>
+
+      <div className="max-w-2xl mx-auto px-4 py-10 space-y-6">
+
+        {/* ── Hero success block ── */}
+        <div className="relative text-center py-8">
+          {/* Confetti dots */}
+          {CONFETTI.map((c, i) => (
+            <span
+              key={i}
+              className="absolute rounded-full"
+              style={{ left: c.x, top: c.y, width: c.size, height: c.size, background: c.color }}
+            />
+          ))}
+
+          {/* Green circle */}
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500 shadow-lg mb-5">
+            <CheckCircle size={40} className="text-white" strokeWidth={2.5} />
+          </div>
+
+          <h1 className="text-2xl font-bold text-foreground mb-2">Ticket Created Successfully!</h1>
+          <p className="text-sm text-muted-foreground">
+            Your support ticket has been created and assigned to the appropriate team.
+          </p>
+        </div>
+
+        {/* ── Ticket number box ── */}
+        <div className="rounded-xl border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 px-5 py-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-0.5">Ticket Number</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400 tracking-wide">{ticket.number}</p>
+          </div>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors flex-shrink-0"
+          >
+            <Copy size={15} />
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+
+        {/* ── Ticket summary card ── */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-sm font-bold text-foreground mb-4">Ticket Summary</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-5 gap-x-4">
+            {summaryItems.map(item => (
+              <div key={item.label} className="flex items-start gap-2.5">
+                <div className="mt-0.5 flex-shrink-0">{item.icon}</div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">{item.label}</p>
+                  {item.isLink ? (
+                    <p className="text-sm font-semibold text-primary">{item.value}</p>
+                  ) : item.isStatus ? (
+                    <span className="inline-flex px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-semibold">
+                      Open
+                    </span>
+                  ) : item.isPriority ? (
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <span className={`w-2.5 h-2.5 rounded-full ${priorityDot}`} />
+                      {priorityLabel}
+                    </span>
+                  ) : (
+                    <p className="text-sm font-medium text-foreground">{item.value}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Email notification banner ── */}
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+          <Info size={16} className="text-blue-500 flex-shrink-0" />
+          <p className="text-sm text-blue-700 dark:text-blue-400">
+            You will receive email notifications for updates on this ticket.
+          </p>
+        </div>
+
+        {/* ── Action buttons ── */}
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => navigate(`/support/track/${ticket.number}`)}
+            className="flex items-center gap-2 px-6 py-2.5 border border-border rounded-lg text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <Eye size={16} />
+            View Ticket
+          </button>
+          <button
+            onClick={() => navigate("/support/tickets")}
+            className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold transition-colors"
+          >
+            <AlignJustify size={16} />
+            Go to Ticket List
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Main form component ────────────────────────────────────────────────────────
 
 export default function CreateSupportTicketPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const clients: StoredClient[] = getClients();
 
   // Form state
-  const [clientId,     setClientId]     = useState("");
-  const [category,     setCategory]     = useState("");
-  const [subCategory,  setSubCategory]  = useState("");
-  const [priority,     setPriority]     = useState("medium");
-  const [subject,      setSubject]      = useState("");
-  const [description,  setDescription]  = useState("");
-  const [department,   setDepartment]   = useState("IT Support");
-  const [ccEmail,      setCcEmail]      = useState("");
-  const [files,        setFiles]        = useState<File[]>([]);
-  const [dragging,     setDragging]     = useState(false);
+  const [clientId,    setClientId]    = useState("");
+  const [category,    setCategory]    = useState("");
+  const [subCategory, setSubCategory] = useState("");
+  const [priority,    setPriority]    = useState("medium");
+  const [subject,     setSubject]     = useState("");
+  const [description, setDescription] = useState("");
+  const [ccEmail,     setCcEmail]     = useState("");
+  const [files,       setFiles]       = useState<File[]>([]);
+  const [dragging,    setDragging]    = useState(false);
+
+  // Success state
+  const [createdTicket, setCreatedTicket] = useState<CreatedTicket | null>(null);
 
   const descRef   = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  // Auto-fill account manager from selected client
   const selectedClient = clients.find(c => c.id === clientId);
-  const accountManager = selectedClient?.rep || "";
 
-  // Sub-category options driven by category
   const subCategories = category ? (TICKET_CATEGORIES[category] ?? []) : [];
-
-  // Reset sub-category when category changes
   useEffect(() => { setSubCategory(""); }, [category]);
 
-  // Sync description char count from contenteditable
   const handleDescInput = () => {
     if (descRef.current) setDescription(descRef.current.innerText);
   };
 
-  // Rich-text formatting commands
   const execFormat = (cmd: string, value?: string) => {
     document.execCommand(cmd, false, value);
     descRef.current?.focus();
   };
 
-  // Drag & drop
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
@@ -100,42 +293,65 @@ export default function CreateSupportTicketPage() {
 
   const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx));
 
-  // Submit
   const handleSubmit = () => {
-    if (!clientId)   { toast.error("Please select a client"); return; }
-    if (!category)   { toast.error("Please select a category"); return; }
-    if (!subCategory){ toast.error("Please select a sub category"); return; }
-    if (!subject.trim()){ toast.error("Please enter a subject"); return; }
+    if (!clientId)       { toast.error("Please select a client"); return; }
+    if (!category)       { toast.error("Please select a category"); return; }
+    if (!subCategory)    { toast.error("Please select a sub category"); return; }
+    if (!subject.trim()) { toast.error("Please enter a subject"); return; }
     const desc = descRef.current?.innerText?.trim() || "";
-    if (!desc)       { toast.error("Please enter a description"); return; }
+    if (!desc)           { toast.error("Please enter a description"); return; }
 
-    const existing = getExistingTickets();
-    const prefix   = getPrefix("supportTicket") || "TKT-";
-    const newNum   = `${prefix}${String(existing.length + 1).padStart(3, "0")}`;
+    const ticketNumber = generateTicketNumber();
+    const now          = new Date();
+    const createdOn    = now.toLocaleString("en-IN", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit", hour12: true,
+    });
+    const createdBy = user?.name || "System Admin";
 
     const ticket = {
       id:          `tkt_${Date.now()}`,
-      number:      newNum,
+      number:      ticketNumber,
       subject:     subject.trim(),
       status:      "open",
       priority,
-      created:     new Date().toISOString().split("T")[0],
+      created:     now.toISOString().split("T")[0],
       clientId,
       clientName:  selectedClient?.name || "",
       category,
       subCategory,
       description: desc,
-      department,
+      department:  "Customer Relationship Manager",
       ccEmail,
-      accountManager,
+      createdBy,
     };
 
-    const updated = [...existing, ticket];
+    const existing = getExistingTickets();
+    const updated  = [...existing, ticket];
     localStorage.setItem("nido_support_tickets_v1", JSON.stringify(updated));
-    saveSupportTickets(updated);
-    toast.success("Support ticket created successfully");
-    navigate("/support");
+    saveSupportTickets(updated.map(t => ({
+      id: t.id, number: t.number, subject: t.subject,
+      status: t.status, priority: t.priority, created: t.created,
+    })));
+
+    setCreatedTicket({
+      number:      ticketNumber,
+      clientName:  selectedClient?.name || "",
+      category,
+      subCategory,
+      subject:     subject.trim(),
+      department:  "Customer Relationship Manager (Auto Assigned)",
+      priority,
+      status:      "open",
+      createdOn,
+      createdBy,
+    });
   };
+
+  // ── Show success screen if ticket was just created ──
+  if (createdTicket) {
+    return <SuccessScreen ticket={createdTicket} />;
+  }
 
   const priorityStyle = PRIORITY_OPTIONS.find(p => p.value === priority)?.color || "";
 
@@ -144,7 +360,6 @@ export default function CreateSupportTicketPage() {
       {/* ── Page header ── */}
       <div className="bg-transparent border-b border-border">
         <div className="w-full px-4 md:px-6 py-3">
-          {/* Breadcrumb */}
           <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
             <Link to="/" className="hover:text-foreground flex items-center">
               <Home size={13} />
@@ -152,12 +367,11 @@ export default function CreateSupportTicketPage() {
             <ChevronRight size={11} />
             <Link to="/support" className="hover:text-foreground">Support</Link>
             <ChevronRight size={11} />
-            <button onClick={() => navigate("/support")} className="hover:text-foreground">Tickets</button>
+            <button onClick={() => navigate("/support/tickets")} className="hover:text-foreground">Tickets</button>
             <ChevronRight size={11} />
             <span className="text-primary font-medium">Create Ticket</span>
           </nav>
 
-          {/* Title */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
               <Headphones size={18} className="text-primary" />
@@ -235,7 +449,7 @@ export default function CreateSupportTicketPage() {
             </div>
           </div>
 
-          {/* Row 2: Account Manager / Priority */}
+          {/* Row 2: Department (static) / Priority */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Department</label>
@@ -284,7 +498,6 @@ export default function CreateSupportTicketPage() {
               Description <span className="text-red-500">*</span>
             </label>
             <div className="border border-border rounded-lg overflow-hidden">
-              {/* Toolbar */}
               <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border bg-muted/20">
                 <select
                   onChange={e => execFormat("formatBlock", e.target.value)}
@@ -328,7 +541,6 @@ export default function CreateSupportTicketPage() {
                 </button>
               </div>
 
-              {/* Editable area */}
               <div
                 ref={descRef}
                 contentEditable
@@ -338,7 +550,6 @@ export default function CreateSupportTicketPage() {
                 className="min-h-[140px] px-4 py-3 text-sm text-foreground focus:outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground"
               />
 
-              {/* Char count */}
               <div className="px-4 py-1.5 border-t border-border bg-muted/10 text-right">
                 <span className={`text-xs ${description.length > 2800 ? "text-red-500" : "text-muted-foreground"}`}>
                   {description.length} / 3000
@@ -364,7 +575,6 @@ export default function CreateSupportTicketPage() {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Attachments (Optional)</label>
 
-            {/* Attached files list */}
             {files.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-2">
                 {files.map((f, i) => (
@@ -378,7 +588,6 @@ export default function CreateSupportTicketPage() {
               </div>
             )}
 
-            {/* Drop zone */}
             <div
               onDragOver={e => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
