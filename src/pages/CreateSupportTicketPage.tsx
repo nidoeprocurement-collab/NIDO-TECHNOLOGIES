@@ -217,7 +217,7 @@ function SuccessScreen({ ticket }: { ticket: CreatedTicket }) {
         {/* ── Action buttons ── */}
         <div className="flex items-center justify-center gap-4">
           <button
-            onClick={() => navigate(`/support/track/${ticket.number}`)}
+            onClick={() => navigate(`/support/ticket/${ticket.number}`)}
             className="flex items-center gap-2 px-6 py-2.5 border border-border rounded-lg text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
           >
             <Eye size={16} />
