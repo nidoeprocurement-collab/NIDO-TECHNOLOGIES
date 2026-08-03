@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { getCustomReports, deleteCustomReport, moduleToCategoryLabel, scheduleLabel as buildScheduleLabel, type CustomReport } from "@/lib/reportStore";
 import { getClients } from "@/lib/clientStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getUsers } from "@/lib/nidoUsersStore";
@@ -710,8 +712,31 @@ function CreateReportModal({ onClose }: { onClose: () => void }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 
+/** Convert a stored CustomReport to the ReportRow shape used by the table */
+function customToRow(r: CustomReport): ReportRow {
+  const catLabel = moduleToCategoryLabel(r.module);
+  const cat: Exclude<ReportCategory, "All"> =
+    catLabel === "All Modules" ? "Orders" : (catLabel as Exclude<ReportCategory, "All">);
+  const fmt: ReportFormat =
+    r.format === "CSV" ? "CSV" : r.format === "PDF" ? "PDF" : "Excel";
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description || r.reportType,
+    category: cat,
+    createdBy: r.createdBy,
+    scheduleLabel: buildScheduleLabel(r.frequency, r.time),
+    scheduleIcon: r.frequency === "Monthly" || r.frequency === "Quarterly" ? "calendar" : "recurring",
+    lastRunDate: r.lastRunDate ?? r.createdAt.split(" ")[0],
+    lastRunTime: r.time,
+    lastRunStatus: r.lastRunStatus ?? "Pending",
+    format: fmt,
+  };
+}
+
 export default function ReportsPage() {
   usePageMeta({ title: "Reports" });
+  const navigate = useNavigate();
 
   // Live counts from stores
   const clients = getClients();
@@ -721,6 +746,15 @@ export default function ReportsPage() {
   const orders = getOrders();
   const tickets = getSupportTickets();
   const serviceReqs = getServiceRequests();
+
+  // Custom reports from store (re-read on every render so additions appear immediately)
+  const [customReports, setCustomReports] = useState<ReportRow[]>(() =>
+    getCustomReports().map(customToRow)
+  );
+
+  const refreshCustom = () => setCustomReports(getCustomReports().map(customToRow));
+
+  const allReports = useMemo(() => [...customReports, ...REPORTS], [customReports]);
 
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
