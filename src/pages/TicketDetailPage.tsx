@@ -510,7 +510,6 @@ export default function TicketDetailPage() {
 
   // ── Local state ──
   const [activeTab,     setActiveTab]     = useState<"conversation"|"details"|"children"|"attachments"|"activity">("conversation");
-  const [replyTab,      setReplyTab]      = useState<"public"|"internal">("public");
   const [replyText,     setReplyText]     = useState("");
   const [conversation,  setConversation]  = useState<ConversationEntry[]>(ticketData?.conversation ?? []);
   const [statusLocal,   setStatusLocal]   = useState(ticketData?.status   ?? "Open");
@@ -556,9 +555,9 @@ export default function TicketDetailPage() {
       + ", " + now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
     const entry: ConversationEntry = {
       id: `reply_${Date.now()}`,
-      kind: replyTab === "internal" ? "internal_note" : "message",
+      kind: "message",
       author: user?.name || "You",
-      role: replyTab === "internal" ? "Internal Note" : "Customer Relationship Manager",
+      role: "Customer Relationship Manager",
       time,
       text,
     };
@@ -851,14 +850,11 @@ export default function TicketDetailPage() {
             <div className="border-t border-border bg-background px-4 md:px-6 py-4 flex-shrink-0">
               {/* Reply type tabs */}
               <div className="flex gap-0 mb-3 border-b border-border">
-                {(["public", "internal"] as const).map(rt => (
-                  <button key={rt} onClick={() => setReplyTab(rt)}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                      replyTab === rt ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}>
-                    {rt === "public" ? "Public Reply" : "Internal Note"}
-                  </button>
-                ))}
+                <button
+                  className="px-4 py-2 text-sm font-medium border-b-2 border-primary text-primary"
+                >
+                  External Reply
+                </button>
               </div>
 
               <textarea
@@ -868,7 +864,7 @@ export default function TicketDetailPage() {
                 placeholder="Type your message..."
                 rows={3}
                 className={`w-full px-3 py-2.5 text-sm border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none mb-3 ${
-                  replyTab === "internal" ? "bg-amber-50/50 dark:bg-amber-950/10 border-amber-300 dark:border-amber-800" : ""
+                  ""
                 }`}
               />
 
