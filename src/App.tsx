@@ -192,6 +192,8 @@ const SupportPage = lazy(() => import("@/pages/SupportPage"));
 const SupportTicketsPage = lazy(() => import("@/pages/SupportTicketsPage"));
 const CreateSupportTicketPage = lazy(() => import("@/pages/CreateSupportTicketPage"));
 const TicketDetailPage = lazy(() => import("@/pages/TicketDetailPage"));
+const CreateChildTicketPage = lazy(() => import("@/pages/CreateChildTicketPage"));
+const ChildTicketDetailPage = lazy(() => import("@/pages/ChildTicketDetailPage"));
 const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
 const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
@@ -676,6 +678,8 @@ function AppRoutes() {
           <Route path="support/tickets" element={<SupportTicketsPage />} />
           <Route path="support/create" element={<CreateSupportTicketPage />} />
           <Route path="support/ticket/:ticketId" element={<TicketDetailPage />} />
+          <Route path="support/create-child-ticket/:parentNumber" element={<CreateChildTicketPage />} />
+          <Route path="support/child-ticket/:childTicketId" element={<ChildTicketDetailPage />} />
           <Route
             path="transactions"
             element={<Navigate to="/sales/quotes" replace />}

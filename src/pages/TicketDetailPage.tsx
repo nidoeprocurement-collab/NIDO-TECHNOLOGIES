@@ -681,7 +681,7 @@ export default function TicketDetailPage() {
 
                         {/* 1. Create Child Ticket */}
                         <button
-                          onClick={() => { setShowMoreMenu(false); setShowStatusSub(false); navigate(`/support/create-ticket?parent=${ticketData?.number}`); }}
+                          onClick={() => { setShowMoreMenu(false); setShowStatusSub(false); navigate(`/support/create-child-ticket/${ticketData?.number}`); }}
                           className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
                         >
                           Create Child Ticket

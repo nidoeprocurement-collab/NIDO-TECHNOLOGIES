@@ -84,13 +84,60 @@ function mapStoredToTicket(raw: {
   };
 }
 
+function loadRealChildTickets(): ChildTicket[] {
+  try {
+    const raw = localStorage.getItem("nido_child_tickets_v1");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as {
+      number: string; parentNumber: string; subject: string;
+      department: string; priority: string; status: string; created: string;
+    }[];
+    const statusMap: Record<string, ChildTicket["status"]> = {
+      open: "Open", in_progress: "In Progress", on_hold: "On Hold",
+      resolved: "Resolved", closed: "Closed",
+    };
+    const priMap: Record<string, ChildTicket["priority"]> = {
+      low: "Low", medium: "Medium", high: "High", critical: "High",
+    };
+    return parsed.map(c => {
+      const priority = priMap[c.priority] ?? "Medium";
+      const status   = statusMap[c.status]   ?? "Open";
+      const isDone   = status === "Resolved" || status === "Closed";
+      const slaHours = priority === "High" ? 12 : priority === "Medium" ? 24 : 48;
+      const elapsed  = Math.floor((Date.now() - new Date(c.created).getTime()) / 60000);
+      const slaMinutesLeft = isDone ? null : Math.max(0, slaHours * 60 - elapsed);
+      const d = new Date(c.created);
+      return {
+        id: c.number,
+        subject: c.subject,
+        department: c.department,
+        priority,
+        status,
+        slaMinutesLeft,
+        slaTargetLabel: `${slaHours}h`,
+        lastUpdated: d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+          + ", " + d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
+        parentNumber: c.parentNumber,
+      } as ChildTicket & { parentNumber: string };
+    });
+  } catch {
+    return [];
+  }
+}
+
 function loadRealTickets(): Ticket[] {
   try {
     const raw = localStorage.getItem("nido_support_tickets_v1");
     if (!raw) return [];
     const parsed = JSON.parse(raw) as Parameters<typeof mapStoredToTicket>[0][];
-    // newest first
-    return [...parsed].reverse().map(mapStoredToTicket);
+    const tickets = [...parsed].reverse().map(mapStoredToTicket);
+    // Attach real child tickets to their parents
+    const realChildren = loadRealChildTickets() as (ChildTicket & { parentNumber: string })[];
+    for (const ticket of tickets) {
+      const mine = realChildren.filter(c => c.parentNumber === ticket.id);
+      if (mine.length > 0) ticket.children = mine;
+    }
+    return tickets;
   } catch {
     return [];
   }
@@ -343,11 +390,15 @@ export default function SupportTicketsPage() {
     return [...realTickets, ...MOCK_TICKETS.filter(t => !realIds.has(t.id))];
   }, [realTickets]);
 
-  // Reload whenever a ticket is saved from another page
+  // Reload whenever a ticket or child ticket is saved from another page
   useEffect(() => {
     const handler = () => setRealTickets(loadRealTickets());
     window.addEventListener("supportTicketsUpdated", handler);
-    return () => window.removeEventListener("supportTicketsUpdated", handler);
+    window.addEventListener("childTicketsUpdated", handler);
+    return () => {
+      window.removeEventListener("supportTicketsUpdated", handler);
+      window.removeEventListener("childTicketsUpdated", handler);
+    };
   }, []);
 
   // Dynamic filter dropdown options
@@ -712,7 +763,7 @@ export default function SupportTicketsPage() {
                                         <td className="px-4 py-2.5 text-xs text-muted-foreground">{child.lastUpdated}</td>
                                         <td className="px-4 py-2.5">
                                           <button
-                                            onClick={() => navigate(`/support/track/${child.id}`)}
+                                            onClick={() => navigate(`/support/child-ticket/${child.id}`)}
                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                                           >
                                             <Eye size={12} />
