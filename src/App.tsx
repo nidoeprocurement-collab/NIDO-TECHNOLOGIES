@@ -157,6 +157,7 @@ const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
 const VendorOrderDetailPage = lazy(() => import("@/pages/VendorOrderDetailPage"));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
 const AuditTrailPage = lazy(() => import("@/pages/AuditTrailPage"));
+const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
 const OrderStatusesPage = lazy(() => import("@/pages/OrderStatusesPage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const ApprovalWorkflowsPage = lazy(
@@ -953,7 +954,7 @@ function AppRoutes() {
           <Route path="credit-notes" element={<CreditNotesPage />} />
           <Route path="eway-bills" element={<EWayBillsPage />} />
           <Route path="invoices" element={<InvoicePage />} />
-          <Route path="reports" element={<AuditTrailPage />} />
+          <Route path="reports" element={<ReportsPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
           {/* Dashboard: reuses ClientDetailPage in portal mode — single source of truth */}
