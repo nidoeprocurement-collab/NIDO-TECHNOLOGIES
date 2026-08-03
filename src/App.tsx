@@ -159,6 +159,17 @@ const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
 const AuditTrailPage = lazy(() => import("@/pages/AuditTrailPage"));
 const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
 const CreateReportPage = lazy(() => import("@/pages/CreateReportPage"));
+const ExecutiveDashboardPage = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
+const SalesReportPage = lazy(() => import("@/pages/reports/SalesReportPage"));
+const ProcurementReportPage = lazy(() => import("@/pages/reports/ProcurementReportPage"));
+const VendorPerformancePage = lazy(() => import("@/pages/reports/VendorPerformancePage"));
+const ClientReportPage = lazy(() => import("@/pages/reports/ClientReportPage"));
+const InventoryReportPage = lazy(() => import("@/pages/reports/InventoryReportPage"));
+const FinanceReportPage = lazy(() => import("@/pages/reports/FinanceReportPage"));
+const SupportReportPage = lazy(() => import("@/pages/reports/SupportReportPage"));
+const SlaReportPage = lazy(() => import("@/pages/reports/SlaReportPage"));
+const ApprovalReportPage = lazy(() => import("@/pages/reports/ApprovalReportPage"));
+const TaxReportPage = lazy(() => import("@/pages/reports/TaxReportPage"));
 const OrderStatusesPage = lazy(() => import("@/pages/OrderStatusesPage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const ApprovalWorkflowsPage = lazy(
@@ -957,6 +968,17 @@ function AppRoutes() {
           <Route path="invoices" element={<InvoicePage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="reports/create" element={<CreateReportPage />} />
+          <Route path="reports/executive" element={<ExecutiveDashboardPage />} />
+          <Route path="reports/sales" element={<SalesReportPage />} />
+          <Route path="reports/procurement" element={<ProcurementReportPage />} />
+          <Route path="reports/vendors" element={<VendorPerformancePage />} />
+          <Route path="reports/clients" element={<ClientReportPage />} />
+          <Route path="reports/inventory" element={<InventoryReportPage />} />
+          <Route path="reports/finance" element={<FinanceReportPage />} />
+          <Route path="reports/support" element={<SupportReportPage />} />
+          <Route path="reports/sla" element={<SlaReportPage />} />
+          <Route path="reports/approvals" element={<ApprovalReportPage />} />
+          <Route path="reports/tax" element={<TaxReportPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
           {/* Dashboard: reuses ClientDetailPage in portal mode — single source of truth */}
