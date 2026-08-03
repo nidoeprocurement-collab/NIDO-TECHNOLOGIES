@@ -515,6 +515,7 @@ export default function TicketDetailPage() {
   const [statusLocal,   setStatusLocal]   = useState(ticketData?.status   ?? "Open");
   const [priorityLocal, setPriorityLocal] = useState(ticketData?.priority ?? "Medium");
   const [showMoreMenu,  setShowMoreMenu]  = useState(false);
+  const [showStatusSub, setShowStatusSub] = useState(false);
   const replyRef = useRef<HTMLTextAreaElement>(null);
 
   // Keep conversation in sync if ticketData changes (e.g. navigation)
@@ -675,26 +676,50 @@ export default function TicketDetailPage() {
                   </button>
                   {showMoreMenu && (
                     <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowMoreMenu(false)} />
+                      <div className="fixed inset-0 z-10" onClick={() => { setShowMoreMenu(false); setShowStatusSub(false); }} />
                       <div className="absolute right-0 top-9 z-20 w-52 bg-card border border-border rounded-xl shadow-lg py-1">
-                        <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground">Change Status</p>
-                        {STATUSES.map(s => (
-                          <button key={s} onClick={() => changeStatus(s)}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-muted/60 transition-colors ${statusLocal === s ? "text-primary font-semibold" : "text-foreground"}`}>
-                            {s}
-                          </button>
-                        ))}
+
+                        {/* 1. Create Child Ticket */}
+                        <button
+                          onClick={() => { setShowMoreMenu(false); setShowStatusSub(false); navigate(`/support/create-ticket?parent=${ticketData?.number}`); }}
+                          className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
+                        >
+                          Create Child Ticket
+                        </button>
+
                         <div className="border-t border-border my-1" />
-                        <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground">Change Priority</p>
-                        {PRIORITIES.map(p => (
-                          <button key={p} onClick={() => { setPriorityLocal(p); setShowMoreMenu(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-muted/60 transition-colors ${priorityLocal === p ? "text-primary font-semibold" : "text-foreground"}`}>
-                            {p}
+
+                        {/* 2. Change Status (with submenu) */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowStatusSub(p => !p)}
+                            className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors flex items-center justify-between"
+                          >
+                            Change Status
+                            <ChevronRight size={14} className={`transition-transform ${showStatusSub ? "rotate-90" : ""}`} />
                           </button>
-                        ))}
+                          {showStatusSub && (
+                            <div className="bg-muted/40 border-t border-border">
+                              {STATUSES.map(s => (
+                                <button key={s} onClick={() => { changeStatus(s); setShowStatusSub(false); }}
+                                  className={`w-full text-left px-6 py-2 text-sm hover:bg-muted/60 transition-colors ${statusLocal === s ? "text-primary font-semibold" : "text-foreground"}`}>
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
                         <div className="border-t border-border my-1" />
-                        <button onClick={() => setShowMoreMenu(false)}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-muted/60">Close Ticket</button>
+
+                        {/* 3. Close Ticket */}
+                        <button
+                          onClick={() => { changeStatus("Closed"); setShowMoreMenu(false); setShowStatusSub(false); }}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-muted/60 transition-colors"
+                        >
+                          Close Ticket
+                        </button>
+
                       </div>
                     </>
                   )}
