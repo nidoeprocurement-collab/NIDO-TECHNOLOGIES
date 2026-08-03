@@ -11,12 +11,15 @@ import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
 import { Button } from "@/components/ui/button";
 import {
+  LayoutDashboard,
+  TrendingUp,
   Users,
   Building2,
   UserCog,
   Package,
   ShoppingCart,
   HeadphonesIcon,
+  DollarSign,
   Settings2,
   Search,
   Filter,
@@ -29,6 +32,9 @@ import {
   FileSpreadsheet,
   FileText,
   CheckCircle2,
+  CheckSquare,
+  Receipt,
+  FileSearch,
   Database,
   Columns3,
   SlidersHorizontal,
@@ -36,6 +42,7 @@ import {
   Play,
   Pencil,
   Plus,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -789,6 +796,21 @@ export default function ReportsPage() {
     { icon: <Play className="w-4 h-4 text-blue-500" />, step: "5. Run Report", desc: "Run now or save and schedule" },
   ];
 
+  const BI_MODULES = [
+    { label: "Executive Dashboard", desc: "Revenue, profit, KPIs & growth", icon: <LayoutDashboard className="w-5 h-5" />, path: "/reports/executive", color: "bg-blue-50 text-blue-600", border: "hover:border-blue-300" },
+    { label: "Sales Reports", desc: "Quotes, orders, invoices & revenue", icon: <TrendingUp className="w-5 h-5" />, path: "/reports/sales", color: "bg-emerald-50 text-emerald-600", border: "hover:border-emerald-300" },
+    { label: "Procurement", desc: "POs, spend & approval cycles", icon: <ShoppingCart className="w-5 h-5" />, path: "/reports/procurement", color: "bg-purple-50 text-purple-600", border: "hover:border-purple-300" },
+    { label: "Vendor Performance", desc: "Ratings, spend & delivery metrics", icon: <Building2 className="w-5 h-5" />, path: "/reports/vendors", color: "bg-indigo-50 text-indigo-600", border: "hover:border-indigo-300" },
+    { label: "Client Reports", desc: "Revenue, contracts & activity", icon: <Users className="w-5 h-5" />, path: "/reports/clients", color: "bg-teal-50 text-teal-600", border: "hover:border-teal-300" },
+    { label: "Inventory Reports", desc: "Stock levels, movements & alerts", icon: <Package className="w-5 h-5" />, path: "/reports/inventory", color: "bg-orange-50 text-orange-600", border: "hover:border-orange-300" },
+    { label: "Finance Reports", desc: "P&L, cash flow & receivables", icon: <DollarSign className="w-5 h-5" />, path: "/reports/finance", color: "bg-green-50 text-green-600", border: "hover:border-green-300" },
+    { label: "Support Reports", desc: "Tickets, resolution & SLA", icon: <HeadphonesIcon className="w-5 h-5" />, path: "/reports/support", color: "bg-rose-50 text-rose-600", border: "hover:border-rose-300" },
+    { label: "SLA Reports", desc: "Compliance, breaches & trends", icon: <Clock className="w-5 h-5" />, path: "/reports/sla", color: "bg-cyan-50 text-cyan-600", border: "hover:border-cyan-300" },
+    { label: "Approval Reports", desc: "Pending, approved & rejected", icon: <CheckSquare className="w-5 h-5" />, path: "/reports/approvals", color: "bg-amber-50 text-amber-600", border: "hover:border-amber-300" },
+    { label: "Tax Reports", desc: "GST, CGST, SGST & ITC summary", icon: <Receipt className="w-5 h-5" />, path: "/reports/tax", color: "bg-pink-50 text-pink-600", border: "hover:border-pink-300" },
+    { label: "Audit Reports", desc: "User activity & system logs", icon: <FileSearch className="w-5 h-5" />, path: "/reports/audit", color: "bg-gray-100 text-gray-600", border: "hover:border-gray-400" },
+  ];
+
   return (
     <div className="space-y-5">
       {showCreateModal && <CreateReportModal onClose={() => setShowCreateModal(false)} />}
@@ -796,15 +818,48 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Master report data for the entire platform.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Reports & Business Intelligence</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Analyze procurement, sales, finance, vendor performance, inventory, SLA and operational insights.</p>
         </div>
         <Button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => navigate("/reports/create")}
           className="bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" /> Create Report
         </Button>
+      </div>
+
+      {/* ── BI Analytics Modules ──────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Business Intelligence Dashboard</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Click any module to open its full analytics report</p>
+          </div>
+          <button
+            onClick={() => navigate("/reports/executive")}
+            className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+          >
+            Open Executive Dashboard <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 p-4">
+          {BI_MODULES.map((m) => (
+            <button
+              key={m.path}
+              onClick={() => navigate(m.path)}
+              className={`flex flex-col items-start gap-2.5 p-4 rounded-xl border border-gray-100 ${m.border} hover:shadow-md transition-all text-left group`}
+            >
+              <div className={`w-9 h-9 rounded-lg ${m.color} flex items-center justify-center shrink-0`}>
+                {m.icon}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-800 leading-tight group-hover:text-blue-700 transition-colors">{m.label}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{m.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Stats row */}
