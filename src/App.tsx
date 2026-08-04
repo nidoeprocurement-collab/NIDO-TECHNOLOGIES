@@ -170,6 +170,7 @@ const SupportReportPage = lazy(() => import("@/pages/reports/SupportReportPage")
 const SlaReportPage = lazy(() => import("@/pages/reports/SlaReportPage"));
 const ApprovalReportPage = lazy(() => import("@/pages/reports/ApprovalReportPage"));
 const TaxReportPage = lazy(() => import("@/pages/reports/TaxReportPage"));
+const CustomReportDetailPage = lazy(() => import("@/pages/reports/CustomReportDetailPage"));
 const OrderStatusesPage = lazy(() => import("@/pages/OrderStatusesPage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const ApprovalWorkflowsPage = lazy(
@@ -968,6 +969,7 @@ function AppRoutes() {
           <Route path="invoices" element={<InvoicePage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="reports/create" element={<CreateReportPage />} />
+          <Route path="reports/custom/:id" element={<CustomReportDetailPage />} />
           <Route path="reports/executive" element={<ExecutiveDashboardPage />} />
           <Route path="reports/sales" element={<SalesReportPage />} />
           <Route path="reports/procurement" element={<ProcurementReportPage />} />
