@@ -139,6 +139,7 @@ export default function AddVendorPage() {
   const paymentTermsBase = ['7 Days', '15 Days', '30 Days', '45 Days', '60 Days', '90 Days', '120 Days', 'Net 15', 'Net 30', 'Net 60'];
   const currenciesBase = ['INR - Indian Rupee', 'USD - US Dollar', 'EUR - Euro', 'GBP - British Pound', 'AED - UAE Dirham', 'SGD - Singapore Dollar'];
   const accountTypesBase = ['Current Account', 'Saving Account', 'Overdraft Account', 'Cash Credit Account', 'Others'];
+  const paymentModesBase = ['NEFT / RTGS', 'IMPS', 'Cheque', 'Demand Draft', 'Cash', 'UPI', 'Wire Transfer', 'Others'];
   const msmeStatusesBase = ['Micro', 'Small', 'Medium', 'Not MSME'];
   const isoCertificationsBase = ['ISO 9001', 'ISO 14001', 'ISO 27001', 'ISO 45001', 'ISO 50001', 'Others'];
   const qualityCertificationsBase = ['CE Certified', 'RoHS Compliant', 'BIS Certified', 'UL Certified', 'FCC Certified', 'Others'];
@@ -205,8 +206,12 @@ export default function AddVendorPage() {
     subCategory: '',
     vendorType: '',
     pan: '',
+    gstNumber: '',
+    registrationNo: '',
     legalEntityName: '',
     yearOfEstablishment: '',
+    employees: '',
+    annualRevenue: '',
     website: '',
     contactPerson: '',
     designation: '',
@@ -232,9 +237,11 @@ export default function AddVendorPage() {
     billingPincode: '',
     // Financial
     paymentTerms: '',
+    paymentMode: '',
     currency: 'INR - Indian Rupee',
     creditLimit: '',
     bankName: '',
+    bankBranch: '',
     accountNumber: '',
     ifscCode: '',
     accountType: '',
@@ -330,6 +337,10 @@ export default function AddVendorPage() {
   const handleSave = () => {
     if (!formData.vendorName.trim()) {
       alert('Vendor Name is required.');
+      return;
+    }
+    if (formData.pan && formData.pan.length !== 10) {
+      alert('PAN must be exactly 10 alphanumeric characters.');
       return;
     }
 
@@ -456,13 +467,48 @@ export default function AddVendorPage() {
                 baseOptions={vendorTypesBase} addLabel="+ Add New Vendor Type" placeholder="Select vendor type" className={selectClass} />
             } />
             <FormField label="PAN" input={
-              <input type="text" placeholder="Enter PAN" name="pan" value={formData.pan} onChange={handleChange} className={inputClass} />
+              <div>
+                <input
+                  type="text"
+                  placeholder="e.g. ABCDE1234F"
+                  name="pan"
+                  value={formData.pan}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10);
+                    handleChange({ target: { name: 'pan', value: v } });
+                  }}
+                  maxLength={10}
+                  className={inputClass + (formData.pan && formData.pan.length !== 10 ? ' border-red-400 focus:ring-red-400' : '')}
+                />
+                <p className={`text-xs mt-1 text-right ${formData.pan.length === 10 ? 'text-green-600' : 'text-gray-400'}`}>
+                  {formData.pan.length}/10 characters
+                </p>
+              </div>
             } />
           </div>
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Legal Entity Name" input={
               <input type="text" placeholder="Enter legal entity name" name="legalEntityName" value={formData.legalEntityName} onChange={handleChange} className={inputClass} />
+            } />
+            <FormField label="Registration Number" input={
+              <input type="text" placeholder="e.g. U12345MH2010PTC123456" name="registrationNo" value={formData.registrationNo} onChange={handleChange} className={inputClass} />
+            } />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField label="Tax ID / GST Number" input={
+              <input
+                type="text"
+                placeholder="e.g. 22AAAAA0000A1Z5"
+                name="gstNumber"
+                value={formData.gstNumber}
+                onChange={e => {
+                  const v = e.target.value.toUpperCase();
+                  handleChange({ target: { name: 'gstNumber', value: v } });
+                }}
+                className={inputClass}
+              />
             } />
             {/* Year of Establishment – free text input instead of dropdown */}
             <FormField label="Year of Establishment" input={
@@ -476,6 +522,15 @@ export default function AddVendorPage() {
                 pattern="\d{4}"
                 className={inputClass}
               />
+            } />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <FormField label="Number of Employees" input={
+              <input type="text" placeholder="e.g. 50–200" name="employees" value={formData.employees} onChange={handleChange} className={inputClass} />
+            } />
+            <FormField label="Annual Revenue" input={
+              <input type="text" placeholder="e.g. ₹5 Cr+" name="annualRevenue" value={formData.annualRevenue} onChange={handleChange} className={inputClass} />
             } />
           </div>
 
