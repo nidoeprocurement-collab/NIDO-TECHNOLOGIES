@@ -1,5 +1,5 @@
 import { useState, useMemo, lazy, Suspense, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import ReportShellContext from "@/contexts/ReportShellContext";
 

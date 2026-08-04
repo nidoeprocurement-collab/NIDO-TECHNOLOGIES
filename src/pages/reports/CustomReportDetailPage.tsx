@@ -299,6 +299,10 @@ export default function CustomReportDetailPage() {
           Reports
         </button>
         <ChevronRight className="w-3.5 h-3.5" />
+        <button onClick={() => navigate("/reports?module=custom")} className="hover:text-blue-600 transition-colors">
+          Custom Reports
+        </button>
+        <ChevronRight className="w-3.5 h-3.5" />
         <span className="text-gray-800 font-medium truncate">{report.name}</span>
       </nav>
 
