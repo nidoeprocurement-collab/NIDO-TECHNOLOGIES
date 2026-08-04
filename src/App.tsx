@@ -979,6 +979,7 @@ function AppRoutes() {
           <Route path="reports/sla" element={<SlaReportPage />} />
           <Route path="reports/approvals" element={<ApprovalReportPage />} />
           <Route path="reports/tax" element={<TaxReportPage />} />
+          <Route path="reports/audit" element={<AuditTrailPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
           {/* Dashboard: reuses ClientDetailPage in portal mode — single source of truth */}
