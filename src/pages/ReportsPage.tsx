@@ -1,6 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import ReportShellContext from "@/contexts/ReportShellContext";
+
+// Lazy-loaded BI report pages (rendered inline when a tile is active)
+const ExecutiveDashboardPage  = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
+const SalesReportPage         = lazy(() => import("@/pages/reports/SalesReportPage"));
+const ProcurementReportPage   = lazy(() => import("@/pages/reports/ProcurementReportPage"));
+const VendorPerformancePage   = lazy(() => import("@/pages/reports/VendorPerformancePage"));
+const ClientReportPage        = lazy(() => import("@/pages/reports/ClientReportPage"));
+const InventoryReportPage     = lazy(() => import("@/pages/reports/InventoryReportPage"));
+const FinanceReportPage       = lazy(() => import("@/pages/reports/FinanceReportPage"));
+const SupportReportPage       = lazy(() => import("@/pages/reports/SupportReportPage"));
+const SlaReportPage           = lazy(() => import("@/pages/reports/SlaReportPage"));
+const ApprovalReportPage      = lazy(() => import("@/pages/reports/ApprovalReportPage"));
+const TaxReportPage           = lazy(() => import("@/pages/reports/TaxReportPage"));
+const AuditTrailPage          = lazy(() => import("@/pages/AuditTrailPage"));
 import { getCustomReports, deleteCustomReport, moduleToCategoryLabel, scheduleLabel as buildScheduleLabel, type CustomReport } from "@/lib/reportStore";
 import { getClients } from "@/lib/clientStore";
 import { getVendors } from "@/lib/vendorDataStore";
@@ -43,6 +58,7 @@ import {
   Pencil,
   Plus,
   ArrowRight,
+  Wrench,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -796,252 +812,280 @@ export default function ReportsPage() {
     { icon: <Play className="w-4 h-4 text-blue-500" />, step: "5. Run Report", desc: "Run now or save and schedule" },
   ];
 
+  const [activeModule, setActiveModule] = useState<string | null>(null);
+
   const BI_MODULES = [
-    { label: "Executive Dashboard", desc: "Revenue, profit, KPIs & growth", icon: <LayoutDashboard className="w-5 h-5" />, path: "/reports/executive", color: "bg-blue-50 text-blue-600", border: "hover:border-blue-300" },
-    { label: "Sales Reports", desc: "Quotes, orders, invoices & revenue", icon: <TrendingUp className="w-5 h-5" />, path: "/reports/sales", color: "bg-emerald-50 text-emerald-600", border: "hover:border-emerald-300" },
-    { label: "Procurement", desc: "POs, spend & approval cycles", icon: <ShoppingCart className="w-5 h-5" />, path: "/reports/procurement", color: "bg-purple-50 text-purple-600", border: "hover:border-purple-300" },
-    { label: "Vendor Performance", desc: "Ratings, spend & delivery metrics", icon: <Building2 className="w-5 h-5" />, path: "/reports/vendors", color: "bg-indigo-50 text-indigo-600", border: "hover:border-indigo-300" },
-    { label: "Client Reports", desc: "Revenue, contracts & activity", icon: <Users className="w-5 h-5" />, path: "/reports/clients", color: "bg-teal-50 text-teal-600", border: "hover:border-teal-300" },
-    { label: "Inventory Reports", desc: "Stock levels, movements & alerts", icon: <Package className="w-5 h-5" />, path: "/reports/inventory", color: "bg-orange-50 text-orange-600", border: "hover:border-orange-300" },
-    { label: "Finance Reports", desc: "P&L, cash flow & receivables", icon: <DollarSign className="w-5 h-5" />, path: "/reports/finance", color: "bg-green-50 text-green-600", border: "hover:border-green-300" },
-    { label: "Support Reports", desc: "Tickets, resolution & SLA", icon: <HeadphonesIcon className="w-5 h-5" />, path: "/reports/support", color: "bg-rose-50 text-rose-600", border: "hover:border-rose-300" },
-    { label: "SLA Reports", desc: "Compliance, breaches & trends", icon: <Clock className="w-5 h-5" />, path: "/reports/sla", color: "bg-cyan-50 text-cyan-600", border: "hover:border-cyan-300" },
-    { label: "Approval Reports", desc: "Pending, approved & rejected", icon: <CheckSquare className="w-5 h-5" />, path: "/reports/approvals", color: "bg-amber-50 text-amber-600", border: "hover:border-amber-300" },
-    { label: "Tax Reports", desc: "GST, CGST, SGST & ITC summary", icon: <Receipt className="w-5 h-5" />, path: "/reports/tax", color: "bg-pink-50 text-pink-600", border: "hover:border-pink-300" },
-    { label: "Audit Reports", desc: "User activity & system logs", icon: <FileSearch className="w-5 h-5" />, path: "/reports/audit", color: "bg-gray-100 text-gray-600", border: "hover:border-gray-400" },
+    { id: "executive",   label: "Executive Dashboard",  desc: "Revenue, profit, KPIs & growth",        icon: <LayoutDashboard className="w-5 h-5" />, color: "bg-blue-50 text-blue-600",    ring: "ring-blue-400",    activeText: "text-blue-700"    },
+    { id: "sales",       label: "Sales Reports",         desc: "Quotes, orders, invoices & revenue",    icon: <TrendingUp className="w-5 h-5" />,      color: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-400", activeText: "text-emerald-700" },
+    { id: "procurement", label: "Procurement",            desc: "POs, spend & approval cycles",          icon: <ShoppingCart className="w-5 h-5" />,    color: "bg-purple-50 text-purple-600",  ring: "ring-purple-400",  activeText: "text-purple-700"  },
+    { id: "vendors",     label: "Vendor Performance",    desc: "Ratings, spend & delivery metrics",     icon: <Building2 className="w-5 h-5" />,       color: "bg-indigo-50 text-indigo-600",  ring: "ring-indigo-400",  activeText: "text-indigo-700"  },
+    { id: "clients",     label: "Client Reports",        desc: "Revenue, contracts & activity",         icon: <Users className="w-5 h-5" />,           color: "bg-teal-50 text-teal-600",      ring: "ring-teal-400",    activeText: "text-teal-700"    },
+    { id: "inventory",   label: "Inventory Reports",     desc: "Stock levels, movements & alerts",      icon: <Package className="w-5 h-5" />,         color: "bg-orange-50 text-orange-600",  ring: "ring-orange-400",  activeText: "text-orange-700"  },
+    { id: "finance",     label: "Finance Reports",       desc: "P&L, cash flow & receivables",          icon: <DollarSign className="w-5 h-5" />,      color: "bg-green-50 text-green-600",    ring: "ring-green-400",   activeText: "text-green-700"   },
+    { id: "support",     label: "Support Reports",       desc: "Tickets, resolution & SLA",             icon: <HeadphonesIcon className="w-5 h-5" />,  color: "bg-rose-50 text-rose-600",      ring: "ring-rose-400",    activeText: "text-rose-700"    },
+    { id: "sla",         label: "SLA Reports",           desc: "Compliance, breaches & trends",         icon: <Clock className="w-5 h-5" />,           color: "bg-cyan-50 text-cyan-600",      ring: "ring-cyan-400",    activeText: "text-cyan-700"    },
+    { id: "approvals",   label: "Approval Reports",      desc: "Pending, approved & rejected",          icon: <CheckSquare className="w-5 h-5" />,     color: "bg-amber-50 text-amber-600",    ring: "ring-amber-400",   activeText: "text-amber-700"   },
+    { id: "tax",         label: "Tax Reports",           desc: "GST, CGST, SGST & ITC summary",         icon: <Receipt className="w-5 h-5" />,         color: "bg-pink-50 text-pink-600",      ring: "ring-pink-400",    activeText: "text-pink-700"    },
+    { id: "audit",       label: "Audit Reports",         desc: "User activity & system logs",           icon: <FileSearch className="w-5 h-5" />,      color: "bg-gray-100 text-gray-600",     ring: "ring-gray-400",    activeText: "text-gray-700"    },
+    { id: "custom",      label: "Custom Reports",        desc: "Create, schedule & manage reports",     icon: <Wrench className="w-5 h-5" />,          color: "bg-violet-50 text-violet-600",  ring: "ring-violet-400",  activeText: "text-violet-700"  },
   ];
+
+  function toggleModule(id: string) {
+    setActiveModule((prev) => (prev === id ? null : id));
+  }
 
   return (
     <div className="space-y-5">
       {showCreateModal && <CreateReportModal onClose={() => setShowCreateModal(false)} />}
 
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports & Business Intelligence</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Analyze procurement, sales, finance, vendor performance, inventory, SLA and operational insights.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Click any module to view its analytics. Click again to collapse.</p>
         </div>
         <Button
-          onClick={() => navigate("/reports/create")}
+          onClick={() => { toggleModule("custom"); setShowCreateModal(true); }}
           className="bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" /> Create Report
         </Button>
       </div>
 
-      {/* ── BI Analytics Modules ──────────────────────────────────────────── */}
+      {/* ── Module tiles (always visible) ───────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Business Intelligence Dashboard</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Click any module to open its full analytics report</p>
-          </div>
-          <button
-            onClick={() => navigate("/reports/executive")}
-            className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            Open Executive Dashboard <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 p-4">
-          {BI_MODULES.map((m) => (
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+          <p className="text-xs font-medium text-gray-500">Select a module to view its report inline</p>
+          {activeModule && (
             <button
-              key={m.path}
-              onClick={() => navigate(m.path)}
-              className={`flex flex-col items-start gap-2.5 p-4 rounded-xl border border-gray-100 ${m.border} hover:shadow-md transition-all text-left group`}
+              onClick={() => setActiveModule(null)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1"
             >
-              <div className={`w-9 h-9 rounded-lg ${m.color} flex items-center justify-center shrink-0`}>
-                {m.icon}
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-800 leading-tight group-hover:text-blue-700 transition-colors">{m.label}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{m.desc}</p>
-              </div>
+              ✕ Close panel
             </button>
-          ))}
+          )}
         </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {stats.map((s, i) => (
-          <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3.5 flex flex-col gap-2">
-            <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center`}>
-              {s.icon}
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 leading-tight">{statTitles[i]}</div>
-              <div className="text-xl font-bold text-gray-900 leading-tight">
-                {s.value.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray-400">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main content: table + sidebar */}
-      <div className="flex gap-4 items-start">
-        {/* Left: tabs + table */}
-        <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-100 px-4 pt-3 gap-1">
-            {TABS.map((t) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 p-4">
+          {BI_MODULES.map((m) => {
+            const isActive = activeModule === m.id;
+            return (
               <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === t.key
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
+                key={m.id}
+                onClick={() => toggleModule(m.id)}
+                className={`flex flex-col items-start gap-2 p-4 rounded-xl border-2 transition-all text-left group ${
+                  isActive
+                    ? `border-current ${m.ring.replace("ring-", "border-")} shadow-sm bg-white`
+                    : "border-gray-100 hover:border-gray-300 hover:shadow-sm"
                 }`}
               >
-                {t.label}
+                <div className={`w-9 h-9 rounded-lg ${m.color} flex items-center justify-center shrink-0`}>
+                  {m.icon}
+                </div>
+                <div className="min-w-0 w-full">
+                  <p className={`text-xs font-semibold leading-tight truncate ${isActive ? m.activeText : "text-gray-800"}`}>
+                    {m.label}
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5 leading-tight line-clamp-2">{m.desc}</p>
+                </div>
+                {isActive && (
+                  <span className={`text-[10px] font-semibold ${m.activeText}`}>▲ open</span>
+                )}
               </button>
-            ))}
-          </div>
-
-          {/* Filters row — only for All Reports */}
-          {activeTab === "all" && (
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-50">
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search reports..."
-                  className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                />
-              </div>
-              <div className="relative">
-                <select
-                  value={catFilter}
-                  onChange={(e) => setCatFilter(e.target.value as ReportCategory)}
-                  className="appearance-none pl-3 pr-7 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-              </div>
-              <div className="relative">
-                <select
-                  value={fmtFilter}
-                  onChange={(e) => setFmtFilter(e.target.value as ReportFormat | "All Formats")}
-                  className="appearance-none pl-3 pr-7 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  {FORMATS.map((f) => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
-              </div>
-              <button
-                onClick={() => { setSearch(""); setCatFilter("All"); setFmtFilter("All Formats"); }}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
-              >
-                <Filter className="w-3.5 h-3.5" /> Filter
-              </button>
-            </div>
-          )}
-
-          {/* Tab content */}
-          {activeTab === "all" && (
-            <ReportTable reports={REPORTS} search={search} category={catFilter} format={fmtFilter} />
-          )}
-          {activeTab === "scheduled" && <ScheduledReportsTab />}
-          {activeTab === "mine" && <MyReportsTab />}
-          {activeTab === "shared" && <SharedReportsTab />}
+            );
+          })}
         </div>
+      </div>
 
-        {/* Right: Create Custom Report panel */}
-        <div className="w-64 shrink-0 bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <h3 className="text-sm font-semibold text-gray-900 mb-1">Create a Custom Report</h3>
-          <p className="text-xs text-gray-400 mb-4">Build a report by selecting data, columns, filters and schedule.</p>
-          <div className="space-y-3.5">
-            {CREATE_STEPS.map(({ icon, step, desc }) => (
-              <div key={step} className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-                  {icon}
+      {/* ── Inline BI module content ─────────────────────────────────────── */}
+      {activeModule && activeModule !== "custom" && (
+        <ReportShellContext.Provider value={{ inline: true }}>
+          <Suspense fallback={
+            <div className="flex items-center justify-center bg-white rounded-xl border border-gray-100 shadow-sm p-16 text-gray-400 text-sm gap-2">
+              <span className="animate-spin">⟳</span> Loading report…
+            </div>
+          }>
+            {activeModule === "executive"   && <ExecutiveDashboardPage />}
+            {activeModule === "sales"       && <SalesReportPage />}
+            {activeModule === "procurement" && <ProcurementReportPage />}
+            {activeModule === "vendors"     && <VendorPerformancePage />}
+            {activeModule === "clients"     && <ClientReportPage />}
+            {activeModule === "inventory"   && <InventoryReportPage />}
+            {activeModule === "finance"     && <FinanceReportPage />}
+            {activeModule === "support"     && <SupportReportPage />}
+            {activeModule === "sla"         && <SlaReportPage />}
+            {activeModule === "approvals"   && <ApprovalReportPage />}
+            {activeModule === "tax"         && <TaxReportPage />}
+            {activeModule === "audit"       && <AuditTrailPage />}
+          </Suspense>
+        </ReportShellContext.Provider>
+      )}
+
+      {/* ── Custom Reports inline content ───────────────────────────────── */}
+      {activeModule === "custom" && (
+        <div className="space-y-5">
+
+          {/* Stats row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {stats.map((s, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3.5 flex flex-col gap-2">
+                <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center`}>
+                  {s.icon}
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-gray-800">{step}</div>
-                  <div className="text-xs text-gray-400 leading-snug">{desc}</div>
+                  <div className="text-xs text-gray-500 leading-tight">{statTitles[i]}</div>
+                  <div className="text-xl font-bold text-gray-900 leading-tight">{s.value.toLocaleString()}</div>
+                  <div className="text-xs text-gray-400">{s.label}</div>
                 </div>
               </div>
             ))}
           </div>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white text-sm"
-          >
-            Create Report
-          </Button>
-        </div>
-      </div>
 
-      {/* Upcoming Scheduled Reports */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900">Upcoming Scheduled Reports</h3>
-          <button
-            onClick={() => setActiveTab("scheduled")}
-            className="text-xs text-blue-600 hover:underline font-medium"
-          >
-            View All Scheduled
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-50">
-                {["Report Name", "Schedule", "Next Run", "Recipients", "Format", ""].map((h, i) => (
-                  <th key={i} className="py-2.5 px-4 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
-                    {h}
-                  </th>
+          {/* Table + create panel */}
+          <div className="flex gap-4 items-start">
+            {/* Left: tabs + table */}
+            <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex border-b border-gray-100 px-4 pt-3 gap-1">
+                {TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setActiveTab(t.key)}
+                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeTab === t.key
+                        ? "border-blue-600 text-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {SCHEDULED.map((s) => (
-                <tr key={s.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
-                  <td className="py-3 px-4">
-                    <button
-                      onClick={() => toast({ title: "Viewing: " + s.name })}
-                      className="text-sm font-medium text-blue-600 hover:underline text-left"
+              </div>
+
+              {activeTab === "all" && (
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-50">
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search reports..."
+                      className="w-full pl-8 pr-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                    />
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={catFilter}
+                      onChange={(e) => setCatFilter(e.target.value as ReportCategory)}
+                      className="appearance-none pl-3 pr-7 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
-                      {s.name}
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">{s.schedule}</td>
-                  <td className="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">{s.nextRun}</td>
-                  <td className="py-3 px-4 text-xs text-gray-500 max-w-[240px] truncate">{s.recipients}</td>
-                  <td className="py-3 px-4">
-                    <FormatBadge format={s.format} />
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        onClick={() => toast({ title: "Edit: " + s.name })}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => toast({ title: "Options: " + s.name })}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
-                      >
-                        <MoreVertical className="w-3.5 h-3.5" />
-                      </button>
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                  </div>
+                  <div className="relative">
+                    <select
+                      value={fmtFilter}
+                      onChange={(e) => setFmtFilter(e.target.value as ReportFormat | "All Formats")}
+                      className="appearance-none pl-3 pr-7 py-2 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      {FORMATS.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                  </div>
+                  <button
+                    onClick={() => { setSearch(""); setCatFilter("All"); setFmtFilter("All Formats"); }}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
+                  >
+                    <Filter className="w-3.5 h-3.5" /> Clear
+                  </button>
+                </div>
+              )}
+
+              {activeTab === "all"       && <ReportTable reports={allReports} search={search} category={catFilter} format={fmtFilter} />}
+              {activeTab === "scheduled" && <ScheduledReportsTab />}
+              {activeTab === "mine"      && <MyReportsTab />}
+              {activeTab === "shared"    && <SharedReportsTab />}
+            </div>
+
+            {/* Right: Create panel */}
+            <div className="w-64 shrink-0 bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Create a Custom Report</h3>
+              <p className="text-xs text-gray-400 mb-4">Build a report by selecting data, columns, filters and schedule.</p>
+              <div className="space-y-3.5">
+                {CREATE_STEPS.map(({ icon, step, desc }) => (
+                  <div key={step} className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
+                      {icon}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div>
+                      <div className="text-xs font-semibold text-gray-800">{step}</div>
+                      <div className="text-xs text-gray-400 leading-snug">{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button
+                onClick={() => setShowCreateModal(true)}
+                className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white text-sm"
+              >
+                Create Report
+              </Button>
+            </div>
+          </div>
+
+          {/* Upcoming Scheduled Reports */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Upcoming Scheduled Reports</h3>
+              <button
+                onClick={() => setActiveTab("scheduled")}
+                className="text-xs text-blue-600 hover:underline font-medium"
+              >
+                View All Scheduled
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-50">
+                    {["Report Name", "Schedule", "Next Run", "Recipients", "Format", ""].map((h, i) => (
+                      <th key={i} className="py-2.5 px-4 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {SCHEDULED.map((s) => (
+                    <tr key={s.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors">
+                      <td className="py-3 px-4">
+                        <button onClick={() => toast({ title: "Viewing: " + s.name })} className="text-sm font-medium text-blue-600 hover:underline text-left">
+                          {s.name}
+                        </button>
+                      </td>
+                      <td className="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">{s.schedule}</td>
+                      <td className="py-3 px-4 text-xs text-gray-600 whitespace-nowrap">{s.nextRun}</td>
+                      <td className="py-3 px-4 text-xs text-gray-500 max-w-[240px] truncate">{s.recipients}</td>
+                      <td className="py-3 px-4"><FormatBadge format={s.format} /></td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => toast({ title: "Edit: " + s.name })} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => toast({ title: "Options: " + s.name })} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

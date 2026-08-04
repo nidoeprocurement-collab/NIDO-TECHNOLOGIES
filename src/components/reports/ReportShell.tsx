@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useReportShellContext } from "@/contexts/ReportShellContext";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -47,9 +48,15 @@ export default function ReportShell({ children, title, subtitle }: {
   title: string;
   subtitle?: string;
 }) {
+  const { inline } = useReportShellContext();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+
+  // When rendered inline inside ReportsPage, skip the sidebar entirely
+  if (inline) {
+    return <div className="space-y-5">{children}</div>;
+  }
 
   return (
     <div className="flex gap-0 -mx-6 -mt-6 min-h-[calc(100vh-64px)]">
