@@ -245,7 +245,7 @@ function FormatDropdown({ value, onChange }: { value: ReportFormat; onChange: (v
         <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+        <div className="absolute left-0 bottom-full mb-1 w-full bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
           {FORMATS.map(f => (
             <button key={f.value} type="button"
               onClick={() => { onChange(f.value); setOpen(false); }}
