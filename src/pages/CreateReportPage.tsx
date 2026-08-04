@@ -38,10 +38,6 @@ import {
   InboxIcon,
 } from "lucide-react";
 
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-type ReportFrequency = "One Time" | "Daily" | "Weekly" | "Monthly" | "Quarterly";
-
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const REPORT_TYPES = [
@@ -304,10 +300,9 @@ function SelectColumnsPanel({
   return (
     <div className="flex-1 flex flex-col min-w-0">
       <div className="flex items-baseline gap-1 mb-1">
-        <span className="text-sm font-medium text-gray-700">Select Columns</span>
-        <span className="text-red-500 text-sm">*</span>
+        <span className="text-sm font-medium text-gray-700">Selected Columns</span>
       </div>
-      <p className="text-xs text-gray-400 mb-2">Choose the columns you want to include in this report.</p>
+      <p className="text-xs text-gray-400 mb-2">Drag to reorder columns</p>
 
       <div ref={ref} className="relative">
         {/* Trigger button */}
