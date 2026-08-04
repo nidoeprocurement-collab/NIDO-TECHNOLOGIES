@@ -845,7 +845,7 @@ export default function ReportsPage() {
           <p className="text-sm text-gray-500 mt-0.5">Click any module to view its analytics. Click again to collapse.</p>
         </div>
         <Button
-          onClick={() => { toggleModule("custom"); setShowCreateModal(true); }}
+          onClick={() => navigate("/reports/create")}
           className="bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" /> Create Report
@@ -1028,7 +1028,7 @@ export default function ReportsPage() {
                 ))}
               </div>
               <Button
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => navigate("/reports/create")}
                 className="w-full mt-5 bg-blue-600 hover:bg-blue-700 text-white text-sm"
               >
                 Create Report
