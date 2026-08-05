@@ -6,7 +6,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
-import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct, computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
+import {
+  getAllProductPricing,
+  updateWinningVendorMoq,
+  getSlabDiscountPct,
+  computeVendorComparisons,
+  computeClientFinalPrice,
+  getClientCommonSettings,
+  resolveClientProfitPct,
+  type VendorComparisonRow,
+} from "@/lib/priceEngineStore";
 import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 
@@ -534,12 +543,15 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     setQtyDraft(String(clamped));
   };
 
-  const cardDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
-  const cardBasePriceExcl = product.priceNum * 100 / (100 + cardGstRate);
-  const cardEffectivePrice = cardDiscountPct > 0 ? cardBasePriceExcl * (1 - cardDiscountPct / 100) : cardBasePriceExcl;
-  const displayPrice = selectedVendor ? selectedVendor.landedCostPerUnit : cardEffectivePrice;
-  const displayPriceLabel = selectedVendor ? "landed cost" : "excl. GST";
+  const selectedVendorSellingPrice = selectedVendor && clientId
+    ? computeClientFinalPrice(
+        selectedVendor.landedCostPerUnit,
+        getClientCommonSettings(clientId),
+        resolveClientProfitPct(clientId, product.productCode, product.category),
+        product.category,
+      ).finalPrice
+    : null;
 
   // Compute HSN code for this product's category (same logic as CartPage)
   const hsnForCategory = (() => {
@@ -657,7 +669,11 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                       })()}
                     </div>
                     <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5 text-[10px] text-gray-500">
-                      <span className="font-semibold text-blue-700">₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")} landed</span>
+                      {selectedVendorSellingPrice !== null && (
+                        <span className="font-semibold text-emerald-700">
+                          ₹{selectedVendorSellingPrice.toLocaleString("en-IN")} selling price
+                        </span>
+                      )}
                       <span>•</span>
                       <span>{selectedVendor.stock.toLocaleString("en-IN")} in stock</span>
                       <span>•</span>
@@ -730,14 +746,20 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                               )}
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
-                              <div>
-                                <p className="text-[9px] text-gray-400">Landed price</p>
-                                <p className="text-[11px] font-bold text-blue-700">₹{comp.landedCostPerUnit.toLocaleString("en-IN")} <span className="font-normal text-gray-400">/ unit</span></p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-gray-400">Base price</p>
-                                <p className="text-[11px] font-semibold text-gray-700">₹{comp.basePrice.toLocaleString("en-IN")}</p>
-                              </div>
+                              {clientId && (
+                                <div>
+                                  <p className="text-[9px] text-gray-400">Selling price</p>
+                                  <p className="text-[11px] font-bold text-emerald-700">
+                                    ₹{computeClientFinalPrice(
+                                      comp.landedCostPerUnit,
+                                      getClientCommonSettings(clientId),
+                                      resolveClientProfitPct(clientId, product.productCode, product.category),
+                                      product.category,
+                                    ).finalPrice.toLocaleString("en-IN")}
+                                    <span className="font-normal text-gray-400"> / unit</span>
+                                  </p>
+                                </div>
+                              )}
                               <div>
                                 <p className="text-[9px] text-gray-400">Delivery</p>
                                 <p className="text-[11px] font-semibold text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2} days` : "—"}</p>
@@ -774,9 +796,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         {selectedVendor && (
           <div className="flex items-center justify-between mb-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5">
             <div>
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-emerald-700">Selected vendor price</p>
+               <p className="text-[9px] font-semibold uppercase tracking-wide text-emerald-700">Final selling price</p>
               <span className="font-bold text-gray-900 text-base leading-tight">
-                ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")}
+                ₹{(selectedVendorSellingPrice ?? 0).toLocaleString("en-IN")}
                 <span className="text-xs font-normal text-gray-500"> / each</span>
               </span>
             </div>
