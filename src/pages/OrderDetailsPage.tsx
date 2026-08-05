@@ -707,6 +707,15 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
   }));
 }
 
+// Returns are allowed for Delivered items within a 7-day window
+function isReturnAllowed(sub: any): boolean {
+  if (sub.itemStatus !== "Delivered") return false;
+  if (!sub.deliveredAt) return true; // deliveredAt not set yet — allow
+  const deliveredMs = sub.deliveredAt instanceof Date ? sub.deliveredAt.getTime() : new Date(sub.deliveredAt).getTime();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  return Date.now() - deliveredMs <= sevenDaysMs;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
@@ -825,11 +834,40 @@ export default function MyOrderPage() {
       : []
   );
   const [subSearch, setSubSearch] = useState("");
+  const filtered = subSearch
+    ? subOrders.filter(s =>
+        s.itemName?.toLowerCase().includes(subSearch.toLowerCase()) ||
+        s.id?.toLowerCase().includes(subSearch.toLowerCase()) ||
+        s.category?.toLowerCase().includes(subSearch.toLowerCase())
+      )
+    : subOrders;
   const [expandedItems, setExpandedItems] = useState(new Set<string>());
   // Incremented whenever a PO is created or updated so getAllPOs() inline calls
   // re-run and the Draft Purchase Orders tab / badge reflects the latest data
   // without needing a page reload.
   const [poRefreshKey, setPoRefreshKey] = useState(0);
+
+  // Derived maps used in the sub-orders table — built from the sub-orders list
+  // so they stay in sync with any status/tracking changes without extra state.
+  const createdPOs: Record<string, any> = useMemo(
+    () => Object.fromEntries((poRefreshKey >= 0 ? getAllPOs() : []).filter(p => p.orderId === orderId).map(p => [p.id, p])),
+    [poRefreshKey, orderId]
+  );
+  const selectedVendors: Record<string, string> = useMemo(
+    () => Object.fromEntries(subOrders.filter(s => s.selectedVendorId).map(s => [s.id, s.selectedVendorId])),
+    [subOrders]
+  );
+  const selectedVendorMeta: Record<string, any> = useMemo(
+    () => Object.fromEntries(subOrders.filter(s => s.selectedVendorId).map(s => [s.id, { vendorId: s.selectedVendorId, vendorName: s.selectedVendorName || s.vendorName, location: "" }])),
+    [subOrders]
+  );
+  const vendorAllocations: Record<string, any[]> = useMemo(
+    () => Object.fromEntries(subOrders.filter(s => s.stockAllocations?.length).map(s => [s.id, s.stockAllocations])),
+    [subOrders]
+  );
+  const updateStatus = (subId: string, status: string) =>
+    setSubOrders(prev => prev.map(s => s.id === subId ? { ...s, itemStatus: status, updatedOn: new Date().toLocaleDateString("en-IN") } : s));
+
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [referenceTarget, setReferenceTarget] = useState(null);
