@@ -664,7 +664,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Landed</span>
                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Stock</span>
                 </div>
-                {vendorComps.map((comp, i) => {
+                {vendorComps.slice(1).map((comp, i) => {
                   const badge = getVendorBadge(comp, vendorComps);
                   return (
                     <button

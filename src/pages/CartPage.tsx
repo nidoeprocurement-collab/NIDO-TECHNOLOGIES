@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
-import { getSlabDiscountPct, getAllProductPricing, allocateQtyAcrossVendors, type VendorStockAllocation } from "@/lib/priceEngineStore";
+import { getSlabDiscountPct, getAllProductPricing, type VendorStockAllocation } from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";

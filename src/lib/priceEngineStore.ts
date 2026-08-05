@@ -546,24 +546,6 @@ export function getProductStockInfo(masterProductCode: string, productCategory?:
   };
 }
 
-/**
- * Given an ordered quantity and the cheapest-first vendor list, return which
- * vendors fulfill how much.  Fills cheapest vendor first until its stock runs
- * out, then spills into the next vendor, and so on.
- */
-export function allocateQtyAcrossVendors(
-  qty: number,
-  allocations: VendorStockAllocation[],
-): Array<VendorStockAllocation & { allocated: number }> {
-  let remaining = qty;
-  return allocations
-    .map(a => {
-      const allocated = Math.min(remaining, a.stock);
-      remaining -= allocated;
-      return { ...a, allocated };
-    })
-    .filter(a => a.allocated > 0);
-}
 
 export function getAllProductPricing(): ProductPricing[] {
   const catalog = getCatalogProducts();
