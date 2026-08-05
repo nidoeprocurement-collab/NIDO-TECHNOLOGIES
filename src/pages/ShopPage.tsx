@@ -498,15 +498,15 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 // ── Vendor badge helper ───────────────────────────────────────────────────────
 function getVendorBadge(comp: VendorComparisonRow, all: VendorComparisonRow[]): { label: string; color: string; bg: string } | null {
-  if (all.length === 0) return null;
-  if (comp.vendorId === all[0]?.vendorId) return { label: "Recommended", color: "#1d4ed8", bg: "#eff6ff" };
-  const others = all.filter(c => c.vendorId !== all[0]?.vendorId);
-  const minLT = Math.min(...all.map(c => c.leadTime));
-  if (comp.leadTime === minLT && minLT > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Fastest", color: "#059669", bg: "#f0fdf4" };
+  const recommended = all.find(c => c.stock > 0);
+  if (all.length === 0 || !recommended || comp.stock <= 0) return null;
+  if (comp.vendorId === recommended.vendorId) return { label: "Recommended", color: "#1d4ed8", bg: "#eff6ff" };
+  const inStock = all.filter(c => c.stock > 0 && c.vendorId !== recommended.vendorId);
+  const minLT = Math.min(...inStock.map(c => c.leadTime));
+  if (comp.leadTime === minLT && minLT > 0 && comp.vendorId !== recommended.vendorId) return { label: "Fastest", color: "#059669", bg: "#f0fdf4" };
+  const others = all.filter(c => c.stock > 0 && c.vendorId !== recommended.vendorId);
   const minPrice = others.length > 0 ? Math.min(...others.map(c => c.basePrice)) : Infinity;
-  if (comp.basePrice <= minPrice && comp.vendorId !== all[0]?.vendorId) return { label: "Best Price", color: "#d97706", bg: "#fffbeb" };
-  const maxRating = Math.max(...all.map(c => c.rating));
-  if (comp.rating === maxRating && maxRating > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Preferred", color: "#7c3aed", bg: "#faf5ff" };
+  if (comp.basePrice <= minPrice && comp.vendorId !== recommended.vendorId) return { label: "Best Price", color: "#d97706", bg: "#fffbeb" };
   return null;
 }
 
@@ -526,13 +526,25 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
 
   useEffect(() => {
-    if (product.productCode) {
-      const comps = computeVendorComparisons(product.productCode, product.category);
-      setVendorComps(comps);
-    }
+    const refreshVendors = () => {
+      if (!product.productCode) return;
+      setVendorComps(computeVendorComparisons(product.productCode, product.category));
+    };
+    refreshVendors();
+    window.addEventListener("vendorProductsUpdated", refreshVendors);
+    return () => window.removeEventListener("vendorProductsUpdated", refreshVendors);
   }, [product.productCode, product.category]);
 
+  useEffect(() => {
+    setSelectedVendor(current => {
+      if (!current) return current;
+      const refreshed = vendorComps.find(comp => comp.vendorId === current.vendorId);
+      return refreshed?.stock && refreshed.stock > 0 ? refreshed : null;
+    });
+  }, [vendorComps]);
+
   const maxQty = selectedVendor ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined) : (product.totalStock > 0 ? product.totalStock : undefined);
+  const recommendedVendor = vendorComps.find(comp => comp.stock > 0) ?? null;
 
   const commitCardQty = () => {
     const min = Math.max(1, product.moq);
@@ -688,8 +700,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                     <Building2 size={15} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-gray-800">Choose a vendor</p>
-                    <p className="text-[10px] text-gray-500 truncate">Compare price, delivery, stock and terms</p>
+                    <p className="text-[11px] font-bold text-gray-800">
+                      {recommendedVendor ? `Recommended: ${recommendedVendor.vendorName}` : "No vendor in stock"}
+                    </p>
+                    <p className="text-[10px] text-gray-500 truncate">
+                      {recommendedVendor ? "Compare price, delivery and stock" : "All listed vendors are out of stock"}
+                    </p>
                   </div>
                   <ChevronDown size={15} className={`text-gray-400 shrink-0 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
                 </div>
@@ -710,20 +726,25 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                   {vendorComps.map((comp) => {
                     const badge = getVendorBadge(comp, vendorComps);
                     const isSelected = selectedVendor?.vendorId === comp.vendorId;
+                    const isOutOfStock = comp.stock <= 0;
                     return (
                       <button
                         key={comp.vendorId}
                         type="button"
                         role="option"
                         aria-selected={isSelected}
+                        disabled={isOutOfStock}
                         onClick={() => {
+                          if (isOutOfStock) return;
                           setSelectedVendor(comp);
                           setVendorPanelOpen(false);
                         }}
                         className={`w-full rounded-lg border p-2 text-left transition-all ${
                           isSelected
                             ? "border-blue-300 bg-blue-50 ring-1 ring-blue-200"
-                            : "border-transparent bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
+                            : isOutOfStock
+                              ? "border-transparent bg-gray-100/80 cursor-not-allowed"
+                              : "border-transparent bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
                         }`}
                       >
                         <div className="flex items-start gap-2">
@@ -733,10 +754,14 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <p className="text-[11px] font-bold text-gray-900 truncate">{comp.vendorName}</p>
+                                <p className={`text-[11px] font-bold truncate ${isOutOfStock ? "text-gray-500" : "text-gray-900"}`}>{comp.vendorName}</p>
                                 <p className="text-[9px] text-gray-500 truncate">{comp.primaryContact || "Primary contact unavailable"}</p>
                               </div>
-                              {badge && (
+                              {isOutOfStock ? (
+                                <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-red-600 bg-red-50">
+                                  Out of Stock
+                                </span>
+                              ) : badge && (
                                 <span
                                   className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
                                   style={{ color: badge.color, backgroundColor: badge.bg }}
@@ -766,15 +791,13 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                               </div>
                               <div>
                                 <p className="text-[9px] text-gray-400">Available stock</p>
-                                <p className={`text-[11px] font-semibold ${comp.stock > 0 ? "text-emerald-600" : "text-red-500"}`}>{comp.stock.toLocaleString("en-IN")} units</p>
+                                <p className={`text-[11px] font-semibold ${comp.stock > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                  {comp.stock > 0 ? `${comp.stock.toLocaleString("en-IN")} units` : "Out of Stock"}
+                                </p>
                               </div>
                               <div>
                                 <p className="text-[9px] text-gray-400">MOQ</p>
                                 <p className="text-[11px] font-semibold text-gray-700">{comp.moq > 0 ? `${comp.moq} units` : "—"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-gray-400">Rating / terms</p>
-                                <p className="text-[11px] font-semibold text-gray-700">{comp.rating > 0 ? `★ ${comp.rating.toFixed(1)}` : "—"} <span className="font-normal text-gray-400">· {comp.paymentTerms}</span></p>
                               </div>
                             </div>
                           </div>
