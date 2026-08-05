@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ShoppingCart, Check, Package, Shield, Clock,
   Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2,
-  Timer, ZoomIn,
+  Timer, ZoomIn, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
-import { getAllProductPricing, getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { getAllProductPricing, getSlabDiscountPct, computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
+import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -161,11 +162,22 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState(Math.max(1, stateProduct?.moq ?? 1));
   const [added, setAdded] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
+  const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
+  const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
 
   // Keep qty >= moq
   useEffect(() => {
     if (product) setQty(Math.max(1, product.moq));
   }, [product?.moq]);
+
+  // Load vendor comparisons for this product
+  useEffect(() => {
+    if (!product?.productCode) return;
+    const comps = computeVendorComparisons(product.productCode, product.category);
+    setVendorComps(comps);
+    setSelectedVendor(null);
+  }, [product?.productCode, product?.category]);
 
   // Load related products from client catalog
   useEffect(() => {
@@ -210,10 +222,29 @@ export default function ProductDetailPage() {
     return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: '', val: s };
   }).filter(sp => sp.key || sp.val);
 
+  const gstRate = getEffectiveTaxPctForCategory(product?.category ?? "");
+
   const handleAdd = () => {
-    if (added) return;
+    if (added || !selectedVendor) return;
     addItem(
-      { id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode, leadTime: product.leadTime },
+      {
+        id: Math.random() * 10000,
+        name: product.name,
+        image: product.image,
+        specs: product.specs,
+        moq: product.moq,
+        totalStock: selectedVendor.stock,
+        priceNum: product.priceNum,
+        clientId,
+        category: product.category,
+        productCode: product.productCode,
+        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
+        selectedVendorId: selectedVendor.vendorId,
+        selectedVendorName: selectedVendor.vendorName,
+        vendorPrice: selectedVendor.basePrice,
+        landedCost: selectedVendor.landedCostPerUnit,
+        gstSnapshot: gstRate,
+      },
       Math.max(1, qty)
     );
     setAdded(true);
@@ -373,8 +404,96 @@ export default function ProductDetailPage() {
                 </p>
               )}
 
+              {/* ── Vendor Selection ── */}
+              <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Select Vendor</span>
+                  {vendorComps.length > 0 && <span className="text-[10px] text-gray-400">{vendorComps.length} available</span>}
+                </div>
+                {vendorComps.length === 0 ? (
+                  <div className="px-3 py-3 text-xs text-gray-400">No vendor pricing available for this product.</div>
+                ) : selectedVendor ? (
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                          <Check size={10} className="text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</p>
+                          <p className="text-[10px] text-gray-500">
+                            ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")} landed
+                            {selectedVendor.stock > 0 && ` · ${selectedVendor.stock} in stock`}
+                            {selectedVendor.leadTime > 0 && ` · ${selectedVendor.leadTime * 2}d lead`}
+                          </p>
+                        </div>
+                      </div>
+                      <button onClick={() => { setSelectedVendor(null); setVendorPanelOpen(true); }} className="text-[10px] text-blue-600 font-semibold shrink-0 ml-2 hover:underline">Change</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Recommended vendor */}
+                    <button
+                      onClick={() => setSelectedVendor(vendorComps[0])}
+                      className="w-full flex items-start justify-between px-3 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>★ Recommended</span>
+                        </div>
+                        <p className="text-xs font-semibold text-gray-900">{vendorComps[0].vendorName}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          {vendorComps[0].stock > 0 ? `${vendorComps[0].stock} in stock` : "No stock"}
+                          {vendorComps[0].leadTime > 0 && ` · ${vendorComps[0].leadTime * 2}d lead`}
+                          {vendorComps[0].rating > 0 && ` · ★ ${vendorComps[0].rating}`}
+                        </p>
+                      </div>
+                      <div className="text-right ml-3 shrink-0">
+                        <p className="text-sm font-bold text-gray-900">₹{vendorComps[0].landedCostPerUnit.toLocaleString("en-IN")}</p>
+                        <p className="text-[10px] text-gray-400">landed cost</p>
+                      </div>
+                    </button>
+                    {/* Other vendors toggle */}
+                    {vendorComps.length > 1 && (
+                      <button
+                        onClick={() => setVendorPanelOpen(v => !v)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-xs text-blue-600 font-semibold hover:bg-gray-50 transition-colors"
+                      >
+                        <span>{vendorPanelOpen ? "Hide other vendors" : `${vendorComps.length - 1} more vendor${vendorComps.length > 2 ? "s" : ""}`}</span>
+                        {vendorPanelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                      </button>
+                    )}
+                    {vendorPanelOpen && (
+                      <div className="border-t border-gray-100">
+                        {vendorComps.slice(1).map((comp, i) => (
+                          <button
+                            key={comp.vendorId}
+                            onClick={() => { setSelectedVendor(comp); setVendorPanelOpen(false); }}
+                            className={`w-full flex items-start justify-between px-3 py-2.5 hover:bg-blue-50 transition-colors text-left ${i > 0 ? "border-t border-gray-50" : ""}`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-semibold text-gray-900">{comp.vendorName}</p>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                {comp.stock > 0 ? `${comp.stock} in stock` : "No stock"}
+                                {comp.leadTime > 0 && ` · ${comp.leadTime * 2}d lead`}
+                                {comp.rating > 0 && ` · ★ ${comp.rating}`}
+                              </p>
+                            </div>
+                            <div className="text-right ml-3 shrink-0">
+                              <p className="text-xs font-bold text-gray-900">₹{comp.landedCostPerUnit.toLocaleString("en-IN")}</p>
+                              <p className="text-[10px] text-gray-400">landed</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Qty stepper */}
-              <div className="flex items-center gap-3 mt-5">
+              <div className="flex items-center gap-3 mt-4">
                 <button
                   onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))}
                   className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
@@ -394,12 +513,14 @@ export default function ProductDetailPage() {
               {/* Add to Cart */}
               <button
                 onClick={handleAdd}
+                disabled={!selectedVendor}
                 className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
+                  !selectedVendor ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" :
                   added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
                 }`}
               >
                 {added ? <Check size={16} /> : <ShoppingCart size={16} />}
-                {added ? "Added to Cart!" : "Add to Cart"}
+                {added ? "Added to Cart!" : !selectedVendor ? "Select a vendor first" : "Add to Cart"}
               </button>
 
               {/* MOQ / Lead time / Warranty */}
@@ -487,16 +608,10 @@ export default function ProductDetailPage() {
                       </p>
                       <p className="text-[11px] text-gray-400 mt-0.5">MOQ: {rp.moq > 0 ? rp.moq : "—"}</p>
                       <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          addItem(
-                            { id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category, productCode: rp.productCode, leadTime: rp.leadTime },
-                            Math.max(1, rp.moq)
-                          );
-                        }}
+                        onClick={e => { e.stopPropagation(); handleRelatedClick(rp); }}
                         className="mt-2 flex items-center justify-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 text-[11px] font-semibold transition-colors"
                       >
-                        <ShoppingCart size={12} /> Cart
+                        <ShoppingCart size={12} /> View &amp; Select Vendor
                       </button>
                     </div>
                   );

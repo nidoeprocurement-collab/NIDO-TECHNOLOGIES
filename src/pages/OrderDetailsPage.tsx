@@ -4,7 +4,7 @@ import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, type StoredPO } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
@@ -1671,21 +1671,21 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
     productCode: item.productCode || "",
     referenceNumber: "",
-    vendorName: "Pending Assignment",
-    vendorInitial: "P",
-    vendorColor: "#6b7280",
+    // Vendor snapshot — set at add-to-cart time by the client's vendor selection.
+    selectedVendorId: item.selectedVendorId || null,
+    selectedVendorName: item.selectedVendorName || null,
+    vendorName: item.selectedVendorName || "—",
+    vendorInitial: item.selectedVendorName ? item.selectedVendorName[0].toUpperCase() : "—",
+    vendorColor: item.selectedVendorId ? "#2563eb" : "#9ca3af",
     poNumber: poNumber,
     qty: item.quantity,
-    unitPrice: `₹${Number(item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    total: `₹${(item.priceNum * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    unitPrice: `₹${Number(item.landedCost || item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    total: `₹${((item.landedCost || item.priceNum) * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
     itemStatus: "Processing",
     updatedOn: orderDate,
     deliveredAt: null,
     tracking: null,
-    // Stock reservations made at order-placement time (StockAllocation[]).
-    // Used by Nido's vendor selection to add back reserved qty and show
-    // the vendor's true supply capacity (currentStock + reservedForThisOrder).
     stockAllocations: item.vendorAllocations || [],
   }));
 }
@@ -1763,7 +1763,7 @@ export default function MyOrderPage() {
 
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
-  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Vendor Selected Summary"];
+  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Draft Purchase Orders"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   // Master status lives on the shared order record itself (single source of
   // truth) so a change made on the owner platform is visible immediately on
@@ -2121,13 +2121,13 @@ export default function MyOrderPage() {
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
 
-  const selectedSummaryCount = Object.keys(selectedVendors).length;
+  const draftPOCount = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft").length;
 
   // Client portal: no PO number or vendor-selection columns — it's a
   // read-only, vendor-agnostic view of the sub-orders.
   const subOrdersColumns = isClientPortalUser
     ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
-    : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "SELECT VENDOR", "ACTIONS"];
+    : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"];
   // Explicit min widths (via minmax) on every column plus a real column gap
   // prevent long values (prices, badges, buttons) from visually overlapping
   // into the neighboring column — a plain "1fr"/px template with no gap lets
@@ -2348,7 +2348,7 @@ export default function MyOrderPage() {
               {TABS.map(tab => {
                 let label = tab;
                 if (tab === "Sub Orders / Items") label = `Sub Orders / Items (${subOrders.length})`;
-                if (tab === "Vendor Selected Summary") label = selectedSummaryCount > 0 ? `Vendor Selected Summary (${selectedSummaryCount})` : "Vendor Selected Summary";
+                if (tab === "Draft Purchase Orders") label = draftPOCount > 0 ? `Draft Purchase Orders (${draftPOCount})` : "Draft Purchase Orders";
                 return (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))", borderBottom: activeTab === tab ? "2px solid hsl(var(--primary))" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -2445,10 +2445,8 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {isOrderInactive ? (
-                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
-                          ) : hasPO ? (
-                            // PO already issued — lock the vendor, no change allowed until PO is cancelled
+                          {hasPO ? (
+                            // PO already confirmed — show the vendor from the PO
                             <div>
                               {subPOs.map((po: any, pi: number) => (
                                 <div key={po.poNumber} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
@@ -2458,44 +2456,21 @@ export default function MyOrderPage() {
                                   <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName}</span>
                                 </div>
                               ))}
-                              <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued · Cancel PO to change</span>
+                              <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued</span>
                             </div>
-                          ) : selVendor ? (
-                            <div>
-                              {isMultiVendor ? (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                                  {subAllocs.map((a: any, ai: number) => (
-                                    <div key={ai} style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: ai === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>
-                                        {(a.meta?.vendorName?.[0] || "V").toUpperCase()}
-                                      </div>
-                                      <div>
-                                        <div style={{ fontSize: 11.5, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{a.meta?.vendorName || a.vendorId}</div>
-                                        <div style={{ fontSize: 10.5, color: "#6b7280" }}>{a.qty} Nos</div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0, textAlign: "left" }}>Change ›</button>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                      {(selVendor.name?.[0] || "V").toUpperCase()}
-                                    </div>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
-                                  </div>
-                                  <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
-                                </div>
-                              )}
+                          ) : sub.selectedVendorName ? (
+                            // Vendor was locked at cart add-to-cart time — display only
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                {(sub.selectedVendorName[0] || "V").toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{sub.selectedVendorName}</div>
+                                <div style={{ fontSize: 10, color: "#9ca3af" }}>Selected at order</div>
+                              </div>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleOpenVendorModal(sub)}
-                              style={{ padding: "5px 10px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                            >
-                              Select Vendor
-                            </button>
+                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                           )}
                         </div>
                       )}
@@ -2563,18 +2538,106 @@ export default function MyOrderPage() {
             </>
           )}
 
-          {/* Vendor Selected Summary tab */}
-          {activeTab === "Vendor Selected Summary" && (
-            <VendorSelectedSummaryTab
-              subOrders={subOrders}
-              selectedVendors={selectedVendors}
-              selectedVendorMeta={selectedVendorMeta}
-              vendorAllocations={vendorAllocations}
-              createdPOs={createdPOs}
-              onCreatePurchaseOrders={handleCreatePurchaseOrders}
-              onCancelPO={handleCancelPO}
-            />
-          )}
+          {/* Draft Purchase Orders tab */}
+          {activeTab === "Draft Purchase Orders" && (() => {
+            const draftPOs = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft");
+            return (
+              <div style={{ padding: 20 }}>
+                {draftPOs.length === 0 ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No Draft Purchase Orders</p>
+                    <p style={{ fontSize: 12, marginTop: 6, maxWidth: 380, margin: "8px auto 0" }}>
+                      Draft POs are created automatically when an order is placed with vendor-selected items.
+                      Each vendor gets their own Draft PO for review.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
+                      {draftPOs.length} Draft PO{draftPOs.length !== 1 ? "s" : ""} pending your confirmation.
+                      Confirm to lock the vendor and send; Reject to cancel this PO.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {draftPOs.map(po => (
+                        <div key={po.poNumber} style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                          {/* PO header */}
+                          <div style={{ padding: "12px 18px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontWeight: 700, fontSize: 14 }}>{po.poNumber}</span>
+                                <span style={{ fontSize: 10, background: "#fef9c3", color: "#92400e", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>Draft</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
+                                <span style={{ fontWeight: 600 }}>Vendor:</span> {po.vendorName}
+                              </div>
+                              {po.vendorEmail && <div style={{ fontSize: 11, color: "#9ca3af" }}>{po.vendorEmail}</div>}
+                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Created: {po.createdOnDisplay}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>
+                                ₹{po.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                                {po.items.length} item{po.items.length !== 1 ? "s" : ""}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Line items */}
+                          <div style={{ padding: "0 18px" }}>
+                            {po.items.map((li, i) => (
+                              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < po.items.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                                  <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{li.item}</div>
+                                  {li.sku && <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 1 }}>SKU: {li.sku}</div>}
+                                  {li.hsnCode && <div style={{ fontSize: 10.5, color: "#9ca3af" }}>HSN: {li.hsnCode} · GST {li.gstPct ?? 18}%</div>}
+                                </div>
+                                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                  <div style={{ fontSize: 11.5, color: "#6b7280" }}>{li.qty} × ₹{li.unitPrice.toLocaleString("en-IN")}</div>
+                                  <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>₹{li.lineSubtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                                </div>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 12, color: "#6b7280", borderTop: "1px solid #f3f4f6" }}>
+                              <span>Subtotal</span>
+                              <span>₹{po.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12, color: "#6b7280" }}>
+                              <span>SGST ({po.sgstPct}%) + CGST ({po.cgstPct}%)</span>
+                              <span>₹{(po.sgstAmt + po.cgstAmt).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 12px", fontWeight: 700, fontSize: 13, borderTop: "1px solid #e5e7eb", marginTop: 4 }}>
+                              <span>Grand Total</span>
+                              <span>₹{po.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          {!isOrderInactive && (
+                            <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                              <button
+                                onClick={() => { updatePO(po.poNumber, { status: "Cancelled", cancelReason: "Rejected by admin" }); setCreatedPOs(p => ({ ...p })); }}
+                                style={{ padding: "7px 16px", border: "1px solid #fca5a5", borderRadius: 7, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}
+                              >
+                                Reject
+                              </button>
+                              <button
+                                onClick={() => { updatePO(po.poNumber, { status: "Confirmed" }); navigate(`/vendor-orders/${po.poNumber}`); }}
+                                style={{ padding: "7px 18px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}
+                              >
+                                Confirm PO →
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
         </div>
 
@@ -2587,15 +2650,6 @@ export default function MyOrderPage() {
         </div>
       </div>
 
-      {/* Vendor Selection Popup Modal — owner platform only */}
-      {!isClientPortalUser && vendorModalSub && (
-        <VendorSelectionModal
-          sub={vendorModalSub}
-          selectedVendorId={selectedVendors[vendorModalSub.id] || null}
-          onSelect={handleSelectVendor}
-          onClose={() => setVendorModalSub(null)}
-        />
-      )}
 
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}

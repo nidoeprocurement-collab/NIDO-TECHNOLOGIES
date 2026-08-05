@@ -81,12 +81,12 @@ function formatMoq(n?: number) { return n && n > 0 ? String(n) : "—"; }
 function formatLeadTime(t?: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 
 function SuggestedCard({
-  product, onAdd,
+  product, clientId,
 }: {
   product: ClientCatalogEntry;
-  onAdd: (p: Omit<CartItem, "quantity" | "vendorAllocations">) => void;
+  clientId?: string;
 }) {
-  const [added, setAdded] = useState(false);
+  const navigate = useNavigate();
   const image = product.img ?? "";
   const priceNum = product.priceNum ?? parseFloat(product.price) ?? 0;
   const specs = product.specs?.slice(0, 2) ?? [];
@@ -118,35 +118,11 @@ function SuggestedCard({
         </div>
 
         <button
-          onClick={() => {
-            const totalStock = (product as ClientCatalogEntry & { totalStock?: number }).totalStock ?? 0;
-            if (totalStock > 0 && totalStock <= 0) return; // guard (handled by disabled)
-            onAdd({
-              id: Math.abs(product.productCode.split("").reduce((a, c) => a + c.charCodeAt(0), 0)),
-              name: product.name,
-              image,
-              specs,
-              moq: product.moq ?? 1,
-              totalStock,
-              priceNum,
-              clientId: undefined,
-              category: product.category,
-              productCode: product.productCode,
-            });
-            setAdded(true);
-            setTimeout(() => setAdded(false), 1500);
-          }}
-          disabled={(product as ClientCatalogEntry & { totalStock?: number }).totalStock === 0}
-          className={`mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors ${
-            (product as ClientCatalogEntry & { totalStock?: number }).totalStock === 0
-              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-              : added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
-          }`}
+          onClick={() => navigate(`/shop/product/${product.productCode}`, { state: { product: { id: product.productCode, productCode: product.productCode, name: product.name, category: product.category, image: product.img || "", specs: product.specs || [], leadTime: product.leadTime || "", moq: product.moq ?? 1, priceNum: priceNum, inStock: (product as any).totalStock !== 0 }, clientId } })}
+          className="mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
         >
           <ShoppingCart size={12} />
-          {(product as ClientCatalogEntry & { totalStock?: number }).totalStock === 0
-            ? "Out of Stock"
-            : added ? "Added!" : "Add to Cart"}
+          View &amp; Select Vendor →
         </button>
       </div>
     </div>
@@ -393,6 +369,20 @@ export default function CartPage() {
                                 </li>
                               ))}
                             </ul>
+                            {item.selectedVendorName && (
+                              <p className="text-xs text-gray-600 mb-0.5 mt-1">
+                                <span className="font-medium">Vendor:</span>{" "}
+                                <span className="inline-flex items-center gap-1">
+                                  <span className="w-4 h-4 rounded-full bg-blue-600 text-white inline-flex items-center justify-center text-[9px] font-bold shrink-0">
+                                    {item.selectedVendorName[0].toUpperCase()}
+                                  </span>
+                                  {item.selectedVendorName}
+                                </span>
+                                {item.landedCost && item.landedCost > 0 && (
+                                  <span className="text-gray-400 ml-1">· ₹{item.landedCost.toLocaleString("en-IN")} landed</span>
+                                )}
+                              </p>
+                            )}
                             {discountPct > 0 && (
                               <p className="text-[10px] text-green-600 font-semibold mt-1.5 bg-green-50 rounded px-1.5 py-0.5 inline-block">
                                 {discountPct}% slab discount applied
@@ -500,7 +490,7 @@ export default function CartPage() {
                     style={{ transform: `translateX(-${scrollIdx * 186}px)` }}
                   >
                     {suggested.map((p) => (
-                      <SuggestedCard key={p.productCode} product={p} onAdd={onAddToCart} />
+                      <SuggestedCard key={p.productCode} product={p} clientId={cart[0]?.clientId} />
                     ))}
                   </div>
                 </div>

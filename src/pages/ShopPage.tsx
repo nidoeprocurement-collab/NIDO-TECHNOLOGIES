@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
-import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct, computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 
@@ -487,13 +487,34 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 // ── Product Card ─────────────────────────────────────────────────────────────
 
+// ── Vendor badge helper ───────────────────────────────────────────────────────
+function getVendorBadge(comp: VendorComparisonRow, all: VendorComparisonRow[]): { label: string; color: string; bg: string } | null {
+  if (all.length === 0) return null;
+  if (comp.vendorId === all[0]?.vendorId) return { label: "Recommended", color: "#1d4ed8", bg: "#eff6ff" };
+  const minLT = Math.min(...all.map(c => c.leadTime));
+  if (comp.leadTime === minLT && minLT > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Fastest", color: "#059669", bg: "#f0fdf4" };
+  const maxRating = Math.max(...all.map(c => c.rating));
+  if (comp.rating === maxRating && maxRating > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Top Rated", color: "#7c3aed", bg: "#faf5ff" };
+  return null;
+}
+
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(Math.max(1, product.moq));
   const [qtyDraft, setQtyDraft] = useState(String(Math.max(1, product.moq)));
   const [adding, setAdding] = useState(false);
+  const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
+  const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
+  const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
 
-  const maxQty = product.totalStock > 0 ? product.totalStock : undefined;
+  useEffect(() => {
+    if (product.productCode) {
+      const comps = computeVendorComparisons(product.productCode, product.category);
+      setVendorComps(comps);
+    }
+  }, [product.productCode, product.category]);
+
+  const maxQty = selectedVendor ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined) : (product.totalStock > 0 ? product.totalStock : undefined);
 
   const commitCardQty = () => {
     const min = Math.max(1, product.moq);
@@ -508,14 +529,38 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
   const cardBasePriceExcl = product.priceNum * 100 / (100 + cardGstRate);
   const cardEffectivePrice = cardDiscountPct > 0 ? cardBasePriceExcl * (1 - cardDiscountPct / 100) : cardBasePriceExcl;
+  const displayPrice = selectedVendor ? selectedVendor.landedCostPerUnit : cardEffectivePrice;
+  const displayPriceLabel = selectedVendor ? "landed cost" : "excl. GST";
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!product.inStock || adding) return;
+    if (!product.inStock || adding || !selectedVendor) return;
     setAdding(true);
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
+    addItem(
+      {
+        id: Math.random() * 10000,
+        name: product.name,
+        image: product.image,
+        specs: product.specs,
+        moq: product.moq,
+        totalStock: selectedVendor.stock,
+        priceNum: product.priceNum,
+        clientId,
+        category: product.category,
+        productCode: product.productCode,
+        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
+        selectedVendorId: selectedVendor.vendorId,
+        selectedVendorName: selectedVendor.vendorName,
+        vendorPrice: selectedVendor.basePrice,
+        landedCost: selectedVendor.landedCostPerUnit,
+        gstSnapshot: cardGstRate,
+      },
+      Math.max(1, qty)
+    );
     setTimeout(() => setAdding(false), 1500);
   };
+
+  const canAdd = product.inStock && !!selectedVendor;
 
   return (
     <div
@@ -543,7 +588,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             <div className="mt-2">
               <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-wide mb-1">Key Specifications</p>
               <ul className="space-y-0.5">
-                {product.specs.slice(0, 6).map((spec, i) => (
+                {product.specs.slice(0, 4).map((spec, i) => (
                   <li key={i} className="flex items-start gap-1 text-[11px] text-gray-600">
                     <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
                     {spec}
@@ -555,14 +600,84 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         </div>
       </div>
 
+      {/* Vendor Selection Section */}
+      <div className="px-3 pt-2 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+        {vendorComps.length === 0 ? (
+          <p className="text-[10px] text-gray-400 py-1">No vendor pricing available</p>
+        ) : selectedVendor ? (
+          <div className="flex items-center justify-between py-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                <Check size={9} className="text-white" />
+              </div>
+              <span className="text-[11px] font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</span>
+              <span className="text-[10px] text-gray-500 shrink-0">· ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")}</span>
+            </div>
+            <button
+              onClick={() => { setSelectedVendor(null); setVendorPanelOpen(true); }}
+              className="text-[10px] text-blue-600 font-semibold shrink-0 ml-1 hover:underline"
+            >
+              Change
+            </button>
+          </div>
+        ) : (
+          <div>
+            {/* Recommended vendor — shown inline as a quick-pick */}
+            {vendorComps[0] && (
+              <button
+                className="w-full flex items-center justify-between py-1.5 rounded-lg hover:bg-blue-50 transition-colors text-left px-1"
+                onClick={() => setSelectedVendor(vendorComps[0])}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 6 }}>★ Recommended</span>
+                  <span className="text-[11px] font-semibold text-gray-800 truncate">{vendorComps[0].vendorName}</span>
+                </div>
+                <span className="text-[11px] text-gray-700 font-bold shrink-0 ml-1">₹{vendorComps[0].landedCostPerUnit.toLocaleString("en-IN")}</span>
+              </button>
+            )}
+            {vendorComps.length > 1 && (
+              <button
+                className="w-full text-left text-[10px] text-blue-600 font-semibold pb-1 hover:underline"
+                onClick={() => setVendorPanelOpen(v => !v)}
+              >
+                {vendorPanelOpen ? "Hide" : `+${vendorComps.length - 1} more vendor${vendorComps.length > 2 ? "s" : ""} →`}
+              </button>
+            )}
+            {vendorPanelOpen && (
+              <div className="border border-gray-100 rounded-lg overflow-hidden mb-1">
+                {vendorComps.map((comp, i) => {
+                  const badge = getVendorBadge(comp, vendorComps);
+                  return (
+                    <button
+                      key={comp.vendorId}
+                      onClick={() => { setSelectedVendor(comp); setVendorPanelOpen(false); }}
+                      className={`w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-blue-50 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] font-semibold text-gray-800 truncate">{comp.vendorName}</span>
+                          {badge && <span style={{ background: badge.bg, color: badge.color, fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 4, whiteSpace: "nowrap" }}>{badge.label}</span>}
+                        </div>
+                        <span className="text-[10px] text-gray-400">{comp.stock > 0 ? `${comp.stock} in stock` : "No stock"}{comp.leadTime > 0 ? ` · ${comp.leadTime * 2}d lead` : ""}</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-900 shrink-0 ml-2">₹{comp.landedCostPerUnit.toLocaleString("en-IN")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Footer */}
-      <div className="px-3 pb-3 border-t border-gray-100 mt-auto pt-2">
+      <div className="px-3 pb-3 mt-auto pt-2">
         <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
-          <span>Lead Time: {formatLeadTime(product.leadTime)}</span>
+          <span>Lead Time: {selectedVendor && selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : formatLeadTime(product.leadTime)}</span>
           <span>MOQ: {formatMoq(product.moq)}</span>
         </div>
         <div className="flex items-center justify-between mb-2">
-          {cardDiscountPct > 0 ? (
+          {cardDiscountPct > 0 && !selectedVendor ? (
             <div className="flex flex-col">
               <span className="text-[10px] text-gray-400 line-through leading-tight">{formatPrice(cardBasePriceExcl)}</span>
               <span className="font-bold text-green-600 text-base leading-tight">
@@ -572,44 +687,53 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               <span className="text-[10px] text-green-600 font-semibold leading-tight">{cardDiscountPct}% off</span>
             </div>
           ) : (
-            <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
-              {formatPrice(cardBasePriceExcl)}
-              {product.priceNum > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
+            <span className={`font-bold text-gray-900 ${displayPrice === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
+              {displayPrice > 0 ? `₹${displayPrice.toLocaleString("en-IN")}` : "Price on request"}
+              {displayPrice > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
             </span>
           )}
-          {product.priceNum > 0 && (
-            <span className="text-[10px] text-gray-400">excl. GST</span>
+          {displayPrice > 0 && (
+            <span className="text-[10px] text-gray-400">{displayPriceLabel}</span>
           )}
         </div>
-        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-          <button
-            onClick={handleAdd}
-            disabled={!product.inStock}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : adding ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
-          >
-            {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
-            {adding ? "Added!" : !product.inStock ? "Out of Stock" : "Add to Cart"}
-          </button>
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
-            <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
-            <input
-              type="number"
-              value={qtyDraft}
-              min={Math.max(1, product.moq)}
-              max={maxQty}
-              onChange={e => setQtyDraft(e.target.value)}
-              onBlur={commitCardQty}
-              onKeyDown={e => e.key === "Enter" && commitCardQty()}
-              className="w-10 text-center text-xs font-semibold text-gray-800 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
+
+        {!selectedVendor && !product.inStock ? (
+          <div className="flex items-center justify-center rounded-lg py-1.5 bg-gray-200 text-gray-400 text-xs font-semibold">Out of Stock</div>
+        ) : (
+          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
             <button
-              onClick={() => { if (maxQty === undefined || qty < maxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
-              disabled={maxQty !== undefined && qty >= maxQty}
-              className={`px-1.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
-            >+</button>
+              onClick={handleAdd}
+              disabled={!canAdd}
+              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                !canAdd ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" : adding ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
+              {adding ? "Added!" : !selectedVendor ? "Select a vendor first" : "Add to Cart"}
+            </button>
+            {selectedVendor && (
+              <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
+                <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
+                <input
+                  type="number"
+                  value={qtyDraft}
+                  min={Math.max(1, product.moq)}
+                  max={maxQty}
+                  onChange={e => setQtyDraft(e.target.value)}
+                  onBlur={commitCardQty}
+                  onKeyDown={e => e.key === "Enter" && commitCardQty()}
+                  className="w-10 text-center text-xs font-semibold text-gray-800 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  onClick={() => { if (maxQty === undefined || qty < maxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
+                  disabled={maxQty !== undefined && qty >= maxQty}
+                  className={`px-1.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
+                >+</button>
+              </div>
+            )}
           </div>
-        </div>
-        {maxQty !== undefined && (
+        )}
+        {maxQty !== undefined && selectedVendor && (
           <p className="text-[10px] text-gray-400 mt-1 text-right">{maxQty.toLocaleString("en-IN")} in stock</p>
         )}
       </div>
