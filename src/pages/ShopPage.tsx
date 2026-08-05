@@ -583,7 +583,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   return (
     <div
-      className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+      className="bg-white border border-gray-200 rounded-xl overflow-visible flex flex-col hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => onPreview(product)}
     >
       <div className="flex gap-0 flex-1">
@@ -620,36 +620,150 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Vendor Selection Section */}
-      <div className="px-3 pt-2 pb-1 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+      <div className="px-3 pt-2 pb-1 border-t border-gray-100 relative" onClick={e => e.stopPropagation()}>
         {vendorComps.length === 0 ? (
           <p className="text-[10px] text-gray-400 py-1">No vendor pricing available</p>
         ) : (
-          <div>
-            <select
-              value={selectedVendor?.vendorId || ""}
-              onChange={e => {
-                const v = vendorComps.find(c => c.vendorId === e.target.value) || null;
-                setSelectedVendor(v);
-              }}
-              className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-              style={{ fontFamily: "inherit" }}
+          <div className="relative">
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={vendorPanelOpen}
+              onClick={() => setVendorPanelOpen(open => !open)}
+              className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+                selectedVendor
+                  ? "border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 shadow-sm"
+                  : "border-dashed border-gray-300 bg-gray-50/70 hover:border-blue-300 hover:bg-blue-50/40"
+              }`}
             >
-              <option value="">— Select a vendor —</option>
-              {vendorComps.map((comp, i) => {
-                const badge = i === 0 ? "★ Recommended" : (getVendorBadge(comp, vendorComps)?.label ?? "");
-                const contactName = comp.primaryContact || comp.vendorName;
-                const moqPart = comp.moq > 0 ? `MOQ: ${comp.moq}` : "MOQ: —";
-                const leadPart = comp.leadTime > 0 ? `Lead: ${comp.leadTime * 2}d` : "Lead: —";
-                const stockPart = comp.stock > 0 ? `Stock: ${comp.stock}` : "Stock: 0";
-                const details = `${moqPart} · ${leadPart} · ${stockPart}`;
-                const prefix = badge ? `[${badge}] ` : "";
-                return (
-                  <option key={comp.vendorId} value={comp.vendorId}>
-                    {`${prefix}${contactName} — ${details}`}
-                  </option>
-                );
-              })}
-            </select>
+              {selectedVendor ? (
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
+                    <Building2 size={15} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-[11px] font-bold text-gray-900 truncate">{selectedVendor.vendorName}</span>
+                      {(() => {
+                        const badge = getVendorBadge(selectedVendor, vendorComps);
+                        return badge ? (
+                          <span
+                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                            style={{ color: badge.color, backgroundColor: badge.bg }}
+                          >
+                            {badge.label}
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
+                    <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5 text-[10px] text-gray-500">
+                      <span className="font-semibold text-blue-700">₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")} landed</span>
+                      <span>•</span>
+                      <span>{selectedVendor.stock.toLocaleString("en-IN")} in stock</span>
+                      <span>•</span>
+                      <span>{selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2}d delivery` : "Lead time —"}</span>
+                    </div>
+                  </div>
+                  <ChevronDown size={15} className={`text-gray-400 shrink-0 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 text-white flex items-center justify-center shrink-0">
+                    <Building2 size={15} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-gray-800">Choose a vendor</p>
+                    <p className="text-[10px] text-gray-500 truncate">Compare price, delivery, stock and terms</p>
+                  </div>
+                  <ChevronDown size={15} className={`text-gray-400 shrink-0 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
+                </div>
+              )}
+            </button>
+
+            {vendorPanelOpen && (
+              <div
+                role="listbox"
+                aria-label={`Vendors for ${product.name}`}
+                className="absolute z-30 left-0 right-0 top-[calc(100%+6px)] rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl shadow-gray-900/10"
+              >
+                <div className="flex items-center justify-between px-2 pb-1.5 pt-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Available vendors</span>
+                  <span className="text-[10px] text-gray-400">{vendorComps.length} option{vendorComps.length === 1 ? "" : "s"}</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-1">
+                  {vendorComps.map((comp) => {
+                    const badge = getVendorBadge(comp, vendorComps);
+                    const isSelected = selectedVendor?.vendorId === comp.vendorId;
+                    return (
+                      <button
+                        key={comp.vendorId}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => {
+                          setSelectedVendor(comp);
+                          setVendorPanelOpen(false);
+                        }}
+                        className={`w-full rounded-lg border p-2 text-left transition-all ${
+                          isSelected
+                            ? "border-blue-300 bg-blue-50 ring-1 ring-blue-200"
+                            : "border-transparent bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSelected ? "bg-blue-600 text-white" : "bg-white text-gray-500 border border-gray-200"}`}>
+                            <Building2 size={13} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-[11px] font-bold text-gray-900 truncate">{comp.vendorName}</p>
+                                <p className="text-[9px] text-gray-500 truncate">{comp.primaryContact || "Primary contact unavailable"}</p>
+                              </div>
+                              {badge && (
+                                <span
+                                  className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                                  style={{ color: badge.color, backgroundColor: badge.bg }}
+                                >
+                                  {badge.label}
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                              <div>
+                                <p className="text-[9px] text-gray-400">Landed price</p>
+                                <p className="text-[11px] font-bold text-blue-700">₹{comp.landedCostPerUnit.toLocaleString("en-IN")} <span className="font-normal text-gray-400">/ unit</span></p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-400">Base price</p>
+                                <p className="text-[11px] font-semibold text-gray-700">₹{comp.basePrice.toLocaleString("en-IN")}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-400">Delivery</p>
+                                <p className="text-[11px] font-semibold text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2} days` : "—"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-400">Available stock</p>
+                                <p className={`text-[11px] font-semibold ${comp.stock > 0 ? "text-emerald-600" : "text-red-500"}`}>{comp.stock.toLocaleString("en-IN")} units</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-400">MOQ</p>
+                                <p className="text-[11px] font-semibold text-gray-700">{comp.moq > 0 ? `${comp.moq} units` : "—"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] text-gray-400">Rating / terms</p>
+                                <p className="text-[11px] font-semibold text-gray-700">{comp.rating > 0 ? `★ ${comp.rating.toFixed(1)}` : "—"} <span className="font-normal text-gray-400">· {comp.paymentTerms}</span></p>
+                              </div>
+                            </div>
+                          </div>
+                          {isSelected && <Check size={15} className="text-blue-600 shrink-0 mt-1" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -658,12 +772,15 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       <div className="px-3 pb-3 mt-auto pt-2">
         {/* Selling price — shown only after vendor is selected */}
         {selectedVendor && (
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="font-bold text-gray-900 text-base leading-tight">
-              ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")}
-              <span className="text-xs font-normal text-gray-500"> / each</span>
-            </span>
-            <span className="text-[10px] text-gray-400">selling price</span>
+          <div className="flex items-center justify-between mb-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5">
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-emerald-700">Selected vendor price</p>
+              <span className="font-bold text-gray-900 text-base leading-tight">
+                ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")}
+                <span className="text-xs font-normal text-gray-500"> / each</span>
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1"><Check size={12} /> Ready</span>
           </div>
         )}
 
