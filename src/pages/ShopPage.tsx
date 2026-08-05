@@ -620,81 +620,43 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Vendor Selection Section */}
-      <div className="px-3 pt-2 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+      <div className="px-3 pt-2 pb-1 border-t border-gray-100" onClick={e => e.stopPropagation()}>
         {vendorComps.length === 0 ? (
           <p className="text-[10px] text-gray-400 py-1">No vendor pricing available</p>
-        ) : selectedVendor ? (
-          <div className="flex items-center justify-between py-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-                <Check size={9} className="text-white" />
-              </div>
-              <span className="text-[11px] font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</span>
-              <span className="text-[10px] text-gray-500 shrink-0">· ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")}</span>
-            </div>
-            <button
-              onClick={() => { setSelectedVendor(null); setVendorPanelOpen(true); }}
-              className="text-[10px] text-blue-600 font-semibold shrink-0 ml-1 hover:underline"
-            >
-              Change
-            </button>
-          </div>
         ) : (
           <div>
-            {/* Recommended vendor — shown inline as a quick-pick */}
-            {vendorComps[0] && (
-              <button
-                className="w-full flex items-center justify-between py-1.5 rounded-lg hover:bg-blue-50 transition-colors text-left px-1"
-                onClick={() => setSelectedVendor(vendorComps[0])}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 6 }}>★ Recommended</span>
-                  <span className="text-[11px] font-semibold text-gray-800 truncate">{vendorComps[0].vendorName}</span>
-                </div>
-                <div className="flex flex-col items-end shrink-0 ml-1">
-                  <span className="text-[11px] text-gray-700 font-bold">₹{vendorComps[0].landedCostPerUnit.toLocaleString("en-IN")}</span>
-                  <span className="text-[9px] text-gray-400">Base ₹{vendorComps[0].basePrice.toLocaleString("en-IN")}</span>
-                </div>
-              </button>
-            )}
-            {vendorComps.length > 1 && (
-              <button
-                className="w-full text-left text-[10px] text-blue-600 font-semibold pb-1 hover:underline"
-                onClick={() => setVendorPanelOpen(v => !v)}
-              >
-                {vendorPanelOpen ? "Hide Vendor Selection Tab" : `Vendor Selection Tab · ${vendorComps.length - 1} more vendor${vendorComps.length > 2 ? "s" : ""} →`}
-              </button>
-            )}
-            {vendorPanelOpen && (
-              <div className="border border-gray-100 rounded-lg overflow-hidden mb-1">
-                <div className="grid px-2 py-1 bg-gray-50 border-b border-gray-100" style={{ gridTemplateColumns: "1fr 60px 60px 50px" }}>
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Vendor</span>
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Base</span>
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Landed</span>
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Stock</span>
-                </div>
-                {vendorComps.slice(1).map((comp, i) => {
-                  const badge = getVendorBadge(comp, vendorComps);
-                  return (
-                    <button
-                      key={comp.vendorId}
-                      onClick={() => { setSelectedVendor(comp); setVendorPanelOpen(false); }}
-                      className={`w-full grid px-2 py-1.5 text-left hover:bg-blue-50 transition-colors items-center ${i > 0 ? "border-t border-gray-100" : ""}`}
-                      style={{ gridTemplateColumns: "1fr 60px 60px 50px" }}
-                    >
-                      <div className="flex flex-col min-w-0 pr-1">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <span className="text-[11px] font-semibold text-gray-800 truncate">{comp.vendorName}</span>
-                          {badge && <span style={{ background: badge.bg, color: badge.color, fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 4, whiteSpace: "nowrap" }}>{badge.label}</span>}
-                        </div>
-                        <span className="text-[10px] text-gray-400">{comp.leadTime > 0 ? `${comp.leadTime * 2}d lead` : "—"} · ★{comp.rating.toFixed(1)}</span>
-                      </div>
-                      <span className="text-[10px] text-gray-600 text-right">₹{comp.basePrice.toLocaleString("en-IN")}</span>
-                      <span className="text-[11px] font-bold text-gray-900 text-right">₹{comp.landedCostPerUnit.toLocaleString("en-IN")}</span>
-                      <span className="text-[10px] text-gray-500 text-right">{comp.stock > 0 ? comp.stock : "—"}</span>
-                    </button>
-                  );
-                })}
+            <select
+              value={selectedVendor?.vendorId || ""}
+              onChange={e => {
+                const v = vendorComps.find(c => c.vendorId === e.target.value) || null;
+                setSelectedVendor(v);
+              }}
+              className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              style={{ fontFamily: "inherit" }}
+            >
+              <option value="">— Select a vendor —</option>
+              {vendorComps.map((comp, i) => {
+                const badge = i === 0 ? "★ Recommended" : (getVendorBadge(comp, vendorComps)?.label ?? "");
+                const label = comp.primaryContact || comp.vendorName;
+                return (
+                  <option key={comp.vendorId} value={comp.vendorId}>
+                    {badge ? `[${badge}] ${label}` : label}
+                  </option>
+                );
+              })}
+            </select>
+            {selectedVendor && (
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500 flex-wrap">
+                <span className="flex items-center gap-0.5">
+                  <Check size={9} className="text-blue-600" />
+                  <span className="font-semibold text-blue-700">{selectedVendor.primaryContact || selectedVendor.vendorName}</span>
+                </span>
+                <span>·</span>
+                <span>★ {selectedVendor.rating.toFixed(1)}</span>
+                <span>·</span>
+                <span>{selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2}d lead` : "—"}</span>
+                <span>·</span>
+                <span>{selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString("en-IN")} in stock` : "Out of stock"}</span>
               </div>
             )}
           </div>
@@ -703,35 +665,25 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
       {/* Footer */}
       <div className="px-3 pb-3 mt-auto pt-2">
-        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
-          <span>Lead Time: {selectedVendor && selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : formatLeadTime(product.leadTime)}</span>
+        {/* MOQ · Lead Time · Stock — always visible */}
+        <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-1 flex-wrap">
           <span>MOQ: {formatMoq(product.moq)}</span>
+          <span>·</span>
+          <span>Lead Time: {selectedVendor && selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : formatLeadTime(product.leadTime)}</span>
+          <span>·</span>
+          <span>Stock: {selectedVendor ? (selectedVendor.stock > 0 ? selectedVendor.stock.toLocaleString("en-IN") : "—") : (product.totalStock > 0 ? product.totalStock.toLocaleString("en-IN") : "—")}</span>
         </div>
-        {selectedVendor && selectedVendor.leadTime > 0 && (
-          <div className="text-[10px] text-gray-400 mb-1.5">
-            Expected Delivery: <span className="text-gray-700 font-semibold">{getExpectedDelivery(selectedVendor.leadTime)}</span>
+
+        {/* Selling price — shown only after vendor is selected */}
+        {selectedVendor && (
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-bold text-gray-900 text-base leading-tight">
+              ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")}
+              <span className="text-xs font-normal text-gray-500"> / each</span>
+            </span>
+            <span className="text-[10px] text-gray-400">selling price</span>
           </div>
         )}
-        <div className="flex items-center justify-between mb-2">
-          {cardDiscountPct > 0 && !selectedVendor ? (
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 line-through leading-tight">{formatPrice(cardBasePriceExcl)}</span>
-              <span className="font-bold text-green-600 text-base leading-tight">
-                {formatPrice(cardEffectivePrice)}
-                <span className="text-xs font-normal text-gray-500"> / each</span>
-              </span>
-              <span className="text-[10px] text-green-600 font-semibold leading-tight">{cardDiscountPct}% off</span>
-            </div>
-          ) : (
-            <span className={`font-bold text-gray-900 ${displayPrice === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
-              {displayPrice > 0 ? `₹${displayPrice.toLocaleString("en-IN")}` : "Price on request"}
-              {displayPrice > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
-            </span>
-          )}
-          {displayPrice > 0 && (
-            <span className="text-[10px] text-gray-400">{displayPriceLabel}</span>
-          )}
-        </div>
 
         {!selectedVendor && !product.inStock ? (
           <div className="flex items-center justify-center rounded-lg py-1.5 bg-gray-200 text-gray-400 text-xs font-semibold">Out of Stock</div>
@@ -768,9 +720,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               </div>
             )}
           </div>
-        )}
-        {maxQty !== undefined && selectedVendor && (
-          <p className="text-[10px] text-gray-400 mt-1 text-right">{maxQty.toLocaleString("en-IN")} in stock</p>
         )}
       </div>
     </div>

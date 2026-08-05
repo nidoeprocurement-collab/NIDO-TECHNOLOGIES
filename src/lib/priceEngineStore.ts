@@ -404,6 +404,7 @@ export function getLandedCost(
 export interface VendorComparisonRow {
   vendorId: string;
   vendorName: string;
+  primaryContact: string;
   vendorProductCode: string;
   basePrice: number;
   moq: number;
@@ -440,6 +441,7 @@ export function computeVendorComparisons(
     rows.push({
       vendorId,
       vendorName: info?.name || vendorId,
+      primaryContact: info?.primaryContact || info?.name || vendorId,
       vendorProductCode: match.vendorProductCode || '—',
       basePrice,
       moq: parseInt(match.moq) || 0,
