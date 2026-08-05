@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
-import { getAllVendorProducts, updateVendorProduct } from "@/lib/vendorStore";
+import { getPOByNumber, updatePO, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf } from "@/lib/generatePO";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -769,6 +769,70 @@ export default function VendorOrderDetailPage() {
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: "18px 20px" };
 
+  // ── Confirm Draft PO ──────────────────────────────────────────────────────────
+  const handleConfirmPO = () => {
+    const po = getPOByNumber(poKey);
+    if (!po || po.status !== "Draft") return;
+    // Convert reserved stock → allocated for every line item
+    for (const li of po.items) {
+      if (li.productCode && po.vendorId && li.qty > 0) {
+        convertReservedToAllocated(po.vendorId, li.productCode, li.qty, po.poNumber);
+      }
+    }
+    updatePO(poKey, { status: "Confirmed" });
+    setOrderStatus("Confirmed");
+  };
+
+  // ── Inline-edit qty / unit price on Draft items ───────────────────────────────
+  const handleDraftItemQtyChange = (itemId: string, newQty: number) => {
+    if (orderStatus !== "Draft" || isCancelled) return;
+    setItems(prev => {
+      const updated = prev.map(it => {
+        if (it.id !== itemId) return it;
+        const po = getPOByNumber(poKey);
+        if (!po) return it;
+        const fmt = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const unitNum = po.items[prev.indexOf(it)]?.unitPrice ?? 0;
+        return { ...it, qty: newQty, total: fmt(unitNum * newQty) };
+      });
+      // Persist to StoredPO
+      const po = getPOByNumber(poKey);
+      if (po) {
+        const updatedLineItems: POLineItem[] = po.items.map((li, i) => {
+          if (updated[i]?.id !== itemId) return li;
+          return { ...li, qty: newQty, lineSubtotal: li.unitPrice * newQty };
+        });
+        const newSubtotal = updatedLineItems.reduce((s, li) => s + li.lineSubtotal, 0);
+        const sgstAmt = Math.round(updatedLineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
+        updatePO(poKey, { items: updatedLineItems, subtotal: newSubtotal, sgstAmt, cgstAmt: sgstAmt, grandTotal: newSubtotal + sgstAmt * 2 });
+      }
+      return updated;
+    });
+  };
+
+  const handleDraftItemPriceChange = (itemId: string, newPrice: number) => {
+    if (orderStatus !== "Draft" || isCancelled) return;
+    setItems(prev => {
+      const updated = prev.map(it => {
+        if (it.id !== itemId) return it;
+        const fmt = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return { ...it, unitPrice: fmt(newPrice), total: fmt(newPrice * it.qty) };
+      });
+      // Persist to StoredPO
+      const po = getPOByNumber(poKey);
+      if (po) {
+        const updatedLineItems: POLineItem[] = po.items.map((li, i) => {
+          if (updated[i]?.id !== itemId) return li;
+          return { ...li, unitPrice: newPrice, lineSubtotal: newPrice * li.qty };
+        });
+        const newSubtotal = updatedLineItems.reduce((s, li) => s + li.lineSubtotal, 0);
+        const sgstAmt = Math.round(updatedLineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
+        updatePO(poKey, { items: updatedLineItems, subtotal: newSubtotal, sgstAmt, cgstAmt: sgstAmt, grandTotal: newSubtotal + sgstAmt * 2 });
+      }
+      return updated;
+    });
+  };
+
   return (
     <div style={{ fontFamily: "'Inter','Segoe UI',sans-serif", background: "#ffffff", minHeight: "100vh", color: "#111827" }}>
       <div style={{ maxWidth: 1360, margin: "0 auto", padding: "28px 24px 60px" }}>
@@ -797,12 +861,22 @@ export default function VendorOrderDetailPage() {
             </div>
           </div>
           {!isCancelled && (
-            <button
-              onClick={() => setShowCancelPO(true)}
-              style={{ padding: "9px 20px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit", flexShrink: 0 }}
-            >
-              Cancel PO
-            </button>
+            <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+              {orderStatus === "Draft" && (
+                <button
+                  onClick={handleConfirmPO}
+                  style={{ padding: "9px 20px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+                >
+                  ✓ Confirm Purchase Order
+                </button>
+              )}
+              <button
+                onClick={() => setShowCancelPO(true)}
+                style={{ padding: "9px 20px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+              >
+                Cancel PO
+              </button>
+            </div>
           )}
         </div>
 
@@ -865,9 +939,21 @@ export default function VendorOrderDetailPage() {
               </div>
             </div>
             <Stepper currentStatus={orderStatus} />
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
               {isCancelled ? (
                 <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
+              ) : orderStatus === "Draft" ? (
+                <>
+                  <span style={{ fontSize: 12.5, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 7, padding: "6px 12px", fontWeight: 500 }}>
+                    Draft – Review items, then confirm to send to vendor
+                  </span>
+                  <button
+                    onClick={handleConfirmPO}
+                    style={{ padding: "8px 18px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+                  >
+                    ✓ Confirm Purchase Order
+                  </button>
+                </>
               ) : (
                 <UpdateStatusDropdown current={orderStatus} onChange={setOrderStatus} />
               )}

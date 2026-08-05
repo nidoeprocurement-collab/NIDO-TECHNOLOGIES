@@ -50,6 +50,20 @@ export default function ReviewPage() {
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
 
+  // Read saved payment terms (selected on the checkout page)
+  const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
+  const paymentTermsLabel = (() => {
+    const map: Record<string, string> = {
+      "Net 30": "Net 30 (Payment due in 30 days)",
+      "Net 45": "Net 45 (Payment due in 45 days)",
+      "Net 60": "Net 60 (Payment due in 60 days)",
+      "Net 90": "Net 90 (Payment due in 90 days)",
+      "Immediate": "Immediate (Payment on delivery)",
+      "Advance": "Advance (Payment before dispatch)",
+    };
+    return map[selectedPaymentTerms] || selectedPaymentTerms;
+  })();
+
   // Read saved payment selection
   const savedPayment: Record<string, string> = (() => {
     try { return JSON.parse(localStorage.getItem("nido_payment_selection") || "{}"); } catch { return {}; }
@@ -150,7 +164,7 @@ export default function ReviewPage() {
       totalAmountNum: totalAmount,
       paymentMethod: paymentSummary.label,
       paymentDetail: paymentSummary.detail,
-      paymentTerms: "Net 30 (Payment due in 30 days)",
+      paymentTerms: paymentTermsLabel,
       deliveryAddress: selectedAddr
         ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
             .filter(Boolean).join(", ")
@@ -197,7 +211,7 @@ export default function ReviewPage() {
           : null,
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
-        paymentTerms: "Net 30 (Payment due in 30 days)",
+        paymentTerms: paymentTermsLabel,
         clientEmail: "owner@nidotech.com",
         clientName: "Nido Tech CorpEssentials",
       },

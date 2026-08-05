@@ -396,6 +396,12 @@ export default function CartPage() {
                                     <span className="text-blue-600 font-medium">{item.leadTime}</span>
                                   </p>
                                 )}
+                                {item.totalStock != null && item.totalStock > 0 && (
+                                  <p className="mb-0.5">
+                                    <span className="font-medium text-gray-500">Vendor Stock:</span>{" "}
+                                    <span className="text-gray-700 font-medium">{item.totalStock.toLocaleString("en-IN")} units</span>
+                                  </p>
+                                )}
                               </div>
                             )}
                             {discountPct > 0 && (

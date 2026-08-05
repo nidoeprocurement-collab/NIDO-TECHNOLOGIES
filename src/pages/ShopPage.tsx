@@ -642,7 +642,10 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                   <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 6 }}>★ Recommended</span>
                   <span className="text-[11px] font-semibold text-gray-800 truncate">{vendorComps[0].vendorName}</span>
                 </div>
-                <span className="text-[11px] text-gray-700 font-bold shrink-0 ml-1">₹{vendorComps[0].landedCostPerUnit.toLocaleString("en-IN")}</span>
+                <div className="flex flex-col items-end shrink-0 ml-1">
+                  <span className="text-[11px] text-gray-700 font-bold">₹{vendorComps[0].landedCostPerUnit.toLocaleString("en-IN")}</span>
+                  <span className="text-[9px] text-gray-400">Base ₹{vendorComps[0].basePrice.toLocaleString("en-IN")}</span>
+                </div>
               </button>
             )}
             {vendorComps.length > 1 && (
@@ -650,27 +653,36 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                 className="w-full text-left text-[10px] text-blue-600 font-semibold pb-1 hover:underline"
                 onClick={() => setVendorPanelOpen(v => !v)}
               >
-                {vendorPanelOpen ? "Hide" : `+${vendorComps.length - 1} more vendor${vendorComps.length > 2 ? "s" : ""} →`}
+                {vendorPanelOpen ? "Hide Vendor Selection Tab" : `Vendor Selection Tab · ${vendorComps.length - 1} more vendor${vendorComps.length > 2 ? "s" : ""} →`}
               </button>
             )}
             {vendorPanelOpen && (
               <div className="border border-gray-100 rounded-lg overflow-hidden mb-1">
+                <div className="grid px-2 py-1 bg-gray-50 border-b border-gray-100" style={{ gridTemplateColumns: "1fr 60px 60px 50px" }}>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">Vendor</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Base</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Landed</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide text-right">Stock</span>
+                </div>
                 {vendorComps.map((comp, i) => {
                   const badge = getVendorBadge(comp, vendorComps);
                   return (
                     <button
                       key={comp.vendorId}
                       onClick={() => { setSelectedVendor(comp); setVendorPanelOpen(false); }}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-blue-50 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}
+                      className={`w-full grid px-2 py-1.5 text-left hover:bg-blue-50 transition-colors items-center ${i > 0 ? "border-t border-gray-100" : ""}`}
+                      style={{ gridTemplateColumns: "1fr 60px 60px 50px" }}
                     >
-                      <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-1">
+                      <div className="flex flex-col min-w-0 pr-1">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <span className="text-[11px] font-semibold text-gray-800 truncate">{comp.vendorName}</span>
                           {badge && <span style={{ background: badge.bg, color: badge.color, fontSize: 8, fontWeight: 700, padding: "1px 4px", borderRadius: 4, whiteSpace: "nowrap" }}>{badge.label}</span>}
                         </div>
-                        <span className="text-[10px] text-gray-400">{comp.stock > 0 ? `${comp.stock} in stock` : "No stock"}{comp.leadTime > 0 ? ` · ${comp.leadTime * 2}d lead` : ""}</span>
+                        <span className="text-[10px] text-gray-400">{comp.leadTime > 0 ? `${comp.leadTime * 2}d lead` : "—"} · ★{comp.rating.toFixed(1)}</span>
                       </div>
-                      <span className="text-[11px] font-bold text-gray-900 shrink-0 ml-2">₹{comp.landedCostPerUnit.toLocaleString("en-IN")}</span>
+                      <span className="text-[10px] text-gray-600 text-right">₹{comp.basePrice.toLocaleString("en-IN")}</span>
+                      <span className="text-[11px] font-bold text-gray-900 text-right">₹{comp.landedCostPerUnit.toLocaleString("en-IN")}</span>
+                      <span className="text-[10px] text-gray-500 text-right">{comp.stock > 0 ? comp.stock : "—"}</span>
                     </button>
                   );
                 })}

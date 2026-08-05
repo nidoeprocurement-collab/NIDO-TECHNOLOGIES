@@ -239,6 +239,49 @@ export function releaseVendorReservation(
 }
 
 /**
+ * Convert `qty` units from Reserved → Allocated when a Draft PO is confirmed.
+ * Decrements both reservedStock and physicalStock so the items are committed
+ * to the order (no longer just tentatively held). Available stock stays the
+ * same (physicalStock − reservedStock unchanged), but physicalStock correctly
+ * reflects the items are now allocated and will leave the warehouse.
+ */
+export function convertReservedToAllocated(
+  vendorId: string,
+  masterProductCode: string,
+  qty: number,
+  reference = 'PO Confirmed',
+): void {
+  if (qty <= 0) return;
+  const products = getVendorProducts(vendorId);
+  const product = products.find(p => p.masterProductCode === masterProductCode);
+  if (!product) return;
+  const currentReserved = parseInt(product.reservedStock ?? '0') || 0;
+  const currentPhysical = parseInt(product.physicalStock ?? product.stock ?? '0') || 0;
+  const convertQty = Math.min(qty, currentReserved);
+  if (convertQty <= 0) return;
+  const newReserved = currentReserved - convertQty;
+  const newPhysical = Math.max(0, currentPhysical - convertQty);
+  updateVendorProduct(vendorId, product.id, {
+    reservedStock: String(newReserved),
+    physicalStock: String(newPhysical),
+    stock: String(newPhysical),
+  }, true);
+  recordStockEvent({
+    masterProductCode,
+    productName: product.productName,
+    vendorId,
+    vendorName: getVendorById(vendorId)?.name || vendorId,
+    action: 'PO Confirmed – Reserved→Allocated',
+    field: 'physicalStock',
+    qtyBefore: currentPhysical,
+    qtyChanged: -convertQty,
+    qtyAfter: newPhysical,
+    reference,
+    user: getCurrentUser(),
+  });
+}
+
+/**
  * Deduct `qty` units of physicalStock from the PO vendor, and release `qty`
  * units of reservedStock from whichever vendor(s) actually hold the reservation.
  *
