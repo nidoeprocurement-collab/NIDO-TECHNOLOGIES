@@ -1812,6 +1812,10 @@ export default function MyOrderPage() {
   const [createdPOs, setCreatedPOs] = useState<Record<string, any>>(() => {
     try { return JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}"); } catch { return {}; }
   });
+  // Incremented whenever a PO is created or updated so getAllPOs() inline calls
+  // re-run and the Draft Purchase Orders tab / badge reflects the latest data
+  // without needing a page reload.
+  const [poRefreshKey, setPoRefreshKey] = useState(0);
   const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
   });
@@ -1933,6 +1937,22 @@ export default function MyOrderPage() {
     window.addEventListener("poCancelled", onPOCancelled);
     return () => window.removeEventListener("poCancelled", onPOCancelled);
   }, [orderId]);
+
+  // Re-render whenever a PO is saved (same tab) or written from another tab,
+  // so the Draft Purchase Orders tab badge and content stay in sync without
+  // a page reload.
+  useEffect(() => {
+    const refresh = () => setPoRefreshKey(k => k + 1);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "nido_all_purchase_orders") refresh();
+    };
+    window.addEventListener("poCreated", refresh);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const handleOpenVendorModal = (sub: any) => {
     // Vendor sourcing is not applicable once the order is Cancelled/Draft.
@@ -2121,7 +2141,9 @@ export default function MyOrderPage() {
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
 
-  const draftPOCount = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft").length;
+  // poRefreshKey is updated by the poCreated/storage listeners above so this
+  // expression re-runs whenever POs are added or changed.
+  const draftPOCount = (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId && po.status === "Draft").length;
 
   // Client portal: no PO number or vendor-selection columns — it's a
   // read-only, vendor-agnostic view of the sub-orders.
