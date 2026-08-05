@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPOByNumber, updatePO, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf } from "@/lib/generatePO";
+import { sendEmail } from "@/lib/emailApi";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -773,14 +774,73 @@ export default function VendorOrderDetailPage() {
   const handleConfirmPO = () => {
     const po = getPOByNumber(poKey);
     if (!po || po.status !== "Draft") return;
-    // Convert reserved stock → allocated for every line item
+
+    // 1. Convert reserved stock → allocated for every line item
     for (const li of po.items) {
       if (li.productCode && po.vendorId && li.qty > 0) {
         convertReservedToAllocated(po.vendorId, li.productCode, li.qty, po.poNumber);
       }
     }
-    updatePO(poKey, { status: "Confirmed" });
+
+    // 2. Create audit log note inside the PO
+    const now = new Date();
+    const dateStr =
+      now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
+      " " +
+      now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const auditNote: PONote = {
+      id: "audit_confirm_" + Date.now(),
+      author: "System",
+      initials: "SY",
+      color: "#059669",
+      date: dateStr,
+      text: `Purchase Order ${po.poNumber} confirmed. Status changed from Draft to Confirmed. Reserved stock converted to allocated. Vendor notification and email dispatched to ${po.vendorName} (${po.vendorEmail || "—"}).`,
+      visibility: "Internal Note",
+    };
+    const updatedNotes = [auditNote, ...(po.notes || [])];
+
+    // 3. Update PO status to Confirmed + persist audit note
+    updatePO(poKey, { status: "Confirmed", notes: updatedNotes });
     setOrderStatus("Confirmed");
+    setNotes(updatedNotes);
+
+    // 4. Send vendor email notification
+    if (po.vendorEmail) {
+      sendEmail({
+        templateKey: "purchase_order_confirmed",
+        to: po.vendorEmail,
+        variables: {
+          vendor_name: po.vendorName,
+          po_number: po.poNumber,
+          order_id: po.orderId,
+          grand_total: po.grandTotal,
+          payment_terms: po.paymentTerms || "—",
+          delivery_address: po.vendorAddress || "—",
+        },
+        triggerModule: "purchase_orders",
+        sentBy: "System",
+        dedupeKey: `po_confirm_${po.poNumber}`,
+      }).catch(() => {
+        // Email service may not be configured yet — log silently, PO is still confirmed
+        console.warn(`[PO Confirm] Email to ${po.vendorEmail} could not be sent — email service not configured.`);
+      });
+    }
+
+    // 5. Dispatch vendor notification event (for in-app notification listeners)
+    try {
+      window.dispatchEvent(
+        new CustomEvent("vendorNotified", {
+          detail: {
+            poNumber: po.poNumber,
+            vendorId: po.vendorId,
+            vendorName: po.vendorName,
+            orderId: po.orderId,
+          },
+        })
+      );
+    } catch {
+      /* SSR safe */
+    }
   };
 
   // ── Inline-edit qty / unit price on Draft items ───────────────────────────────
