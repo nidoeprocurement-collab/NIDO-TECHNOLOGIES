@@ -637,43 +637,25 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               <option value="">— Select a vendor —</option>
               {vendorComps.map((comp, i) => {
                 const badge = i === 0 ? "★ Recommended" : (getVendorBadge(comp, vendorComps)?.label ?? "");
-                const label = comp.primaryContact || comp.vendorName;
+                const contactName = comp.primaryContact || comp.vendorName;
+                const moqPart = comp.moq > 0 ? `MOQ: ${comp.moq}` : "MOQ: —";
+                const leadPart = comp.leadTime > 0 ? `Lead: ${comp.leadTime * 2}d` : "Lead: —";
+                const stockPart = comp.stock > 0 ? `Stock: ${comp.stock}` : "Stock: 0";
+                const details = `${moqPart} · ${leadPart} · ${stockPart}`;
+                const prefix = badge ? `[${badge}] ` : "";
                 return (
                   <option key={comp.vendorId} value={comp.vendorId}>
-                    {badge ? `[${badge}] ${label}` : label}
+                    {`${prefix}${contactName} — ${details}`}
                   </option>
                 );
               })}
             </select>
-            {selectedVendor && (
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500 flex-wrap">
-                <span className="flex items-center gap-0.5">
-                  <Check size={9} className="text-blue-600" />
-                  <span className="font-semibold text-blue-700">{selectedVendor.primaryContact || selectedVendor.vendorName}</span>
-                </span>
-                <span>·</span>
-                <span>★ {selectedVendor.rating.toFixed(1)}</span>
-                <span>·</span>
-                <span>{selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2}d lead` : "—"}</span>
-                <span>·</span>
-                <span>{selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString("en-IN")} in stock` : "Out of stock"}</span>
-              </div>
-            )}
           </div>
         )}
       </div>
 
       {/* Footer */}
       <div className="px-3 pb-3 mt-auto pt-2">
-        {/* MOQ · Lead Time · Stock — always visible */}
-        <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-1 flex-wrap">
-          <span>MOQ: {formatMoq(product.moq)}</span>
-          <span>·</span>
-          <span>Lead Time: {selectedVendor && selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : formatLeadTime(product.leadTime)}</span>
-          <span>·</span>
-          <span>Stock: {selectedVendor ? (selectedVendor.stock > 0 ? selectedVendor.stock.toLocaleString("en-IN") : "—") : (product.totalStock > 0 ? product.totalStock.toLocaleString("en-IN") : "—")}</span>
-        </div>
-
         {/* Selling price — shown only after vendor is selected */}
         {selectedVendor && (
           <div className="flex items-center justify-between mb-1.5">
