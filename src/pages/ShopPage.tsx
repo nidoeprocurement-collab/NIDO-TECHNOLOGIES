@@ -8,7 +8,7 @@ import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogSt
 import { getClients as getStoredClients } from "@/lib/clientStore";
 import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct, computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getProductTotalAvailableStock } from "@/lib/vendorStore";
-import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -532,6 +532,14 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const displayPrice = selectedVendor ? selectedVendor.landedCostPerUnit : cardEffectivePrice;
   const displayPriceLabel = selectedVendor ? "landed cost" : "excl. GST";
 
+  // Compute HSN code for this product's category (same logic as CartPage)
+  const hsnForCategory = (() => {
+    const map = new Map<string, string>();
+    getHsnCodes().forEach(h => { if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code); });
+    getProductCategoryTaxMap().forEach(m => { if (m.defaultHsnCode && m.productCategory) map.set(m.productCategory.toLowerCase(), m.defaultHsnCode); });
+    return map.get((product.category || "").toLowerCase()) || "";
+  })();
+
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!product.inStock || adding || !selectedVendor) return;
@@ -554,6 +562,8 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         vendorPrice: selectedVendor.basePrice,
         landedCost: selectedVendor.landedCostPerUnit,
         gstSnapshot: cardGstRate,
+        hsnSnapshot: hsnForCategory,
+        vendorRating: selectedVendor.rating,
       },
       Math.max(1, qty)
     );

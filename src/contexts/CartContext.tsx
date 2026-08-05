@@ -32,6 +32,8 @@ export type CartItem = {
   gstSnapshot?: number;
   /** HSN code captured at time of add. */
   hsnSnapshot?: string;
+  /** Vendor rating (0-5) captured at time of add. */
+  vendorRating?: number;
   /** Single-entry allocation record — kept for order-cancellation stock-release path. */
   vendorAllocations: StockAllocation[];
 };

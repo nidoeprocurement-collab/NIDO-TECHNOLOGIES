@@ -26,11 +26,12 @@ export interface PONote {
 
 export type POStatus =
   | "Draft"
-  | "Processing"
   | "Confirmed"
-  | "Shipped"
+  | "Vendor Notified"
+  | "Accepted"
+  | "Dispatched"
   | "Delivered"
-  | "Closed"
+  | "Completed"
   | "Cancelled";
 
 /** One line-item inside a multi-item PO */

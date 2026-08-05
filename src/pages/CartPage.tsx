@@ -370,18 +370,33 @@ export default function CartPage() {
                               ))}
                             </ul>
                             {item.selectedVendorName && (
-                              <p className="text-xs text-gray-600 mb-0.5 mt-1">
-                                <span className="font-medium">Vendor:</span>{" "}
-                                <span className="inline-flex items-center gap-1">
-                                  <span className="w-4 h-4 rounded-full bg-blue-600 text-white inline-flex items-center justify-center text-[9px] font-bold shrink-0">
-                                    {item.selectedVendorName[0].toUpperCase()}
+                              <div className="mt-1 text-xs text-gray-600">
+                                <p className="mb-0.5">
+                                  <span className="font-medium">Vendor:</span>{" "}
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="w-4 h-4 rounded-full bg-blue-600 text-white inline-flex items-center justify-center text-[9px] font-bold shrink-0">
+                                      {item.selectedVendorName[0].toUpperCase()}
+                                    </span>
+                                    {item.selectedVendorName}
                                   </span>
-                                  {item.selectedVendorName}
-                                </span>
-                                {item.landedCost && item.landedCost > 0 && (
-                                  <span className="text-gray-400 ml-1">· ₹{item.landedCost.toLocaleString("en-IN")} landed</span>
+                                  {item.landedCost && item.landedCost > 0 && (
+                                    <span className="text-gray-400 ml-1">· ₹{item.landedCost.toLocaleString("en-IN")} landed</span>
+                                  )}
+                                </p>
+                                {item.vendorRating != null && item.vendorRating > 0 && (
+                                  <p className="mb-0.5">
+                                    <span className="font-medium text-gray-500">Rating:</span>{" "}
+                                    <span className="text-amber-500 font-semibold">{"★".repeat(Math.round(item.vendorRating))}</span>{" "}
+                                    <span className="text-gray-500">{item.vendorRating.toFixed(1)}/5</span>
+                                  </p>
                                 )}
-                              </p>
+                                {item.leadTime && (
+                                  <p className="mb-0.5">
+                                    <span className="font-medium text-gray-500">Lead Time:</span>{" "}
+                                    <span className="text-blue-600 font-medium">{item.leadTime}</span>
+                                  </p>
+                                )}
+                              </div>
                             )}
                             {discountPct > 0 && (
                               <p className="text-[10px] text-green-600 font-semibold mt-1.5 bg-green-50 rounded px-1.5 py-0.5 inline-block">
