@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
+import { releaseVendorReservation } from "@/lib/vendorStore";
 import { getSlabDiscountPct, getAllProductPricing, type VendorStockAllocation } from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
@@ -402,6 +403,18 @@ export default function CartPage() {
                                     <span className="text-gray-700 font-medium">{item.totalStock.toLocaleString("en-IN")} units</span>
                                   </p>
                                 )}
+                                <button
+                                  onClick={() => {
+                                    if (item.selectedVendorId && item.productCode) {
+                                      releaseVendorReservation(item.selectedVendorId, item.productCode, item.quantity);
+                                    }
+                                    onRemove(item.id);
+                                    navigate("/shop");
+                                  }}
+                                  className="mt-1.5 text-[11px] text-blue-600 font-semibold hover:underline cursor-pointer"
+                                >
+                                  ↩ Change Vendor
+                                </button>
                               </div>
                             )}
                             {discountPct > 0 && (

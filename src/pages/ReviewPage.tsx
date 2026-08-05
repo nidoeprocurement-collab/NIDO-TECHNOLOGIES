@@ -181,6 +181,15 @@ export default function ReviewPage() {
         clientId: i.clientId,
         productCode: i.productCode,
         vendorAllocations: i.vendorAllocations,
+        // Vendor snapshot locked at add-to-cart time — travels with the order
+        selectedVendorId: i.selectedVendorId,
+        selectedVendorName: i.selectedVendorName,
+        vendorPrice: i.vendorPrice,
+        landedCost: i.landedCost,
+        gstSnapshot: i.gstSnapshot,
+        hsnSnapshot: i.hsnSnapshot,
+        vendorRating: i.vendorRating,
+        stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
       })) satisfies OrderCartItem[],
     });
 

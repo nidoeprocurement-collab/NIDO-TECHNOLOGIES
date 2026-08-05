@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
-import { savePO, generatePoNumber, type StoredPO, type POLineItem } from "../lib/purchaseOrderStore";
+import { savePO, generatePoNumber, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
 import { getVendorById } from "../lib/vendorDataStore";
 import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
 
@@ -36,6 +36,9 @@ export interface OrderCartItem {
   landedCost?: number;
   gstSnapshot?: number;
   hsnSnapshot?: string;
+  vendorRating?: number;
+  /** Unique ID for the stock reservation placed at checkout — used for auditing and release on cancellation */
+  stockReservationId?: string;
 }
 
 export interface MyOrder {
@@ -201,6 +204,17 @@ function autoCreateDraftPOs(
 
     const vendorAddrParts = [vendor?.addressLine1, vendor?.addressLine2, vendor?.city, vendor?.state, vendor?.zipCode].filter(Boolean);
 
+    const grandTotal = subtotal + sgstAmt + cgstAmt;
+    const creationNote: PONote = {
+      id: "audit_created_" + Date.now() + "_" + vendorId,
+      author: "System",
+      initials: "SY",
+      color: "#6b7280",
+      date: displayDate,
+      text: `Draft PO ${poNumber} automatically created for order ${orderId}. Vendor: ${vendor?.name || vendorId}. ${lineItems.length} item${lineItems.length !== 1 ? "s" : ""} — Grand Total ₹${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. Awaiting admin review and confirmation.`,
+      visibility: "Internal Note",
+    };
+
     const po: StoredPO = {
       poNumber,
       orderId,
@@ -232,14 +246,14 @@ function autoCreateDraftPOs(
       cgstPct: halfGst,
       sgstAmt,
       cgstAmt,
-      grandTotal: subtotal + sgstAmt + cgstAmt,
+      grandTotal,
       paymentTerms: paymentTerms || "Net 30",
       status: "Draft",
       createdOn: now.toISOString(),
       createdOnDisplay: displayDate,
       requestedDelivery: "",
       documents: [],
-      notes: [],
+      notes: [creationNote],
     };
 
     try {

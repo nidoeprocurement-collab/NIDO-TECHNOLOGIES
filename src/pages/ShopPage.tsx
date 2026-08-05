@@ -491,11 +491,20 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 function getVendorBadge(comp: VendorComparisonRow, all: VendorComparisonRow[]): { label: string; color: string; bg: string } | null {
   if (all.length === 0) return null;
   if (comp.vendorId === all[0]?.vendorId) return { label: "Recommended", color: "#1d4ed8", bg: "#eff6ff" };
+  const others = all.filter(c => c.vendorId !== all[0]?.vendorId);
   const minLT = Math.min(...all.map(c => c.leadTime));
   if (comp.leadTime === minLT && minLT > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Fastest", color: "#059669", bg: "#f0fdf4" };
+  const minPrice = others.length > 0 ? Math.min(...others.map(c => c.basePrice)) : Infinity;
+  if (comp.basePrice <= minPrice && comp.vendorId !== all[0]?.vendorId) return { label: "Best Price", color: "#d97706", bg: "#fffbeb" };
   const maxRating = Math.max(...all.map(c => c.rating));
-  if (comp.rating === maxRating && maxRating > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Top Rated", color: "#7c3aed", bg: "#faf5ff" };
+  if (comp.rating === maxRating && maxRating > 0 && comp.vendorId !== all[0]?.vendorId) return { label: "Preferred", color: "#7c3aed", bg: "#faf5ff" };
   return null;
+}
+
+function getExpectedDelivery(leadTimeDays: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + leadTimeDays * 2);
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
@@ -694,10 +703,15 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
       {/* Footer */}
       <div className="px-3 pb-3 mt-auto pt-2">
-        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
+        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
           <span>Lead Time: {selectedVendor && selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : formatLeadTime(product.leadTime)}</span>
           <span>MOQ: {formatMoq(product.moq)}</span>
         </div>
+        {selectedVendor && selectedVendor.leadTime > 0 && (
+          <div className="text-[10px] text-gray-400 mb-1.5">
+            Expected Delivery: <span className="text-gray-700 font-semibold">{getExpectedDelivery(selectedVendor.leadTime)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-2">
           {cardDiscountPct > 0 && !selectedVendor ? (
             <div className="flex flex-col">

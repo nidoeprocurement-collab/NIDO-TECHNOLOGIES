@@ -4,6 +4,7 @@ import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { savePO, generatePoNumber, updatePO, getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
