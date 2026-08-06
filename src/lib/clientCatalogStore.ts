@@ -12,6 +12,7 @@ export interface ClientCatalogEntry {
   price: string;
   availability: string;
   img: string;
+  images?: string[];   // all product images from master catalog
   // enriched from master catalog for Shop display
   description?: string;
   specs?: string[];        // "Key: Value" formatted

@@ -29,6 +29,7 @@ type Product = {
   name: string;
   category: string;
   image: string;
+  images?: string[];
   specs: string[];
   leadTime: string;
   moq: number;
@@ -129,12 +130,17 @@ function prefOrder(pref?: string): number {
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
   const totalStock = match?.totalStock ?? 0;
+  // Build the images array: use stored array when available, else wrap single img
+  const images = e.images && e.images.length > 0
+    ? e.images
+    : e.img ? [e.img] : [];
   return {
     id: `client-${e.productCode}`,
     productCode: e.productCode,
     name: e.name,
     category: e.category || "General",
-    image: e.img || "",
+    image: images[0] || "",
+    images,
     specs: e.specs || [],
     leadTime: match?.leadTime || e.leadTime || "",
     moq: match?.moq ?? e.moq ?? 0,
@@ -193,9 +199,11 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   const [added, setAdded] = useState(false);
   const [editingMoq, setEditingMoq] = useState(false);
   const [moqDraft, setMoqDraft] = useState(String(product?.moq ?? 0));
+  const [selectedImage, setSelectedImage] = useState<string>(product?.image ?? "");
 
   useEffect(() => { if (product) { const v = Math.max(1, product.moq); setQty(v); setQtyDraft(String(v)); } }, [product]);
   useEffect(() => { if (product) setMoqDraft(String(product.moq)); }, [product?.moq]);
+  useEffect(() => { if (product) setSelectedImage(product.image ?? ""); }, [product?.id]);
 
   const dialogMaxQty = product ? (product.totalStock > 0 ? product.totalStock : undefined) : undefined;
 
@@ -271,24 +279,40 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
             {/* Image column: thumbnail rail + main image */}
             <div className="w-[340px] shrink-0">
               <div className="flex gap-3">
-                <div className="flex flex-col gap-2 shrink-0">
-                  <div className="w-14 h-14 rounded-lg border-2 border-blue-500 bg-gray-50 overflow-hidden flex items-center justify-center">
-                    {product.image ? (
-                      <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="scale-[0.35] origin-center">{getProductIcon(product.name, product.category)}</div>
+                {/* Thumbnail rail */}
+                {(product.images && product.images.length > 0) && (
+                  <div className="flex flex-col gap-2 shrink-0">
+                    {product.images.slice(0, 4).map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedImage(img)}
+                        className={`w-14 h-14 rounded-lg border-2 bg-gray-50 overflow-hidden flex items-center justify-center transition-all ${selectedImage === img ? "border-blue-500 shadow-sm" : "border-gray-200 hover:border-blue-300"}`}
+                      >
+                        <img src={img} alt={`${product.name} view ${i + 1}`} className="w-full h-full object-contain" />
+                      </button>
+                    ))}
+                    {product.images.length > 4 && (
+                      <button
+                        onClick={() => setSelectedImage(product.images![4])}
+                        className={`w-14 h-14 rounded-lg border-2 bg-gray-50 overflow-hidden flex items-center justify-center transition-all ${product.images.slice(4).includes(selectedImage) ? "border-blue-500 shadow-sm" : "border-gray-200 hover:border-blue-300"}`}
+                      >
+                        <span className="text-xs font-semibold text-gray-600">+{product.images.length - 4}</span>
+                      </button>
                     )}
                   </div>
-                </div>
+                )}
+                {/* Main image */}
                 <div className="flex-1 aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50">
-                  {product.image ? (
+                  {selectedImage ? (
+                    <ZoomableImage src={selectedImage} alt={product.name} />
+                  ) : product.image ? (
                     <ZoomableImage src={product.image} alt={product.name} />
                   ) : (
                     getProductIcon(product.name, product.category)
                   )}
                 </div>
               </div>
-              {product.image && (
+              {(selectedImage || product.image) && (
                 <p className="text-xs text-gray-400 mt-2 flex items-center gap-1 justify-center">
                   <ZoomIn size={12} /> Hover image to zoom
                 </p>

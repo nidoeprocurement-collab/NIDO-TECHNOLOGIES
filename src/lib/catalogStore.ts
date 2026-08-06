@@ -145,6 +145,7 @@ export function saveCatalogProduct(product: CatalogProduct): void {
           name:         product.productName,
           category:     product.category,
           img:          product.images?.[0] ?? (e.img as string) ?? '',
+          images:       product.images ?? [],
           description:  product.description,
           specs,
           generalSpecs,
