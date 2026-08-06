@@ -624,11 +624,17 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     >
       {/* Product identity — centered image with details beneath, matching the reference */}
       <div className="relative flex flex-col items-center border-b border-gray-100 pb-3">
-        <div className="flex h-[155px] w-full max-w-[235px] items-center justify-center overflow-hidden rounded-xl bg-gray-50">
+        <div className="flex h-[155px] w-full max-w-[235px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-gray-50 via-white to-blue-50/40 p-2">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.02]" />
+            <img
+              src={product.image}
+              alt={product.name}
+              loading="lazy"
+              decoding="async"
+              className="block max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
+            />
           ) : (
-            <div className="h-full w-full">
+            <div className="h-full w-full overflow-hidden rounded-lg">
               {getProductIcon(product.name, product.category)}
             </div>
           )}
