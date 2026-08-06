@@ -643,7 +643,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   return (
     <div
-      className="group relative flex h-full flex-col overflow-visible rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.09)] cursor-pointer"
+      className={`group relative flex h-full flex-col overflow-visible rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.09)] cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
       {/* Product identity — centered image with details beneath, matching the reference */}
