@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2 } from "lucide-react";
+import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Star, Tag, Plus } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
@@ -520,34 +520,15 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 // ── Product Card ─────────────────────────────────────────────────────────────
 
-// ── Vendor badge helper ───────────────────────────────────────────────────────
-function getVendorBadge(comp: VendorComparisonRow, all: VendorComparisonRow[]): { label: string; color: string; bg: string } | null {
-  const recommended = all.find(c => c.stock > 0);
-  if (all.length === 0 || !recommended || comp.stock <= 0) return null;
-  if (comp.vendorId === recommended.vendorId) return { label: "Recommended", color: "#1d4ed8", bg: "#eff6ff" };
-  const inStock = all.filter(c => c.stock > 0 && c.vendorId !== recommended.vendorId);
-  const minLT = Math.min(...inStock.map(c => c.leadTime));
-  if (comp.leadTime === minLT && minLT > 0 && comp.vendorId !== recommended.vendorId) return { label: "Fastest", color: "#059669", bg: "#f0fdf4" };
-  const others = all.filter(c => c.stock > 0 && c.vendorId !== recommended.vendorId);
-  const minPrice = others.length > 0 ? Math.min(...others.map(c => c.basePrice)) : Infinity;
-  if (comp.basePrice <= minPrice && comp.vendorId !== recommended.vendorId) return { label: "Best Price", color: "#d97706", bg: "#fffbeb" };
-  return null;
-}
-
-function getExpectedDelivery(leadTimeDays: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + leadTimeDays * 2);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
-
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(Math.max(1, product.moq));
-  const [qtyDraft, setQtyDraft] = useState(String(Math.max(1, product.moq)));
   const [adding, setAdding] = useState(false);
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [liked, setLiked] = useState(false);
   const vendorSelectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -572,26 +553,21 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     const handleOutsidePointerDown = (event: PointerEvent) => {
       if (!vendorSelectionRef.current?.contains(event.target as Node)) {
         setVendorPanelOpen(false);
+        setVendorSearch("");
       }
     };
-
     document.addEventListener("pointerdown", handleOutsidePointerDown);
     return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
   }, []);
 
-  const maxQty = selectedVendor ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined) : (product.totalStock > 0 ? product.totalStock : undefined);
+  const maxQty = selectedVendor
+    ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
+    : (product.totalStock > 0 ? product.totalStock : undefined);
+
   const recommendedVendor = vendorComps.find(comp => comp.stock > 0) ?? null;
 
-  const commitCardQty = () => {
-    const min = Math.max(1, product.moq);
-    const parsed = parseInt(qtyDraft, 10);
-    let clamped = isNaN(parsed) || parsed < min ? min : parsed;
-    if (maxQty !== undefined) clamped = Math.min(maxQty, clamped);
-    setQty(clamped);
-    setQtyDraft(String(clamped));
-  };
-
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
+
   const selectedVendorSellingPrice = selectedVendor && clientId
     ? computeClientFinalPrice(
         selectedVendor.landedCostPerUnit,
@@ -601,7 +577,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       ).finalPrice
     : null;
 
-  // Compute HSN code for this product's category (same logic as CartPage)
   const hsnForCategory = (() => {
     const map = new Map<string, string>();
     getHsnCodes().forEach(h => { if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code); });
@@ -641,263 +616,339 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   const canAdd = product.inStock && !!selectedVendor;
 
+  // Parse specs into key/value pairs
+  const specPairs = product.specs.map(s => {
+    const idx = s.indexOf(': ');
+    return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: '', val: s };
+  });
+
+  // Filtered vendors by search
+  const filteredVendors = vendorSearch
+    ? vendorComps.filter(v => v.vendorName.toLowerCase().includes(vendorSearch.toLowerCase()))
+    : vendorComps;
+
+  // Display values
+  const displayMoq = selectedVendor ? (selectedVendor.moq > 0 ? `${selectedVendor.moq} Units` : '--') : '--';
+  const displayLeadTime = selectedVendor && selectedVendor.leadTime > 0
+    ? `${selectedVendor.leadTime * 2}-${selectedVendor.leadTime * 2 + 1} Days`
+    : '--';
+  const displayStock = selectedVendor
+    ? (selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString('en-IN')} Units` : 'Out of Stock')
+    : '--';
+  const displayPrice = selectedVendor
+    ? (clientId && selectedVendorSellingPrice
+        ? `₹${selectedVendorSellingPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : `₹${selectedVendor.basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+    : '--';
+
   return (
     <div
-      className={`group relative flex h-full flex-col overflow-visible rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.09)] cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
+      className={`group relative flex h-full flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
-      {/* Product identity — centered image with details beneath, matching the reference */}
-      <div className="relative flex flex-col items-center border-b border-gray-100 pb-3">
-        <div className="flex h-[155px] w-full max-w-[235px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-gray-50 via-white to-blue-50/40 p-2">
-          {product.image ? (
-            <img
-              src={product.image}
-              alt={product.name}
-              loading="lazy"
-              decoding="async"
-              className="block max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]"
-            />
-          ) : (
-            <div className="h-full w-full overflow-hidden rounded-lg">
-              {getProductIcon(product.name, product.category)}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-2 w-full min-w-0 text-center">
-          <h3 className="line-clamp-2 text-[13px] font-bold leading-[1.15] text-gray-950">{product.name}</h3>
-          <span className={`mt-1 block truncate text-[10px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
-        </div>
-
-        <div className="mt-3 w-full border-t border-gray-100 pt-2.5">
-          <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.08em] text-gray-600">Key specifications</p>
-          {product.specs.length > 0 ? (
-            <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
-              {product.specs.slice(0, 4).map((spec, i) => (
-                <li key={i} className="flex min-w-0 items-start gap-1 text-[9px] leading-[1.2] text-gray-600">
-                  <span className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-gray-400" />
-                  <span className="line-clamp-1">{spec}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-[9px] text-gray-400">Specifications unavailable</p>
-          )}
-        </div>
-
-        {product.inStock && (
-          <span className="absolute right-0 top-0 flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700">
-            <Check size={10} /> Ready
+      {/* Top row: In Stock badge + Heart */}
+      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+        {product.inStock ? (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            In Stock
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+            Out of Stock
           </span>
         )}
+        <button
+          onClick={e => { e.stopPropagation(); setLiked(l => !l); }}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <Heart size={14} className={liked ? "fill-red-500 text-red-500" : "text-gray-300"} />
+        </button>
       </div>
 
-      {/* Vendor Selection Section */}
-      <div ref={vendorSelectionRef} className="relative pt-2.5" onClick={e => e.stopPropagation()}>
-        {vendorComps.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-2.5 py-2 text-[10px] text-gray-400">No vendor pricing available</p>
+      {/* Product image */}
+      <div className="flex items-center justify-center px-3 py-2 h-[150px]">
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            className="max-h-full max-w-full object-contain"
+          />
         ) : (
-          <div className="relative flex items-stretch gap-2">
-            <button
-              type="button"
-              aria-haspopup="listbox"
-              aria-expanded={vendorPanelOpen}
-              onClick={() => setVendorPanelOpen(open => !open)}
-              className={`min-w-0 flex-1 rounded-xl border px-2.5 py-2 text-left transition-all ${
-                selectedVendor
-                  ? "border-blue-200 bg-blue-50/70 shadow-sm"
-                  : "border-dashed border-blue-200 bg-blue-50/40 hover:border-blue-300 hover:bg-blue-50/70"
-              }`}
-            >
-              {selectedVendor ? (
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-                    <Building2 size={13} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-1">
-                      <span className="truncate text-[10px] font-bold text-gray-900">{selectedVendor.vendorName}</span>
-                      {(() => {
-                        const badge = getVendorBadge(selectedVendor, vendorComps);
-                        return badge ? (
-                          <span
-                            className="shrink-0 rounded-full px-1 py-0.5 text-[8px] font-bold"
-                            style={{ color: badge.color, backgroundColor: badge.bg }}
-                          >
-                            {badge.label}
-                          </span>
-                        ) : null;
-                      })()}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[9px] text-gray-500">
-                      <span className="font-bold text-emerald-700">₹{(selectedVendorSellingPrice ?? 0).toLocaleString("en-IN")}</span>
-                      <span>/ price</span>
-                      <span>•</span>
-                      <span>{selectedVendor.stock.toLocaleString("en-IN")} in stock</span>
-                      <span>•</span>
-                      <span>{selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2}d delivery` : "Lead time —"}</span>
-                    </div>
-                  </div>
-                  <ChevronDown size={13} className={`shrink-0 text-blue-400 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-                    <Building2 size={13} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[10px] font-bold text-gray-800">
-                      {recommendedVendor ? `Recommended: ${recommendedVendor.vendorName}` : "No vendor in stock"}
-                    </p>
-                    <p className="truncate text-[9px] text-gray-500">
-                      {recommendedVendor ? "Compare price, delivery and stock" : "All listed vendors are out of stock"}
-                    </p>
-                  </div>
-                  <ChevronDown size={13} className={`shrink-0 text-blue-400 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
-                </div>
-              )}
-            </button>
-
-
-            {vendorPanelOpen && (
-              <div
-                role="listbox"
-                aria-label={`Vendors for ${product.name}`}
-                className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl shadow-gray-900/10"
-              >
-                <div className="flex items-center justify-between px-2 pb-1.5 pt-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Available vendors</span>
-                  <span className="text-[10px] text-gray-400">{vendorComps.length} option{vendorComps.length === 1 ? "" : "s"}</span>
-                </div>
-                <div className="max-h-64 overflow-y-auto space-y-1">
-                  {vendorComps.map((comp) => {
-                    const badge = getVendorBadge(comp, vendorComps);
-                    const isSelected = selectedVendor?.vendorId === comp.vendorId;
-                    const isOutOfStock = comp.stock <= 0;
-                    return (
-                      <button
-                        key={comp.vendorId}
-                        type="button"
-                        role="option"
-                        aria-selected={isSelected}
-                        disabled={isOutOfStock}
-                        onClick={() => {
-                          if (isOutOfStock) return;
-                          setSelectedVendor(comp);
-                          setVendorPanelOpen(false);
-                        }}
-                        className={`w-full rounded-lg border p-2 text-left transition-all ${
-                          isSelected
-                            ? "border-blue-300 bg-blue-50 ring-1 ring-blue-200"
-                            : isOutOfStock
-                              ? "border-transparent bg-gray-100/80 cursor-not-allowed"
-                              : "border-transparent bg-gray-50 hover:border-gray-200 hover:bg-white hover:shadow-sm"
-                        }`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSelected ? "bg-blue-600 text-white" : "bg-white text-gray-500 border border-gray-200"}`}>
-                            <Building2 size={13} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className={`text-[11px] font-bold truncate ${isOutOfStock ? "text-gray-500" : "text-gray-900"}`}>{comp.vendorName}</p>
-                                <p className="text-[9px] text-gray-500 truncate">{comp.primaryContact || "Primary contact unavailable"}</p>
-                              </div>
-                              {isOutOfStock ? (
-                                <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-red-600 bg-red-50">
-                                  Out of Stock
-                                </span>
-                              ) : badge && (
-                                <span
-                                  className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-                                  style={{ color: badge.color, backgroundColor: badge.bg }}
-                                >
-                                  {badge.label}
-                                </span>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
-                              {clientId && (
-                                <div>
-                                  <p className="text-[9px] text-gray-400">Price</p>
-                                  <p className="text-[11px] font-bold text-emerald-700">
-                                    ₹{computeClientFinalPrice(
-                                      comp.landedCostPerUnit,
-                                      getClientCommonSettings(clientId),
-                                      resolveClientProfitPct(clientId, product.productCode, product.category),
-                                      product.category,
-                                    ).finalPrice.toLocaleString("en-IN")}
-                                    <span className="font-normal text-gray-400"> / unit</span>
-                                  </p>
-                                </div>
-                              )}
-                              <div>
-                                <p className="text-[9px] text-gray-400">Delivery</p>
-                                <p className="text-[11px] font-semibold text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2} days` : "—"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-gray-400">Available stock</p>
-                                <p className={`text-[11px] font-semibold ${comp.stock > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                  {comp.stock > 0 ? `${comp.stock.toLocaleString("en-IN")} units` : "Out of Stock"}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[9px] text-gray-400">MOQ</p>
-                                <p className="text-[11px] font-semibold text-gray-700">{comp.moq > 0 ? `${comp.moq} units` : "—"}</p>
-                              </div>
-                            </div>
-                          </div>
-                          {isSelected && <Check size={15} className="text-blue-600 shrink-0 mt-1" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <div className="w-full h-full overflow-hidden rounded-xl">
+            {getProductIcon(product.name, product.category)}
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="mt-auto pt-2.5">
-        {!selectedVendor && !product.inStock ? (
-          <div className="flex items-center justify-center rounded-xl bg-gray-100 py-2 text-[10px] font-semibold text-gray-400">Out of Stock</div>
-        ) : (
-          <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={handleAdd}
-              disabled={!canAdd}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-semibold transition-all ${
-                !canAdd ? "cursor-not-allowed border border-dashed border-gray-300 bg-gray-100 text-gray-400" : adding ? "bg-emerald-600 text-white" : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-            >
-              {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
-              {adding ? "Added!" : !selectedVendor ? "Select a vendor first" : "Add to Cart"}
-            </button>
-            {selectedVendor && (
-              <div className="flex shrink-0 items-center gap-1 overflow-hidden rounded-xl border border-gray-200 bg-white">
-                <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-2 py-2 text-sm leading-none text-gray-600 hover:bg-gray-100">−</button>
+      {/* Name + Category */}
+      <div className="text-center px-3 pb-3 border-b border-gray-100">
+        <h3 className="text-[13px] font-bold text-gray-900 leading-snug line-clamp-2">{product.name}</h3>
+        <span className={`block mt-0.5 text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+      </div>
+
+      {/* Vendor selector */}
+      <div ref={vendorSelectionRef} className="relative px-3 pt-2.5" onClick={e => e.stopPropagation()}>
+        <p className="text-[10px] text-gray-500 mb-1">Vendor</p>
+        <button
+          type="button"
+          onClick={() => setVendorPanelOpen(o => !o)}
+          className="w-full flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-2 text-left hover:border-blue-300 transition-colors bg-white"
+        >
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+            <Building2 size={13} className="text-blue-600" />
+          </div>
+          {selectedVendor ? (
+            <div className="flex-1 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</span>
+              <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />
+              <span className="shrink-0 text-[8px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">Rec</span>
+            </div>
+          ) : (
+            <span className="flex-1 text-[11px] font-medium text-gray-500">Select Vendor</span>
+          )}
+          <ChevronDown size={13} className={`shrink-0 text-gray-400 transition-transform ${vendorPanelOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Vendor dropdown panel */}
+        {vendorPanelOpen && (
+          <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden">
+            {/* Header */}
+            <div className="px-3 py-2 border-b border-gray-100">
+              <p className="text-[12px] font-bold text-gray-800">Select Vendor</p>
+            </div>
+            {/* Search */}
+            <div className="px-2 py-2 border-b border-gray-100">
+              <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-200">
+                <Search size={11} className="text-gray-400 shrink-0" />
                 <input
-                  type="number"
-                  value={qtyDraft}
-                  min={Math.max(1, product.moq)}
-                  max={maxQty}
-                  onChange={e => setQtyDraft(e.target.value)}
-                  onBlur={commitCardQty}
-                  onKeyDown={e => e.key === "Enter" && commitCardQty()}
-                  className="w-7 border-0 text-center text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  value={vendorSearch}
+                  onChange={e => setVendorSearch(e.target.value)}
+                  placeholder="Search vendor..."
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 text-[11px] bg-transparent outline-none text-gray-700 placeholder-gray-400"
                 />
+              </div>
+            </div>
+            {/* Table header */}
+            <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1.2fr" }}>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Stock</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Price / Unit</span>
+            </div>
+            {/* Vendor rows */}
+            <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
+              {filteredVendors.map(comp => {
+                const isRecommended = recommendedVendor?.vendorId === comp.vendorId && comp.stock > 0;
+                const isSelected = selectedVendor?.vendorId === comp.vendorId;
+                const isOOS = comp.stock <= 0;
+                const price = clientId
+                  ? computeClientFinalPrice(
+                      comp.landedCostPerUnit,
+                      getClientCommonSettings(clientId),
+                      resolveClientProfitPct(clientId, product.productCode, product.category),
+                      product.category,
+                    ).finalPrice
+                  : comp.basePrice;
+                return (
+                  <button
+                    key={comp.vendorId}
+                    type="button"
+                    disabled={isOOS}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!isOOS) { setSelectedVendor(comp); setVendorPanelOpen(false); setVendorSearch(""); }
+                    }}
+                    className={`w-full grid items-center px-3 py-2 text-left transition-colors ${
+                      isSelected ? 'bg-blue-50' : isOOS ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50'
+                    }`}
+                    style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1.2fr" }}
+                  >
+                    {/* Vendor name */}
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center shrink-0">
+                        <Building2 size={11} className="text-gray-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-[10px] font-semibold truncate ${isOOS ? 'text-gray-400' : 'text-gray-800'}`}>{comp.vendorName}</p>
+                        {isRecommended && (
+                          <span className="inline-block text-[8px] font-bold text-blue-700 bg-blue-100 px-1 py-0.5 rounded leading-none mt-0.5">Recommended</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* MOQ */}
+                    <span className="text-[10px] text-gray-700">{comp.moq > 0 ? `${comp.moq} Units` : '--'}</span>
+                    {/* Lead Time */}
+                    <span className="text-[10px] text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2}-${comp.leadTime * 2 + 1} Days` : '--'}</span>
+                    {/* Stock */}
+                    <span className={`text-[10px] font-semibold ${comp.stock > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {comp.stock > 0 ? `${comp.stock.toLocaleString('en-IN')} Units` : 'Out of Stock'}
+                    </span>
+                    {/* Price */}
+                    <span className="text-[10px] font-semibold text-gray-800">
+                      {price > 0 ? `₹${price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '--'}
+                    </span>
+                  </button>
+                );
+              })}
+              {filteredVendors.length === 0 && (
+                <div className="px-3 py-4 text-center text-[11px] text-gray-400">No vendors found</div>
+              )}
+            </div>
+            {/* Add New Vendor footer */}
+            <div className="border-t border-gray-100 px-3 py-2">
+              <button
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                <Plus size={12} />
+                Add New Vendor
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Key Specifications */}
+      <div className="px-3 pt-3 pb-2 border-t border-gray-100 mt-2.5">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Key Specifications</p>
+        {specPairs.length > 0 ? (
+          <ul className="space-y-[3px]">
+            {specPairs.slice(0, 5).map((sp, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-[10px] leading-snug">
+                <span className="text-gray-400 shrink-0 mt-[2px]">•</span>
+                {sp.key ? (
+                  <>
+                    <span className="font-semibold text-gray-700 shrink-0">{sp.key}</span>
+                    <span className="text-gray-500 min-w-0 truncate">{sp.val}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-600 min-w-0">{sp.val}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[9px] text-gray-400">Specifications unavailable</p>
+        )}
+      </div>
+
+      {/* Info grid */}
+      <div className="px-3 pt-2 border-t border-gray-100 space-y-2" onClick={e => e.stopPropagation()}>
+        {/* Row 1: MOQ + (Lead Time when vendor selected) + Stock Available */}
+        <div className={`grid gap-3 ${selectedVendor ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div>
+            <div className="flex items-center gap-1 text-[9px] text-gray-500">
+              <Package size={10} className="text-gray-400 shrink-0" />
+              <span className="font-medium">MOQ</span>
+            </div>
+            <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayMoq}</p>
+          </div>
+          {selectedVendor && (
+            <div>
+              <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                <Clock size={10} className="text-gray-400 shrink-0" />
+                <span className="font-medium">Lead Time</span>
+              </div>
+              <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayLeadTime}</p>
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-1 text-[9px] text-gray-500">
+              <Package size={10} className="text-gray-400 shrink-0" />
+              <span className="font-medium">Stock Available</span>
+            </div>
+            <p className={`text-[11px] font-semibold mt-0.5 ${selectedVendor && selectedVendor.stock > 0 ? 'text-emerald-600' : 'text-gray-800'}`}>
+              {displayStock}
+            </p>
+            {selectedVendor && selectedVendor.stock > 0 && selectedVendor.moq > 0 && (
+              <p className="text-[9px] text-emerald-600 font-medium leading-tight">5% off on {selectedVendor.moq}+ Units</p>
+            )}
+          </div>
+        </div>
+
+        {/* Lead Time row — only when no vendor selected */}
+        {!selectedVendor && (
+          <div className="flex items-center gap-1.5">
+            <Clock size={10} className="text-gray-400 shrink-0" />
+            <span className="text-[9px] text-gray-500 font-medium">Lead Time</span>
+            <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
+          </div>
+        )}
+
+        {/* Price per Unit row */}
+        {selectedVendor ? (
+          <div className="flex items-end justify-between gap-2 pb-2">
+            <div>
+              <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                <Tag size={10} className="text-gray-400 shrink-0" />
+                <span className="font-medium">Price per Unit</span>
+              </div>
+              <p className="text-[13px] font-bold text-gray-900 mt-0.5">{displayPrice}</p>
+            </div>
+            <div>
+              <p className="text-[9px] text-gray-500 font-medium mb-1">Quantity</p>
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                 <button
-                  onClick={() => { if (maxQty === undefined || qty < maxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
+                  onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); }}
+                  className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
+                >−</button>
+                <span className="px-2 text-[11px] font-semibold text-gray-800 min-w-[24px] text-center">{qty}</span>
+                <button
+                  onClick={() => { if (maxQty === undefined || qty < maxQty) setQty(v => v + 1); }}
                   disabled={maxQty !== undefined && qty >= maxQty}
-                  className={`px-2 py-2 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "cursor-not-allowed text-gray-300" : "text-gray-600 hover:bg-gray-100"}`}
+                  className={`px-2.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
                 >+</button>
               </div>
-            )}
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5">
+              <Tag size={10} className="text-gray-400 shrink-0" />
+              <span className="text-[9px] text-gray-500 font-medium">Price per Unit</span>
+              <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
+            </div>
+            {/* Quantity row when no vendor */}
+            <div className="flex items-center justify-between pb-2">
+              <span className="text-[10px] text-gray-600 font-medium">Quantity</span>
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); }}
+                  className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
+                >−</button>
+                <span className="px-2 text-[11px] font-semibold text-gray-800 min-w-[24px] text-center">{qty}</span>
+                <button
+                  onClick={() => setQty(v => v + 1)}
+                  className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
+                >+</button>
+              </div>
+            </div>
+          </>
         )}
+      </div>
+
+      {/* Add to Cart button */}
+      <div className="px-3 pb-3" onClick={e => e.stopPropagation()}>
+        <button
+          onClick={handleAdd}
+          disabled={!canAdd}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${
+            !canAdd
+              ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+              : adding
+                ? 'bg-emerald-600 text-white'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
+          {adding ? 'Added to Cart!' : 'Add to Cart'}
+        </button>
       </div>
     </div>
   );
