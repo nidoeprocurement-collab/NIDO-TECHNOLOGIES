@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
@@ -524,6 +524,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const vendorSelectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const refreshVendors = () => {
@@ -542,6 +543,17 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       return refreshed?.stock && refreshed.stock > 0 ? refreshed : null;
     });
   }, [vendorComps]);
+
+  useEffect(() => {
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (!vendorSelectionRef.current?.contains(event.target as Node)) {
+        setVendorPanelOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
+  }, []);
 
   const maxQty = selectedVendor ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined) : (product.totalStock > 0 ? product.totalStock : undefined);
   const recommendedVendor = vendorComps.find(comp => comp.stock > 0) ?? null;
@@ -644,7 +656,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Vendor Selection Section */}
-      <div className="px-3 pt-2 pb-1 border-t border-gray-100 relative" onClick={e => e.stopPropagation()}>
+      <div ref={vendorSelectionRef} className="px-3 pt-2 pb-1 border-t border-gray-100 relative" onClick={e => e.stopPropagation()}>
         {vendorComps.length === 0 ? (
           <p className="text-[10px] text-gray-400 py-1">No vendor pricing available</p>
         ) : (
