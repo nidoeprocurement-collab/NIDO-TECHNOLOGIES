@@ -758,16 +758,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               )}
             </button>
 
-            {selectedVendor && selectedVendorSellingPrice !== null && (
-              <div className="flex w-[40%] min-w-0 flex-col justify-center rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-2">
-                <p className="text-[8px] font-bold uppercase tracking-[0.08em] text-emerald-700">Final price</p>
-                <p className="mt-1 truncate text-[15px] font-bold leading-none text-gray-950">
-                  ₹{selectedVendorSellingPrice.toLocaleString("en-IN")}
-                  <span className="ml-1 text-[9px] font-normal text-gray-500">/ each</span>
-                </p>
-                <span className="mt-1 flex items-center gap-1 text-[8px] font-semibold text-emerald-700"><Check size={9} /> Ready</span>
-              </div>
-            )}
 
             {vendorPanelOpen && (
               <div
