@@ -622,37 +622,37 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       className="group relative flex h-full flex-col overflow-visible rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.09)] cursor-pointer"
       onClick={() => onPreview(product)}
     >
-      {/* Product identity — image-led and compact like the reference card */}
-      <div className="relative flex min-h-[142px] gap-2.5 border-b border-gray-100 pb-2.5">
-        <div className="w-[42%] min-w-0 overflow-hidden rounded-xl bg-gray-50">
+      {/* Product identity — centered image with details beneath, matching the reference */}
+      <div className="relative flex flex-col items-center border-b border-gray-100 pb-3">
+        <div className="flex h-[155px] w-full max-w-[235px] items-center justify-center overflow-hidden rounded-xl bg-gray-50">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="h-full min-h-[132px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
+            <img src={product.image} alt={product.name} className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.02]" />
           ) : (
-            <div className="h-full min-h-[132px]">
+            <div className="h-full w-full">
               {getProductIcon(product.name, product.category)}
             </div>
           )}
         </div>
 
-        <div className="min-w-0 flex-1 pt-0.5">
-          <h3 className="line-clamp-2 text-[12px] font-bold leading-[1.15] text-gray-950">{product.name}</h3>
-          <span className={`mt-0.5 block truncate text-[10px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+        <div className="mt-2 w-full min-w-0 text-center">
+          <h3 className="line-clamp-2 text-[13px] font-bold leading-[1.15] text-gray-950">{product.name}</h3>
+          <span className={`mt-1 block truncate text-[10px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+        </div>
 
-          <div className="mt-2.5">
-            <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.08em] text-gray-600">Key specifications</p>
-            {product.specs.length > 0 ? (
-              <ul className="space-y-0.5">
-                {product.specs.slice(0, 4).map((spec, i) => (
-                  <li key={i} className="flex min-w-0 items-start gap-1 text-[9px] leading-[1.2] text-gray-600">
-                    <span className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-gray-400" />
-                    <span className="line-clamp-1">{spec}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[9px] text-gray-400">Specifications unavailable</p>
-            )}
-          </div>
+        <div className="mt-3 w-full border-t border-gray-100 pt-2.5">
+          <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.08em] text-gray-600">Key specifications</p>
+          {product.specs.length > 0 ? (
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
+              {product.specs.slice(0, 4).map((spec, i) => (
+                <li key={i} className="flex min-w-0 items-start gap-1 text-[9px] leading-[1.2] text-gray-600">
+                  <span className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-gray-400" />
+                  <span className="line-clamp-1">{spec}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[9px] text-gray-400">Specifications unavailable</p>
+          )}
         </div>
 
         {product.inStock && (
