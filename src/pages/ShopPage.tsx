@@ -619,72 +619,79 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   return (
     <div
-      className="bg-white border border-gray-200 rounded-xl overflow-visible flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+      className="group relative flex h-full flex-col overflow-visible rounded-2xl border border-gray-200 bg-white p-2.5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.09)] cursor-pointer"
       onClick={() => onPreview(product)}
     >
-      <div className="flex gap-0 flex-1">
-        {/* Image */}
-        <div className="w-[110px] shrink-0 bg-gray-50 overflow-hidden">
+      {/* Product identity — image-led and compact like the reference card */}
+      <div className="relative flex min-h-[142px] gap-2.5 border-b border-gray-100 pb-2.5">
+        <div className="w-[42%] min-w-0 overflow-hidden rounded-xl bg-gray-50">
           {product.image ? (
-            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+            <img src={product.image} alt={product.name} className="h-full min-h-[132px] w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
           ) : (
-            <div className="w-full h-full min-h-[160px]">
+            <div className="h-full min-h-[132px]">
               {getProductIcon(product.name, product.category)}
             </div>
           )}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 p-2 flex flex-col min-w-0">
-          <h3 className="font-semibold text-gray-900 text-sm leading-snug">{product.name}</h3>
-          <span className={`text-xs font-medium mt-0.5 ${getCategoryColor(product.category)}`}>{product.category}</span>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <h3 className="line-clamp-2 text-[12px] font-bold leading-[1.15] text-gray-950">{product.name}</h3>
+          <span className={`mt-0.5 block truncate text-[10px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
 
-          {product.specs.length > 0 && (
-            <div className="mt-2">
-              <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-wide mb-1">Key Specifications</p>
+          <div className="mt-2.5">
+            <p className="mb-1 text-[8px] font-bold uppercase tracking-[0.08em] text-gray-600">Key specifications</p>
+            {product.specs.length > 0 ? (
               <ul className="space-y-0.5">
                 {product.specs.slice(0, 4).map((spec, i) => (
-                  <li key={i} className="flex items-start gap-1 text-[11px] text-gray-600">
-                    <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
-                    {spec}
+                  <li key={i} className="flex min-w-0 items-start gap-1 text-[9px] leading-[1.2] text-gray-600">
+                    <span className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-gray-400" />
+                    <span className="line-clamp-1">{spec}</span>
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
+            ) : (
+              <p className="text-[9px] text-gray-400">Specifications unavailable</p>
+            )}
+          </div>
         </div>
+
+        {product.inStock && (
+          <span className="absolute right-0 top-0 flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700">
+            <Check size={10} /> Ready
+          </span>
+        )}
       </div>
 
       {/* Vendor Selection Section */}
-      <div ref={vendorSelectionRef} className="px-3 pt-2 pb-1 border-t border-gray-100 relative" onClick={e => e.stopPropagation()}>
+      <div ref={vendorSelectionRef} className="relative pt-2.5" onClick={e => e.stopPropagation()}>
         {vendorComps.length === 0 ? (
-          <p className="text-[10px] text-gray-400 py-1">No vendor pricing available</p>
+          <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-2.5 py-2 text-[10px] text-gray-400">No vendor pricing available</p>
         ) : (
-          <div className="relative">
+          <div className="relative flex items-stretch gap-2">
             <button
               type="button"
               aria-haspopup="listbox"
               aria-expanded={vendorPanelOpen}
               onClick={() => setVendorPanelOpen(open => !open)}
-              className={`w-full rounded-xl border px-3 py-2 text-left transition-all ${
+              className={`min-w-0 flex-1 rounded-xl border px-2.5 py-2 text-left transition-all ${
                 selectedVendor
-                  ? "border-blue-200 bg-gradient-to-r from-blue-50 via-white to-indigo-50 shadow-sm"
-                  : "border-dashed border-gray-300 bg-gray-50/70 hover:border-blue-300 hover:bg-blue-50/40"
+                  ? "border-blue-200 bg-blue-50/70 shadow-sm"
+                  : "border-dashed border-blue-200 bg-blue-50/40 hover:border-blue-300 hover:bg-blue-50/70"
               }`}
             >
               {selectedVendor ? (
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0">
-                    <Building2 size={15} />
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                    <Building2 size={13} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-[11px] font-bold text-gray-900 truncate">{selectedVendor.vendorName}</span>
+                    <div className="flex min-w-0 items-center gap-1">
+                      <span className="truncate text-[10px] font-bold text-gray-900">{selectedVendor.vendorName}</span>
                       {(() => {
                         const badge = getVendorBadge(selectedVendor, vendorComps);
                         return badge ? (
                           <span
-                            className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                            className="shrink-0 rounded-full px-1 py-0.5 text-[8px] font-bold"
                             style={{ color: badge.color, backgroundColor: badge.bg }}
                           >
                             {badge.label}
@@ -692,43 +699,51 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                         ) : null;
                       })()}
                     </div>
-                    <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5 text-[10px] text-gray-500">
-                      {selectedVendorSellingPrice !== null && (
-                        <span className="font-semibold text-emerald-700">
-                          ₹{selectedVendorSellingPrice.toLocaleString("en-IN")} selling price
-                        </span>
-                      )}
+                    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[9px] text-gray-500">
+                      <span className="font-bold text-emerald-700">₹{(selectedVendorSellingPrice ?? 0).toLocaleString("en-IN")}</span>
+                      <span>/ price</span>
                       <span>•</span>
                       <span>{selectedVendor.stock.toLocaleString("en-IN")} in stock</span>
                       <span>•</span>
                       <span>{selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2}d delivery` : "Lead time —"}</span>
                     </div>
                   </div>
-                  <ChevronDown size={15} className={`text-gray-400 shrink-0 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown size={13} className={`shrink-0 text-blue-400 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
                 </div>
               ) : (
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 text-white flex items-center justify-center shrink-0">
-                    <Building2 size={15} />
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                    <Building2 size={13} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-gray-800">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[10px] font-bold text-gray-800">
                       {recommendedVendor ? `Recommended: ${recommendedVendor.vendorName}` : "No vendor in stock"}
                     </p>
-                    <p className="text-[10px] text-gray-500 truncate">
+                    <p className="truncate text-[9px] text-gray-500">
                       {recommendedVendor ? "Compare price, delivery and stock" : "All listed vendors are out of stock"}
                     </p>
                   </div>
-                  <ChevronDown size={15} className={`text-gray-400 shrink-0 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
+                  <ChevronDown size={13} className={`shrink-0 text-blue-400 transition-transform ${vendorPanelOpen ? "rotate-180" : ""}`} />
                 </div>
               )}
             </button>
+
+            {selectedVendor && selectedVendorSellingPrice !== null && (
+              <div className="flex w-[40%] min-w-0 flex-col justify-center rounded-xl border border-emerald-100 bg-emerald-50 px-2.5 py-2">
+                <p className="text-[8px] font-bold uppercase tracking-[0.08em] text-emerald-700">Final price</p>
+                <p className="mt-1 truncate text-[15px] font-bold leading-none text-gray-950">
+                  ₹{selectedVendorSellingPrice.toLocaleString("en-IN")}
+                  <span className="ml-1 text-[9px] font-normal text-gray-500">/ each</span>
+                </p>
+                <span className="mt-1 flex items-center gap-1 text-[8px] font-semibold text-emerald-700"><Check size={9} /> Ready</span>
+              </div>
+            )}
 
             {vendorPanelOpen && (
               <div
                 role="listbox"
                 aria-label={`Vendors for ${product.name}`}
-                className="absolute z-30 left-0 right-0 top-[calc(100%+6px)] rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl shadow-gray-900/10"
+                className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 rounded-xl border border-gray-200 bg-white p-1.5 shadow-xl shadow-gray-900/10"
               >
                 <div className="flex items-center justify-between px-2 pb-1.5 pt-0.5">
                   <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Available vendors</span>
@@ -826,38 +841,24 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Footer */}
-      <div className="px-3 pb-3 mt-auto pt-2">
-        {/* Selling price — shown only after vendor is selected */}
-        {selectedVendor && (
-          <div className="flex items-center justify-between mb-1.5 rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5">
-            <div>
-               <p className="text-[9px] font-semibold uppercase tracking-wide text-emerald-700">Final selling price</p>
-              <span className="font-bold text-gray-900 text-base leading-tight">
-                ₹{(selectedVendorSellingPrice ?? 0).toLocaleString("en-IN")}
-                <span className="text-xs font-normal text-gray-500"> / each</span>
-              </span>
-            </div>
-            <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1"><Check size={12} /> Ready</span>
-          </div>
-        )}
-
+      <div className="mt-auto pt-2.5">
         {!selectedVendor && !product.inStock ? (
-          <div className="flex items-center justify-center rounded-lg py-1.5 bg-gray-200 text-gray-400 text-xs font-semibold">Out of Stock</div>
+          <div className="flex items-center justify-center rounded-xl bg-gray-100 py-2 text-[10px] font-semibold text-gray-400">Out of Stock</div>
         ) : (
           <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
             <button
               onClick={handleAdd}
               disabled={!canAdd}
-              className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${
-                !canAdd ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" : adding ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[11px] font-semibold transition-all ${
+                !canAdd ? "cursor-not-allowed border border-dashed border-gray-300 bg-gray-100 text-gray-400" : adding ? "bg-emerald-600 text-white" : "bg-blue-600 text-white hover:bg-blue-700"
               }`}
             >
               {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
               {adding ? "Added!" : !selectedVendor ? "Select a vendor first" : "Add to Cart"}
             </button>
             {selectedVendor && (
-              <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
-                <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
+              <div className="flex shrink-0 items-center gap-1 overflow-hidden rounded-xl border border-gray-200 bg-white">
+                <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-2 py-2 text-sm leading-none text-gray-600 hover:bg-gray-100">−</button>
                 <input
                   type="number"
                   value={qtyDraft}
@@ -866,12 +867,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                   onChange={e => setQtyDraft(e.target.value)}
                   onBlur={commitCardQty}
                   onKeyDown={e => e.key === "Enter" && commitCardQty()}
-                  className="w-10 text-center text-xs font-semibold text-gray-800 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-7 border-0 text-center text-xs font-semibold text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button
                   onClick={() => { if (maxQty === undefined || qty < maxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
                   disabled={maxQty !== undefined && qty >= maxQty}
-                  className={`px-1.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
+                  className={`px-2 py-2 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "cursor-not-allowed text-gray-300" : "text-gray-600 hover:bg-gray-100"}`}
                 >+</button>
               </div>
             )}
