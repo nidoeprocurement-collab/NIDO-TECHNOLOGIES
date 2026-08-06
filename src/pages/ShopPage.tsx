@@ -10,6 +10,7 @@ import {
   getAllProductPricing,
   updateWinningVendorMoq,
   getSlabDiscountPct,
+  getClientPriceSlabs,
   computeVendorComparisons,
   computeClientFinalPrice,
   getClientCommonSettings,
@@ -641,6 +642,20 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         : `₹${selectedVendor.basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
     : '--';
 
+  // First active slab with a non-zero discount that applies to this product's
+  // category (category-specific slabs take priority over "All Products").
+  const firstSlabHint: { discountPct: number; minQty: number } | null = (() => {
+    if (!clientId) return null;
+    const slabs = getClientPriceSlabs(clientId)
+      .filter(s => s.status === 'Active' && s.discountPct > 0);
+    if (slabs.length === 0) return null;
+    const catSlabs = slabs.filter(s => s.applyTo !== 'All Products' && s.applyTo.toLowerCase() === (product.category || '').toLowerCase());
+    const pool = catSlabs.length > 0 ? catSlabs : slabs.filter(s => s.applyTo === 'All Products');
+    if (pool.length === 0) return null;
+    const best = pool.slice().sort((a, b) => a.minQty - b.minQty)[0];
+    return { discountPct: best.discountPct, minQty: best.minQty };
+  })();
+
   return (
     <div
       className={`group relative flex h-full flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
@@ -866,8 +881,8 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             <p className={`text-[11px] font-semibold mt-0.5 ${selectedVendor && selectedVendor.stock > 0 ? 'text-emerald-600' : 'text-gray-800'}`}>
               {displayStock}
             </p>
-            {selectedVendor && selectedVendor.stock > 0 && selectedVendor.moq > 0 && (
-              <p className="text-[9px] text-emerald-600 font-medium leading-tight">5% off on {selectedVendor.moq}+ Units</p>
+            {selectedVendor && selectedVendor.stock > 0 && firstSlabHint && (
+              <p className="text-[9px] text-emerald-600 font-medium leading-tight">{firstSlabHint.discountPct}% off on {firstSlabHint.minQty}+ Units</p>
             )}
           </div>
         </div>
