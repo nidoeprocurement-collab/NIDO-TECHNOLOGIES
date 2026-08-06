@@ -773,7 +773,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
                               {clientId && (
                                 <div>
-                                  <p className="text-[9px] text-gray-400">Selling price</p>
+                                  <p className="text-[9px] text-gray-400">Price</p>
                                   <p className="text-[11px] font-bold text-emerald-700">
                                     ₹{computeClientFinalPrice(
                                       comp.landedCostPerUnit,
