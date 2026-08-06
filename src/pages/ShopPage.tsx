@@ -715,7 +715,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
         {/* Vendor dropdown panel */}
         {vendorPanelOpen && (
-          <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden">
+          <div className="absolute left-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden" style={{ width: "480px" }}>
             {/* Header */}
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-[12px] font-bold text-gray-800">Select Vendor</p>
