@@ -15,6 +15,9 @@ import {
   computeClientFinalPrice,
   getClientCommonSettings,
   resolveClientProfitPct,
+  canVendorFulfillMoq,
+  getRecommendedVendor,
+  getVendorComparisonBadge,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
 import { getProductTotalAvailableStock } from "@/lib/vendorStore";
@@ -92,7 +95,7 @@ function formatPrice(n: number) {
 function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
-type VendorMatch = { leadTime: string; moq: number; totalStock: number };
+type VendorMatch = { leadTime: string; moq: number; totalStock: number; hasEligibleVendor: boolean };
 
 // getClientOrderedQtyMap and getPOdQtyMap removed — available stock is now
 // calculated directly from physicalStock − reservedStock in vendorStore, so
@@ -101,7 +104,8 @@ type VendorMatch = { leadTime: string; moq: number; totalStock: number };
 function getVendorMatchMap(): Map<string, VendorMatch> {
   const map = new Map<string, VendorMatch>();
   getAllProductPricing().forEach(p => {
-    const days = p.winningVendor?.leadTime ?? 0;
+    const winningVendor = getRecommendedVendor(p.vendorComparisons);
+    const days = winningVendor?.leadTime ?? 0;
     const displayDays = days > 0 ? days * 2 : 0;
     // Use sum(physicalStock) − sum(reservedStock) across all vendors — the
     // same formula Stock Management uses — so the Shop always shows the
@@ -110,8 +114,9 @@ function getVendorMatchMap(): Map<string, VendorMatch> {
     const totalStock = getProductTotalAvailableStock(p.masterProductCode);
     map.set(p.masterProductCode, {
       leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
-      moq: p.winningVendor?.moq ?? 0,
+      moq: winningVendor?.moq ?? 0,
       totalStock,
+      hasEligibleVendor: !!winningVendor,
     });
   });
   return map;
@@ -147,8 +152,8 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     moq: match?.moq ?? e.moq ?? 0,
     totalStock,
     priceNum: e.priceNum ?? 0,
-    // Out of stock if: marked so in the catalog OR vendor stock is known and is 0.
-    inStock: e.availability !== "Out of Stock" && (totalStock > 0 || match === undefined),
+    // A product is in stock only when at least one vendor can fulfill its MOQ.
+    inStock: e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
     description: e.description,
     generalSpecs: e.generalSpecs,
     preference: e.preference,
@@ -546,7 +551,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     setSelectedVendor(current => {
       if (!current) return current;
       const refreshed = vendorComps.find(comp => comp.vendorId === current.vendorId);
-      return refreshed?.stock && refreshed.stock > 0 ? refreshed : null;
+      return refreshed && canVendorFulfillMoq(refreshed) ? refreshed : null;
     });
   }, [vendorComps]);
 
@@ -565,7 +570,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
     : (product.totalStock > 0 ? product.totalStock : undefined);
 
-  const recommendedVendor = vendorComps.find(comp => comp.stock > 0) ?? null;
+  const recommendedVendor = getRecommendedVendor(vendorComps);
 
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
 
@@ -595,7 +600,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         name: product.name,
         image: product.image,
         specs: product.specs,
-        moq: product.moq,
+        moq: selectedVendor.moq,
         totalStock: selectedVendor.stock,
         priceNum: product.priceNum,
         clientId,
@@ -610,12 +615,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         hsnSnapshot: hsnForCategory,
         vendorRating: selectedVendor.rating,
       },
-      Math.max(1, qty)
+      Math.max(1, Math.max(selectedVendor.moq, qty))
     );
     setTimeout(() => setAdding(false), 1500);
   };
 
-  const canAdd = product.inStock && !!selectedVendor;
+  const canAdd = product.inStock && !!selectedVendor && canVendorFulfillMoq(selectedVendor);
 
   // Parse specs into key/value pairs
   const specPairs = product.specs.map(s => {
@@ -636,7 +641,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const displayStock = selectedVendor
     ? (selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString('en-IN')} Units` : 'Out of Stock')
     : '--';
-  const displayPrice = selectedVendor
+  const displayPrice = selectedVendor && canVendorFulfillMoq(selectedVendor)
     ? (clientId && selectedVendorSellingPrice
         ? `₹${selectedVendorSellingPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         : `₹${selectedVendor.basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
@@ -759,17 +764,18 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             {/* Vendor rows */}
             <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
               {filteredVendors.map(comp => {
-                const isRecommended = recommendedVendor?.vendorId === comp.vendorId && comp.stock > 0;
+                const isRecommended = recommendedVendor?.vendorId === comp.vendorId;
                 const isSelected = selectedVendor?.vendorId === comp.vendorId;
-                const isOOS = comp.stock <= 0;
-                const price = clientId
+                const isOOS = !canVendorFulfillMoq(comp);
+                const badge = getVendorComparisonBadge(comp, vendorComps);
+                const price = !isOOS && clientId
                   ? computeClientFinalPrice(
                       comp.landedCostPerUnit,
                       getClientCommonSettings(clientId),
                       resolveClientProfitPct(clientId, product.productCode, product.category),
                       product.category,
                     ).finalPrice
-                  : comp.basePrice;
+                  : !isOOS ? comp.basePrice : 0;
                 return (
                   <button
                     key={comp.vendorId}
@@ -777,7 +783,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                     disabled={isOOS}
                     onClick={e => {
                       e.stopPropagation();
-                      if (!isOOS) { setSelectedVendor(comp); setVendorPanelOpen(false); setVendorSearch(""); }
+                      if (!isOOS) {
+                        setSelectedVendor(comp);
+                        setQty(Math.max(1, comp.moq));
+                        setVendorPanelOpen(false);
+                        setVendorSearch("");
+                      }
                     }}
                     className={`w-full grid items-center px-3 py-2 text-left transition-colors ${
                       isSelected ? 'bg-blue-50' : isOOS ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50'
@@ -791,8 +802,15 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                       </div>
                       <div className="min-w-0">
                         <p className={`text-[10px] font-semibold truncate ${isOOS ? 'text-gray-400' : 'text-gray-800'}`}>{comp.vendorName}</p>
-                        {isRecommended && (
-                          <span className="inline-block text-[8px] font-bold text-blue-700 bg-blue-100 px-1 py-0.5 rounded leading-none mt-0.5">Recommended</span>
+                        {badge && (
+                          <span className={`inline-block text-[8px] font-bold px-1 py-0.5 rounded leading-none mt-0.5 ${
+                            badge === "Recommended" ? "text-blue-700 bg-blue-100" :
+                            badge === "Fastest" ? "text-emerald-700 bg-emerald-100" :
+                            badge === "Best Price" ? "text-amber-700 bg-amber-100" :
+                            "text-violet-700 bg-violet-100"
+                          }`}>
+                            {badge === "Recommended" && "★ "}{badge}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -802,11 +820,11 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                     <span className="text-[10px] text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2}-${comp.leadTime * 2 + 1} Days` : '--'}</span>
                     {/* Stock */}
                     <span className={`text-[10px] font-semibold ${comp.stock > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {comp.stock > 0 ? `${comp.stock.toLocaleString('en-IN')} Units` : 'Out of Stock'}
+                      {isOOS ? 'Out of Stock' : `${comp.stock.toLocaleString('en-IN')} Units`}
                     </span>
                     {/* Price */}
                     <span className="text-[10px] font-semibold text-gray-800">
-                      {price > 0 ? `₹${price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '--'}
+                      {!isOOS && price > 0 ? `₹${price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '--'}
                     </span>
                   </button>
                 );

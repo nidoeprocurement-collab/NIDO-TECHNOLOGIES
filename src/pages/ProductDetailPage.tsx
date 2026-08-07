@@ -7,7 +7,18 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
-import { getAllProductPricing, getSlabDiscountPct, computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
+import {
+  getAllProductPricing,
+  getSlabDiscountPct,
+  computeVendorComparisons,
+  computeClientFinalPrice,
+  getClientCommonSettings,
+  resolveClientProfitPct,
+  canVendorFulfillMoq,
+  getRecommendedVendor,
+  getVendorComparisonBadge,
+  type VendorComparisonRow,
+} from "@/lib/priceEngineStore";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
 

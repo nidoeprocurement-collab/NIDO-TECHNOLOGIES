@@ -416,6 +416,53 @@ export interface VendorComparisonRow {
   score: number;
 }
 
+/** A vendor is usable for Shop checkout only when it can satisfy its own MOQ. */
+export function canVendorFulfillMoq(row: VendorComparisonRow): boolean {
+  const moq = Math.max(1, row.moq || 0);
+  return row.stock >= moq;
+}
+
+/**
+ * The price engine's recommendation is the first vendor in its ranked list
+ * that can actually fulfill the vendor's MOQ. Out-of-stock and below-MOQ
+ * vendors remain visible for comparison, but can never be recommended.
+ */
+export function getRecommendedVendor(
+  comparisons: VendorComparisonRow[],
+): VendorComparisonRow | null {
+  return comparisons.find(canVendorFulfillMoq) ?? null;
+}
+
+/**
+ * Return the single comparison badge for a vendor. Recommendation is based on
+ * the price-engine ranking; the other badges describe eligible alternatives.
+ */
+export function getVendorComparisonBadge(
+  comparison: VendorComparisonRow,
+  comparisons: VendorComparisonRow[],
+): "Recommended" | "Fastest" | "Best Price" | "Top Rated" | null {
+  const eligible = comparisons.filter(canVendorFulfillMoq);
+  const recommended = getRecommendedVendor(comparisons);
+  if (!recommended || !canVendorFulfillMoq(comparison)) return null;
+  if (comparison.vendorId === recommended.vendorId) return "Recommended";
+
+  const fastest = eligible.reduce((best, row) =>
+    row.leadTime > 0 && (best === null || row.leadTime < best.leadTime) ? row : best,
+  null as VendorComparisonRow | null);
+  if (fastest && comparison.vendorId === fastest.vendorId) return "Fastest";
+
+  const bestPrice = eligible.reduce((best, row) =>
+    best === null || row.landedCostPerUnit < best.landedCostPerUnit ? row : best,
+  null as VendorComparisonRow | null);
+  if (bestPrice && comparison.vendorId === bestPrice.vendorId) return "Best Price";
+
+  const topRated = eligible.reduce((best, row) =>
+    best === null || row.rating > best.rating ? row : best,
+  null as VendorComparisonRow | null);
+  if (topRated && topRated.rating > 0 && comparison.vendorId === topRated.vendorId) return "Top Rated";
+  return null;
+}
+
 export function computeVendorComparisons(
   masterProductCode: string,
   productCategory?: string,
