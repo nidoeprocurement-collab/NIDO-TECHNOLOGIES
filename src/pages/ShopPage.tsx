@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Star, Tag, Plus } from "lucide-react";
+import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { getCatalogProducts } from "@/lib/catalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
 import {
   getAllProductPricing,
@@ -32,6 +33,11 @@ type Product = {
   productCode: string;
   name: string;
   category: string;
+  subcategory?: string;
+  brand?: string;
+  tags?: string[];
+  productType?: string;
+  physicalType?: string;
   image: string;
   images?: string[];
   specs: string[];
@@ -43,6 +49,9 @@ type Product = {
   inStock: boolean;
   description?: string;
   generalSpecs?: { label: string; value: string }[];
+  productNotes?: string;
+  videoUrl?: string;
+  warranty?: string;
   preference?: string;
 };
 
@@ -135,27 +144,44 @@ function prefOrder(pref?: string): number {
 
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
+  const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
+  const masterSpecs = master?.specifications
+    ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
+    .filter(Boolean);
+  const masterGeneralSpecs = master?.generalSpecs
+    ?.filter(s => s.category || s.attributeValue)
+    .map(s => ({ label: s.category, value: s.attributeValue }));
   const totalStock = match?.totalStock ?? 0;
   // Build the images array: use stored array when available, else wrap single img
-  const images = e.images && e.images.length > 0
-    ? e.images
-    : e.img ? [e.img] : [];
+  const images = master?.images?.length
+    ? master.images
+    : e.images && e.images.length > 0
+      ? e.images
+      : e.img ? [e.img] : [];
   return {
     id: `client-${e.productCode}`,
     productCode: e.productCode,
     name: e.name,
-    category: e.category || "General",
+    category: master?.category || e.category || "General",
+    subcategory: master?.subcategory || e.subcategory,
+    brand: master?.brand || e.brand,
+    tags: master?.tags || e.tags || [],
+    productType: master?.productType || e.productType,
+    physicalType: master?.physicalType || e.physicalType,
     image: images[0] || "",
     images,
-    specs: e.specs || [],
+    specs: masterSpecs?.length ? masterSpecs : e.specs || [],
     leadTime: match?.leadTime || e.leadTime || "",
     moq: match?.moq ?? e.moq ?? 0,
     totalStock,
     priceNum: e.priceNum ?? 0,
     // A product is in stock only when at least one vendor can fulfill its MOQ.
     inStock: e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
-    description: e.description,
-    generalSpecs: e.generalSpecs,
+    description: master?.description || e.description,
+    generalSpecs: masterGeneralSpecs?.length ? masterGeneralSpecs : e.generalSpecs,
+    productNotes: master?.productNotes || e.productNotes,
+    videoUrl: master?.videoUrl || e.videoUrl,
+    warranty: master?.warranty || e.warranty,
     preference: e.preference,
   };
 }
@@ -528,7 +554,8 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
-  const [qty, setQty] = useState(Math.max(1, product.moq));
+  const [qty, setQty] = useState(1);
+  const [qtyDraft, setQtyDraft] = useState("1");
   const [adding, setAdding] = useState(false);
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
@@ -568,7 +595,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   const maxQty = selectedVendor
     ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
-    : (product.totalStock > 0 ? product.totalStock : undefined);
+    : undefined;
 
   const recommendedVendor = getRecommendedVendor(vendorComps);
 
@@ -724,8 +751,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
           {selectedVendor ? (
             <div className="flex-1 flex items-center gap-1.5 min-w-0">
               <span className="text-[11px] font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</span>
-              <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />
-              <span className="shrink-0 text-[8px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">Rec</span>
             </div>
           ) : (
             <span className="flex-1 text-[11px] font-medium text-gray-500">Select Vendor</span>
@@ -764,7 +789,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             {/* Vendor rows */}
             <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
               {filteredVendors.map(comp => {
-                const isRecommended = recommendedVendor?.vendorId === comp.vendorId;
                 const isSelected = selectedVendor?.vendorId === comp.vendorId;
                 const isOOS = !canVendorFulfillMoq(comp);
                 const badge = getVendorComparisonBadge(comp, vendorComps);
@@ -785,7 +809,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                       e.stopPropagation();
                       if (!isOOS) {
                         setSelectedVendor(comp);
-                        setQty(Math.max(1, comp.moq));
+                        const nextQty = Math.max(1, comp.moq);
+                        setQty(nextQty);
+                        setQtyDraft(String(nextQty));
                         setVendorPanelOpen(false);
                         setVendorSearch("");
                       }
@@ -871,6 +897,13 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         )}
       </div>
 
+      {product.productNotes && (
+        <div className="mx-3 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-amber-700 mb-0.5">Product Notes</p>
+          <p className="text-[10px] leading-snug text-amber-900 whitespace-pre-line line-clamp-3">{product.productNotes}</p>
+        </div>
+      )}
+
       {/* Info grid */}
       <div className="px-3 pt-2 border-t border-gray-100 space-y-2" onClick={e => e.stopPropagation()}>
         {/* Row 1: MOQ + (Lead Time when vendor selected) + Stock Available */}
@@ -928,12 +961,41 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               <p className="text-[9px] text-gray-500 font-medium mb-1">Quantity</p>
               <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                 <button
-                  onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); }}
+                  onClick={() => {
+                    const v = Math.max(Math.max(1, selectedVendor.moq), qty - 1);
+                    setQty(v);
+                    setQtyDraft(String(v));
+                  }}
                   className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
                 >−</button>
-                <span className="px-2 text-[11px] font-semibold text-gray-800 min-w-[24px] text-center">{qty}</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={Math.max(1, selectedVendor.moq)}
+                  max={maxQty}
+                  value={qtyDraft}
+                  onChange={e => setQtyDraft(e.target.value)}
+                  onBlur={() => {
+                    const minQty = Math.max(1, selectedVendor.moq);
+                    const parsed = parseInt(qtyDraft, 10);
+                    const normalized = Math.min(maxQty ?? Number.MAX_SAFE_INTEGER, Math.max(minQty, Number.isFinite(parsed) ? parsed : minQty));
+                    setQty(normalized);
+                    setQtyDraft(String(normalized));
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+                  }}
+                  className="w-12 px-1 py-1.5 text-[11px] font-semibold text-gray-800 text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  aria-label={`Quantity for ${product.name}`}
+                />
                 <button
-                  onClick={() => { if (maxQty === undefined || qty < maxQty) setQty(v => v + 1); }}
+                  onClick={() => {
+                    if (maxQty === undefined || qty < maxQty) {
+                      const v = qty + 1;
+                      setQty(v);
+                      setQtyDraft(String(v));
+                    }
+                  }}
                   disabled={maxQty !== undefined && qty >= maxQty}
                   className={`px-2.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
                 >+</button>
@@ -946,21 +1008,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               <Tag size={10} className="text-gray-400 shrink-0" />
               <span className="text-[9px] text-gray-500 font-medium">Price per Unit</span>
               <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
-            </div>
-            {/* Quantity row when no vendor */}
-            <div className="flex items-center justify-between pb-2">
-              <span className="text-[10px] text-gray-600 font-medium">Quantity</span>
-              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); }}
-                  className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
-                >−</button>
-                <span className="px-2 text-[11px] font-semibold text-gray-800 min-w-[24px] text-center">{qty}</span>
-                <button
-                  onClick={() => setQty(v => v + 1)}
-                  className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
-                >+</button>
-              </div>
             </div>
           </>
         )}

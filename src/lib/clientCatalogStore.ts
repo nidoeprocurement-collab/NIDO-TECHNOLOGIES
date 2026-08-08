@@ -6,6 +6,11 @@ export interface ClientCatalogEntry {
   sku: string;
   name: string;
   category: string;
+  subcategory?: string;
+  brand?: string;
+  tags?: string[];
+  productType?: string;
+  physicalType?: string;
   roles: string[];
   preference?: string;
   cpc?: string;
@@ -20,6 +25,9 @@ export interface ClientCatalogEntry {
   moq?: number;
   priceNum?: number;
   generalSpecs?: { label: string; value: string }[];
+  productNotes?: string;
+  videoUrl?: string;
+  warranty?: string;
 }
 
 const STORE_KEY = 'nido_client_catalogs';

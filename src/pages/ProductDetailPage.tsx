@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { getCatalogProducts } from "@/lib/catalogStore";
 import {
   getAllProductPricing,
   getSlabDiscountPct,
@@ -29,6 +30,11 @@ type Product = {
   productCode: string;
   name: string;
   category: string;
+  subcategory?: string;
+  brand?: string;
+  tags?: string[];
+  productType?: string;
+  physicalType?: string;
   image: string;
   images?: string[];
   specs: string[];
@@ -38,6 +44,8 @@ type Product = {
   inStock: boolean;
   description?: string;
   generalSpecs?: { label: string; value: string }[];
+  productNotes?: string;
+  videoUrl?: string;
   warranty?: string;
 };
 
@@ -141,19 +149,35 @@ function getVendorMatchMap(): Map<string, { leadTime: string; moq: number }> {
 
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { leadTime: string; moq: number }>): Product {
   const match = vendorMatches.get(e.productCode);
+  const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
+  const masterSpecs = master?.specifications
+    ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
+    .filter(Boolean);
+  const masterGeneralSpecs = master?.generalSpecs
+    ?.filter(s => s.category || s.attributeValue)
+    .map(s => ({ label: s.category, value: s.attributeValue }));
   return {
     id: `client-${e.productCode}`,
     productCode: e.productCode,
     name: e.name,
-    category: e.category || "General",
-    image: e.img || "",
-    specs: e.specs || [],
+    category: master?.category || e.category || "General",
+    subcategory: master?.subcategory || e.subcategory,
+    brand: master?.brand || e.brand,
+    tags: master?.tags || e.tags || [],
+    productType: master?.productType || e.productType,
+    physicalType: master?.physicalType || e.physicalType,
+    image: master?.images?.[0] || e.img || "",
+    images: master?.images?.length ? master.images : e.images,
+    specs: masterSpecs?.length ? masterSpecs : e.specs || [],
     leadTime: match?.leadTime || e.leadTime || "",
     moq: match?.moq ?? e.moq ?? 0,
     priceNum: e.priceNum ?? 0,
     inStock: e.availability !== "Out of Stock",
-    description: e.description,
-    generalSpecs: e.generalSpecs,
+    description: master?.description || e.description,
+    generalSpecs: masterGeneralSpecs?.length ? masterGeneralSpecs : e.generalSpecs,
+    productNotes: master?.productNotes || e.productNotes,
+    videoUrl: master?.videoUrl || e.videoUrl,
+    warranty: master?.warranty || e.warranty,
   };
 }
 
@@ -227,6 +251,7 @@ export default function ProductDetailPage() {
 
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const effectivePrice = discountPct > 0 ? product.priceNum * (1 - discountPct / 100) : product.priceNum;
+  const recommendedVendor = getRecommendedVendor(vendorComps);
 
   const specPairs = product.specs.map(s => {
     const idx = s.indexOf(': ');
@@ -444,49 +469,52 @@ export default function ProductDetailPage() {
                   </div>
                 ) : (
                   <div>
-                    {/* Recommended vendor */}
-                    <button
-                      onClick={() => setSelectedVendor(vendorComps[0])}
-                      className="w-full flex items-start justify-between px-3 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>★ Recommended</span>
+                    {/* Price-engine recommendation — only an eligible vendor can be suggested. */}
+                    {recommendedVendor && (
+                      <button
+                        onClick={() => setSelectedVendor(recommendedVendor)}
+                        className="w-full flex items-start justify-between px-3 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>★ Recommended by Price Engine</span>
+                          </div>
+                          <p className="text-xs font-semibold text-gray-900">{recommendedVendor.vendorName}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">
+                            {recommendedVendor.stock} in stock
+                            {recommendedVendor.leadTime > 0 && ` · ${recommendedVendor.leadTime * 2}d lead`}
+                            {recommendedVendor.rating > 0 && ` · ★ ${recommendedVendor.rating}`}
+                          </p>
                         </div>
-                        <p className="text-xs font-semibold text-gray-900">{vendorComps[0].vendorName}</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5">
-                          {vendorComps[0].stock > 0 ? `${vendorComps[0].stock} in stock` : "No stock"}
-                          {vendorComps[0].leadTime > 0 && ` · ${vendorComps[0].leadTime * 2}d lead`}
-                          {vendorComps[0].rating > 0 && ` · ★ ${vendorComps[0].rating}`}
-                        </p>
-                      </div>
-                      <div className="text-right ml-3 shrink-0">
-                        <p className="text-sm font-bold text-gray-900">₹{vendorComps[0].landedCostPerUnit.toLocaleString("en-IN")}</p>
-                        <p className="text-[10px] text-gray-400">landed cost</p>
-                      </div>
-                    </button>
+                        <div className="text-right ml-3 shrink-0">
+                          <p className="text-sm font-bold text-gray-900">₹{recommendedVendor.landedCostPerUnit.toLocaleString("en-IN")}</p>
+                          <p className="text-[10px] text-gray-400">landed cost</p>
+                        </div>
+                      </button>
+                    )}
                     {/* Other vendors toggle */}
-                    {vendorComps.length > 1 && (
+                    {vendorComps.filter(v => v.vendorId !== recommendedVendor?.vendorId).length > 0 && (
                       <button
                         onClick={() => setVendorPanelOpen(v => !v)}
                         className="w-full flex items-center justify-between px-3 py-2 text-xs text-blue-600 font-semibold hover:bg-gray-50 transition-colors"
                       >
-                        <span>{vendorPanelOpen ? "Hide other vendors" : `${vendorComps.length - 1} more vendor${vendorComps.length > 2 ? "s" : ""}`}</span>
+                        <span>{vendorPanelOpen ? "Hide other vendors" : `${vendorComps.filter(v => v.vendorId !== recommendedVendor?.vendorId).length} more vendor${vendorComps.filter(v => v.vendorId !== recommendedVendor?.vendorId).length > 1 ? "s" : ""}`}</span>
                         {vendorPanelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </button>
                     )}
                     {vendorPanelOpen && (
                       <div className="border-t border-gray-100">
-                        {vendorComps.slice(1).map((comp, i) => (
+                        {vendorComps.filter(comp => comp.vendorId !== recommendedVendor?.vendorId).map((comp, i) => (
                           <button
                             key={comp.vendorId}
+                            disabled={!canVendorFulfillMoq(comp)}
                             onClick={() => { setSelectedVendor(comp); setVendorPanelOpen(false); }}
-                            className={`w-full flex items-start justify-between px-3 py-2.5 hover:bg-blue-50 transition-colors text-left ${i > 0 ? "border-t border-gray-50" : ""}`}
+                            className={`w-full flex items-start justify-between px-3 py-2.5 transition-colors text-left ${i > 0 ? "border-t border-gray-50" : ""} ${canVendorFulfillMoq(comp) ? "hover:bg-blue-50" : "opacity-50 cursor-not-allowed"}`}
                           >
                             <div className="min-w-0 flex-1">
                               <p className="text-xs font-semibold text-gray-900">{comp.vendorName}</p>
                               <p className="text-[10px] text-gray-500 mt-0.5">
-                                {comp.stock > 0 ? `${comp.stock} in stock` : "No stock"}
+                                {canVendorFulfillMoq(comp) ? `${comp.stock} in stock` : "Cannot fulfill MOQ"}
                                 {comp.leadTime > 0 && ` · ${comp.leadTime * 2}d lead`}
                                 {comp.rating > 0 && ` · ★ ${comp.rating}`}
                               </p>
