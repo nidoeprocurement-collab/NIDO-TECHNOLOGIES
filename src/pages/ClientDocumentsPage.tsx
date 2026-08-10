@@ -3,9 +3,11 @@ import {
   FileText, MoreVertical, FilePlus, Download, Archive,
   X, Upload, ArrowLeft,
 } from "lucide-react";
+import { getClientDocuments, saveClientDocument, type ClientDocumentRecord } from "@/lib/clientDataStore";
 
 type Doc = {
-  id: number;
+  id: string;
+  clientId?: string;
   name: string;
   type: string;
   size: string;
@@ -334,28 +336,31 @@ function DocsTable({
   );
 }
 
-export default function ClientDocumentsPage() {
-  const [docs, setDocs] = useState<Doc[]>(INITIAL_DOCS);
-  const [archivedDocs, setArchivedDocs] = useState<Doc[]>([]);
+export default function ClientDocumentsPage({ clientId }: { clientId: string }) {
+  const [storedDocs, setStoredDocs] = useState<ClientDocumentRecord[]>(() => getClientDocuments(clientId));
+  const docs = storedDocs.filter((doc) => !doc.archived);
+  const archivedDocs = storedDocs.filter((doc) => doc.archived);
   const [view, setView] = useState<"active" | "archived">("active");
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
-  const [rowMenuOpen, setRowMenuOpen] = useState<number | null>(null);
+  const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const fileStoreRef = useRef<Map<number, File>>(new Map());
   const pageMenuRef = useRef<HTMLDivElement>(null);
   useClickOutside(pageMenuRef, () => setPageMenuOpen(false));
 
   function handleArchive(id: number) {
-    const doc = docs.find((d) => d.id === id);
+    const doc = docs.find((d) => d.id === String(id));
     if (!doc) return;
-    setDocs((prev) => prev.filter((d) => d.id !== id));
-    setArchivedDocs((prev) => [...prev, doc]);
+    const next = { ...doc, archived: true };
+    saveClientDocument(next);
+    setStoredDocs(getClientDocuments(clientId));
   }
 
   function handleAdd(newDoc: Omit<Doc, "id">, file: File | null) {
-    const id = Date.now();
+    const id = String(Date.now());
     if (file) fileStoreRef.current.set(id, file);
-    setDocs((prev) => [{ id, ...newDoc }, ...prev]);
+    saveClientDocument({ id, clientId, ...newDoc });
+    setStoredDocs(getClientDocuments(clientId));
   }
 
   function handleExport() {
