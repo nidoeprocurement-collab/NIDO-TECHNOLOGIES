@@ -92,3 +92,31 @@ all point here — do not add a second Users or Roles page; extend this one.
 - `src/lib/routePermissions.ts` + `src/components/layout/PermissionGate.tsx` —
   every admin route (not `/portal/*`) is checked against `hasPermission(moduleKey, 'view')`
   before rendering; unauthorized access shows `AccessDeniedPage`.
+
+## Client user-management audit status
+
+The client-user-management audit was completed without changing the existing
+authentication or data architecture. The current project is a frontend/localStorage
+prototype: `src/lib/portalUserStore.ts`, `src/lib/clientStore.ts`,
+`src/contexts/OrdersContext.tsx`, and `src/lib/purchaseOrderStore.ts` do not have
+server-side persistence or tenant authorization. The backend currently provides
+email and quote routes only; `server/migrate.js` has no user, client, session,
+invitation, permission, or audit-log schema.
+
+Existing portal user, role, and address pages are now reachable at:
+
+- `/portal/users`
+- `/portal/roles`
+- `/portal/addresses`
+
+Remaining production corrections must be continued as a separate, explicit task:
+add secure server-side authentication, password handling, client-user APIs,
+invitation/password-reset flows, status enforcement, audit logging, and backend
+client isolation. Do not create a second authentication or user-management
+system; extend the existing files and preserve the current portal and procurement
+flows.
+
+For future imports, treat this section and the uploaded NIDO permanent rules as
+the handoff. Inspect only the relevant files for the requested continuation;
+do not repeat a broad project audit or reinstall dependencies unless explicitly
+requested.

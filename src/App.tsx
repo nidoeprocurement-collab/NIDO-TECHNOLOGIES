@@ -1104,6 +1104,37 @@ function AppRoutes() {
               </ClientPortalRoute>
             }
           />
+          {/* Client user administration — existing pages, protected by portal auth */}
+          <Route
+            path="portal/users"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal users failed to load" resetKey={location.pathname}>
+                  <ClientPortalUsersPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/roles"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal roles failed to load" resetKey={location.pathname}>
+                  <ClientPortalRolesPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/addresses"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal addresses failed to load" resetKey={location.pathname}>
+                  <ClientPortalAddressesPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
           {/* Portal shopping flow */}
           <Route path="portal/shop/cart" element={<ClientPortalRoute><CartPage /></ClientPortalRoute>} />
           <Route path="portal/shop/checkout" element={<ClientPortalRoute><CheckoutPage /></ClientPortalRoute>} />
