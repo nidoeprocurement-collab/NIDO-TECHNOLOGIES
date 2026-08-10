@@ -25,6 +25,8 @@ import {
   Phone,
   X,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { getClientContract, saveClientContract } from "@/lib/clientDataStore";
 
 interface ContractDetailViewProps {
@@ -666,6 +668,183 @@ export default function ContractDetailView({ contractId, contractTitle, clientId
     });
   };
 
+  const downloadContract = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 42;
+    const contentWidth = pageWidth - margin * 2;
+    const generatedOn = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    const colors = {
+      blue: [37, 99, 235] as [number, number, number],
+      dark: [31, 41, 55] as [number, number, number],
+      muted: [107, 114, 128] as [number, number, number],
+      line: [229, 231, 235] as [number, number, number],
+      header: [239, 246, 255] as [number, number, number],
+    };
+
+    const setBodyStyle = () => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.dark);
+    };
+
+    const addPageHeader = () => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.muted);
+      doc.text("NIDO-TECH | CLIENT CONTRACT", margin, 28);
+      doc.setDrawColor(...colors.line);
+      doc.line(margin, 34, pageWidth - margin, 34);
+    };
+
+    const addSectionTitle = (title: string, y: number) => {
+      if (y > 760) {
+        doc.addPage();
+        addPageHeader();
+        y = 54;
+      }
+      doc.setFillColor(...colors.header);
+      doc.roundedRect(margin, y, contentWidth, 22, 3, 3, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...colors.blue);
+      doc.text(title, margin + 9, y + 15);
+      return y + 34;
+    };
+
+    const addKeyValueRows = (title: string, rows: Array<[string, string]>, y: number) => {
+      y = addSectionTitle(title, y);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        head: [["Detail", "Value"]],
+        body: rows.map(([label, value]) => [label, value || "—"]),
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 6, textColor: colors.dark },
+        headStyles: { fillColor: colors.blue, textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: { 0: { cellWidth: 150, fontStyle: "bold" }, 1: { cellWidth: contentWidth - 150 } },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
+      return ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 18;
+    };
+
+    const addTable = (title: string, headers: string[], rows: string[][], y: number) => {
+      y = addSectionTitle(title, y);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        head: [headers],
+        body: rows.length ? rows : [["No entries", ...headers.slice(1).map(() => "—")]],
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 5, textColor: colors.dark, overflow: "linebreak" },
+        headStyles: { fillColor: colors.blue, textColor: [255, 255, 255], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
+      return ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 18;
+    };
+
+    let y = 58;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(...colors.dark);
+    doc.text(contractTitle || "SaaS & Services Agreement", margin, y);
+    y += 25;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...colors.muted);
+    doc.text(`Contract ID: ${contractId || "CLIENT-CONTRACT"}   |   Generated: ${generatedOn}`, margin, y);
+    y += 22;
+    doc.setDrawColor(...colors.line);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 20;
+    setBodyStyle();
+
+    y = addKeyValueRows("Contract Overview", [
+      ["Purpose", overview.purpose],
+      ["Scope", overview.scope],
+      ["Deployment", overview.deployment],
+      ["Currency", overview.currency],
+      ["Taxation", overview.taxation],
+      ["Jurisdiction", overview.jurisdiction],
+      ["Confidentiality Summary", overview.confidentiality],
+    ], y);
+
+    y = addKeyValueRows("Commercial Terms", [
+      ["Contract Type", commercialTerms.type],
+      ["Commercial Model", commercialTerms.model],
+      ["Duration", commercialTerms.duration],
+      ["Payment Terms", commercialTerms.paymentTerms],
+      ["Late Payment Penalty", commercialTerms.latePenalty],
+      ["Additional Services", commercialTerms.extras],
+      ["Price Revision", commercialTerms.priceRevision],
+      ["Force Majeure", commercialTerms.forceMajeure],
+      ["Dispute Resolution", commercialTerms.dispute],
+    ], y);
+
+    y = addTable("Services Covered", ["Service", "Scope"], servicesCovered.map((item) => [item.service, item.scope]), y);
+    y = addTable("Response Targets", ["Priority", "Response", "Resolution"], responseTargets.map((item) => [item.priority, item.response, item.resolution]), y);
+    y = addTable("Data Security", ["Control", "Status"], dataSecurity.map((item) => [item.label, item.active ? "Active" : "Inactive"]), y);
+
+    y = addKeyValueRows("Confidentiality", [
+      ["Status", confidentiality.status],
+      ["Effective Period", confidentiality.effective],
+      ["Terms", confidentiality.text],
+    ], y);
+
+    y = addTable("Support Matrix", ["Level", "Team", "Email", "Availability"], supportMatrix.map((item) => [item.level, item.team, item.email, item.availability]), y);
+    y = addTable("SLA Commitments", ["Commitment", "Target"], slaCommitments.map((item) => [item.commitment, item.target]), y);
+    y = addTable("Renewal & Termination", ["Term", "Details"], renewalTerm.map((item) => [item.label.split(":")[0] || item.label, item.label.includes(":") ? item.label.slice(item.label.indexOf(":") + 1).trim() : item.label]), y);
+
+    y = addKeyValueRows("Renewal Information", [
+      ["Renewal Date", renewalInfo.renewalDate],
+      ["Auto Renewal", renewalInfo.autoRenewal],
+      ["Days Remaining", renewalInfo.daysRemaining],
+      ["Support Plan", supportInfo.plan],
+      ["Support Hours", supportInfo.hours],
+      ["Response SLA", supportInfo.responseSLA],
+    ], y);
+
+    y = addKeyValueRows("Subscription", [
+      ["User Licensing", subscription.userLicensing],
+      ["Licensed Users", subscription.licensedUsers],
+      ["Concurrent Users", subscription.concurrent],
+      ["Additional User Cost", subscription.additionalCost],
+      ["License Transfer", subscription.transfer],
+      ["Minimum Commitment", subscription.minCommitment],
+    ], y);
+
+    y = addTable("Key Contacts", ["Contact", "Role", "Email", "Phone"], [
+      [keyContacts.apex.name, keyContacts.apex.role, keyContacts.apex.email, keyContacts.apex.phone],
+      [keyContacts.nidoTech.name, keyContacts.nidoTech.role, keyContacts.nidoTech.email, keyContacts.nidoTech.phone],
+    ], y);
+    y = addTable("Relationship Owners", ["Party", "Name", "Email", "Phone"], [
+      ["Nido-Tech", relationshipOwners.nidoTech.name, relationshipOwners.nidoTech.email, relationshipOwners.nidoTech.phone],
+      ["Client", relationshipOwners.apex.name, relationshipOwners.apex.email, relationshipOwners.apex.phone],
+    ], y);
+    addTable("Reminders", ["Reminder", "Date"], reminders.map((item) => [item.label, item.date]), y);
+
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      addPageHeader();
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...colors.muted);
+      doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, 816, { align: "right" });
+    }
+
+    const safeName = (contractTitle || "Client-Contract").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    doc.save(`${safeName || "Client-Contract"}.pdf`);
+    setDropdownOpen(false);
+  };
+
   // ── JSX ───────────────────────────────────────────────────────────────────────
 
   return (
@@ -693,7 +872,7 @@ export default function ContractDetailView({ contractId, contractTitle, clientId
           {dropdownOpen && (
             <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
               <button
-                onClick={() => setDropdownOpen(false)}
+                onClick={downloadContract}
                 className="w-full px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Download size={14} className="text-gray-400" />

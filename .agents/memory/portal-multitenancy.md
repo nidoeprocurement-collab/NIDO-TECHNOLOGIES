@@ -69,6 +69,8 @@ Client portal roles stored in localStorage: `nido_portal_roles_{clientId}`.
 
 Client detail tabs use `clientDataStore` records filtered by `clientId`; the detail page passes the ID into Orders, Services, Contracts, Activity, and Documents and listens for `nidoClientDataUpdated` for same-app synchronization. Contracts persist their editable state and document uploads persist browser data URLs.
 
+Contract downloads must generate a PDF from the currently hydrated contract state, not from demo or static content, so edits made in the contract detail view are included.
+
 ## Why
 
 Spec requires single codebase, unlimited clients, full isolation. localStorage is the prototype backend — swap for real DB (Task #2) once MongoDB is connected. All client-scoped data flows through `user.clientId` from the session; never from the frontend directly.
