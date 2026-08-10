@@ -84,9 +84,10 @@ export type AssignedDeviceEntry = {
   status: "Active" | "In Repair";
 };
 
-function AddUserModal({ onClose }: { onClose: () => void }) {
+function AddUserModal({ onClose, onCreate }: { onClose: () => void; onCreate: (user: UserRecord) => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
+  const [notification, setNotification] = useState("");
 
   const [form, setForm] = useState({
     employeeId: "",
@@ -164,12 +165,76 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
   const labelCls = "block text-xs text-blue-600 mb-1";
   const disabledCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
 
+  const handleCreate = () => {
+    const requiredFields: Array<[keyof typeof form, string]> = [
+      ["employeeId", "Employee ID"],
+      ["fullName", "Full Name"],
+      ["email", "Email ID"],
+      ["phone", "Phone Number"],
+      ["role", "Role"],
+      ["orgAccess", "Organization Access"],
+    ];
+    const missing = requiredFields
+      .filter(([key]) => !form[key].trim())
+      .map(([, label]) => label);
+
+    if (missing.length > 0) {
+      setNotification(`Please fill in the required fields: ${missing.join(", ")}.`);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setNotification("Please enter a valid email address.");
+      return;
+    }
+
+    const initials = form.fullName
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    const newUser: UserRecord = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `user-${Date.now()}`,
+      name: form.fullName.trim(),
+      role: form.role,
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      lastActive: new Date().toISOString(),
+      status: form.status,
+      initials,
+      color: "bg-blue-500",
+    };
+
+    onCreate(newUser);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-white" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-fullmx-4 flex flex-col max-h-[92vh]"
+        className="bg-white w-full h-full flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {notification && (
+          <div className="fixed top-5 right-5 z-[60] max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg" role="alert">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 font-bold">!</span>
+              <p className="flex-1 leading-5">{notification}</p>
+              <button
+                type="button"
+                onClick={() => setNotification("")}
+                className="text-red-400 hover:text-red-700"
+                aria-label="Dismiss notification"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        )}
         {/* Modal header */}
         <div className="px-6 pt-5 pb-0 border-b border-gray-100">
           <div className="flex items-start justify-between mb-4">
@@ -605,7 +670,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
             <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+            <button onClick={handleCreate} className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
               Create User
             </button>
           </div>
@@ -2471,6 +2536,10 @@ export default function ClientUsersPage() {
   const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
   const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
 
+  const createUser = (user: UserRecord) => {
+    setUsers((prev) => [user, ...prev]);
+  };
+
   const archiveUser = (id: string) => {
     const u = users.find((u) => u.id === id);
     if (!u) return;
@@ -2538,7 +2607,12 @@ export default function ClientUsersPage() {
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
-      {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} />}
+      {showAddUser && (
+        <AddUserModal
+          onClose={() => setShowAddUser(false)}
+          onCreate={createUser}
+        />
+      )}
       {showImportUsers && <ImportUsersModal onClose={() => setShowImportUsers(false)} />}
       {resetPasswordUser && <ResetPasswordModal userName={resetPasswordUser.name} onClose={() => setResetPasswordUser(null)} />}
       {archiveTarget && (
