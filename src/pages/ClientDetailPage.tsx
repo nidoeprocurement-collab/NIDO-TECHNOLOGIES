@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import jsPDF from "jspdf";
@@ -37,26 +37,25 @@ import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
 import { getClients } from "@/lib/clientStore";
+import {
+  getClientActivities,
+  getClientContract,
+  getClientDocuments,
+  getClientOrders,
+  getClientServices,
+  type ClientActivityRecord,
+  type ClientDocumentRecord,
+  type ClientOrderRecord,
+  type ClientServiceRecord,
+} from "@/lib/clientDataStore";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 
 const ADMIN_TABS = ["Overview", "Roles", "Users", "Orders", "Services", "Contracts", "Catalog", "Activity", "Configuration", "Documents"];
 const PORTAL_TABS = ["Overview"];
 
-const spendCategories = [
-  { name: "Hardware", value: 45, amount: "$200,250", color: "#3b82f6" },
-  { name: "Software", value: 30, amount: "$30,300", color: "#22c55e" },
-  { name: "Service", value: 15, amount: "$15,300", color: "#f97316" },
-  { name: "Other", value: 10, amount: "$10,500", color: "#a855f7" },
-];
+type SpendCategory = { name: string; value: number; amount: string; color: string };
 
-function generateMonthlySpend(seed: number) {
-  const base = [18, 22, 19, 25, 21, 28, 32, 38, 45, 52, 58, 60];
-  return base.map((v, i) => ({
-    month: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i],
-    value: Math.round(v * 1000 * (0.8 + ((seed * (i + 1)) % 40) / 100)),
-  }));
-}
-
-function DonutChart({ categories, size }: { categories: typeof spendCategories; size: number }) {
+function DonutChart({ categories, size }: { categories: SpendCategory[]; size: number }) {
   const cx = size / 2;
   const cy = size / 2;
   const outerR = size * 0.45;
@@ -144,6 +143,30 @@ export default function App({ portalMode = false }: ClientDetailProps) {
 
   const clients = getClients();
   const client = clients.find(c => c.id === clientId);
+  const [liveOrders, setLiveOrders] = useState<ClientOrderRecord[]>(() => getClientOrders(clientId));
+  const [liveServices, setLiveServices] = useState<ClientServiceRecord[]>(() => getClientServices(clientId));
+  const [liveActivities, setLiveActivities] = useState<ClientActivityRecord[]>(() => getClientActivities(clientId));
+  const [liveDocuments, setLiveDocuments] = useState<ClientDocumentRecord[]>(() => getClientDocuments(clientId));
+  const [liveContract, setLiveContract] = useState(() => getClientContract(clientId));
+  const [portalUserCount, setPortalUserCount] = useState(() => getPortalUsersByClient(clientId).length);
+
+  useEffect(() => {
+    const reload = () => {
+      setLiveOrders(getClientOrders(clientId, client?.name));
+      setLiveServices(getClientServices(clientId));
+      setLiveActivities(getClientActivities(clientId));
+      setLiveDocuments(getClientDocuments(clientId));
+      setLiveContract(getClientContract(clientId));
+      setPortalUserCount(getPortalUsersByClient(clientId).length);
+    };
+    reload();
+    window.addEventListener("nidoClientDataUpdated", reload);
+    window.addEventListener("nidoPortalUsersUpdated", reload);
+    return () => {
+      window.removeEventListener("nidoClientDataUpdated", reload);
+      window.removeEventListener("nidoPortalUsersUpdated", reload);
+    };
+  }, [clientId, client?.name]);
 
   if (!client) {
     return <NotFoundPage id={clientId || ""} />;
@@ -156,10 +179,35 @@ export default function App({ portalMode = false }: ClientDetailProps) {
     .toUpperCase()
     .slice(0, 2);
 
-  const seed = client.id.replace(/\D/g, "").slice(-3);
-  const seedNum = parseInt(seed || "1", 10);
-  const monthlySpend = generateMonthlySpend(seedNum);
-  const totalSpend = monthlySpend.reduce((s, m) => s + m.value, 0);
+  const monthlySpend = Array.from({ length: 12 }, (_, index) => {
+    const month = new Date();
+    month.setMonth(month.getMonth() - (11 - index), 1);
+    const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+    const value = liveOrders
+      .filter((order) => order.date?.startsWith(key))
+      .reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
+    return {
+      month: month.toLocaleDateString("en-US", { month: "short" }),
+      value,
+    };
+  });
+  const totalSpend = liveOrders.reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
+  const spendByCategory = liveServices.reduce<Record<string, number>>((result, service) => {
+    const amount = Number(String(service.amount).replace(/[^\d.-]/g, "")) || 0;
+    result[service.category || "Services"] = (result[service.category || "Services"] || 0) + amount;
+    return result;
+  }, {});
+  if (totalSpend > 0) spendByCategory.Orders = (spendByCategory.Orders || 0) + totalSpend;
+  const categoryColors = ["#3b82f6", "#22c55e", "#f97316", "#a855f7", "#06b6d4"];
+  const categoryTotal = Object.values(spendByCategory).reduce((sum, value) => sum + value, 0);
+  const spendCategories: SpendCategory[] = Object.entries(spendByCategory).map(([name, amount], index) => ({
+    name,
+    value: categoryTotal ? Math.round((amount / categoryTotal) * 100) : 0,
+    amount: `₹${amount.toLocaleString("en-IN")}`,
+    color: categoryColors[index % categoryColors.length],
+  }));
+  const openOrders = liveOrders.filter((order) => !["delivered", "completed", "cancelled"].includes(order.status.toLowerCase())).length;
+  const activeServiceCount = liveServices.filter((service) => service.status.toLowerCase() === "active").length;
 
   const contractStart = client.contractStartDate
     ? new Date(client.contractStartDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
@@ -510,7 +558,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Total Users</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-tight">—</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-tight">{portalUserCount}</p>
                     <p className="text-xs text-gray-400 mt-0.5">Managed under {client.name}</p>
                   </div>
                 </div>
@@ -536,7 +584,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Open Orders</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-tight">—</p>
+                    <p className="text-2xl font-bold text-gray-900 leading-tight">{openOrders}</p>
                     <p className="text-xs text-gray-400 mt-0.5">Active contracts</p>
                   </div>
                 </div>
@@ -571,13 +619,13 @@ export default function App({ portalMode = false }: ClientDetailProps) {
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
               {activeTab === "Roles" ? <RolesPage />
                 : activeTab === "Users" ? <UsersPage />
-                : activeTab === "Orders" ? <OrdersPage />
-                : activeTab === "Services" ? <ServicesPage />
-                : activeTab === "Contracts" ? <ContractsPage contractId={""} contractTitle={""} onBack={() => setActiveTab("Overview")} />
+                : activeTab === "Orders" ? <OrdersPage clientId={clientId} clientName={client.name} />
+                : activeTab === "Services" ? <ServicesPage clientId={clientId} />
+                : activeTab === "Contracts" ? <ContractsPage clientId={clientId} contractId={liveContract?.contractId || ""} contractTitle={liveContract?.contractTitle || "Client Contract"} onBack={() => setActiveTab("Overview")} />
                 : activeTab === "Catalog" ? <CatalogPage clientId={clientId || "CLI-DEFAULT"} />
-                : activeTab === "Activity" ? <ActivityPage />
+                : activeTab === "Activity" ? <ActivityPage clientId={clientId} />
                 : activeTab === "Configuration" ? <ConfigurationPage clientId={clientId || "CLI-DEFAULT"} />
-                : activeTab === "Documents" ? <DocumentsPage />
+                : activeTab === "Documents" ? <DocumentsPage clientId={clientId} />
                 : <PlaceholderPage tab={activeTab} />}
             </div>
           )}
@@ -692,7 +740,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                   <div className="flex items-end gap-6">
                     <div>
                       <Users size={22} className="text-gray-300 mb-1" />
-                      <p className="text-2xl font-bold text-gray-900">—</p>
+                      <p className="text-2xl font-bold text-gray-900">{portalUserCount}</p>
                       <p className="text-xs text-gray-400">Total Users</p>
                     </div>
                   </div>
@@ -712,7 +760,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                   <div className="flex items-end gap-6">
                     <div>
                       <ShoppingCart size={22} className="text-gray-300 mb-1" />
-                      <p className="text-2xl font-bold text-gray-900">—</p>
+                      <p className="text-2xl font-bold text-gray-900">{openOrders}</p>
                       <p className="text-xs text-gray-400">Open Orders</p>
                     </div>
                   </div>
@@ -732,8 +780,8 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                   <div className="flex items-end gap-6">
                     <div>
                       <FileText size={22} className="text-gray-300 mb-1" />
-                      <p className="text-2xl font-bold text-gray-900">—</p>
-                      <p className="text-xs text-gray-400">Active Contracts</p>
+                      <p className="text-2xl font-bold text-gray-900">{activeServiceCount}</p>
+                      <p className="text-xs text-gray-400">Active Services</p>
                     </div>
                     <div className="pb-1">
                       <p className="text-xl font-bold text-blue-500">{daysLeft} days</p>

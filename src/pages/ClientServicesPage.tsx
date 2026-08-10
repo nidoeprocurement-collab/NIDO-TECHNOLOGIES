@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Filter, X } from "lucide-react";
 import { getClientServices, saveClientService, type ClientServiceRecord } from "@/lib/clientDataStore";
 
@@ -164,9 +164,16 @@ export default function ClientServicesPage({ clientId }: { clientId: string }) {
   const [showAddService, setShowAddService] = useState(false);
   const [services, setServices] = useState<ClientServiceRecord[]>(() => getClientServices(clientId));
 
+  const reload = () => setServices(getClientServices(clientId));
+  useEffect(() => {
+    reload();
+    window.addEventListener("nidoClientDataUpdated", reload);
+    return () => window.removeEventListener("nidoClientDataUpdated", reload);
+  }, [clientId]);
+
   const handleAdd = (service: ClientServiceRecord) => {
     saveClientService({ ...service, clientId });
-    setServices(getClientServices(clientId));
+    reload();
   };
 
   const filtered = selectedCategory === "Category" || selectedCategory === "All"

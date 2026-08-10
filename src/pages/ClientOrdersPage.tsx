@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Filter, MoreVertical, X } from "lucide-react";
 import { getClientOrders, saveClientOrder, type ClientOrderRecord } from "@/lib/clientDataStore";
@@ -144,6 +144,12 @@ export default function ClientOrdersPage({ clientId, clientName }: { clientId: s
   const total = orders.length;
 
   const reload = () => setOrders(getClientOrders(clientId, clientName));
+  useEffect(() => {
+    reload();
+    window.addEventListener("nidoClientDataUpdated", reload);
+    return () => window.removeEventListener("nidoClientDataUpdated", reload);
+  }, [clientId, clientName]);
+
   const handleCreate = (order: ClientOrderRecord) => {
     saveClientOrder(order);
     reload();

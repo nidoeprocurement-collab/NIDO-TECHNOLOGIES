@@ -57,6 +57,8 @@ export interface ClientDocumentRecord {
   uploadedBy: string;
   uploadedOn: string;
   archived?: boolean;
+  /** Persisted data URL for browser-only document uploads. */
+  fileData?: string;
 }
 
 export interface ClientContractRecord {

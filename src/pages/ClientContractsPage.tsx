@@ -25,10 +25,12 @@ import {
   Phone,
   X,
 } from "lucide-react";
+import { getClientContract, saveClientContract } from "@/lib/clientDataStore";
 
 interface ContractDetailViewProps {
   contractId: string;
   contractTitle: string;
+  clientId?: string;
   onBack: () => void;
 }
 
@@ -164,7 +166,7 @@ function getRenewalIcon(type: string) {
   }
 }
 
-export default function ContractDetailView({ contractId, contractTitle, onBack }: ContractDetailViewProps) {
+export default function ContractDetailView({ contractId, contractTitle, clientId, onBack }: ContractDetailViewProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [phonePopup, setPhonePopup] = useState<string | null>(null);
@@ -322,6 +324,78 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
   const [showAddReminder, setShowAddReminder] = useState(false);
   const [newReminderLabel, setNewReminderLabel] = useState("");
   const [newReminderDate, setNewReminderDate] = useState("");
+  const [contractHydrated, setContractHydrated] = useState(!clientId);
+
+  useEffect(() => {
+    if (!clientId) return;
+    const saved = getClientContract(clientId);
+    if (saved?.data) {
+      const data = saved.data as Record<string, unknown>;
+      if (data.relationshipOwners) setRelationshipOwners(data.relationshipOwners as typeof relationshipOwners);
+      if (data.overview) setOverview(data.overview as typeof overview);
+      if (data.responseTargets) setResponseTargets(data.responseTargets as typeof responseTargets);
+      if (data.commercialTerms) setCommercialTerms(data.commercialTerms as typeof commercialTerms);
+      if (data.servicesCovered) setServicesCovered(data.servicesCovered as typeof servicesCovered);
+      if (data.dataSecurity) setDataSecurity(data.dataSecurity as typeof dataSecurity);
+      if (data.confidentiality) setConfidentiality(data.confidentiality as typeof confidentiality);
+      if (data.supportMatrix) setSupportMatrix(data.supportMatrix as typeof supportMatrix);
+      if (data.renewalTerm) setRenewalTerm(data.renewalTerm as typeof renewalTerm);
+      if (data.subscription) setSubscription(data.subscription as typeof subscription);
+      if (data.slaCommitments) setSlaCommitments(data.slaCommitments as typeof slaCommitments);
+      if (data.renewalInfo) setRenewalInfo(data.renewalInfo as typeof renewalInfo);
+      if (data.supportInfo) setSupportInfo(data.supportInfo as typeof supportInfo);
+      if (data.keyContacts) setKeyContacts(data.keyContacts as typeof keyContacts);
+      if (data.reminders) setReminders(data.reminders as typeof reminders);
+    }
+    setContractHydrated(true);
+  }, [clientId]);
+
+  useEffect(() => {
+    if (!clientId || !contractHydrated) return;
+    saveClientContract({
+      clientId,
+      contractId: contractId || "CLIENT-CONTRACT",
+      contractTitle: contractTitle || "Client Contract",
+      data: {
+        relationshipOwners,
+        overview,
+        responseTargets,
+        commercialTerms,
+        servicesCovered,
+        dataSecurity,
+        confidentiality,
+        supportMatrix,
+        renewalTerm,
+        subscription,
+        slaCommitments,
+        renewalInfo,
+        supportInfo,
+        keyContacts,
+        reminders,
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    clientId,
+    contractId,
+    contractTitle,
+    contractHydrated,
+    relationshipOwners,
+    overview,
+    responseTargets,
+    commercialTerms,
+    servicesCovered,
+    dataSecurity,
+    confidentiality,
+    supportMatrix,
+    renewalTerm,
+    subscription,
+    slaCommitments,
+    renewalInfo,
+    supportInfo,
+    keyContacts,
+    reminders,
+  ]);
 
   // ── Edit handlers ─────────────────────────────────────────────────────────────
 
