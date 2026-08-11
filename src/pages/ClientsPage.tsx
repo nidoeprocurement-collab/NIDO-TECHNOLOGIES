@@ -10,7 +10,12 @@ import {
   type StoredClient,
   type ArchivedClient,
 } from "@/lib/clientStore"
-import { provisionClientPortal, isClientProvisioned, type ProvisionResult } from "@/lib/portalUserStore"
+import {
+  activateClientPortal,
+  generatePortalCredentials,
+  isClientProvisioned,
+  type ProvisionResult,
+} from "@/lib/portalUserStore"
 import {
   Users, Building2, ChevronDown, X, Mail, MapPin, Calendar,
   Archive, MoreVertical, CheckCircle, Clock, XCircle, Edit,
@@ -276,8 +281,22 @@ function ArchivedModal({ clients, onClose, onClientClick }: {
   )
 }
 
+type ProvisionFlow = ProvisionResult & {
+  clientId: string
+  clientName: string
+  isReprovision: boolean
+}
+
 // ── Provision Credentials Dialog ───────────────────────────────────────────
-function ProvisionDialog({ result, onClose }: { result: ProvisionResult & { clientName: string }; onClose: () => void }) {
+function ProvisionDialog({
+  result,
+  onClose,
+  onDone,
+}: {
+  result: ProvisionFlow
+  onClose: () => void
+  onDone: () => void
+}) {
   const [copiedField, setCopiedField] = useState<"email" | "password" | null>(null)
   const copy = (text: string, field: "email" | "password") => {
     navigator.clipboard.writeText(text).catch(() => {})
@@ -293,15 +312,17 @@ function ProvisionDialog({ result, onClose }: { result: ProvisionResult & { clie
               <Zap size={20} className="text-purple-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Portal Provisioned</h2>
+              <h2 className="text-lg font-semibold">
+                {result.isReprovision ? "Portal Credentials Re-generated" : "Portal Credentials Generated"}
+              </h2>
               <p className="text-xs text-gray-500">{result.clientName}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-5">
-          <p className="text-sm text-green-800 font-medium">Client portal is ready!</p>
-          <p className="text-xs text-green-700 mt-1">Share the credentials below with the client admin.</p>
+           <p className="text-sm text-purple-800 font-medium">Credentials are ready for review.</p>
+           <p className="text-xs text-purple-700 mt-1">Portal access will remain inactive until you confirm access in the next step.</p>
         </div>
         <div className="space-y-3 mb-6">
           {([["Login Email", result.email, "email"], ["Temporary Password", result.password, "password"]] as const).map(([label, val, field]) => (
@@ -319,7 +340,73 @@ function ProvisionDialog({ result, onClose }: { result: ProvisionResult & { clie
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5">
           <p className="text-xs text-amber-800"><strong>Important:</strong> Save these credentials now — the password cannot be recovered later.</p>
         </div>
-        <Button className="w-full" onClick={onClose}>Done</Button>
+         <Button className="w-full" onClick={onDone}>Done</Button>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmPortalAccessDialog({
+  result,
+  onCancel,
+  onConfirm,
+}: {
+  result: ProvisionFlow
+  onCancel: () => void
+  onConfirm: (reason: string) => void
+}) {
+  const [reason, setReason] = useState("")
+  const requiresReason = result.isReprovision
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+        <div className="flex justify-between items-start mb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {requiresReason ? "Confirm Portal Re-provisioning" : "Confirm Client Portal Access"}
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">{result.clientName}</p>
+          </div>
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+          <p className="text-sm text-amber-900 font-medium">
+            {requiresReason
+              ? "The existing portal credentials will be replaced only after confirmation."
+              : "This will give the client admin access to the client portal."}
+          </p>
+          <p className="text-xs text-amber-800 mt-1">
+            Username: <span className="font-mono">{result.email}</span>
+          </p>
+        </div>
+
+        {requiresReason && (
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Reason for re-provisioning <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={3}
+              placeholder="Enter why the portal credentials are being re-provisioned"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400"
+            />
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
+          <Button
+            className="flex-1"
+            disabled={requiresReason && !reason.trim()}
+            onClick={() => onConfirm(reason)}
+          >
+            Confirm &amp; Give Access
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -335,7 +422,8 @@ export default function ClientsPageUI() {
   const [archivedOverview, setArchivedOverview] = useState<ArchivedClient | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [showBulkImport, setShowBulkImport] = useState(false)
-  const [provisionResult, setProvisionResult] = useState<(ProvisionResult & { clientName: string }) | null>(null)
+  const [provisionResult, setProvisionResult] = useState<ProvisionFlow | null>(null)
+  const [provisionConfirmation, setProvisionConfirmation] = useState<ProvisionFlow | null>(null)
 
   // Tile filter
   const [activeFilter, setActiveFilter] = useState("All")
@@ -393,8 +481,17 @@ export default function ClientsPageUI() {
   }
 
   const handleProvision = (c: StoredClient) => {
-    const result = provisionClientPortal(c.id, c.name)
-    setProvisionResult({ ...result, clientName: c.name })
+    setProvisionResult({
+      ...generatePortalCredentials(c.id, c.name),
+      clientId: c.id,
+      clientName: c.name,
+      isReprovision: isClientProvisioned(c.id),
+    })
+  }
+
+  const confirmProvision = (flow: ProvisionFlow, reason: string) => {
+    activateClientPortal(flow.clientId, flow.clientName, flow, reason)
+    setProvisionConfirmation(null)
   }
 
   const handleExport = () => {
@@ -686,7 +783,23 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
       {archivedOverview && <ClientOverviewPopup client={archivedOverview} onClose={() => setArchivedOverview(null)} />}
 
       {/* Provision Dialog */}
-      {provisionResult && <ProvisionDialog result={provisionResult} onClose={() => setProvisionResult(null)} />}
+      {provisionResult && (
+        <ProvisionDialog
+          result={provisionResult}
+          onClose={() => setProvisionResult(null)}
+          onDone={() => {
+            setProvisionConfirmation(provisionResult)
+            setProvisionResult(null)
+          }}
+        />
+      )}
+      {provisionConfirmation && (
+        <ConfirmPortalAccessDialog
+          result={provisionConfirmation}
+          onCancel={() => setProvisionConfirmation(null)}
+          onConfirm={(reason) => confirmProvision(provisionConfirmation, reason)}
+        />
+      )}
 
       {/* Bulk Import Modal */}
       {showBulkImport && (
