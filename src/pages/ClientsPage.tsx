@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
 import {
   getClients as getStoredClients,
   saveClients as saveStoredClients,
@@ -415,6 +416,8 @@ function ConfirmPortalAccessDialog({
 // ── Main Page ──────────────────────────────────────────────────────────────
 export default function ClientsPageUI() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const userScope = user?.id || user?.email || "anonymous"
 
   const [clients, setClientsState] = useState<StoredClient[]>(() => getStoredClients())
   const [archivedClients, setArchivedClientsState] = useState<ArchivedClient[]>(() => getArchivedClients())
@@ -437,9 +440,19 @@ export default function ClientsPageUI() {
     setClientsState(getStoredClients())
     setArchivedClientsState(getArchivedClients())
     const onUpdate = () => setClientsState(getStoredClients())
+    const onStorage = (event: StorageEvent) => {
+      if (event.key?.startsWith("nido_clients_v3:") || event.key?.startsWith("nido_clients_archived_v2:")) {
+        setClientsState(getStoredClients())
+        setArchivedClientsState(getArchivedClients())
+      }
+    }
     window.addEventListener("nidoClientsUpdated", onUpdate)
-    return () => window.removeEventListener("nidoClientsUpdated", onUpdate)
-  }, [])
+    window.addEventListener("storage", onStorage)
+    return () => {
+      window.removeEventListener("nidoClientsUpdated", onUpdate)
+      window.removeEventListener("storage", onStorage)
+    }
+  }, [userScope])
 
   // Stats computed from real data — each tile is a filter key
   const stats = useMemo(() => [
