@@ -71,6 +71,8 @@ Client detail tabs use `clientDataStore` records filtered by `clientId`; the det
 
 Contract downloads must generate a PDF from the currently hydrated contract state, not from demo or static content, so edits made in the contract detail view are included.
 
+New clients must not inherit seeded contract terms; the contract screen should initialize empty and hydrate only from a saved client contract, while header metadata comes from the selected client's record.
+
 ## Why
 
 Spec requires single codebase, unlimited clients, full isolation. localStorage is the prototype backend — swap for real DB (Task #2) once MongoDB is connected. All client-scoped data flows through `user.clientId` from the session; never from the frontend directly.

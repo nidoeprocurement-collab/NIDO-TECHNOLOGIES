@@ -621,7 +621,24 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                 : activeTab === "Users" ? <UsersPage />
                 : activeTab === "Orders" ? <OrdersPage clientId={clientId} clientName={client.name} />
                 : activeTab === "Services" ? <ServicesPage clientId={clientId} />
-                : activeTab === "Contracts" ? <ContractsPage clientId={clientId} contractId={liveContract?.contractId || ""} contractTitle={liveContract?.contractTitle || "Client Contract"} onBack={() => setActiveTab("Overview")} />
+                : activeTab === "Contracts" ? (
+                  <ContractsPage
+                    clientId={clientId}
+                    contractId={liveContract?.contractId || ""}
+                    contractTitle={liveContract?.contractTitle || "Client Contract"}
+                    clientName={client.name}
+                    clientEmail={client.email || ""}
+                    clientPhone={client.phone || client.mobile || ""}
+                    clientGstin={client.gstin || client.gstin_number || ""}
+                    clientAddress={address}
+                    contractStartDate={client.contractStartDate || client.contract_start_date || ""}
+                    contractEndDate={client.contractEndDate || client.contract_end_date || ""}
+                    clientCurrency={client.currency || ""}
+                    clientPaymentTerms={client.payment_terms || ""}
+                    clientStatus={client.status || ""}
+                    onBack={() => setActiveTab("Overview")}
+                  />
+                )
                 : activeTab === "Catalog" ? <CatalogPage clientId={clientId || "CLI-DEFAULT"} />
                 : activeTab === "Activity" ? <ActivityPage clientId={clientId} />
                 : activeTab === "Configuration" ? <ConfigurationPage clientId={clientId || "CLI-DEFAULT"} />
