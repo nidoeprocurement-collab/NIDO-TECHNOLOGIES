@@ -63,7 +63,7 @@ rather than hardcoding fonts, sizes, or hex colors.
 
 - Keep the existing project structure and dark-themed UI.
 - Follow STYLE_GUIDE.md (Inter/Poppins fonts, enterprise blue palette, 8pt spacing) for all UI work, now and in future.
-- Keep future project imports credit-light: inspect only the README and essential project configuration first, then ask what I want done. Do not install dependencies, restart workflows, take screenshots, run tests/builds, or broadly analyze the imported project unless I explicitly request setup, running, verification, or a specific change.
+- Keep future project imports credit-light: inspect only the README and essential project configuration first, then ask what I want done. Do not use extra agents, broad analysis, redesign work, screenshots, tests, or builds during import. Only install dependencies, restart the existing workflow, or verify the preview when I explicitly ask to run/setup the project; otherwise leave it untouched.
 
 ## Tax Engine
 
