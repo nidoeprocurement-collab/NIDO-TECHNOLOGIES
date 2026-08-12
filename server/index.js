@@ -27,6 +27,15 @@ async function main() {
 
   app.use("/api/email", emailRouter);
   app.use("/api/quotes", quotesRouter);
+  app.get("/api/client-context", (req, res) => {
+    const forwardedFor = req.headers["x-forwarded-for"];
+    const forwardedIp = Array.isArray(forwardedFor)
+      ? forwardedFor[0]
+      : forwardedFor?.split(",")[0]?.trim();
+    res.json({
+      ip: forwardedIp || req.socket.remoteAddress || "Not available",
+    });
+  });
 
   const httpServer = http.createServer(app);
 

@@ -18,6 +18,11 @@ export interface NidoRole {
 export interface LoginHistoryEntry {
   timestamp: string;
   result: "success" | "invalid_password" | "inactive" | "suspended" | "locked";
+  ip?: string;
+  device?: string;
+  latitude?: number;
+  longitude?: number;
+  locationAccuracy?: number;
 }
 
 export interface NidoUser {
@@ -53,6 +58,14 @@ const USERS_KEY = "nido_config_users";
 
 export const NIDO_ROLES_EVENT = "nidoConfigRolesUpdated";
 export const NIDO_USERS_EVENT = "nidoConfigUsersUpdated";
+
+export interface LoginContext {
+  ip?: string;
+  device?: string;
+  latitude?: number;
+  longitude?: number;
+  locationAccuracy?: number;
+}
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
@@ -245,7 +258,8 @@ export function deleteUser(id: string): void {
  */
 export function authenticateNidoUser(
   email: string,
-  password: string
+  password: string,
+  context: LoginContext = {}
 ): { user: NidoUser; error?: never } | { user?: never; error: "invalid_credentials" | "inactive" | "suspended" | "locked" } {
   const users = getUsers();
   const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
@@ -255,7 +269,11 @@ export function authenticateNidoUser(
   }
 
   const logAttempt = (result: LoginHistoryEntry["result"], extra?: Partial<NidoUser>) => {
-    const entry: LoginHistoryEntry = { timestamp: new Date().toISOString(), result };
+    const entry: LoginHistoryEntry = {
+      timestamp: new Date().toISOString(),
+      result,
+      ...context,
+    };
     const history = [...(user.loginHistory ?? []), entry].slice(-50); // keep last 50
     updateUser(user.id, { loginHistory: history, ...extra });
   };

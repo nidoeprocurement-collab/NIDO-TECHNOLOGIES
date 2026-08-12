@@ -2,12 +2,47 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { findPortalUser } from '@/lib/portalUserStore';
-import { authenticateNidoUser, unlockUser, getUsers } from '@/lib/nidoUsersStore';
+import { authenticateNidoUser, unlockUser, getUsers, type LoginContext } from '@/lib/nidoUsersStore';
 import { consumeRecoveryCode } from '@/lib/recoveryCodeStore';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { Mail, Lock, Eye, EyeOff, Loader2, Zap, KeyRound, ShieldAlert } from 'lucide-react';
 
 type LoginTab = 'password' | 'recovery';
+
+async function captureLoginContext(): Promise<LoginContext> {
+  const context: LoginContext = {
+    device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+  };
+
+  try {
+    const response = await fetch('/api/client-context');
+    if (response.ok) {
+      const data = await response.json() as { ip?: string };
+      context.ip = data.ip;
+    }
+  } catch {
+    // The authentication flow still works if the context endpoint is unavailable.
+  }
+
+  if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 4000,
+          maximumAge: 300000,
+        });
+      });
+      context.latitude = position.coords.latitude;
+      context.longitude = position.coords.longitude;
+      context.locationAccuracy = position.coords.accuracy;
+    } catch {
+      // Coordinates are optional because the user may deny browser permission.
+    }
+  }
+
+  return context;
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -58,7 +93,8 @@ export default function LoginPage() {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
       // ── 1. Try NIDO internal users ────────────────────────────────────────
-      const result = authenticateNidoUser(email.trim(), password);
+      const loginContext = await captureLoginContext();
+      const result = authenticateNidoUser(email.trim(), password, loginContext);
 
       if ('user' in result && result.user) {
         const u = result.user;

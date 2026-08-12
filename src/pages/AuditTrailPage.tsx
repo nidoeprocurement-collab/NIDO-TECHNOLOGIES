@@ -125,6 +125,26 @@ function fmtTs(ms: number): string {
   return `${M} ${String(d.getDate()).padStart(2,"0")}, ${d.getFullYear()} ${hh}:${mm}:${ss}`;
 }
 
+function formatCoordinates(latitude?: number, longitude?: number, accuracy?: number): string {
+  if (typeof latitude !== "number" || typeof longitude !== "number") return "Not recorded";
+  const accuracyText = typeof accuracy === "number" ? ` · ±${Math.round(accuracy)}m` : "";
+  return `Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)}${accuracyText}`;
+}
+
+function formatDevice(userAgent?: string): string {
+  if (!userAgent) return "Not recorded";
+  const browser = userAgent.match(/Edg\/[\d.]+|Chrome\/[\d.]+|Firefox\/[\d.]+|Version\/[\d.]+.*Safari/)?.[0]
+    ?.replace(/^Version\//, "Safari ")
+    .replace(/\/[\d.]+/, "") ?? "Browser";
+  const os = userAgent.match(/Windows NT [\d.]+|Mac OS X [\d_]+|Android [\d.]+|iPhone OS [\d_]+|Linux/)
+    ?. [0]
+    ?.replace("Windows NT", "Windows")
+    .replace("Mac OS X", "macOS")
+    .replace("iPhone OS", "iOS")
+    .replace(/_/g, ".") ?? "Unknown OS";
+  return `${browser} / ${os}`;
+}
+
 function fmtINR(n: number): string {
   return "₹" + (n ?? 0).toLocaleString("en-IN");
 }
@@ -648,9 +668,9 @@ function deriveRecordedActivity(): UserActivity[] {
         action: success ? "Login" : "Failed Login",
         resource: "Platform",
         module: "Authentication",
-        ip: "Not recorded",
-        device: "Not recorded",
-        location: "Not recorded",
+        ip: entry.ip ?? "Not recorded",
+        device: formatDevice(entry.device),
+        location: formatCoordinates(entry.latitude, entry.longitude, entry.locationAccuracy),
         timestamp: fmtTs(ms),
         tsMs: ms,
         status: success ? "Success" : "Failed",
@@ -757,7 +777,7 @@ function deriveRecordedSystemLogs(): SystemLog[] {
         timestamp: fmtTs(ms),
         tsMs: ms,
         user: user.email,
-        ip: "Not recorded",
+        ip: entry.ip ?? "Not recorded",
         statusCode: success ? 200 : 401,
       });
     });
