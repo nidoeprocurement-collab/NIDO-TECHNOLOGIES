@@ -14,6 +14,16 @@ interface LoginContextResult {
   locationGranted: boolean;
 }
 
+async function getLocationPermissionState(): Promise<PermissionState | undefined> {
+  if (typeof navigator === 'undefined' || !navigator.permissions?.query) return undefined;
+  try {
+    const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+    return status.state;
+  } catch {
+    return undefined;
+  }
+}
+
 async function captureLoginContext(): Promise<LoginContextResult> {
   const context: LoginContext = {
     device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
@@ -36,8 +46,8 @@ async function captureLoginContext(): Promise<LoginContextResult> {
   try {
     const position = await new Promise<GeolocationPosition>((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 4000,
+        enableHighAccuracy: false,
+        timeout: 12000,
         maximumAge: 300000,
       });
     });
@@ -46,7 +56,13 @@ async function captureLoginContext(): Promise<LoginContextResult> {
     context.locationAccuracy = position.coords.accuracy;
     return { context, locationGranted: true };
   } catch {
-    return { context, locationGranted: false };
+    // Some browsers grant permission but cannot return a fresh fix quickly.
+    // In that case sign-in may continue and the missing coordinates remain
+    // explicitly unrecorded instead of incorrectly treating permission as denied.
+    return {
+      context,
+      locationGranted: (await getLocationPermissionState()) === 'granted',
+    };
   }
 }
 
