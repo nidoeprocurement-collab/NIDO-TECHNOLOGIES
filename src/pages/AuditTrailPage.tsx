@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useEffect } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import ReportShell from "@/components/reports/ReportShell";
 import { useReportShellContext } from "@/contexts/ReportShellContext";
@@ -1029,6 +1029,44 @@ export default function AuditTrailPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [dateRange, setDateRange]   = useState("All Time");
+  const [lastLiveUpdate, setLastLiveUpdate] = useState(() => Date.now());
+
+  // Keep both report tabs synchronized with the platform's local stores.
+  // Store events update immediately in this tab; storage and polling cover
+  // changes made by another tab or by legacy code that does not emit an event.
+  useEffect(() => {
+    const liveEvents = [
+      "nidoConfigUsersUpdated",
+      "nidoSalesOrdersUpdated",
+      "nidoQuotesUpdated",
+      "nidoInvoicesUpdated",
+      "nidoVendorsUpdated",
+      "nidoClientsUpdated",
+      "supportTicketsUpdated",
+      "serviceRequestsUpdated",
+      "stockHistoryUpdated",
+      "poCreated",
+      "poCancelled",
+      "nidoPortalUsersUpdated",
+      "nidoImpersonationUpdated",
+      "nido:config-changed",
+    ];
+
+    const refreshLiveData = () => {
+      setRefreshKey(key => key + 1);
+      setLastLiveUpdate(Date.now());
+    };
+
+    liveEvents.forEach(eventName => window.addEventListener(eventName, refreshLiveData));
+    window.addEventListener("storage", refreshLiveData);
+    const pollingTimer = window.setInterval(refreshLiveData, 3000);
+
+    return () => {
+      liveEvents.forEach(eventName => window.removeEventListener(eventName, refreshLiveData));
+      window.removeEventListener("storage", refreshLiveData);
+      window.clearInterval(pollingTimer);
+    };
+  }, []);
 
   // Derive live data (re-derived on every refreshKey bump)
   const activity  = useMemo(() => deriveActivity(),              [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1077,9 +1115,18 @@ export default function AuditTrailPage() {
       <div className="flex items-center justify-between">
         <div>
           {inline && <h2 className="text-lg font-bold text-gray-900">Audit Reports</h2>}
-          <p className={`text-sm text-gray-500 ${inline ? "mt-0.5" : ""}`}>
-            Live user activity &amp; system logs derived from all platform data
-          </p>
+          <div className={`flex items-center gap-2 ${inline ? "mt-0.5" : ""}`}>
+            <p className="text-sm text-gray-500">
+              Live user activity &amp; system logs derived from all platform data
+            </p>
+            <span
+              title={`Updated ${new Date(lastLiveUpdate).toLocaleTimeString()}`}
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 whitespace-nowrap"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleRefresh}
