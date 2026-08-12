@@ -24,6 +24,8 @@ export interface User {
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
+  /** The identity that authenticated, never the impersonated effective user. */
+  currentAuthenticatedUser: User | null;
   login: (user: User) => void;
   logout: () => void;
   isLoading: boolean;
@@ -88,7 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (userData: User) => {
+    // A new login always starts from a clean identity. Do not carry an old
+    // impersonation session into another account.
+    if (getImpersonationSession()) clearImpersonationSession();
     setUser(userData);
+    setImpersonationSession(null);
     setIsAuthenticated(true);
     localStorage.setItem('nido_user', JSON.stringify(userData));
   };
@@ -106,8 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isNidoAdmin = effectiveUser?.userType === 'nido_admin';
   const isClientPortalUser = effectiveUser?.userType === 'client_admin' || effectiveUser?.userType === 'client_user';
   const beginImpersonation = (target: User) => {
-    if (!user || user.userType !== "nido_admin") return false;
-    const session = createImpersonationSession(user, target);
+    // Never allow nested impersonation and always use the preserved original
+    // internal identity for the authorization decision.
+    if (!originalUser || originalUser.userType !== "nido_admin" || isImpersonating) return false;
+    const session = createImpersonationSession(originalUser, target);
     if (!session) return false;
     setImpersonationSession(session);
     setUser(session.impersonatedUser);
@@ -123,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextType = {
     isAuthenticated,
     user,
+    currentAuthenticatedUser: originalUser,
     login,
     logout,
     isLoading,

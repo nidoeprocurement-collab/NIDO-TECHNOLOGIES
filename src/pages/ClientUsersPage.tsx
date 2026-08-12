@@ -2548,7 +2548,10 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   );
   const getPortalTarget = (row: UserRecord) => {
     const portalUser = getPortalUsersByClient(clientId || "").find(
-      (candidate) => candidate.email.toLowerCase() === row.email.toLowerCase(),
+      (candidate) =>
+        candidate.email.toLowerCase() === row.email.toLowerCase() &&
+        candidate.status === "active" &&
+        row.status === "Active",
     );
     return portalUser ? {
       id: portalUser.id,

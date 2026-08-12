@@ -1,5 +1,5 @@
 import type { User } from "@/contexts/AuthContext";
-import { getPortalUsers } from "@/lib/portalUserStore";
+import { getPortalUsers, type PortalUser } from "@/lib/portalUserStore";
 import { hasPermission } from "@/lib/permissionsStore";
 
 export type ImpersonationMode = "VIEW_ONLY" | "FULL_ACCESS";
@@ -33,6 +33,10 @@ const AUDIT_KEY = "nido_impersonation_audit";
 export const IMPERSONATION_EVENT = "nidoImpersonationUpdated";
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
+function getSessionStorage(): Storage {
+  return window.sessionStorage;
+}
+
 function notify() {
   window.dispatchEvent(new Event(IMPERSONATION_EVENT));
 }
@@ -45,14 +49,17 @@ function saveAudit(entry: ImpersonationAuditEntry) {
 
 export function getImpersonationSession(): ImpersonationSession | null {
   try {
-    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null") as ImpersonationSession | null;
+    const session = JSON.parse(getSessionStorage().getItem(SESSION_KEY) || "null") as ImpersonationSession | null;
     if (!session) return null;
-    if (session.expiresAt <= new Date().toISOString()) {
+    if (session.status !== "active" || session.expiresAt <= new Date().toISOString()) {
       endImpersonation("expired");
       return null;
     }
-    const target = getPortalUsers().find((u) => u.id === session.impersonatedUser.id);
-    if (!target || target.status !== "active" || !canStartImpersonation(session.originalUser, session.impersonatedUser)) {
+    const target = getPortalUsers().find((u) =>
+      u.id === session.impersonatedUser.id &&
+      u.clientId === session.clientId,
+    );
+    if (!target || target.status !== "active" || !canStartImpersonation(session.originalUser, toAuthUser(target))) {
       endImpersonation("revoked");
       return null;
     }
@@ -65,25 +72,47 @@ export function getImpersonationSession(): ImpersonationSession | null {
 
 export function canStartImpersonation(originalUser: User, targetUser: User): boolean {
   return originalUser.userType === "nido_admin" &&
-    targetUser.userType !== "nido_admin" &&
+    (targetUser.userType === "client_admin" || targetUser.userType === "client_user") &&
     Boolean(targetUser.clientId) &&
     hasPermission(originalUser.role || "", "client_user_impersonation", "manage");
 }
 
+function toAuthUser(target: PortalUser): User {
+  return {
+    id: target.id,
+    email: target.email,
+    name: target.name,
+    role: target.role,
+    userType: target.userType,
+    clientId: target.clientId,
+    clientName: target.clientName,
+  };
+}
+
 export function startImpersonation(originalUser: User, targetUser: User): ImpersonationSession | null {
-  if (!canStartImpersonation(originalUser, targetUser)) return null;
+  // Resolve the target from the portal-user store instead of trusting the
+  // row/object supplied by the browser. This is the authoritative local
+  // equivalent of a server-side lookup.
+  const target = getPortalUsers().find((candidate) =>
+    candidate.id === targetUser.id &&
+    candidate.status === "active" &&
+    candidate.clientId === targetUser.clientId,
+  );
+  if (!target) return null;
+  const effectiveTarget = toAuthUser(target);
+  if (!canStartImpersonation(originalUser, effectiveTarget)) return null;
   const now = new Date();
   const session: ImpersonationSession = {
-    id: `imp-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `imp-${crypto.randomUUID()}`,
     originalUser,
-    impersonatedUser: { ...targetUser, userType: "client_user" },
-    clientId: targetUser.clientId!,
+    impersonatedUser: effectiveTarget,
+    clientId: target.clientId,
     mode: "VIEW_ONLY",
     startedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + ONE_HOUR_MS).toISOString(),
     status: "active",
   };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  getSessionStorage().setItem(SESSION_KEY, JSON.stringify(session));
   saveAudit({
     eventType: "IMPERSONATION_STARTED",
     originalUserId: originalUser.id,
@@ -101,7 +130,7 @@ export function startImpersonation(originalUser: User, targetUser: User): Impers
 
 export function endImpersonation(reason: "ended" | "expired" | "revoked" = "ended"): void {
   try {
-    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || "null") as ImpersonationSession | null;
+    const session = JSON.parse(getSessionStorage().getItem(SESSION_KEY) || "null") as ImpersonationSession | null;
     if (session) {
       const endedAt = new Date().toISOString();
       saveAudit({
@@ -118,7 +147,7 @@ export function endImpersonation(reason: "ended" | "expired" | "revoked" = "ende
       });
     }
   } finally {
-    localStorage.removeItem(SESSION_KEY);
+    getSessionStorage().removeItem(SESSION_KEY);
     notify();
   }
 }

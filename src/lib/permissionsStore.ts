@@ -120,6 +120,9 @@ const DEFAULTS: Record<string, Record<string, ModulePermissions>> = {
     notifications:ALL, configuration:{ view:true, manage:true, configure:true },
     client_user_impersonation:ALL,
   },
+  // Keep the policy explicit: managers can be granted this permission from
+  // the Roles UI, but it is off by default. Procurement and other roles are
+  // denied unless an administrator deliberately changes their role matrix.
   'Procurement Manager': {
     dashboard:VIEW, shop:CRUD, services:CRUD, support:VIEW,
     clients:VIEW, vendors:{ view:true, create:true, edit:true },
@@ -128,6 +131,7 @@ const DEFAULTS: Record<string, Record<string, ModulePermissions>> = {
     contracts:VIEW, approvals:CRUD_APR, master_catalogue:VIEW,
     users:VIEW, roles:NONE, departments:VIEW,
     audit_logs:NONE, notifications:VIEW, configuration:VIEW,
+    client_user_impersonation:NONE,
   },
   'Accounts Payable': {
     dashboard:VIEW, shop:VIEW, services:VIEW, support:VIEW,
