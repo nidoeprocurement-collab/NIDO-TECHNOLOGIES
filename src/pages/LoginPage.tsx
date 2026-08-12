@@ -9,7 +9,12 @@ import { Mail, Lock, Eye, EyeOff, Loader2, Zap, KeyRound, ShieldAlert } from 'lu
 
 type LoginTab = 'password' | 'recovery';
 
-async function captureLoginContext(): Promise<LoginContext> {
+interface LoginContextResult {
+  context: LoginContext;
+  locationGranted: boolean;
+}
+
+async function captureLoginContext(): Promise<LoginContextResult> {
   const context: LoginContext = {
     device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
   };
@@ -24,24 +29,25 @@ async function captureLoginContext(): Promise<LoginContext> {
     // The authentication flow still works if the context endpoint is unavailable.
   }
 
-  if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 4000,
-          maximumAge: 300000,
-        });
-      });
-      context.latitude = position.coords.latitude;
-      context.longitude = position.coords.longitude;
-      context.locationAccuracy = position.coords.accuracy;
-    } catch {
-      // Coordinates are optional because the user may deny browser permission.
-    }
+  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+    return { context, locationGranted: false };
   }
 
-  return context;
+  try {
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 4000,
+        maximumAge: 300000,
+      });
+    });
+    context.latitude = position.coords.latitude;
+    context.longitude = position.coords.longitude;
+    context.locationAccuracy = position.coords.accuracy;
+    return { context, locationGranted: true };
+  } catch {
+    return { context, locationGranted: false };
+  }
 }
 
 export default function LoginPage() {
@@ -59,6 +65,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
+  const [locationBlocked, setLocationBlocked] = useState(false);
 
   // Recovery tab
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -93,8 +100,13 @@ export default function LoginPage() {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
       // ── 1. Try NIDO internal users ────────────────────────────────────────
-      const loginContext = await captureLoginContext();
-      const result = authenticateNidoUser(email.trim(), password, loginContext);
+      const captured = await captureLoginContext();
+      if (!captured.locationGranted) {
+        setLocationBlocked(true);
+        setError('Location permission is required to sign in. Enable location access in your browser, then refresh this page and try again.');
+        return;
+      }
+      const result = authenticateNidoUser(email.trim(), password, captured.context);
 
       if ('user' in result && result.user) {
         const u = result.user;
@@ -137,6 +149,13 @@ export default function LoginPage() {
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 400));
+
+      const captured = await captureLoginContext();
+      if (!captured.locationGranted) {
+        setLocationBlocked(true);
+        setError('Location permission is required to sign in. Enable location access in your browser, then refresh this page and try again.');
+        return;
+      }
 
       const userId = consumeRecoveryCode(email.trim(), recoveryCode.trim());
 
@@ -323,11 +342,13 @@ export default function LoginPage() {
 
                     <button
                       type="submit"
-                      disabled={isLoading}
+                      disabled={isLoading || locationBlocked}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
                     >
                       {isLoading ? (
                         <><Loader2 size={18} className="animate-spin" />Signing in…</>
+                      ) : locationBlocked ? (
+                        <>Location Permission Required</>
                       ) : (
                         <>Sign In <span>→</span></>
                       )}
@@ -405,11 +426,13 @@ export default function LoginPage() {
 
                     <button
                       type="submit"
-                      disabled={isLoading || recoveryCode.replace(/-/g, '').length < 15}
+                      disabled={isLoading || locationBlocked || recoveryCode.replace(/-/g, '').length < 15}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
                     >
                       {isLoading ? (
                         <><Loader2 size={18} className="animate-spin" />Verifying…</>
+                      ) : locationBlocked ? (
+                        <>Location Permission Required</>
                       ) : (
                         <><KeyRound size={16} /> Sign In with Recovery Code</>
                       )}
