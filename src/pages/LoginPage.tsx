@@ -5,7 +5,7 @@ import { findPortalUser } from '@/lib/portalUserStore';
 import { authenticateNidoUser, unlockUser, getUsers, type LoginContext } from '@/lib/nidoUsersStore';
 import { consumeRecoveryCode } from '@/lib/recoveryCodeStore';
 import { useOrgConfig } from '@/contexts/ConfigContext';
-import { Mail, Lock, Eye, EyeOff, Loader2, Zap, KeyRound, ShieldAlert } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, Zap, KeyRound, ShieldAlert, MapPin } from 'lucide-react';
 
 type LoginTab = 'password' | 'recovery';
 
@@ -66,6 +66,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [locationBlocked, setLocationBlocked] = useState(false);
+  const [locationPrompt, setLocationPrompt] = useState<LoginTab | null>(null);
 
   // Recovery tab
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -90,23 +91,12 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLocked(false);
-    setIsLoading(true);
-
+  const completePasswordLogin = async (context: LoginContext) => {
     try {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
       // ── 1. Try NIDO internal users ────────────────────────────────────────
-      const captured = await captureLoginContext();
-      if (!captured.locationGranted) {
-        setLocationBlocked(true);
-        setError('Location permission is required to sign in. Enable location access in your browser, then refresh this page and try again.');
-        return;
-      }
-      const result = authenticateNidoUser(email.trim(), password, captured.context);
+      const result = authenticateNidoUser(email.trim(), password, context);
 
       if ('user' in result && result.user) {
         const u = result.user;
@@ -136,29 +126,14 @@ export default function LoginPage() {
       setError('Invalid email or password.');
     } catch {
       setError('An error occurred during sign in. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const handleRecoveryLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setRecoverySuccess('');
-    setIsLoading(true);
-
+  const completeRecoveryLogin = async () => {
     try {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
-      const captured = await captureLoginContext();
-      if (!captured.locationGranted) {
-        setLocationBlocked(true);
-        setError('Location permission is required to sign in. Enable location access in your browser, then refresh this page and try again.');
-        return;
-      }
-
       const userId = consumeRecoveryCode(email.trim(), recoveryCode.trim());
-
       if (!userId) {
         setError('Invalid or already-used recovery code. Please check the code and try again.');
         return;
@@ -177,13 +152,47 @@ export default function LoginPage() {
         return;
       }
 
-      // Fall back: check portal users (if recovery codes are ever issued for them)
       setError('Account not found. Make sure the email matches your account.');
     } catch {
       setError('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLocked(false);
+    if (!locationBlocked) setLocationPrompt('password');
+  };
+
+  const handleRecoveryLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setRecoverySuccess('');
+    if (!locationBlocked) setLocationPrompt('recovery');
+  };
+
+  const handleLocationContinue = async () => {
+    if (!locationPrompt) return;
+    const requestedAction = locationPrompt;
+    setIsLoading(true);
+
+    const captured = await captureLoginContext();
+    if (!captured.locationGranted) {
+      setLocationBlocked(true);
+      setLocationPrompt(null);
+      setError('Location permission is required to sign in. Enable location access in your browser, then refresh this page and try again.');
+      setIsLoading(false);
+      return;
+    }
+
+    setLocationPrompt(null);
+    if (requestedAction === 'password') {
+      await completePasswordLogin(captured.context);
+    } else {
+      await completeRecoveryLogin();
+    }
+    setIsLoading(false);
   };
 
   // Format recovery code input as user types: insert hyphens automatically
@@ -448,6 +457,49 @@ export default function LoginPage() {
                     </p>
                   </div>
                 </>
+              )}
+
+              {locationPrompt && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="location-permission-title"
+                    className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+                  >
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                      <MapPin size={24} />
+                    </div>
+                    <h2 id="location-permission-title" className="mt-4 text-center text-xl font-bold text-gray-900">
+                      Location access required
+                    </h2>
+                    <p className="mt-2 text-center text-sm leading-relaxed text-gray-600">
+                      To sign in, NIDO needs permission to record the sign-in IP address, device information, and the device&apos;s latitude and longitude for the audit trail.
+                    </p>
+                    <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-relaxed text-blue-800">
+                      Your coordinates are requested by your browser and are stored with the sign-in activity. You can cancel now, but sign-in will not continue without location permission.
+                    </div>
+                    <div className="mt-6 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLocationPrompt(null)}
+                        disabled={isLoading}
+                        className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLocationContinue}
+                        disabled={isLoading}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+                        {isLoading ? 'Checking location…' : 'Allow Location & Continue'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
