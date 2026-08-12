@@ -395,7 +395,8 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrdersStatus } = useMyOrders();
-  const { user } = useAuth();
+  const { user, isImpersonating } = useAuth();
+  const isViewOnly = isImpersonating;
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
@@ -484,6 +485,10 @@ export default function MyOrderPage() {
 
   // ── Bulk update status ──────────────────────────────────────────────────────
   const handleBulkStatusApply = (status: OrderStatus) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      return;
+    }
     if (status === "Cancelled") {
       // Cancelling is a terminal, hard-to-undo action — confirm first.
       setPendingBulkCancel(true);
@@ -493,6 +498,12 @@ export default function MyOrderPage() {
   };
 
   const applyBulkStatus = (status: OrderStatus, cancelReason?: string) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      setPendingBulkCancel(false);
+      setShowBulkStatus(false);
+      return;
+    }
     // Cascades to sub-orders (and clears vendor selection) when moving to
     // Cancelled/Draft, and stays in sync with the order detail page since
     // both read/write the same shared order + sub-order state. Orders that
@@ -513,6 +524,11 @@ export default function MyOrderPage() {
 
   // ── Bulk update notes ───────────────────────────────────────────────────────
   const handleBulkNotesApply = (note: string, visibility: string) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      setShowBulkNotes(false);
+      return;
+    }
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -563,9 +579,27 @@ export default function MyOrderPage() {
             {showActions && (
               <ActionDropdown
                 onExport={handleExport}
-                onCreateOrder={() => navigate("/shop")}
-                onBulkStatus={() => setShowBulkStatus(true)}
-                onBulkNotes={() => setShowBulkNotes(true)}
+                onCreateOrder={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  navigate("/shop");
+                }}
+                onBulkStatus={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  setShowBulkStatus(true);
+                }}
+                onBulkNotes={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  setShowBulkNotes(true);
+                }}
                 onClose={() => setShowActions(false)}
               />
             )}

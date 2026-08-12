@@ -24,6 +24,7 @@ export interface ImpersonationAuditEntry {
   timestamp: string;
   startedAt?: string;
   endedAt?: string;
+  durationSeconds?: number;
   mode: ImpersonationMode;
   status: string;
 }
@@ -142,6 +143,10 @@ export function endImpersonation(reason: "ended" | "expired" | "revoked" = "ende
         timestamp: endedAt,
         startedAt: session.startedAt,
         endedAt,
+        durationSeconds: Math.max(
+          0,
+          Math.round((Date.parse(endedAt) - Date.parse(session.startedAt)) / 1000),
+        ),
         mode: session.mode,
         status: reason,
       });
