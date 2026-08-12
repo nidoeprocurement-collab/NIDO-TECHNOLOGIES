@@ -24,6 +24,8 @@ import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
 import { getStockHistory } from "@/lib/stockHistoryStore";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
+import { getImpersonationAudit } from "@/lib/impersonationStore";
+import { getTaxAuditLog } from "@/lib/taxEngine";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -626,6 +628,200 @@ function deriveSystemLogs(activity: UserActivity[]): SystemLog[] {
   return logs.sort((a, b) => b.tsMs - a.tsMs).slice(0, 200);
 }
 
+// Only read audit records that are explicitly written by live application
+// actions. This intentionally excludes seeded business records and generated
+// IP/device/location values from the report.
+function deriveRecordedActivity(): UserActivity[] {
+  const users = getUsers();
+  const events: UserActivity[] = [];
+
+  users.forEach(user => {
+    (user.loginHistory ?? []).forEach((entry, index) => {
+      const ms = toMs(entry.timestamp);
+      if (!ms) return;
+      const success = entry.result === "success";
+      events.push({
+        id: `live-login-${user.id}-${index}`,
+        user: user.name,
+        avatar: initials(user.name),
+        role: user.role,
+        action: success ? "Login" : "Failed Login",
+        resource: "Platform",
+        module: "Authentication",
+        ip: "Not recorded",
+        device: "Not recorded",
+        location: "Not recorded",
+        timestamp: fmtTs(ms),
+        tsMs: ms,
+        status: success ? "Success" : "Failed",
+        details: success
+          ? "Successful login recorded by the authentication service"
+          : `Failed login recorded — ${entry.result.replace(/_/g, " ")}`,
+      });
+    });
+  });
+
+  getStockHistory().forEach(entry => {
+    const ms = toMs(entry.timestamp);
+    if (!ms) return;
+    const user = users.find(candidate => candidate.name === entry.user || candidate.email === entry.user);
+    const action: ActivityAction =
+      entry.action === "Stock In" ? "Create" :
+      entry.action === "Stock Out" ? "Delete" :
+      entry.action === "PO Cancelled" ? "Reject" :
+      entry.action === "Order Reserved" ? "Approve" :
+      entry.action === "Reservation Released" ? "Reject" : "Edit";
+    events.push({
+      id: `live-stock-${entry.id}`,
+      user: entry.user,
+      avatar: initials(entry.user),
+      role: user?.role ?? "Recorded event",
+      action,
+      resource: `${entry.productName} (${entry.masterProductCode})`,
+      module: "Inventory",
+      ip: "Not recorded",
+      device: "Not recorded",
+      location: "Not recorded",
+      timestamp: fmtTs(ms),
+      tsMs: ms,
+      status: entry.action === "Stock Correction" && Math.abs(entry.qtyChanged) > 50 ? "Warning" : "Success",
+      details: `${entry.action}: ${entry.qtyChanged > 0 ? "+" : ""}${entry.qtyChanged} units → ${entry.qtyAfter} in stock | Ref: ${entry.reference}`,
+    });
+  });
+
+  getImpersonationAudit().forEach((entry, index) => {
+    const ms = toMs(entry.timestamp);
+    if (!ms) return;
+    const user = users.find(candidate => candidate.id === entry.originalUserId);
+    const started = entry.eventType === "IMPERSONATION_STARTED";
+    events.push({
+      id: `live-impersonation-${entry.impersonationSessionId}-${index}`,
+      user: user?.name ?? entry.originalUserId,
+      avatar: initials(user?.name ?? entry.originalUserId),
+      role: user?.role ?? "Recorded event",
+      action: "View",
+      resource: `Client Portal: ${entry.clientId}`,
+      module: "Security",
+      ip: "Not recorded",
+      device: "Not recorded",
+      location: "Not recorded",
+      timestamp: fmtTs(ms),
+      tsMs: ms,
+      status: "Success",
+      details: started ? "Client portal impersonation started" : "Client portal impersonation ended",
+    });
+  });
+
+  getTaxAuditLog().forEach(entry => {
+    const ms = toMs(entry.timestamp);
+    if (!ms) return;
+    events.push({
+      id: `live-tax-${entry.id}`,
+      user: entry.user,
+      avatar: initials(entry.user),
+      role: "Recorded event",
+      action: "Settings",
+      resource: entry.module,
+      module: "Tax Configuration",
+      ip: entry.clientIp ?? "Not recorded",
+      device: "Not recorded",
+      location: "Not recorded",
+      timestamp: fmtTs(ms),
+      tsMs: ms,
+      status: "Success",
+      details: `Tax configuration changed${entry.reason ? ` — ${entry.reason}` : ""}`,
+    });
+  });
+
+  return events.sort((a, b) => b.tsMs - a.tsMs).slice(0, 200);
+}
+
+function deriveRecordedSystemLogs(): SystemLog[] {
+  const users = getUsers();
+  const logs: SystemLog[] = [];
+
+  users.forEach(user => {
+    (user.loginHistory ?? []).forEach((entry, index) => {
+      const ms = toMs(entry.timestamp);
+      if (!ms) return;
+      const success = entry.result === "success";
+      logs.push({
+        id: `live-slog-login-${user.id}-${index}`,
+        severity: success ? "Info" : entry.result === "locked" ? "Critical" : "Warning",
+        category: success ? "Authentication" : "Security",
+        event: success ? "User Session Created" : "Authentication Failure",
+        service: "auth-service",
+        message: success
+          ? `Successful login recorded for ${user.email}`
+          : `Authentication failed for ${user.email} — ${entry.result.replace(/_/g, " ")}`,
+        timestamp: fmtTs(ms),
+        tsMs: ms,
+        user: user.email,
+        ip: "Not recorded",
+        statusCode: success ? 200 : 401,
+      });
+    });
+  });
+
+  getStockHistory().forEach(entry => {
+    const ms = toMs(entry.timestamp);
+    if (!ms) return;
+    const correction = entry.action === "Stock Correction";
+    logs.push({
+      id: `live-slog-stock-${entry.id}`,
+      severity: correction && Math.abs(entry.qtyChanged) > 100 ? "Warning" : "Info",
+      category: "Data",
+      event: `Stock ${entry.action}`,
+      service: "inventory-service",
+      message: `${entry.action} on ${entry.productName}: ${entry.qtyChanged > 0 ? "+" : ""}${entry.qtyChanged} units | Ref: ${entry.reference}`,
+      timestamp: fmtTs(ms),
+      tsMs: ms,
+      user: entry.user,
+      ip: "Not recorded",
+      statusCode: 200,
+    });
+  });
+
+  getImpersonationAudit().forEach((entry, index) => {
+    const ms = toMs(entry.timestamp);
+    if (!ms) return;
+    const started = entry.eventType === "IMPERSONATION_STARTED";
+    logs.push({
+      id: `live-slog-impersonation-${entry.impersonationSessionId}-${index}`,
+      severity: "Info",
+      category: "Security",
+      event: started ? "Client Impersonation Started" : "Client Impersonation Ended",
+      service: "impersonation-service",
+      message: `${started ? "Started" : "Ended"} view-only impersonation for client ${entry.clientId}`,
+      timestamp: fmtTs(ms),
+      tsMs: ms,
+      user: entry.originalUserId,
+      ip: "Not recorded",
+      statusCode: 200,
+    });
+  });
+
+  getTaxAuditLog().forEach(entry => {
+    const ms = toMs(entry.timestamp);
+    if (!ms) return;
+    logs.push({
+      id: `live-slog-tax-${entry.id}`,
+      severity: "Info",
+      category: "Configuration",
+      event: "Tax Configuration Updated",
+      service: "tax-service",
+      message: `${entry.module} configuration changed${entry.reason ? ` — ${entry.reason}` : ""}`,
+      timestamp: fmtTs(ms),
+      tsMs: ms,
+      user: entry.user,
+      ip: entry.clientIp ?? "Not recorded",
+      statusCode: 200,
+    });
+  });
+
+  return logs.sort((a, b) => b.tsMs - a.tsMs).slice(0, 200);
+}
+
 // ── Hourly chart: count events from activity per last-24h hours ───────────────
 function buildHourlyChart(activity: UserActivity[]): { hour: string; activity: number; errors: number }[] {
   const now = Date.now();
@@ -1069,8 +1265,8 @@ export default function AuditTrailPage() {
   }, []);
 
   // Derive live data (re-derived on every refreshKey bump)
-  const activity  = useMemo(() => deriveActivity(),              [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const systemLogs = useMemo(() => deriveSystemLogs(activity),   [activity]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const activity  = useMemo(() => deriveRecordedActivity(),       [refreshKey]);
+  const systemLogs = useMemo(() => deriveRecordedSystemLogs(),    [refreshKey]);
   const hourlyData = useMemo(() => buildHourlyChart(activity),   [activity]);
 
   // Filter by date range
