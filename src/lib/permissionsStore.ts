@@ -194,8 +194,15 @@ export function getRolePermissions(roleName: string): Record<string, ModulePermi
     return Object.fromEntries(MODULES.map(m => [m.key, ALL]));
   }
   const stored = getAllRolePermissions();
-  if (stored[roleName]) return stored[roleName];
-  return DEFAULTS[roleName] ?? {};
+  const defaults = DEFAULTS[roleName] ?? {};
+  const existing = stored[roleName] ?? {};
+  const moduleKeys = new Set([...Object.keys(defaults), ...Object.keys(existing)]);
+  return Object.fromEntries(
+    [...moduleKeys].map(moduleKey => [
+      moduleKey,
+      { ...(defaults[moduleKey] ?? {}), ...(existing[moduleKey] ?? {}) },
+    ]),
+  );
 }
 
 export function saveRolePermissions(roleName: string, perms: Record<string, ModulePermissions>): void {
@@ -216,7 +223,15 @@ export function initDefaultPermissions(): void {
   const all = getAllRolePermissions();
   let changed = false;
   for (const [name, perms] of Object.entries(DEFAULTS)) {
-    if (!all[name]) { all[name] = perms; changed = true; }
+    const existing = all[name] ?? {};
+    const merged: Record<string, ModulePermissions> = { ...existing };
+    for (const [moduleKey, modulePerms] of Object.entries(perms)) {
+      merged[moduleKey] = { ...(modulePerms ?? {}), ...(existing[moduleKey] ?? {}) };
+    }
+    if (JSON.stringify(merged) !== JSON.stringify(existing)) {
+      all[name] = merged;
+      changed = true;
+    }
   }
   if (changed) localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(all));
 }

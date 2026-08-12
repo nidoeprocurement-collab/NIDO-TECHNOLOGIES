@@ -2784,9 +2784,19 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                         {user.status === "Inactive" ? "Activate" : "Deactivate"}
                       </button>
                       <div className="my-1 border-t border-gray-100" />
-                      {canImpersonate && getPortalTarget(user) && (
+                      {canImpersonate && user.status === "Active" && (
                         <button
-                          onClick={() => { setImpersonationTarget(user); setRowMenu(null); }}
+                          onClick={() => {
+                            const target = getPortalTarget(user);
+                            setRowMenu(null);
+                            if (target) {
+                              setImpersonationTarget(user);
+                            } else {
+                              window.alert(
+                                "This user does not have an active Client Portal account. Provision or create Client Portal access for this email before impersonating.",
+                              );
+                            }
+                          }}
                           className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors text-blue-600"
                         >
                           Impersonate
