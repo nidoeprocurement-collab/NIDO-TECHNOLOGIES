@@ -618,7 +618,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
           {!isOverview && (
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
               {activeTab === "Roles" ? <RolesPage />
-                : activeTab === "Users" ? <UsersPage />
+                : activeTab === "Users" ? <UsersPage clientId={clientId} clientName={client.name} />
                 : activeTab === "Orders" ? <OrdersPage clientId={clientId} clientName={client.name} />
                 : activeTab === "Services" ? <ServicesPage clientId={clientId} />
                 : activeTab === "Contracts" ? (

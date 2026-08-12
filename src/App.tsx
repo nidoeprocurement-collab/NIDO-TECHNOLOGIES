@@ -86,6 +86,7 @@ import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { OrdersProvider } from "@/contexts/OrdersContext";
 import { MyOrdersProvider } from "@/contexts/MyOrdersContext";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ConfigProvider } from "@/contexts/ConfigContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
@@ -138,10 +139,32 @@ function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
 
 /** Guards client portal routes: redirects NIDO admins to /dashboard */
 function ClientPortalRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isNidoAdmin } = useAuth();
+  const { isAuthenticated, isClientPortalUser, isImpersonating } = useAuth();
+  const location = useLocation();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (isNidoAdmin) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
+  if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
+  const readOnlyBlocked = isImpersonating && (
+    location.pathname.includes("/shop/cart") ||
+    location.pathname.includes("/checkout") ||
+    location.pathname.includes("/order-confirmation") ||
+    location.pathname.endsWith("/users") ||
+    location.pathname.endsWith("/roles") ||
+    location.pathname.endsWith("/addresses") ||
+    location.pathname.endsWith("/profile")
+  );
+  return (
+    <>
+      <ImpersonationBanner />
+      {readOnlyBlocked ? (
+        <div className="min-h-[70vh] flex items-center justify-center p-6">
+          <div className="max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+            <h1 className="text-base font-semibold text-amber-900">View-only impersonation</h1>
+            <p className="mt-2 text-sm text-amber-800">This action is disabled while using client-user impersonation.</p>
+          </div>
+        </div>
+      ) : children}
+    </>
+  );
 }
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));

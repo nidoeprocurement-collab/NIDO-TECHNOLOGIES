@@ -27,6 +27,7 @@ export const MODULES = [
   { key: 'audit_logs',      label: 'Audit Logs' },
   { key: 'notifications',   label: 'Notifications' },
   { key: 'configuration',   label: 'Configuration' },
+  { key: 'client_user_impersonation', label: 'Client User Impersonation' },
 ] as const;
 
 export type ModuleKey = typeof MODULES[number]['key'];
@@ -117,6 +118,7 @@ const DEFAULTS: Record<string, Record<string, ModulePermissions>> = {
     users:MGR, roles:{ view:true, manage:true },
     departments:ALL, audit_logs:READ_EXP,
     notifications:ALL, configuration:{ view:true, manage:true, configure:true },
+    client_user_impersonation:ALL,
   },
   'Procurement Manager': {
     dashboard:VIEW, shop:CRUD, services:CRUD, support:VIEW,

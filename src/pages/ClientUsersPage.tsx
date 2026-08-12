@@ -28,6 +28,9 @@ import {
 import { servicesData } from "./ClientServicesPage";
 import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { CircleCheck } from "./ClientRolesPage";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 
 
 export const usersData = [
@@ -2520,7 +2523,10 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
   );
 }
 
-export default function ClientUsersPage() {
+export default function ClientUsersPage({ clientId, clientName }: { clientId?: string; clientName?: string } = {}) {
+  const { user: authenticatedUser, startImpersonation } = useAuth();
+  const { hasPermission } = usePermissions();
+  const [impersonationTarget, setImpersonationTarget] = useState<UserRecord | null>(null);
   const [users, setUsers] = useState<UserRecord[]>([...usersData]);
   const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -2535,6 +2541,25 @@ export default function ClientUsersPage() {
   const [archiveTarget, setArchiveTarget] = useState<UserRecord | null>(null);
   const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
   const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
+  const canImpersonate = Boolean(
+    clientId &&
+    authenticatedUser?.userType === "nido_admin" &&
+    hasPermission("client_user_impersonation", "manage"),
+  );
+  const getPortalTarget = (row: UserRecord) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(
+      (candidate) => candidate.email.toLowerCase() === row.email.toLowerCase(),
+    );
+    return portalUser ? {
+      id: portalUser.id,
+      email: portalUser.email,
+      name: portalUser.name,
+      role: portalUser.role,
+      userType: portalUser.userType,
+      clientId: portalUser.clientId,
+      clientName: portalUser.clientName || clientName,
+    } : null;
+  };
 
   const createUser = (user: UserRecord) => {
     setUsers((prev) => [user, ...prev]);
@@ -2756,6 +2781,14 @@ export default function ClientUsersPage() {
                         {user.status === "Inactive" ? "Activate" : "Deactivate"}
                       </button>
                       <div className="my-1 border-t border-gray-100" />
+                      {canImpersonate && getPortalTarget(user) && (
+                        <button
+                          onClick={() => { setImpersonationTarget(user); setRowMenu(null); }}
+                          className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors text-blue-600"
+                        >
+                          Impersonate
+                        </button>
+                      )}
                       <button onClick={() => { setArchiveTarget(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-orange-500">Archive User</button>
                     </div>
                   )}
@@ -2765,6 +2798,33 @@ export default function ClientUsersPage() {
           </tbody>
         </table>
       </div>
+      {impersonationTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => setImpersonationTarget(null)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-gray-900">Impersonate Client User?</h2>
+            <p className="mt-3 text-sm text-gray-600">You are about to enter the NIDO Client Portal as:</p>
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-sm font-semibold text-gray-900">{impersonationTarget.name}</p>
+              <p className="text-xs text-gray-500">{impersonationTarget.email}</p>
+              <p className="text-xs text-gray-500">{clientName || "Client portal"}</p>
+            </div>
+            <p className="mt-3 text-xs text-amber-700">The session is view-only and expires automatically after one hour.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setImpersonationTarget(null)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600">Cancel</button>
+              <button
+                onClick={() => {
+                  const target = getPortalTarget(impersonationTarget);
+                  if (target && startImpersonation(target)) window.location.assign("/portal/dashboard");
+                  else setImpersonationTarget(null);
+                }}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
+              >
+                Start Impersonation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

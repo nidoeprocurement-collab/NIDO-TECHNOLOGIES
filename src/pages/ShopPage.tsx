@@ -226,6 +226,7 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 
 function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, allProducts, onSelectProduct }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string; allProducts: Product[]; onSelectProduct: (p: Product) => void }) {
   const { addItem } = useCart();
+  const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [qtyDraft, setQtyDraft] = useState(String(product?.moq ?? 1));
   const [added, setAdded] = useState(false);
@@ -259,6 +260,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
     : dialogBasePriceExcl;
 
   const handleAdd = () => {
+    if (isImpersonating) return;
     if (added) return;
     addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setAdded(true);
@@ -554,6 +556,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
+  const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(1);
   const [qtyDraft, setQtyDraft] = useState("1");
   const [adding, setAdding] = useState(false);
@@ -619,6 +622,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isImpersonating) return;
     if (!product.inStock || adding || !selectedVendor) return;
     setAdding(true);
     addItem(
@@ -647,7 +651,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     setTimeout(() => setAdding(false), 1500);
   };
 
-  const canAdd = product.inStock && !!selectedVendor && canVendorFulfillMoq(selectedVendor);
+  const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canVendorFulfillMoq(selectedVendor);
 
   // Parse specs into key/value pairs
   const specPairs = product.specs.map(s => {
