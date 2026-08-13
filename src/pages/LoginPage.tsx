@@ -5,9 +5,10 @@ import { findPortalUser } from '@/lib/portalUserStore';
 import { authenticateNidoUser, unlockUser, getUsers, type LoginContext } from '@/lib/nidoUsersStore';
 import { consumeRecoveryCode } from '@/lib/recoveryCodeStore';
 import { useOrgConfig } from '@/contexts/ConfigContext';
-import { Mail, Lock, Eye, EyeOff, Loader2, Zap, KeyRound, ShieldAlert, MapPin } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, KeyRound, ShieldAlert, MapPin } from 'lucide-react';
 
 type LoginTab = 'password' | 'recovery';
+const DEFAULT_LOGIN_LOGO = '/attached_assets/image_1786602878335.png';
 
 interface LoginContextResult {
   context: LoginContext;
@@ -259,19 +260,18 @@ export default function LoginPage() {
               {/* Logo */}
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
-                  {org.logoUrl ? (
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-200 flex items-center justify-center shrink-0">
-                      <img src={org.logoUrl} alt={org.displayName || 'Logo'} className="h-full w-full object-contain" />
-                    </div>
-                  ) : (
-                    <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center text-white shrink-0">
-                      <Zap size={20} />
+                  <div className={`${org.logoUrl ? 'h-10 w-10 rounded-lg border border-gray-200' : 'h-14 w-[180px]'} overflow-hidden bg-white flex items-center justify-start shrink-0`}>
+                    <img
+                      src={org.logoUrl || DEFAULT_LOGIN_LOGO}
+                      alt={org.displayName || 'Nido Tech'}
+                      className="h-full w-full object-contain object-left"
+                    />
+                  </div>
+                  {org.logoUrl && (
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">{org.displayName}</h2>
                     </div>
                   )}
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900">{org.displayName}</h2>
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">{org.industry}</p>
-                  </div>
                 </div>
               </div>
 
