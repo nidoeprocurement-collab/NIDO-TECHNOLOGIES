@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CATEGORY_LIST } from "@/lib/categories";
-import { addClient as addStoredClient, getClients } from "@/lib/clientStore";
+import {
+  addClient as addStoredClient,
+  getClients,
+  isSharedClient,
+} from "@/lib/clientStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -248,9 +252,19 @@ export default function AddClient() {
       // Generate new Client ID
       setIsLoading(true);
       const timer = setTimeout(() => {
-        // Generate next ID: CL-00001, CL-00002, etc.
-        const nextNumber = Math.floor(Math.random() * 10000) + 1;
-        const clientId = `${getPrefix("client") || "CL-"}${String(nextNumber).padStart(5, "0")}`;
+        // Generate the next unused ID instead of a random ID that can collide.
+        const prefix = getPrefix("client") || "CL-";
+        const existingIds = new Set(getClients().map((client) => client.id));
+        const nextNumber = getClients().reduce((highest, client) => {
+          if (!client.id.startsWith(prefix)) return highest;
+          const number = Number(client.id.slice(prefix.length));
+          return Number.isFinite(number) ? Math.max(highest, number) : highest;
+        }, 0) + 1;
+        let candidateNumber = nextNumber;
+        while (existingIds.has(`${prefix}${String(candidateNumber).padStart(5, "0")}`)) {
+          candidateNumber += 1;
+        }
+        const clientId = `${prefix}${String(candidateNumber).padStart(5, "0")}`;
 
         setFormData((prev) => ({
           ...prev,
@@ -388,6 +402,15 @@ export default function AddClient() {
     try {
       console.log("[v0] Saving client data:", formData.company_name);
 
+      if (clientIdToEdit && isSharedClient(clientIdToEdit)) {
+        toast.error("Shared demo clients are read-only. Add a new client to save changes.");
+        return;
+      }
+
+      const existingClient = clientIdToEdit
+        ? getClients().find((client) => client.id === clientIdToEdit)
+        : undefined;
+
       // Mock save operation
       const clientData = {
         company_name: formData.company_name,
@@ -400,6 +423,8 @@ export default function AddClient() {
         website: formData.website,
         contract_start_date: formData.contract_start_date,
         contract_end_date: formData.contract_end_date,
+        contractStartDate: formData.contract_start_date,
+        contractEndDate: formData.contract_end_date,
         client_logo_url: formData.client_logo_url,
         gst_treatment: formData.gst_treatment,
         gstin: formData.gstin,
@@ -418,9 +443,13 @@ export default function AddClient() {
         ifsc_code: formData.ifsc_code,
         branch: formData.branch,
         billing_address: formData.billing_address,
+        billingAddress: formData.billing_address,
         billing_city: formData.billing_city,
+        billingCity: formData.billing_city,
         billing_state: formData.billing_state,
+        billingState: formData.billing_state,
         billing_pincode: formData.billing_pincode,
+        billingPincode: formData.billing_pincode,
         shipping_address: formData.same_address
           ? formData.billing_address
           : formData.shipping_address,
@@ -433,7 +462,10 @@ export default function AddClient() {
         shipping_pincode: formData.same_address
           ? formData.billing_pincode
           : formData.shipping_pincode,
-        status: "active",
+        same_address: formData.same_address,
+        tier: formData.client_tier,
+        rep: formData.contact_person,
+        status: existingClient?.status || "active",
       };
 
       // Save to shared client store
@@ -464,7 +496,7 @@ export default function AddClient() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white border-b p-6">
-        <div className="max-w-6xlflex items-start justify-between">
+        <div className="max-w-6xl mx-auto flex items-start justify-between">
           <button
             onClick={() => navigate("/clients")}
             className="text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"
@@ -484,11 +516,11 @@ export default function AddClient() {
         </div>
       </div>
 
-      <div className="max-w-6xlp-6">
+      <div className="max-w-6xl mx-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spinmb-4" />
+              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spin mb-4" />
               <p className="text-gray-600">Loading client information...</p>
             </div>
           </div>

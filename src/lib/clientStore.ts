@@ -36,6 +36,10 @@ const DEFAULT_CLIENTS: StoredClient[] = [
 ];
 const DEFAULT_CLIENT_IDS = new Set(DEFAULT_CLIENTS.map(client => client.id));
 
+export function isSharedClient(clientId: string): boolean {
+  return DEFAULT_CLIENT_IDS.has(clientId);
+}
+
 function currentUserScope(): string {
   try {
     const rawUser = localStorage.getItem('nido_user');
