@@ -261,7 +261,7 @@ export default function LoginPage() {
                  </div>
                  {displayNameSubtitle && (
                    <div className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/60">
-                     ({displayNameSubtitle})
+                     {displayNameSubtitle}
                    </div>
                  )}
                </div>
