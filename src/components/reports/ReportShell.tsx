@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useReportShellContext } from "@/contexts/ReportShellContext";
 import {
@@ -15,8 +14,6 @@ import {
   Receipt,
   FileSearch,
   Wrench,
-  ChevronLeft,
-  ChevronRight,
   BarChart3,
 } from "lucide-react";
 
@@ -51,37 +48,25 @@ export default function ReportShell({ children, title, subtitle }: {
   const { inline } = useReportShellContext();
   const navigate = useNavigate();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-
-  // When rendered inline inside ReportsPage, skip the sidebar entirely
+  // When rendered inline inside ReportsPage, the Reports page already shows
+  // its module navigation tiles. Do not add another navigation layer there.
   if (inline) {
     return <div className="space-y-5">{children}</div>;
   }
 
   return (
-    <div className="flex gap-0 -mx-6 -mt-6 min-h-[calc(100vh-64px)]">
-      {/* Left Sidebar */}
-      <aside
-        className={`shrink-0 bg-white border-r border-gray-100 flex flex-col transition-all duration-200 ${collapsed ? "w-14" : "w-56"}`}
+    <div className="space-y-4">
+      {/* Report navigation belongs at the top of the report page. The
+          application Sidebar remains the only left sidebar. */}
+      <nav
+        aria-label="Report navigation"
+        className="bg-white border border-gray-100 rounded-lg shadow-sm overflow-x-auto"
       >
-        {/* Sidebar header */}
-        <div className="flex items-center justify-between px-3 py-4 border-b border-gray-100">
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-blue-600 shrink-0" />
-              <span className="text-xs font-semibold text-gray-700">Reports & BI</span>
-            </div>
-          )}
-          <button
-            onClick={() => setCollapsed((p) => !p)}
-            className={`p-1 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors ${collapsed ? "mx-auto" : ""}`}
-          >
-            {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-
-        {/* Nav items */}
-        <nav className="flex-1 py-2 overflow-y-auto">
+        <div className="flex items-center gap-1 min-w-max px-2 py-2">
+          <div className="flex items-center gap-2 px-2 pr-3 mr-1 border-r border-gray-100">
+            <BarChart3 className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">Reports &amp; BI</span>
+          </div>
           {NAV_ITEMS.map((item) => {
             const active =
               item.path === "/reports"
@@ -91,41 +76,30 @@ export default function ReportShell({ children, title, subtitle }: {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                title={collapsed ? item.label : undefined}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors relative group ${
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
                   active
                     ? "bg-blue-50 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                 }`}
               >
-                {active && (
-                  <span className="absolute left-0 top-1 bottom-1 w-0.5 bg-blue-600 rounded-r" />
-                )}
-                <span className={`shrink-0 ${active ? "text-blue-600" : ""}`}>{item.icon}</span>
-                {!collapsed && (
-                  <span className="text-xs font-medium leading-tight truncate">{item.label}</span>
-                )}
-                {collapsed && (
-                  <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50">
-                    {item.label}
-                  </div>
-                )}
+                <span className={active ? "text-blue-600" : ""}>{item.icon}</span>
+                {item.label}
               </button>
             );
           })}
-        </nav>
-      </aside>
+        </div>
+      </nav>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="bg-white border border-gray-100 rounded-lg shadow-sm overflow-hidden">
         {/* Page header */}
-        <div className="bg-white border-b border-gray-100 px-6 py-4 shrink-0">
+        <div className="px-6 py-4 border-b border-gray-100">
           <h1 className="text-xl font-bold text-gray-900">{title}</h1>
           {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+        {/* Report body */}
+        <div className="p-6 bg-gray-50/50">
           {children}
         </div>
       </div>
