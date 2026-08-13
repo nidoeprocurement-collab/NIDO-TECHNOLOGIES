@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
@@ -28,6 +29,8 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getClientContract, saveClientContract } from "@/lib/clientDataStore";
+import { getClients } from "@/lib/clientStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractDetailViewProps {
   contractId: string;
@@ -195,7 +198,7 @@ function getInitials(value?: string): string {
     .slice(0, 5);
 }
 
-export default function ContractDetailView({
+function ContractDetailView({
   contractId,
   contractTitle,
   clientId,
@@ -1503,5 +1506,57 @@ export default function ContractDetailView({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ClientContractsRoute() {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const clientId = id || user?.clientId || "";
+  const client = getClients().find((item) => item.id === clientId);
+  const contract = getClientContract(clientId);
+  const isPortalRoute = window.location.pathname.startsWith("/portal/");
+
+  if (!client) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Client not found</h2>
+        <p className="text-sm text-gray-500">No client profile is available for this contract.</p>
+        <button
+          type="button"
+          onClick={() => navigate(isPortalRoute ? "/portal/dashboard" : "/clients")}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  const address = [
+    client.billingAddress || client.billing_address,
+    client.billingCity || client.billing_city,
+    client.billingState || client.billing_state,
+    client.billingPincode || client.billing_pincode,
+  ].filter(Boolean).join(", ");
+
+  return (
+    <ContractDetailView
+      contractId={contract?.contractId || ""}
+      contractTitle={contract?.contractTitle || "Client Contract"}
+      clientId={clientId}
+      clientName={client.name}
+      clientEmail={client.email || ""}
+      clientPhone={client.phone || client.mobile || ""}
+      clientGstin={client.gstin || client.gstin_number || ""}
+      clientAddress={address}
+      contractStartDate={client.contractStartDate || client.contract_start_date || ""}
+      contractEndDate={client.contractEndDate || client.contract_end_date || ""}
+      clientCurrency={client.currency || ""}
+      clientPaymentTerms={client.payment_terms || ""}
+      clientStatus={client.status || ""}
+      onBack={() => navigate(isPortalRoute ? "/portal/dashboard" : `/clients/${clientId}`)}
+    />
   );
 }

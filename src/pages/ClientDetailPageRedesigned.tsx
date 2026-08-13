@@ -80,6 +80,49 @@ function dateValue(value?: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+type ClientDateRange = { start: string; end: string };
+
+function toDateInputValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function normalizeDate(value?: string): string {
+  return value?.slice(0, 10) || "";
+}
+
+function isDateInRange(value: string | undefined, range: ClientDateRange): boolean {
+  const date = normalizeDate(value);
+  return Boolean(range.start && range.end && range.start <= range.end && date >= range.start && date <= range.end);
+}
+
+function overlapsDateRange(startValue: string | undefined, endValue: string | undefined, range: ClientDateRange): boolean {
+  const start = normalizeDate(startValue);
+  const end = normalizeDate(endValue || startValue);
+  return Boolean(range.start && range.end && range.start <= range.end && start && end && start <= range.end && end >= range.start);
+}
+
+function getPeriodRange(period: Period, customStart: string, customEnd: string): ClientDateRange {
+  if (period === "Custom") return { start: customStart, end: customEnd };
+
+  const end = new Date();
+  const start = new Date(end);
+  if (period === "Year") start.setMonth(0, 1);
+  if (period === "Month") start.setMonth(end.getMonth() - 1);
+  if (period === "Week") start.setDate(end.getDate() - 7);
+  if (period === "Day") start.setDate(end.getDate() - 1);
+  return { start: toDateInputValue(start), end: toDateInputValue(end) };
+}
+
+function formatDateRange(range: ClientDateRange): string {
+  if (!range.start || !range.end) return "Choose start and end dates";
+  const format = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${format(range.start)} – ${format(range.end)}`;
+}
+
 function formatMoney(value: number, currency?: string): string {
   const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : "₹";
   return `${symbol}${Math.round(value).toLocaleString("en-IN")}`;
@@ -208,7 +251,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const clientId = portalMode ? user?.clientId ?? "" : params.id ?? "";
   const [activeTab, setActiveTab] = useState("Overview");
   const [period, setPeriod] = useState<Period>("Year");
-  const [customDate, setCustomDate] = useState("");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const client = getClients().find((item) => item.id === clientId);
@@ -245,34 +290,40 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     return () => events.forEach((event) => window.removeEventListener(event, reload));
   }, [clientId, client?.name]);
 
-  const periodOrders = useMemo(() => {
-    if (period === "Custom" && customDate) {
-      return orders.filter((order) => order.date?.startsWith(customDate));
-    }
-    const now = new Date();
-    const start = new Date(now);
-    if (period === "Month") start.setMonth(now.getMonth() - 1);
-    if (period === "Week") start.setDate(now.getDate() - 7);
-    if (period === "Day") start.setDate(now.getDate() - 1);
-    if (period === "Year") start.setMonth(0, 1);
-    const startTime = start.getTime();
-    return orders.filter((order) => dateValue(order.date) >= startTime);
-  }, [customDate, orders, period]);
+  const selectedDateRange = useMemo(
+    () => getPeriodRange(period, customStartDate, customEndDate),
+    [customEndDate, customStartDate, period],
+  );
+  const validDateRange = Boolean(
+    selectedDateRange.start &&
+    selectedDateRange.end &&
+    selectedDateRange.start <= selectedDateRange.end,
+  );
+  const periodOrders = useMemo(
+    () => validDateRange ? orders.filter((order) => isDateInRange(order.date, selectedDateRange)) : [],
+    [orders, selectedDateRange.end, selectedDateRange.start, validDateRange],
+  );
 
   if (!client) return <NotFound id={clientId} />;
 
   const currency = client.currency;
   const clientInvoices = invoices.filter((invoice) => invoice.clientName.toLowerCase() === client.name.toLowerCase());
+  const periodInvoices = validDateRange
+    ? clientInvoices.filter((invoice) => isDateInRange(invoice.invoiceDate, selectedDateRange))
+    : [];
   const clientTickets = tickets.filter((ticket) => {
     const record = ticket as SupportTicket & { clientId?: string; clientName?: string };
     return !record.clientId && !record.clientName
       ? true
       : record.clientId === clientId || record.clientName?.toLowerCase() === client.name.toLowerCase();
   });
+  const periodTickets = validDateRange
+    ? clientTickets.filter((ticket) => isDateInRange(ticket.created, selectedDateRange))
+    : [];
   const totalSpend = periodOrders.reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
   const openOrders = periodOrders.filter((order) => !["Completed", "Cancelled"].includes(orderStatusGroup(order.status))).length;
-  const activeServices = services.filter((service) => service.status.toLowerCase() === "active");
-  const pendingInvoices = clientInvoices.filter((invoice) => !["Paid", "Cancelled"].includes(invoice.status));
+  const activeServices = services.filter((service) => service.status.toLowerCase() === "active" && overlapsDateRange(service.startDate, service.endDate, selectedDateRange));
+  const pendingInvoices = periodInvoices.filter((invoice) => !["Paid", "Cancelled"].includes(invoice.status));
   const unpaidAmount = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.grandTotal || 0), 0);
   const statusCounts = (["Completed", "Processing", "Awaiting Payment", "Cancelled"] as const).map((status) => ({
     status,
@@ -291,8 +342,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const renderTab = () => {
     if (activeTab === "Roles") return <RolesPage key={`${clientId}-${refreshKey}-roles`} />;
     if (activeTab === "Users") return <UsersPage key={`${clientId}-${refreshKey}-users`} clientId={clientId} clientName={client.name} />;
-    if (activeTab === "Orders") return <OrdersPage key={`${clientId}-${refreshKey}-orders`} clientId={clientId} clientName={client.name} />;
-    if (activeTab === "Services") return <ServicesPage key={`${clientId}-${refreshKey}-services`} clientId={clientId} />;
+    if (activeTab === "Orders") return <OrdersPage key={`${clientId}-${refreshKey}-orders`} clientId={clientId} clientName={client.name} dateRange={selectedDateRange} />;
+    if (activeTab === "Services") return <ServicesPage key={`${clientId}-${refreshKey}-services`} clientId={clientId} dateRange={selectedDateRange} />;
     if (activeTab === "Contracts") {
       return (
         <ContractsPage
@@ -371,23 +422,66 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           <div className="mt-5 flex flex-wrap items-center gap-1.5">
             <span className="mr-2 text-[10px] font-semibold text-gray-500">Time Period</span>
             {PERIODS.map((item) => (
-              <button key={item} type="button" onClick={() => setPeriod(item)} className={`rounded-md border px-4 py-2 text-[10px] font-semibold ${period === item ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}>
+              <button key={item} type="button" onClick={() => { setPeriod(item); setShowCustomPicker(false); }} className={`rounded-md border px-4 py-2 text-[10px] font-semibold ${period === item ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}>
                 {item}
               </button>
             ))}
-            <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-2 text-[10px] font-semibold ${period === "Custom" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600"}`}>
-              Custom <CalendarDays size={12} />
-              <input type="date" value={customDate} onChange={(event) => { setCustomDate(event.target.value); setPeriod("Custom"); }} className="sr-only" />
-            </label>
-            {period !== "Year" && <button type="button" onClick={() => { setPeriod("Year"); setCustomDate(""); }} className="ml-1 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" title="Reset period"><RefreshCw size={13} /></button>}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setPeriod("Custom"); setShowCustomPicker((visible) => !visible); }}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-[10px] font-semibold ${period === "Custom" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}
+              >
+                Custom <CalendarDays size={12} />
+              </button>
+              {showCustomPicker && (
+                <div className="absolute left-0 top-10 z-30 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+                  <p className="mb-2 text-[10px] font-semibold text-gray-700">Choose a date range</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[10px] text-gray-500">
+                      Start date
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(event) => { setCustomStartDate(event.target.value); setPeriod("Custom"); }}
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700"
+                      />
+                    </label>
+                    <label className="text-[10px] text-gray-500">
+                      End date
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        min={customStartDate || undefined}
+                        onChange={(event) => { setCustomEndDate(event.target.value); setPeriod("Custom"); }}
+                        className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700"
+                      />
+                    </label>
+                  </div>
+                  {!validDateRange && <p className="mt-2 text-[10px] text-red-500">Choose a valid start and end date.</p>}
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomPicker(false)}
+                    disabled={!validDateRange}
+                    className="mt-3 w-full rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Apply Date Range
+                  </button>
+                </div>
+              )}
+            </div>
+            {period !== "Year" && <button type="button" onClick={() => { setPeriod("Year"); setCustomStartDate(""); setCustomEndDate(""); setShowCustomPicker(false); }} className="ml-1 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" title="Reset period"><RefreshCw size={13} /></button>}
           </div>
+          <p className={`mt-2 text-[10px] ${validDateRange ? "text-gray-500" : "text-red-500"}`}>
+            Data shown below: <span className="font-semibold">{formatDateRange(selectedDateRange)}</span>
+          </p>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<Users size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => goTo("Orders")} />
             <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => goTo("Orders")} />
             <MetricCard label="Products" value={catalog.length} change={`${catalog.length ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={catalog.map((_, i) => i + 1)} onClick={() => goTo("Catalog")} />
-            <MetricCard label="Invoices" value={clientInvoices.length} change={`${clientInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={clientInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => goTo("Documents")} />
-            <MetricCard label="Open Support Tickets" value={clientTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${clientTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={clientTickets.map((_, i) => i + 1)} onClick={() => navigate("/support")} />
+            <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => goTo("Documents")} />
+            <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate("/support")} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -405,7 +499,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
                 {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
               </div>
-              <button type="button" onClick={() => navigate(`/clients/${client.id}/edit`)} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
+                <button type="button" onClick={() => navigate(`/clients/${client.id}/contracts`)} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
                 View Full Profile
               </button>
             </Panel>
