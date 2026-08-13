@@ -480,7 +480,12 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                     <Mail size={12} /> Email
                   </a>
                 ) : (
-                  <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <button
+                    type="button"
+                    disabled
+                    title="No email address available"
+                    className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 rounded-lg py-1.5 text-xs text-gray-400 cursor-not-allowed"
+                  >
                     <Mail size={12} /> Email
                   </button>
                 )}
@@ -492,7 +497,12 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                     <Phone size={12} /> Call
                   </a>
                 ) : (
-                  <button className="flex-1 flex items-center justify-center gap-1.5 border border-gray-300 rounded-lg py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                  <button
+                    type="button"
+                    disabled
+                    title="No phone number available"
+                    className="flex-1 flex items-center justify-center gap-1.5 border border-gray-200 rounded-lg py-1.5 text-xs text-gray-400 cursor-not-allowed"
+                  >
                     <Phone size={12} /> Call
                   </button>
                 )}
@@ -790,7 +800,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                       <Clock size={15} className="text-gray-400" />
                       <h3 className="font-semibold text-gray-900 text-sm">Active Services</h3>
                     </div>
-                    <button onClick={() => setActiveTab("Contracts")} className="hover:text-blue-500 transition-colors">
+                    <button onClick={() => setActiveTab("Services")} className="hover:text-blue-500 transition-colors">
                       <ChevronRight size={15} className="text-gray-400" />
                     </button>
                   </div>
