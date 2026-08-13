@@ -71,6 +71,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const org = useOrgConfig();
+  const displayNameParts = (org.displayName || 'Nido Tech').match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  const mainDisplayName = displayNameParts ? displayNameParts[1].trim() : (org.displayName || 'Nido Tech');
+  const displayNameSubtitle = displayNameParts ? displayNameParts[2].trim() : null;
 
   // Shared
   const [activeTab, setActiveTab] = useState<LoginTab>('password');
@@ -268,8 +271,11 @@ export default function LoginPage() {
                     />
                   </div>
                   {org.logoUrl && (
-                    <div>
-                      <h2 className="text-xl font-bold text-gray-900">{org.displayName}</h2>
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-bold leading-tight text-gray-900">{mainDisplayName}</h2>
+                      {displayNameSubtitle && (
+                        <p className="mt-0.5 text-xs font-medium text-gray-500">{displayNameSubtitle}</p>
+                      )}
                     </div>
                   )}
                 </div>
