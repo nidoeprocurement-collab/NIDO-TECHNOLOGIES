@@ -64,8 +64,9 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
 }
 
 // ── Row Actions Menu ───────────────────────────────────────────────────────
-function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
+function RowActionsMenu({ client, onViewOverview, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
   client: StoredClient
+  onViewOverview: () => void
   onEdit: () => void
   onArchive: () => void
   onSetStatus: (s: ClientStatus) => void
@@ -100,6 +101,13 @@ function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, p
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+          <button
+            type="button"
+            onClick={() => { onViewOverview(); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+          >
+            <FileText className="w-3.5 h-3.5 opacity-60" /> View Overview
+          </button>
           {isSharedClient(client.id) ? (
             <div className="px-3 py-2 text-xs text-gray-500">
               Shared demo client · read only
@@ -168,7 +176,15 @@ function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, p
 }
 
 // ── Client Overview Popup ──────────────────────────────────────────────────
-function ClientOverviewPopup({ client, onClose }: { client: StoredClient; onClose: () => void }) {
+function ClientOverviewPopup({
+  client,
+  onClose,
+  onViewFullProfile,
+}: {
+  client: StoredClient
+  onClose: () => void
+  onViewFullProfile?: () => void
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -231,6 +247,17 @@ function ClientOverviewPopup({ client, onClose }: { client: StoredClient; onClos
             </Badge>
           </div>
         </div>
+        {onViewFullProfile && (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onViewFullProfile}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              View Full Profile <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -753,6 +780,7 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
                     <td className="px-3 py-3 text-center">
                       <RowActionsMenu
                         client={c}
+                        onViewOverview={() => setOverviewClient(c)}
                         onEdit={() => navigate(`/clients/${c.id}/edit`)}
                         onArchive={() => archiveClient(c)}
                         onSetStatus={s => setClientStatus(c.id, s)}
@@ -797,7 +825,16 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
       </div>
 
       {/* Client Overview Popup */}
-      {overviewClient && <ClientOverviewPopup client={overviewClient} onClose={() => setOverviewClient(null)} />}
+      {overviewClient && (
+        <ClientOverviewPopup
+          client={overviewClient}
+          onClose={() => setOverviewClient(null)}
+          onViewFullProfile={() => {
+            setOverviewClient(null)
+            navigate(`/clients/${overviewClient.id}/contracts`)
+          }}
+        />
+      )}
 
       {/* Archived Modal */}
       {showArchived && (

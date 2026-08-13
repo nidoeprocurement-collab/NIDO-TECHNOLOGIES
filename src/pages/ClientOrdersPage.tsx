@@ -10,6 +10,14 @@ export const ordersData = [
   { id: "ORD-2024-1187", date: "2024-05-10", items: 15, amount: "$89,000", client: "TechSupply Co", status: "Delivered" },
 ];
 
+type ClientDateRange = { start: string; end: string };
+
+function isOrderInDateRange(date: string, range?: ClientDateRange): boolean {
+  if (!range) return true;
+  const normalized = date.slice(0, 10);
+  return Boolean(range.start && range.end && range.start <= range.end && normalized >= range.start && normalized <= range.end);
+}
+
 export function OrderStatusBadge({ status }: { status: string }) {
   if (status === "Delivered") return (
     <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
@@ -135,13 +143,22 @@ function CreateOrderModal({ clientId, clientName, onClose, onCreate }: { clientI
   );
 }
 
-export default function ClientOrdersPage({ clientId, clientName }: { clientId: string; clientName: string }) {
+export default function ClientOrdersPage({
+  clientId,
+  clientName,
+  dateRange,
+}: {
+  clientId: string;
+  clientName: string;
+  dateRange?: ClientDateRange;
+}) {
   const navigate = useNavigate();
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
   const [orders, setOrders] = useState<ClientOrderRecord[]>(() => getClientOrders(clientId, clientName));
-  const total = orders.length;
+  const visibleOrders = orders.filter((order) => isOrderInDateRange(order.date, dateRange));
+  const total = visibleOrders.length;
 
   const reload = () => setOrders(getClientOrders(clientId, clientName));
   useEffect(() => {
@@ -149,6 +166,10 @@ export default function ClientOrdersPage({ clientId, clientName }: { clientId: s
     window.addEventListener("nidoClientDataUpdated", reload);
     return () => window.removeEventListener("nidoClientDataUpdated", reload);
   }, [clientId, clientName]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateRange?.start, dateRange?.end]);
 
   const handleCreate = (order: ClientOrderRecord) => {
     saveClientOrder(order);
@@ -187,7 +208,7 @@ export default function ClientOrdersPage({ clientId, clientName }: { clientId: s
             </tr>
           </thead>
           <tbody>
-            {orders.map((order, i) => (
+            {visibleOrders.map((order, i) => (
               <tr key={order.id} className={`border-b border-gray-100 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
                 <td className="px-4 py-3">
                   <span
@@ -221,6 +242,13 @@ export default function ClientOrdersPage({ clientId, clientName }: { clientId: s
                 </td>
               </tr>
             ))}
+            {visibleOrders.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-xs text-gray-400">
+                  No orders found for this date range.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 

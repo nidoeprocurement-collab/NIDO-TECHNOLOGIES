@@ -26,6 +26,7 @@ import {
   FileText,
   Clock,
   ChevronLeft,
+  ChevronDown,
 } from "lucide-react";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
@@ -54,6 +55,36 @@ const ADMIN_TABS = ["Overview", "Roles", "Users", "Orders", "Services", "Contrac
 const PORTAL_TABS = ["Overview"];
 
 type SpendCategory = { name: string; value: number; amount: string; color: string };
+export type ClientDateRange = { start: string; end: string };
+
+function toDateInputValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function normalizeDate(value?: string): string {
+  return value?.slice(0, 10) || "";
+}
+
+function isDateInRange(value: string | undefined, range: ClientDateRange): boolean {
+  const date = normalizeDate(value);
+  return Boolean(date && range.start && range.end && range.start <= range.end && date >= range.start && date <= range.end);
+}
+
+function overlapsDateRange(startValue: string | undefined, endValue: string | undefined, range: ClientDateRange): boolean {
+  const start = normalizeDate(startValue);
+  const end = normalizeDate(endValue || startValue);
+  return Boolean(start && end && range.start && range.end && range.start <= range.end && start <= range.end && end >= range.start);
+}
+
+function formatDateRange(range: ClientDateRange): string {
+  if (!range.start || !range.end) return "Choose start and end dates";
+  const format = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${format(range.start)} – ${format(range.end)}`;
+}
 
 function DonutChart({ categories, size }: { categories: SpendCategory[]; size: number }) {
   const cx = size / 2;
@@ -135,6 +166,16 @@ export default function App({ portalMode = false }: ClientDetailProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Overview");
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const today = new Date();
+  const todayInput = toDateInputValue(today);
+  const thisYearRange: ClientDateRange = {
+    start: `${today.getFullYear()}-01-01`,
+    end: todayInput,
+  };
+  const [periodPreset, setPeriodPreset] = useState<"thisYear" | "custom">("thisYear");
+  const [customStartDate, setCustomStartDate] = useState(thisYearRange.start);
+  const [customEndDate, setCustomEndDate] = useState(thisYearRange.end);
+  const [showPeriodPicker, setShowPeriodPicker] = useState(false);
 
   // In portal mode use the authenticated user's clientId; otherwise use the route param.
   const clientId = portalMode ? (user?.clientId ?? "") : (params.id ?? "");
@@ -179,20 +220,40 @@ export default function App({ portalMode = false }: ClientDetailProps) {
     .toUpperCase()
     .slice(0, 2);
 
-  const monthlySpend = Array.from({ length: 12 }, (_, index) => {
-    const month = new Date();
-    month.setMonth(month.getMonth() - (11 - index), 1);
-    const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-    const value = liveOrders
-      .filter((order) => order.date?.startsWith(key))
-      .reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
-    return {
-      month: month.toLocaleDateString("en-US", { month: "short" }),
-      value,
-    };
-  });
-  const totalSpend = liveOrders.reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
-  const spendByCategory = liveServices.reduce<Record<string, number>>((result, service) => {
+  const selectedDateRange: ClientDateRange = periodPreset === "thisYear"
+    ? thisYearRange
+    : { start: customStartDate, end: customEndDate };
+  const validDateRange = Boolean(
+    selectedDateRange.start &&
+    selectedDateRange.end &&
+    selectedDateRange.start <= selectedDateRange.end,
+  );
+  const periodOrders = validDateRange
+    ? liveOrders.filter((order) => isDateInRange(order.date, selectedDateRange))
+    : [];
+  const periodServices = validDateRange
+    ? liveServices.filter((service) => overlapsDateRange(service.startDate, service.endDate, selectedDateRange))
+    : [];
+
+  const monthlySpend: { month: string; value: number }[] = [];
+  if (validDateRange) {
+    const cursor = new Date(`${selectedDateRange.start}T00:00:00`);
+    const endMonth = new Date(`${selectedDateRange.end}T00:00:00`);
+    cursor.setDate(1);
+    endMonth.setDate(1);
+    while (cursor <= endMonth) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+      monthlySpend.push({
+        month: cursor.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        value: periodOrders
+          .filter((order) => normalizeDate(order.date).startsWith(key))
+          .reduce((sum, order) => sum + Number(order.amountNum || 0), 0),
+      });
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+  const totalSpend = periodOrders.reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
+  const spendByCategory = periodServices.reduce<Record<string, number>>((result, service) => {
     const amount = Number(String(service.amount).replace(/[^\d.-]/g, "")) || 0;
     result[service.category || "Services"] = (result[service.category || "Services"] || 0) + amount;
     return result;
@@ -206,8 +267,8 @@ export default function App({ portalMode = false }: ClientDetailProps) {
     amount: `₹${amount.toLocaleString("en-IN")}`,
     color: categoryColors[index % categoryColors.length],
   }));
-  const openOrders = liveOrders.filter((order) => !["delivered", "completed", "cancelled"].includes(order.status.toLowerCase())).length;
-  const activeServiceCount = liveServices.filter((service) => service.status.toLowerCase() === "active").length;
+  const openOrders = periodOrders.filter((order) => !["delivered", "completed", "cancelled"].includes(order.status.toLowerCase())).length;
+  const activeServiceCount = periodServices.filter((service) => service.status.toLowerCase() === "active").length;
 
   const contractStart = client.contractStartDate
     ? new Date(client.contractStartDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
@@ -215,7 +276,6 @@ export default function App({ portalMode = false }: ClientDetailProps) {
   const contractEnd = client.contractEndDate
     ? new Date(client.contractEndDate)
     : null;
-  const today = new Date();
   const daysLeft = contractEnd
     ? Math.max(0, Math.round((contractEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -622,6 +682,14 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                 </button>
               ))}
             </div>
+            <div className="flex items-center justify-between gap-3 py-2 text-xs text-gray-500">
+              <span>
+                Data period: <span className="font-medium text-gray-700">{formatDateRange(selectedDateRange)}</span>
+              </span>
+              {!validDateRange && (
+                <span className="text-red-500">Select a valid start and end date.</span>
+              )}
+            </div>
           </div>
 
           {/* Non-overview tab content */}
@@ -629,8 +697,8 @@ export default function App({ portalMode = false }: ClientDetailProps) {
             <div className="bg-white rounded-xl border border-gray-200 flex-1">
               {activeTab === "Roles" ? <RolesPage />
                 : activeTab === "Users" ? <UsersPage clientId={clientId} clientName={client.name} />
-                : activeTab === "Orders" ? <OrdersPage clientId={clientId} clientName={client.name} />
-                : activeTab === "Services" ? <ServicesPage clientId={clientId} />
+                : activeTab === "Orders" ? <OrdersPage clientId={clientId} clientName={client.name} dateRange={selectedDateRange} />
+                : activeTab === "Services" ? <ServicesPage clientId={clientId} dateRange={selectedDateRange} />
                 : activeTab === "Contracts" ? (
                   <ContractsPage
                     clientId={clientId}
@@ -711,10 +779,76 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <div className="flex items-center justify-between mb-1">
                     <h3 className="font-semibold text-gray-900 text-sm">Spending Overview</h3>
-                    <span className="text-xs border border-gray-200 rounded-md px-2 py-0.5 text-gray-500">This Year</span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowPeriodPicker((visible) => !visible)}
+                        className="flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-600 hover:bg-gray-50 transition-colors"
+                      >
+                        {periodPreset === "thisYear" ? "This Year" : "Custom"}
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                      {showPeriodPicker && (
+                        <div className="absolute right-0 top-8 z-30 w-64 rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+                          <div className="flex gap-2 mb-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPeriodPreset("thisYear");
+                                setShowPeriodPicker(false);
+                              }}
+                              className={`flex-1 rounded-lg px-2 py-1.5 text-xs ${periodPreset === "thisYear" ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                            >
+                              This Year
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPeriodPreset("custom")}
+                              className={`flex-1 rounded-lg px-2 py-1.5 text-xs ${periodPreset === "custom" ? "bg-blue-600 text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                            >
+                              Custom
+                            </button>
+                          </div>
+                          {periodPreset === "custom" && (
+                            <div className="space-y-2">
+                              <label className="block text-xs text-gray-600">
+                                Start date
+                                <input
+                                  type="date"
+                                  value={customStartDate}
+                                  onChange={(event) => setCustomStartDate(event.target.value)}
+                                  className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700"
+                                />
+                              </label>
+                              <label className="block text-xs text-gray-600">
+                                End date
+                                <input
+                                  type="date"
+                                  value={customEndDate}
+                                  min={customStartDate || undefined}
+                                  onChange={(event) => setCustomEndDate(event.target.value)}
+                                  className="mt-1 w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700"
+                                />
+                              </label>
+                              {!validDateRange && (
+                                <p className="text-[11px] text-red-500">End date must be on or after the start date.</p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowPeriodPicker(false)}
+                                disabled={!validDateRange}
+                                className="w-full rounded-lg bg-gray-900 px-2 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Apply Date Range
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <p className="text-2xl font-bold text-gray-900">${totalSpend.toLocaleString()}</p>
-                  <p className="text-xs text-gray-400 mb-1">Total Spend</p>
+                  <p className="text-xs text-gray-400 mb-1">{formatDateRange(selectedDateRange)}</p>
                   <p className="text-xs text-green-500 font-medium mb-3">+12.5% vs last year</p>
                   <ResponsiveContainer width="100%" height={130}>
                     <BarChart data={monthlySpend} barSize={10} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>

@@ -9,6 +9,14 @@ export const servicesData = [
 ];
 
 const serviceCategories = ["All", "Hosting", "Support", "Software", "Networking", "Security"];
+type ClientDateRange = { start: string; end: string };
+
+function overlapsDateRange(startDate: string, endDate: string, range?: ClientDateRange): boolean {
+  if (!range) return true;
+  const start = startDate.slice(0, 10);
+  const end = (endDate || startDate).slice(0, 10);
+  return Boolean(range.start && range.end && range.start <= range.end && start && end && start <= range.end && end >= range.start);
+}
 
 function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (service: ClientServiceRecord) => void }) {
   const [form, setForm] = useState({
@@ -156,7 +164,7 @@ function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (serv
   );
 }
 
-export default function ClientServicesPage({ clientId }: { clientId: string }) {
+export default function ClientServicesPage({ clientId, dateRange }: { clientId: string; dateRange?: ClientDateRange }) {
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Category");
@@ -176,9 +184,10 @@ export default function ClientServicesPage({ clientId }: { clientId: string }) {
     reload();
   };
 
+  const periodServices = services.filter((service) => overlapsDateRange(service.startDate, service.endDate, dateRange));
   const filtered = selectedCategory === "Category" || selectedCategory === "All"
-    ? services
-    : services.filter((s) => s.category === selectedCategory);
+    ? periodServices
+    : periodServices.filter((s) => s.category === selectedCategory);
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setCategoryOpen(false); }}>
