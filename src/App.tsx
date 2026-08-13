@@ -168,6 +168,8 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
 }
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
 const ClientPortalUsersPage = lazy(() => import("@/pages/ClientPortalUsersPage"));
 const ClientPortalRolesPage = lazy(() => import("@/pages/ClientPortalRolesPage"));
@@ -343,6 +345,28 @@ function AppRoutes() {
                 <LoginPage />
               </PageErrorBoundary>
             )
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PageErrorBoundary
+              title="Forgot password page failed to load"
+              resetKey={location.pathname}
+            >
+              <ForgotPasswordPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <PageErrorBoundary
+              title="Reset password page failed to load"
+              resetKey={location.pathname}
+            >
+              <ResetPasswordPage />
+            </PageErrorBoundary>
           }
         />
         <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
