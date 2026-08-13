@@ -651,14 +651,14 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
 
             <table className="w-full table-fixed">
               <colgroup>
-                <col style={{ width: "10%" }} />
-                <col style={{ width: "20%" }} />
-                <col style={{ width: "11%" }} />
-                <col style={{ width: "16%" }} />
                 <col style={{ width: "8%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
                 <col style={{ width: "8%" }} />
                 <col style={{ width: "9%" }} />
-                <col style={{ width: "11%" }} />
+                <col style={{ width: "10%" }} />
                 <col style={{ width: "7%" }} />
               </colgroup>
               <thead>
