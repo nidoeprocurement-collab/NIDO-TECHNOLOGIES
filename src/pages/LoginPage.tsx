@@ -85,7 +85,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
-  const [locationBlocked, setLocationBlocked] = useState(false);
   const [locationPrompt, setLocationPrompt] = useState<LoginTab | null>(null);
 
   // Recovery tab
@@ -182,14 +181,14 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setIsLocked(false);
-    if (!locationBlocked) setLocationPrompt('password');
+    setLocationPrompt('password');
   };
 
   const handleRecoveryLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setRecoverySuccess('');
-    if (!locationBlocked) setLocationPrompt('recovery');
+    setLocationPrompt('recovery');
   };
 
   const handleLocationContinue = async () => {
@@ -198,17 +197,26 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const captured = await captureLoginContext();
-    if (!captured.locationGranted) {
-      setLocationBlocked(true);
-      setLocationPrompt(null);
-      setError('Location permission is required to sign in. Enable location access in your browser, then refresh this page and try again.');
-      setIsLoading(false);
-      return;
-    }
-
     setLocationPrompt(null);
     if (requestedAction === 'password') {
       await completePasswordLogin(captured.context);
+    } else {
+      await completeRecoveryLogin();
+    }
+    setIsLoading(false);
+  };
+
+  const handleContinueWithoutLocation = async () => {
+    if (!locationPrompt) return;
+    const requestedAction = locationPrompt;
+    setLocationPrompt(null);
+    setIsLoading(true);
+
+    const context: LoginContext = {
+      device: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+    };
+    if (requestedAction === 'password') {
+      await completePasswordLogin(context);
     } else {
       await completeRecoveryLogin();
     }
@@ -258,8 +266,8 @@ export default function LoginPage() {
           </div>
 
           {/* Right — Login form */}
-          <div className="w-full max-w-sm" style={{ marginLeft: '50px', marginRight: '-50px' }}>
-            <div className="bg-white rounded-3xl shadow-2xl p-2 md:p-10">
+          <div className="w-full max-w-sm lg:ml-[50px] lg:mr-[-50px]">
+            <div className="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 md:p-10">
               {/* Logo */}
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
@@ -283,13 +291,15 @@ export default function LoginPage() {
 
               {/* Tabs */}
               <div className="mb-6 border-b border-gray-200 flex gap-1">
-                <button
+                  <button
+                    type="button"
                   onClick={() => switchTab('password')}
                   className={`pb-3 px-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'password' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                   Sign In
                 </button>
-                <button
+                  <button
+                    type="button"
                   onClick={() => switchTab('recovery')}
                   className={`pb-3 px-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'recovery' ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
@@ -332,15 +342,17 @@ export default function LoginPage() {
 
                   <form onSubmit={handleLogin} className="space-y-5">
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
+                      <label htmlFor="login-email" className="block text-sm font-medium text-gray-900 mb-2">Email</label>
                       <div className="relative">
                         <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="email"
+                          id="login-email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-gray-900"
                           placeholder="your@email.com"
+                          autoComplete="email"
                           disabled={isLoading}
                           required
                         />
@@ -348,15 +360,17 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">Password</label>
+                      <label htmlFor="login-password" className="block text-sm font-medium text-gray-900 mb-2">Password</label>
                       <div className="relative">
                         <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type={showPassword ? 'text' : 'password'}
+                          id="login-password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-gray-900"
                           placeholder="••••••••••"
+                          autoComplete="current-password"
                           disabled={isLoading}
                           required
                         />
@@ -373,13 +387,11 @@ export default function LoginPage() {
 
                     <button
                       type="submit"
-                      disabled={isLoading || locationBlocked}
+                      disabled={isLoading}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6"
                     >
                       {isLoading ? (
                         <><Loader2 size={18} className="animate-spin" />Signing in…</>
-                      ) : locationBlocked ? (
-                        <>Location Permission Required</>
                       ) : (
                         <>Sign In <span>→</span></>
                       )}
@@ -420,15 +432,17 @@ export default function LoginPage() {
 
                   <form onSubmit={handleRecoveryLogin} className="space-y-5">
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
+                      <label htmlFor="recovery-email" className="block text-sm font-medium text-gray-900 mb-2">Email</label>
                       <div className="relative">
                         <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="email"
+                          id="recovery-email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-gray-900"
                           placeholder="your@email.com"
+                          autoComplete="email"
                           disabled={isLoading}
                           required
                         />
@@ -436,11 +450,12 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">Recovery Code</label>
+                      <label htmlFor="recovery-code" className="block text-sm font-medium text-gray-900 mb-2">Recovery Code</label>
                       <div className="relative">
                         <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                           type="text"
+                          id="recovery-code"
                           value={recoveryCode}
                           onChange={(e) => handleRecoveryCodeChange(e.target.value)}
                           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-gray-50 focus:bg-white text-gray-900 font-mono tracking-widest uppercase"
@@ -457,13 +472,11 @@ export default function LoginPage() {
 
                     <button
                       type="submit"
-                      disabled={isLoading || locationBlocked || recoveryCode.replace(/-/g, '').length < 15}
+                      disabled={isLoading || recoveryCode.replace(/-/g, '').length < 15}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
                     >
                       {isLoading ? (
                         <><Loader2 size={18} className="animate-spin" />Verifying…</>
-                      ) : locationBlocked ? (
-                        <>Location Permission Required</>
                       ) : (
                         <><KeyRound size={16} /> Sign In with Recovery Code</>
                       )}
@@ -493,15 +506,15 @@ export default function LoginPage() {
                       <MapPin size={24} />
                     </div>
                     <h2 id="location-permission-title" className="mt-4 text-center text-xl font-bold text-gray-900">
-                      Location access required
+                      Location access
                     </h2>
                     <p className="mt-2 text-center text-sm leading-relaxed text-gray-600">
-                      To sign in, NIDO needs permission to record the sign-in IP address, device information, and the device&apos;s latitude and longitude for the audit trail.
+                      NIDO can record your sign-in IP address, device information, and (when available) your device&apos;s latitude and longitude for the audit trail.
                     </p>
                     <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-relaxed text-blue-800">
-                      Your coordinates are requested by your browser and are stored with the sign-in activity. You can cancel now, but sign-in will not continue without location permission.
+                      Your coordinates are requested by your browser and stored with the sign-in activity when permission is granted. You can continue without sharing your location.
                     </div>
-                    <div className="mt-6 flex justify-end gap-2">
+                    <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                       <button
                         type="button"
                         onClick={() => setLocationPrompt(null)}
@@ -512,12 +525,20 @@ export default function LoginPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={handleContinueWithoutLocation}
+                        disabled={isLoading}
+                        className="rounded-lg border border-blue-200 px-4 py-2.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:opacity-50"
+                      >
+                        Continue without location
+                      </button>
+                      <button
+                        type="button"
                         onClick={handleLocationContinue}
                         disabled={isLoading}
                         className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isLoading ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-                        {isLoading ? 'Checking location…' : 'Allow Location & Continue'}
+                        {isLoading ? 'Checking location…' : 'Allow & Continue'}
                       </button>
                     </div>
                   </div>
