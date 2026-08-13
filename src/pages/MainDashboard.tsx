@@ -63,15 +63,17 @@ function isInDashboardPeriod(value: string | number | undefined, period: Dashboa
 const PeriodSelector = ({
   value,
   onChange,
+  label,
 }: {
   value: DashboardPeriod;
   onChange: (value: DashboardPeriod) => void;
+  label: string;
 }) => (
   <select
     value={value}
     onChange={(event) => onChange(event.target.value as DashboardPeriod)}
     className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-700 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-    aria-label="Select chart period"
+    aria-label={label}
   >
     {PERIOD_OPTIONS.map((option) => (
       <option key={option.value} value={option.value}>{option.label}</option>
@@ -259,7 +261,10 @@ export default function MainDashboard() {
   const clients = useMemo(() => getClients(), []);
   const pos = useMemo(() => getAllPOs(), []);
   const serviceRequests = useMemo(() => getServiceRequests(), []);
-  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>('all');
+  // Each pie chart has its own period selector so changing one chart does
+  // not unexpectedly change the other chart's reporting window.
+  const [categoryPeriod, setCategoryPeriod] = useState<DashboardPeriod>('all');
+  const [orderStatusPeriod, setOrderStatusPeriod] = useState<DashboardPeriod>('all');
 
   const poByOrderId = useMemo(() => {
     const map = new Map<string, StoredPO>();
@@ -277,13 +282,13 @@ export default function MainDashboard() {
   }, [orders]);
 
   const periodicOrders = useMemo(
-    () => orders.filter((order) => isInDashboardPeriod(order.orderDate, dashboardPeriod)),
-    [orders, dashboardPeriod],
+    () => orders.filter((order) => isInDashboardPeriod(order.orderDate, orderStatusPeriod)),
+    [orders, orderStatusPeriod],
   );
 
   const periodicPOs = useMemo(
-    () => pos.filter((po) => isInDashboardPeriod(po.createdOn || po.createdOnDisplay, dashboardPeriod)),
-    [pos, dashboardPeriod],
+    () => pos.filter((po) => isInDashboardPeriod(po.createdOn || po.createdOnDisplay, categoryPeriod)),
+    [pos, categoryPeriod],
   );
 
   const orderStatusData = useMemo(() => {
@@ -368,7 +373,10 @@ export default function MainDashboard() {
   const activeContracts = vendors.filter(v => v.status === 'Active').length;
   const openPOs = pos.filter(po => po.status !== 'Closed' && po.status !== 'Cancelled').length;
   const cancelledPOs = pos.filter(po => po.status === 'Cancelled').length;
-  const selectedPeriodLabel = PERIOD_OPTIONS.find((option) => option.value === dashboardPeriod)?.label || 'All time';
+  const selectedCategoryPeriodLabel =
+    PERIOD_OPTIONS.find((option) => option.value === categoryPeriod)?.label || 'All time';
+  const selectedOrderStatusPeriodLabel =
+    PERIOD_OPTIONS.find((option) => option.value === orderStatusPeriod)?.label || 'All time';
 
   return (
     <div className="space-y-2">
@@ -382,7 +390,8 @@ export default function MainDashboard() {
         </div>
       </div>
 
-       {/* KPI Cards — separated so client activity stays above vendor/procurement activity */}
+       {/* KPI Cards — client activity stays above internal vendor/procurement activity.
+           This admin dashboard is not rendered inside the client portal routes. */}
        <section className="space-y-2 mb-3">
          <div className="flex items-center justify-between gap-3">
            <div>
@@ -394,7 +403,7 @@ export default function MainDashboard() {
            <KPICard title="Total Clients" value={String(clients.length)} icon={Eye} bgColor="bg-blue-600" href="/clients" />
            <KPICard title="Total Orders" value={String(orders.length)} icon={ShoppingCart} bgColor="bg-purple-600" href="/orders" />
            <KPICard title="Services Opted" value={String(serviceRequests.length)} icon={Wrench} bgColor="bg-orange-500" href="/my-services" />
-           <KPICard title="Pending Approvals" value={String(pendingApprovals)} icon={AlertCircle} bgColor="bg-yellow-500" href="/orders" />
+            <KPICard title="Pending Approvals" value={String(pendingApprovals)} icon={AlertCircle} bgColor="bg-yellow-500" href="/reports/approvals" />
          </div>
        </section>
 
@@ -437,14 +446,18 @@ export default function MainDashboard() {
           </div>
         </div>
 
-        {/* Expenses by Category */}
+         {/* Expenses by Category */}
          <div className="lg:col-span-1 bg-white rounded-lg border border-gray-200 p-6">
            <div className="flex justify-between items-start gap-3 mb-4">
              <div>
                <h3 className="text-lg font-semibold text-gray-900">Expenses by Category</h3>
-               <p className="text-xs text-gray-600 mt-1">{selectedPeriodLabel}</p>
+                <p className="text-xs text-gray-600 mt-1">{selectedCategoryPeriodLabel}</p>
              </div>
-             <PeriodSelector value={dashboardPeriod} onChange={setDashboardPeriod} />
+              <PeriodSelector
+                value={categoryPeriod}
+                onChange={setCategoryPeriod}
+                label="Select expenses by category period"
+              />
            </div>
           {categoryData.length === 0 ? (
              <EmptyState label="No purchase order line items in this period." />
@@ -481,9 +494,13 @@ export default function MainDashboard() {
            <div className="flex justify-between items-start gap-3 mb-4">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Order Status</h3>
-               <p className="text-xs text-gray-600 mt-1">{selectedPeriodLabel}</p>
+                <p className="text-xs text-gray-600 mt-1">{selectedOrderStatusPeriodLabel}</p>
             </div>
-             <PeriodSelector value={dashboardPeriod} onChange={setDashboardPeriod} />
+              <PeriodSelector
+                value={orderStatusPeriod}
+                onChange={setOrderStatusPeriod}
+                label="Select order status period"
+              />
           </div>
           {orderStatusData.length === 0 ? (
              <EmptyState label="No orders placed in this period." />
