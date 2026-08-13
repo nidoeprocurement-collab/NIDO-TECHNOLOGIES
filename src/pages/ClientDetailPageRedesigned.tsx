@@ -1,0 +1,474 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BriefcaseBusiness,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  CircleDollarSign,
+  Clock3,
+  FileText,
+  Globe2,
+  Headphones,
+  Mail,
+  MapPin,
+  Package,
+  Phone,
+  Receipt,
+  RefreshCw,
+  ShoppingCart,
+  TicketCheck,
+  Users,
+  Wrench,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getClients, type StoredClient } from "@/lib/clientStore";
+import {
+  getClientActivities,
+  getClientContract,
+  getClientDocuments,
+  getClientOrders,
+  getClientServices,
+  type ClientActivityRecord,
+  type ClientDocumentRecord,
+  type ClientOrderRecord,
+  type ClientServiceRecord,
+} from "@/lib/clientDataStore";
+import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
+import { getSupportTickets, type SupportTicket } from "@/lib/supportTicketStore";
+import RolesPage from "./ClientRolesPage";
+import UsersPage from "./ClientUsersPage";
+import OrdersPage from "./ClientOrdersPage";
+import ServicesPage from "./ClientServicesPage";
+import CatalogPage from "./ClientCatalogPage";
+import ActivityPage from "./ClientActivityPage";
+import ConfigurationPage from "./ClientConfigurationPage";
+import ContractsPage from "./ClientContractsPage";
+import DocumentsPage from "./ClientDocumentsPage";
+
+const ADMIN_TABS = [
+  "Overview",
+  "Roles",
+  "Users",
+  "Orders",
+  "Services",
+  "Contracts",
+  "Catalog",
+  "Activity",
+  "Configuration",
+  "Documents",
+];
+
+const PERIODS = ["Year", "Month", "Week", "Day"] as const;
+type Period = (typeof PERIODS)[number] | "Custom";
+
+function initialsFor(client: StoredClient): string {
+  return client.name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function dateValue(value?: string): number {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatMoney(value: number, currency?: string): string {
+  const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : "₹";
+  return `${symbol}${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+function orderStatusGroup(status: string): "Completed" | "Processing" | "Awaiting Payment" | "Cancelled" {
+  const normalized = status.toLowerCase();
+  if (normalized.includes("cancel")) return "Cancelled";
+  if (normalized.includes("complete") || normalized.includes("deliver")) return "Completed";
+  if (normalized.includes("payment") || normalized.includes("pending") || normalized.includes("overdue")) return "Awaiting Payment";
+  return "Processing";
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const points = values.length > 1 ? values : [0, 0];
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const range = Math.max(max - min, 1);
+  const polyline = points
+    .map((value, index) => {
+      const x = (index / (points.length - 1)) * 100;
+      const y = 30 - ((value - min) / range) * 24;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg viewBox="0 0 100 34" className="h-9 w-full overflow-visible" aria-hidden="true">
+      <polyline points={polyline} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  change,
+  positive = true,
+  icon,
+  color,
+  values,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  change: string;
+  positive?: boolean;
+  icon: React.ReactNode;
+  color: string;
+  values: number[];
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group min-w-0 rounded-xl border border-gray-200 bg-white p-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.02)] transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+    >
+      <div className="flex items-start gap-3">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${color}`}>{icon}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[10px] font-semibold text-gray-500">{label}</span>
+          <span className="mt-0.5 block text-xl font-bold leading-6 text-gray-900">{value}</span>
+          <span className={`mt-1 block text-[10px] font-medium ${positive ? "text-emerald-600" : "text-red-500"}`}>
+            {positive ? "↑" : "↓"} {change} <span className="font-normal text-gray-400">vs last 30 days</span>
+          </span>
+        </span>
+      </div>
+      <div className="mt-2">
+        <Sparkline values={values} color={positive ? "#7c3aed" : "#f59e0b"} />
+      </div>
+    </button>
+  );
+}
+
+function Panel({
+  title,
+  action,
+  children,
+  className = "",
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`rounded-xl border border-gray-200 bg-white p-3.5 ${className}`}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-xs font-bold text-gray-900">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <div className="py-8 text-center text-xs text-gray-400">{message}</div>;
+}
+
+function NotFound({ id }: { id: string }) {
+  const navigate = useNavigate();
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500">
+        <BriefcaseBusiness size={25} />
+      </div>
+      <h2 className="text-lg font-semibold text-gray-900">Client not found</h2>
+      <p className="text-sm text-gray-400">No client with ID {id} exists.</p>
+      <button type="button" onClick={() => navigate("/clients")} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+        Back to Clients
+      </button>
+    </div>
+  );
+}
+
+interface ClientDetailProps {
+  portalMode?: boolean;
+}
+
+export default function ClientDetailPageRedesigned({ portalMode = false }: ClientDetailProps) {
+  const params = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const clientId = portalMode ? user?.clientId ?? "" : params.id ?? "";
+  const [activeTab, setActiveTab] = useState("Overview");
+  const [period, setPeriod] = useState<Period>("Year");
+  const [customDate, setCustomDate] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const client = getClients().find((item) => item.id === clientId);
+  const [orders, setOrders] = useState<ClientOrderRecord[]>(() => getClientOrders(clientId, client?.name));
+  const [services, setServices] = useState<ClientServiceRecord[]>(() => getClientServices(clientId));
+  const [activities, setActivities] = useState<ClientActivityRecord[]>(() => getClientActivities(clientId));
+  const [documents, setDocuments] = useState<ClientDocumentRecord[]>(() => getClientDocuments(clientId));
+  const [catalog, setCatalog] = useState<ClientCatalogEntry[]>(() => getClientCatalog(clientId));
+  const [contract, setContract] = useState(() => getClientContract(clientId));
+  const [invoices, setInvoices] = useState<StoredInvoice[]>(() => getInvoices());
+  const [tickets, setTickets] = useState<SupportTicket[]>(() => getSupportTickets());
+
+  useEffect(() => {
+    const reload = () => {
+      setOrders(getClientOrders(clientId, client?.name));
+      setServices(getClientServices(clientId));
+      setActivities(getClientActivities(clientId));
+      setDocuments(getClientDocuments(clientId));
+      setCatalog(getClientCatalog(clientId));
+      setContract(getClientContract(clientId));
+      setInvoices(getInvoices());
+      setTickets(getSupportTickets());
+      setRefreshKey((value) => value + 1);
+    };
+    reload();
+    const events = [
+      "nidoClientDataUpdated",
+      "clientCatalogUpdated",
+      "catalogUpdated",
+      "nidoInvoicesUpdated",
+      "supportTicketsUpdated",
+    ] as const;
+    events.forEach((event) => window.addEventListener(event, reload));
+    return () => events.forEach((event) => window.removeEventListener(event, reload));
+  }, [clientId, client?.name]);
+
+  const periodOrders = useMemo(() => {
+    if (period === "Custom" && customDate) {
+      return orders.filter((order) => order.date?.startsWith(customDate));
+    }
+    const now = new Date();
+    const start = new Date(now);
+    if (period === "Month") start.setMonth(now.getMonth() - 1);
+    if (period === "Week") start.setDate(now.getDate() - 7);
+    if (period === "Day") start.setDate(now.getDate() - 1);
+    if (period === "Year") start.setMonth(0, 1);
+    const startTime = start.getTime();
+    return orders.filter((order) => dateValue(order.date) >= startTime);
+  }, [customDate, orders, period]);
+
+  if (!client) return <NotFound id={clientId} />;
+
+  const currency = client.currency;
+  const clientInvoices = invoices.filter((invoice) => invoice.clientName.toLowerCase() === client.name.toLowerCase());
+  const clientTickets = tickets.filter((ticket) => {
+    const record = ticket as SupportTicket & { clientId?: string; clientName?: string };
+    return !record.clientId && !record.clientName
+      ? true
+      : record.clientId === clientId || record.clientName?.toLowerCase() === client.name.toLowerCase();
+  });
+  const totalSpend = periodOrders.reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
+  const openOrders = periodOrders.filter((order) => !["Completed", "Cancelled"].includes(orderStatusGroup(order.status))).length;
+  const activeServices = services.filter((service) => service.status.toLowerCase() === "active");
+  const pendingInvoices = clientInvoices.filter((invoice) => !["Paid", "Cancelled"].includes(invoice.status));
+  const unpaidAmount = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.grandTotal || 0), 0);
+  const statusCounts = (["Completed", "Processing", "Awaiting Payment", "Cancelled"] as const).map((status) => ({
+    status,
+    count: periodOrders.filter((order) => orderStatusGroup(order.status) === status).length,
+  }));
+  const totalStatusCount = Math.max(periodOrders.length, 1);
+  const recentOrders = [...periodOrders].sort((a, b) => dateValue(b.date) - dateValue(a.date)).slice(0, 5);
+  const topProducts = catalog.slice(0, 5);
+  const startDate = client.contractStartDate || client.contract_start_date;
+  const contractStart = startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "N/A";
+  const address = [client.billingAddress || client.billing_address, client.billingCity || client.billing_city, client.billingState || client.billing_state, client.billingPincode || client.billing_pincode].filter(Boolean).join(", ");
+  const initials = initialsFor(client);
+  const formatDate = (value: string) => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  const goTo = (tab: string) => setActiveTab(tab);
+
+  const renderTab = () => {
+    if (activeTab === "Roles") return <RolesPage key={`${clientId}-${refreshKey}-roles`} />;
+    if (activeTab === "Users") return <UsersPage key={`${clientId}-${refreshKey}-users`} clientId={clientId} clientName={client.name} />;
+    if (activeTab === "Orders") return <OrdersPage key={`${clientId}-${refreshKey}-orders`} clientId={clientId} clientName={client.name} />;
+    if (activeTab === "Services") return <ServicesPage key={`${clientId}-${refreshKey}-services`} clientId={clientId} />;
+    if (activeTab === "Contracts") {
+      return (
+        <ContractsPage
+          key={`${clientId}-${refreshKey}-contracts`}
+          clientId={clientId}
+          contractId={contract?.contractId || ""}
+          contractTitle={contract?.contractTitle || "Client Contract"}
+          clientName={client.name}
+          clientEmail={client.email || ""}
+          clientPhone={client.phone || client.mobile || ""}
+          clientGstin={client.gstin || client.gstin_number || ""}
+          clientAddress={address}
+          contractStartDate={client.contractStartDate || client.contract_start_date || ""}
+          contractEndDate={client.contractEndDate || client.contract_end_date || ""}
+          clientCurrency={client.currency || ""}
+          clientPaymentTerms={client.payment_terms || ""}
+          clientStatus={client.status || ""}
+          onBack={() => goTo("Overview")}
+        />
+      );
+    }
+    if (activeTab === "Catalog") return <CatalogPage key={`${clientId}-${refreshKey}-catalog`} clientId={clientId} />;
+    if (activeTab === "Activity") return <ActivityPage key={`${clientId}-${refreshKey}-activity`} clientId={clientId} />;
+    if (activeTab === "Configuration") return <ConfigurationPage key={`${clientId}-${refreshKey}-configuration`} clientId={clientId} />;
+    if (activeTab === "Documents") return <DocumentsPage key={`${clientId}-${refreshKey}-documents`} clientId={clientId} />;
+    return null;
+  };
+
+  return (
+    <div className="min-h-screen bg-[#fcfcfd] text-gray-900">
+      <div className="border-b border-gray-200 bg-white px-3 sm:px-5">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {(portalMode ? ["Overview"] : ADMIN_TABS).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`relative whitespace-nowrap px-3 py-3 text-[11px] font-semibold transition-colors ${activeTab === tab ? "text-blue-600" : "text-gray-600 hover:text-gray-900"}`}
+            >
+              {tab}
+              {activeTab === tab && <span className="absolute inset-x-1 bottom-0 h-0.5 rounded-t-full bg-blue-600" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab !== "Overview" ? (
+        <div className="p-3 sm:p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-600">{client.id}</p>
+              <h1 className="text-xl font-bold">{client.name}</h1>
+            </div>
+            <button type="button" onClick={() => setActiveTab("Overview")} className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800">
+              <ArrowRight size={13} className="rotate-180" /> Overview
+            </button>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">{renderTab()}</div>
+        </div>
+      ) : (
+        <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-5 lg:px-7">
+          <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome back, {client.name}! <span aria-hidden="true">👋</span></h1>
+              <p className="mt-1 text-xs text-gray-500">Here's what's happening with your account today.</p>
+            </div>
+            <div className="flex items-start gap-2 text-right text-[10px] text-gray-500">
+              <div>
+                <p>{new Date().toLocaleDateString("en-US", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</p>
+                <p className="mt-0.5 text-base font-bold text-gray-900">{new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
+              </div>
+              <span className="mt-1 text-amber-500">☼</span>
+            </div>
+          </header>
+
+          <div className="mt-5 flex flex-wrap items-center gap-1.5">
+            <span className="mr-2 text-[10px] font-semibold text-gray-500">Time Period</span>
+            {PERIODS.map((item) => (
+              <button key={item} type="button" onClick={() => setPeriod(item)} className={`rounded-md border px-4 py-2 text-[10px] font-semibold ${period === item ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"}`}>
+                {item}
+              </button>
+            ))}
+            <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-3 py-2 text-[10px] font-semibold ${period === "Custom" ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600"}`}>
+              Custom <CalendarDays size={12} />
+              <input type="date" value={customDate} onChange={(event) => { setCustomDate(event.target.value); setPeriod("Custom"); }} className="sr-only" />
+            </label>
+            {period !== "Year" && <button type="button" onClick={() => { setPeriod("Year"); setCustomDate(""); }} className="ml-1 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" title="Reset period"><RefreshCw size={13} /></button>}
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<Users size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => goTo("Orders")} />
+            <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => goTo("Orders")} />
+            <MetricCard label="Products" value={catalog.length} change={`${catalog.length ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={catalog.map((_, i) => i + 1)} onClick={() => goTo("Catalog")} />
+            <MetricCard label="Invoices" value={clientInvoices.length} change={`${clientInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={clientInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => goTo("Documents")} />
+            <MetricCard label="Open Support Tickets" value={clientTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${clientTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={clientTickets.map((_, i) => i + 1)} onClick={() => navigate("/support")} />
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <Panel title="Company Information" action={<span className="rounded bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-600">{client.status || "Active"}</span>}>
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 text-sm font-semibold text-violet-700">{client.client_logo_url ? <img src={client.client_logo_url} alt="" className="h-full w-full rounded-full object-cover" /> : initials}</div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-gray-900">{client.name}</p>
+                  <p className="mt-1 text-[10px] text-gray-500">Client since {contractStart}</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2 text-[10px] text-gray-600">
+                <a href={client.email ? `mailto:${client.email}` : undefined} className="flex items-center gap-2 truncate hover:text-blue-600"><Mail size={12} className="shrink-0 text-gray-400" />{client.email || "No email available"}</a>
+                <a href={client.phone ? `tel:${client.phone}` : undefined} className="flex items-center gap-2 hover:text-blue-600"><Phone size={12} className="shrink-0 text-gray-400" />{client.phone || "No phone available"}</a>
+                <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
+                {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
+              </div>
+              <button type="button" onClick={() => navigate(`/clients/${client.id}/edit`)} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
+                View Full Profile
+              </button>
+            </Panel>
+
+            <Panel title="Orders Overview" action={<button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
+              <div className="flex min-h-[138px] items-center gap-4">
+                <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#10b981 0 ${((statusCounts[0].count / totalStatusCount) * 100)}%, #2563eb ${((statusCounts[0].count / totalStatusCount) * 100)}% ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}%, #f59e0b ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}% ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}%, #7c3aed ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}% 100%)` }}>
+                  <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white"><span className="text-xl font-bold">{periodOrders.length}</span><span className="text-[9px] text-gray-500">Total Orders</span></div>
+                </div>
+                <div className="min-w-0 flex-1 space-y-2 text-[10px]">
+                  {statusCounts.map((item, index) => {
+                    const colors = ["bg-emerald-500", "bg-blue-600", "bg-orange-500", "bg-violet-600"];
+                    return <div key={item.status} className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-gray-600"><i className={`h-2 w-2 rounded-full ${colors[index]}`} />{item.status}</span><strong>{item.count} <span className="font-normal text-gray-400">({Math.round((item.count / totalStatusCount) * 100)}%)</span></strong></div>;
+                  })}
+                </div>
+              </div>
+            </Panel>
+
+            <Panel title="Account Summary" action={<button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
+              <div className="space-y-2.5 text-[10px]">
+                <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Active Contracts</span><strong>{contract ? 1 : 0}</strong></button>
+                <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
+                <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
+                <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
+              </div>
+            </Panel>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <Panel title="Top Products" action={<button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
+              {topProducts.length === 0 ? <EmptyState message="No products have been assigned to this client yet." /> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[460px] text-left text-[10px]">
+                    <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">Stock</th></tr></thead>
+                    <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              )}
+            </Panel>
+
+            <Panel title="Recent Orders" action={<button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
+              {recentOrders.length === 0 ? <EmptyState message="No orders found for this client in the selected period." /> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[470px] text-left text-[10px]">
+                    <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Order ID</th><th className="pb-2 font-semibold">Date</th><th className="pb-2 font-semibold">Status</th><th className="pb-2 text-right font-semibold">Total</th><th /></tr></thead>
+                    <tbody>{recentOrders.map((order) => <tr key={order.id} onClick={() => goTo("Orders")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{order.id}</td><td className="py-2 text-gray-500">{formatDate(order.date)}</td><td className="py-2"><span className={`rounded px-1.5 py-1 text-[9px] font-semibold ${orderStatusGroup(order.status) === "Completed" ? "bg-emerald-50 text-emerald-600" : orderStatusGroup(order.status) === "Cancelled" ? "bg-red-50 text-red-500" : "bg-blue-50 text-blue-600"}`}>{order.status}</span></td><td className="py-2 text-right font-semibold">{order.amount || formatMoney(order.amountNum, currency)}</td><td className="py-2 text-right text-gray-400"><ChevronRight size={13} className="inline" /></td></tr>)}</tbody>
+                  </table>
+                </div>
+              )}
+            </Panel>
+          </div>
+
+          <div className="mt-3">
+            <h2 className="mb-2 text-xs font-bold text-gray-900">Quick Links</h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <button type="button" onClick={() => goTo("Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => goTo("Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => navigate("/support")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+              <button type="button" onClick={() => goTo("Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+            </div>
+          </div>
+        </main>
+      )}
+    </div>
+  );
+}

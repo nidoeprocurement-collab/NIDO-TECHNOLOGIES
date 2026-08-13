@@ -208,7 +208,7 @@ const VendorEditPage = lazy(() => import("@/pages/VendorEditPage"));
 const AddVendorProductsPage = lazy(() => import("@/pages/AddVendorProductsPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
-const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
+const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPageRedesigned"));
 const ClientContractsPage = lazy(() => import("@/pages/ClientContractsPage"));
 const ContractDetailsPage = lazy(() => import("@/pages/ContractDetailsPage"));
 const UsersPage = lazy(() => import("@/pages/UsersPage"));
