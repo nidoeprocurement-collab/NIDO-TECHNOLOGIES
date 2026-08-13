@@ -73,7 +73,7 @@ export default function LoginPage() {
   const org = useOrgConfig();
   const displayNameParts = (org.displayName || 'Nido Tech').match(/^(.*?)\s*\(([^)]+)\)\s*$/);
   const mainDisplayName = displayNameParts ? displayNameParts[1].trim() : (org.displayName || 'Nido Tech');
-  const displayNameSubtitle = displayNameParts ? displayNameParts[2].trim() : null;
+  const displayNameSubtitle = displayNameParts ? displayNameParts[2].trim() : (org.industry || null);
 
   // Shared
   const [activeTab, setActiveTab] = useState<LoginTab>('password');
@@ -244,6 +244,28 @@ export default function LoginPage() {
         >
           {/* Left — Feature panel */}
           <div className="hidden lg:block bg-black" style={{ marginLeft: '20px' }}>
+             {/* Live platform branding — mirrors the sidebar header */}
+             <div className="mb-14 flex flex-col items-start">
+               <div
+                 role="img"
+                 aria-label={org.displayName || 'Nido Tech'}
+                 className="h-14 w-14 overflow-hidden rounded-xl bg-white/5 bg-left bg-no-repeat ring-1 ring-white/10"
+                 style={{
+                   backgroundImage: `url("${org.logoUrl || DEFAULT_LOGIN_LOGO}")`,
+                   backgroundSize: 'auto 100%',
+                 }}
+               />
+               <div className="mt-3">
+                 <div className="text-2xl font-extrabold leading-tight tracking-tight text-white">
+                   {mainDisplayName}
+                 </div>
+                 {displayNameSubtitle && (
+                   <div className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/60">
+                     ({displayNameSubtitle})
+                   </div>
+                 )}
+               </div>
+             </div>
             <h1 className="text-4xl font-bold text-white mb-6">Real-time spend insights</h1>
             <div className="space-y-6">
               <p className="text-sm font-semibold text-white uppercase tracking-wider">Enterprise Features</p>
