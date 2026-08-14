@@ -407,21 +407,6 @@ export default function MainDashboard() {
          </div>
        </section>
 
-       <section className="space-y-2 mb-2">
-         <div>
-           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Vendor Overview</h2>
-           <p className="text-xs text-gray-500">Vendor and procurement activity</p>
-         </div>
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2">
-           <KPICard title="Total Vendors" value={String(vendors.length)} icon={Package} bgColor="bg-green-600" href="/vendors" />
-           <KPICard title="Active Vendors" value={String(activeContracts)} icon={CheckCircle} bgColor="bg-emerald-500" href="/vendors" />
-           <KPICard title="Total Expenses" value={formatRupees(totalExpenses)} icon={DollarSign} bgColor="bg-red-600" href="/expenses" />
-           <KPICard title="Avg Order Value" value={formatRupees(avgOrderValue)} icon={TrendingUp} bgColor="bg-indigo-600" href="/orders" />
-           <KPICard title="Purchase Orders" value={String(pos.length)} icon={CheckCircle} bgColor="bg-teal-600" href="/purchase-orders" />
-           <KPICard title="Open Purchase Orders" value={String(openPOs)} icon={Clock} bgColor="bg-blue-500" href="/vendors/orders" />
-         </div>
-       </section>
-
       {/* Charts Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-6 mt-6 md:mt-8">
         {/* Expenses Overview */}
@@ -532,6 +517,22 @@ export default function MainDashboard() {
           )}
         </div>
       </div>
+
+      {/* Vendor Overview */}
+      <section className="space-y-2 mb-2">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Vendor Overview</h2>
+          <p className="text-xs text-gray-500">Vendor and procurement activity</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2">
+          <KPICard title="Total Vendors" value={String(vendors.length)} icon={Package} bgColor="bg-green-600" href="/vendors" />
+          <KPICard title="Active Vendors" value={String(activeContracts)} icon={CheckCircle} bgColor="bg-emerald-500" href="/vendors" />
+          <KPICard title="Total Expenses" value={formatRupees(totalExpenses)} icon={DollarSign} bgColor="bg-red-600" href="/expenses" />
+          <KPICard title="Avg Order Value" value={formatRupees(avgOrderValue)} icon={TrendingUp} bgColor="bg-indigo-600" href="/orders" />
+          <KPICard title="Purchase Orders" value={String(pos.length)} icon={CheckCircle} bgColor="bg-teal-600" href="/purchase-orders" />
+          <KPICard title="Open Purchase Orders" value={String(openPOs)} icon={Clock} bgColor="bg-blue-500" href="/vendors/orders" />
+        </div>
+      </section>
 
       {/* Recent Orders */}
       <RecentOrdersTable orders={orders} poByOrderId={poByOrderId} />
