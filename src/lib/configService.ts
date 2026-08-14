@@ -1,3 +1,6 @@
+import type { AddressDetails } from "@/lib/addressTypes";
+import { createEmptyAddress, formatAddressDetails } from "@/lib/addressTypes";
+
 // ── Centralized Configuration Service ─────────────────────────────────────────
 // Single source of truth for all platform settings.
 // Persists to localStorage. Fires a DOM event on every save so every
@@ -17,6 +20,8 @@ export interface OrgSettings {
   cin: string;
   registeredAddress: string;
   billingAddress: string;
+  billingAddressDetails: AddressDetails;
+  shippingAddressDetails: AddressDetails;
   phone: string;
   supportPhone: string;
   email: string;
@@ -113,11 +118,19 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
   organization: {
     companyName: "Nido Tech Pvt. Ltd.",
     displayName: "Nido Tech",
-    gstNumber: "27AACCN1234A11ZD",
+    gstNumber: "27AACCN1234A1Z5",
     panNumber: "AACCN1234A",
     cin: "",
     registeredAddress: "123 Corporate Ave, Chennai",
     billingAddress: "",
+    billingAddressDetails: {
+      ...createEmptyAddress(),
+      country: "India",
+      addressLine1: "123 Corporate Ave",
+      city: "Chennai",
+      state: "Tamil Nadu",
+    },
+    shippingAddressDetails: createEmptyAddress(),
     phone: "+91-44-1234-5678",
     supportPhone: "",
     email: "info@nido-tech.com",
@@ -228,8 +241,31 @@ export function loadConfig(): GeneralSettings {
     const defaultKeys = new Set(CONFIG_DEFAULTS.prefixes.map((p) => p.key));
     const customPrefixes = savedPrefixes.filter((p) => !defaultKeys.has(p.key));
 
+    const savedOrganization = parsed.organization ?? {};
+    const organization = { ...CONFIG_DEFAULTS.organization, ...savedOrganization };
+    const savedBillingDetails = savedOrganization.billingAddressDetails as Partial<AddressDetails> | undefined;
+    const savedShippingDetails = savedOrganization.shippingAddressDetails as Partial<AddressDetails> | undefined;
+
+    // Migrate the old free-form address fields into the new Billing/Shipping
+    // structure without dropping values saved by earlier versions.
+    organization.billingAddressDetails = {
+      ...CONFIG_DEFAULTS.organization.billingAddressDetails,
+      ...savedBillingDetails,
+    };
+    if (!savedBillingDetails && (savedOrganization.registeredAddress || savedOrganization.billingAddress)) {
+      organization.billingAddressDetails.addressLine1 =
+        savedOrganization.registeredAddress || savedOrganization.billingAddress;
+    }
+    organization.shippingAddressDetails = {
+      ...CONFIG_DEFAULTS.organization.shippingAddressDetails,
+      ...savedShippingDetails,
+    };
+    if (!savedShippingDetails && savedOrganization.billingAddress) {
+      organization.shippingAddressDetails.addressLine1 = savedOrganization.billingAddress;
+    }
+
     return {
-      organization: { ...CONFIG_DEFAULTS.organization, ...parsed.organization },
+      organization,
       theme: { ...CONFIG_DEFAULTS.theme, ...parsed.theme },
       localization: { ...CONFIG_DEFAULTS.localization, ...parsed.localization },
       procurement: { ...CONFIG_DEFAULTS.procurement, ...parsed.procurement },

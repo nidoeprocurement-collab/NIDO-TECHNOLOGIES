@@ -5,6 +5,16 @@ import { useNavigate } from 'react-router-dom';
 import { Cloud, Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
+import AddressPairFields from '@/components/shared/AddressPairFields';
+import {
+  createEmptyAddress,
+  formatAddressDetails,
+  isValidGst,
+  isValidPan,
+  normalizeGstInput,
+  normalizePanInput,
+  type AddressDetails,
+} from '@/lib/addressTypes';
 
 // ─── Reusable AddableSelect ──────────────────────────────────────────────────
 // Renders a <select> with an inline "add new" flow. When the user picks the
@@ -271,6 +281,14 @@ export default function AddVendorPage() {
     otherDocuments: false,
   });
 
+  const [addressDetails, setAddressDetails] = useState<{
+    billing: AddressDetails;
+    shipping: AddressDetails;
+  }>({
+    billing: createEmptyAddress(),
+    shipping: createEmptyAddress(),
+  });
+
   const [subCategoryOptions, setSubCategoryOptions] = useState<string[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | { target: { name: string; value: string | boolean } }) => {
@@ -343,6 +361,14 @@ export default function AddVendorPage() {
       alert('PAN must be exactly 10 alphanumeric characters.');
       return;
     }
+    if (formData.pan && !isValidPan(formData.pan)) {
+      alert('PAN must follow the format AAAAA9999A.');
+      return;
+    }
+    if (formData.gstNumber && !isValidGst(formData.gstNumber)) {
+      alert('GST Number must be exactly 15 alphanumeric characters.');
+      return;
+    }
 
     const existing = getVendors();
     const maxId = existing.reduce((max, v) => {
@@ -366,12 +392,12 @@ export default function AddVendorPage() {
       email: formData.email,
       phone: formData.phoneNumber ? `${formData.phone} ${formData.phoneNumber}` : '',
       rating,
-      region: formData.state || formData.country || '',
+       region: addressDetails.billing.state || addressDetails.billing.country || '',
       status: 'Pending',
       onboardedDate: today,
       monthSpend: 0,
       score: rating,
-      address: [formData.city, formData.state, formData.country].filter(Boolean).join(', '),
+       address: formatAddressDetails(addressDetails.billing),
       totalSpend: 0,
       complianceIssues: 0,
       archived: false,
@@ -383,19 +409,32 @@ export default function AddVendorPage() {
       bankAccount: formData.accountNumber,
       ifscCode: formData.ifscCode,
       // Registered address
-      city: formData.city,
-      state: formData.state,
-      country: formData.country,
-      zipCode: formData.pincode,
-      addressLine1: formData.registeredAddress,
-      // Billing address – re-derive from registered fields at save time if
-      // "same as registered" is still checked, so stale state cannot persist
-      billingAddressLine1: formData.sameAsRegistered ? formData.registeredAddress : formData.billingAddressLine1,
-      billingAddressLine2: formData.sameAsRegistered ? '' : formData.billingAddressLine2,
-      billingCity: formData.sameAsRegistered ? formData.city : formData.billingCity,
-      billingState: formData.sameAsRegistered ? formData.state : formData.billingState,
-      billingZip: formData.sameAsRegistered ? formData.pincode : formData.billingPincode,
-      billingCountry: formData.sameAsRegistered ? formData.country : formData.billingCountry,
+       city: addressDetails.billing.city,
+       state: addressDetails.billing.state,
+       country: addressDetails.billing.country,
+       zipCode: addressDetails.billing.pinCode,
+       addressLine1: addressDetails.billing.addressLine1,
+       addressLine2: addressDetails.billing.addressLine2,
+       billingAttention: addressDetails.billing.attention,
+       billingAddressLine1: addressDetails.billing.addressLine1,
+       billingAddressLine2: addressDetails.billing.addressLine2,
+       billingCity: addressDetails.billing.city,
+       billingState: addressDetails.billing.state,
+       billingZip: addressDetails.billing.pinCode,
+       billingCountry: addressDetails.billing.country,
+       billingPhoneCountryCode: addressDetails.billing.phoneCountryCode,
+       billingPhone: addressDetails.billing.phone,
+       billingFaxNumber: addressDetails.billing.faxNumber,
+       shippingAttention: addressDetails.shipping.attention,
+       shippingAddressLine1: addressDetails.shipping.addressLine1,
+       shippingAddressLine2: addressDetails.shipping.addressLine2,
+       shippingCity: addressDetails.shipping.city,
+       shippingState: addressDetails.shipping.state,
+       shippingZip: addressDetails.shipping.pinCode,
+       shippingCountry: addressDetails.shipping.country,
+       shippingPhoneCountryCode: addressDetails.shipping.phoneCountryCode,
+       shippingPhone: addressDetails.shipping.phone,
+       shippingFaxNumber: addressDetails.shipping.faxNumber,
       // Related document metadata (file binaries are not stored in localStorage)
       relatedDocuments: additionalDocs.map(d => ({ name: d.name, size: d.size, sizeBytes: d.sizeBytes, type: d.type })),
       performanceQuality: formData.qualityRating * 20,
@@ -474,14 +513,15 @@ export default function AddVendorPage() {
                   name="pan"
                   value={formData.pan}
                   onChange={e => {
-                    const v = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10);
+                    const v = normalizePanInput(e.target.value);
                     handleChange({ target: { name: 'pan', value: v } });
                   }}
                   maxLength={10}
-                  className={inputClass + (formData.pan && formData.pan.length !== 10 ? ' border-red-400 focus:ring-red-400' : '')}
+                  placeholder="AAAAA9999A"
+                  className={inputClass + (formData.pan && !isValidPan(formData.pan) ? ' border-red-400 focus:ring-red-400' : '')}
                 />
-                <p className={`text-xs mt-1 text-right ${formData.pan.length === 10 ? 'text-green-600' : 'text-gray-400'}`}>
-                  {formData.pan.length}/10 characters
+                <p className={`text-xs mt-1 text-right ${formData.pan.length === 10 && isValidPan(formData.pan) ? 'text-green-600' : 'text-gray-400'}`}>
+                  {formData.pan.length}/10 · 5 letters, 4 numbers, 1 letter
                 </p>
               </div>
             } />
@@ -498,17 +538,24 @@ export default function AddVendorPage() {
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Tax ID / GST Number" input={
-              <input
-                type="text"
-                placeholder="e.g. 22AAAAA0000A1Z5"
-                name="gstNumber"
-                value={formData.gstNumber}
-                onChange={e => {
-                  const v = e.target.value.toUpperCase();
-                  handleChange({ target: { name: 'gstNumber', value: v } });
-                }}
-                className={inputClass}
-              />
+              <div>
+                <input
+                  type="text"
+                  placeholder="e.g. 22AAAAA0000A1Z5"
+                  name="gstNumber"
+                  value={formData.gstNumber}
+                  onChange={e => {
+                    const v = normalizeGstInput(e.target.value);
+                    handleChange({ target: { name: 'gstNumber', value: v } });
+                  }}
+                  maxLength={15}
+                  pattern="[A-Za-z0-9]{15}"
+                  className={inputClass + (formData.gstNumber && !isValidGst(formData.gstNumber) ? ' border-red-400 focus:ring-red-400' : '')}
+                />
+                <p className={`text-xs mt-1 text-right ${formData.gstNumber.length === 15 ? 'text-green-600' : 'text-gray-400'}`}>
+                  {formData.gstNumber.length}/15 characters
+                </p>
+              </div>
             } />
             {/* Year of Establishment – free text input instead of dropdown */}
             <FormField label="Year of Establishment" input={
@@ -585,91 +632,20 @@ export default function AddVendorPage() {
         {/* ── Section 3: Business & Address Details ────────────────────────── */}
         <FormSection number={3} title="Business & Address Details">
 
-          {/* Registered Address */}
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Registered Address</p>
-          <FormField label="Address Line" required input={
-            <textarea placeholder="Enter registered address" name="registeredAddress" value={formData.registeredAddress}
-              onChange={handleChange} rows={2} className={inputClass} />
-          } />
-          <div className="grid grid-cols-2 gap-6">
-            <FormField label="Country" required input={
-              <AddableSelect name="country" value={formData.country} onChange={handleChange}
-                baseOptions={countriesBase} addLabel="+ Add New Country" placeholder="Select country" className={selectClass} />
-            } />
-            <FormField label="State" required input={
-              <AddableSelect name="state" value={formData.state} onChange={handleChange}
-                baseOptions={statesBase} addLabel="+ Add New State" placeholder="Select state" className={selectClass} />
-            } />
-          </div>
-          <div className="grid grid-cols-2 gap-6">
-            <FormField label="City" required input={
-              <AddableSelect name="city" value={formData.city} onChange={handleChange}
-                baseOptions={citiesBase} addLabel="+ Add New City" placeholder="Select city" className={selectClass} />
-            } />
-            <FormField label="Pincode" required input={
-              <input type="text" placeholder="Enter pincode" name="pincode" value={formData.pincode} onChange={handleChange} className={inputClass} />
-            } />
-          </div>
-
-          {/* Billing Address */}
-          <div className="pt-2">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Billing Address</p>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  name="sameAsRegistered"
-                  checked={formData.sameAsRegistered}
-                  onChange={handleChange}
-                  className="w-4 h-4 rounded border-gray-300"
-                />
-                Same as Registered Address
-              </label>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-6">
-                <FormField label="Address Line 1" input={
-                  <input type="text" placeholder="Building / Street" name="billingAddressLine1"
-                    value={formData.billingAddressLine1} onChange={handleChange}
-                    disabled={formData.sameAsRegistered} className={inputClass + (formData.sameAsRegistered ? ' bg-gray-50 text-gray-500' : '')} />
-                } />
-                <FormField label="Address Line 2" input={
-                  <input type="text" placeholder="Area / Locality (optional)" name="billingAddressLine2"
-                    value={formData.billingAddressLine2} onChange={handleChange}
-                    disabled={formData.sameAsRegistered} className={inputClass + (formData.sameAsRegistered ? ' bg-gray-50 text-gray-500' : '')} />
-                } />
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <FormField label="Country" input={
-                  <AddableSelect name="billingCountry" value={formData.billingCountry} onChange={handleChange}
-                    baseOptions={countriesBase} addLabel="+ Add New Country" placeholder="Select country"
-                    className={selectClass + (formData.sameAsRegistered ? ' bg-gray-50 text-gray-500' : '')}
-                    disabled={formData.sameAsRegistered} />
-                } />
-                <FormField label="State" input={
-                  <AddableSelect name="billingState" value={formData.billingState} onChange={handleChange}
-                    baseOptions={statesBase} addLabel="+ Add New State" placeholder="Select state"
-                    className={selectClass + (formData.sameAsRegistered ? ' bg-gray-50 text-gray-500' : '')}
-                    disabled={formData.sameAsRegistered} />
-                } />
-              </div>
-              <div className="grid grid-cols-2 gap-6">
-                <FormField label="City" input={
-                  <AddableSelect name="billingCity" value={formData.billingCity} onChange={handleChange}
-                    baseOptions={citiesBase} addLabel="+ Add New City" placeholder="Select city"
-                    className={selectClass + (formData.sameAsRegistered ? ' bg-gray-50 text-gray-500' : '')}
-                    disabled={formData.sameAsRegistered} />
-                } />
-                <FormField label="Pincode" input={
-                  <input type="text" placeholder="Enter pincode" name="billingPincode"
-                    value={formData.billingPincode} onChange={handleChange}
-                    disabled={formData.sameAsRegistered}
-                    className={inputClass + (formData.sameAsRegistered ? ' bg-gray-50 text-gray-500' : '')} />
-                } />
-              </div>
-            </div>
-          </div>
+          <AddressPairFields
+            billing={addressDetails.billing}
+            shipping={addressDetails.shipping}
+            countries={countriesBase}
+            states={statesBase}
+            onBillingChange={(patch) => setAddressDetails((prev) => ({
+              ...prev,
+              billing: { ...prev.billing, ...patch },
+            }))}
+            onShippingChange={(patch) => setAddressDetails((prev) => ({
+              ...prev,
+              shipping: { ...prev.shipping, ...patch },
+            }))}
+          />
         </FormSection>
 
         {/* ── Section 4: Financial Details ─────────────────────────────────── */}

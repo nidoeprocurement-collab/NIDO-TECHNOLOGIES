@@ -19,6 +19,14 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, Check, Download, Upload, Loader2 } from "lucide-react";
+import AddressPairFields from "@/components/shared/AddressPairFields";
+import {
+  isValidGst,
+  isValidPan,
+  normalizeGstInput,
+  normalizePanInput,
+  type AddressDetails,
+} from "@/lib/addressTypes";
 
 // Mock toast notification system
 const toast = {
@@ -39,13 +47,6 @@ const CATEGORIES = CATEGORY_LIST;
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY"];
 
 const isAlphaOnly = (value: string) => /^[A-Za-z\s]*$/.test(value);
-
-const isValidAlphanumeric = (value: string) => {
-  if (!value.trim()) return true;
-  const hasLetter = /[A-Za-z]/.test(value);
-  const hasNumber = /[0-9]/.test(value);
-  return hasLetter && hasNumber;
-};
 
 const GST_TREATMENTS = [
   "Registered Business",
@@ -130,13 +131,25 @@ export default function AddClient() {
 
     // Step 4: Address
     billing_address: "",
+    billing_attention: "",
+    billing_country: "",
+    billing_address_line2: "",
     shipping_address: "",
+    shipping_attention: "",
+    shipping_country: "",
+    shipping_address_line2: "",
     billing_city: "",
     shipping_city: "",
     billing_state: "",
     shipping_state: "",
     billing_pincode: "",
     shipping_pincode: "",
+    billing_phone_country_code: "+91",
+    billing_phone: "",
+    billing_fax_number: "",
+    shipping_phone_country_code: "+91",
+    shipping_phone: "",
+    shipping_fax_number: "",
     same_address: false,
 
     // Step 5: Documents
@@ -201,18 +214,30 @@ export default function AddClient() {
           branch: existing.branch || "",
           billing_address:
             existing.billing_address || existing.billingAddress || "",
+          billing_attention: existing.billing_attention || existing.billingAttention || "",
+          billing_country: existing.billing_country || existing.billingCountry || "",
+          billing_address_line2: existing.billing_address_line2 || existing.billingAddressLine2 || "",
           billing_city: existing.billing_city || existing.billingCity || "",
           billing_state: existing.billing_state || existing.billingState || "",
           billing_pincode:
             existing.billing_pincode || existing.billingPincode || "",
           shipping_address:
             existing.shipping_address || existing.shippingAddress || "",
+          shipping_attention: existing.shipping_attention || existing.shippingAttention || "",
+          shipping_country: existing.shipping_country || existing.shippingCountry || "",
+          shipping_address_line2: existing.shipping_address_line2 || existing.shippingAddressLine2 || "",
           shipping_city:
             existing.shipping_city || existing.shippingCity || "",
           shipping_state:
             existing.shipping_state || existing.shippingState || "",
           shipping_pincode:
             existing.shipping_pincode || existing.shippingPincode || "",
+          billing_phone_country_code: existing.billing_phone_country_code || existing.billingPhoneCountryCode || "+91",
+          billing_phone: existing.billing_phone || existing.billingPhone || "",
+          billing_fax_number: existing.billing_fax_number || existing.billingFaxNumber || "",
+          shipping_phone_country_code: existing.shipping_phone_country_code || existing.shippingPhoneCountryCode || "+91",
+          shipping_phone: existing.shipping_phone || existing.shippingPhone || "",
+          shipping_fax_number: existing.shipping_fax_number || existing.shippingFaxNumber || "",
           same_address: !!existing.same_address,
         };
 
@@ -284,6 +309,56 @@ export default function AddClient() {
     }));
   };
 
+  const billingAddressDetails: AddressDetails = {
+    attention: formData.billing_attention,
+    country: formData.billing_country,
+    addressLine1: formData.billing_address,
+    addressLine2: formData.billing_address_line2,
+    city: formData.billing_city,
+    state: formData.billing_state,
+    pinCode: formData.billing_pincode,
+    phoneCountryCode: formData.billing_phone_country_code,
+    phone: formData.billing_phone,
+    faxNumber: formData.billing_fax_number,
+  };
+
+  const shippingAddressDetails: AddressDetails = {
+    attention: formData.shipping_attention,
+    country: formData.shipping_country,
+    addressLine1: formData.shipping_address,
+    addressLine2: formData.shipping_address_line2,
+    city: formData.shipping_city,
+    state: formData.shipping_state,
+    pinCode: formData.shipping_pincode,
+    phoneCountryCode: formData.shipping_phone_country_code,
+    phone: formData.shipping_phone,
+    faxNumber: formData.shipping_fax_number,
+  };
+
+  const updateAddressDetails = (
+    kind: "billing" | "shipping",
+    patch: Partial<AddressDetails>,
+  ) => {
+    const prefix = kind === "billing" ? "billing" : "shipping";
+    const fieldMap: Record<keyof AddressDetails, string> = {
+      attention: `${prefix}_attention`,
+      country: `${prefix}_country`,
+      addressLine1: `${prefix}_address`,
+      addressLine2: `${prefix}_address_line2`,
+      city: `${prefix}_city`,
+      state: `${prefix}_state`,
+      pinCode: `${prefix}_pincode`,
+      phoneCountryCode: `${prefix}_phone_country_code`,
+      phone: `${prefix}_phone`,
+      faxNumber: `${prefix}_fax_number`,
+    };
+    const updates: Record<string, string> = {};
+    Object.entries(patch).forEach(([field, value]) => {
+      if (value !== undefined) updates[fieldMap[field as keyof AddressDetails]] = value;
+    });
+    setFormData((prev) => ({ ...prev, ...updates }));
+  };
+
   const handleFileSelect = (files: FileList | null) => {
     if (files) {
       setFormData((prev) => ({
@@ -310,8 +385,8 @@ export default function AddClient() {
       const gstinRequired = formData.gst_treatment === "Registered Business";
       return !!(
         formData.gst_treatment &&
-        (!gstinRequired || (formData.gstin.trim() && isValidAlphanumeric(formData.gstin))) &&
-        formData.pan_number.trim()
+        (!gstinRequired || (isValidGst(formData.gstin))) &&
+        isValidPan(formData.pan_number)
       );
     }
     if (step === 2) {
@@ -329,11 +404,10 @@ export default function AddClient() {
         formData.billing_city.trim() &&
         formData.billing_state &&
         formData.billing_pincode.trim() &&
-        (formData.same_address ||
-          (formData.shipping_address.trim() &&
-            formData.shipping_city.trim() &&
-            formData.shipping_state &&
-            formData.shipping_pincode.trim()))
+        formData.shipping_address.trim() &&
+        formData.shipping_city.trim() &&
+        formData.shipping_state &&
+        formData.shipping_pincode.trim()
       );
     }
     return true;
@@ -398,6 +472,14 @@ export default function AddClient() {
       toast.error("Please fill in all required fields");
       return;
     }
+    if (formData.gstin && !isValidGst(formData.gstin)) {
+      toast.error("GSTIN must be exactly 15 alphanumeric characters");
+      return;
+    }
+    if (!isValidPan(formData.pan_number)) {
+      toast.error("PAN must follow the format AAAAA9999A");
+      return;
+    }
 
     try {
       console.log("[v0] Saving client data:", formData.company_name);
@@ -442,27 +524,43 @@ export default function AddClient() {
         account_number: formData.account_number,
         ifsc_code: formData.ifsc_code,
         branch: formData.branch,
-        billing_address: formData.billing_address,
-        billingAddress: formData.billing_address,
+        billing_address: [billingAddressDetails.addressLine1, billingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        billingAddress: [billingAddressDetails.addressLine1, billingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        billing_attention: billingAddressDetails.attention,
+        billingAttention: billingAddressDetails.attention,
+        billing_country: billingAddressDetails.country,
+        billingCountry: billingAddressDetails.country,
+        billing_address_line2: billingAddressDetails.addressLine2,
+        billingAddressLine2: billingAddressDetails.addressLine2,
         billing_city: formData.billing_city,
         billingCity: formData.billing_city,
         billing_state: formData.billing_state,
         billingState: formData.billing_state,
         billing_pincode: formData.billing_pincode,
         billingPincode: formData.billing_pincode,
-        shipping_address: formData.same_address
-          ? formData.billing_address
-          : formData.shipping_address,
-        shipping_city: formData.same_address
-          ? formData.billing_city
-          : formData.shipping_city,
-        shipping_state: formData.same_address
-          ? formData.billing_state
-          : formData.shipping_state,
-        shipping_pincode: formData.same_address
-          ? formData.billing_pincode
-          : formData.shipping_pincode,
-        same_address: formData.same_address,
+        shipping_address: [shippingAddressDetails.addressLine1, shippingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        shipping_city: shippingAddressDetails.city,
+        shipping_state: shippingAddressDetails.state,
+        shipping_pincode: shippingAddressDetails.pinCode,
+        shipping_attention: shippingAddressDetails.attention,
+        shippingAttention: shippingAddressDetails.attention,
+        shipping_country: shippingAddressDetails.country,
+        shippingCountry: shippingAddressDetails.country,
+        shipping_address_line2: shippingAddressDetails.addressLine2,
+        shippingAddressLine2: shippingAddressDetails.addressLine2,
+        billing_phone_country_code: billingAddressDetails.phoneCountryCode,
+        billingPhoneCountryCode: billingAddressDetails.phoneCountryCode,
+        billing_phone: billingAddressDetails.phone,
+        billingPhone: billingAddressDetails.phone,
+        billing_fax_number: billingAddressDetails.faxNumber,
+        billingFaxNumber: billingAddressDetails.faxNumber,
+        shipping_phone_country_code: shippingAddressDetails.phoneCountryCode,
+        shippingPhoneCountryCode: shippingAddressDetails.phoneCountryCode,
+        shipping_phone: shippingAddressDetails.phone,
+        shippingPhone: shippingAddressDetails.phone,
+        shipping_fax_number: shippingAddressDetails.faxNumber,
+        shippingFaxNumber: shippingAddressDetails.faxNumber,
+        same_address: false,
         tier: formData.client_tier,
         rep: formData.contact_person,
         status: existingClient?.status || "active",
@@ -1204,195 +1302,13 @@ export default function AddClient() {
                 <div>
                   <h2 className="text-xl font-bold mb-1">Step 4: Address</h2>
                 </div>
-
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.same_address}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      if (checked) {
-                        setFormData((prev: any) => ({
-                          ...prev,
-                          same_address: true,
-                          shipping_address: prev.billing_address,
-                          shipping_city: prev.billing_city,
-                          shipping_state: prev.billing_state,
-                          shipping_pincode: prev.billing_pincode,
-                        }));
-                      } else {
-                        handleInputChange("same_address", false);
-                      }
-                    }}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">
-                    Shipping address same as billing
-                  </span>
-                </label>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4 border rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700">
-                      Billing Address
-                    </h3>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing Address *
-                      </label>
-                      <Textarea
-                        placeholder="Street address"
-                        value={formData.billing_address}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_address: value,
-                            shipping_address: prev.same_address
-                              ? value
-                              : prev.shipping_address,
-                          }));
-                        }}
-                        rows={3}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing City *
-                      </label>
-                      <Input
-                        placeholder="City"
-                        value={formData.billing_city}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_city: value,
-                            shipping_city: prev.same_address
-                              ? value
-                              : prev.shipping_city,
-                          }));
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing State *
-                      </label>
-                      <Select
-                        value={formData.billing_state}
-                        onValueChange={(value) =>
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_state: value,
-                            shipping_state: prev.same_address
-                              ? value
-                              : prev.shipping_state,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INDIAN_STATES.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing Pincode *
-                      </label>
-                      <Input
-                        placeholder="400001"
-                        value={formData.billing_pincode}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_pincode: value,
-                            shipping_pincode: prev.same_address
-                              ? value
-                              : prev.shipping_pincode,
-                          }));
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 border rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700">
-                      Shipping Address
-                    </h3>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping Address
-                      </label>
-                      <Textarea
-                        placeholder="Street address"
-                        value={formData.shipping_address}
-                        onChange={(e) =>
-                          handleInputChange("shipping_address", e.target.value)
-                        }
-                        rows={3}
-                        disabled={formData.same_address}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping City
-                      </label>
-                      <Input
-                        placeholder="City"
-                        value={formData.shipping_city}
-                        onChange={(e) =>
-                          handleInputChange("shipping_city", e.target.value)
-                        }
-                        disabled={formData.same_address}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping State
-                      </label>
-                      <Select
-                        value={formData.shipping_state}
-                        onValueChange={(value) =>
-                          handleInputChange("shipping_state", value)
-                        }
-                        disabled={formData.same_address}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INDIAN_STATES.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping Pincode
-                      </label>
-                      <Input
-                        placeholder="400001"
-                        value={formData.shipping_pincode}
-                        onChange={(e) =>
-                          handleInputChange("shipping_pincode", e.target.value)
-                        }
-                        disabled={formData.same_address}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <AddressPairFields
+                  billing={billingAddressDetails}
+                  shipping={shippingAddressDetails}
+                  states={INDIAN_STATES}
+                  onBillingChange={(patch) => updateAddressDetails("billing", patch)}
+                  onShippingChange={(patch) => updateAddressDetails("shipping", patch)}
+                />
               </div>
             )}
 
