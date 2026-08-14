@@ -121,15 +121,9 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     gstNumber: "27AACCN1234A1Z5",
     panNumber: "AACCN1234A",
     cin: "",
-    registeredAddress: "123 Corporate Ave, Chennai",
+    registeredAddress: "",
     billingAddress: "",
-    billingAddressDetails: {
-      ...createEmptyAddress(),
-      country: "India",
-      addressLine1: "123 Corporate Ave",
-      city: "Chennai",
-      state: "Tamil Nadu",
-    },
+    billingAddressDetails: createEmptyAddress(),
     shippingAddressDetails: createEmptyAddress(),
     phone: "+91-44-1234-5678",
     supportPhone: "",
@@ -246,23 +240,16 @@ export function loadConfig(): GeneralSettings {
     const savedBillingDetails = savedOrganization.billingAddressDetails as Partial<AddressDetails> | undefined;
     const savedShippingDetails = savedOrganization.shippingAddressDetails as Partial<AddressDetails> | undefined;
 
-    // Migrate the old free-form address fields into the new Billing/Shipping
-    // structure without dropping values saved by earlier versions.
+    // Load only explicitly saved structured addresses. New/default forms stay
+    // empty instead of being populated from the old demo address fields.
     organization.billingAddressDetails = {
       ...CONFIG_DEFAULTS.organization.billingAddressDetails,
       ...savedBillingDetails,
     };
-    if (!savedBillingDetails && (savedOrganization.registeredAddress || savedOrganization.billingAddress)) {
-      organization.billingAddressDetails.addressLine1 =
-        savedOrganization.registeredAddress || savedOrganization.billingAddress;
-    }
     organization.shippingAddressDetails = {
       ...CONFIG_DEFAULTS.organization.shippingAddressDetails,
       ...savedShippingDetails,
     };
-    if (!savedShippingDetails && savedOrganization.billingAddress) {
-      organization.shippingAddressDetails.addressLine1 = savedOrganization.billingAddress;
-    }
 
     return {
       organization,
