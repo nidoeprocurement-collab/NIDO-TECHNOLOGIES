@@ -197,10 +197,10 @@ export default function AddClient() {
             existing.contract_end_date || existing.contractEndDate || "",
           client_logo_url: existing.client_logo_url || "",
           gst_treatment: existing.gst_treatment || "",
-          gstin: existing.gstin || "",
+          gstin: normalizeGstInput(existing.gstin || ""),
           id_reference_number: existing.id_reference_number || "",
           source_of_supply: existing.source_of_supply || "",
-          pan_number: existing.pan_number || "",
+          pan_number: normalizePanInput(existing.pan_number || ""),
           currency: existing.currency || "INR",
           opening_balance:
             existing.opening_balance != null
@@ -385,7 +385,8 @@ export default function AddClient() {
       const gstinRequired = formData.gst_treatment === "Registered Business";
       return !!(
         formData.gst_treatment &&
-        (!gstinRequired || (isValidGst(formData.gstin))) &&
+        (!formData.gstin || isValidGst(formData.gstin)) &&
+        (!gstinRequired || isValidGst(formData.gstin)) &&
         isValidPan(formData.pan_number)
       );
     }
@@ -404,10 +405,11 @@ export default function AddClient() {
         formData.billing_city.trim() &&
         formData.billing_state &&
         formData.billing_pincode.trim() &&
-        formData.shipping_address.trim() &&
-        formData.shipping_city.trim() &&
-        formData.shipping_state &&
-        formData.shipping_pincode.trim()
+        (formData.same_address ||
+          (formData.shipping_address.trim() &&
+            formData.shipping_city.trim() &&
+            formData.shipping_state &&
+            formData.shipping_pincode.trim()))
       );
     }
     return true;
@@ -472,7 +474,7 @@ export default function AddClient() {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (formData.gstin && !isValidGst(formData.gstin)) {
+      if (formData.gstin && !isValidGst(formData.gstin)) {
       toast.error("GSTIN must be exactly 15 alphanumeric characters");
       return;
     }
@@ -560,7 +562,7 @@ export default function AddClient() {
         shippingPhone: shippingAddressDetails.phone,
         shipping_fax_number: shippingAddressDetails.faxNumber,
         shippingFaxNumber: shippingAddressDetails.faxNumber,
-        same_address: false,
+        same_address: formData.same_address,
         tier: formData.client_tier,
         rep: formData.contact_person,
         status: existingClient?.status || "active",
@@ -1068,18 +1070,23 @@ export default function AddClient() {
                     <Input
                       placeholder="27AABCT1234A1Z5"
                       value={formData.gstin}
+                      maxLength={15}
+                      pattern="[A-Za-z0-9]{15}"
                       onChange={(e) =>
-                        handleInputChange("gstin", e.target.value)
+                        handleInputChange("gstin", normalizeGstInput(e.target.value))
                       }
                       className={
-                        formData.gstin && !isValidAlphanumeric(formData.gstin)
+                        formData.gstin && !isValidGst(formData.gstin)
                           ? "border-red-400 focus-visible:ring-red-400"
                           : ""
                       }
                     />
-                    {formData.gstin && !isValidAlphanumeric(formData.gstin) && (
+                    <p className={`mt-1 text-xs ${formData.gstin.length === 15 ? "text-green-600" : "text-gray-500"}`}>
+                      {formData.gstin.length}/15 characters
+                    </p>
+                    {formData.gstin && !isValidGst(formData.gstin) && (
                       <p className="text-xs text-red-500 mt-1">
-                        GSTIN must be alphanumeric (letters and numbers only, not all letters or all numbers)
+                        GSTIN must contain exactly 15 letters and numbers.
                       </p>
                     )}
                   </div>
@@ -1090,10 +1097,15 @@ export default function AddClient() {
                     <Input
                       placeholder="AAAAA0000A"
                       value={formData.pan_number}
+                      maxLength={10}
+                      pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
                       onChange={(e) =>
-                        handleInputChange("pan_number", e.target.value)
+                        handleInputChange("pan_number", normalizePanInput(e.target.value))
                       }
                     />
+                    <p className={`mt-1 text-xs ${isValidPan(formData.pan_number) ? "text-green-600" : "text-gray-500"}`}>
+                      {formData.pan_number.length}/10 characters · 5 letters, 4 numbers, 1 letter
+                    </p>
                   </div>
                 </div>
 
@@ -1307,7 +1319,11 @@ export default function AddClient() {
                   shipping={shippingAddressDetails}
                   states={INDIAN_STATES}
                   onBillingChange={(patch) => updateAddressDetails("billing", patch)}
-                  onShippingChange={(patch) => updateAddressDetails("shipping", patch)}
+                  onShippingChange={(patch) => {
+                    updateAddressDetails("shipping", patch);
+                    handleInputChange("same_address", false);
+                  }}
+                  onCopyBilling={() => handleInputChange("same_address", true)}
                 />
               </div>
             )}

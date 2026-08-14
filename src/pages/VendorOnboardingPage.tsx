@@ -403,6 +403,8 @@ export default function AddVendorPage() {
       archived: false,
       website: formData.website,
       pan: formData.pan,
+       taxId: formData.gstNumber,
+       gstNumber: formData.gstNumber,
       founded: formData.yearOfEstablishment,
       paymentTerms: formData.paymentTerms,
       bankName: formData.bankName,
@@ -517,7 +519,6 @@ export default function AddVendorPage() {
                     handleChange({ target: { name: 'pan', value: v } });
                   }}
                   maxLength={10}
-                  placeholder="AAAAA9999A"
                   className={inputClass + (formData.pan && !isValidPan(formData.pan) ? ' border-red-400 focus:ring-red-400' : '')}
                 />
                 <p className={`text-xs mt-1 text-right ${formData.pan.length === 10 && isValidPan(formData.pan) ? 'text-green-600' : 'text-gray-400'}`}>

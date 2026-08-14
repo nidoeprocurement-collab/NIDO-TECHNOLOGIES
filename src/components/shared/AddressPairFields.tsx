@@ -89,26 +89,28 @@ function AddressColumn({
         </select>
 
         <label htmlFor={`${stateListId}-address-line-1`} className="text-sm font-medium text-gray-700">
-          Address
+          Address line 1
         </label>
-        <div className="space-y-3">
-          <textarea
-            id={`${stateListId}-address-line-1`}
-            rows={2}
-            value={address.addressLine1}
-            onChange={(event) => set("addressLine1", event.target.value)}
-            placeholder="Street 1"
-            className={`${controlClass} h-auto resize-y py-2`}
-          />
-          <textarea
-            rows={2}
-            value={address.addressLine2}
-            onChange={(event) => set("addressLine2", event.target.value)}
-            placeholder="Street 2"
-            aria-label={`${title} street 2`}
-            className={`${controlClass} h-auto resize-y py-2`}
-          />
-        </div>
+        <textarea
+          id={`${stateListId}-address-line-1`}
+          rows={2}
+          value={address.addressLine1}
+          onChange={(event) => set("addressLine1", event.target.value)}
+          placeholder="Street 1"
+          className={`${controlClass} h-auto resize-y py-2`}
+        />
+
+        <label htmlFor={`${stateListId}-address-line-2`} className="text-sm font-medium text-gray-700">
+          Address line 2
+        </label>
+        <textarea
+          id={`${stateListId}-address-line-2`}
+          rows={2}
+          value={address.addressLine2}
+          onChange={(event) => set("addressLine2", event.target.value)}
+          placeholder="Street 2"
+          className={`${controlClass} h-auto resize-y py-2`}
+        />
 
         <label htmlFor={`${stateListId}-city`} className="text-sm font-medium text-gray-700">
           City
@@ -188,6 +190,7 @@ export default function AddressPairFields({
   shipping,
   onBillingChange,
   onShippingChange,
+  onCopyBilling,
   countries = DEFAULT_COUNTRIES,
   states = DEFAULT_STATES,
 }: {
@@ -195,13 +198,17 @@ export default function AddressPairFields({
   shipping: AddressDetails;
   onBillingChange: (patch: Partial<AddressDetails>) => void;
   onShippingChange: (patch: Partial<AddressDetails>) => void;
+  onCopyBilling?: () => void;
   countries?: string[];
   states?: string[];
 }) {
-  const copyBillingToShipping = () => onShippingChange({ ...billing });
+  const copyBillingToShipping = () => {
+    onShippingChange({ ...billing });
+    onCopyBilling?.();
+  };
 
   return (
-    <div className="grid grid-cols-1 gap-10 xl:grid-cols-2 xl:gap-x-14">
+    <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-x-14">
       <AddressColumn
         title="Billing Address"
         address={billing}
