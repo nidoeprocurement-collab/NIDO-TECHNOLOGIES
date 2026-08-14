@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, ArrowLeft, ChevronRight, Home } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useConfig } from '@/contexts/ConfigContext';
 import SLANotificationPopup from '@/components/shared/SLANotificationPopup';
 
 // Route to label mapping for breadcrumbs
@@ -79,6 +80,7 @@ export default function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isClientPortalUser } = useAuth();
+  const { config } = useConfig();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [now, setNow] = useState(new Date());
 
@@ -87,8 +89,26 @@ export default function TopBar() {
     return () => clearInterval(timer);
   }, []);
 
-  const formattedDate = now.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-  const formattedTime = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  // Read localization settings from ConfigContext so the clock reacts to a
+  // saved General Settings change without requiring a page refresh. The
+  // timezone values are stored as "IANA name (label)", so Intl receives only
+  // the valid IANA timezone portion.
+  const timeZone = config.localization.timezone.split(' ')[0];
+  const timeFormat = config.localization.timeFormat;
+  const formattedDate = now.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone,
+  });
+  const formattedTime = now.toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: timeFormat !== '24h',
+    timeZone,
+  });
 
   const allBreadcrumbs = generateBreadcrumbs(location.pathname);
   // Client portal users should never see a link back to the owner/admin
