@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Eye, Save, Upload, AlertCircle, RotateCcw, Plus, Trash2 } from "lucide-react"
+import { Save, Upload, AlertCircle, RotateCcw, Plus, Trash2 } from "lucide-react"
 import { useConfig } from "@/contexts/ConfigContext"
 import type { GeneralSettings, PrefixEntry } from "@/lib/configService"
 import AddressPairFields from "@/components/shared/AddressPairFields"
@@ -163,10 +163,6 @@ export default function GeneralSettingsPage() {
               Unsaved changes
             </div>
           )}
-          <Button variant="outline" onClick={() => toast.message(org.companyName, { description: `${org.email} • ${org.phone}` })}>
-            <Eye className="mr-2 h-4 w-4" />
-            View Company Profile
-          </Button>
           {isDirty && (
             <Button variant="outline" onClick={handleDiscard}>
               <RotateCcw className="mr-2 h-4 w-4" />
