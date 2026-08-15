@@ -9,6 +9,8 @@ import { computeCartGST } from "@/lib/cartGstHelper";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 import { reserveVendorStock } from "@/lib/vendorStore";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -33,11 +35,12 @@ function loadAddresses(clientId: string): DeliveryAddress[] {
 }
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 
 export default function ReviewPage() {
   const navigate = useNavigate();
+  useI18n();
   const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
 

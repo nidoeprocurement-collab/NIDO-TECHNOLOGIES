@@ -8,6 +8,8 @@ import {
   type StoredSalesOrder,
 } from "@/lib/salesOrderStore";
 import { downloadSalesOrderPdf } from "@/lib/salesOrderPdfGenerator";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -20,11 +22,12 @@ function statusBadge(status: string) {
 }
 
 const fmt = (n: number) =>
-  `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  formatCurrency(n);
 
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
   const { config } = useConfig();
+  useI18n();
   const soPrefix = config.prefixes.find(p => p.key === "salesOrder")?.value || "SO-";
 
   const [orders, setOrders] = useState<StoredSalesOrder[]>([]);

@@ -25,6 +25,8 @@ import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStor
 import { getVendors } from "@/lib/vendorDataStore";
 import { getVendorProducts, type VendorProduct } from "@/lib/vendorStore";
 import { loadConfig } from "@/lib/configService";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 import { getEffectiveVendorTaxPct, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { generateManualPOPdf, downloadPOPdf } from "@/lib/generatePO";
 import {
@@ -114,8 +116,7 @@ const BILLS_STORAGE_KEY = "nido_purchase_bills_v1";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const toNumber = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 
-const money = (v: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(v);
+const money = (v: number) => formatCurrency(v);
 
 const isoToIndian = (v: string) => {
   if (!v) return "";
@@ -288,6 +289,7 @@ function DetailField({ label, value }: { label: string; value: React.ReactNode }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PurchaseOrdersPage() {
+  useI18n();
   const { setMeta } = usePageMeta();
   const navigate = useNavigate();
   const location = useLocation();

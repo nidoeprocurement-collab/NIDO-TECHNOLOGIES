@@ -4,9 +4,11 @@ import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 
 export default function OrderSummaryPanel({
@@ -14,6 +16,7 @@ export default function OrderSummaryPanel({
 }: {
   showItemList?: boolean;
 }) {
+  useI18n();
   const navigate = useNavigate();
   const { items: cart } = useCart();
   const org = useOrgConfig();

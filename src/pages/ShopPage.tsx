@@ -23,6 +23,8 @@ import {
 } from "@/lib/priceEngineStore";
 import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +101,7 @@ const PAGE_SIZE = 20;
 
 function formatPrice(n: number) {
   if (!n || n === 0) return "Price on request";
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
@@ -674,8 +676,8 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     : '--';
   const displayPrice = selectedVendor && canVendorFulfillMoq(selectedVendor)
     ? (clientId && selectedVendorSellingPrice
-        ? `₹${selectedVendorSellingPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-        : `₹${selectedVendor.basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+        ? formatCurrency(selectedVendorSellingPrice)
+        : formatCurrency(selectedVendor.basePrice))
     : '--';
 
   // First active slab with a non-zero discount that applies to this product's
@@ -854,7 +856,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                     </span>
                     {/* Price */}
                     <span className="text-[10px] font-semibold text-gray-800">
-                      {!isOOS && price > 0 ? `₹${price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '--'}
+                      {!isOOS && price > 0 ? formatCurrency(price, undefined, { decimals: 0 }) : '--'}
                     </span>
                   </button>
                 );
@@ -1043,6 +1045,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 export default function ShopPage() {
   const navigate = useNavigate();
   const { user, isClientPortalUser } = useAuth();
+  useI18n();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>(
     () => (isClientPortalUser ? user?.clientId ?? "" : localStorage.getItem("nido_shop_selected_client") ?? "")

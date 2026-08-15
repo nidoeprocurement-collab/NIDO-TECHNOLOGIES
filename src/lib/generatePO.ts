@@ -5,6 +5,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredPO } from './purchaseOrderStore';
 
@@ -22,6 +23,10 @@ function fmt2(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function money(value: number): string {
+  return formatCurrency(value, loadConfig());
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -136,12 +141,12 @@ function drawPOSummary(
     .join(', ');
 
   const rows: Array<[string, string, boolean?]> = [
-    ['Gross Subtotal', `INR ${fmt2(po.subtotal)}`],
-    ['Item Level Discounts (-)', 'INR - 0.00', true],
-    ['Total Taxable Value', `INR ${fmt2(po.subtotal)}`, true],
-    [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(totalTax)}`],
-    ['Shipping & Handling Charges', 'INR 0.00'],
-    ['Round Off Adjustment', 'INR 0.00'],
+    ['Gross Subtotal', money(po.subtotal)],
+    ['Item Level Discounts (-)', `${getCurrencySymbol(loadConfig())} - 0.00`, true],
+    ['Total Taxable Value', money(po.subtotal), true],
+    [`Total GST${rates ? ` (${rates})` : ''}`, money(totalTax)],
+    ['Shipping & Handling Charges', money(0)],
+    ['Round Off Adjustment', money(0)],
   ];
 
   const rowHeight = 20;
@@ -172,7 +177,7 @@ function drawPOSummary(
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
   drawText(doc, 'Total Order Value', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `INR ${fmt2(po.grandTotal)}`, x + width - 10, totalY + 17, {
+  drawText(doc, money(po.grandTotal), x + width - 10, totalY + 17, {
     size: 8.5,
     color: DARK,
     bold: true,

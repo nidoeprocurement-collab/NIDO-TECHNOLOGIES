@@ -19,9 +19,11 @@ import {
   type PaymentReceipt,
 } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 function fmt(n: number) {
-  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(n);
 }
 
 function fmtDate(v: string) {
@@ -265,6 +267,7 @@ function ArchivedDrawer({ onClose }: { onClose: () => void }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PaymentReceiptsPage() {
+  useI18n();
   const navigate = useNavigate();
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [showArchived, setShowArchived] = useState(false);

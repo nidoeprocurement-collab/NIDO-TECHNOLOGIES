@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { formatCurrency, getCurrencySymbol } from './formatters';
 
 // ── Colour palette (identical to invoicePdf.ts) ───────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -39,6 +40,10 @@ export interface ExpenseForPdf {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt2(value: number): string {
   return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function money(value: number): string {
+  return formatCurrency(value, loadConfig());
 }
 
 function fmtDate(value: string): string {
@@ -212,9 +217,9 @@ export async function generateExpensePdf(expense: ExpenseForPdf): Promise<void> 
       expense.expenseAccount,
       expense.expenseType || 'Services',
       expense.sac || '-',
-      `INR ${fmt2(baseAmount)}`,
-      `INR ${fmt2(expense.taxAmount)}`,
-      `INR ${fmt2(totalAmount)}`,
+      money(baseAmount),
+      money(expense.taxAmount),
+      money(totalAmount),
     ]],
     theme: 'grid',
     tableWidth: contentWidth,
@@ -247,8 +252,8 @@ export async function generateExpensePdf(expense: ExpenseForPdf): Promise<void> 
   const summaryWidth = 255;
   const summaryX = margin + contentWidth - summaryWidth;
   const rows: [string, string][] = [
-    ['Base Amount', `INR ${fmt2(baseAmount)}`],
-    [`Tax (${expense.taxLabel || `GST ${expense.taxPercent}%`}) — ${expense.amountIs}`, `INR ${fmt2(expense.taxAmount)}`],
+    ['Base Amount', money(baseAmount)],
+    [`Tax (${expense.taxLabel || `GST ${expense.taxPercent}%`}) — ${expense.amountIs}`, money(expense.taxAmount)],
   ];
   const rowH = 20;
   const totalH = 27;
@@ -269,7 +274,7 @@ export async function generateExpensePdf(expense: ExpenseForPdf): Promise<void> 
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(summaryX, totalY, summaryX + summaryWidth, totalY);
   drawText(doc, 'Total Expense', summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `INR ${fmt2(totalAmount)}`, summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
+  drawText(doc, money(totalAmount), summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
 
   // Amount in words (left of summary)
   const wordsWidth = summaryX - margin - 12;
@@ -288,7 +293,7 @@ export async function generateExpensePdf(expense: ExpenseForPdf): Promise<void> 
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [['ACCOUNT', 'DEBIT (INR)', 'CREDIT (INR)']],
+    head: [['ACCOUNT', `DEBIT (${getCurrencySymbol(loadConfig())})`, `CREDIT (${getCurrencySymbol(loadConfig())})`]],
     body: [
       [expense.expenseAccount, fmt2(expense.amount - expense.taxAmount), '0.00'],
       [expense.paidThrough, '0.00', fmt2(expense.amount)],
@@ -459,9 +464,9 @@ export async function generateRecurringExpensePdf(profile: RecurringExpenseProfi
       profile.expenseAccount,
       profile.frequency,
       profile.paidThrough,
-      `INR ${fmt2(baseAmount)}`,
-      `INR ${fmt2(taxAmount)}`,
-      `INR ${fmt2(totalAmount)}`,
+      money(baseAmount),
+      money(taxAmount),
+      money(totalAmount),
     ]],
     theme: 'grid',
     tableWidth: contentWidth,
@@ -475,8 +480,8 @@ export async function generateRecurringExpensePdf(profile: RecurringExpenseProfi
   const summaryWidth = 255;
   const summaryX = margin + contentWidth - summaryWidth;
   const rows: [string, string][] = [
-    ['Base Amount', `INR ${fmt2(baseAmount)}`],
-    [`Tax (${profile.taxLabel || `GST ${taxPercent}%`}) — ${profile.amountIs}`, `INR ${fmt2(taxAmount)}`],
+    ['Base Amount', money(baseAmount)],
+    [`Tax (${profile.taxLabel || `GST ${taxPercent}%`}) — ${profile.amountIs}`, money(taxAmount)],
   ];
   const rowH = 20;
   const totalH = 27;
@@ -496,7 +501,7 @@ export async function generateRecurringExpensePdf(profile: RecurringExpenseProfi
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(summaryX, totalY, summaryX + summaryWidth, totalY);
   drawText(doc, 'Amount per Cycle', summaryX + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `INR ${fmt2(totalAmount)}`, summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
+  drawText(doc, money(totalAmount), summaryX + summaryWidth - 10, totalY + 17, { size: 8.5, color: DARK, bold: true, align: 'right' });
   y += summaryH + 18;
 
   // Notes

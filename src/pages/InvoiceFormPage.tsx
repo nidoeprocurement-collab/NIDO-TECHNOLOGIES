@@ -13,6 +13,8 @@ import { getActiveQuotes } from '@/lib/quoteStore';
 import { getActiveOrders } from '@/lib/salesOrderStore';
 import { useMyOrders } from '@/contexts/MyOrdersContext';
 import { getEffectiveTaxPctForCategory } from '@/lib/taxEngine';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency } from '@/lib/formatters';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -29,7 +31,7 @@ const blankItem = (): InvoiceLineItem => ({
 });
 
 function fmt(value: number) {
-  return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(value);
 }
 
 function Label({ text, children }: { text: string; children: React.ReactNode }) {
@@ -54,6 +56,7 @@ const SOURCE_TABS: { key: ImportSource; label: string }[] = [
 ];
 
 export default function InvoiceFormPage() {
+  useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const existing = useMemo(() => (id ? getInvoiceById(id) : undefined), [id]);

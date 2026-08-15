@@ -3,6 +3,8 @@ import { ArrowLeft, Download, Send, FileText, Edit, Paperclip } from 'lucide-rea
 import { useState, useEffect } from 'react';
 import { getQuoteById, type StoredQuote } from '@/lib/quoteStore';
 import { downloadReferenceQuotePdf } from '@/lib/referenceQuotePdf';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency, getCurrencySymbol } from '@/lib/formatters';
 
 function statusBadge(status: StoredQuote['status']) {
   const map: Record<string, string> = {
@@ -15,7 +17,7 @@ function statusBadge(status: StoredQuote['status']) {
 }
 
 function fmt(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(n);
 }
 
 function fmtSize(bytes: number) {
@@ -32,6 +34,8 @@ function downloadDoc(doc: { name: string; data: string }) {
 }
 
 export default function SalesQuoteDetailPage() {
+  useI18n();
+  const { currencySymbol } = useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('details');
@@ -73,7 +77,7 @@ export default function SalesQuoteDetailPage() {
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Customer: {quote.clientName}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total: ₹{fmt(quote.grandTotal)}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total: {formatCurrency(quote.grandTotal)}</p>
           </div>
         </div>
 
@@ -125,7 +129,7 @@ export default function SalesQuoteDetailPage() {
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
               <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-2">LINE ITEMS</p>
               <p className="text-lg font-bold text-gray-900 dark:text-white">{quote.lineItems.length}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">₹{fmt(quote.grandTotal)} total</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(quote.grandTotal)} total</p>
             </div>
           </div>
 
@@ -176,7 +180,7 @@ export default function SalesQuoteDetailPage() {
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                    {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)'].map(h => (
+                    {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map(h => (
                       <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -225,35 +229,35 @@ export default function SalesQuoteDetailPage() {
                     <tbody>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Gross Subtotal</td>
-                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(grossSubtotal)}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(grossSubtotal)}</td>
                       </tr>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Item Level Discounts (-)</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹ - {fmt(totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">− {formatCurrency(totalDiscount)}</td>
                       </tr>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Total Taxable Value</td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹{fmt(totalTaxableValue)}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">{formatCurrency(totalTaxableValue)}</td>
                       </tr>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
                           Total GST{gstRateLabels ? ` (${gstRateLabels})` : ''}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(totalGst)}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(totalGst)}</td>
                       </tr>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
-                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingCharges)}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(shippingCharges)}</td>
                       </tr>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
                         <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">
-                          {roundOff >= 0 ? '' : '-'}₹{fmt(Math.abs(roundOff))}
+                          {roundOff >= 0 ? '' : '-'}{formatCurrency(Math.abs(roundOff))}
                         </td>
                       </tr>
                       <tr className="border-t-2 border-gray-300 dark:border-gray-500">
                         <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">Total Payable</td>
-                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">₹{fmt(quote.grandTotal)}</td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{formatCurrency(quote.grandTotal)}</td>
                       </tr>
                     </tbody>
                   </table>

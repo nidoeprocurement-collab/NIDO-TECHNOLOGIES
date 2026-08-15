@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '@/contexts/ConfigContext';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency } from '@/lib/formatters';
 import {
   archiveInvoice,
   getArchivedInvoices,
@@ -21,7 +23,7 @@ const statusStyles: Record<InvoiceStatus, string> = {
 };
 
 function fmt(value: number) {
-  return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatCurrency(value);
 }
 
 function displayNumber(invoiceNumber: string, prefix: string) {
@@ -280,6 +282,7 @@ function ArchivedModal({
    Main Page
 ───────────────────────────────────────────────────────────────── */
 export default function InvoicePage() {
+  useI18n();
   const navigate = useNavigate();
   const { config } = useConfig();
   const prefix = config.prefixes.find((item) => item.key === 'invoice')?.value || 'INV-';

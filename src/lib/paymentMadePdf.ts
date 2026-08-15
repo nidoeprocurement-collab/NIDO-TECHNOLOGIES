@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { formatCurrency } from './formatters';
 
 // ── Colour palette (identical to invoicePdf) ──────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -32,6 +33,10 @@ function fmt2(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function money(value: number): string {
+  return formatCurrency(value, loadConfig());
 }
 
 function fmtDate(value: string): string {
@@ -167,7 +172,7 @@ export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promis
   doc.setFillColor(...LIGHT_BLUE);
   doc.roundedRect(pageWidth - margin - 140, balanceBoxY, 140, 32, 4, 4, 'F');
   drawText(doc, 'Amount Paid', pageWidth - margin - 10, balanceBoxY + 11, { size: 7, color: MUTED, align: 'right' });
-  drawText(doc, `INR ${fmt2(payment.amount)}`, pageWidth - margin - 10, balanceBoxY + 25, { size: 11, color: DARK, bold: true, align: 'right' });
+  drawText(doc, money(payment.amount), pageWidth - margin - 10, balanceBoxY + 25, { size: 11, color: DARK, bold: true, align: 'right' });
 
   // ── Cards: Paid To (left) + Payment Summary (right) ──────────────────────
   let y = Math.max(companyY + 12, 164);
@@ -190,9 +195,9 @@ export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promis
   const summaryCardX = margin + cardWidth + cardGap;
   const usedAmount = payment.allocations.reduce((s, a) => s + a.amount, 0);
   const summaryRows: [string, string, boolean?][] = [
-    ['Amount Paid', `INR ${fmt2(payment.amount)}`],
-    ['Used for Payments', `INR ${fmt2(usedAmount)}`],
-    ['Unused Amount', `INR ${fmt2(payment.unusedAmount)}`, true],
+    ['Amount Paid', money(payment.amount)],
+    ['Used for Payments', money(usedAmount)],
+    ['Unused Amount', money(payment.unusedAmount), true],
   ];
   const summaryCardHeight = Math.max(92, 54 + summaryRows.length * 14);
 
@@ -214,12 +219,12 @@ export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promis
   // ── Payment For table ─────────────────────────────────────────────────────
   const tableBody: string[][] =
     payment.allocations.length === 0
-      ? [['—', 'Advance payment — no bill linked', `INR ${fmt2(payment.amount)}`]]
+      ? [['—', 'Advance payment — no bill linked', money(payment.amount)]]
       : payment.allocations.map((a, i) => [
           String(i + 1),
           payment.billNumber || a.billId || '—',
           payment.referenceNumber || '—',
-          `INR ${fmt2(a.amount)}`,
+          money(a.amount),
         ]);
 
   const hasAllocations = payment.allocations.length > 0;
@@ -268,9 +273,9 @@ export async function downloadPaymentMadePdf(payment: PaymentMadeForPdf): Promis
   const boxWidth = 220;
   const boxX = pageWidth - margin - boxWidth;
   const finalRows: [string, string, boolean?][] = [
-    ['Amount Paid', `INR ${fmt2(payment.amount)}`],
-    ['Used for Payments', `INR ${fmt2(usedAmount)}`],
-    ['Unused Amount', `INR ${fmt2(payment.unusedAmount)}`, true],
+    ['Amount Paid', money(payment.amount)],
+    ['Used for Payments', money(usedAmount)],
+    ['Unused Amount', money(payment.unusedAmount), true],
   ];
   const rowH = 20;
   const totalH = finalRows.length * rowH + 4;

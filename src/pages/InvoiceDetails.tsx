@@ -3,9 +3,11 @@ import { ArrowLeft, Download, Edit, Plus, Receipt, Send } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceStore';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency } from '@/lib/formatters';
 
 function fmt(value: number) {
-  return value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(value);
 }
 
 const statusStyles: Record<string, string> = {
@@ -27,6 +29,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function InvoiceDetails() {
+  useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<StoredInvoice | null>(null);

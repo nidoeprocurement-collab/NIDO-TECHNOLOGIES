@@ -14,9 +14,11 @@ import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogSt
 import { getCatalogProducts } from "@/lib/catalogStore";
 import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } from "@/lib/taxEngine";
 import { useOrgConfig } from "@/contexts/ConfigContext";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(n);
 }
 
 /** Pick up to 6 client-catalog products relevant to what's in the cart. */
@@ -123,6 +125,7 @@ function SuggestedCard({
 const FREE_DELIVERY_THRESHOLD = 200000; // ₹2,00,000
 
 export default function CartPage() {
+  useI18n();
   const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
   const navigate = useNavigate();
   const org = useOrgConfig();

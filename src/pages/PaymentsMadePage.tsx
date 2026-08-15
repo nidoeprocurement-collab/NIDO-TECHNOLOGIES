@@ -6,6 +6,8 @@ import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { getPrefix } from "@/lib/configService";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,8 +102,7 @@ const BILLS_STORAGE_KEY = "nido_purchase_bills_v1";
 const PAYMENTS_STORAGE_KEY = "nido_purchase_payments_made_v1";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const money = (v: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(v);
+const money = (v: number) => formatCurrency(v);
 
 const toNumber = (v: string | number, fallback = 0) => {
   const n = Number(v);
@@ -251,6 +252,7 @@ function PaymentVoucher({ entry }: { entry: PaymentEntry }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PaymentsMadePage() {
+  useI18n();
   const { setMeta } = usePageMeta();
   const navigate = useNavigate();
   const location = useLocation();

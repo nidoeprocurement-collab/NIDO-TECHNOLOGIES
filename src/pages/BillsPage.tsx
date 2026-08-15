@@ -6,6 +6,8 @@ import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
 import { safeReadJson } from "@/lib/utils";
 import { generateBillPdf } from "@/lib/billPdf";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -102,8 +104,7 @@ const STATUS_STYLE: Record<BillStatus, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const toNumber = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 
-const money = (v: number) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(v);
+const money = (v: number) => formatCurrency(v);
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -450,6 +451,7 @@ function BillPdfView({ bill }: { bill: BillEntry }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BillsPage() {
+  const { currencySymbol } = useI18n();
   const { setMeta } = usePageMeta();
   const navigate = useNavigate();
   const location = useLocation();
@@ -821,32 +823,32 @@ export default function BillsPage() {
                   <tbody>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-600">Gross Subtotal</td>
-                      <td className="px-4 py-2.5 text-right text-gray-900">₹{formTotals.grossSubtotal.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">{money(formTotals.grossSubtotal)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 font-semibold text-gray-900">Item Level Discounts (−)</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹ − {formTotals.totalDiscount.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">− {money(formTotals.totalDiscount)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹{formTotals.subtotal.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{money(formTotals.subtotal)}</td>
                     </tr>
                     {formTotals.gstSlabs.map((slab) => (
                       <>
                         <tr key={`cgst-${slab.rate}`} className="border-b border-gray-100">
                           <td className="px-4 py-2 text-gray-500 pl-6">CGST @ {slab.rate / 2}%</td>
-                          <td className="px-4 py-2 text-right text-gray-700">₹{slab.cgst.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right text-gray-700">{money(slab.cgst)}</td>
                         </tr>
                         <tr key={`sgst-${slab.rate}`} className="border-b border-gray-100">
                           <td className="px-4 py-2 text-gray-500 pl-6">SGST @ {slab.rate / 2}%</td>
-                          <td className="px-4 py-2 text-right text-gray-700">₹{slab.sgst.toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right text-gray-700">{money(slab.sgst)}</td>
                         </tr>
                       </>
                     ))}
                     {formTotals.gstSlabs.length === 0 && (
                       <tr className="border-b border-gray-100">
                         <td className="px-4 py-2.5 text-gray-500">Total GST</td>
-                        <td className="px-4 py-2.5 text-right text-gray-700">₹0.00</td>
+                        <td className="px-4 py-2.5 text-right text-gray-700">{money(0)}</td>
                       </tr>
                     )}
                     <tr className="border-b border-gray-100">
@@ -857,7 +859,7 @@ export default function BillsPage() {
                     </tr>
                     <tr className="border-t-2 border-gray-300 bg-blue-50/40">
                       <td className="px-4 py-3 font-bold text-gray-900">Total</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">₹{formTotals.total.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">{money(formTotals.total)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1036,7 +1038,7 @@ export default function BillsPage() {
                 <table className="w-full text-sm min-w-[700px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {["#", "ITEM / DESCRIPTION", "ACCOUNT", "QTY", "RATE (₹)", "DISC %", "TAXABLE (₹)", "GST RATE", "GST (₹)", "AMOUNT (₹)"].map((h) => (
+                      {["#", "ITEM / DESCRIPTION", "ACCOUNT", "QTY", `RATE (${currencySymbol})`, "DISC %", `TAXABLE (${currencySymbol})`, "GST RATE", `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map((h) => (
                         <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -1106,8 +1108,8 @@ export default function BillsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-xs font-bold uppercase text-gray-500">Account</TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-gray-500 text-right">Debit (₹)</TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-gray-500 text-right">Credit (₹)</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-gray-500 text-right">Debit ({currencySymbol})</TableHead>
+                      <TableHead className="text-xs font-bold uppercase text-gray-500 text-right">Credit ({currencySymbol})</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

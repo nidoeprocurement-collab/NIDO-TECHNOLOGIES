@@ -393,6 +393,7 @@ export default function GeneralSettingsPage() {
                 <Select value={localization.currency} onValueChange={v => {
                   const sym = v.match(/\((.+?)\)/)?.[1] ?? v
                   update("localization", { currency: v, currencySymbol: sym })
+                  update("procurement", { defaultCurrency: v })
                 }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

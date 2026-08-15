@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredInvoice } from './invoiceStore';
 
@@ -18,6 +19,10 @@ function fmt2(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function money(value: number): string {
+  return formatCurrency(value, loadConfig());
 }
 
 function fmtDate(value: string): string {
@@ -135,12 +140,12 @@ function drawSummary(
     .join(', ');
 
   const rows: Array<[string, string, boolean?]> = [
-    ['Gross Subtotal', `INR ${fmt2(grossSubtotal)}`],
-    ['Item Level Discounts (-)', `INR - ${fmt2(totalDiscount)}`, true],
-    ['Total Taxable Value', `INR ${fmt2(taxableSubtotal)}`, true],
-    [`Total GST${rates ? ` (${rates})` : ''}`, `INR ${fmt2(invoice.totalTax)}`],
-    ['Shipping & Handling Charges', `INR ${fmt2(shipping)}`],
-    [`Round Off Adjustment`, `${adjustment < 0 ? '-' : ''}INR ${fmt2(Math.abs(adjustment))}`],
+    ['Gross Subtotal', money(grossSubtotal)],
+    ['Item Level Discounts (-)', `${adjustment < 0 ? '-' : ''}${money(totalDiscount)}`, true],
+    ['Total Taxable Value', money(taxableSubtotal), true],
+    [`Total GST${rates ? ` (${rates})` : ''}`, money(invoice.totalTax)],
+    ['Shipping & Handling Charges', money(shipping)],
+    [`Round Off Adjustment`, `${adjustment < 0 ? '-' : ''}${money(Math.abs(adjustment))}`],
   ];
 
   const rowHeight = 20;
@@ -167,7 +172,7 @@ function drawSummary(
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
   drawText(doc, 'Total Payable', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `INR ${fmt2(invoice.grandTotal)}`, x + width - 10, totalY + 17, {
+  drawText(doc, money(invoice.grandTotal), x + width - 10, totalY + 17, {
     size: 8.5,
     color: DARK,
     bold: true,

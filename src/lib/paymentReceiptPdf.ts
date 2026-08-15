@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { formatCurrency } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { PaymentReceipt } from './paymentReceiptStore';
 
@@ -18,6 +19,10 @@ function fmt2(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function money(value: number): string {
+  return formatCurrency(value, loadConfig());
 }
 
 function fmtDate(value: string): string {
@@ -125,8 +130,8 @@ function drawSummary(
   const total = amount + bankCharges;
 
   const rows: Array<[string, string, boolean?]> = [
-    ['Amount Received', `INR ${fmt2(amount)}`],
-    ...(bankCharges > 0 ? [['Bank Charges', `INR ${fmt2(bankCharges)}`] as [string, string]] : []),
+    ['Amount Received', money(amount)],
+    ...(bankCharges > 0 ? [['Bank Charges', money(bankCharges)] as [string, string]] : []),
     ['Tax Deducted', receipt.taxDeducted === 'tds' ? 'TDS (Income Tax)' : 'No Tax Deducted', true],
     ['Payment Mode', receipt.paymentMode || '—'],
     ['Deposit To', receipt.depositTo || '—'],
@@ -156,7 +161,7 @@ function drawSummary(
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
   drawText(doc, 'Total Received', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, `INR ${fmt2(total)}`, x + width - 10, totalY + 17, {
+  drawText(doc, money(total), x + width - 10, totalY + 17, {
     size: 8.5,
     color: DARK,
     bold: true,
@@ -270,11 +275,11 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
       receipt.invoiceNumber || '—',
       receipt.paymentMode,
       receipt.taxDeducted === 'tds' ? 'TDS (Income Tax)' : 'No Tax',
-      `INR ${fmt2(receipt.amountReceived)}`,
+      money(receipt.amountReceived),
     ],
   ];
   if (bankCharges > 0) {
-    tableBody.push(['2', 'Bank Charges', '—', '—', '—', `INR ${fmt2(bankCharges)}`]);
+    tableBody.push(['2', 'Bank Charges', '—', '—', '—', money(bankCharges)]);
   }
 
   autoTable(doc, {

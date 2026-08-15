@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import type { ReceiptFile } from "./NewExpensePage";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type BillableStatus = "BILLABLE" | "NON-BILLABLE";
@@ -141,12 +143,7 @@ const defaultExpenses: ExpenseEntry[] = [
   },
 ];
 
-const fmtCurrency = (value: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(value);
+const fmtCurrency = (value: number) => formatCurrency(value);
 
 // Normalise a receipt entry to a ReceiptFile (handles legacy string entries)
 function toReceiptFile(r: ReceiptFile | string): ReceiptFile {
@@ -166,6 +163,7 @@ function DetailField({ label, value }: { label: string; value: React.ReactNode }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ExpensesPage() {
+  useI18n();
   const { setMeta } = usePageMeta();
   useEffect(() => { setMeta({ title: "Expenses" }); }, []);
 

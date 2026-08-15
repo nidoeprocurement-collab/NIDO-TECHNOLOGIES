@@ -3,6 +3,8 @@ import { ArrowLeft, Edit, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getOrderById, type StoredSalesOrder } from '@/lib/salesOrderStore';
 import { downloadSalesOrderPdf } from '@/lib/salesOrderPdfGenerator';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency } from '@/lib/formatters';
 
 function statusBadge(status: StoredSalesOrder['status']) {
   const map: Record<string, string> = {
@@ -16,10 +18,11 @@ function statusBadge(status: StoredSalesOrder['status']) {
 }
 
 function fmt(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatCurrency(n);
 }
 
 export default function SalesOrderDetails() {
+  const { currencySymbol } = useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('details');
@@ -71,7 +74,7 @@ export default function SalesOrderDetails() {
               </span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">Customer: {order.clientName}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total: ₹{fmt(order.grandTotal)}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total: {formatCurrency(order.grandTotal)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
@@ -122,7 +125,7 @@ export default function SalesOrderDetails() {
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
               <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-2">LINE ITEMS</p>
               <p className="text-lg font-bold text-gray-900 dark:text-white">{order.lineItems.length}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">₹{fmt(order.grandTotal)} total</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(order.grandTotal)} total</p>
             </div>
           </div>
 
@@ -160,7 +163,7 @@ export default function SalesOrderDetails() {
                   </colgroup>
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                      {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)'].map(h => (
+                      {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map(h => (
                         <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -201,39 +204,39 @@ export default function SalesOrderDetails() {
                 <tbody>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Gross Subtotal</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(grossSubtotal)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(grossSubtotal)}</td>
                   </tr>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Item Level Discounts (-)</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹ - {fmt(totalDiscount)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">− {formatCurrency(totalDiscount)}</td>
                   </tr>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Total Taxable Value</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹{fmt(totalTaxableValue)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">{formatCurrency(totalTaxableValue)}</td>
                   </tr>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
                       Total GST{gstRateLabels ? ` (${gstRateLabels})` : ''}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(order.totalTax)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(order.totalTax)}</td>
                   </tr>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(order.shippingCharges)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(order.shippingCharges)}</td>
                   </tr>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">GST on Shipping ({shippingGstRate}%)</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingGst)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(shippingGst)}</td>
                   </tr>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
                     <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">
-                      {order.adjustment >= 0 ? '' : '-'}₹{fmt(Math.abs(order.adjustment))}
+                      {order.adjustment >= 0 ? '' : '-'}{formatCurrency(Math.abs(order.adjustment))}
                     </td>
                   </tr>
                   <tr className="border-t-2 border-gray-300 dark:border-gray-500">
                     <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">Total Payable</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">₹{fmt(order.grandTotal)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{formatCurrency(order.grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>

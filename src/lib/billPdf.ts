@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
+import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 
 // ── Colour palette (identical to invoicePdf) ──────────────────────────────────
@@ -41,6 +42,10 @@ function fmt2(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function money(value: number): string {
+  return formatCurrency(value, loadConfig());
 }
 
 function splitLines(value: string | undefined): string[] {
@@ -190,7 +195,7 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
   doc.setFillColor(...LIGHT_BLUE);
   doc.roundedRect(pageWidth - margin - 140, balanceBoxY, 140, 32, 4, 4, 'F');
   drawText(doc, 'Balance Due', pageWidth - margin - 10, balanceBoxY + 11, { size: 7, color: MUTED, align: 'right' });
-  drawText(doc, `INR ${fmt2(balanceDue)}`, pageWidth - margin - 10, balanceBoxY + 25, { size: 11, color: DARK, bold: true, align: 'right' });
+  drawText(doc, money(balanceDue), pageWidth - margin - 10, balanceBoxY + 25, { size: 11, color: DARK, bold: true, align: 'right' });
 
   // ── Bill From card ─────────────────────────────────────────────────────────
   let y = Math.max(companyY + 12, 164);
@@ -224,12 +229,12 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(summaryCardX + 13, y + 27, summaryCardX + cardWidth - 13, y + 27);
   const summaryRows: [string, string][] = [
-    ['Sub Total', `INR ${fmt2(totals.subtotal)}`],
-    ['SGST (9%)', `INR ${fmt2(totals.sgst)}`],
-    ['CGST (9%)', `INR ${fmt2(totals.cgst)}`],
-    bill.adjustment !== 0 ? ['Adjustment', `${bill.adjustment < 0 ? '-' : ''}INR ${fmt2(Math.abs(bill.adjustment))}`] : ['', ''],
-    ['Payment Made (-)', `INR ${fmt2(bill.paymentMade)}`],
-    ['Balance Due', `INR ${fmt2(balanceDue)}`],
+    ['Sub Total', money(totals.subtotal)],
+    ['SGST (9%)', money(totals.sgst)],
+    ['CGST (9%)', money(totals.cgst)],
+    bill.adjustment !== 0 ? ['Adjustment', `${bill.adjustment < 0 ? '-' : ''}${money(Math.abs(bill.adjustment))}`] : ['', ''],
+    ['Payment Made (-)', money(bill.paymentMade)],
+    ['Balance Due', money(balanceDue)],
   ].filter(([l]) => l);
   let summaryRowY = y + 42;
   summaryRows.forEach(([label, value], idx) => {
@@ -312,12 +317,12 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
   const boxWidth = 220;
   const boxX = pageWidth - margin - boxWidth;
   const finalRows: [string, string, boolean?][] = [
-    ['Sub Total', `INR ${fmt2(totals.subtotal)}`],
-    ['SGST (9%)', `INR ${fmt2(totals.sgst)}`],
-    ['CGST (9%)', `INR ${fmt2(totals.cgst)}`],
-    ...(bill.adjustment !== 0 ? [['Adjustment', `${bill.adjustment < 0 ? '-' : ''}INR ${fmt2(Math.abs(bill.adjustment))}`] as [string, string]] : []),
-    ['Payment Made (-)', `INR ${fmt2(bill.paymentMade)}`, false],
-    ['Balance Due', `INR ${fmt2(balanceDue)}`, true],
+    ['Sub Total', money(totals.subtotal)],
+    ['SGST (9%)', money(totals.sgst)],
+    ['CGST (9%)', money(totals.cgst)],
+    ...(bill.adjustment !== 0 ? [['Adjustment', `${bill.adjustment < 0 ? '-' : ''}${money(Math.abs(bill.adjustment))}`] as [string, string]] : []),
+    ['Payment Made (-)', money(bill.paymentMade), false],
+    ['Balance Due', money(balanceDue), true],
   ];
   const rowH = 19;
   const totalH = finalRows.length * rowH + 4;
