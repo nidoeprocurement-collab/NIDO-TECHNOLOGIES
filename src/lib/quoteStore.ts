@@ -3,6 +3,7 @@
 
 const STORE_KEY = 'nido_sales_quotes';
 const COUNTER_KEY = 'nido_quote_counter';
+import { getPrefix } from './configService';
 
 export interface QuoteLineItem {
   id: string;
@@ -135,5 +136,5 @@ export function restoreQuote(id: string): void {
 export function generateQuoteNumber(): string {
   const counter = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) + 1;
   localStorage.setItem(COUNTER_KEY, String(counter));
-  return `EST-${String(counter).padStart(6, '0')}`;
+  return `${getPrefix('salesQuote') || 'QT-'}${String(counter).padStart(6, '0')}`;
 }

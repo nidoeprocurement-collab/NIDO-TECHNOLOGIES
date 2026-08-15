@@ -3,6 +3,7 @@
 
 const STORE_KEY = 'nido_sales_orders';
 const COUNTER_KEY = 'nido_sales_order_counter';
+import { getPrefix } from './configService';
 
 export interface OrderLineItem {
   id: string;
@@ -108,5 +109,5 @@ export function restoreOrder(id: string): void {
 export function generateOrderNumber(): string {
   const counter = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) + 1;
   localStorage.setItem(COUNTER_KEY, String(counter));
-  return `SO-${String(counter).padStart(6, '0')}`;
+  return `${getPrefix('salesOrder') || 'SO-'}${String(counter).padStart(6, '0')}`;
 }

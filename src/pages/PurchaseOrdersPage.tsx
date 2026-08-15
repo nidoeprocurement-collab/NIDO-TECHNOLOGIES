@@ -196,11 +196,12 @@ const readStoredManualOrders = (): PurchaseOrderEntry[] => {
 };
 
 const nextPoNumber = (entries: PurchaseOrderEntry[]) => {
+  const prefix = loadConfig().prefixes.find((p) => p.key === "purchaseOrder")?.value ?? "PO-";
   const max = entries.reduce((c, e) => {
     const n = Number(e.poNumber.replace(/\D/g, ""));
     return Number.isFinite(n) ? Math.max(c, n) : c;
   }, 0);
-  return `PO-${String(max + 1).padStart(5, "0")}`;
+  return `${prefix}${String(max + 1).padStart(5, "0")}`;
 };
 
 const nextBillNumber = (entries: any[]) => {

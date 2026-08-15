@@ -39,6 +39,8 @@ export interface OrderCartItem {
   vendorRating?: number;
   /** Unique ID for the stock reservation placed at checkout — used for auditing and release on cancellation */
   stockReservationId?: string;
+  /** Stable generated sub-order identifier assigned when the master order is created. */
+  subOrderId?: string;
 }
 
 export interface MyOrder {
@@ -111,8 +113,8 @@ function cascadeStatusToSubOrders(order: MyOrder, status: MyOrderStatus) {
     }
     const updatedOn = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     for (let i = 0; i < itemCount; i++) {
-      const soPrefix = getPrefix("salesOrder") || "SO-";
-      const subId = `${soPrefix}${order.id}-${String(i + 1).padStart(3, "0")}`;
+      const subId = order.cartItems?.[i]?.subOrderId
+        || `SO-${order.id}-${String(i + 1).padStart(3, "0")}`;
       saved[subId] = { ...(saved[subId] || {}), itemStatus: status, updatedOn };
     }
     localStorage.setItem(key, JSON.stringify(saved));
@@ -141,7 +143,7 @@ function nextOrderId(): string {
   } catch {
     /* ignore */
   }
-  return `ORD-${String(seq).padStart(6, "0")}`;
+  return `${getPrefix("order") || "ORD-"}${String(seq).padStart(6, "0")}`;
 }
 
 // ─── Auto Draft-PO creation ───────────────────────────────────────────────────
@@ -176,14 +178,15 @@ function autoCreateDraftPOs(
     const poNumber = generatePoNumber();
 
     const lineItems: POLineItem[] = items.map((item, i) => {
-      const subOrderId = `SO-${orderId}-${String(i + 1).padStart(3, "0")}`;
+      const subOrderId = item.subOrderId
+        || `${getPrefix("salesOrder") || "SO-"}${orderId}-${String(i + 1).padStart(3, "0")}`;
       const unitPrice = item.landedCost || item.vendorPrice || item.priceNum || 0;
       const qty = item.quantity;
       const gstPct = item.gstSnapshot ?? getEffectiveTaxPctForCategory(item.category);
       return {
         subOrderId,
         item: item.name,
-        sku: item.productCode || `SKU-${item.id}`,
+        sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
         productCode: item.productCode || "",
         category: item.category || "General",
         hsnCode: item.hsnSnapshot || "",
@@ -296,10 +299,16 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
 
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
     const id = nextOrderId();
-    setOrders((prev) => [{ ...order, id } as MyOrder, ...prev]);
+    const cartItems = order.cartItems?.map((item, index) => ({
+      ...item,
+      subOrderId: item.subOrderId
+        || `${getPrefix("salesOrder") || "SO-"}${id}-${String(index + 1).padStart(3, "0")}`,
+    }));
+    const normalizedOrder = { ...order, id, cartItems } as MyOrder;
+    setOrders((prev) => [normalizedOrder, ...prev]);
     // Auto-create Draft POs grouped by vendor immediately after the order is saved.
-    if (order.cartItems?.length) {
-      autoCreateDraftPOs(id, order.cartItems, order.orderDate, order.paymentTerms || "", order.deliveryAddress || "");
+    if (cartItems?.length) {
+      autoCreateDraftPOs(id, cartItems, order.orderDate, order.paymentTerms || "", order.deliveryAddress || "");
     }
     return id;
   };

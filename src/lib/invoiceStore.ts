@@ -1,3 +1,5 @@
+import { getPrefix } from './configService';
+
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
 
 export interface InvoiceLineItem {
@@ -286,11 +288,12 @@ export function deleteInvoice(id: string): void {
 
 export function generateInvoiceNumber(): string {
   const year = new Date().getFullYear();
-  // Match only numbers in the new format INV-YYYY##### to get the serial portion
-  const re = new RegExp(`^INV-${year}(\\d+)$`);
+  const prefix = getPrefix('invoice') || 'INV-';
+  const prefixEscaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^${prefixEscaped}${year}(\\d+)$`);
   const serials = seedInvoices()
     .map((inv) => { const m = inv.invoiceNumber.match(re); return m ? parseInt(m[1], 10) : 0; })
     .filter((n) => n > 0);
   const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
-  return `INV-${year}${String(next).padStart(5, '0')}`;
+  return `${prefix}${year}${String(next).padStart(5, '0')}`;
 }

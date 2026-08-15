@@ -11,6 +11,7 @@ import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { getPrefix } from "@/lib/configService";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -680,10 +681,12 @@ function Field({ label, value }) {
 function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: string, poNumber: string) {
   return (cartItems || []).map((item: any, idx: number) => ({
     num: idx + 1,
-    id: `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
+    // New orders carry a stable generated ID. The legacy fallback intentionally
+    // retains the historical SO- value for existing stored orders.
+    id: item.subOrderId || `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
     itemName: item.name,
     image: item.image || "",
-    sku: `SKU/SHOP-${item.id}`,
+    sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
     category: item.category || "General",
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
     productCode: item.productCode || "",

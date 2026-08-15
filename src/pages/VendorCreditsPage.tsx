@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
+import { getPrefix } from "@/lib/configService";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getVendorProducts } from "@/lib/vendorStore";
 import { getEffectiveVendorTaxPct, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
@@ -122,6 +123,21 @@ const toIsoDate = (v: string | undefined): string => {
 
 const buildCreditNumber = (prefix: string, next: number) =>
   `${prefix}${String(next).padStart(5, "0")}`;
+
+const readCreditNumberPref = (): CreditNumberPref => {
+  const saved = safeReadJson<CreditNumberPref>(PREF_KEY, {
+    mode: "auto",
+    prefix: getPrefix("vendorCredit") || "VC-",
+    nextNumber: 1,
+  });
+  return {
+    ...saved,
+    // The General Settings prefix is the source of truth for new documents.
+    // Keep the saved mode and sequence for backwards compatibility, but do not
+    // let the old page-local prefix override the centralized configuration.
+    prefix: getPrefix("vendorCredit") || "VC-",
+  };
+};
 
 const getCreditTotals = (entry: Pick<VendorCreditEntry, "items" | "adjustment">) => {
   const grossSubtotal = entry.items.reduce((s, i) => s + i.quantity * i.rate, 0);
@@ -356,12 +372,8 @@ export default function VendorCreditsPage() {
   const bills = useMemo(() => readBills(), []);
 
   const [credits, setCredits] = useState<VendorCreditEntry[]>(readCredits);
-  const [pref, setPref] = useState<CreditNumberPref>(() =>
-    safeReadJson<CreditNumberPref>(PREF_KEY, { mode: "auto", prefix: "VC-", nextNumber: 1 }),
-  );
-  const [form, setForm] = useState<CreditForm>(() => blankForm(
-    safeReadJson<CreditNumberPref>(PREF_KEY, { mode: "auto", prefix: "VC-", nextNumber: 1 }),
-  ));
+  const [pref, setPref] = useState<CreditNumberPref>(readCreditNumberPref);
+  const [form, setForm] = useState<CreditForm>(() => blankForm(readCreditNumberPref()));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPdfView, setShowPdfView] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "items" | "journal">("overview");

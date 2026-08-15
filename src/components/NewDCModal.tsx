@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Plus, Trash2, Eye, Save } from "lucide-react";
 import { toast } from "sonner";
 import { generateDCPdfBase64, downloadDCPdf, type DeliveryChallanData, type DCLineItem } from "@/lib/dcPdfGenerator";
+import { generateDCNumber } from "@/lib/dcStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface DCFormLineItem {
@@ -59,7 +60,7 @@ const emptyLine = (): DCFormLineItem => ({
 });
 
 const defaultForm = (): DCForm => ({
-  challanNo: `DC-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+  challanNo: generateDCNumber(),
   challanDate: new Date().toLocaleDateString("en-GB").replace(/\//g, "/"),
   invoiceRef: "",
   poReference: "",
@@ -121,7 +122,7 @@ function toDataModel(form: DCForm): DeliveryChallanData {
     .filter(Boolean);
 
   return {
-    challanNo: form.challanNo.trim() || "DC-DRAFT",
+    challanNo: form.challanNo.trim() || `${generateDCNumber()}DRAFT`,
     challanDate: form.challanDate.trim(),
     invoiceRef: form.invoiceRef.trim() || undefined,
     poReference: form.poReference.trim() || undefined,

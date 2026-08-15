@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getPrefix } from "@/lib/configService";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -128,7 +129,7 @@ function nextCode(prefix: string, existing: string[], pad = 5): string {
     .map((s) => { const m = s.match(/(\d+)$/); return m ? parseInt(m[1], 10) : 0; })
     .filter((n) => Number.isFinite(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
-  return `${prefix}-${String(next).padStart(pad, "0")}`;
+  return `${prefix}${String(next).padStart(pad, "0")}`;
 }
 
 const defaultNotes: CreditNoteEntry[] = [

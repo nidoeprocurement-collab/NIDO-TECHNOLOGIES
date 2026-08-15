@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Filter, MoreVertical, X } from "lucide-react";
 import { getClientOrders, saveClientOrder, type ClientOrderRecord } from "@/lib/clientDataStore";
+import { getPrefix } from "@/lib/configService";
 
 export const ordersData = [
   { id: "ORD-2024-1245", date: "2024-05-28", items: 12, amount: "$125,000", client: "TechSupply Co", status: "Delivered" },
@@ -120,7 +121,7 @@ function CreateOrderModal({ clientId, clientName, onClose, onCreate }: { clientI
             onClick={() => {
               if (!form.items.trim() || !form.quantity || !form.amount || !form.deliveryDate) return;
               const order: ClientOrderRecord = {
-                id: `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`,
+                id: `${getPrefix("order") || "ORD-"}${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`,
                 clientId,
                 date: form.deliveryDate,
                 items: Number(form.quantity),

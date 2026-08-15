@@ -131,7 +131,7 @@ function toModel(form: DCForm): DeliveryChallanData {
     .filter(Boolean);
 
   return {
-    challanNo: form.challanNo.trim() || "DC-DRAFT",
+    challanNo: form.challanNo.trim() || `${generateDCNumber()}DRAFT`,
     challanDate: form.challanDate.trim(),
     invoiceRef: form.invoiceRef.trim() || undefined,
     poReference: form.poReference.trim() || undefined,

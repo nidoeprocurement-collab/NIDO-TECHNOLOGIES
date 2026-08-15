@@ -17,6 +17,7 @@ import type { StoredClient } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import type { StoredInvoice } from "@/lib/invoiceStore";
 import { safeReadJson } from "@/lib/utils";
+import { getPrefix } from "@/lib/configService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Reason =
@@ -119,7 +120,7 @@ function nextCode(prefix: string, existing: string[], pad = 5): string {
     .map((s) => { const m = s.match(/(\d+)$/); return m ? parseInt(m[1], 10) : 0; })
     .filter((n) => Number.isFinite(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
-  return `${prefix}-${String(next).padStart(pad, "0")}`;
+  return `${prefix}${String(next).padStart(pad, "0")}`;
 }
 
 function buildAddress(c: StoredClient): string {
@@ -255,7 +256,7 @@ export default function CreditNoteFormPage() {
         navigate("/sales/credit-notes", { replace: true });
       }
     } else {
-      const cn = nextCode("CN", list.map((n) => n.creditNoteNumber), 5);
+      const cn = nextCode(getPrefix("creditNote") || "CR-", list.map((n) => n.creditNoteNumber), 5);
       setForm(blankForm(cn));
     }
   }, []);

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Cloud, Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
+import { getPrefix } from '@/lib/configService';
 import AddressPairFields from '@/components/shared/AddressPairFields';
 import {
   createEmptyAddress,
@@ -372,10 +373,10 @@ export default function AddVendorPage() {
 
     const existing = getVendors();
     const maxId = existing.reduce((max, v) => {
-      const num = parseInt(v.id.replace('VND-', ''), 10);
+      const num = parseInt(v.id.replace(/\D/g, ''), 10);
       return isNaN(num) ? max : Math.max(max, num);
     }, 1000);
-    const newId = `VND-${maxId + 1}`;
+    const newId = `${getPrefix('vendor') || 'VND-'}${maxId + 1}`;
 
     const avgRating = [formData.qualityRating, formData.deliveryRating, formData.serviceRating].filter(r => r > 0);
     const rating = avgRating.length > 0

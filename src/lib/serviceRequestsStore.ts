@@ -6,6 +6,7 @@
 
 const STORE_KEY = "nido_service_requests";
 const SEQ_KEY   = "nido_service_requests_seq";
+import { getPrefix } from "./configService";
 
 export interface StoredServiceRequest {
   id: string;
@@ -44,9 +45,10 @@ function nextSeq(prefix: string): number {
 }
 
 export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "requestDateTs">, prefix: string): StoredServiceRequest {
-  const seq = nextSeq(prefix);
+  const effectivePrefix = getPrefix("serviceRequest") || prefix || "SVC-";
+  const seq = nextSeq(effectivePrefix);
   const year = new Date().getFullYear();
-  const id = `${prefix}-${year}-${String(seq).padStart(5, "0")}`;
+  const id = `${effectivePrefix}${year}-${String(seq).padStart(5, "0")}`;
 
   const now = new Date();
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -74,8 +76,9 @@ export function getServiceRequests(): StoredServiceRequest[] {
  * Used by new-request forms to show a preview Request ID before submission.
  */
 export function peekNextId(prefix: string): string {
+  const effectivePrefix = getPrefix("serviceRequest") || prefix || "SVC-";
   const raw = JSON.parse(localStorage.getItem(SEQ_KEY) || "{}") as Record<string, number>;
-  const next = (raw[prefix] ?? 0) + 1;
+  const next = (raw[effectivePrefix] ?? 0) + 1;
   const year = new Date().getFullYear();
-  return `${prefix}-${year}-${String(next).padStart(5, "0")}`;
+  return `${effectivePrefix}${year}-${String(next).padStart(5, "0")}`;
 }

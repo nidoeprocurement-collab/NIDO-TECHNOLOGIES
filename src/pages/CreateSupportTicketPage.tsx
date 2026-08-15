@@ -10,6 +10,7 @@ import {
 import { getClients, StoredClient } from "@/lib/clientStore";
 import { saveSupportTickets } from "@/lib/supportTicketStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { getPrefix } from "@/lib/configService";
 
 // ── Static data ────────────────────────────────────────────────────────────────
 
@@ -46,16 +47,17 @@ function getExistingTickets(): {
 
 function generateTicketNumber(): string {
   const year = new Date().getFullYear();
-  const prefix = `TKT-${year}-`;
+  const prefix = getPrefix("supportTicket") || "TKT-";
+  const prefixWithYear = `${prefix}${year}-`;
   const existing = getExistingTickets();
   let maxSerial = 0;
   for (const t of existing) {
-    if (t.number && t.number.startsWith(prefix)) {
-      const serial = parseInt(t.number.slice(prefix.length), 10);
+    if (t.number && t.number.startsWith(prefixWithYear)) {
+      const serial = parseInt(t.number.slice(prefixWithYear.length), 10);
       if (!isNaN(serial) && serial > maxSerial) maxSerial = serial;
     }
   }
-  return `${prefix}${String(maxSerial + 1).padStart(6, "0")}`;
+  return `${prefixWithYear}${String(maxSerial + 1).padStart(6, "0")}`;
 }
 
 // ── Confetti dots (decorative, static) ────────────────────────────────────────

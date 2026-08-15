@@ -5,6 +5,7 @@ import { downloadPaymentMadePdf } from "@/lib/paymentMadePdf";
 import { getVendors } from "@/lib/vendorDataStore";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
+import { getPrefix } from "@/lib/configService";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,7 +126,7 @@ const nextPaymentNumber = (entries: PaymentEntry[]) => {
     const n = Number(e.paymentNumber.replace(/\D/g, ""));
     return Number.isFinite(n) ? Math.max(c, n) : c;
   }, 0);
-  return `PAY-${String(max + 1).padStart(5, "0")}`;
+  return `${getPrefix("payment") || "PMT-"}${String(max + 1).padStart(5, "0")}`;
 };
 
 const STATUS_STYLE: Record<string, string> = {

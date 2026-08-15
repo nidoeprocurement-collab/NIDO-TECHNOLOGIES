@@ -1,4 +1,5 @@
 import type { DeliveryChallanData } from './dcPdfGenerator';
+import { getPrefix } from './configService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface DCListItem {
@@ -132,10 +133,12 @@ export function removeChallan(id: string): void {
 
 export function generateDCNumber(): string {
   const year = new Date().getFullYear();
-  const re = new RegExp(`^DC-${year}-(\\d+)$`);
+  const prefix = getPrefix("deliveryChallan") || "DC-";
+  const prefixEscaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${prefixEscaped}${year}-(\\d+)$`);
   const serials = _challans
     .map((c) => { const m = c.number.match(re); return m ? parseInt(m[1], 10) : 0; })
     .filter((n) => n > 0);
   const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
-  return `DC-${year}-${String(next).padStart(5, '0')}`;
+  return `${prefix}${year}-${String(next).padStart(5, "0")}`;
 }

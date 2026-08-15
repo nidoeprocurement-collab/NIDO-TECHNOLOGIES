@@ -9,6 +9,7 @@ import {
   Clock, BarChart3, ChevronDown, Filter, Eye, MoreVertical,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getPrefix } from "@/lib/configService";
 
 // ── Mock data helpers ──────────────────────────────────────────────────────────
 
@@ -61,14 +62,14 @@ function getMockValue(col: string, idx: number): string {
     case "Vendor Category": return ["Electronics", "Office Supplies", "Furniture", "Logistics", "IT Services"][i % 5];
     case "Vendor Status":   return i < 8 ? "Active" : "Inactive";
     case "Rating":          return `${(3.5 + (i % 15) * 0.1).toFixed(1)} / 5`;
-    case "Order ID":        return `ORD-2026-${String(i + 1).padStart(4, "0")}`;
+    case "Order ID":        return `${getPrefix("order") || "ORD-"}2026-${String(i + 1).padStart(4, "0")}`;
     case "Order Date":      return fmtDate(i) + " " + fmtTime(10 + (i % 8), (i * 17) % 60);
     case "Order Status":    return ["Completed", "Pending", "Cancelled", "Completed", "Pending", "Completed", "Completed", "Pending", "Completed", "Pending"][i];
     case "Amount":          return fmtAmount(50000 + (idx * 17531) % 200000);
     case "Tax":             return fmtAmount(Math.round((50000 + (idx * 17531) % 200000) * 0.18));
     case "Total":           return fmtAmount(Math.round((50000 + (idx * 17531) % 200000) * 1.18));
     case "Item Name":       return ["Laptop Pro", "Office Chair", "Printer Ink", "USB Hub", "Monitor 24\"", "Keyboard", "Desk Lamp", "Webcam", "Headset", "Mouse"][i];
-    case "SKU":             return `SKU-${String(1000 + idx).padStart(6, "0")}`;
+    case "SKU":             return `${getPrefix("sku") || "SKU-"}${String(1000 + idx).padStart(6, "0")}`;
     case "Category":        return ["Electronics", "Furniture", "Consumables", "Peripherals", "Accessories"][i % 5];
     case "Price":           return fmtAmount(500 + (idx * 1234) % 50000);
     case "Stock":           return String(5 + (idx * 7) % 200);
@@ -78,7 +79,7 @@ function getMockValue(col: string, idx: number): string {
     case "Status":          return STATUSES[i % STATUSES.length];
     case "Priority":        return PRIORITIES[i % PRIORITIES.length];
     case "Assigned To":     return ["Rahul Sharma", "Priya Mehta", "Amit Verma", "Sneha Iyer", "Vikram Singh"][i % 5];
-    case "Ticket ID":       return `TKT-2026-${String(i + 1).padStart(4, "0")}`;
+    case "Ticket ID":       return `${getPrefix("supportTicket") || "TKT-"}2026-${String(i + 1).padStart(4, "0")}`;
     case "Subject":         return ["Login issue", "Payment failed", "Report error", "Access denied", "Slow performance", "Data mismatch", "Email not sent", "Export broken", "UI bug", "Missing invoice"][i];
     case "Resolution Date": return i < 6 ? fmtDate(i + 2) : "—";
     case "Agent":           return ["Rahul S.", "Priya M.", "Amit V.", "Sneha I.", "Vikram S."][i % 5];

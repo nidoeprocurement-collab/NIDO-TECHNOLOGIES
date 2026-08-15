@@ -7,3 +7,4 @@
 - [RBAC single source of truth](rbac-single-source-of-truth.md) — NIDO Users/Roles/Permissions must stay one module at /configuration/nido-users; route-level PermissionGate enforces module permissions per navigation.
 - [Quote PDF reference fidelity](quote-pdf-reference-fidelity.md) — quote downloads must preserve the uploaded estimate’s A4 Helvetica shell while allowing only the requested item-table header/data changes.
 - [Sales order PDF fidelity](sales-order-pdf-fidelity.md) — sales-order downloads reuse the quote renderer so both documents stay visually identical apart from labels and dates.
+- [Prefix configuration behavior](prefix-configuration.md) — new IDs read centralized prefixes; vendor credits remain distinct, while legacy stored identifiers are preserved.
