@@ -365,7 +365,11 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
         />
       );
     }
-    if (activeTab === "Catalog") return <CatalogPage key={`${clientId}-${refreshKey}-catalog`} clientId={clientId} />;
+    // ClientCatalogPage persists its own edits and emits clientCatalogUpdated.
+    // Do not key it by refreshKey: the parent listens to that same event, and
+    // remounting the catalog here would save on mount, emit again, and create
+    // an update loop that prevents the row action menu from responding.
+    if (activeTab === "Catalog") return <CatalogPage key={`${clientId}-catalog`} clientId={clientId} />;
     if (activeTab === "Activity") return <ActivityPage key={`${clientId}-${refreshKey}-activity`} clientId={clientId} />;
     if (activeTab === "Configuration") return <ConfigurationPage key={`${clientId}-${refreshKey}-configuration`} clientId={clientId} />;
     if (activeTab === "Documents") return <DocumentsPage key={`${clientId}-${refreshKey}-documents`} clientId={clientId} />;
