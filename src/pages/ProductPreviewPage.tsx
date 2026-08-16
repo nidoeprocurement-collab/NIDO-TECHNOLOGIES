@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Printer, Timer, Wifi, FileText, Shield, Cpu, HardDrive, Monitor, Settings2, Package } from 'lucide-react';
+import { ArrowLeft, Printer, Timer, Wifi, FileText, Shield, Cpu, HardDrive, Monitor, Settings2, Package } from 'lucide-react';
 
 interface PreviewData {
   masterProductCode: string;
@@ -67,6 +67,15 @@ export default function ProductPreviewPage() {
   return (
     <div className="h-screen overflow-y-auto bg-white">
       <div className="max-w-5xlpx-2 py-2 space-y-0">
+        <button
+          type="button"
+          onClick={() => navigate('/configuration/master-catalogue')}
+          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-900"
+          aria-label="Go back to Master Catalogue"
+        >
+          <ArrowLeft size={17} />
+          Go back to Master Catalogue
+        </button>
 
         {/* Section 1: Product Header */}
         <div className="border border-gray-200 rounded-xl p-2 mb-0">
