@@ -142,7 +142,7 @@ export default function OrderStatusesPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold">
-            Order Statuses
+            Order Status
           </h1>
 
           <p className="text-muted-foreground">
