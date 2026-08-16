@@ -47,6 +47,11 @@ export interface LocalizationSettings {
   timeFormat: string;
   currency: string;
   currencySymbol: string;
+  /** Stored monetary amounts use this base currency. */
+  baseCurrency: string;
+  /** Target-currency units received for one unit of baseCurrency. */
+  exchangeRates: Record<string, number>;
+  exchangeRatesUpdatedAt: string;
   numberFormat: string;
   weekStartDay: string;
   measurementUnit: string;
@@ -148,6 +153,15 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     timeFormat: "12h",
     currency: "INR (₹)",
     currencySymbol: "₹",
+    baseCurrency: "INR",
+    exchangeRates: {
+      INR: 1,
+      USD: 0.010471,
+      EUR: 0.009061,
+      GBP: 0.007743,
+      AED: 0.038454,
+    },
+    exchangeRatesUpdatedAt: "",
     numberFormat: "1,23,456.00 (Indian)",
     weekStartDay: "Monday",
     measurementUnit: "Metric",

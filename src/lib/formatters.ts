@@ -30,6 +30,25 @@ export function getCurrencySymbol(config?: GeneralSettings): string {
   return cfg.localization.currencySymbol || parseCurrencySymbol(cfg.localization.currency);
 }
 
+/** Extract an ISO currency code from settings values such as "USD ($)". */
+export function getCurrencyCode(currency?: string): string {
+  return currency?.match(/^[A-Z]{3}/)?.[0] ?? "INR";
+}
+
+/**
+ * Convert a stored base-currency amount to the currently selected display
+ * currency. Existing records remain stored in INR; only presentation changes.
+ */
+export function convertCurrency(value: number, config?: GeneralSettings): number {
+  const cfg = config ?? getConfig();
+  const baseCode = getCurrencyCode(cfg.localization.baseCurrency || "INR");
+  const targetCode = getCurrencyCode(cfg.localization.currency);
+  if (baseCode === targetCode) return value;
+
+  const rate = cfg.localization.exchangeRates?.[targetCode];
+  return typeof rate === "number" && Number.isFinite(rate) ? value * rate : value;
+}
+
 /**
  * Format a number as a currency string using the active config.
  * Uses compact suffixes (K / L / Cr) for Indian format when compact=true.
@@ -43,21 +62,22 @@ export function formatCurrency(
   const sym = getCurrencySymbol(cfg);
   const locale = getLocale(cfg);
   const dec = options?.decimals ?? 2;
+  const convertedValue = convertCurrency(value, cfg);
 
   if (options?.compact) {
     if (isIndianFormat(cfg)) {
-      if (value >= 10_000_000) return `${sym}${(value / 10_000_000).toFixed(2)}Cr`;
-      if (value >= 100_000) return `${sym}${(value / 100_000).toFixed(2)}L`;
-      if (value >= 1_000) return `${sym}${(value / 1_000).toFixed(1)}K`;
-      return `${sym}${Math.round(value).toLocaleString(locale)}`;
+      if (convertedValue >= 10_000_000) return `${sym}${(convertedValue / 10_000_000).toFixed(2)}Cr`;
+      if (convertedValue >= 100_000) return `${sym}${(convertedValue / 100_000).toFixed(2)}L`;
+      if (convertedValue >= 1_000) return `${sym}${(convertedValue / 1_000).toFixed(1)}K`;
+      return `${sym}${Math.round(convertedValue).toLocaleString(locale)}`;
     } else {
-      if (value >= 1_000_000) return `${sym}${(value / 1_000_000).toFixed(2)}M`;
-      if (value >= 1_000) return `${sym}${(value / 1_000).toFixed(1)}K`;
-      return `${sym}${Math.round(value).toLocaleString(locale)}`;
+      if (convertedValue >= 1_000_000) return `${sym}${(convertedValue / 1_000_000).toFixed(2)}M`;
+      if (convertedValue >= 1_000) return `${sym}${(convertedValue / 1_000).toFixed(1)}K`;
+      return `${sym}${Math.round(convertedValue).toLocaleString(locale)}`;
     }
   }
 
-  const formatted = value.toLocaleString(locale, {
+  const formatted = convertedValue.toLocaleString(locale, {
     minimumFractionDigits: dec,
     maximumFractionDigits: dec,
   });
