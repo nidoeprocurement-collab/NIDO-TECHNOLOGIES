@@ -13,6 +13,7 @@ import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { getPrefix } from "@/lib/configService";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
+import { createApprovalRequest } from "@/lib/approvalEngine";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -820,6 +821,7 @@ export default function MyOrderPage() {
     updateOrderStatus(orderId, status as any);
   };
   const [showStatusDd, setShowStatusDd] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const masterStatusOptions = Array.from(new Set([
     ...statusConfig.statuses
@@ -1480,7 +1482,39 @@ export default function MyOrderPage() {
                                 Reject
                               </button>
                               <button
-                                onClick={() => { updatePO(po.poNumber, { status: "Confirmed" }); navigate(`/vendor-orders/${po.poNumber}`); }}
+                                onClick={async () => {
+                                  setApprovalError("");
+                                  try {
+                                    // The central engine decides whether this PO
+                                    // needs approval. With no matching active
+                                    // workflow, the existing confirmation flow
+                                    // continues unchanged.
+                                    const requests = await createApprovalRequest({
+                                      module: "Purchase Order",
+                                      trigger: "PO created",
+                                      reference: po.poNumber,
+                                      amount: po.grandTotal,
+                                      requestedBy: user?.id || "system",
+                                      requestedByName: user?.name || "System",
+                                      requestedByRole: user?.role || "",
+                                      context: {
+                                        amount: po.grandTotal,
+                                        poNumber: po.poNumber,
+                                        vendor: po.vendorName,
+                                        orderId: po.orderId,
+                                      },
+                                    });
+                                    if (requests.length) {
+                                      setApprovalError(`${po.poNumber} is pending approval. Review it from Configuration → Approval Workflow.`);
+                                      setPoRefreshKey(k => k + 1);
+                                      return;
+                                    }
+                                    updatePO(po.poNumber, { status: "Confirmed" });
+                                    navigate(`/vendor-orders/${po.poNumber}`);
+                                  } catch (error: any) {
+                                    setApprovalError(error?.message || "Approval service is unavailable. The PO was not confirmed.");
+                                  }
+                                }}
                                 style={{ padding: "7px 18px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}
                               >
                                 Confirm PO →
@@ -1491,6 +1525,11 @@ export default function MyOrderPage() {
                       ))}
                     </div>
                   </>
+                )}
+                {approvalError && (
+                  <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 7, background: "#fffbeb", border: "1px solid #fcd34d", color: "#92400e", fontSize: 12.5 }}>
+                    {approvalError}
+                  </div>
                 )}
               </div>
             );

@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import emailRouter from "./routes/email.js";
 import quotesRouter from "./routes/quotes.js";
 import exchangeRatesRouter from "./routes/exchangeRates.js";
+import approvalsRouter from "./routes/approvals.js";
 import { migrate } from "./migrate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +30,7 @@ async function main() {
   app.use("/api/email", emailRouter);
   app.use("/api/quotes", quotesRouter);
   app.use("/api/exchange-rates", exchangeRatesRouter);
+  app.use("/api/approvals", approvalsRouter);
   app.get("/api/client-context", (req, res) => {
     const forwardedFor = req.headers["x-forwarded-for"];
     const forwardedIp = Array.isArray(forwardedFor)
