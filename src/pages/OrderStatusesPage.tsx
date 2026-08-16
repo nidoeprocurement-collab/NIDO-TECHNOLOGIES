@@ -38,65 +38,39 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-type StatusCategory = string
+import {
+  addConfiguredOrderStatus,
+  addOrderStatusParticular,
+  deleteConfiguredOrderStatus,
+  type ConfiguredOrderStatus,
+  type StatusCategory,
+  updateConfiguredOrderStatus,
+  useOrderStatusConfig,
+} from "@/lib/orderStatusStore"
 
-type OrderStatus = {
-  id: number
-  category: StatusCategory
-  color: string
-  name: string
-  description: string
-  sortOrder: number
-  visible: boolean
-  default: boolean
+const particularVisuals: Record<
+  string,
+  { icon: typeof ShoppingCart; iconClass: string }
+> = {
+  orders: { icon: ShoppingCart, iconClass: "text-blue-600 bg-blue-50" },
+  "purchase-orders": { icon: ClipboardCheck, iconClass: "text-violet-600 bg-violet-50" },
+  transactions: { icon: ReceiptText, iconClass: "text-emerald-600 bg-emerald-50" },
+  support: { icon: Headset, iconClass: "text-amber-600 bg-amber-50" },
+  other: { icon: Layers, iconClass: "text-slate-600 bg-slate-100" },
 }
 
-const statusCategories: {
-  value: StatusCategory
-  description: string
-  icon: typeof ShoppingCart
-  iconClass: string
-}[] = [
-  {
-    value: "Orders",
-    description: "Customer order lifecycle",
-    icon: ShoppingCart,
-    iconClass: "text-blue-600 bg-blue-50",
-  },
-  {
-    value: "Purchase Orders",
-    description: "Vendor purchase order lifecycle",
-    icon: ClipboardCheck,
-    iconClass: "text-violet-600 bg-violet-50",
-  },
-  {
-    value: "Transactions",
-    description: "Payment and reconciliation lifecycle",
-    icon: ReceiptText,
-    iconClass: "text-emerald-600 bg-emerald-50",
-  },
-  {
-    value: "Support Services",
-    description: "Service request lifecycle",
-    icon: Headset,
-    iconClass: "text-amber-600 bg-amber-50",
-  },
-  {
-    value: "Other",
-    description: "Additional workflow statuses",
-    icon: Layers,
-    iconClass: "text-slate-600 bg-slate-100",
-  },
-]
+type OrderStatus = ConfiguredOrderStatus
 
 const ALL_PARTICULARS = "all"
 const ADD_PARTICULAR = "__add_particular__"
 
 export default function OrderStatusesPage() {
+  const config = useOrderStatusConfig()
+  const particulars = config.particulars
+  const statuses = config.statuses
   const [search, setSearch] = useState("")
   const [open, setOpen] = useState(false)
 
-  const [particulars, setParticulars] = useState(statusCategories)
   const [selectedParticular, setSelectedParticular] = useState(ALL_PARTICULARS)
   const [category, setCategory] = useState<StatusCategory>("Orders")
   const [isAddingParticular, setIsAddingParticular] = useState(false)
@@ -128,99 +102,6 @@ export default function OrderStatusesPage() {
     { name: "Black", value: "#111827" },
   ]
 
-  const [statuses, setStatuses] = useState<OrderStatus[]>([
-    {
-      id: 1,
-      category: "Orders",
-      color: "#f59e0b",
-      name: "Pending",
-      description: "Order awaiting review",
-      sortOrder: 1,
-      visible: true,
-      default: true,
-    },
-    {
-      id: 2,
-      category: "Orders",
-      color: "#f97316",
-      name: "Processing",
-      description: "Order being processed",
-      sortOrder: 2,
-      visible: true,
-      default: false,
-    },
-    {
-      id: 3,
-      category: "Orders",
-      color: "#10b981",
-      name: "Approved",
-      description: "Order approved",
-      sortOrder: 3,
-      visible: true,
-      default: false,
-    },
-    {
-      id: 4,
-      category: "Purchase Orders",
-      color: "#6366f1",
-      name: "Draft",
-      description: "Purchase order being prepared",
-      sortOrder: 1,
-      visible: true,
-      default: true,
-    },
-    {
-      id: 5,
-      category: "Purchase Orders",
-      color: "#8b5cf6",
-      name: "Sent to Vendor",
-      description: "Purchase order sent for vendor confirmation",
-      sortOrder: 2,
-      visible: true,
-      default: false,
-    },
-    {
-      id: 6,
-      category: "Transactions",
-      color: "#0ea5e9",
-      name: "Pending Payment",
-      description: "Transaction awaiting payment",
-      sortOrder: 1,
-      visible: true,
-      default: true,
-    },
-    {
-      id: 7,
-      category: "Transactions",
-      color: "#10b981",
-      name: "Completed",
-      description: "Transaction successfully completed",
-      sortOrder: 2,
-      visible: true,
-      default: false,
-    },
-    {
-      id: 8,
-      category: "Support Services",
-      color: "#f59e0b",
-      name: "Open",
-      description: "Support request received and awaiting action",
-      sortOrder: 1,
-      visible: true,
-      default: true,
-    },
-    {
-      id: 9,
-      category: "Support Services",
-      color: "#14b8a6",
-      name: "Resolved",
-      description: "Support request resolved",
-      sortOrder: 2,
-      visible: true,
-      default: false,
-    },
-  ])
-
   const addParticular = () => {
     const name = newParticularName.trim()
     if (!name) {
@@ -239,14 +120,11 @@ export default function OrderStatusesPage() {
       return
     }
 
-    const newParticular = {
+    addOrderStatusParticular({
       value: name,
       description: "Custom workflow particular",
-      icon: Layers,
-      iconClass: "text-slate-600 bg-slate-100",
-    }
-
-    setParticulars((current) => [...current, newParticular])
+      iconKey: "other",
+    })
     setCategory(name)
     setSelectedParticular(name)
     setIsAddingParticular(false)
@@ -269,8 +147,7 @@ export default function OrderStatusesPage() {
   const addStatus = () => {
     if (!statusName.trim()) return
 
-    const status = {
-      id: Date.now(),
+    addConfiguredOrderStatus({
       category,
       color,
       name: statusName,
@@ -278,9 +155,7 @@ export default function OrderStatusesPage() {
       sortOrder: Number(sortOrder),
       visible,
       default: false,
-    }
-
-    setStatuses([...statuses, status])
+    })
 
     setSelectedParticular(category)
     setCategory(particulars[0]?.value ?? "Orders")
@@ -296,17 +171,12 @@ export default function OrderStatusesPage() {
   }
 
   const deleteStatus = (id: number) => {
-    setStatuses(statuses.filter((s) => s.id !== id))
+    deleteConfiguredOrderStatus(id)
   }
 
   const toggleVisible = (id: number) => {
-    setStatuses(
-      statuses.map((s) =>
-        s.id === id
-          ? { ...s, visible: !s.visible }
-          : s
-      )
-    )
+    const status = statuses.find((item) => item.id === id)
+    if (status) updateConfiguredOrderStatus(id, { visible: !status.visible })
   }
 
   const filteredStatuses = statuses.filter((status) =>
@@ -324,6 +194,8 @@ export default function OrderStatusesPage() {
   const groupedStatuses = visibleParticulars
     .map((group) => ({
       ...group,
+      icon: particularVisuals[group.iconKey]?.icon || Layers,
+      iconClass: particularVisuals[group.iconKey]?.iconClass || particularVisuals.other.iconClass,
       statuses: filteredStatuses
         .filter((status) => status.category === group.value)
         .sort((a, b) => a.sortOrder - b.sortOrder),
@@ -366,7 +238,9 @@ export default function OrderStatusesPage() {
         <p className="mb-3 text-sm font-semibold text-slate-700">Particulars</p>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           {particulars.map((particular) => {
-            const ParticularIcon = particular.icon
+            const ParticularIcon = particularVisuals[particular.iconKey]?.icon || Layers
+            const particularIconClass =
+              particularVisuals[particular.iconKey]?.iconClass || particularVisuals.other.iconClass
             const count = statuses.filter((status) => status.category === particular.value).length
 
             return (
@@ -381,7 +255,7 @@ export default function OrderStatusesPage() {
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${particular.iconClass}`}>
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${particularIconClass}`}>
                     <ParticularIcon className="h-4 w-4" />
                   </div>
                   <Badge variant="secondary">{count}</Badge>

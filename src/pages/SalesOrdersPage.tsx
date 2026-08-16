@@ -10,6 +10,7 @@ import {
 import { downloadSalesOrderPdf } from "@/lib/salesOrderPdfGenerator";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
 function statusBadge(status: string) {
   switch (status) {
@@ -27,8 +28,16 @@ const fmt = (n: number) =>
 export default function SalesOrdersPage() {
   const navigate = useNavigate();
   const { config } = useConfig();
+  const statusConfig = useOrderStatusConfig();
   useI18n();
   const soPrefix = config.prefixes.find(p => p.key === "salesOrder")?.value || "SO-";
+  const salesStatusOptions = useMemo(() => Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Transactions" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    "Draft", "Confirmed", "Processing", "Completed", "Cancelled",
+  ])), [statusConfig.statuses]);
 
   const [orders, setOrders] = useState<StoredSalesOrder[]>([]);
   const [archivedOrders, setArchivedOrders] = useState<StoredSalesOrder[]>([]);
@@ -197,11 +206,9 @@ export default function SalesOrdersPage() {
           className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All</option>
-          <option value="Draft">Draft</option>
-          <option value="Confirmed">Confirmed</option>
-          <option value="Processing">Processing</option>
-          <option value="Completed">Completed</option>
-          <option value="Cancelled">Cancelled</option>
+          {salesStatusOptions.map(status => (
+            <option key={status} value={status}>{status}</option>
+          ))}
         </select>
       </div>
 

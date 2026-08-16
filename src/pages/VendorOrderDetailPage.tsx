@@ -4,6 +4,7 @@ import { getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } 
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -325,7 +326,15 @@ function UploadDocumentModal({ onSave, onClose }: { onSave: (doc: any) => void; 
 function StatusDropdown({ status, onChange, disabled }: { status: string; onChange: (s: string) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const statusConfig = useOrderStatusConfig();
   const s = STATUS_STYLE[status] || STATUS_STYLE["Pending"];
+  const itemStatuses = Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(item => item.category === "Purchase Orders" && item.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(item => item.name),
+    ...ITEM_STATUSES,
+  ]));
 
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -351,7 +360,7 @@ function StatusDropdown({ status, onChange, disabled }: { status: string; onChan
       </button>
       {open && (
         <div style={{ position: "absolute", left: 0, top: 32, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 200, minWidth: 160, overflow: "hidden" }}>
-          {ITEM_STATUSES.map(opt => (
+          {itemStatuses.map(opt => (
             <button
               key={opt}
               onClick={() => { onChange(opt); setOpen(false); }}
@@ -542,7 +551,14 @@ function Stepper({ currentStatus }: { currentStatus: string }) {
 function UpdateStatusDropdown({ current, onChange }: { current: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const opts = ["Confirmed", "Processing", "Shipped", "Delivered"];
+  const statusConfig = useOrderStatusConfig();
+  const opts = Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Purchase Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    "Confirmed", "Processing", "Shipped", "Delivered",
+  ]));
 
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };

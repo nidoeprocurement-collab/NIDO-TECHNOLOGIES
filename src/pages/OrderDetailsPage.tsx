@@ -12,6 +12,7 @@ import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { getPrefix } from "@/lib/configService";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -618,12 +619,19 @@ const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "
 function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, referenceLocked, onCancel, onRaiseReturn, returnAllowed }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const ref = useRef<any>(null);
+  const statusConfig = useOrderStatusConfig();
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setStatusSub(false); } };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-  const statuses = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered"];
+  const statuses = Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    "Pending", "Confirmed", "Processing", "Shipped", "Delivered",
+  ]));
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button onClick={e => { e.stopPropagation(); setOpen(v => !v); setStatusSub(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
@@ -725,6 +733,7 @@ export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrderStatus } = useMyOrders();
   const { user, isClientPortalUser } = useAuth();
+  const statusConfig = useOrderStatusConfig();
   const orderId = id || "";
 
   // Find the real order from context
@@ -812,6 +821,13 @@ export default function MyOrderPage() {
   };
   const [showStatusDd, setShowStatusDd] = useState(false);
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
+  const masterStatusOptions = Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
+  ]));
 
   // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
   // Stock is no longer reserved at cart time, so no stock release is needed here.
@@ -1144,7 +1160,7 @@ export default function MyOrderPage() {
                     <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid hsl(var(--primary))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--primary))", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
                     {showStatusDd && (
                       <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                        {["Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft"].map(opt => (
+                        {masterStatusOptions.map(opt => (
                           <button key={opt} onClick={() => {
                             setShowStatusDd(false);
                             if (opt === "Cancelled") { setPendingCancelStatus(true); return; }

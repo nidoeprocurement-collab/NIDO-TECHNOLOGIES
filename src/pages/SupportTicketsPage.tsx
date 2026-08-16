@@ -6,6 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, MoreVertical,
   Clock, CheckCircle, Paperclip, Eye,
 } from "lucide-react";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ interface ChildTicket {
   subject: string;
   department: string;
   priority: "High" | "Medium" | "Low";
-  status: "Open" | "In Progress" | "On Hold" | "Resolved" | "Closed";
+  status: string;
   slaMinutesLeft: number | null; // null = SLA met / resolved
   slaTargetLabel: string;
   lastUpdated: string;
@@ -27,7 +28,7 @@ interface Ticket {
   client: string;
   department: string;
   priority: "High" | "Medium" | "Low";
-  status: "Open" | "In Progress" | "On Hold" | "Resolved" | "Closed";
+  status: string;
   slaMinutesLeft: number | null;
   slaTargetLabel: string;
   lastUpdated: string;
@@ -374,12 +375,21 @@ function SLACell({ minutesLeft, targetLabel }: { minutesLeft: number | null; tar
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-const STATUS_LIST     = ["All Status", "Open", "In Progress", "On Hold", "Resolved", "Closed"];
+const LEGACY_SUPPORT_STATUSES = ["Open", "In Progress", "On Hold", "Resolved", "Closed"];
 const PRIORITY_LIST   = ["All Priority", "High", "Medium", "Low"];
 const PAGE_SIZE_OPTIONS = [10, 25, 50];
 
 export default function SupportTicketsPage() {
   const navigate = useNavigate();
+  const statusConfig = useOrderStatusConfig();
+  const supportStatusOptions = useMemo(() => Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Support Services" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    ...LEGACY_SUPPORT_STATUSES,
+  ])), [statusConfig.statuses]);
+  const statusFilterOptions = ["All Status", ...supportStatusOptions];
 
   // Real tickets from localStorage (prepended, newest first)
   const [realTickets, setRealTickets] = useState<Ticket[]>(() => loadRealTickets());
@@ -428,15 +438,6 @@ export default function SupportTicketsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["TKT-2026-00077"]));
 
   // ── Counts for tiles (live) ──
-  const counts = useMemo(() => ({
-    total:      allTickets.length,
-    open:       allTickets.filter(t => t.status === "Open").length,
-    inProgress: allTickets.filter(t => t.status === "In Progress").length,
-    onHold:     allTickets.filter(t => t.status === "On Hold").length,
-    resolved:   allTickets.filter(t => t.status === "Resolved").length,
-    closed:     allTickets.filter(t => t.status === "Closed").length,
-  }), [allTickets]);
-
   // ── Filter + search ──
   const filtered = useMemo(() => {
     return allTickets.filter(t => {
@@ -506,12 +507,19 @@ export default function SupportTicketsPage() {
 
   // ── Tile definition ──
   const TILES = [
-    { label: "Total Tickets", value: counts.total,      status: null,          valueClass: "text-foreground" },
-    { label: "Open",           value: counts.open,       status: "Open",        valueClass: "text-blue-600 dark:text-blue-400" },
-    { label: "In Progress",    value: counts.inProgress, status: "In Progress", valueClass: "text-orange-500 dark:text-orange-400" },
-    { label: "On Hold",        value: counts.onHold,     status: "On Hold",     valueClass: "text-purple-600 dark:text-purple-400" },
-    { label: "Resolved",       value: counts.resolved,   status: "Resolved",    valueClass: "text-green-600 dark:text-green-400" },
-    { label: "Closed",         value: counts.closed,     status: "Closed",      valueClass: "text-muted-foreground" },
+    { label: "Total Tickets", value: allTickets.length, status: null, valueClass: "text-foreground" },
+    ...supportStatusOptions.map((status, index) => ({
+      label: status,
+      value: allTickets.filter(ticket => ticket.status === status).length,
+      status,
+      valueClass: [
+        "text-blue-600 dark:text-blue-400",
+        "text-orange-500 dark:text-orange-400",
+        "text-purple-600 dark:text-purple-400",
+        "text-green-600 dark:text-green-400",
+        "text-muted-foreground",
+      ][index % 5],
+    })),
   ];
 
   const activeStatus = tileFilter ?? (statusF !== "All Status" ? statusF : null);
@@ -566,7 +574,7 @@ export default function SupportTicketsPage() {
           {[
             { value: clientF,   setValue: setClientF,   options: CLIENTS_LIST   },
             { value: deptF,     setValue: setDeptF,     options: DEPT_LIST      },
-            { value: statusF,   setValue: (v: string) => { setStatusF(v); setTileFilter(null); }, options: STATUS_LIST   },
+            { value: statusF,   setValue: (v: string) => { setStatusF(v); setTileFilter(null); }, options: statusFilterOptions   },
             { value: priorityF, setValue: setPriorityF, options: PRIORITY_LIST  },
           ].map(({ value, setValue, options }) => (
             <div key={options[0]} className="relative">
