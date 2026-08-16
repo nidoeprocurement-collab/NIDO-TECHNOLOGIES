@@ -38,12 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-type StatusCategory =
-  | "Orders"
-  | "Purchase Orders"
-  | "Transactions"
-  | "Support Services"
-  | "Other"
+type StatusCategory = string
 
 type OrderStatus = {
   id: number
@@ -94,11 +89,19 @@ const statusCategories: {
   },
 ]
 
+const ALL_PARTICULARS = "all"
+const ADD_PARTICULAR = "__add_particular__"
+
 export default function OrderStatusesPage() {
   const [search, setSearch] = useState("")
   const [open, setOpen] = useState(false)
 
+  const [particulars, setParticulars] = useState(statusCategories)
+  const [selectedParticular, setSelectedParticular] = useState(ALL_PARTICULARS)
   const [category, setCategory] = useState<StatusCategory>("Orders")
+  const [isAddingParticular, setIsAddingParticular] = useState(false)
+  const [newParticularName, setNewParticularName] = useState("")
+  const [particularError, setParticularError] = useState("")
   const [statusName, setStatusName] = useState("")
   const [description, setDescription] = useState("")
   const [sortOrder, setSortOrder] = useState("0")
@@ -218,6 +221,51 @@ export default function OrderStatusesPage() {
     },
   ])
 
+  const addParticular = () => {
+    const name = newParticularName.trim()
+    if (!name) {
+      setParticularError("Enter a particular name.")
+      return
+    }
+
+    const existing = particulars.find(
+      (item) => item.value.toLowerCase() === name.toLowerCase()
+    )
+    if (existing) {
+      setCategory(existing.value)
+      setIsAddingParticular(false)
+      setNewParticularName("")
+      setParticularError("")
+      return
+    }
+
+    const newParticular = {
+      value: name,
+      description: "Custom workflow particular",
+      icon: Layers,
+      iconClass: "text-slate-600 bg-slate-100",
+    }
+
+    setParticulars((current) => [...current, newParticular])
+    setCategory(name)
+    setSelectedParticular(name)
+    setIsAddingParticular(false)
+    setNewParticularName("")
+    setParticularError("")
+  }
+
+  const handleParticularChange = (value: string) => {
+    if (value === ADD_PARTICULAR) {
+      setIsAddingParticular(true)
+      setParticularError("")
+      return
+    }
+
+    setCategory(value)
+    setIsAddingParticular(false)
+    setParticularError("")
+  }
+
   const addStatus = () => {
     if (!statusName.trim()) return
 
@@ -234,7 +282,10 @@ export default function OrderStatusesPage() {
 
     setStatuses([...statuses, status])
 
-    setCategory("Orders")
+    setSelectedParticular(category)
+    setCategory(particulars[0]?.value ?? "Orders")
+    setIsAddingParticular(false)
+    setNewParticularName("")
     setStatusName("")
     setDescription("")
     setSortOrder("0")
@@ -264,7 +315,13 @@ export default function OrderStatusesPage() {
       .includes(search.toLowerCase())
   )
 
-  const groupedStatuses = statusCategories
+  const visibleParticulars = particulars.filter(
+    (particular) =>
+      selectedParticular === ALL_PARTICULARS ||
+      particular.value === selectedParticular
+  )
+
+  const groupedStatuses = visibleParticulars
     .map((group) => ({
       ...group,
       statuses: filteredStatuses
@@ -305,6 +362,57 @@ export default function OrderStatusesPage() {
         />
       </div>
 
+      <div>
+        <p className="mb-3 text-sm font-semibold text-slate-700">Particulars</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <button
+            type="button"
+            onClick={() => setSelectedParticular(ALL_PARTICULARS)}
+            className={`rounded-xl border p-3 text-left transition-all ${
+              selectedParticular === ALL_PARTICULARS
+                ? "border-blue-500 bg-blue-50 shadow-sm"
+                : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50"
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                <Layers className="h-4 w-4" />
+              </div>
+              <Badge variant="secondary">{statuses.length}</Badge>
+            </div>
+            <p className="text-sm font-semibold text-slate-800">All Particulars</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Show all statuses</p>
+          </button>
+
+          {particulars.map((particular) => {
+            const ParticularIcon = particular.icon
+            const count = statuses.filter((status) => status.category === particular.value).length
+
+            return (
+              <button
+                key={particular.value}
+                type="button"
+                onClick={() => setSelectedParticular(particular.value)}
+                className={`rounded-xl border p-3 text-left transition-all ${
+                  selectedParticular === particular.value
+                    ? "border-blue-500 bg-blue-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${particular.iconClass}`}>
+                    <ParticularIcon className="h-4 w-4" />
+                  </div>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+                <p className="truncate text-sm font-semibold text-slate-800">{particular.value}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{particular.description}</p>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="space-y-5">
         {groupedStatuses.map((group) => {
           const GroupIcon = group.icon
@@ -329,7 +437,7 @@ export default function OrderStatusesPage() {
               <CardContent className="p-0">
                 {group.statuses.length === 0 ? (
                   <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-                    No statuses in this particular yet.
+                    No statuses in this particular yet. Use Add Status to create one.
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -423,21 +531,49 @@ export default function OrderStatusesPage() {
 
             <div>
               <Label>Particular</Label>
-              <Select value={category} onValueChange={(value) => setCategory(value as StatusCategory)}>
+              <Select
+                value={isAddingParticular ? ADD_PARTICULAR : category}
+                onValueChange={handleParticularChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a particular" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statusCategories.map((item) => (
+                  {particulars.map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       {item.value}
                     </SelectItem>
                   ))}
+                  <SelectItem value={ADD_PARTICULAR}>+ Add new particular</SelectItem>
                 </SelectContent>
               </Select>
               <p className="mt-1.5 text-xs text-muted-foreground">
                 Choose which workflow this status belongs to.
               </p>
+
+              {isAddingParticular && (
+                <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/60 p-3">
+                  <Label htmlFor="new-particular-name">New Particular Name</Label>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      id="new-particular-name"
+                      value={newParticularName}
+                      onChange={(event) => {
+                        setNewParticularName(event.target.value)
+                        setParticularError("")
+                      }}
+                      placeholder="e.g. Service Requests"
+                      autoFocus
+                    />
+                    <Button type="button" onClick={addParticular}>
+                      Add
+                    </Button>
+                  </div>
+                  {particularError && (
+                    <p className="mt-1.5 text-xs text-red-600">{particularError}</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
