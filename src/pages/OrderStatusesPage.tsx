@@ -364,26 +364,7 @@ export default function OrderStatusesPage() {
 
       <div>
         <p className="mb-3 text-sm font-semibold text-slate-700">Particulars</p>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <button
-            type="button"
-            onClick={() => setSelectedParticular(ALL_PARTICULARS)}
-            className={`rounded-xl border p-3 text-left transition-all ${
-              selectedParticular === ALL_PARTICULARS
-                ? "border-blue-500 bg-blue-50 shadow-sm"
-                : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50"
-            }`}
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                <Layers className="h-4 w-4" />
-              </div>
-              <Badge variant="secondary">{statuses.length}</Badge>
-            </div>
-            <p className="text-sm font-semibold text-slate-800">All Particulars</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Show all statuses</p>
-          </button>
-
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
           {particulars.map((particular) => {
             const ParticularIcon = particular.icon
             const count = statuses.filter((status) => status.category === particular.value).length
