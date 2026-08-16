@@ -6,7 +6,6 @@ import {
   Bell,
   BookOpen,
   Plug,
-  FileText,
   Zap,
   DollarSign,
   Mail,
@@ -65,12 +64,6 @@ const menuItems = [
     description: "Manage connectors and API integrations",
     icon: Plug,
     href: "/integrations",
-  },
-  {
-    title: "System Logs",
-    description: "Activity & system event logs",
-    icon: FileText,
-    href: "/reports/audit",
   },
   {
     title: "Auto Assignment",
