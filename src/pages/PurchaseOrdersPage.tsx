@@ -289,7 +289,7 @@ function DetailField({ label, value }: { label: string; value: React.ReactNode }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PurchaseOrdersPage() {
-  useI18n();
+  const { currencySymbol } = useI18n();
   const { setMeta } = usePageMeta();
   const navigate = useNavigate();
   const location = useLocation();
@@ -721,7 +721,7 @@ export default function PurchaseOrdersPage() {
                               <option value="">— Pick from vendor catalog —</option>
                               {vendorProducts.map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.productName}{p.price ? ` · ₹${p.price}` : ""}
+                                  {p.productName}{p.price ? ` · ${currencySymbol}${p.price}` : ""}
                                 </option>
                               ))}
                             </select>
@@ -763,7 +763,7 @@ export default function PurchaseOrdersPage() {
                   <tbody>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-600">Gross Subtotal</td>
-                      <td className="px-4 py-2.5 text-right text-gray-900">INR {formTotals.subtotal.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">{money(formTotals.subtotal)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 font-semibold text-gray-900">
@@ -772,17 +772,17 @@ export default function PurchaseOrdersPage() {
                           <input type="number" min={0} max={100} className="w-12 px-1.5 py-0.5 text-right text-xs border border-gray-200 rounded focus:outline-none focus:border-blue-400 bg-white" value={form.discountPercent} onChange={(e) => setF("discountPercent", toNumber(e.target.value))} />%
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">INR − {formTotals.discountAmount.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">− {money(formTotals.discountAmount)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">INR {formTotals.taxableBase.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{money(formTotals.taxableBase)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-600">
                         Total GST{formTotals.gstSlabs.length > 0 ? ` (${formTotals.gstSlabs.map(s => `${s.rate}%`).join(", ")})` : ""}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-gray-900">INR {formTotals.taxAmount.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-900">{money(formTotals.taxAmount)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-600">Shipping &amp; Handling Charges</td>
@@ -798,7 +798,7 @@ export default function PurchaseOrdersPage() {
                     </tr>
                     <tr className="bg-blue-50">
                       <td className="px-4 py-3 font-bold text-gray-900">Total Payable</td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">INR {formTotals.total.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">{money(formTotals.total)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1210,32 +1210,32 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
             <tbody>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-2 text-gray-600">Gross Subtotal</td>
-                <td className="px-4 py-2 text-right text-gray-900">INR {totals.subtotal.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right text-gray-900">{money(totals.subtotal)}</td>
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-2 font-semibold text-gray-900">Item Level Discounts (−)</td>
-                <td className="px-4 py-2 text-right font-semibold text-gray-900">INR − {totals.discountAmount.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right font-semibold text-gray-900">− {money(totals.discountAmount)}</td>
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-2 font-semibold text-gray-900">Total Taxable Value</td>
-                <td className="px-4 py-2 text-right font-semibold text-gray-900">INR {totals.taxableBase.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right font-semibold text-gray-900">{money(totals.taxableBase)}</td>
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-2 text-gray-600">
                   Total GST{totals.gstSlabs.length > 0 ? ` (${totals.gstSlabs.map(s => `${s.rate}%`).join(", ")})` : ""}
                 </td>
-                <td className="px-4 py-2 text-right text-gray-900">INR {totals.taxAmount.toFixed(2)}</td>
+                <td className="px-4 py-2 text-right text-gray-900">{money(totals.taxAmount)}</td>
               </tr>
               {(order.shippingCharges ?? 0) > 0 && (
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-2 text-gray-600">Shipping &amp; Handling Charges</td>
-                  <td className="px-4 py-2 text-right text-gray-900">INR {(order.shippingCharges ?? 0).toFixed(2)}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{money(order.shippingCharges ?? 0)}</td>
                 </tr>
               )}
               {order.adjustment !== 0 && (
                 <tr className="border-b border-gray-100">
                   <td className="px-4 py-2 text-gray-600">Round Off Adjustment</td>
-                  <td className="px-4 py-2 text-right text-gray-900">{order.adjustment < 0 ? "−" : ""}INR {Math.abs(order.adjustment).toFixed(2)}</td>
+                  <td className="px-4 py-2 text-right text-gray-900">{order.adjustment < 0 ? "−" : ""}{money(Math.abs(order.adjustment))}</td>
                 </tr>
               )}
               <tr className="bg-blue-50">

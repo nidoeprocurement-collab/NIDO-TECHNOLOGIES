@@ -101,9 +101,9 @@ function ReceiptPreviewDrawer({
           <div className="rounded-xl bg-blue-50 border border-blue-100 px-6 py-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-blue-500 uppercase tracking-widest mb-1">Amount Received</p>
-              <p className="text-3xl font-bold text-blue-700 tabular-nums">₹{fmt(receipt.amountReceived)}</p>
+              <p className="text-3xl font-bold text-blue-700 tabular-nums">{fmt(receipt.amountReceived)}</p>
               {Number(receipt.bankCharges ?? 0) > 0 && (
-                <p className="text-xs text-blue-400 mt-1">+ ₹{fmt(Number(receipt.bankCharges))} bank charges</p>
+                <p className="text-xs text-blue-400 mt-1">+ {fmt(Number(receipt.bankCharges))} bank charges</p>
               )}
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${STATUS_STYLES[receipt.status] ?? "bg-gray-100 text-gray-600"}`}>
@@ -172,18 +172,18 @@ function ReceiptPreviewDrawer({
             <div className="divide-y divide-gray-100">
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-sm text-gray-600">Amount Received</span>
-                <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(receipt.amountReceived)}</span>
+                <span className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(receipt.amountReceived)}</span>
               </div>
               {Number(receipt.bankCharges ?? 0) > 0 && (
                 <div className="flex items-center justify-between px-4 py-2.5">
                   <span className="text-sm text-gray-600">Bank Charges</span>
-                  <span className="text-sm font-semibold text-gray-800 tabular-nums">₹{fmt(Number(receipt.bankCharges))}</span>
+                  <span className="text-sm font-semibold text-gray-800 tabular-nums">{fmt(Number(receipt.bankCharges))}</span>
                 </div>
               )}
               <div className="flex items-center justify-between px-4 py-3 bg-blue-50/60">
                 <span className="text-sm font-bold text-gray-800">Total</span>
                 <span className="text-base font-bold text-blue-700 tabular-nums">
-                  ₹{fmt(receipt.amountReceived + Number(receipt.bankCharges ?? 0))}
+                  {fmt(receipt.amountReceived + Number(receipt.bankCharges ?? 0))}
                 </span>
               </div>
             </div>
@@ -248,7 +248,7 @@ function ArchivedDrawer({ onClose }: { onClose: () => void }) {
                       <td className="px-4 py-3 text-gray-700">{r.customerName}</td>
                       <td className="px-4 py-3 text-gray-500">{r.invoiceNumber || "—"}</td>
                       <td className="px-4 py-3 text-gray-500">{r.paymentMode}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-700 tabular-nums">₹{fmt(r.amountReceived)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-700 tabular-nums">{fmt(r.amountReceived)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -342,7 +342,7 @@ export default function PaymentReceiptsPage() {
       <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
         <p className="text-sm text-gray-500">
           Total Paid:{" "}
-          <span className="text-lg font-bold text-gray-900">₹{fmt(totalPaid)}</span>
+          <span className="text-lg font-bold text-gray-900">{fmt(totalPaid)}</span>
         </p>
       </div>
 
@@ -400,7 +400,7 @@ export default function PaymentReceiptsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                        ₹{fmt(r.amountReceived)}
+                        {fmt(r.amountReceived)}
                       </td>
                       {/* Actions — stop row-click propagation */}
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>

@@ -56,7 +56,7 @@ const SOURCE_TABS: { key: ImportSource; label: string }[] = [
 ];
 
 export default function InvoiceFormPage() {
-  useI18n();
+  const { currencySymbol } = useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const existing = useMemo(() => (id ? getInvoiceById(id) : undefined), [id]);
@@ -264,13 +264,13 @@ export default function InvoiceFormPage() {
     if (importSource === 'quotation') {
       return quotations.map((q) => ({
         id:    q.id,
-        label: `${q.quoteNumber} — ${q.clientName} (₹${q.grandTotal.toLocaleString('en-IN')})`,
+        label: `${q.quoteNumber} — ${q.clientName} (${fmt(q.grandTotal)})`,
       }));
     }
     // salesorder
     return salesOrders.map((o) => ({
       id:    o.id,
-      label: `${o.orderNumber} — ${o.clientName} (₹${o.grandTotal.toLocaleString('en-IN')})`,
+      label: `${o.orderNumber} — ${o.clientName} (${fmt(o.grandTotal)})`,
     }));
   }, [importSource, myOrders, quotations, salesOrders]);
 
@@ -618,7 +618,7 @@ export default function InvoiceFormPage() {
             <table className="w-full text-sm min-w-[1040px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)', ''].map((h) => (
+                  {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`, ''].map((h) => (
                     <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -728,35 +728,35 @@ export default function InvoiceFormPage() {
                 <tbody>
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 text-gray-600">Gross Subtotal</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900">₹{fmt(grossSubtotal)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900">{fmt(grossSubtotal)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 font-semibold text-gray-900">Item Level Discounts (-)</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹ - {fmt(totalDiscount)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">− {fmt(totalDiscount)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 font-semibold text-gray-900">Total Taxable Value</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">₹{fmt(totalTaxableValue)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900">{fmt(totalTaxableValue)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 text-gray-600">
                       Total GST{gstSlabs.length > 0 ? ` (${gstSlabs.map(s => `${s.rate}%`).join(', ')})` : ''}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-gray-900">₹{fmt(totalGst)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900">{fmt(totalGst)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 text-gray-600">Shipping &amp; Handling Charges</td>
-                    <td className="px-4 py-2.5 text-right text-gray-900">₹{fmt(shippingCharges)}</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900">{fmt(shippingCharges)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="px-4 py-2.5 text-gray-600">Round Off Adjustment</td>
                     <td className="px-4 py-2.5 text-right text-gray-900">
-                      {adjustment < 0 ? '-' : ''}₹{fmt(Math.abs(adjustment))}
+                      {adjustment < 0 ? '−' : ''}{fmt(Math.abs(adjustment))}
                     </td>
                   </tr>
                   <tr className="border-t-2 border-gray-300">
                     <td className="px-4 py-3 font-bold text-gray-900">Total Payable</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900">₹{fmt(grandTotal)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -765,14 +765,14 @@ export default function InvoiceFormPage() {
 
           {/* Shipping + Round Off inputs below the table */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
-            <Label text="Shipping & Handling Charges (₹)">
+            <Label text={`Shipping & Handling Charges (${currencySymbol})`}>
               <input
                 type="number" min={0} value={shippingCharges}
                 onChange={(e) => setShippingCharges(Number(e.target.value) || 0)}
                 className={inputCls}
               />
             </Label>
-            <Label text="Round Off Adjustment (₹)">
+            <Label text={`Round Off Adjustment (${currencySymbol})`}>
               <input
                 type="number" value={adjustment}
                 onChange={(e) => setAdjustment(Number(e.target.value) || 0)}

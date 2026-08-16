@@ -29,7 +29,7 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function InvoiceDetails() {
-  useI18n();
+  const { currencySymbol } = useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<StoredInvoice | null>(null);
@@ -99,7 +99,7 @@ export default function InvoiceDetails() {
             </div>
             <p className="text-sm text-gray-600">Customer: <span className="font-medium text-gray-900">{invoice.clientName}</span></p>
             {invoice.poReference && <p className="text-sm text-gray-500">PO Reference: {invoice.poReference}</p>}
-            <p className="text-sm text-gray-600 mt-0.5">Total: <span className="font-semibold text-gray-900">₹{fmt(invoice.grandTotal)}</span></p>
+            <p className="text-sm text-gray-600 mt-0.5">Total: <span className="font-semibold text-gray-900">{fmt(invoice.grandTotal)}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -159,7 +159,7 @@ export default function InvoiceDetails() {
               <p className="text-sm text-gray-500 mt-1">Due {invoice.dueDate}</p>
             </InfoCard>
             <InfoCard label="Amount">
-              <p className="text-base font-bold text-gray-900">₹{fmt(invoice.grandTotal)}</p>
+              <p className="text-base font-bold text-gray-900">{fmt(invoice.grandTotal)}</p>
               <p className="text-sm text-gray-500 mt-1">{invoice.lineItems.length} item{invoice.lineItems.length !== 1 ? 's' : ''}</p>
             </InfoCard>
             <InfoCard label="References">
@@ -232,7 +232,7 @@ export default function InvoiceDetails() {
               <table className="w-full text-sm min-w-[800px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)'].map((h) => (
+                    {['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map((h) => (
                       <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -275,35 +275,35 @@ export default function InvoiceDetails() {
                 <tbody>
                   <tr className="border-b border-gray-100">
                     <td className="px-4 py-2.5 text-gray-500">Gross Subtotal</td>
-                    <td className="px-4 py-2.5 text-right">₹{fmt(grossSubtotal)}</td>
+                    <td className="px-4 py-2.5 text-right">{fmt(grossSubtotal)}</td>
                   </tr>
                   <tr className="border-b border-gray-100">
                     <td className="px-4 py-2.5 text-gray-500">Item Level Discounts (−)</td>
-                    <td className="px-4 py-2.5 text-right">−₹{fmt(totalDiscount)}</td>
+                    <td className="px-4 py-2.5 text-right">−{fmt(totalDiscount)}</td>
                   </tr>
                   <tr className="border-b border-gray-100">
                     <td className="px-4 py-2.5 font-medium text-gray-800">Total Taxable Value</td>
-                    <td className="px-4 py-2.5 text-right font-medium">₹{fmt(invoice.subtotal)}</td>
+                    <td className="px-4 py-2.5 text-right font-medium">{fmt(invoice.subtotal)}</td>
                   </tr>
                   <tr className="border-b border-gray-100">
                     <td className="px-4 py-2.5 text-gray-500">Total GST</td>
-                    <td className="px-4 py-2.5 text-right">₹{fmt(invoice.totalTax)}</td>
+                    <td className="px-4 py-2.5 text-right">{fmt(invoice.totalTax)}</td>
                   </tr>
                   {shippingCharges > 0 && (
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-500">Shipping & Handling</td>
-                      <td className="px-4 py-2.5 text-right">₹{fmt(shippingCharges)}</td>
+                      <td className="px-4 py-2.5 text-right">{fmt(shippingCharges)}</td>
                     </tr>
                   )}
                   {adjustment !== 0 && (
                     <tr className="border-b border-gray-100">
                       <td className="px-4 py-2.5 text-gray-500">Round Off Adjustment</td>
-                      <td className="px-4 py-2.5 text-right">{adjustment < 0 ? '−' : ''}₹{fmt(Math.abs(adjustment))}</td>
+                    <td className="px-4 py-2.5 text-right">{adjustment < 0 ? '−' : ''}{fmt(Math.abs(adjustment))}</td>
                     </tr>
                   )}
                   <tr className="bg-blue-50">
                     <td className="px-4 py-3 font-bold text-gray-900">Total Payable</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900">₹{fmt(invoice.grandTotal)}</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900">{fmt(invoice.grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -356,7 +356,7 @@ export default function InvoiceDetails() {
                       <td className="px-4 py-3 text-gray-600">{p.date}</td>
                       <td className="px-4 py-3 text-gray-900">{p.method}</td>
                       <td className="px-4 py-3 text-gray-600">{p.reference}</td>
-                      <td className="px-4 py-3 text-right font-medium">₹{fmt(p.amount)}</td>
+                      <td className="px-4 py-3 text-right font-medium">{fmt(p.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
