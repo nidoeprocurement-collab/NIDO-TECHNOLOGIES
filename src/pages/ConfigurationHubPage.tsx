@@ -36,7 +36,7 @@ const menuItems = [
     href: "/configuration/workflows",
   },
   {
-    title: "Order Statuses",
+    title: "Order Status",
     description: "Customize order lifecycle stages",
     icon: ClipboardList,
     href: "/configuration/order-statuses",
