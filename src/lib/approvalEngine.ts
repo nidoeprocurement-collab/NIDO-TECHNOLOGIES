@@ -59,8 +59,18 @@ export interface ApprovalRequest {
 }
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
+  let role = "";
+  try {
+    role = JSON.parse(localStorage.getItem("nido_user") || "null")?.role || "";
+  } catch {
+    // The backend will reject protected operations when no role is available.
+  }
   const response = await fetch(`/api/approvals${path}`, {
-    headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...(role ? { "x-nido-role": role } : {}),
+      ...(options?.headers || {}),
+    },
     ...options,
   });
   const payload = await response.json().catch(() => ({}));
@@ -84,7 +94,10 @@ export async function setApprovalWorkflowStatus(id: string, status: ApprovalWork
 }
 
 export async function duplicateApprovalWorkflow(id: string, createdBy: string) {
-  return api<ApprovalWorkflow>(`/workflows/${id}/duplicate`, { method: "POST", body: JSON.stringify({ createdBy }) });
+  return api<ApprovalWorkflow>(`/workflows/${id}/duplicate`, {
+    method: "POST",
+    body: JSON.stringify({ createdBy, actorRole: currentRole() }),
+  });
 }
 
 export async function deleteApprovalWorkflow(id: string) {
@@ -97,4 +110,20 @@ export async function createApprovalRequest(payload: Record<string, unknown>) {
 
 export async function actOnApprovalRequest(id: string, payload: Record<string, unknown>) {
   return api<ApprovalRequest>(`/requests/${id}/action`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function getApprovalRequest(id: string) {
+  return api<ApprovalRequest>(`/requests/${id}`);
+}
+
+export async function getApprovalWorkflowHistory(id: string) {
+  return api<unknown[]>(`/workflows/${id}/history`);
+}
+
+function currentRole(): string {
+  try {
+    return JSON.parse(localStorage.getItem("nido_user") || "null")?.role || "";
+  } catch {
+    return "";
+  }
 }

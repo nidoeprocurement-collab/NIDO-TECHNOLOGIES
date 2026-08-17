@@ -8,6 +8,24 @@ import {
 } from "../services/approvalEngine.js";
 
 const router = Router();
+const MANAGEMENT_ROLES = new Set([
+  "System Owner", "System Admin", "Procurement Manager",
+  "Accounts Payable", "Finance", "Operations Manager",
+]);
+const VIEW_ROLES = new Set([...MANAGEMENT_ROLES, "Viewer"]);
+
+function requestRole(req) {
+  return String(req.get("x-nido-role") || req.body?.actorRole || req.body?.updatedByRole || req.body?.userRole || "");
+}
+
+function requireRole(req, res, roles) {
+  if (!roles.has(requestRole(req))) {
+    res.status(403).json({ success: false, error: "You do not have permission to use approval workflows." });
+    return false;
+  }
+  return true;
+}
+
 const ah = fn => (req, res) => Promise.resolve(fn(req, res)).catch(error => {
   console.error("[approval routes]", error);
   res.status(error.message?.includes("cannot be deleted") || error.message?.includes("already complete") ? 409 : 400)
@@ -24,44 +42,66 @@ router.use(async (_req, res, next) => {
   }
 });
 
-router.get("/bootstrap", ah(async (_req, res) => {
+router.get("/bootstrap", ah(async (req, res) => {
+  if (!requireRole(req, res, VIEW_ROLES)) return;
   const [workflows, requests, stats] = await Promise.all([listWorkflows(), listRequests(), dashboard()]);
   res.json({ success: true, data: { workflows, requests, stats } });
 }));
 
-router.get("/workflows", ah(async (_req, res) => res.json({ success: true, data: await listWorkflows() })));
+router.get("/workflows", ah(async (req, res) => {
+  if (!requireRole(req, res, VIEW_ROLES)) return;
+  return res.json({ success: true, data: await listWorkflows() });
+}));
 router.get("/workflows/:id", ah(async (req, res) => {
+  if (!requireRole(req, res, VIEW_ROLES)) return;
   const data = await getWorkflow(req.params.id);
   if (!data) return res.status(404).json({ success: false, error: "Workflow not found." });
   return res.json({ success: true, data });
 }));
-router.post("/workflows", ah(async (req, res) => res.status(201).json({ success: true, data: await createWorkflow(req.body || {}) })));
+router.post("/workflows", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
+  res.status(201).json({ success: true, data: await createWorkflow(req.body || {}) });
+}));
 router.put("/workflows/:id", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
   const data = await updateWorkflow(req.params.id, req.body || {});
   if (!data) return res.status(404).json({ success: false, error: "Workflow not found." });
   return res.json({ success: true, data });
 }));
 router.post("/workflows/:id/status", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
   const data = await changeWorkflowStatus(req.params.id, req.body?.status, req.body?.updatedBy);
   if (!data) return res.status(404).json({ success: false, error: "Workflow not found." });
   return res.json({ success: true, data });
 }));
-router.post("/workflows/:id/duplicate", ah(async (req, res) => res.status(201).json({ success: true, data: await duplicateWorkflow(req.params.id, req.body?.createdBy) })));
+router.post("/workflows/:id/duplicate", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
+  res.status(201).json({ success: true, data: await duplicateWorkflow(req.params.id, req.body?.createdBy) });
+}));
 router.delete("/workflows/:id", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
   const deleted = await deleteWorkflow(req.params.id);
   if (!deleted) return res.status(404).json({ success: false, error: "Workflow not found." });
   return res.json({ success: true });
 }));
-router.get("/workflows/:id/history", ah(async (req, res) => res.json({ success: true, data: await workflowHistory(req.params.id) })));
+router.get("/workflows/:id/history", ah(async (req, res) => {
+  if (!requireRole(req, res, VIEW_ROLES)) return;
+  res.json({ success: true, data: await workflowHistory(req.params.id) });
+}));
 
-router.get("/requests", ah(async (req, res) => res.json({ success: true, data: await listRequests(req.query.status) })));
+router.get("/requests", ah(async (req, res) => {
+  if (!requireRole(req, res, VIEW_ROLES)) return;
+  res.json({ success: true, data: await listRequests(req.query.status) });
+}));
 router.get("/requests/:id", ah(async (req, res) => {
+  if (!requireRole(req, res, VIEW_ROLES)) return;
   const data = await getRequest(req.params.id);
   if (!data) return res.status(404).json({ success: false, error: "Approval request not found." });
   return res.json({ success: true, data });
 }));
 router.post("/requests/evaluate", ah(async (req, res) => res.json({ success: true, data: await evaluateAndCreate(req.body || {}) })));
 router.post("/requests/:id/action", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
   const data = await takeAction(req.params.id, req.body || {});
   if (!data) return res.status(404).json({ success: false, error: "Approval request not found." });
   return res.json({ success: true, data });

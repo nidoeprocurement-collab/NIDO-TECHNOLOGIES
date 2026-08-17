@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
@@ -29,6 +30,8 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getEffectiveVendorTaxPct, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { generateManualPOPdf, downloadPOPdf } from "@/lib/generatePO";
+import { createApprovalRequest, getApprovalRequest } from "@/lib/approvalEngine";
+import { getUsers } from "@/lib/nidoUsersStore";
 import {
   ArrowLeft,
   Download,
@@ -48,7 +51,7 @@ import {
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type PurchaseOrderStatus = "DRAFT" | "ISSUED" | "CANCELLED";
+type PurchaseOrderStatus = "DRAFT" | "ISSUED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "CANCELLED";
 type BilledStatus = "YET TO BE BILLED" | "BILLED";
 type ReceiveStatus = "YET TO BE RECEIVED" | "RECEIVED";
 
@@ -78,6 +81,7 @@ export interface PurchaseOrderEntry {
   shipmentPreference: string;
   includeInterStateGst: boolean;
   status: PurchaseOrderStatus;
+  approvalRequestId?: string;
   billedStatus: BilledStatus;
   receiveStatus: ReceiveStatus;
   discountPercent: number;
@@ -239,6 +243,9 @@ const emptyForm = (): PurchaseOrderForm => ({
 const MANUAL_STATUS_STYLE: Record<PurchaseOrderStatus, string> = {
   DRAFT: "bg-gray-100 text-gray-600 border-gray-200",
   ISSUED: "bg-blue-100 text-blue-700 border-blue-200",
+  PENDING_APPROVAL: "bg-amber-100 text-amber-700 border-amber-200",
+  APPROVED: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  REJECTED: "bg-red-100 text-red-700 border-red-200",
   CANCELLED: "bg-red-100 text-red-700 border-red-200",
 };
 
@@ -289,6 +296,7 @@ function DetailField({ label, value }: { label: string; value: React.ReactNode }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PurchaseOrdersPage() {
+  const { user } = useAuth();
   const { currencySymbol } = useI18n();
   const { setMeta } = usePageMeta();
   const navigate = useNavigate();
@@ -360,6 +368,18 @@ export default function PurchaseOrdersPage() {
   // Reset cancel confirm when navigating away
   useEffect(() => { setConfirmCancel(false); setConfirmConvert(false); }, [params.id]);
 
+  useEffect(() => {
+    if (!selectedManual?.approvalRequestId) return;
+    let active = true;
+    getApprovalRequest(selectedManual.approvalRequestId).then((request) => {
+      if (!active || !["Approved", "Rejected"].includes(request.status)) return;
+      const nextStatus = request.status === "Approved" ? "APPROVED" : "REJECTED";
+      if (selectedManual.status === nextStatus) return;
+      persist(manualOrders.map((order) => order.id === selectedManual.id ? { ...order, status: nextStatus } : order));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [selectedManual?.id, selectedManual?.approvalRequestId, selectedManual?.status]);
+
   const persist = (next: PurchaseOrderEntry[]) => {
     setManualOrders(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -384,7 +404,30 @@ export default function PurchaseOrdersPage() {
     setF("items", next.length ? next : [newItem(`tmp-${Date.now()}`)]);
   };
 
-  const saveOrder = (send: boolean) => {
+  const requestApprovalIfNeeded = async (order: PurchaseOrderEntry, trigger: string) => {
+    const approverEmails = getUsers()
+      .filter((candidate) => candidate.status === "Active" && candidate.email)
+      .map((candidate) => candidate.email);
+    const requests = await createApprovalRequest({
+      module: "Purchase Order",
+      trigger,
+      reference: order.poNumber,
+      amount: getTotals(order).total,
+      context: {
+        amount: getTotals(order).total,
+        vendor: order.vendorName,
+        quantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
+      },
+      requestedBy: user?.id || "system",
+      requestedByName: user?.name || "System",
+      requestedByRole: user?.role || "System Admin",
+      approverEmails,
+      portalUrl: "/configuration/workflows",
+    });
+    return requests[0] || null;
+  };
+
+  const saveOrder = async (send: boolean) => {
     if (!form.vendorName || !form.date || !form.deliveryDate) {
       toast({ title: "Vendor Name, Date and Delivery Date are required" });
       return;
@@ -420,8 +463,16 @@ export default function PurchaseOrdersPage() {
             status: send ? "ISSUED" as const : o.status,
           };
         });
+        const updatedOrder = updated.find((order) => order.id === editingId);
+        if (send && updatedOrder) {
+          const approval = await requestApprovalIfNeeded(updatedOrder, "PO modification");
+          if (approval) {
+            updatedOrder.status = "PENDING_APPROVAL";
+            updatedOrder.approvalRequestId = approval.id;
+          }
+        }
         persist(updated);
-        toast({ title: send ? "Purchase order updated and issued" : "Purchase order updated" });
+        toast({ title: send ? (updatedOrder?.status === "PENDING_APPROVAL" ? "Purchase order submitted for approval" : "Purchase order updated and issued") : "Purchase order updated" });
         navigate(`/transactions/purchase/purchase-orders/${editingId}`, { replace: true });
       } else {
         const id = `po-${Date.now()}`;
@@ -449,10 +500,19 @@ export default function PurchaseOrdersPage() {
           attachmentType: form.attachmentType,
           items: form.items,
         };
+        if (send) {
+          const approval = await requestApprovalIfNeeded(created, "PO created");
+          if (approval) {
+            created.status = "PENDING_APPROVAL";
+            created.approvalRequestId = approval.id;
+          }
+        }
         persist([created, ...manualOrders]);
-        toast({ title: send ? "Purchase order issued" : "Draft saved" });
+        toast({ title: send ? (created.status === "PENDING_APPROVAL" ? "Purchase order submitted for approval" : "Purchase order issued") : "Draft saved" });
         navigate(`/transactions/purchase/purchase-orders/${id}`, { replace: true });
       }
+    } catch (error: any) {
+      toast({ title: "Purchase order was not submitted", description: error?.message || "Approval service unavailable." });
     } finally {
       setSaving(false);
     }
@@ -462,6 +522,10 @@ export default function PurchaseOrdersPage() {
     if (!selectedManual) return;
     if (selectedManual.status === "CANCELLED") {
       toast({ title: "Cannot convert", description: "Cancelled POs cannot be converted to bills." });
+      return;
+    }
+    if (selectedManual.status === "PENDING_APPROVAL") {
+      toast({ title: "Approval required", description: "This purchase order must be approved before it can be converted to a bill." });
       return;
     }
     const existingBills = safeReadJson<any[]>(BILLS_STORAGE_KEY, []);
@@ -904,7 +968,7 @@ export default function PurchaseOrdersPage() {
           </Card>
 
           {/* "What's next" prompt */}
-          {selectedManual.status !== "CANCELLED" && selectedManual.billedStatus === "YET TO BE BILLED" && (
+          {!["CANCELLED", "PENDING_APPROVAL", "REJECTED"].includes(selectedManual.status) && selectedManual.billedStatus === "YET TO BE BILLED" && (
             <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5">
               <p className="text-sm font-medium text-emerald-800">WHAT'S NEXT? Convert this to a bill to complete your purchase.</p>
               <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8" onClick={convertToBill}>Convert to Bill</Button>
@@ -919,7 +983,12 @@ export default function PurchaseOrdersPage() {
                   <span className="text-gray-500">Receive Status: <span className="text-gray-800 font-medium">{selectedManual.receiveStatus}</span></span>
                   <span className="text-gray-300">|</span>
                   <span className="text-gray-500">Bill Status: <span className="text-gray-800 font-medium">{selectedManual.billedStatus}</span></span>
-                  <Badge className={`text-xs font-semibold ${MANUAL_STATUS_STYLE[selectedManual.status]}`} variant="outline">{selectedManual.status}</Badge>
+                  <Badge className={`text-xs font-semibold ${MANUAL_STATUS_STYLE[selectedManual.status]}`} variant="outline">{selectedManual.status.replace("_", " ")}</Badge>
+                  {selectedManual.approvalRequestId && (
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/configuration/workflows?request=${selectedManual.approvalRequestId}`)}>
+                      View Approval
+                    </Button>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-gray-500">Show PDF View</span>
@@ -1102,7 +1171,7 @@ export default function PurchaseOrdersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="py-3.5">
-                        <Badge className={`text-xs font-semibold ${o.statusClass}`} variant="outline">{o.statusLabel}</Badge>
+                        <Badge className={`text-xs font-semibold ${o.statusClass}`} variant="outline">{o.statusLabel.replace("_", " ")}</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-gray-600 py-3.5">{o.billedStatus}</TableCell>
                       <TableCell className="text-sm font-semibold text-gray-800 py-3.5 text-right whitespace-nowrap">{money(o.amount)}</TableCell>

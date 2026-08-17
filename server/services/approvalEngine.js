@@ -336,6 +336,9 @@ export async function takeAction(requestId, body) {
   if (["reject", "send_back", "request_changes"].includes(action) && !String(body.comment || "").trim()) {
     throw new Error("A reason is required for this action.");
   }
+  if (["delegate", "reassign"].includes(action) && !String(body.targetUserId || "").trim()) {
+    throw new Error("A target user is required for delegation or reassignment.");
+  }
   const step = request.steps.find(s => Number(s.level_number) === Number(request.currentLevel));
   const actorRole = body.userRole || "";
   const actorId = body.userId || "system";
@@ -360,6 +363,20 @@ export async function takeAction(requestId, body) {
       `UPDATE approval_request_steps SET status=$2, decided_by=$3, decided_at=now() WHERE id=$1`,
       [step.id, action === "approve" ? "Approved" : action === "reject" ? "Rejected" : "Actioned", actorId],
     );
+    if (["delegate", "reassign"].includes(action)) {
+      await client.query(
+        `INSERT INTO approval_delegations
+         (request_id, step_id, from_user_id, to_user_id, reason)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [requestId, step.id, actorId, body.targetUserId, body.comment || ""],
+      );
+      await client.query(
+        `UPDATE approval_request_steps
+         SET approver_type='Specific User', specific_user_id=$2, approver_role=NULL, status='Pending'
+         WHERE id=$1`,
+        [step.id, body.targetUserId],
+      );
+    }
     if (action === "approve" && newStatus === "In Progress") {
       const next = request.steps.find(s => Number(s.level_number) === nextLevel);
       const due = new Date(Date.now() + (Number(next.sla_hours) || 24) * 3600000);
