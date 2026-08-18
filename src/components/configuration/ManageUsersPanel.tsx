@@ -25,6 +25,7 @@ import {
   exportUsersCsv, exportUsersPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
   MAX_FAILED_LOGIN_ATTEMPTS,
+  isSystemOwner,
 } from "@/lib/nidoUsersStore"
 
 /** Returns true when a user should be treated as locked — covers both the explicit
@@ -252,6 +253,17 @@ function ActionsMenu({
   );
 }
 
+function ProtectedOwnerBadge() {
+  return (
+    <span
+      title="System Owner is protected and cannot be changed or removed"
+      className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+    >
+      <Lock size={13} /> Protected
+    </span>
+  );
+}
+
 // ── Main panel ─────────────────────────────────────────────────────────────────
 /** Roles that are allowed to view passwords in the user table. */
 const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
@@ -279,11 +291,16 @@ export default function ManageUsersPanel() {
   useEffect(() => {
     refresh()
     const handler = () => refresh()
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "nido_config_users" || event.key === "nido_config_roles") handler()
+    }
     window.addEventListener(NIDO_ROLES_EVENT, handler)
     window.addEventListener(NIDO_USERS_EVENT, handler)
+    window.addEventListener("storage", handleStorage)
     return () => {
       window.removeEventListener(NIDO_ROLES_EVENT, handler)
       window.removeEventListener(NIDO_USERS_EVENT, handler)
+      window.removeEventListener("storage", handleStorage)
     }
   }, [])
 
@@ -296,10 +313,21 @@ export default function ManageUsersPanel() {
   )
 
   const handleAddUser = () => { setEditingUser(null); setUserDialogOpen(true); }
-  const handleEditUser = (user: NidoUser) => { setEditingUser(user); setUserDialogOpen(true); }
+  const handleEditUser = (user: NidoUser) => {
+    if (isSystemOwner(user)) {
+      toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
+      return
+    }
+    setEditingUser(user)
+    setUserDialogOpen(true)
+  }
 
   const handleSaveUser = (values: Omit<NidoUser, "id">) => {
     if (editingUser) {
+      if (isSystemOwner(editingUser)) {
+        toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
+        return
+      }
       const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
       if (duplicate) { toast.error("Email already in use"); return; }
       updateUser(editingUser.id, values)
@@ -389,7 +417,11 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3"><StatusBadge status={user.status} locked={isUserLocked(user)} /></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{user.lastLogin ?? "Never"}</td>
                   <td className="px-4 py-3">
-                    <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
+                     {isSystemOwner(user) ? (
+                       <ProtectedOwnerBadge />
+                     ) : (
+                       <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
+                     )}
                   </td>
                 </tr>
               ))}
