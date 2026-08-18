@@ -70,22 +70,32 @@ export interface LoginContext {
 }
 
 // ── Bootstrap data ────────────────────────────────────────────────────────────
-// User records are live data persisted in localStorage. Do not seed demo users
-// into the Add / Manage Users list. The protected owner is the only bootstrap
-// account because the local authentication flow needs an initial administrator.
+// Roles and user records are live data persisted in localStorage. Do not seed
+// demo roles or users into the configuration lists. The protected owner is the
+// only bootstrap account because the local authentication flow needs an initial
+// administrator.
 
 const NOW = new Date().toISOString().split("T")[0];
 
 const DEFAULT_ROLES: NidoRole[] = [
   { id: "role-system-owner",       name: "System Owner",       description: "Full system access — all permissions always granted",        status: "Active" },
-  { id: "role-system-admin",       name: "System Admin",       description: "Manages platform configuration and users",                   status: "Active" },
-  { id: "role-procurement-manager",name: "Procurement Manager",description: "Manages purchase orders and procurement workflows",           status: "Active" },
-  { id: "role-accounts-payable",   name: "Accounts Payable",   description: "Manages invoices, bills, and vendor payments",               status: "Active" },
-  { id: "role-vendor-admin",       name: "Vendor Admin",       description: "Manages vendor information and related orders",               status: "Active" },
-  { id: "role-finance",            name: "Finance",            description: "Full access to financial modules",                           status: "Active" },
-  { id: "role-operations",         name: "Operations Manager", description: "Oversees day-to-day operations and fulfilment",              status: "Active" },
-  { id: "role-viewer",             name: "Viewer",             description: "Read-only access to all allowed modules",                   status: "Active" },
 ];
+
+// These identify only the seeded role records from the previous version.
+// Roles created through the live form use generated IDs and are never removed.
+const LEGACY_DEMO_ROLE_IDS = new Set([
+  "role-system-admin",
+  "role-procurement-manager",
+  "role-accounts-payable",
+  "role-vendor-admin",
+  "role-finance",
+  "role-operations",
+  "role-viewer",
+]);
+
+function removeLegacyDemoRoles(roles: NidoRole[]): NidoRole[] {
+  return roles.filter(role => !LEGACY_DEMO_ROLE_IDS.has(role.id));
+}
 
 const SYSTEM_OWNER_USER: NidoUser = {
   id: SYSTEM_OWNER_ID, employeeId: "EMP-001",
@@ -173,7 +183,10 @@ export function getRoles(): NidoRole[] {
       localStorage.setItem(ROLES_KEY, JSON.stringify(DEFAULT_ROLES));
       return DEFAULT_ROLES;
     }
-    return JSON.parse(raw);
+    const roles = removeLegacyDemoRoles(JSON.parse(raw));
+    const normalized = JSON.stringify(roles);
+    if (normalized !== raw) localStorage.setItem(ROLES_KEY, normalized);
+    return roles;
   } catch {
     return DEFAULT_ROLES;
   }
