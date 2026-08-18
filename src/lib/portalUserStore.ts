@@ -11,6 +11,8 @@ export interface PortalUser {
   role: string;
   status: 'active' | 'inactive';
   createdAt: string;
+  provisionReason?: string;
+  provisionedAt?: string;
 }
 
 const STORE_KEY = 'nido_portal_users';
@@ -93,6 +95,46 @@ export interface ProvisionResult {
   userId: string;
 }
 
+/** Generates credentials without granting portal access. */
+export function generatePortalCredentials(
+  clientId: string,
+  clientName: string
+): ProvisionResult {
+  const slug = toSlug(clientName) || 'client';
+  return {
+    email: `admin@${slug}.portal`,
+    password: `Admin@${randomSuffix()}!`,
+    userId: `portal-${clientId}-admin`,
+  };
+}
+
+/** Activates the prepared credentials after an owner confirms portal access. */
+export function activateClientPortal(
+  clientId: string,
+  clientName: string,
+  credentials: ProvisionResult,
+  reason = ''
+): void {
+  const existing = getPortalUsers().find(
+    (user) => user.clientId === clientId && user.userType === 'client_admin'
+  );
+  const user: PortalUser = {
+    id: existing?.id || credentials.userId,
+    email: credentials.email,
+    password: credentials.password,
+    name: `${clientName} Admin`,
+    userType: 'client_admin',
+    clientId,
+    clientName,
+    role: 'Client Admin',
+    status: 'active',
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    provisionReason: reason.trim() || undefined,
+    provisionedAt: new Date().toISOString(),
+  };
+  addPortalUser(user);
+}
+
 /**
  * Provisions a Client Admin for the given client.
  * Returns the generated credentials.
@@ -103,24 +145,7 @@ export function provisionClientPortal(
   clientId: string,
   clientName: string
 ): ProvisionResult {
-  const slug = toSlug(clientName) || 'client';
-  const email = `admin@${slug}.portal`;
-  const password = `Admin@${randomSuffix()}!`;
-  const userId = `portal-${clientId}-admin`;
-
-  const user: PortalUser = {
-    id: userId,
-    email,
-    password,
-    name: `${clientName} Admin`,
-    userType: 'client_admin',
-    clientId,
-    clientName,
-    role: 'Client Admin',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-  };
-
-  addPortalUser(user);
-  return { email, password, userId };
+  const credentials = generatePortalCredentials(clientId, clientName);
+  activateClientPortal(clientId, clientName, credentials);
+  return credentials;
 }

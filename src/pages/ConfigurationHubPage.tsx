@@ -6,12 +6,12 @@ import {
   Bell,
   BookOpen,
   Plug,
-  FileText,
   Zap,
   DollarSign,
   Mail,
   Calculator,
   Gauge,
+  Boxes,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -35,7 +35,7 @@ const menuItems = [
     href: "/configuration/workflows",
   },
   {
-    title: "Order Statuses",
+    title: "Order Status",
     description: "Customize order lifecycle stages",
     icon: ClipboardList,
     href: "/configuration/order-statuses",
@@ -66,12 +66,6 @@ const menuItems = [
     href: "/integrations",
   },
   {
-    title: "System Logs",
-    description: "Activity & system event logs",
-    icon: FileText,
-    href: "/reports/audit",
-  },
-  {
     title: "Auto Assignment",
     description: "Smart analyst auto-routing rules",
     icon: Zap,
@@ -94,6 +88,12 @@ const menuItems = [
     description: "Centralized SLA Engine — vendor, client, procurement & service SLAs",
     icon: Gauge,
     href: "/configuration/sla-settings",
+  },
+  {
+    title: "Stock Management",
+    description: "Centralized inventory — single source of truth for all vendor stock",
+    icon: Boxes,
+    href: "/configuration/stock-management",
   },
 ];
 

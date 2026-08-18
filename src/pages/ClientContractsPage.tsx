@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Calendar,
@@ -25,10 +26,26 @@ import {
   Phone,
   X,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { getClientContract, saveClientContract } from "@/lib/clientDataStore";
+import { getClients } from "@/lib/clientStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractDetailViewProps {
   contractId: string;
   contractTitle: string;
+  clientId?: string;
+  clientName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  clientGstin?: string;
+  clientAddress?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  clientCurrency?: string;
+  clientPaymentTerms?: string;
+  clientStatus?: string;
   onBack: () => void;
 }
 
@@ -164,7 +181,39 @@ function getRenewalIcon(type: string) {
   }
 }
 
-export default function ContractDetailView({ contractId, contractTitle, onBack }: ContractDetailViewProps) {
+function formatContractDate(value?: string): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+}
+
+function getInitials(value?: string): string {
+  return (value || "Client")
+    .split(/\s+/)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 5);
+}
+
+function ContractDetailView({
+  contractId,
+  contractTitle,
+  clientId,
+  clientName,
+  clientEmail,
+  clientPhone,
+  clientGstin,
+  clientAddress,
+  contractStartDate,
+  contractEndDate,
+  clientCurrency,
+  clientPaymentTerms,
+  clientStatus,
+  onBack,
+}: ContractDetailViewProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [phonePopup, setPhonePopup] = useState<string | null>(null);
@@ -205,123 +254,179 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
   // ── Data states ──────────────────────────────────────────────────────────────
 
   const [relationshipOwners, setRelationshipOwners] = useState({
-    nidoTech: { name: "Rahul Sharma", email: "rahul.sharma@nido-tech.com", phone: "+91 93456 78901", initials: "RS" },
-    apex: { name: "Vikram Singh", email: "vikram.singh@apex.com", phone: "+91 98765 43210", initials: "VS" },
+    nidoTech: { name: "", email: "", phone: "", initials: "" },
+    apex: { name: "", email: "", phone: "", initials: "" },
   });
 
   const [overview, setOverview] = useState({
-    purpose: "To define the terms under which Nido-Tech provides the SaaS platform and related services to Apex Tech Solutions.",
-    scope: "Provision of Nido-Tech Procurement Platform (SaaS) along with agreed professional services, support and training.",
-    deployment: "Cloud (Multi-Tenant)",
-    currency: "INR",
-    taxation: "Exclusive of applicable taxes",
-    jurisdiction: "Bangalore, Karnataka, India",
-    confidentiality: "Both parties agree to maintain confidentiality of shared information.",
+    purpose: "",
+    scope: "",
+    deployment: "",
+    currency: "",
+    taxation: "",
+    jurisdiction: "",
+    confidentiality: "",
   });
 
-  const [responseTargets, setResponseTargets] = useState([
-    { priority: "Critical (P1)", response: "≤ 2 Hours", resolution: "≤ 8 Hours", color: "red" },
-    { priority: "High (P2)", response: "≤ 4 Hours", resolution: "≤ 16 Hours", color: "orange" },
-    { priority: "Medium (P3)", response: "≤ 8 Hours", resolution: "≤ 24 Hours", color: "yellow" },
-    { priority: "Low (P4)", response: "≤ 24 Hours", resolution: "≤ 72 Hours", color: "gray" },
-  ]);
+  const [responseTargets, setResponseTargets] = useState<Array<{ priority: string; response: string; resolution: string; color: string }>>([]);
 
   const [commercialTerms, setCommercialTerms] = useState({
-    type: "SaaS Subscription + Managed Services",
-    model: "Annual Contract",
-    duration: "1 Year",
-    paymentTerms: "Net 30 Days",
-    latePenalty: "1.5% per month on outstanding amount",
-    extras: "As applicable",
-    priceRevision: "Annual (subject to 5% cap)",
-    forceMajeure: "As per standard clause",
-    dispute: "Arbitration - Bangalore, India",
+    type: "",
+    model: "",
+    duration: "",
+    paymentTerms: clientPaymentTerms || "",
+    latePenalty: "",
+    extras: "",
+    priceRevision: "",
+    forceMajeure: "",
+    dispute: "",
   });
 
-  const [servicesCovered, setServicesCovered] = useState([
-    { service: "Nido-Tech Procurement Platform", scope: "Included", badge: "green" },
-    { service: "AMC Management", scope: "Included", badge: "green" },
-    { service: "Smart Management", scope: "Included", badge: "green" },
-    { service: "Repair Services", scope: "Included", badge: "green" },
-    { service: "Recycling Services", scope: "Included", badge: "green" },
-    { service: "Custom Development / Enhancements", scope: "Change Request Required", badge: "amber" },
-    { service: "Third Party Integrations", scope: "Change Request Required", badge: "amber" },
-  ]);
+  const [servicesCovered, setServicesCovered] = useState<Array<{ service: string; scope: string; badge: string }>>([]);
 
-  const [dataSecurity, setDataSecurity] = useState([
-    { type: "ssl", label: "SSL Encryption", active: true },
-    { type: "backup", label: "Daily Backup", active: true },
-    { type: "disaster", label: "Disaster Recovery", active: true },
-    { type: "audit", label: "Audit Logs", active: true },
-    { type: "rbac", label: "Role-Based Access", active: true },
-    { type: "hosting", label: "Secure Cloud Hosting", active: true },
-  ]);
+  const [dataSecurity, setDataSecurity] = useState<Array<{ type: string; label: string; active: boolean }>>([]);
 
   const [confidentiality, setConfidentiality] = useState({
-    text: "Both Nido-Tech and Apex Tech Solutions agree to maintain confidentiality of all shared business information, user data, pricing details, procurement information, contracts, and system-generated records. This information shall not be disclosed to any unauthorized party without prior written consent, except as required by law.",
-    effective: "Contract Termination + 3 Years",
-    status: "Active",
+    text: "",
+    effective: "",
+    status: "",
   });
 
-  const [supportMatrix, setSupportMatrix] = useState([
-    { level: "L1 Support", team: "Support Team", email: "support@nido-tech.com", availability: "24x7" },
-    { level: "L2 Support", team: "Service Desk", email: "service@nido-tech.com", availability: "24x7" },
-    { level: "L3 Escalation", team: "Operations Team", email: "operations@nido-tech.com", availability: "24x7" },
-    { level: "Account Manager", team: "Rahul Sharma", email: "rahul.sharma@nido-tech.com", availability: "Mon–Sat (9 AM – 6 PM)" },
-    { level: "Business Head", team: "Escalation Desk", email: "escalation@nido-tech.com", availability: "Mon–Sat (9 AM – 6 PM)" },
-  ]);
+  const [supportMatrix, setSupportMatrix] = useState<Array<{ level: string; team: string; email: string; availability: string }>>([]);
 
-  const [renewalTerm, setRenewalTerm] = useState([
-    { type: "renewal", label: "Auto Renewal: Enabled" },
-    { type: "notice", label: "Renewal Notice: 60 Days Before Expiry" },
-    { type: "termination", label: "Termination Notice: 30 Days" },
-    { type: "exit", label: "Exit Support: Included" },
-    { type: "export", label: "Data Export: Available upon Request" },
-    { type: "retention", label: "Data Retention: 60 Days Post Termination" },
-  ]);
+  const [renewalTerm, setRenewalTerm] = useState<Array<{ type: string; label: string }>>([]);
 
   const [subscription, setSubscription] = useState({
-    userLicensing: "260",
-    licensedUsers: "260",
-    concurrent: "Unlimited",
-    additionalCost: "₹500 / User / Month",
-    transfer: "Yes",
-    minCommitment: "250 Users",
+    userLicensing: "",
+    licensedUsers: "",
+    concurrent: "",
+    additionalCost: "",
+    transfer: "",
+    minCommitment: "",
   });
 
-  const [slaCommitments, setSlaCommitments] = useState([
-    { commitment: "Platform Uptime", target: "99.5%", color: "gray" },
-    { commitment: "Critical Issue Response", target: "2 Hours", color: "red" },
-    { commitment: "High Priority Response", target: "4 Hours", color: "orange" },
-    { commitment: "Medium Priority Response", target: "6 Hours", color: "yellow" },
-    { commitment: "Low Priority Response", target: "24 Hours", color: "gray" },
-    { commitment: "Resolution Target", target: "As per SLA Document", color: "gray" },
-  ]);
+  const [slaCommitments, setSlaCommitments] = useState<Array<{ commitment: string; target: string; color: string }>>([]);
 
   const [renewalInfo, setRenewalInfo] = useState({
-    renewalDate: "31 Mar 2026",
-    autoRenewal: "Enabled",
-    daysRemaining: "248 Days",
+    renewalDate: "",
+    autoRenewal: "",
+    daysRemaining: "",
   });
 
   const [supportInfo, setSupportInfo] = useState({
-    plan: "Enterprise",
-    hours: "24x7",
-    responseSLA: "2 Hours",
+    plan: "",
+    hours: "",
+    responseSLA: "",
   });
 
   const [keyContacts, setKeyContacts] = useState({
-    apex: { name: "Vikram Singh", role: "Procurement Manager", email: "vikram.singh@apex.com", phone: "+91 98765 43210", initials: "VS" },
-    nidoTech: { name: "Priya Nair", role: "Account Manager", email: "priya.nair@nido-tech.com", phone: "+91 90123 45678", initials: "PN" },
+    apex: { name: "", role: "", email: "", phone: "", initials: "" },
+    nidoTech: { name: "", role: "", email: "", phone: "", initials: "" },
   });
 
-  const [reminders, setReminders] = useState([
-    { label: "Contract review meeting", date: "May 15, 2025" },
-    { label: "Renewal evaluation", date: "Mar 15, 2026" },
-  ]);
+  const [reminders, setReminders] = useState<Array<{ label: string; date: string }>>([]);
   const [showAddReminder, setShowAddReminder] = useState(false);
   const [newReminderLabel, setNewReminderLabel] = useState("");
   const [newReminderDate, setNewReminderDate] = useState("");
+  const [contractHydrated, setContractHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!clientId) {
+      setContractHydrated(true);
+      return;
+    }
+    const saved = getClientContract(clientId);
+    if (saved?.data) {
+      const data = saved.data as Record<string, unknown>;
+      if (data.relationshipOwners) setRelationshipOwners(data.relationshipOwners as typeof relationshipOwners);
+      if (data.overview) setOverview(data.overview as typeof overview);
+      if (data.responseTargets) setResponseTargets(data.responseTargets as typeof responseTargets);
+      if (data.commercialTerms) setCommercialTerms(data.commercialTerms as typeof commercialTerms);
+      if (data.servicesCovered) setServicesCovered(data.servicesCovered as typeof servicesCovered);
+      if (data.dataSecurity) setDataSecurity(data.dataSecurity as typeof dataSecurity);
+      if (data.confidentiality) setConfidentiality(data.confidentiality as typeof confidentiality);
+      if (data.supportMatrix) setSupportMatrix(data.supportMatrix as typeof supportMatrix);
+      if (data.renewalTerm) setRenewalTerm(data.renewalTerm as typeof renewalTerm);
+      if (data.subscription) setSubscription(data.subscription as typeof subscription);
+      if (data.slaCommitments) setSlaCommitments(data.slaCommitments as typeof slaCommitments);
+      if (data.renewalInfo) setRenewalInfo(data.renewalInfo as typeof renewalInfo);
+      if (data.supportInfo) setSupportInfo(data.supportInfo as typeof supportInfo);
+      if (data.keyContacts) setKeyContacts(data.keyContacts as typeof keyContacts);
+      if (data.reminders) setReminders(data.reminders as typeof reminders);
+    } else {
+      const clientInitials = getInitials(clientName);
+      setRelationshipOwners((current) => ({
+        ...current,
+        apex: { name: clientName || "", email: clientEmail || "", phone: clientPhone || "", initials: clientInitials },
+      }));
+      setKeyContacts((current) => ({
+        ...current,
+        apex: {
+          name: clientName || "",
+          role: "",
+          email: clientEmail || "",
+          phone: clientPhone || "",
+          initials: clientInitials,
+        },
+      }));
+      setOverview((current) => ({
+        ...current,
+        currency: clientCurrency || "",
+      }));
+      setCommercialTerms((current) => ({
+        ...current,
+        paymentTerms: clientPaymentTerms || "",
+      }));
+    }
+    setContractHydrated(true);
+  }, [clientId, clientName, clientEmail, clientPhone, clientCurrency, clientPaymentTerms]);
+
+  useEffect(() => {
+    if (!clientId || !contractHydrated) return;
+    saveClientContract({
+      clientId,
+      contractId: contractId || "CLIENT-CONTRACT",
+      contractTitle: contractTitle || "Client Contract",
+      data: {
+        relationshipOwners,
+        overview,
+        responseTargets,
+        commercialTerms,
+        servicesCovered,
+        dataSecurity,
+        confidentiality,
+        supportMatrix,
+        renewalTerm,
+        subscription,
+        slaCommitments,
+        renewalInfo,
+        supportInfo,
+        keyContacts,
+        reminders,
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    clientId,
+    contractId,
+    contractTitle,
+    contractHydrated,
+    relationshipOwners,
+    overview,
+    responseTargets,
+    commercialTerms,
+    servicesCovered,
+    dataSecurity,
+    confidentiality,
+    supportMatrix,
+    renewalTerm,
+    subscription,
+    slaCommitments,
+    renewalInfo,
+    supportInfo,
+    keyContacts,
+    reminders,
+  ]);
 
   // ── Edit handlers ─────────────────────────────────────────────────────────────
 
@@ -592,6 +697,183 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
     });
   };
 
+  const downloadContract = () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 42;
+    const contentWidth = pageWidth - margin * 2;
+    const generatedOn = new Date().toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
+    const colors = {
+      blue: [37, 99, 235] as [number, number, number],
+      dark: [31, 41, 55] as [number, number, number],
+      muted: [107, 114, 128] as [number, number, number],
+      line: [229, 231, 235] as [number, number, number],
+      header: [239, 246, 255] as [number, number, number],
+    };
+
+    const setBodyStyle = () => {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.dark);
+    };
+
+    const addPageHeader = () => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...colors.muted);
+      doc.text("NIDO-TECH | CLIENT CONTRACT", margin, 28);
+      doc.setDrawColor(...colors.line);
+      doc.line(margin, 34, pageWidth - margin, 34);
+    };
+
+    const addSectionTitle = (title: string, y: number) => {
+      if (y > 760) {
+        doc.addPage();
+        addPageHeader();
+        y = 54;
+      }
+      doc.setFillColor(...colors.header);
+      doc.roundedRect(margin, y, contentWidth, 22, 3, 3, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...colors.blue);
+      doc.text(title, margin + 9, y + 15);
+      return y + 34;
+    };
+
+    const addKeyValueRows = (title: string, rows: Array<[string, string]>, y: number) => {
+      y = addSectionTitle(title, y);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        head: [["Detail", "Value"]],
+        body: rows.map(([label, value]) => [label, value || "—"]),
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 6, textColor: colors.dark },
+        headStyles: { fillColor: colors.blue, textColor: [255, 255, 255], fontStyle: "bold" },
+        columnStyles: { 0: { cellWidth: 150, fontStyle: "bold" }, 1: { cellWidth: contentWidth - 150 } },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
+      return ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 18;
+    };
+
+    const addTable = (title: string, headers: string[], rows: string[][], y: number) => {
+      y = addSectionTitle(title, y);
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        head: [headers],
+        body: rows.length ? rows : [["No entries", ...headers.slice(1).map(() => "—")]],
+        theme: "grid",
+        styles: { font: "helvetica", fontSize: 8, cellPadding: 5, textColor: colors.dark, overflow: "linebreak" },
+        headStyles: { fillColor: colors.blue, textColor: [255, 255, 255], fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
+      return ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY || y) + 18;
+    };
+
+    let y = 58;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(...colors.dark);
+    doc.text(contractTitle || "SaaS & Services Agreement", margin, y);
+    y += 25;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(...colors.muted);
+    doc.text(`Contract ID: ${contractId || "CLIENT-CONTRACT"}   |   Generated: ${generatedOn}`, margin, y);
+    y += 22;
+    doc.setDrawColor(...colors.line);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 20;
+    setBodyStyle();
+
+    y = addKeyValueRows("Contract Overview", [
+      ["Purpose", overview.purpose],
+      ["Scope", overview.scope],
+      ["Deployment", overview.deployment],
+      ["Currency", overview.currency],
+      ["Taxation", overview.taxation],
+      ["Jurisdiction", overview.jurisdiction],
+      ["Confidentiality Summary", overview.confidentiality],
+    ], y);
+
+    y = addKeyValueRows("Commercial Terms", [
+      ["Contract Type", commercialTerms.type],
+      ["Commercial Model", commercialTerms.model],
+      ["Duration", commercialTerms.duration],
+      ["Payment Terms", commercialTerms.paymentTerms],
+      ["Late Payment Penalty", commercialTerms.latePenalty],
+      ["Additional Services", commercialTerms.extras],
+      ["Price Revision", commercialTerms.priceRevision],
+      ["Force Majeure", commercialTerms.forceMajeure],
+      ["Dispute Resolution", commercialTerms.dispute],
+    ], y);
+
+    y = addTable("Services Covered", ["Service", "Scope"], servicesCovered.map((item) => [item.service, item.scope]), y);
+    y = addTable("Response Targets", ["Priority", "Response", "Resolution"], responseTargets.map((item) => [item.priority, item.response, item.resolution]), y);
+    y = addTable("Data Security", ["Control", "Status"], dataSecurity.map((item) => [item.label, item.active ? "Active" : "Inactive"]), y);
+
+    y = addKeyValueRows("Confidentiality", [
+      ["Status", confidentiality.status],
+      ["Effective Period", confidentiality.effective],
+      ["Terms", confidentiality.text],
+    ], y);
+
+    y = addTable("Support Matrix", ["Level", "Team", "Email", "Availability"], supportMatrix.map((item) => [item.level, item.team, item.email, item.availability]), y);
+    y = addTable("SLA Commitments", ["Commitment", "Target"], slaCommitments.map((item) => [item.commitment, item.target]), y);
+    y = addTable("Renewal & Termination", ["Term", "Details"], renewalTerm.map((item) => [item.label.split(":")[0] || item.label, item.label.includes(":") ? item.label.slice(item.label.indexOf(":") + 1).trim() : item.label]), y);
+
+    y = addKeyValueRows("Renewal Information", [
+      ["Renewal Date", renewalInfo.renewalDate],
+      ["Auto Renewal", renewalInfo.autoRenewal],
+      ["Days Remaining", renewalInfo.daysRemaining],
+      ["Support Plan", supportInfo.plan],
+      ["Support Hours", supportInfo.hours],
+      ["Response SLA", supportInfo.responseSLA],
+    ], y);
+
+    y = addKeyValueRows("Subscription", [
+      ["User Licensing", subscription.userLicensing],
+      ["Licensed Users", subscription.licensedUsers],
+      ["Concurrent Users", subscription.concurrent],
+      ["Additional User Cost", subscription.additionalCost],
+      ["License Transfer", subscription.transfer],
+      ["Minimum Commitment", subscription.minCommitment],
+    ], y);
+
+    y = addTable("Key Contacts", ["Contact", "Role", "Email", "Phone"], [
+      [keyContacts.apex.name, keyContacts.apex.role, keyContacts.apex.email, keyContacts.apex.phone],
+      [keyContacts.nidoTech.name, keyContacts.nidoTech.role, keyContacts.nidoTech.email, keyContacts.nidoTech.phone],
+    ], y);
+    y = addTable("Relationship Owners", ["Party", "Name", "Email", "Phone"], [
+      ["Nido-Tech", relationshipOwners.nidoTech.name, relationshipOwners.nidoTech.email, relationshipOwners.nidoTech.phone],
+      ["Client", relationshipOwners.apex.name, relationshipOwners.apex.email, relationshipOwners.apex.phone],
+    ], y);
+    addTable("Reminders", ["Reminder", "Date"], reminders.map((item) => [item.label, item.date]), y);
+
+    const pageCount = doc.getNumberOfPages();
+    for (let page = 1; page <= pageCount; page += 1) {
+      doc.setPage(page);
+      addPageHeader();
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...colors.muted);
+      doc.text(`Page ${page} of ${pageCount}`, pageWidth - margin, 816, { align: "right" });
+    }
+
+    const safeName = (contractTitle || "Client-Contract").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    doc.save(`${safeName || "Client-Contract"}.pdf`);
+    setDropdownOpen(false);
+  };
+
   // ── JSX ───────────────────────────────────────────────────────────────────────
 
   return (
@@ -619,7 +901,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
           {dropdownOpen && (
             <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
               <button
-                onClick={() => setDropdownOpen(false)}
+                onClick={downloadContract}
                 className="w-full px-2 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
               >
                 <Download size={14} className="text-gray-400" />
@@ -652,10 +934,9 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
               </div>
               <div className="text-[11px] text-gray-500 space-y-0.5 pl-11">
                 <p className="text-[10px] text-gray-400 font-medium">GSTIN</p>
-                <p className="font-mono">29AABCN1234D1Z5</p>
+                   <p className="font-mono">—</p>
                 <p className="text-[10px] text-gray-400 font-medium mt-1">Registered Address</p>
-                <p>No. 24, 2nd Floor, MG Road,</p>
-                <p>Bangalore – 560001, Karnataka, India</p>
+                   <p>—</p>
               </div>
             </div>
 
@@ -673,17 +954,17 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
                   <ChevronRight size={12} className="text-gray-400" />
                 </div>
                 <div className="bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-medium px-2 py-1 rounded">
-                  Apex Tech Solutions<br /><span className="text-[10px] text-blue-600">(Client)</span>
+                  {clientName || "Client"}<br /><span className="text-[10px] text-blue-600">(Client)</span>
                 </div>
               </div>
               <div className="flex gap-2 text-center">
                 <div>
                   <p className="text-[10px] text-gray-400">Contract No.</p>
-                  <p className="text-xs font-semibold text-gray-800">{contractId || "CT-2025-001"}</p>
+                  <p className="text-xs font-semibold text-gray-800">{contractId || "—"}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400">Contract Type</p>
-                  <p className="text-xs font-semibold text-gray-800">SaaS & Services Agreement</p>
+                  <p className="text-xs font-semibold text-gray-800">{commercialTerms.type || "—"}</p>
                 </div>
               </div>
             </div>
@@ -692,7 +973,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
             <div className="w-64 shrink-0 text-right pr-6">
               <div className="flex items-center justify-end gap-2 mb-2">
                 <div>
-                  <p className="text-sm font-bold text-gray-900 leading-tight">Apex Tech Solutions</p>
+                   <p className="text-sm font-bold text-gray-900 leading-tight">{clientName || "Client"}</p>
                   <div className="flex justify-end">
                     <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Client</span>
                   </div>
@@ -703,10 +984,9 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
               </div>
               <div className="text-[11px] text-gray-500 space-y-0.5 pr-11">
                 <p className="text-[10px] text-gray-400 font-medium">GSTIN</p>
-                <p className="font-mono">29AABCA1234B1Z5</p>
+                 <p className="font-mono">{clientGstin || "—"}</p>
                 <p className="text-[10px] text-gray-400 font-medium mt-1">Registered Address</p>
-                <p>No. 45, 3rd Floor, Embassy Tech Village,</p>
-                <p>Outer Ring Road, Bangalore – 560103, Karnataka, India</p>
+                 <p>{clientAddress || "—"}</p>
               </div>
             </div>
           </div>
@@ -715,16 +995,16 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
         {/* Meta bar */}
         <div className="bg-gray-50 border-b border-gray-200 overflow-x-auto">
           <div className="flex min-w-max">
-            <MetaCell icon={<Calendar size={13} />} label="Contract Start Date" value="Apr 01, 2025" />
-            <MetaCell icon={<Calendar size={13} />} label="Contract End Date" value="Mar 31, 2026" />
-            <MetaCell icon={<IndianRupee size={13} />} label="Contract Value" value="₹2,45,000.00" />
-            <MetaCell icon={<Receipt size={13} />} label="Billing Frequency" value="Monthly" />
-            <MetaCell icon={<FileText size={13} />} label="Payment Terms" value="Net 30 Days" />
-            <MetaCell icon={<CheckCircle2 size={13} className="text-green-500" />} label="Contract Status" value={<span className="text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-[10px]">Active</span>} />
-            <MetaCell icon={<RefreshCw size={13} />} label="Auto Renewal" value="Yes" />
-            <MetaCell icon={<Bell size={13} />} label="Notice Period" value="30 Days" />
-            <MetaCell icon={<Scale size={13} />} label="Governing Law" value="Laws of India" />
-            <MetaCell icon={<PenLine size={13} />} label="Signed On" value="Mar 28, 2025" />
+            <MetaCell icon={<Calendar size={13} />} label="Contract Start Date" value={formatContractDate(contractStartDate)} />
+            <MetaCell icon={<Calendar size={13} />} label="Contract End Date" value={formatContractDate(contractEndDate)} />
+            <MetaCell icon={<IndianRupee size={13} />} label="Currency" value={clientCurrency || overview.currency || "—"} />
+            <MetaCell icon={<Receipt size={13} />} label="Billing Model" value={commercialTerms.model || "—"} />
+            <MetaCell icon={<FileText size={13} />} label="Payment Terms" value={commercialTerms.paymentTerms || "—"} />
+            <MetaCell icon={<CheckCircle2 size={13} className={clientStatus?.toLowerCase() === "active" ? "text-green-500" : "text-gray-400"} />} label="Client Status" value={clientStatus || "—"} />
+            <MetaCell icon={<RefreshCw size={13} />} label="Auto Renewal" value={renewalInfo.autoRenewal || "—"} />
+            <MetaCell icon={<Bell size={13} />} label="Notice Period" value={renewalTerm.find((item) => item.label.toLowerCase().includes("notice"))?.label || "—"} />
+            <MetaCell icon={<Scale size={13} />} label="Governing Law" value={overview.jurisdiction || "—"} />
+            <MetaCell icon={<PenLine size={13} />} label="Signed On" value="—" />
           </div>
         </div>
       </div>
@@ -1126,7 +1406,7 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
               <div className="space-y-4">
                 {/* Apex */}
                 <div>
-                  <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Apex Tech Solutions Pvt. Ltd.</h4>
+                  <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">{clientName || "Client"}</h4>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold shrink-0">
@@ -1226,5 +1506,57 @@ export default function ContractDetailView({ contractId, contractTitle, onBack }
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ClientContractsRoute() {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const clientId = id || user?.clientId || "";
+  const client = getClients().find((item) => item.id === clientId);
+  const contract = getClientContract(clientId);
+  const isPortalRoute = window.location.pathname.startsWith("/portal/");
+
+  if (!client) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Client not found</h2>
+        <p className="text-sm text-gray-500">No client profile is available for this contract.</p>
+        <button
+          type="button"
+          onClick={() => navigate(isPortalRoute ? "/portal/dashboard" : "/clients")}
+          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  const address = [
+    client.billingAddress || client.billing_address,
+    client.billingCity || client.billing_city,
+    client.billingState || client.billing_state,
+    client.billingPincode || client.billing_pincode,
+  ].filter(Boolean).join(", ");
+
+  return (
+    <ContractDetailView
+      contractId={contract?.contractId || ""}
+      contractTitle={contract?.contractTitle || "Client Contract"}
+      clientId={clientId}
+      clientName={client.name}
+      clientEmail={client.email || ""}
+      clientPhone={client.phone || client.mobile || ""}
+      clientGstin={client.gstin || client.gstin_number || ""}
+      clientAddress={address}
+      contractStartDate={client.contractStartDate || client.contract_start_date || ""}
+      contractEndDate={client.contractEndDate || client.contract_end_date || ""}
+      clientCurrency={client.currency || ""}
+      clientPaymentTerms={client.payment_terms || ""}
+      clientStatus={client.status || ""}
+      onBack={() => navigate(isPortalRoute ? "/portal/dashboard" : `/clients/${clientId}`)}
+    />
   );
 }

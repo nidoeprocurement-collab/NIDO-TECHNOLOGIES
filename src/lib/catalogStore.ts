@@ -144,10 +144,19 @@ export function saveCatalogProduct(product: CatalogProduct): void {
           sku:          product.skuCode,
           name:         product.productName,
           category:     product.category,
+          subcategory:  product.subcategory,
+          brand:        product.brand,
+          tags:         product.tags ?? [],
+          productType:  product.productType,
+          physicalType: product.physicalType,
           img:          product.images?.[0] ?? (e.img as string) ?? '',
+          images:       product.images ?? [],
           description:  product.description,
           specs,
           generalSpecs,
+          productNotes: product.productNotes,
+          videoUrl:     product.videoUrl,
+          warranty:     product.warranty,
         };
       });
     }

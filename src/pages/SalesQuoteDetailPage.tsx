@@ -1,329 +1,322 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Send, Share2, FileText, MoreVertical, Save } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Download, Send, FileText, Edit, Paperclip } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { getQuoteById, type StoredQuote } from '@/lib/quoteStore';
+import { downloadReferenceQuotePdf } from '@/lib/referenceQuotePdf';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency, getCurrencySymbol } from '@/lib/formatters';
+
+function statusBadge(status: StoredQuote['status']) {
+  const map: Record<string, string> = {
+    'Draft': 'bg-gray-100 text-gray-600',
+    'Sent to Client': 'bg-blue-100 text-blue-700',
+    'Accepted': 'bg-green-100 text-green-700',
+    'Rejected': 'bg-red-100 text-red-700',
+  };
+  return map[status] ?? 'bg-gray-100 text-gray-600';
+}
+
+function fmt(n: number) {
+  return formatCurrency(n);
+}
+
+function fmtSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function downloadDoc(doc: { name: string; data: string }) {
+  const link = document.createElement('a');
+  link.href = doc.data;
+  link.download = doc.name;
+  link.click();
+}
 
 export default function SalesQuoteDetailPage() {
+  useI18n();
+  const { currencySymbol } = useI18n();
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState('details');
+  const [quote, setQuote] = useState<StoredQuote | null>(null);
 
-  const quote = {
-    id: 1,
-    quoteNumber: 'EST-000126',
-    referenceNumber: 'REF-EST-126',
-    status: 'ACCEPTED',
-    customer: 'Nido Technologies',
-    customerLocation: 'Karnataka (29)',
-    total: 'INR 472',
-    date: '2026-03-30',
-    validTill: '2026-04-30',
-    quoteType: 'Invoice',
-    createdDate: '2026-03-30',
-    salesperson: 'Mark Adams',
-    placeOfSupply: 'Karnataka (29)',
-    emailRecipients: 'pavaniddo@gmail.com',
-    pdfTemplate: 'Simple',
-    lineItems: [
-      {
-        id: 1,
-        itemName: '3D Design Model',
-        description: '3D model mould designs for handle',
-        hsn: '9983',
-        qty: 1,
-        rate: 400,
-        discount: 0,
-        tax: 18,
-        amount: 400
-      }
-    ],
-    subtotal: 400,
-    cgst: 36,
-    sgst: 36,
-    adjustment: 0,
-    finalTotal: 472,
-    billTo: {
-      name: 'Nido Technologies',
-      address: 'Nido Technologies, 4/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru'
-    },
-    shipTo: {
-      name: 'Nido Technologies',
-      address: 'Nido Technologies, 4/1 2nd Floor 10th Cross, Wilson Garden, Bengaluru'
-    },
-    notes: {
-      bankDetails: 'BANK NAME: IDFC\nA/c Payee Name: Nido Technologies\nBank A/C No.: 00281864611'
-    },
-    termsConditions: 'Payment of 50% post approval of quote, 30% against trial component and 20% before delivery.',
-    bankDetails: 'BANK NAME: IDFC\nA/c Payee Name: Nido Technologies\nBank IFSC Code: IDF0080154',
-    activities: [
-      {
-        id: 1,
-        type: 'CREATED',
-        description: `Quote ${this?.quoteNumber || 'EST-000126'} created`,
-        timestamp: '3/30/2026, 2:30:00 PM',
-        user: 'System Owner'
-      },
-      {
-        id: 2,
-        type: 'CONVERTED',
-        description: `Quote ${this?.quoteNumber || 'EST-000126'} converted to Sales Order SO-00001`,
-        timestamp: '3/30/2026, 4:30:00 PM',
-        user: 'System Owner'
-      }
-    ]
-  };
+  useEffect(() => {
+    if (!id) return;
+    const q = getQuoteById(id);
+    setQuote(q || null);
+  }, [id]);
 
-  const activities = [
-    {
-      id: 1,
-      type: 'CREATED',
-      description: `Quote ${quote.quoteNumber} created`,
-      timestamp: '3/30/2026, 2:30:00 PM',
-      user: 'System Owner'
-    },
-    {
-      id: 2,
-      type: 'CONVERTED',
-      description: `Quote ${quote.quoteNumber} converted to Sales Order SO-00001`,
-      timestamp: '3/30/2026, 4:30:00 PM',
-      user: 'System Owner'
-    }
-  ];
+  if (!quote) {
+    return (
+      <div className="space-y-6 pb-6">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/sales/quotes')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
+          </button>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Quote not found</h1>
+        </div>
+        <p className="text-gray-500 dark:text-gray-400">This quote may have been deleted.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-2 sm:p-6">
+      <div className="flex items-start justify-between gap-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
         <div className="flex items-start gap-4">
-          <button
-            onClick={() => navigate('/sales/quotes')}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors mt-1"
-          >
+          <button onClick={() => navigate('/sales/quotes')} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors mt-1">
             <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
           </button>
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Quote</h1>
-              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-xs font-semibold uppercase">
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{quote.quoteNumber}</h1>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(quote.status)}`}>
                 {quote.status}
               </span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Customer: {quote.customer}</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total: {quote.total}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Customer: {quote.clientName}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total: {formatCurrency(quote.grandTotal)}</p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-2 sm:gap-3">
-          <select className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-            <option>ACCEPTED</option>
-            <option>PENDING</option>
-            <option>REJECTED</option>
-          </select>
-          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
-            <Save size={16} />
-            <span className="hidden sm:inline">Save</span>
+
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+          <button
+            onClick={() => navigate(`/sales/quotes/${quote.id}/edit`)}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium"
+          >
+            <Edit size={16} /> Edit
           </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            <Send size={18} className="text-gray-600 dark:text-gray-400" />
-          </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            <Share2 size={18} className="text-gray-600 dark:text-gray-400" />
-          </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            <FileText size={18} className="text-gray-600 dark:text-gray-400" />
-          </button>
-          <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-            <MoreVertical size={18} className="text-gray-600 dark:text-gray-400" />
+          <button
+            onClick={() => { void downloadReferenceQuotePdf(quote); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm"
+          >
+            <FileText size={16} />
+            Download PDF
           </button>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-        <button
-          onClick={() => setActiveTab('details')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'details'
-              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-          }`}
-        >
-          Quote Details
-        </button>
-        <button
-          onClick={() => setActiveTab('activity')}
-          className={`pb-3 px-1 font-medium transition-colors ${
-            activeTab === 'activity'
-              ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
-          }`}
-        >
-          Activity Logs
-        </button>
+        {['details', 'documents'].map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`pb-3 px-1 font-medium transition-colors capitalize ${
+              activeTab === tab
+                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300'
+            }`}>
+            {tab === 'documents' ? `Supporting Documents${quote.supportingDocs.length ? ` (${quote.supportingDocs.length})` : ''}` : 'Quote Details'}
+          </button>
+        ))}
       </div>
 
       {activeTab === 'details' && (
         <div className="space-y-6">
-          {/* Quote Information Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Customer */}
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide mb-2">CUSTOMER</p>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{quote.customer}</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{quote.customerLocation}</p>
+              <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-2">CUSTOMER</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">{quote.clientName}</p>
+              {quote.contactPerson && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{quote.contactPerson}</p>}
             </div>
-
-            {/* Document Window */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide mb-2">DOCUMENT WINDOW</p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white">{quote.date}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Valid till {quote.validTill}</p>
+              <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-2">DOCUMENT WINDOW</p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">{quote.quoteDate}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Valid till {quote.validTill}</p>
             </div>
-
-            {/* Line Items */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide mb-2">LINE ITEMS</p>
+              <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-2">LINE ITEMS</p>
               <p className="text-lg font-bold text-gray-900 dark:text-white">{quote.lineItems.length}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{quote.total} total quote value</p>
-            </div>
-          </div>
-
-          {/* Details Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Quote Type</p>
-              <p className="font-semibold text-gray-900 dark:text-white">{quote.quoteType}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Quote Number</p>
-              <p className="font-semibold text-gray-900 dark:text-white">{quote.quoteNumber}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Creation Date</p>
-              <p className="font-semibold text-gray-900 dark:text-white">{quote.createdDate}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Salesperson</p>
-              <p className="font-semibold text-gray-900 dark:text-white">{quote.salesperson}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Reference #</p>
-              <p className="font-semibold text-gray-900 dark:text-white">{quote.referenceNumber}</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Place of Supply</p>
-              <p className="font-semibold text-gray-900 dark:text-white">{quote.placeOfSupply}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{formatCurrency(quote.grandTotal)} total</p>
             </div>
           </div>
 
           {/* Email Recipients */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Email Recipients</p>
-            <p className="font-semibold text-gray-900 dark:text-white">{quote.emailRecipients}</p>
-          </div>
+          {quote.emails.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Email Recipients</p>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {quote.emails.map((e, i) => (
+                  <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm border border-blue-200 dark:border-blue-700">
+                    {e}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-          {/* Bill To and Ship To */}
+          {/* Bill To / Ship To */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide font-semibold mb-3">BILL TO</h3>
-              <p className="font-bold text-gray-900 dark:text-white mb-1">{quote.billTo.name}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{quote.billTo.address}</p>
+              <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide font-semibold mb-3">BILL TO</p>
+              <p className="font-bold text-gray-900 dark:text-white mb-1">{quote.clientName}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{quote.billingAddress}</p>
+              {quote.clientGstin && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">GSTIN: {quote.clientGstin}</p>}
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide font-semibold mb-3">SHIP TO</h3>
-              <p className="font-bold text-gray-900 dark:text-white mb-1">{quote.shipTo.name}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{quote.shipTo.address}</p>
+              <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide font-semibold mb-3">SHIP TO</p>
+              <p className="font-bold text-gray-900 dark:text-white mb-1">{quote.clientName}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{quote.shippingAddress}</p>
             </div>
           </div>
 
           {/* Line Items Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-sm">
+                <colgroup>
+                  <col style={{ width: '3%' }} />
+                  <col style={{ width: '22%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '5%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '10%' }} />
+                </colgroup>
                 <thead>
-                  <tr className="bg-gray-900 dark:bg-gray-950">
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Item Name</th>
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Description</th>
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">HSN/SAC</th>
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Qty</th>
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Rate</th>
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Discount</th>
-                    <th className="px-4 sm:px-6 py-2 text-left text-xs font-semibold text-white uppercase tracking-wider">Tax %</th>
-                    <th className="px-4 sm:px-6 py-2 text-right text-xs font-semibold text-white uppercase tracking-wider">Amount</th>
+                  <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                    {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map(h => (
+                      <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {quote.lineItems.map((item) => (
-                    <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white font-medium">{item.itemName}</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-600 dark:text-gray-400">{item.description}</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-600 dark:text-gray-400">{item.hsn}</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.qty}</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.rate}</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.discount}</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white">{item.tax}%</td>
-                      <td className="px-4 sm:px-6 py-2 text-sm text-gray-900 dark:text-white text-right font-medium">{item.amount}</td>
-                    </tr>
-                  ))}
+                  {quote.lineItems.map((item, idx) => {
+                    const taxable = Math.max(0, item.qty * item.rate - item.discount);
+                    const gst = taxable * (item.taxPercent / 100);
+                    const amt = taxable + gst;
+                    return (
+                      <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 text-center">{idx + 1}</td>
+                        <td className="px-3 py-2.5">
+                          <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
+                          {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.description}</p>}
+                        </td>
+                        <td className="px-3 py-2.5 text-gray-600 dark:text-gray-400">{item.hsnSac}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-center">{item.qty}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(item.rate)}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(item.discount)}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(taxable)}</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-center">{item.taxPercent}%</td>
+                        <td className="px-3 py-2.5 text-gray-900 dark:text-white text-right">{fmt(gst)}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-white text-right">{fmt(amt)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="flex justify-end">
-            <div className="w-full sm:w-96 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                  <span className="text-gray-900 dark:text-white font-medium">{quote.subtotal}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">CGST (9%)</span>
-                  <span className="text-gray-900 dark:text-white font-medium">{quote.cgst}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">SGST (9%)</span>
-                  <span className="text-gray-900 dark:text-white font-medium">{quote.sgst}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Adjustment</span>
-                  <span className="text-gray-900 dark:text-white font-medium">{quote.adjustment}</span>
-                </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between">
-                  <span className="font-semibold text-gray-900 dark:text-white">Total</span>
-                  <span className="font-bold text-lg text-gray-900 dark:text-white">{quote.finalTotal}</span>
+          {/* Totals — matches Create New Quote summary panel */}
+          {(() => {
+            const grossSubtotal = quote.lineItems.reduce((s, i) => s + i.qty * i.rate, 0);
+            const totalDiscount = quote.lineItems.reduce((s, i) => s + i.discount, 0);
+            const totalTaxableValue = quote.lineItems.reduce((s, i) => s + Math.max(0, i.qty * i.rate - i.discount), 0);
+            const totalGst = quote.totalTax;
+            const shippingCharges = quote.shippingCharges ?? 0;
+            const roundOff = quote.adjustment;
+            const gstRateLabels = [...new Set(quote.lineItems.map(i => i.taxPercent))].sort((a,b)=>a-b).map(r=>`${r}%`).join(', ');
+            return (
+              <div className="flex justify-end">
+                <div className="w-full sm:w-96 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Gross Subtotal</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(grossSubtotal)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Item Level Discounts (-)</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">− {formatCurrency(totalDiscount)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Total Taxable Value</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">{formatCurrency(totalTaxableValue)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
+                          Total GST{gstRateLabels ? ` (${gstRateLabels})` : ''}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(totalGst)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{formatCurrency(shippingCharges)}</td>
+                      </tr>
+                      <tr className="border-b border-gray-200 dark:border-gray-700">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">
+                          {roundOff >= 0 ? '' : '-'}{formatCurrency(Math.abs(roundOff))}
+                        </td>
+                      </tr>
+                      <tr className="border-t-2 border-gray-300 dark:border-gray-500">
+                        <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">Total Payable</td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{formatCurrency(quote.grandTotal)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
 
-          {/* Notes and Additional Info */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide font-semibold mb-3">NOTES</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{quote.notes.bankDetails}</p>
+          {/* Terms / Notes */}
+          {(quote.termsConditions || quote.customerNotes) && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {quote.termsConditions && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide font-semibold mb-3">TERMS & CONDITIONS</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{quote.termsConditions}</p>
+                </div>
+              )}
+              {quote.customerNotes && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                  <p className="text-xs uppercase text-gray-500 dark:text-gray-400 tracking-wide font-semibold mb-3">CUSTOMER NOTES</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{quote.customerNotes}</p>
+                </div>
+              )}
             </div>
-            <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide font-semibold mb-3">TERMS & CONDITIONS</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{quote.termsConditions}</p>
-            </div>
-            <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-xs uppercase text-gray-600 dark:text-gray-400 tracking-wide font-semibold mb-3">BANK DETAILS</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">{quote.bankDetails}</p>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      {activeTab === 'activity' && (
+      {activeTab === 'documents' && (
         <div className="space-y-4">
-          {activities.map((activity) => (
-            <div key={activity.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-2 sm:p-6">
-              <p className="text-xs uppercase font-semibold text-gray-700 dark:text-gray-300 tracking-wide mb-2">{activity.type}</p>
-              <p className="text-sm sm:text-base text-gray-900 dark:text-white font-medium mb-2">{activity.description}</p>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{activity.timestamp} by {activity.user}</p>
+          {quote.supportingDocs.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-12 text-center">
+              <Paperclip size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+              <p className="text-gray-500 dark:text-gray-400">No supporting documents attached to this quote.</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">You can add documents when editing the quote.</p>
             </div>
-          ))}
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700 overflow-hidden">
+              {quote.supportingDocs.map((doc, i) => (
+                <div key={i} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                      <Paperclip size={18} className="text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{fmtSize(doc.size)} · {doc.type || 'File'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => downloadDoc(doc)}
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm font-medium flex-shrink-0 ml-4"
+                  >
+                    <Download size={15} /> Download
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

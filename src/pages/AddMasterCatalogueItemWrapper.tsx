@@ -160,14 +160,56 @@ export default function AddMasterCatalogueItemWrapper() {
   const removeImageUrlInputRow = (idx: number) =>
     setImageUrlInputs(rows => rows.length > 1 ? rows.filter((_, i) => i !== idx) : rows);
 
+  const normalizeImageUrl = (raw: string): string | null => {
+    const value = raw.trim();
+    if (!value) return null;
+    if (value.startsWith('/') || value.startsWith('./') || value.startsWith('../')) return value;
+    if (value.startsWith('//')) return `https:${value}`;
+
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleAddImageUrls = () => {
-    const urls = imageUrlInputs.map(u => u.trim()).filter(Boolean);
-    if (urls.length === 0) { toast.error('Enter at least one image URL'); return; }
-    const invalid = urls.find(u => !/^https?:\/\//i.test(u));
-    if (invalid) { toast.error('Please enter valid image URLs starting with http:// or https://'); return; }
-    setImages(p => [...p, ...urls]);
+    const enteredValues = imageUrlInputs.map(u => u.trim()).filter(Boolean);
+    if (enteredValues.length === 0) { toast.error('Enter at least one image URL'); return; }
+
+    const validUrls = enteredValues
+      .map(normalizeImageUrl)
+      .filter((url): url is string => Boolean(url));
+    const existing = new Set(images);
+    const newUrls = validUrls.filter(url => !existing.has(url));
+    const invalidCount = enteredValues.length - validUrls.length;
+    const duplicateCount = validUrls.length - newUrls.length;
+
+    if (newUrls.length === 0) {
+      if (invalidCount > 0) {
+        toast.error('Enter a valid image URL starting with http:// or https://');
+      } else {
+        toast.info('Those image URLs are already added');
+      }
+      return;
+    }
+
+    setImages(p => [...p, ...newUrls]);
     setImageUrlInputs(['', '', '', '', '']);
-    toast.success(`${urls.length} image URL(s) added`);
+    const details = [
+      `${newUrls.length} image URL${newUrls.length === 1 ? '' : 's'} added`,
+      duplicateCount > 0 ? `${duplicateCount} duplicate skipped` : '',
+      invalidCount > 0 ? `${invalidCount} invalid skipped` : '',
+    ].filter(Boolean).join(' · ');
+    toast.success(details);
+  };
+
+  const handleImageUrlKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleAddImageUrls();
+    }
   };
 
   const buildProduct = (status: 'draft' | 'published') => ({
@@ -517,7 +559,19 @@ export default function AddMasterCatalogueItemWrapper() {
                 <div className="flex flex-wrap gap-2 mt-3">
                   {images.map((img, i) => (
                     <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 group">
-                      <img src={img} alt={`img-${i}`} className="w-full h-full object-cover" />
+                      <img
+                        src={img}
+                        alt={`Product image ${i + 1}`}
+                        className="w-full h-full object-contain bg-white p-1"
+                        onError={e => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          e.currentTarget.nextElementSibling?.classList.add('flex');
+                        }}
+                      />
+                      <div className="hidden absolute inset-0 items-center justify-center bg-red-50 px-1 text-center text-[9px] text-red-600">
+                        Image unavailable
+                      </div>
                       <button
                         onClick={() => setImages(p => p.filter((_, idx) => idx !== i))}
                         className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -541,6 +595,7 @@ export default function AddMasterCatalogueItemWrapper() {
                       placeholder={`https://example.com/image${idx + 1}.jpg`}
                       value={url}
                       onChange={e => updateImageUrlInput(idx, e.target.value)}
+                      onKeyDown={handleImageUrlKeyDown}
                       className="text-sm flex-1"
                     />
                     {imageUrlInputs.length > 1 && (

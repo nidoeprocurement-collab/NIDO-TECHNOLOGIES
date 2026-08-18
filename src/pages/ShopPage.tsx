@@ -1,12 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2 } from "lucide-react";
+import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
+import { getCatalogProducts } from "@/lib/catalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
-import { getAllProductPricing, updateWinningVendorMoq, getSlabDiscountPct } from "@/lib/priceEngineStore";
+import {
+  getAllProductPricing,
+  updateWinningVendorMoq,
+  getSlabDiscountPct,
+  getClientPriceSlabs,
+  computeVendorComparisons,
+  computeClientFinalPrice,
+  getClientCommonSettings,
+  resolveClientProfitPct,
+  canVendorFulfillMoq,
+  getRecommendedVendor,
+  getVendorComparisonBadge,
+  type VendorComparisonRow,
+} from "@/lib/priceEngineStore";
+import { getProductTotalAvailableStock } from "@/lib/vendorStore";
+import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +35,13 @@ type Product = {
   productCode: string;
   name: string;
   category: string;
+  subcategory?: string;
+  brand?: string;
+  tags?: string[];
+  productType?: string;
+  physicalType?: string;
   image: string;
+  images?: string[];
   specs: string[];
   leadTime: string;
   moq: number;
@@ -27,6 +51,9 @@ type Product = {
   inStock: boolean;
   description?: string;
   generalSpecs?: { label: string; value: string }[];
+  productNotes?: string;
+  videoUrl?: string;
+  warranty?: string;
   preference?: string;
 };
 
@@ -74,24 +101,33 @@ const PAGE_SIZE = 20;
 
 function formatPrice(n: number) {
   if (!n || n === 0) return "Price on request";
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)` : "—"; }
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
-type VendorMatch = { leadTime: string; moq: number; totalStock: number };
+type VendorMatch = { leadTime: string; moq: number; totalStock: number; hasEligibleVendor: boolean };
+
+// getClientOrderedQtyMap and getPOdQtyMap removed — available stock is now
+// calculated directly from physicalStock − reservedStock in vendorStore, so
+// no manual order/PO scanning is needed here.
 
 function getVendorMatchMap(): Map<string, VendorMatch> {
   const map = new Map<string, VendorMatch>();
   getAllProductPricing().forEach(p => {
-    const days = p.winningVendor?.leadTime ?? 0;
+    const winningVendor = getRecommendedVendor(p.vendorComparisons);
+    const days = winningVendor?.leadTime ?? 0;
     const displayDays = days > 0 ? days * 2 : 0;
-    // Sum across ALL vendors so the shop knows the real combined capacity.
-    const totalStock = p.vendorComparisons.reduce((s, r) => s + (r.stock ?? 0), 0);
+    // Use sum(physicalStock) − sum(reservedStock) across all vendors — the
+    // same formula Stock Management uses — so the Shop always shows the
+    // correct available qty even when one vendor's reservation exceeds its
+    // physical stock (per-vendor clamping would over-report in that case).
+    const totalStock = getProductTotalAvailableStock(p.masterProductCode);
     map.set(p.masterProductCode, {
       leadTime: displayDays > 0 ? `${displayDays} Day${displayDays !== 1 ? "s" : ""}` : "",
-      moq: p.winningVendor?.moq ?? 0,
+      moq: winningVendor?.moq ?? 0,
       totalStock,
+      hasEligibleVendor: !!winningVendor,
     });
   });
   return map;
@@ -110,22 +146,44 @@ function prefOrder(pref?: string): number {
 
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
+  const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
+  const masterSpecs = master?.specifications
+    ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
+    .filter(Boolean);
+  const masterGeneralSpecs = master?.generalSpecs
+    ?.filter(s => s.category || s.attributeValue)
+    .map(s => ({ label: s.category, value: s.attributeValue }));
   const totalStock = match?.totalStock ?? 0;
+  // Build the images array: use stored array when available, else wrap single img
+  const images = master?.images?.length
+    ? master.images
+    : e.images && e.images.length > 0
+      ? e.images
+      : e.img ? [e.img] : [];
   return {
     id: `client-${e.productCode}`,
     productCode: e.productCode,
     name: e.name,
-    category: e.category || "General",
-    image: e.img || "",
-    specs: e.specs || [],
+    category: master?.category || e.category || "General",
+    subcategory: master?.subcategory || e.subcategory,
+    brand: master?.brand || e.brand,
+    tags: master?.tags || e.tags || [],
+    productType: master?.productType || e.productType,
+    physicalType: master?.physicalType || e.physicalType,
+    image: images[0] || "",
+    images,
+    specs: masterSpecs?.length ? masterSpecs : e.specs || [],
     leadTime: match?.leadTime || e.leadTime || "",
     moq: match?.moq ?? e.moq ?? 0,
     totalStock,
     priceNum: e.priceNum ?? 0,
-    // Out of stock if: marked so in the catalog OR vendor stock is known and is 0.
-    inStock: e.availability !== "Out of Stock" && (totalStock > 0 || match === undefined),
-    description: e.description,
-    generalSpecs: e.generalSpecs,
+    // A product is in stock only when at least one vendor can fulfill its MOQ.
+    inStock: e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
+    description: master?.description || e.description,
+    generalSpecs: masterGeneralSpecs?.length ? masterGeneralSpecs : e.generalSpecs,
+    productNotes: master?.productNotes || e.productNotes,
+    videoUrl: master?.videoUrl || e.videoUrl,
+    warranty: master?.warranty || e.warranty,
     preference: e.preference,
   };
 }
@@ -170,14 +228,17 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 
 function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, allProducts, onSelectProduct }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string; allProducts: Product[]; onSelectProduct: (p: Product) => void }) {
   const { addItem } = useCart();
+  const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [qtyDraft, setQtyDraft] = useState(String(product?.moq ?? 1));
   const [added, setAdded] = useState(false);
   const [editingMoq, setEditingMoq] = useState(false);
   const [moqDraft, setMoqDraft] = useState(String(product?.moq ?? 0));
+  const [selectedImage, setSelectedImage] = useState<string>(product?.image ?? "");
 
   useEffect(() => { if (product) { const v = Math.max(1, product.moq); setQty(v); setQtyDraft(String(v)); } }, [product]);
   useEffect(() => { if (product) setMoqDraft(String(product.moq)); }, [product?.moq]);
+  useEffect(() => { if (product) setSelectedImage(product.image ?? ""); }, [product?.id]);
 
   const dialogMaxQty = product ? (product.totalStock > 0 ? product.totalStock : undefined) : undefined;
 
@@ -193,9 +254,15 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   if (!product) return null;
 
   const dialogDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
-  const dialogEffectivePrice = dialogDiscountPct > 0 ? product.priceNum * (1 - dialogDiscountPct / 100) : product.priceNum;
+  const dialogGstRate = getEffectiveTaxPctForCategory(product.category);
+  // priceNum is GST-inclusive; convert to excl. GST for display
+  const dialogBasePriceExcl = product.priceNum * 100 / (100 + dialogGstRate);
+  const dialogEffectivePrice = dialogDiscountPct > 0
+    ? dialogBasePriceExcl * (1 - dialogDiscountPct / 100)
+    : dialogBasePriceExcl;
 
   const handleAdd = () => {
+    if (isImpersonating) return;
     if (added) return;
     addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setAdded(true);
@@ -248,24 +315,40 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
             {/* Image column: thumbnail rail + main image */}
             <div className="w-[340px] shrink-0">
               <div className="flex gap-3">
-                <div className="flex flex-col gap-2 shrink-0">
-                  <div className="w-14 h-14 rounded-lg border-2 border-blue-500 bg-gray-50 overflow-hidden flex items-center justify-center">
-                    {product.image ? (
-                      <img src={product.image} alt={product.name} className="w-full h-full object-contain" />
-                    ) : (
-                      <div className="scale-[0.35] origin-center">{getProductIcon(product.name, product.category)}</div>
+                {/* Thumbnail rail */}
+                {(product.images && product.images.length > 0) && (
+                  <div className="flex flex-col gap-2 shrink-0">
+                    {product.images.slice(0, 4).map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedImage(img)}
+                        className={`w-14 h-14 rounded-lg border-2 bg-gray-50 overflow-hidden flex items-center justify-center transition-all ${selectedImage === img ? "border-blue-500 shadow-sm" : "border-gray-200 hover:border-blue-300"}`}
+                      >
+                        <img src={img} alt={`${product.name} view ${i + 1}`} className="w-full h-full object-contain" />
+                      </button>
+                    ))}
+                    {product.images.length > 4 && (
+                      <button
+                        onClick={() => setSelectedImage(product.images![4])}
+                        className={`w-14 h-14 rounded-lg border-2 bg-gray-50 overflow-hidden flex items-center justify-center transition-all ${product.images.slice(4).includes(selectedImage) ? "border-blue-500 shadow-sm" : "border-gray-200 hover:border-blue-300"}`}
+                      >
+                        <span className="text-xs font-semibold text-gray-600">+{product.images.length - 4}</span>
+                      </button>
                     )}
                   </div>
-                </div>
+                )}
+                {/* Main image */}
                 <div className="flex-1 aspect-square rounded-2xl border border-gray-200 overflow-hidden bg-gray-50">
-                  {product.image ? (
+                  {selectedImage ? (
+                    <ZoomableImage src={selectedImage} alt={product.name} />
+                  ) : product.image ? (
                     <ZoomableImage src={product.image} alt={product.name} />
                   ) : (
                     getProductIcon(product.name, product.category)
                   )}
                 </div>
               </div>
-              {product.image && (
+              {(selectedImage || product.image) && (
                 <p className="text-xs text-gray-400 mt-2 flex items-center gap-1 justify-center">
                   <ZoomIn size={12} /> Hover image to zoom
                 </p>
@@ -305,7 +388,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Price (Excl. GST)</p>
                 {dialogDiscountPct > 0 ? (
                   <>
-                    <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(product.priceNum)}</p>
+                    <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(dialogBasePriceExcl)}</p>
                     <p className="text-3xl font-bold text-green-600 mt-0.5">
                       {formatPrice(dialogEffectivePrice)}
                       {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
@@ -314,10 +397,11 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                   </>
                 ) : (
                   <p className="text-3xl font-bold text-gray-900 mt-1">
-                    {formatPrice(product.priceNum)}
+                    {formatPrice(dialogBasePriceExcl)}
                     {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
                   </p>
                 )}
+                <p className="text-[10px] text-gray-400 mt-1">+ {dialogGstRate}% GST extra</p>
 
                 <div className="flex items-center gap-3 mt-5">
                   <button
@@ -424,7 +508,9 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-2">
                   {related.map(rp => {
                     const rpDiscountPct = clientId ? getSlabDiscountPct(clientId, rp.category, Math.max(1, rp.moq)) : 0;
-                    const rpPrice = rpDiscountPct > 0 ? rp.priceNum * (1 - rpDiscountPct / 100) : rp.priceNum;
+                    const rpGstRate = getEffectiveTaxPctForCategory(rp.category);
+                    const rpBasePriceExcl = rp.priceNum * 100 / (100 + rpGstRate);
+                    const rpPrice = rpDiscountPct > 0 ? rpBasePriceExcl * (1 - rpDiscountPct / 100) : rpBasePriceExcl;
                     return (
                       <div
                         key={rp.id}
@@ -472,124 +558,483 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
   const { addItem } = useCart();
-  const [qty, setQty] = useState(Math.max(1, product.moq));
-  const [qtyDraft, setQtyDraft] = useState(String(Math.max(1, product.moq)));
+  const { isImpersonating } = useAuth();
+  const [qty, setQty] = useState(1);
+  const [qtyDraft, setQtyDraft] = useState("1");
   const [adding, setAdding] = useState(false);
+  const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
+  const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
+  const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [liked, setLiked] = useState(false);
+  const vendorSelectionRef = useRef<HTMLDivElement>(null);
 
-  const maxQty = product.totalStock > 0 ? product.totalStock : undefined;
+  useEffect(() => {
+    const refreshVendors = () => {
+      if (!product.productCode) return;
+      setVendorComps(computeVendorComparisons(product.productCode, product.category));
+    };
+    refreshVendors();
+    window.addEventListener("vendorProductsUpdated", refreshVendors);
+    return () => window.removeEventListener("vendorProductsUpdated", refreshVendors);
+  }, [product.productCode, product.category]);
 
-  const commitCardQty = () => {
-    const min = Math.max(1, product.moq);
-    const parsed = parseInt(qtyDraft, 10);
-    let clamped = isNaN(parsed) || parsed < min ? min : parsed;
-    if (maxQty !== undefined) clamped = Math.min(maxQty, clamped);
-    setQty(clamped);
-    setQtyDraft(String(clamped));
-  };
+  useEffect(() => {
+    setSelectedVendor(current => {
+      if (!current) return current;
+      const refreshed = vendorComps.find(comp => comp.vendorId === current.vendorId);
+      return refreshed && canVendorFulfillMoq(refreshed) ? refreshed : null;
+    });
+  }, [vendorComps]);
 
-  const cardDiscountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
-  const cardEffectivePrice = cardDiscountPct > 0 ? product.priceNum * (1 - cardDiscountPct / 100) : product.priceNum;
+  useEffect(() => {
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (!vendorSelectionRef.current?.contains(event.target as Node)) {
+        setVendorPanelOpen(false);
+        setVendorSearch("");
+      }
+    };
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
+  }, []);
+
+  const maxQty = selectedVendor
+    ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
+    : undefined;
+
+  const recommendedVendor = getRecommendedVendor(vendorComps);
+
+  const cardGstRate = getEffectiveTaxPctForCategory(product.category);
+
+  const selectedVendorSellingPrice = selectedVendor && clientId
+    ? computeClientFinalPrice(
+        selectedVendor.landedCostPerUnit,
+        getClientCommonSettings(clientId),
+        resolveClientProfitPct(clientId, product.productCode, product.category),
+        product.category,
+      ).finalPrice
+    : null;
+
+  const hsnForCategory = (() => {
+    const map = new Map<string, string>();
+    getHsnCodes().forEach(h => { if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code); });
+    getProductCategoryTaxMap().forEach(m => { if (m.defaultHsnCode && m.productCategory) map.set(m.productCategory.toLowerCase(), m.defaultHsnCode); });
+    return map.get((product.category || "").toLowerCase()) || "";
+  })();
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!product.inStock || adding) return;
+    if (isImpersonating) return;
+    if (!product.inStock || adding || !selectedVendor) return;
     setAdding(true);
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
+    addItem(
+      {
+        id: Math.random() * 10000,
+        name: product.name,
+        image: product.image,
+        specs: product.specs,
+        moq: selectedVendor.moq,
+        totalStock: selectedVendor.stock,
+        priceNum: product.priceNum,
+        clientId,
+        category: product.category,
+        productCode: product.productCode,
+        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
+        selectedVendorId: selectedVendor.vendorId,
+        selectedVendorName: selectedVendor.vendorName,
+        vendorPrice: selectedVendor.basePrice,
+        landedCost: selectedVendor.landedCostPerUnit,
+        gstSnapshot: cardGstRate,
+        hsnSnapshot: hsnForCategory,
+        vendorRating: selectedVendor.rating,
+      },
+      Math.max(1, Math.max(selectedVendor.moq, qty))
+    );
     setTimeout(() => setAdding(false), 1500);
   };
 
+  const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canVendorFulfillMoq(selectedVendor);
+
+  // Parse specs into key/value pairs
+  const specPairs = product.specs.map(s => {
+    const idx = s.indexOf(': ');
+    return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: '', val: s };
+  });
+
+  // Filtered vendors by search
+  const filteredVendors = vendorSearch
+    ? vendorComps.filter(v => v.vendorName.toLowerCase().includes(vendorSearch.toLowerCase()))
+    : vendorComps;
+
+  // Display values
+  const displayMoq = selectedVendor ? (selectedVendor.moq > 0 ? `${selectedVendor.moq} Units` : '--') : '--';
+  const displayLeadTime = selectedVendor && selectedVendor.leadTime > 0
+    ? `${selectedVendor.leadTime * 2}-${selectedVendor.leadTime * 2 + 1} Days`
+    : '--';
+  const displayStock = selectedVendor
+    ? (selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString('en-IN')} Units` : 'Out of Stock')
+    : '--';
+  const displayPrice = selectedVendor && canVendorFulfillMoq(selectedVendor)
+    ? (clientId && selectedVendorSellingPrice
+        ? formatCurrency(selectedVendorSellingPrice)
+        : formatCurrency(selectedVendor.basePrice))
+    : '--';
+
+  // First active slab with a non-zero discount that applies to this product's
+  // category (category-specific slabs take priority over "All Products").
+  const firstSlabHint: { discountPct: number; minQty: number } | null = (() => {
+    if (!clientId) return null;
+    const slabs = getClientPriceSlabs(clientId)
+      .filter(s => s.status === 'Active' && s.discountPct > 0);
+    if (slabs.length === 0) return null;
+    const catSlabs = slabs.filter(s => s.applyTo !== 'All Products' && s.applyTo.toLowerCase() === (product.category || '').toLowerCase());
+    const pool = catSlabs.length > 0 ? catSlabs : slabs.filter(s => s.applyTo === 'All Products');
+    if (pool.length === 0) return null;
+    const best = pool.slice().sort((a, b) => a.minQty - b.minQty)[0];
+    return { discountPct: best.discountPct, minQty: best.minQty };
+  })();
+
   return (
     <div
-      className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow cursor-pointer"
+      className={`group relative flex h-full flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
-      <div className="flex gap-0 flex-1">
-        {/* Image */}
-        <div className="w-[110px] shrink-0 bg-gray-50 overflow-hidden">
-          {product.image ? (
-            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full min-h-[160px]">
-              {getProductIcon(product.name, product.category)}
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 p-2 flex flex-col min-w-0">
-          <h3 className="font-semibold text-gray-900 text-sm leading-snug">{product.name}</h3>
-          <span className={`text-xs font-medium mt-0.5 ${getCategoryColor(product.category)}`}>{product.category}</span>
-
-          {product.specs.length > 0 && (
-            <div className="mt-2">
-              <p className="text-[10px] font-semibold text-gray-700 uppercase tracking-wide mb-1">Key Specifications</p>
-              <ul className="space-y-0.5">
-                {product.specs.slice(0, 6).map((spec, i) => (
-                  <li key={i} className="flex items-start gap-1 text-[11px] text-gray-600">
-                    <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 shrink-0" />
-                    {spec}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+      {/* Top row: In Stock badge + Heart */}
+      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+        {product.inStock ? (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+            In Stock
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+            Out of Stock
+          </span>
+        )}
+        <button
+          onClick={e => { e.stopPropagation(); setLiked(l => !l); }}
+          className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <Heart size={14} className={liked ? "fill-red-500 text-red-500" : "text-gray-300"} />
+        </button>
       </div>
 
-      {/* Footer */}
-      <div className="px-3 pb-3 border-t border-gray-100 mt-auto pt-2">
-        <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1.5">
-          <span>Lead Time: {formatLeadTime(product.leadTime)}</span>
-          <span>MOQ: {formatMoq(product.moq)}</span>
-        </div>
-        <div className="flex items-center justify-between mb-2">
-          {cardDiscountPct > 0 ? (
-            <div className="flex flex-col">
-              <span className="text-[10px] text-gray-400 line-through leading-tight">{formatPrice(product.priceNum)}</span>
-              <span className="font-bold text-green-600 text-base leading-tight">
-                {formatPrice(cardEffectivePrice)}
-                <span className="text-xs font-normal text-gray-500"> / each</span>
-              </span>
-              <span className="text-[10px] text-green-600 font-semibold leading-tight">{cardDiscountPct}% off</span>
+      {/* Product image */}
+      <div className="flex items-center justify-center px-3 py-2 h-[150px]">
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            className="max-h-full max-w-full object-contain"
+          />
+        ) : (
+          <div className="w-full h-full overflow-hidden rounded-xl">
+            {getProductIcon(product.name, product.category)}
+          </div>
+        )}
+      </div>
+
+      {/* Name + Category */}
+      <div className="text-center px-3 pb-3 border-b border-gray-100">
+        <h3 className="text-[13px] font-bold text-gray-900 leading-snug line-clamp-2">{product.name}</h3>
+        <span className={`block mt-0.5 text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+      </div>
+
+      {/* Vendor selector */}
+      <div ref={vendorSelectionRef} className="relative px-3 pt-2.5" onClick={e => e.stopPropagation()}>
+        <p className="text-[10px] text-gray-500 mb-1">Vendor</p>
+        <button
+          type="button"
+          onClick={() => setVendorPanelOpen(o => !o)}
+          className="w-full flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-2 text-left hover:border-blue-300 transition-colors bg-white"
+        >
+          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+            <Building2 size={13} className="text-blue-600" />
+          </div>
+          {selectedVendor ? (
+            <div className="flex-1 flex items-center gap-1.5 min-w-0">
+              <span className="text-[11px] font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</span>
             </div>
           ) : (
-            <span className={`font-bold text-gray-900 ${product.priceNum === 0 ? 'text-xs text-gray-500' : 'text-base'}`}>
-              {formatPrice(product.priceNum)}
-              {product.priceNum > 0 && <span className="text-xs font-normal text-gray-500"> / each</span>}
-            </span>
+            <span className="flex-1 text-[11px] font-medium text-gray-500">Select Vendor</span>
           )}
+          <ChevronDown size={13} className={`shrink-0 text-gray-400 transition-transform ${vendorPanelOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Vendor dropdown panel */}
+        {vendorPanelOpen && (
+          <div className="absolute left-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden" style={{ width: "480px" }}>
+            {/* Header */}
+            <div className="px-3 py-2 border-b border-gray-100">
+              <p className="text-[12px] font-bold text-gray-800">Select Vendor</p>
+            </div>
+            {/* Search */}
+            <div className="px-2 py-2 border-b border-gray-100">
+              <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-2.5 py-1.5 border border-gray-200">
+                <Search size={11} className="text-gray-400 shrink-0" />
+                <input
+                  value={vendorSearch}
+                  onChange={e => setVendorSearch(e.target.value)}
+                  placeholder="Search vendor..."
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 text-[11px] bg-transparent outline-none text-gray-700 placeholder-gray-400"
+                />
+              </div>
+            </div>
+            {/* Table header */}
+            <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1.2fr" }}>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Stock</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Price / Unit</span>
+            </div>
+            {/* Vendor rows */}
+            <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
+              {filteredVendors.map(comp => {
+                const isSelected = selectedVendor?.vendorId === comp.vendorId;
+                const isOOS = !canVendorFulfillMoq(comp);
+                const badge = getVendorComparisonBadge(comp, vendorComps);
+                const price = !isOOS && clientId
+                  ? computeClientFinalPrice(
+                      comp.landedCostPerUnit,
+                      getClientCommonSettings(clientId),
+                      resolveClientProfitPct(clientId, product.productCode, product.category),
+                      product.category,
+                    ).finalPrice
+                  : !isOOS ? comp.basePrice : 0;
+                return (
+                  <button
+                    key={comp.vendorId}
+                    type="button"
+                    disabled={isOOS}
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!isOOS) {
+                        setSelectedVendor(comp);
+                        const nextQty = Math.max(1, comp.moq);
+                        setQty(nextQty);
+                        setQtyDraft(String(nextQty));
+                        setVendorPanelOpen(false);
+                        setVendorSearch("");
+                      }
+                    }}
+                    className={`w-full grid items-center px-3 py-2 text-left transition-colors ${
+                      isSelected ? 'bg-blue-50' : isOOS ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50'
+                    }`}
+                    style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1.2fr" }}
+                  >
+                    {/* Vendor name */}
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <div className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center shrink-0">
+                        <Building2 size={11} className="text-gray-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-[10px] font-semibold truncate ${isOOS ? 'text-gray-400' : 'text-gray-800'}`}>{comp.vendorName}</p>
+                        {badge && (
+                          <span className={`inline-block text-[8px] font-bold px-1 py-0.5 rounded leading-none mt-0.5 ${
+                            badge === "Recommended" ? "text-blue-700 bg-blue-100" :
+                            badge === "Fastest" ? "text-emerald-700 bg-emerald-100" :
+                            badge === "Best Price" ? "text-amber-700 bg-amber-100" :
+                            "text-violet-700 bg-violet-100"
+                          }`}>
+                            {badge === "Recommended" && "★ "}{badge}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* MOQ */}
+                    <span className="text-[10px] text-gray-700">{comp.moq > 0 ? `${comp.moq} Units` : '--'}</span>
+                    {/* Lead Time */}
+                    <span className="text-[10px] text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2}-${comp.leadTime * 2 + 1} Days` : '--'}</span>
+                    {/* Stock */}
+                    <span className={`text-[10px] font-semibold ${comp.stock > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {isOOS ? 'Out of Stock' : `${comp.stock.toLocaleString('en-IN')} Units`}
+                    </span>
+                    {/* Price */}
+                    <span className="text-[10px] font-semibold text-gray-800">
+                      {!isOOS && price > 0 ? formatCurrency(price, undefined, { decimals: 0 }) : '--'}
+                    </span>
+                  </button>
+                );
+              })}
+              {filteredVendors.length === 0 && (
+                <div className="px-3 py-4 text-center text-[11px] text-gray-400">No vendors found</div>
+              )}
+            </div>
+            {/* Add New Vendor footer */}
+            <div className="border-t border-gray-100 px-3 py-2">
+              <button
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                <Plus size={12} />
+                Add New Vendor
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Key Specifications */}
+      <div className="px-3 pt-3 pb-2 border-t border-gray-100 mt-2.5">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Key Specifications</p>
+        {specPairs.length > 0 ? (
+          <ul className="space-y-[3px]">
+            {specPairs.slice(0, 5).map((sp, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-[10px] leading-snug">
+                <span className="text-gray-400 shrink-0 mt-[2px]">•</span>
+                {sp.key ? (
+                  <>
+                    <span className="font-semibold text-gray-700 shrink-0">{sp.key}</span>
+                    <span className="text-gray-500 min-w-0 truncate">{sp.val}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-600 min-w-0">{sp.val}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[9px] text-gray-400">Specifications unavailable</p>
+        )}
+      </div>
+
+      {product.productNotes && (
+        <div className="mx-3 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-amber-700 mb-0.5">Product Notes</p>
+          <p className="text-[10px] leading-snug text-amber-900 whitespace-pre-line line-clamp-3">{product.productNotes}</p>
         </div>
-        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-          <button
-            onClick={handleAdd}
-            disabled={!product.inStock}
-            className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : adding ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
-          >
-            {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
-            {adding ? "Added!" : !product.inStock ? "Out of Stock" : "Add to Cart"}
-          </button>
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg overflow-hidden shrink-0">
-            <button onClick={() => { const v = Math.max(Math.max(1, product.moq), qty - 1); setQty(v); setQtyDraft(String(v)); }} className="px-1.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none">−</button>
-            <input
-              type="number"
-              value={qtyDraft}
-              min={Math.max(1, product.moq)}
-              max={maxQty}
-              onChange={e => setQtyDraft(e.target.value)}
-              onBlur={commitCardQty}
-              onKeyDown={e => e.key === "Enter" && commitCardQty()}
-              className="w-10 text-center text-xs font-semibold text-gray-800 border-0 focus:outline-none focus:ring-1 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
-            <button
-              onClick={() => { if (maxQty === undefined || qty < maxQty) { const v = qty + 1; setQty(v); setQtyDraft(String(v)); } }}
-              disabled={maxQty !== undefined && qty >= maxQty}
-              className={`px-1.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? "text-gray-300 cursor-not-allowed" : "text-gray-600 hover:bg-gray-100"}`}
-            >+</button>
+      )}
+
+      {/* Info grid */}
+      <div className="px-3 pt-2 border-t border-gray-100 space-y-2" onClick={e => e.stopPropagation()}>
+        {/* Row 1: MOQ + (Lead Time when vendor selected) + Stock Available */}
+        <div className={`grid gap-3 ${selectedVendor ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div>
+            <div className="flex items-center gap-1 text-[9px] text-gray-500">
+              <Package size={10} className="text-gray-400 shrink-0" />
+              <span className="font-medium">MOQ</span>
+            </div>
+            <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayMoq}</p>
+          </div>
+          {selectedVendor && (
+            <div>
+              <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                <Clock size={10} className="text-gray-400 shrink-0" />
+                <span className="font-medium">Lead Time</span>
+              </div>
+              <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayLeadTime}</p>
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-1 text-[9px] text-gray-500">
+              <Package size={10} className="text-gray-400 shrink-0" />
+              <span className="font-medium">Stock Available</span>
+            </div>
+            <p className={`text-[11px] font-semibold mt-0.5 ${selectedVendor && selectedVendor.stock > 0 ? 'text-emerald-600' : 'text-gray-800'}`}>
+              {displayStock}
+            </p>
+            {selectedVendor && selectedVendor.stock > 0 && firstSlabHint && (
+              <p className="text-[9px] text-emerald-600 font-medium leading-tight">{firstSlabHint.discountPct}% off on {firstSlabHint.minQty}+ Units</p>
+            )}
           </div>
         </div>
-        {maxQty !== undefined && (
-          <p className="text-[10px] text-gray-400 mt-1 text-right">{maxQty.toLocaleString("en-IN")} in stock</p>
+
+        {/* Lead Time row — only when no vendor selected */}
+        {!selectedVendor && (
+          <div className="flex items-center gap-1.5">
+            <Clock size={10} className="text-gray-400 shrink-0" />
+            <span className="text-[9px] text-gray-500 font-medium">Lead Time</span>
+            <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
+          </div>
         )}
+
+        {/* Price per Unit row */}
+        {selectedVendor ? (
+          <div className="flex items-end justify-between gap-2 pb-2">
+            <div>
+              <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                <Tag size={10} className="text-gray-400 shrink-0" />
+                <span className="font-medium">Price per Unit</span>
+              </div>
+              <p className="text-[13px] font-bold text-gray-900 mt-0.5">{displayPrice}</p>
+            </div>
+            <div>
+              <p className="text-[9px] text-gray-500 font-medium mb-1">Quantity</p>
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => {
+                    const v = Math.max(Math.max(1, selectedVendor.moq), qty - 1);
+                    setQty(v);
+                    setQtyDraft(String(v));
+                  }}
+                  className="px-2.5 py-1.5 text-gray-600 hover:bg-gray-100 text-sm leading-none"
+                >−</button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={Math.max(1, selectedVendor.moq)}
+                  max={maxQty}
+                  value={qtyDraft}
+                  onChange={e => setQtyDraft(e.target.value)}
+                  onBlur={() => {
+                    const minQty = Math.max(1, selectedVendor.moq);
+                    const parsed = parseInt(qtyDraft, 10);
+                    const normalized = Math.min(maxQty ?? Number.MAX_SAFE_INTEGER, Math.max(minQty, Number.isFinite(parsed) ? parsed : minQty));
+                    setQty(normalized);
+                    setQtyDraft(String(normalized));
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+                  }}
+                  className="w-12 px-1 py-1.5 text-[11px] font-semibold text-gray-800 text-center outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  aria-label={`Quantity for ${product.name}`}
+                />
+                <button
+                  onClick={() => {
+                    if (maxQty === undefined || qty < maxQty) {
+                      const v = qty + 1;
+                      setQty(v);
+                      setQtyDraft(String(v));
+                    }
+                  }}
+                  disabled={maxQty !== undefined && qty >= maxQty}
+                  className={`px-2.5 py-1.5 text-sm leading-none ${maxQty !== undefined && qty >= maxQty ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
+                >+</button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5">
+              <Tag size={10} className="text-gray-400 shrink-0" />
+              <span className="text-[9px] text-gray-500 font-medium">Price per Unit</span>
+              <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Add to Cart button */}
+      <div className="px-3 pb-3" onClick={e => e.stopPropagation()}>
+        <button
+          onClick={handleAdd}
+          disabled={!canAdd}
+          className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${
+            !canAdd
+              ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
+              : adding
+                ? 'bg-emerald-600 text-white'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
+          {adding ? 'Added to Cart!' : 'Add to Cart'}
+        </button>
       </div>
     </div>
   );
@@ -600,6 +1045,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 export default function ShopPage() {
   const navigate = useNavigate();
   const { user, isClientPortalUser } = useAuth();
+  useI18n();
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>(
     () => (isClientPortalUser ? user?.clientId ?? "" : localStorage.getItem("nido_shop_selected_client") ?? "")
@@ -631,6 +1077,9 @@ export default function ShopPage() {
 
   // Load client catalog whenever selectedClientId changes, merging in the
   // live winning-vendor Lead Time / MOQ from the Vendor Product List for every product.
+  // Available stock is now physicalStock − reservedStock, maintained directly
+  // in vendorStore. No order/PO scanning needed — the vendorProductsUpdated
+  // event fires whenever reservedStock or physicalStock changes.
   const loadClientProducts = () => {
     if (!selectedClientId) { setCatalogProducts([]); return; }
     const entries = getClientCatalog(selectedClientId);
@@ -642,7 +1091,9 @@ export default function ShopPage() {
     loadClientProducts();
     const events = ['clientCatalogUpdated', 'vendorProductsUpdated', 'nidoVendorsUpdated', 'catalogUpdated', 'priceEngineSettingsUpdated'];
     events.forEach(ev => window.addEventListener(ev, loadClientProducts));
-    return () => events.forEach(ev => window.removeEventListener(ev, loadClientProducts));
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, loadClientProducts));
+    };
   }, [selectedClientId]);
 
   // Reset page on filter change

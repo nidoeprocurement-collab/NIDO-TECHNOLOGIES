@@ -309,16 +309,15 @@ export default function App() {
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
 
   useEffect(() => {
+    // Re-read on mount to always pick up latest store data
+    setVendors(getVendors());
     const onUpdate = () => setVendors(getVendors());
     window.addEventListener('nidoVendorsUpdated', onUpdate);
     return () => window.removeEventListener('nidoVendorsUpdated', onUpdate);
   }, []);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedOverview, setArchivedOverview] = useState<Vendor | null>(null);
-  const [filterCategory, setFilterCategory] = useState("All");
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [filterRating, setFilterRating] = useState("All");
-  const [filterRegion, setFilterRegion] = useState("All");
+  const [activeTileFilter, setActiveTileFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
@@ -331,25 +330,23 @@ export default function App() {
   const complianceIssues = activeVendors.reduce((s, v) => s + v.complianceIssues, 0);
   const activeCount = activeVendors.filter(v => v.status === "Active").length;
 
-  const categories = ["All", ...Array.from(new Set(vendors.map(v => v.category)))];
-  const regions = ["All", ...Array.from(new Set(vendors.map(v => v.region)))];
-
   const filteredVendors = activeVendors.filter(v => {
-    if (filterCategory !== "All" && v.category !== filterCategory) return false;
-    if (filterStatus !== "All" && v.status !== filterStatus) return false;
-    if (filterRegion !== "All" && v.region !== filterRegion) return false;
-    if (filterRating === "5★ (4.5+)" && v.rating < 4.5) return false;
-    if (filterRating === "4★ (3.5–4.5)" && (v.rating < 3.5 || v.rating >= 4.5)) return false;
-    if (filterRating === "3★ (Below 3.5)" && v.rating >= 3.5) return false;
-    return true;
+    switch (activeTileFilter) {
+      case "Active":     return v.status === "Active";
+      case "On Hold":    return v.status === "On Hold";
+      case "Pending":    return v.status === "Pending";
+      case "Compliance": return v.complianceIssues > 0;
+      case "HasSpend":   return v.totalSpend > 0;
+      default:           return true;
+    }
   });
 
   const totalPages = Math.max(1, Math.ceil(filteredVendors.length / ITEMS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
   const pagedVendors = filteredVendors.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
 
-  const setFilter = (setter: (v: string) => void) => (val: string) => {
-    setter(val);
+  const handleTileClick = (filterKey: string) => {
+    setActiveTileFilter(prev => prev === filterKey ? "All" : filterKey);
     setCurrentPage(1);
   };
 
@@ -368,42 +365,12 @@ export default function App() {
   const pendingCount = activeVendors.filter(v => v.status === "Pending").length;
 
   const stats = [
-    {
-      label: "Total Vendors",
-      value: activeVendors.length,
-      color: "text-gray-900",
-      icon: <Building2 className="text-gray-400" />,
-    },
-    {
-      label: "Active Vendors",
-      value: activeCount,
-      color: "text-green-600",
-      icon: <Users className="text-green-400" />,
-    },
-    {
-      label: "On Hold",
-      value: onHoldCount,
-      color: "text-orange-600",
-      icon: <PauseCircle className="text-orange-400" />,
-    },
-    {
-      label: "Pending",
-      value: pendingCount,
-      color: "text-blue-600",
-      icon: <Clock className="text-blue-400" />,
-    },
-    {
-      label: "Compliance Issues",
-      value: complianceIssues,
-      color: "text-red-600",
-      icon: <AlertTriangle className="text-red-400" />,
-    },
-    {
-      label: "Total Spend",
-      value: formatCrores(totalSpend),
-      color: "text-purple-700",
-      icon: <IndianRupee className="text-purple-400" />,
-    },
+    { label: "Total Vendors",     filterKey: "All",        value: activeVendors.length,       color: "text-gray-900",   icon: <Building2    className="text-gray-400"   /> },
+    { label: "Active Vendors",    filterKey: "Active",     value: activeCount,                color: "text-green-600",  icon: <Users        className="text-green-400"  /> },
+    { label: "On Hold",           filterKey: "On Hold",    value: onHoldCount,                color: "text-orange-600", icon: <PauseCircle  className="text-orange-400" /> },
+    { label: "Pending",           filterKey: "Pending",    value: pendingCount,               color: "text-blue-600",   icon: <Clock        className="text-blue-400"   /> },
+    { label: "Compliance Issues", filterKey: "Compliance", value: complianceIssues,           color: "text-red-600",    icon: <AlertTriangle className="text-red-400"   /> },
+    { label: "Total Spend",       filterKey: "HasSpend",   value: formatCrores(totalSpend),   color: "text-purple-700", icon: <IndianRupee  className="text-purple-400" /> },
   ];
 
   return (
@@ -445,35 +412,40 @@ export default function App() {
       </div>
 
       <div className="w-full px-2 py-2">
-        {/* Stats tiles */}
+        {/* Stats tiles — each acts as a filter */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-          {stats.map(s => (
-            <Card key={s.label}>
-              <CardContent className="p-2 flex justify-between items-start">
-                <div>
-                  <p className="text-xs text-gray-500">{s.label}</p>
-                  <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-                </div>
-                {s.icon}
-              </CardContent>
-            </Card>
-          ))}
+          {stats.map(s => {
+            const isActive = activeTileFilter === s.filterKey;
+            return (
+              <Card
+                key={s.label}
+                onClick={() => handleTileClick(s.filterKey)}
+                className={`cursor-pointer transition-all hover:shadow-md ${isActive ? "ring-2 ring-blue-500 shadow-md" : ""}`}
+              >
+                <CardContent className="p-2 flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+                  </div>
+                  {s.icon}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Table Card */}
         <Card>
           <CardContent className="p-0">
-            {/* Filters */}
-            <div className="flex items-center gap-2 px-2 py-2.5 border-b flex-wrap">
-              <span className="text-xs font-semibold text-gray-400 mr-1">Filters:</span>
-              <FilterSelect label="Category" value={filterCategory} options={categories} onChange={setFilter(setFilterCategory)} />
-              <FilterSelect label="Status" value={filterStatus} options={["All", "Active", "Inactive", "On Hold", "Pending"]} onChange={setFilter(setFilterStatus)} />
-              <FilterSelect label="Rating" value={filterRating} options={["All", "5★ (4.5+)", "4★ (3.5–4.5)", "3★ (Below 3.5)"]} onChange={setFilter(setFilterRating)} />
-              <FilterSelect label="Region" value={filterRegion} options={regions} onChange={setFilter(setFilterRegion)} />
-              <button onClick={() => { setFilterCategory("All"); setFilterStatus("All"); setFilterRating("All"); setFilterRegion("All"); setCurrentPage(1); }}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium">Clear all</button>
-              <span className="ml-auto text-xs text-gray-400">{filteredVendors.length} of {activeVendors.length} vendors</span>
-            </div>
+            {/* Active filter indicator */}
+            {activeTileFilter !== "All" && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b bg-blue-50">
+                <span className="text-xs text-blue-700 font-medium">Filtered: {activeTileFilter === "HasSpend" ? "Has Spend" : activeTileFilter === "Compliance" ? "Compliance Issues" : activeTileFilter}</span>
+                <span className="text-xs text-gray-400">·</span>
+                <span className="text-xs text-gray-500">{filteredVendors.length} of {activeVendors.length} vendors</span>
+                <button onClick={() => { setActiveTileFilter("All"); setCurrentPage(1); }} className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium">Clear ✕</button>
+              </div>
+            )}
 
             <table className="w-full table-fixed">
               <colgroup>

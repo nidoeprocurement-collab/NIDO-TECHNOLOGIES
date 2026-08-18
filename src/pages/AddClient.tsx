@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CATEGORY_LIST } from "@/lib/categories";
-import { addClient as addStoredClient, getClients } from "@/lib/clientStore";
+import {
+  addClient as addStoredClient,
+  getClients,
+  isSharedClient,
+} from "@/lib/clientStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +19,14 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, Check, Download, Upload, Loader2 } from "lucide-react";
+import AddressPairFields from "@/components/shared/AddressPairFields";
+import {
+  isValidGst,
+  isValidPan,
+  normalizeGstInput,
+  normalizePanInput,
+  type AddressDetails,
+} from "@/lib/addressTypes";
 
 // Mock toast notification system
 const toast = {
@@ -35,13 +47,6 @@ const CATEGORIES = CATEGORY_LIST;
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY"];
 
 const isAlphaOnly = (value: string) => /^[A-Za-z\s]*$/.test(value);
-
-const isValidAlphanumeric = (value: string) => {
-  if (!value.trim()) return true;
-  const hasLetter = /[A-Za-z]/.test(value);
-  const hasNumber = /[0-9]/.test(value);
-  return hasLetter && hasNumber;
-};
 
 const GST_TREATMENTS = [
   "Registered Business",
@@ -126,13 +131,25 @@ export default function AddClient() {
 
     // Step 4: Address
     billing_address: "",
+    billing_attention: "",
+    billing_country: "",
+    billing_address_line2: "",
     shipping_address: "",
+    shipping_attention: "",
+    shipping_country: "",
+    shipping_address_line2: "",
     billing_city: "",
     shipping_city: "",
     billing_state: "",
     shipping_state: "",
     billing_pincode: "",
     shipping_pincode: "",
+    billing_phone_country_code: "+91",
+    billing_phone: "",
+    billing_fax_number: "",
+    shipping_phone_country_code: "+91",
+    shipping_phone: "",
+    shipping_fax_number: "",
     same_address: false,
 
     // Step 5: Documents
@@ -180,10 +197,10 @@ export default function AddClient() {
             existing.contract_end_date || existing.contractEndDate || "",
           client_logo_url: existing.client_logo_url || "",
           gst_treatment: existing.gst_treatment || "",
-          gstin: existing.gstin || "",
+          gstin: normalizeGstInput(existing.gstin || ""),
           id_reference_number: existing.id_reference_number || "",
           source_of_supply: existing.source_of_supply || "",
-          pan_number: existing.pan_number || "",
+          pan_number: normalizePanInput(existing.pan_number || ""),
           currency: existing.currency || "INR",
           opening_balance:
             existing.opening_balance != null
@@ -197,18 +214,30 @@ export default function AddClient() {
           branch: existing.branch || "",
           billing_address:
             existing.billing_address || existing.billingAddress || "",
+          billing_attention: existing.billing_attention || existing.billingAttention || "",
+          billing_country: existing.billing_country || existing.billingCountry || "",
+          billing_address_line2: existing.billing_address_line2 || existing.billingAddressLine2 || "",
           billing_city: existing.billing_city || existing.billingCity || "",
           billing_state: existing.billing_state || existing.billingState || "",
           billing_pincode:
             existing.billing_pincode || existing.billingPincode || "",
           shipping_address:
             existing.shipping_address || existing.shippingAddress || "",
+          shipping_attention: existing.shipping_attention || existing.shippingAttention || "",
+          shipping_country: existing.shipping_country || existing.shippingCountry || "",
+          shipping_address_line2: existing.shipping_address_line2 || existing.shippingAddressLine2 || "",
           shipping_city:
             existing.shipping_city || existing.shippingCity || "",
           shipping_state:
             existing.shipping_state || existing.shippingState || "",
           shipping_pincode:
             existing.shipping_pincode || existing.shippingPincode || "",
+          billing_phone_country_code: existing.billing_phone_country_code || existing.billingPhoneCountryCode || "+91",
+          billing_phone: existing.billing_phone || existing.billingPhone || "",
+          billing_fax_number: existing.billing_fax_number || existing.billingFaxNumber || "",
+          shipping_phone_country_code: existing.shipping_phone_country_code || existing.shippingPhoneCountryCode || "+91",
+          shipping_phone: existing.shipping_phone || existing.shippingPhone || "",
+          shipping_fax_number: existing.shipping_fax_number || existing.shippingFaxNumber || "",
           same_address: !!existing.same_address,
         };
 
@@ -248,9 +277,19 @@ export default function AddClient() {
       // Generate new Client ID
       setIsLoading(true);
       const timer = setTimeout(() => {
-        // Generate next ID: CL-00001, CL-00002, etc.
-        const nextNumber = Math.floor(Math.random() * 10000) + 1;
-        const clientId = `${getPrefix("client") || "CL-"}${String(nextNumber).padStart(5, "0")}`;
+        // Generate the next unused ID instead of a random ID that can collide.
+        const prefix = getPrefix("client") || "CL-";
+        const existingIds = new Set(getClients().map((client) => client.id));
+        const nextNumber = getClients().reduce((highest, client) => {
+          if (!client.id.startsWith(prefix)) return highest;
+          const number = Number(client.id.slice(prefix.length));
+          return Number.isFinite(number) ? Math.max(highest, number) : highest;
+        }, 0) + 1;
+        let candidateNumber = nextNumber;
+        while (existingIds.has(`${prefix}${String(candidateNumber).padStart(5, "0")}`)) {
+          candidateNumber += 1;
+        }
+        const clientId = `${prefix}${String(candidateNumber).padStart(5, "0")}`;
 
         setFormData((prev) => ({
           ...prev,
@@ -268,6 +307,56 @@ export default function AddClient() {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const billingAddressDetails: AddressDetails = {
+    attention: formData.billing_attention,
+    country: formData.billing_country,
+    addressLine1: formData.billing_address,
+    addressLine2: formData.billing_address_line2,
+    city: formData.billing_city,
+    state: formData.billing_state,
+    pinCode: formData.billing_pincode,
+    phoneCountryCode: formData.billing_phone_country_code,
+    phone: formData.billing_phone,
+    faxNumber: formData.billing_fax_number,
+  };
+
+  const shippingAddressDetails: AddressDetails = {
+    attention: formData.shipping_attention,
+    country: formData.shipping_country,
+    addressLine1: formData.shipping_address,
+    addressLine2: formData.shipping_address_line2,
+    city: formData.shipping_city,
+    state: formData.shipping_state,
+    pinCode: formData.shipping_pincode,
+    phoneCountryCode: formData.shipping_phone_country_code,
+    phone: formData.shipping_phone,
+    faxNumber: formData.shipping_fax_number,
+  };
+
+  const updateAddressDetails = (
+    kind: "billing" | "shipping",
+    patch: Partial<AddressDetails>,
+  ) => {
+    const prefix = kind === "billing" ? "billing" : "shipping";
+    const fieldMap: Record<keyof AddressDetails, string> = {
+      attention: `${prefix}_attention`,
+      country: `${prefix}_country`,
+      addressLine1: `${prefix}_address`,
+      addressLine2: `${prefix}_address_line2`,
+      city: `${prefix}_city`,
+      state: `${prefix}_state`,
+      pinCode: `${prefix}_pincode`,
+      phoneCountryCode: `${prefix}_phone_country_code`,
+      phone: `${prefix}_phone`,
+      faxNumber: `${prefix}_fax_number`,
+    };
+    const updates: Record<string, string> = {};
+    Object.entries(patch).forEach(([field, value]) => {
+      if (value !== undefined) updates[fieldMap[field as keyof AddressDetails]] = value;
+    });
+    setFormData((prev) => ({ ...prev, ...updates }));
   };
 
   const handleFileSelect = (files: FileList | null) => {
@@ -296,8 +385,9 @@ export default function AddClient() {
       const gstinRequired = formData.gst_treatment === "Registered Business";
       return !!(
         formData.gst_treatment &&
-        (!gstinRequired || (formData.gstin.trim() && isValidAlphanumeric(formData.gstin))) &&
-        formData.pan_number.trim()
+        (!formData.gstin || isValidGst(formData.gstin)) &&
+        (!gstinRequired || isValidGst(formData.gstin)) &&
+        isValidPan(formData.pan_number)
       );
     }
     if (step === 2) {
@@ -384,9 +474,26 @@ export default function AddClient() {
       toast.error("Please fill in all required fields");
       return;
     }
+      if (formData.gstin && !isValidGst(formData.gstin)) {
+      toast.error("GSTIN must be exactly 15 alphanumeric characters");
+      return;
+    }
+    if (!isValidPan(formData.pan_number)) {
+      toast.error("PAN must follow the format AAAAA9999A");
+      return;
+    }
 
     try {
       console.log("[v0] Saving client data:", formData.company_name);
+
+      if (clientIdToEdit && isSharedClient(clientIdToEdit)) {
+        toast.error("Shared demo clients are read-only. Add a new client to save changes.");
+        return;
+      }
+
+      const existingClient = clientIdToEdit
+        ? getClients().find((client) => client.id === clientIdToEdit)
+        : undefined;
 
       // Mock save operation
       const clientData = {
@@ -400,6 +507,8 @@ export default function AddClient() {
         website: formData.website,
         contract_start_date: formData.contract_start_date,
         contract_end_date: formData.contract_end_date,
+        contractStartDate: formData.contract_start_date,
+        contractEndDate: formData.contract_end_date,
         client_logo_url: formData.client_logo_url,
         gst_treatment: formData.gst_treatment,
         gstin: formData.gstin,
@@ -417,23 +526,46 @@ export default function AddClient() {
         account_number: formData.account_number,
         ifsc_code: formData.ifsc_code,
         branch: formData.branch,
-        billing_address: formData.billing_address,
+        billing_address: [billingAddressDetails.addressLine1, billingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        billingAddress: [billingAddressDetails.addressLine1, billingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        billing_attention: billingAddressDetails.attention,
+        billingAttention: billingAddressDetails.attention,
+        billing_country: billingAddressDetails.country,
+        billingCountry: billingAddressDetails.country,
+        billing_address_line2: billingAddressDetails.addressLine2,
+        billingAddressLine2: billingAddressDetails.addressLine2,
         billing_city: formData.billing_city,
+        billingCity: formData.billing_city,
         billing_state: formData.billing_state,
+        billingState: formData.billing_state,
         billing_pincode: formData.billing_pincode,
-        shipping_address: formData.same_address
-          ? formData.billing_address
-          : formData.shipping_address,
-        shipping_city: formData.same_address
-          ? formData.billing_city
-          : formData.shipping_city,
-        shipping_state: formData.same_address
-          ? formData.billing_state
-          : formData.shipping_state,
-        shipping_pincode: formData.same_address
-          ? formData.billing_pincode
-          : formData.shipping_pincode,
-        status: "active",
+        billingPincode: formData.billing_pincode,
+        shipping_address: [shippingAddressDetails.addressLine1, shippingAddressDetails.addressLine2].filter(Boolean).join(", "),
+        shipping_city: shippingAddressDetails.city,
+        shipping_state: shippingAddressDetails.state,
+        shipping_pincode: shippingAddressDetails.pinCode,
+        shipping_attention: shippingAddressDetails.attention,
+        shippingAttention: shippingAddressDetails.attention,
+        shipping_country: shippingAddressDetails.country,
+        shippingCountry: shippingAddressDetails.country,
+        shipping_address_line2: shippingAddressDetails.addressLine2,
+        shippingAddressLine2: shippingAddressDetails.addressLine2,
+        billing_phone_country_code: billingAddressDetails.phoneCountryCode,
+        billingPhoneCountryCode: billingAddressDetails.phoneCountryCode,
+        billing_phone: billingAddressDetails.phone,
+        billingPhone: billingAddressDetails.phone,
+        billing_fax_number: billingAddressDetails.faxNumber,
+        billingFaxNumber: billingAddressDetails.faxNumber,
+        shipping_phone_country_code: shippingAddressDetails.phoneCountryCode,
+        shippingPhoneCountryCode: shippingAddressDetails.phoneCountryCode,
+        shipping_phone: shippingAddressDetails.phone,
+        shippingPhone: shippingAddressDetails.phone,
+        shipping_fax_number: shippingAddressDetails.faxNumber,
+        shippingFaxNumber: shippingAddressDetails.faxNumber,
+        same_address: formData.same_address,
+        tier: formData.client_tier,
+        rep: formData.contact_person,
+        status: existingClient?.status || "active",
       };
 
       // Save to shared client store
@@ -464,7 +596,7 @@ export default function AddClient() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white border-b p-6">
-        <div className="max-w-6xlflex items-start justify-between">
+        <div className="max-w-6xl mx-auto flex items-start justify-between">
           <button
             onClick={() => navigate("/clients")}
             className="text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm"
@@ -484,11 +616,11 @@ export default function AddClient() {
         </div>
       </div>
 
-      <div className="max-w-6xlp-6">
+      <div className="max-w-6xl mx-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spinmb-4" />
+              <Loader2 className="h-12 w-12 text-[#4A6CF7] animate-spin mb-4" />
               <p className="text-gray-600">Loading client information...</p>
             </div>
           </div>
@@ -938,18 +1070,23 @@ export default function AddClient() {
                     <Input
                       placeholder="27AABCT1234A1Z5"
                       value={formData.gstin}
+                      maxLength={15}
+                      pattern="[A-Za-z0-9]{15}"
                       onChange={(e) =>
-                        handleInputChange("gstin", e.target.value)
+                        handleInputChange("gstin", normalizeGstInput(e.target.value))
                       }
                       className={
-                        formData.gstin && !isValidAlphanumeric(formData.gstin)
+                        formData.gstin && !isValidGst(formData.gstin)
                           ? "border-red-400 focus-visible:ring-red-400"
                           : ""
                       }
                     />
-                    {formData.gstin && !isValidAlphanumeric(formData.gstin) && (
+                    <p className={`mt-1 text-xs ${formData.gstin.length === 15 ? "text-green-600" : "text-gray-500"}`}>
+                      {formData.gstin.length}/15 characters
+                    </p>
+                    {formData.gstin && !isValidGst(formData.gstin) && (
                       <p className="text-xs text-red-500 mt-1">
-                        GSTIN must be alphanumeric (letters and numbers only, not all letters or all numbers)
+                        GSTIN must contain exactly 15 letters and numbers.
                       </p>
                     )}
                   </div>
@@ -960,10 +1097,15 @@ export default function AddClient() {
                     <Input
                       placeholder="AAAAA0000A"
                       value={formData.pan_number}
+                      maxLength={10}
+                      pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
                       onChange={(e) =>
-                        handleInputChange("pan_number", e.target.value)
+                        handleInputChange("pan_number", normalizePanInput(e.target.value))
                       }
                     />
+                    <p className={`mt-1 text-xs ${isValidPan(formData.pan_number) ? "text-green-600" : "text-gray-500"}`}>
+                      {formData.pan_number.length}/10 characters · 5 letters, 4 numbers, 1 letter
+                    </p>
                   </div>
                 </div>
 
@@ -1172,195 +1314,17 @@ export default function AddClient() {
                 <div>
                   <h2 className="text-xl font-bold mb-1">Step 4: Address</h2>
                 </div>
-
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.same_address}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      if (checked) {
-                        setFormData((prev: any) => ({
-                          ...prev,
-                          same_address: true,
-                          shipping_address: prev.billing_address,
-                          shipping_city: prev.billing_city,
-                          shipping_state: prev.billing_state,
-                          shipping_pincode: prev.billing_pincode,
-                        }));
-                      } else {
-                        handleInputChange("same_address", false);
-                      }
-                    }}
-                    className="mr-2"
-                  />
-                  <span className="text-sm">
-                    Shipping address same as billing
-                  </span>
-                </label>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4 border rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700">
-                      Billing Address
-                    </h3>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing Address *
-                      </label>
-                      <Textarea
-                        placeholder="Street address"
-                        value={formData.billing_address}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_address: value,
-                            shipping_address: prev.same_address
-                              ? value
-                              : prev.shipping_address,
-                          }));
-                        }}
-                        rows={3}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing City *
-                      </label>
-                      <Input
-                        placeholder="City"
-                        value={formData.billing_city}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_city: value,
-                            shipping_city: prev.same_address
-                              ? value
-                              : prev.shipping_city,
-                          }));
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing State *
-                      </label>
-                      <Select
-                        value={formData.billing_state}
-                        onValueChange={(value) =>
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_state: value,
-                            shipping_state: prev.same_address
-                              ? value
-                              : prev.shipping_state,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INDIAN_STATES.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Billing Pincode *
-                      </label>
-                      <Input
-                        placeholder="400001"
-                        value={formData.billing_pincode}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setFormData((prev: any) => ({
-                            ...prev,
-                            billing_pincode: value,
-                            shipping_pincode: prev.same_address
-                              ? value
-                              : prev.shipping_pincode,
-                          }));
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 border rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-gray-700">
-                      Shipping Address
-                    </h3>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping Address
-                      </label>
-                      <Textarea
-                        placeholder="Street address"
-                        value={formData.shipping_address}
-                        onChange={(e) =>
-                          handleInputChange("shipping_address", e.target.value)
-                        }
-                        rows={3}
-                        disabled={formData.same_address}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping City
-                      </label>
-                      <Input
-                        placeholder="City"
-                        value={formData.shipping_city}
-                        onChange={(e) =>
-                          handleInputChange("shipping_city", e.target.value)
-                        }
-                        disabled={formData.same_address}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping State
-                      </label>
-                      <Select
-                        value={formData.shipping_state}
-                        onValueChange={(value) =>
-                          handleInputChange("shipping_state", value)
-                        }
-                        disabled={formData.same_address}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {INDIAN_STATES.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shipping Pincode
-                      </label>
-                      <Input
-                        placeholder="400001"
-                        value={formData.shipping_pincode}
-                        onChange={(e) =>
-                          handleInputChange("shipping_pincode", e.target.value)
-                        }
-                        disabled={formData.same_address}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <AddressPairFields
+                  billing={billingAddressDetails}
+                  shipping={shippingAddressDetails}
+                  states={INDIAN_STATES}
+                  onBillingChange={(patch) => updateAddressDetails("billing", patch)}
+                  onShippingChange={(patch) => {
+                    updateAddressDetails("shipping", patch);
+                    handleInputChange("same_address", false);
+                  }}
+                  onCopyBilling={() => handleInputChange("same_address", true)}
+                />
               </div>
             )}
 

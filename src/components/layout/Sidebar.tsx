@@ -10,7 +10,7 @@ import {
   ChevronRight, ChevronLeft, Menu, X, Zap, List,
   ClipboardList, Tags, ShoppingBag, Gauge, FileText, Receipt,
   Repeat, Truck, FileMinus, FileCheck, Wallet, CreditCard,
-  Banknote, ShieldCheck, Building2, Mail, History, LogOut,
+  Banknote, LogOut,
   Bell, User, KeyRound, ShieldAlert,
 } from 'lucide-react';
 
@@ -47,7 +47,7 @@ const adminNavigationItems: NavItem[] = [
     icon: <TrendingUp size={20} />,
     children: [
       { label: 'My Orders',   icon: <ShoppingBag size={16} />, path: '/orders',      moduleKey: 'orders' },
-      { label: 'My Services', icon: <Wrench size={16} />,      path: '/services',    moduleKey: 'services' },
+      { label: 'My Services', icon: <Wrench size={16} />,      path: '/my-services', moduleKey: 'services' },
       { label: 'SLA Overview',icon: <Gauge size={16} />,       path: '/sla-overview',moduleKey: 'orders' },
     ],
   },
@@ -82,17 +82,6 @@ const adminNavigationItems: NavItem[] = [
           { label: 'Vendor Credits',     icon: <Banknote size={16} />,   path: '/vendor-credits',      moduleKey: 'purchases' },
         ],
       },
-    ],
-  },
-  {
-    label: 'User Management',
-    icon: <Users size={20} />,
-    children: [
-      { label: 'Users',      icon: <Users size={16} />,      path: '/configuration/nido-users?tab=users', moduleKey: 'users' },
-      { label: 'Roles',      icon: <ShieldCheck size={16} />,path: '/configuration/nido-users?tab=roles', moduleKey: 'roles' },
-      { label: 'Departments',icon: <Building2 size={16} />,  path: '/departments',       moduleKey: 'departments' },
-      { label: 'Invitations',icon: <Mail size={16} />,       path: '/user-invitations',  moduleKey: 'users' },
-      { label: 'Audit Trail',icon: <History size={16} />,    path: '/audit-logs',        moduleKey: 'audit_logs' },
     ],
   },
   { label: 'Configuration', icon: <Settings size={20} />, path: '/configuration', moduleKey: 'configuration' },

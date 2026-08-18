@@ -1,4 +1,4 @@
-// Stock Engine — reserves and releases vendor stock as items move in and out of the cart.
+// Stock Engine — computes vendor allocation records for cart items.
 //
 // Enterprise Stock Flow:
 //   • reserveStock / releaseStock / releasePartial / reserveExtra all operate on
@@ -11,9 +11,9 @@
 // When releasing a partial reduction, we give stock back to the most-expensive vendor
 // first (reverse order) so the cheap vendor's stock is consumed last and released last.
 //
-// All mutations go through updateVendorProduct → writeStore → fires 'vendorProductsUpdated'
-// so every listener (CartPage vendorMatchMap, ShopPage product list) sees fresh numbers
-// after each cart action.
+// reserveStock / releaseStock / releasePartial are kept for API compatibility
+// (they still compute allocation records the order-details flow depends on)
+// but they no longer mutate the vendorStore stock field.
 
 import { getAllVendorProducts, updateVendorProduct, getAvailableStock } from './vendorStore';
 import { computeVendorComparisons } from './priceEngineStore';
@@ -46,8 +46,9 @@ export function reserveStock(
 ): StockAllocation[] {
   if (qty <= 0) return [];
 
-  // Re-read live vendor products at call time (not cached) so we see the
-  // latest stock numbers even if another call just updated them.
+  // Read live vendor products to compute which vendors cover this qty.
+  // NOTE: we intentionally do NOT deduct from vendor stock here.
+  // Stock is only deducted when a PO is raised (see OrderDetailsPage handleRaisePOs).
   const storeMap = getAllVendorProducts();
 
   // Vendor comparisons sorted cheapest-first — defines fill order.
@@ -128,16 +129,16 @@ export function releasePartial(
 ): StockAllocation[] {
   if (qtyToRelease <= 0 || !allocations?.length) return allocations;
 
-  const storeMap = getAllVendorProducts();
-  // Work on a copy; release from most-expensive (last) vendor first.
+  // Work on a copy; adjust allocated counts from most-expensive (last) vendor first.
+  // NOTE: vendor stock field is NOT modified — only the allocation records are updated.
   const updated = allocations.map(a => ({ ...a }));
+  const storeMap = getAllVendorProducts();
   let remaining = qtyToRelease;
 
   for (let i = updated.length - 1; i >= 0 && remaining > 0; i--) {
     const alloc = updated[i];
     const toReturn = Math.min(remaining, alloc.allocated);
     if (toReturn <= 0) continue;
-
     const vendorProducts = storeMap[alloc.vendorId] || [];
     const match = vendorProducts.find(p => p.id === alloc.vendorProductId);
     if (match) {

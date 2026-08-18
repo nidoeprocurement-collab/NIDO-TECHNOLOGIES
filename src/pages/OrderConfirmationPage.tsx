@@ -3,6 +3,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, Copy, Check, Mail, Phone, MapPin, CreditCard } from "lucide-react";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { useOrgConfig } from "@/contexts/ConfigContext";
+import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,6 +22,7 @@ type ConfirmationState = {
     quantity: number;
     category?: string;
     specs?: string[];
+    clientId?: string;
   }[];
   subtotal: number;
   gst: number;
@@ -36,7 +40,7 @@ type ConfirmationState = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 
 function formatDate(iso: string) {
@@ -48,6 +52,7 @@ function formatDate(iso: string) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrderConfirmationPage() {
+  useI18n();
   const location = useLocation();
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
@@ -247,7 +252,11 @@ export default function OrderConfirmationPage() {
                       )}
                     </span>
                     <span className="text-gray-800 font-medium shrink-0">
-                      {formatPrice(item.priceNum * item.quantity)}
+                      {(() => {
+                        const discountPct = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
+                        const effectivePrice = discountPct > 0 ? item.priceNum * (1 - discountPct / 100) : item.priceNum;
+                        return formatPrice(effectivePrice * item.quantity);
+                      })()}
                     </span>
                   </div>
                 ))

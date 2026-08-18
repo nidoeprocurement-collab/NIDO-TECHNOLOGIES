@@ -11,7 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
-import type { NidoRole, NidoUser } from "@/lib/nidoUsersStore"
+import { SYSTEM_OWNER_ROLE, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore"
 
 interface AddEditUserDialogProps {
   open: boolean
@@ -132,7 +132,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
             <Select value={role} onValueChange={setRole}>
               <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
               <SelectContent>
-                {roles.filter(r => r.status === "Active").map(r => (
+                {roles.filter(r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE).map(r => (
                   <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
                 ))}
               </SelectContent>

@@ -3,14 +3,17 @@ import {
   FileText, MoreVertical, FilePlus, Download, Archive,
   X, Upload, ArrowLeft,
 } from "lucide-react";
+import { getClientDocuments, saveClientDocument, type ClientDocumentRecord } from "@/lib/clientDataStore";
 
 type Doc = {
-  id: number;
+  id: string;
+  clientId?: string;
   name: string;
   type: string;
   size: string;
   uploadedBy: string;
   uploadedOn: string;
+  fileData?: string;
 };
 
 const INITIAL_DOCS: Doc[] = [
@@ -212,7 +215,7 @@ function DocsTable({
 }: {
   docs: Doc[];
   readOnly?: boolean;
-  fileStore: Map<number, File>;
+  fileStore: Map<string, File>;
   onArchive?: (id: number) => void;
   onRowMenuOpen?: (id: number | null) => void;
   rowMenuOpen?: number | null;
@@ -226,6 +229,11 @@ function DocsTable({
       a.download = stored.name;
       a.click();
       URL.revokeObjectURL(url);
+    } else if (doc.fileData) {
+      const a = document.createElement("a");
+      a.href = doc.fileData;
+      a.download = doc.name;
+      a.click();
     } else {
       const content = [
         `Document: ${doc.name}`,
@@ -334,28 +342,45 @@ function DocsTable({
   );
 }
 
-export default function ClientDocumentsPage() {
-  const [docs, setDocs] = useState<Doc[]>(INITIAL_DOCS);
-  const [archivedDocs, setArchivedDocs] = useState<Doc[]>([]);
+export default function ClientDocumentsPage({ clientId }: { clientId: string }) {
+  const [storedDocs, setStoredDocs] = useState<ClientDocumentRecord[]>(() => getClientDocuments(clientId));
+  const docs = storedDocs.filter((doc) => !doc.archived);
+  const archivedDocs = storedDocs.filter((doc) => doc.archived);
   const [view, setView] = useState<"active" | "archived">("active");
   const [pageMenuOpen, setPageMenuOpen] = useState(false);
-  const [rowMenuOpen, setRowMenuOpen] = useState<number | null>(null);
+  const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const fileStoreRef = useRef<Map<number, File>>(new Map());
+  const fileStoreRef = useRef<Map<string, File>>(new Map());
   const pageMenuRef = useRef<HTMLDivElement>(null);
   useClickOutside(pageMenuRef, () => setPageMenuOpen(false));
+  useEffect(() => {
+    const reload = () => setStoredDocs(getClientDocuments(clientId));
+    window.addEventListener("nidoClientDataUpdated", reload);
+    return () => window.removeEventListener("nidoClientDataUpdated", reload);
+  }, [clientId]);
 
   function handleArchive(id: number) {
-    const doc = docs.find((d) => d.id === id);
+    const doc = docs.find((d) => d.id === String(id));
     if (!doc) return;
-    setDocs((prev) => prev.filter((d) => d.id !== id));
-    setArchivedDocs((prev) => [...prev, doc]);
+    const next = { ...doc, archived: true };
+    saveClientDocument(next);
+    setStoredDocs(getClientDocuments(clientId));
   }
 
-  function handleAdd(newDoc: Omit<Doc, "id">, file: File | null) {
-    const id = Date.now();
+  async function handleAdd(newDoc: Omit<Doc, "id">, file: File | null) {
+    const id = String(Date.now());
     if (file) fileStoreRef.current.set(id, file);
-    setDocs((prev) => [{ id, ...newDoc }, ...prev]);
+    let fileData: string | undefined;
+    if (file) {
+      fileData = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+    saveClientDocument({ id, clientId, ...newDoc, fileData });
+    setStoredDocs(getClientDocuments(clientId));
   }
 
   function handleExport() {

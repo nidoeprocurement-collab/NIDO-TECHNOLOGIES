@@ -1,293 +1,639 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { getClients as getStoredClients, saveClients as saveStoredClients, addClient as addStoredClient, type StoredClient } from "@/lib/clientStore"
-import { provisionClientPortal, isClientProvisioned, type ProvisionResult } from "@/lib/portalUserStore"
-import { MoreVertical, Users, Plus, Download, Upload, FileDown, Archive, Zap, Copy, Check, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/contexts/AuthContext"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  getClients as getStoredClients,
+  saveClients as saveStoredClients,
+  getArchivedClients,
+  saveArchivedClients,
+  isSharedClient,
+  type StoredClient,
+  type ArchivedClient,
+} from "@/lib/clientStore"
+import {
+  activateClientPortal,
+  generatePortalCredentials,
+  isClientProvisioned,
+  type ProvisionResult,
+} from "@/lib/portalUserStore"
+import {
+  Users, Building2, ChevronDown, X, Mail, MapPin, Calendar,
+  Archive, MoreVertical, CheckCircle, Clock, XCircle, Edit,
+  Plus, Download, Upload, FileDown, Zap, Copy, Check,
+  IndianRupee, Star, FileText,
+} from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 
-export default function ClientsPageUI() {
-  const navigate = useNavigate()
+type ClientStatus = "active" | "pending" | "inactive"
 
-  const archivedClientsData = [
-    {
-      id: "CI-00099",
-      name: "Archived Client 1",
-      rep: "Rep Name",
-      email: "archived@example.com",
-      phone: "+91 98765 43210",
-      mobile: "+91 99876 54321",
-      website: "www.archivedclient1.com",
-      category: "IT Hardware",
-      status: "archived",
-      archivedOn: "2025-11-01",
-      contractEndDate: "2025-11-01",
-      billingAddress: "123 Business Street",
-      billingCity: "Mumbai",
-      billingState: "Maharashtra",
-      billingPincode: "400001",
-    },
-    {
-      id: "CI-00098",
-      name: "Archived Client 2",
-      rep: "Rep Name",
-      email: "archived2@example.com",
-      phone: "+91 99876 54321",
-      mobile: "+91 98765 43210",
-      website: "www.archivedclient2.com",
-      category: "Cloud Servers",
-      status: "archived",
-      archivedOn: "2025-10-15",
-      contractEndDate: "2025-10-15",
-      billingAddress: "456 Corporate Plaza",
-      billingCity: "Bangalore",
-      billingState: "Karnataka",
-      billingPincode: "560001",
-    },
+const statusColors: Record<string, string> = {
+  active:   "bg-emerald-100 text-emerald-700",
+  pending:  "bg-blue-100 text-blue-700",
+  inactive: "bg-gray-100 text-gray-500",
+  archived: "bg-red-100 text-red-600",
+}
+
+const tierColors: Record<string, string> = {
+  Premium:         "bg-amber-100 text-amber-700",
+  "Premium Clients": "bg-amber-100 text-amber-700",
+  Standard:        "bg-blue-100 text-blue-700",
+  "Standard Clients": "bg-blue-100 text-blue-700",
+  Basic:           "bg-gray-100 text-gray-600",
+  "Medium Clients": "bg-gray-100 text-gray-600",
+}
+
+function formatBalance(val: any): string {
+  const num = parseFloat(val)
+  if (!val || isNaN(num) || num === 0) return "—"
+  const lakh = num / 100000
+  return lakh >= 100 ? `₹${(lakh / 100).toFixed(1)} Cr` : `₹${lakh.toFixed(1)} L`
+}
+
+function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${className}`}>
+      {children}
+    </span>
+  )
+}
+
+// ── Row Actions Menu ───────────────────────────────────────────────────────
+function RowActionsMenu({ client, onViewOverview, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
+  client: StoredClient
+  onViewOverview: () => void
+  onEdit: () => void
+  onArchive: () => void
+  onSetStatus: (s: ClientStatus) => void
+  onProvision: () => void
+  provisioned: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [statusOpen, setStatusOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setStatusOpen(false) }
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  const statuses: { label: ClientStatus; icon: React.ReactNode; color: string }[] = [
+    { label: "active",   icon: <CheckCircle className="w-3.5 h-3.5" />, color: "text-emerald-600" },
+    { label: "pending",  icon: <Clock       className="w-3.5 h-3.5" />, color: "text-blue-600"    },
+    { label: "inactive", icon: <XCircle     className="w-3.5 h-3.5" />, color: "text-gray-500"    },
   ]
 
-  const [activeFilter, setActiveFilter] = useState("All")
-  const [showArchivedClients, setShowArchivedClients] = useState(false)
-  const [selectedArchivedClient, setSelectedArchivedClient] = useState<any>(null)
-  const [showBulkImport, setShowBulkImport] = useState(false)
-  const [importedClients, setImportedClients] = useState<any[]>([])
-  const [allClients, setAllClientsState] = useState<any[]>(() => getStoredClients())
-  const [archivedClientsList, setArchivedClientsList] = useState<any[]>(archivedClientsData)
-  // Portal provisioning
-  const [provisionResult, setProvisionResult] = useState<(ProvisionResult & { clientName: string }) | null>(null)
-  const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(null)
+  return (
+    <div ref={ref} className="relative flex justify-center">
+      <button
+        onClick={() => { setOpen(p => !p); setStatusOpen(false) }}
+        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        <MoreVertical className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+          <button
+            type="button"
+            onClick={() => { onViewOverview(); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+          >
+            <FileText className="w-3.5 h-3.5 opacity-60" /> View Overview
+          </button>
+          {isSharedClient(client.id) ? (
+            <div className="px-3 py-2 text-xs text-gray-500">
+              Shared demo client · read only
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => { onEdit(); setOpen(false) }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+              >
+                <Edit className="w-3.5 h-3.5 opacity-60" /> Edit Client
+              </button>
 
-  const setAllClients = (clients: any[]) => {
-    setAllClientsState(clients)
-    saveStoredClients(clients)
-  }
+              {/* Set Status submenu */}
+              <div className="relative">
+                <button
+                  onClick={() => setStatusOpen(p => !p)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckCircle className="w-3.5 h-3.5 opacity-60" /> Set Status
+                  </span>
+                  <ChevronDown className={`w-3 h-3 opacity-40 transition-transform ${statusOpen ? "rotate-180" : ""}`} />
+                </button>
+                {statusOpen && (
+                  <div className="absolute right-full top-0 mr-1 w-40 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+                    {statuses.map(s => (
+                      <button
+                        key={s.label}
+                        onClick={() => { onSetStatus(s.label); setOpen(false); setStatusOpen(false) }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 transition-colors text-left capitalize ${s.color} ${client.status === s.label ? "font-bold" : ""}`}
+                      >
+                        {s.icon} {s.label} {client.status === s.label && <span className="ml-auto opacity-50">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
-  const handleProvision = (c: any) => {
-    const result = provisionClientPortal(c.id, c.name)
-    setProvisionResult({ ...result, clientName: c.name })
-  }
+          {/* Provision Portal */}
+          <button
+            onClick={() => { onProvision(); setOpen(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-purple-700 hover:bg-purple-50 transition-colors text-left"
+          >
+            <Zap className="w-3.5 h-3.5 opacity-70" />
+            {provisioned ? "Re-provision Portal" : "Provision Portal"}
+          </button>
 
-  const copyToClipboard = (text: string, field: 'email' | 'password') => {
+          {!isSharedClient(client.id) && (
+            <>
+              <div className="border-t border-gray-100 my-0.5" />
+              <button
+                onClick={() => { onArchive(); setOpen(false) }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors text-left"
+              >
+                <Archive className="w-3.5 h-3.5 opacity-70" /> Archive Client
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Client Overview Popup ──────────────────────────────────────────────────
+function ClientOverviewPopup({
+  client,
+  onClose,
+  onViewFullProfile,
+}: {
+  client: StoredClient
+  onClose: () => void
+  onViewFullProfile?: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3 flex items-start justify-between">
+          <div>
+            <p className="text-blue-200 text-xs font-medium mb-1">{client.id}</p>
+            <h2 className="text-white text-xl font-semibold">{client.name}</h2>
+            <p className="text-blue-200 text-sm mt-0.5">{client.category || "—"} · {client.billingCity || "—"}</p>
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white p-1"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+          {[
+            { label: "Tier",   value: client.tier   || "—", icon: <Star        className="w-4 h-4 text-amber-400" /> },
+            { label: "Status", value: client.status || "—", icon: <CheckCircle className="w-4 h-4 text-emerald-500" /> },
+            { label: "Category", value: client.category ? client.category.split(" ")[0] : "—", icon: <Building2 className="w-4 h-4 text-blue-500" /> },
+          ].map(s => (
+            <div key={s.label} className="flex flex-col items-center py-3 gap-1">
+              {s.icon}
+              <p className="text-sm font-bold text-gray-800 capitalize">{s.value}</p>
+              <p className="text-xs text-gray-400">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-4 grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact</h3>
+            {[
+              { icon: <Users  className="w-3.5 h-3.5 text-blue-400" />, v: client.rep },
+              { icon: <Mail   className="w-3.5 h-3.5 text-blue-400" />, v: client.email },
+              { icon: <MapPin className="w-3.5 h-3.5 text-blue-400" />, v: [client.billingCity, client.billingState].filter(Boolean).join(", ") || client.billingAddress },
+            ].map((r, i) => r.v ? (
+              <div key={i} className="flex items-start gap-2">
+                <span className="mt-0.5 flex-shrink-0">{r.icon}</span>
+                <p className="text-sm text-gray-700 break-all">{r.v}</p>
+              </div>
+            ) : null)}
+          </div>
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Details</h3>
+            <div className="bg-blue-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 mb-0.5">Opening Balance</p>
+              <p className="text-base font-bold text-gray-800">{formatBalance(client.openingBalance)}</p>
+            </div>
+            {(client.contractStartDate || client.contractEndDate) && (
+              <div className="flex items-center gap-2 mt-1">
+                <Calendar className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-gray-400">Contract</p>
+                  <p className="text-sm font-medium text-gray-700">
+                    {client.contractStartDate || "—"} → {client.contractEndDate || "—"}
+                  </p>
+                </div>
+              </div>
+            )}
+            <Badge className={statusColors[(client.status || "").toLowerCase()] || "bg-gray-100 text-gray-500"}>
+              {client.status || "unknown"}
+            </Badge>
+          </div>
+        </div>
+        {onViewFullProfile && (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onViewFullProfile}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              View Full Profile <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Archived Modal ─────────────────────────────────────────────────────────
+function ArchivedModal({ clients, onClose, onClientClick }: {
+  clients: ArchivedClient[]; onClose: () => void; onClientClick: (c: ArchivedClient) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-2" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Archived Clients</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{clients.length} {clients.length === 1 ? "client" : "clients"} · Read only</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="overflow-auto flex-1">
+          {clients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <Archive className="w-10 h-10 mb-3 opacity-30" />
+              <p className="text-sm">No archived clients yet</p>
+            </div>
+          ) : (
+            <table className="w-full table-fixed text-xs">
+              <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
+                <tr>
+                  {["Client ID", "Client Name", "Category", "Representative", "Tier", "City", "Archived On"].map(h => (
+                    <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {clients.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-3 py-3">
+                      <button onClick={() => onClientClick(c)} className="text-blue-600 font-bold hover:underline text-xs">{c.id}</button>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">
+                          {c.name?.[0]?.toUpperCase() || "?"}
+                        </div>
+                        <span className="font-medium text-gray-800 truncate">{c.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-gray-500 truncate">{c.category || "—"}</td>
+                    <td className="px-3 py-3 text-gray-500 truncate">{c.rep || "—"}</td>
+                    <td className="px-3 py-3 text-gray-500">{c.tier || "—"}</td>
+                    <td className="px-3 py-3 text-gray-500">{c.billingCity || "—"}</td>
+                    <td className="px-3 py-3 text-gray-500">{c.archivedOn}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <p className="text-xs text-gray-400">This list is read-only. No actions can be performed on archived clients.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type ProvisionFlow = ProvisionResult & {
+  clientId: string
+  clientName: string
+  isReprovision: boolean
+}
+
+// ── Provision Credentials Dialog ───────────────────────────────────────────
+function ProvisionDialog({
+  result,
+  onClose,
+  onDone,
+}: {
+  result: ProvisionFlow
+  onClose: () => void
+  onDone: () => void
+}) {
+  const [copiedField, setCopiedField] = useState<"email" | "password" | null>(null)
+  const copy = (text: string, field: "email" | "password") => {
     navigator.clipboard.writeText(text).catch(() => {})
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
   }
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+        <div className="flex justify-between items-start mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+              <Zap size={20} className="text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">
+                {result.isReprovision ? "Portal Credentials Re-generated" : "Portal Credentials Generated"}
+              </h2>
+              <p className="text-xs text-gray-500">{result.clientName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 mb-5">
+           <p className="text-sm text-purple-800 font-medium">Credentials are ready for review.</p>
+           <p className="text-xs text-purple-700 mt-1">Portal access will remain inactive until you confirm access in the next step.</p>
+        </div>
+        <div className="space-y-3 mb-6">
+          {([["Login Email", result.email, "email"], ["Temporary Password", result.password, "password"]] as const).map(([label, val, field]) => (
+            <div key={field} className="border border-gray-200 rounded-xl p-4">
+              <p className="text-xs text-gray-500 mb-1">{label}</p>
+              <div className="flex items-center justify-between gap-3">
+                <code className="text-sm font-mono text-gray-900 break-all">{val}</code>
+                <button onClick={() => copy(val, field)} className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors">
+                  {copiedField === field ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5">
+          <p className="text-xs text-amber-800"><strong>Important:</strong> Save these credentials now — the password cannot be recovered later.</p>
+        </div>
+         <Button className="w-full" onClick={onDone}>Done</Button>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmPortalAccessDialog({
+  result,
+  onCancel,
+  onConfirm,
+}: {
+  result: ProvisionFlow
+  onCancel: () => void
+  onConfirm: (reason: string) => void
+}) {
+  const [reason, setReason] = useState("")
+  const requiresReason = result.isReprovision
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+        <div className="flex justify-between items-start mb-5">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {requiresReason ? "Confirm Portal Re-provisioning" : "Confirm Client Portal Access"}
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">{result.clientName}</p>
+          </div>
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+          <p className="text-sm text-amber-900 font-medium">
+            {requiresReason
+              ? "The existing portal credentials will be replaced only after confirmation."
+              : "This will give the client admin access to the client portal."}
+          </p>
+          <p className="text-xs text-amber-800 mt-1">
+            Username: <span className="font-mono">{result.email}</span>
+          </p>
+        </div>
+
+        {requiresReason && (
+          <div className="mb-5">
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Reason for re-provisioning <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={3}
+              placeholder="Enter why the portal credentials are being re-provisioned"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-400"
+            />
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
+          <Button
+            className="flex-1"
+            disabled={requiresReason && !reason.trim()}
+            onClick={() => onConfirm(reason)}
+          >
+            Confirm &amp; Give Access
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ──────────────────────────────────────────────────────────────
+export default function ClientsPageUI() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const userScope = user?.id || user?.email || "anonymous"
+
+  const [clients, setClientsState] = useState<StoredClient[]>(() => getStoredClients())
+  const [archivedClients, setArchivedClientsState] = useState<ArchivedClient[]>(() => getArchivedClients())
+  const [overviewClient, setOverviewClient] = useState<StoredClient | null>(null)
+  const [archivedOverview, setArchivedOverview] = useState<ArchivedClient | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
+  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [provisionResult, setProvisionResult] = useState<ProvisionFlow | null>(null)
+  const [provisionConfirmation, setProvisionConfirmation] = useState<ProvisionFlow | null>(null)
+
+  // Tile filter
+  const [activeFilter, setActiveFilter] = useState("All")
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 10
+
+  const persistClients = (list: StoredClient[]) => { setClientsState(list); saveStoredClients(list) }
+  const persistArchived = (list: ArchivedClient[]) => { setArchivedClientsState(list); saveArchivedClients(list) }
 
   useEffect(() => {
-    const onUpdate = () => setAllClientsState(getStoredClients())
-    window.addEventListener('nidoClientsUpdated', onUpdate)
-    return () => window.removeEventListener('nidoClientsUpdated', onUpdate)
-  }, [])
+    setClientsState(getStoredClients())
+    setArchivedClientsState(getArchivedClients())
+    const onUpdate = () => setClientsState(getStoredClients())
+    const onStorage = (event: StorageEvent) => {
+      if (event.key?.startsWith("nido_clients_v3:") || event.key?.startsWith("nido_clients_archived_v2:")) {
+        setClientsState(getStoredClients())
+        setArchivedClientsState(getArchivedClients())
+      }
+    }
+    window.addEventListener("nidoClientsUpdated", onUpdate)
+    window.addEventListener("storage", onStorage)
+    return () => {
+      window.removeEventListener("nidoClientsUpdated", onUpdate)
+      window.removeEventListener("storage", onStorage)
+    }
+  }, [userScope])
 
-  const stats = {
-    premium: 0,
-    active: 14,
-    pending: 0,
-    inactive: 0,
+  // Stats computed from real data — each tile is a filter key
+  const stats = useMemo(() => [
+    { label: "Total Clients",   filterKey: "All",      value: clients.length,                                                            color: "text-gray-900",  icon: <Building2 className="text-gray-400"  /> },
+    { label: "Active Clients",  filterKey: "Active",   value: clients.filter(c => (c.status || "").toLowerCase() === "active").length,   color: "text-green-600", icon: <Users     className="text-green-400" /> },
+    { label: "Pending",         filterKey: "Pending",  value: clients.filter(c => (c.status || "").toLowerCase() === "pending").length,  color: "text-blue-600",  icon: <Clock     className="text-blue-400"  /> },
+    { label: "Inactive",        filterKey: "Inactive", value: clients.filter(c => (c.status || "").toLowerCase() === "inactive").length, color: "text-gray-500",  icon: <XCircle   className="text-gray-400"  /> },
+    { label: "Premium Clients", filterKey: "Premium",  value: clients.filter(c => (c.tier   || "").toLowerCase().startsWith("premium")).length,  color: "text-amber-600", icon: <Star      className="text-amber-400" /> },
+  ], [clients])
+
+  // Filtering + pagination
+  const filtered = useMemo(() => {
+    switch (activeFilter) {
+      case "Active":   return clients.filter(c => (c.status || "").toLowerCase() === "active")
+      case "Pending":  return clients.filter(c => (c.status || "").toLowerCase() === "pending")
+      case "Inactive": return clients.filter(c => (c.status || "").toLowerCase() === "inactive")
+      case "Premium":  return clients.filter(c => (c.tier   || "").toLowerCase().startsWith("premium"))
+      default:         return clients
+    }
+  }, [clients, activeFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+  const safePage   = Math.min(currentPage, totalPages)
+  const paged      = filtered.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE)
+
+  const handleTileClick = (filterKey: string) => {
+    setActiveFilter(prev => prev === filterKey ? "All" : filterKey)
+    setCurrentPage(1)
+  }
+
+  // Actions
+  const archiveClient = (client: StoredClient) => {
+    persistClients(clients.filter(c => c.id !== client.id))
+    persistArchived([...archivedClients, { ...client, status: "archived", archivedOn: new Date().toISOString().split("T")[0] }])
+  }
+
+  const setClientStatus = (id: string, status: ClientStatus) => {
+    persistClients(clients.map(c => c.id === id ? { ...c, status } : c))
+  }
+
+  const handleProvision = (c: StoredClient) => {
+    setProvisionResult({
+      ...generatePortalCredentials(c.id, c.name),
+      clientId: c.id,
+      clientName: c.name,
+      isReprovision: isClientProvisioned(c.id),
+    })
+  }
+
+  const confirmProvision = (flow: ProvisionFlow, reason: string) => {
+    activateClientPortal(flow.clientId, flow.clientName, flow, reason)
+    setProvisionConfirmation(null)
+  }
+
+  const handleExport = () => {
+    const headers = "Client ID,Company Name,Category,Tier,Representative,Email,Phone,Status,Opening Balance,Contract Start,Contract End,Billing City,Billing State\n"
+    const rows = clients.map(c => [
+      c.id, c.name, c.category || "", c.tier || "", c.rep || "",
+      c.email || "", c.phone || "", c.status || "",
+      c.openingBalance || "0", c.contractStartDate || "",
+      c.contractEndDate || "", c.billingCity || "", c.billingState || "",
+    ].join(",")).join("\n")
+    const blob = new Blob([headers + rows], { type: "text/csv" })
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "clients-export.csv"
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
   const handleDownloadTemplate = () => {
-    // Create a CSV template with client onboarding details
     const template = `Client ID,Company Name,Category,Client Tier,Contact Person,Email,Phone,Mobile,Website,Contract Start Date,Contract End Date,GST Treatment,GSTIN,Source of Supply,PAN Number,Currency,Opening Balance,Payment Terms,TDS Rate,Bank Name,Account Number,IFSC Code,Branch,Billing Address,Billing City,Billing State,Billing Pincode,Shipping Address,Shipping City,Shipping State,Shipping Pincode
-CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 98765 43210,+91 99876 54321,www.company.com,2024-01-01,2025-01-01,Registered Business,27AABCT1234A1Z5,Maharashtra,AAAAA0000A,INR,50000,Net 30,1.0,ICIC Bank,9876543210,ICIC0001234,Mumbai,123 Business Street,Mumbai,Maharashtra,400001,123 Business Street,Mumbai,Maharashtra,400001`
-
-    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'client-template.csv')
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43210,+91 99876 54321,www.company.com,2024-01-01,2025-01-01,Registered Business,27AABCT1234A1Z5,Maharashtra,AAAAA0000A,INR,50000,Net 30,1.0,ICICI Bank,9876543210,ICIC0001234,Mumbai,123 Business Street,Mumbai,Maharashtra,400001,123 Business Street,Mumbai,Maharashtra,400001`
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8;" })
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "client-template.csv"
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
   const handleBulkImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
+    const file = event.target.files?.[0]; if (!file) return
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const csv = e.target?.result as string
-        const lines = csv.split('\n')
-        const headers = lines[0].split(',').map(h => h.trim())
-        
-        // Get the highest existing client ID to auto-generate new ones
-        const maxId = allClients.length > 0 
-          ? Math.max(...allClients.map(c => parseInt(c.id.replace('CI-', '')))) 
-          : 24
-
-        const newClients = lines.slice(1)
-          .filter(line => line.trim())
-          .map((line, index) => {
-            const values = line.split(',').map(v => v.trim())
-            const clientData: any = {}
-            
-            headers.forEach((header, idx) => {
-              const value = values[idx] || '' // Keep blank fields as empty strings
-              clientData[header] = value
-            })
-
-            // Auto-generate client ID if not provided
-            if (!clientData['Client ID'] || clientData['Client ID'] === '') {
-              clientData['Client ID'] = `CI-${String(maxId + index + 1).padStart(5, '0')}`
-            }
-
-            return {
-              id: clientData['Client ID'],
-              name: clientData['Company Name'] || '',
-              category: clientData['Category'] || '',
-              tier: clientData['Client Tier'] || '',
-              rep: clientData['Contact Person'] || '',
-              email: clientData['Email'] || '',
-              phone: clientData['Phone'] || '',
-              mobile: clientData['Mobile'] || '',
-              website: clientData['Website'] || '',
-              contractStartDate: clientData['Contract Start Date'] || '',
-              contractEndDate: clientData['Contract End Date'] || '',
-              gstTreatment: clientData['GST Treatment'] || '',
-              gstin: clientData['GSTIN'] || '',
-              sourceOfSupply: clientData['Source of Supply'] || '',
-              pan: clientData['PAN Number'] || '',
-              currency: clientData['Currency'] || '',
-              openingBalance: clientData['Opening Balance'] || '',
-              paymentTerms: clientData['Payment Terms'] || '',
-              tdsRate: clientData['TDS Rate'] || '',
-              bankName: clientData['Bank Name'] || '',
-              accountNumber: clientData['Account Number'] || '',
-              ifscCode: clientData['IFSC Code'] || '',
-              branch: clientData['Branch'] || '',
-              billingAddress: clientData['Billing Address'] || '',
-              billingCity: clientData['Billing City'] || '',
-              billingState: clientData['Billing State'] || '',
-              billingPincode: clientData['Billing Pincode'] || '',
-              shippingAddress: clientData['Shipping Address'] || '',
-              shippingCity: clientData['Shipping City'] || '',
-              shippingState: clientData['Shipping State'] || '',
-              shippingPincode: clientData['Shipping Pincode'] || '',
-              status: 'active'
-            }
-          })
-
-        setImportedClients(newClients)
+        const lines = csv.split("\n")
+        const headers = lines[0].split(",").map(h => h.trim())
+        const maxId = clients.length > 0 ? Math.max(...clients.map(c => parseInt(c.id.replace("CI-", "")) || 0)) : 0
+        const newClients: StoredClient[] = lines.slice(1).filter(l => l.trim()).map((line, index) => {
+          const values = line.split(",").map(v => v.trim())
+          const d: Record<string, string> = {}
+          headers.forEach((h, i) => { d[h] = values[i] || "" })
+          return {
+            id: d["Client ID"] || `CI-${String(maxId + index + 1).padStart(5, "0")}`,
+            name: d["Company Name"] || "", category: d["Category"] || "", tier: d["Client Tier"] || "",
+            rep: d["Contact Person"] || "", email: d["Email"] || "", phone: d["Phone"] || "",
+            mobile: d["Mobile"] || "", website: d["Website"] || "",
+            contractStartDate: d["Contract Start Date"] || "", contractEndDate: d["Contract End Date"] || "",
+            billingAddress: d["Billing Address"] || "", billingCity: d["Billing City"] || "",
+            billingState: d["Billing State"] || "", billingPincode: d["Billing Pincode"] || "",
+            openingBalance: d["Opening Balance"] || "", paymentTerms: d["Payment Terms"] || "",
+            status: "active",
+          }
+        })
+        const existingIds = new Set(clients.map(c => c.id))
+        persistClients([...clients, ...newClients.filter(c => !existingIds.has(c.id))])
         setShowBulkImport(false)
-      } catch (error) {
-        console.error('Error parsing CSV:', error)
-        alert('Error parsing CSV file. Please check the format.')
-      }
+      } catch { alert("Error parsing CSV file. Please check the format.") }
     }
     reader.readAsText(file)
   }
 
-  const clients = [
-    {
-      id: "CI-00024",
-      name: "raj",
-      rep: "raj",
-      email: "raj@info.com",
-      status: "active",
-    },
-    {
-      id: "CI-00023",
-      name: "veera industries",
-      rep: "Veeru",
-      email: "Veeru@indu.com",
-      status: "active",
-    },
-    {
-      id: "CI-00020",
-      name: "Nitin Supplies",
-      rep: "Nitin Shetty",
-      email: "nitinshetty@gmail.com",
-      status: "active",
-    },
-    {
-      id: "CI-00021",
-      name: "Mohan Textiles",
-      rep: "Mohan Bhat",
-      email: "mohanbhat@gmail.com",
-      status: "active",
-    },
-    {
-      id: "CI-00008",
-      name: "Naveen Solutions",
-      rep: "Naveen Kumar",
-      email: "naveenkumar@gmail.com",
-      status: "active",
-    },
-  ]
-
   return (
-    <div className="min-h-screen bg-white p-2">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-2 py-2 flex justify-between">
+        <div className="w-full px-2 py-3 flex justify-between items-center">
           <div>
             <p className="text-xs text-gray-500">Clients / Client List</p>
             <h1 className="text-2xl font-bold">Clients</h1>
           </div>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="rounded-full"
-              >
+              <Button variant="outline" size="icon" className="rounded-full">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/clients/add')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Client
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/clients/add")}>
+                <Plus     className="h-4 w-4 mr-2" /> Add Client
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                const clientsData = [
-                  { id: "CI-00019", name: "Raj Manufacturing", rep: "Rajesh Kumar", email: "rajesh@gmail.com", status: "active" },
-                  { id: "CI-00018", name: "Tech Solutions Ltd", rep: "Amit Singh", email: "amit@gmail.com", status: "active" },
-                  { id: "CI-00017", name: "Global Exports", rep: "Priya Sharma", email: "priya@gmail.com", status: "pending" },
-                  { id: "CI-00016", name: "Express IT Services", rep: "Vikram Patel", email: "vikram@gmail.com", status: "active" },
-                  { id: "CI-00015", name: "Digital Innovations", rep: "Anita Desai", email: "anita@gmail.com", status: "active" },
-                  { id: "CI-00021", name: "Mohan Textiles", rep: "Mohan Bhat", email: "mohanbhat@gmail.com", status: "active" },
-                  { id: "CI-00008", name: "Naveen Solutions", rep: "Naveen Kumar", email: "naveenkumar@gmail.com", status: "active" },
-                ]
-                const csv = clientsData.map(c => `${c.id},${c.name},${c.rep},${c.email},${c.status}`).join('\n')
-                const headers = 'Client ID,Name,Representative,Email,Status\n'
-                const blob = new Blob([headers + csv], { type: 'text/csv' })
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = 'clients-export.csv'
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-              }}>
-                <Download className="h-4 w-4 mr-2" />
-                Export Clients
+              <DropdownMenuItem className="cursor-pointer" onClick={handleExport}>
+                <Download className="h-4 w-4 mr-2" /> Export Clients
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => setShowBulkImport(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Import
+                <Upload   className="h-4 w-4 mr-2" /> Bulk Import
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={handleDownloadTemplate}>
-                <FileDown className="h-4 w-4 mr-2" />
-                Download Template
+                <FileDown className="h-4 w-4 mr-2" /> Download Template
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchivedClients(true)}>
-                <Archive className="h-4 w-4 mr-2" />
-                Archived Clients
+              <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
+                <Archive  className="h-4 w-4 mr-2" /> Archived Clients ({archivedClients.length})
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -295,140 +641,152 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
       </div>
 
       <div className="w-full px-2 py-2">
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-2 mb-2">
-          {/* Premium */}
-          <Card>
-              <CardContent className="p-3 flex justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Premium Clients</p>
-                <p className="text-3xl font-bold mt-2">
-                  {stats.premium}
-                </p>
-              </div>
-              <Users className="text-gray-400" />
-            </CardContent>
-          </Card>
-
-          {/* Active */}
-          <Card>
-            <CardContent className="p-3 flex justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Active Clients</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">
-                  {stats.active}
-                </p>
-              </div>
-              <Users className="text-green-400" />
-            </CardContent>
-          </Card>
-
-          {/* Pending */}
-          <Card>
-            <CardContent className="p-3 flex justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-3xl font-bold text-orange-600 mt-2">
-                  {stats.pending}
-                </p>
-              </div>
-              <Users className="text-orange-400" />
-            </CardContent>
-          </Card>
-
-          {/* Inactive */}
-          <Card>
-            <CardContent className="p-3 flex justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Inactive</p>
-                <p className="text-3xl font-bold text-red-600 mt-2">
-                  {stats.inactive}
-                </p>
-              </div>
-              <Users className="text-red-400" />
-            </CardContent>
-          </Card>
+        {/* Stats — 5 tiles, each acts as a filter */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+          {stats.map(s => {
+            const isActive = activeFilter === s.filterKey
+            return (
+              <Card
+                key={s.label}
+                onClick={() => handleTileClick(s.filterKey)}
+                className={`cursor-pointer transition-all hover:shadow-md ${isActive ? "ring-2 ring-blue-500 shadow-md" : ""}`}
+              >
+                <CardContent className="p-2 flex justify-between items-start">
+                  <div>
+                    <p className="text-xs text-gray-500">{s.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+                  </div>
+                  {s.icon}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
 
-        {/* Table */}
+        {/* Table Card */}
         <Card>
           <CardContent className="p-0">
-            <table className="w-full">
+            {/* Active filter indicator */}
+            {activeFilter !== "All" && (
+              <div className="flex items-center gap-2 px-3 py-2 border-b bg-blue-50">
+                <span className="text-xs text-blue-700 font-medium">Filtered: {activeFilter}</span>
+                <span className="text-xs text-gray-400">·</span>
+                <span className="text-xs text-gray-500">{filtered.length} of {clients.length} clients</span>
+                <button onClick={() => { setActiveFilter("All"); setCurrentPage(1) }} className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium">Clear ✕</button>
+              </div>
+            )}
+
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "15%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "10%" }} />
+                <col style={{ width: "7%" }} />
+              </colgroup>
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
-                  <th className="px-6 py-2 text-left">
-                    <input type="checkbox" />
-                  </th>
-                  <th className="px-6 py-2 text-left">Client ID</th>
-                  <th className="px-6 py-2 text-left">Client Name</th>
-                  <th className="px-6 py-2 text-left">Categories</th>
-                  <th className="px-6 py-2 text-left">Representative</th>
-                  <th className="px-6 py-2 text-left">Email</th>
-                  <th className="px-6 py-2 text-left">Total Spend (USD)</th>
-                  <th className="px-6 py-2 text-left">Status</th>
-                  <th className="px-6 py-2 text-center">Actions</th>
+                  <th className="px-3 py-3 text-left">Client ID</th>
+                  <th className="px-3 py-3 text-left">Client Name</th>
+                  <th className="px-3 py-3 text-left">Category</th>
+                  <th className="px-3 py-3 text-left">Representative</th>
+                  <th className="px-3 py-3 text-left">Tier</th>
+                  <th className="px-3 py-3 text-left">City</th>
+                  <th className="px-3 py-3 text-left">Status</th>
+                  <th className="px-3 py-3 text-left">Balance</th>
+                  <th className="px-3 py-3 text-center">Actions</th>
                 </tr>
               </thead>
-
               <tbody>
-                {[...allClients, ...importedClients].map((c, i) => (
-                  <tr
-                    key={i}
-                    className="border-b hover:bg-gray-50"
-                  >
-                    <td className="px-6 py-4">
-                      <input type="checkbox" />
+                {paged.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-16 text-gray-400">
+                      <div className="flex flex-col items-center gap-2">
+                        <Building2 className="w-8 h-8 opacity-30" />
+                        <p className="text-sm">No clients match the current filters</p>
+                      </div>
                     </td>
-
-                    <td 
-                      className="px-6 py-2 text-blue-600 font-medium cursor-pointer hover:underline"
+                  </tr>
+                ) : paged.map(c => (
+                  <tr key={c.id} className="border-b hover:bg-gray-50 transition-colors">
+                    {/* Client ID */}
+                    <td
+                      className="px-3 py-3 text-blue-600 font-medium cursor-pointer hover:underline text-sm truncate"
                       onClick={() => navigate(`/clients/${c.id}`)}
                     >
                       {c.id}
                     </td>
 
-                    <td className="px-6 py-4">{c.name}</td>
-                    <td className="px-6 py-4">{c.category || '-'}</td>
-                    <td className="px-6 py-4">{c.rep}</td>
-                    <td className="px-6 py-4">{c.email}</td>
-                    <td className="px-6 py-4">$0</td>
+                    {/* Client Name + email */}
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs flex-shrink-0">
+                          {c.name?.[0]?.toUpperCase() || "?"}
+                        </div>
+                        <div className="min-w-0">
+                          <p
+                            className="font-medium text-gray-800 text-sm leading-tight truncate cursor-pointer hover:underline"
+                            onClick={() => navigate(`/clients/${c.id}`)}
+                          >
+                            {c.name}
+                          </p>
+                          <p className="text-xs text-gray-400 leading-tight truncate">{c.email || ""}</p>
+                        </div>
+                      </div>
+                    </td>
 
-                    <td className="px-6 py-4">
-                      <Badge className="bg-green-100 text-green-800">
-                        {c.status}
+                    {/* Category pill */}
+                    <td className="px-3 py-3">
+                      {c.category
+                        ? <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-medium truncate block max-w-full">{c.category}</span>
+                        : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+
+                    {/* Representative + phone */}
+                    <td className="px-3 py-3">
+                      <p className="text-sm text-gray-700 font-medium leading-tight truncate">{c.rep || "—"}</p>
+                      <p className="text-xs text-gray-400 leading-tight truncate">{c.phone || ""}</p>
+                    </td>
+
+                    {/* Tier */}
+                    <td className="px-3 py-3">
+                      {c.tier
+                        ? <Badge className={tierColors[c.tier] || "bg-gray-100 text-gray-600"}>{c.tier}</Badge>
+                        : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+
+                    {/* City */}
+                    <td className="px-3 py-3 text-sm text-gray-600 truncate">{c.billingCity || "—"}</td>
+
+                    {/* Status badge */}
+                    <td className="px-3 py-3">
+                      <Badge className={statusColors[(c.status || "").toLowerCase()] || "bg-gray-100 text-gray-500"}>
+                        {c.status || "unknown"}
                       </Badge>
                     </td>
 
-                    <td className="px-6 py-2 text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
+                    {/* Opening Balance */}
+                    <td className="px-3 py-3">
+                      <span className={`text-sm font-semibold ${c.openingBalance && parseFloat(c.openingBalance) > 0 ? "text-gray-800" : "text-gray-300"}`}>
+                        {formatBalance(c.openingBalance)}
+                      </span>
+                    </td>
 
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/clients/${c.id}/edit`)}>
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="cursor-pointer"
-                            onClick={() => handleProvision(c)}
-                          >
-                            <Zap className="h-4 w-4 mr-2 text-purple-600" />
-                            {isClientProvisioned(c.id) ? 'Re-provision Portal' : 'Provision Client Portal'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600 cursor-pointer"
-                            onClick={() => {
-                              setAllClients(allClients.filter(client => client.id !== c.id))
-                              setArchivedClientsList([...archivedClientsList, { ...c, status: 'archived', archivedOn: new Date().toISOString().split('T')[0] }])
-                            }}
-                          >
-                            Archive
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    {/* Actions */}
+                    <td className="px-3 py-3 text-center">
+                      <RowActionsMenu
+                        client={c}
+                        onViewOverview={() => setOverviewClient(c)}
+                        onEdit={() => navigate(`/clients/${c.id}/edit`)}
+                        onArchive={() => archiveClient(c)}
+                        onSetStatus={s => setClientStatus(c.id, s)}
+                        onProvision={() => handleProvision(c)}
+                        provisioned={isClientProvisioned(c.id)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -436,287 +794,104 @@ CL-00001,Company Name,IT Hardware,Premium Clients,John Doe,john@company.com,+91 
             </table>
 
             {/* Pagination */}
-            <div className="px-6 py-2 flex justify-between text-sm text-gray-600 border-t">
-              <span>1-10 of 03 clients</span>
-              <div className="flex gap-2">
-                <button className="p-2 hover:bg-gray-100 rounded">←</button>
-                <button className="px-3 py-1 border rounded">1</button>
-                <button className="p-2 hover:bg-gray-100 rounded">→</button>
+            <div className="px-3 py-3 flex items-center justify-between text-sm text-gray-600 border-t">
+              <span>
+                {filtered.length === 0
+                  ? "0 clients"
+                  : `${(safePage - 1) * ITEMS_PER_PAGE + 1}–${Math.min(safePage * ITEMS_PER_PAGE, filtered.length)} of ${filtered.length} clients`}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="p-1.5 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >←</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`w-8 h-8 rounded border text-xs font-medium transition-colors ${p === safePage ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 hover:bg-gray-50"}`}
+                  >{p}</button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="p-1.5 rounded border border-gray-200 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >→</button>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Archived Clients Modal */}
-      {showArchivedClients && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xlw-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between p-2 border-b bg-white">
-              <h2 className="text-lg font-semibold">Archived Clients</h2>
-              <button onClick={() => setShowArchivedClients(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-2 font-semibold text-sm">Client ID</th>
-                      <th className="text-left py-2 px-2 font-semibold text-sm">Company Name</th>
-                      <th className="text-left py-2 px-2 font-semibold text-sm">Categories</th>
-                      <th className="text-left py-2 px-2 font-semibold text-sm">Representative</th>
-                      <th className="text-left py-2 px-2 font-semibold text-sm">Email</th>
-                      <th className="text-left py-2 px-2 font-semibold text-sm">Archived On</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {archivedClientsList.map((client) => (
-                      <tr key={client.id} className="border-b hover:bg-gray-50">
-                        <td 
-                          className="py-3 px-2 text-sm text-blue-600 font-medium cursor-pointer hover:underline"
-                          onClick={() => setSelectedArchivedClient(client)}
-                        >
-                          {client.id}
-                        </td>
-                        <td className="py-3 px-2 text-sm font-medium">{client.name}</td>
-                        <td className="py-3 px-2 text-sm">{client.category || '-'}</td>
-                        <td className="py-3 px-2 text-sm">{client.rep}</td>
-                        <td className="py-3 px-2 text-sm">{client.email}</td>
-                        <td className="py-3 px-2 text-sm">{client.archivedOn}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {archivedClientsList.length === 0 && (
-                <div className="text-center py-2 text-gray-500">No archived clients found</div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 p-2 border-t">
-              <button onClick={() => setShowArchivedClients(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Close</button>
-            </div>
-          </div>
-        </div>
+      {/* Client Overview Popup */}
+      {overviewClient && (
+        <ClientOverviewPopup
+          client={overviewClient}
+          onClose={() => setOverviewClient(null)}
+          onViewFullProfile={() => {
+            setOverviewClient(null)
+            navigate(`/clients/${overviewClient.id}/contracts`)
+          }}
+        />
       )}
 
-      {/* Archived Client Detail Modal */}
-      {selectedArchivedClient && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xlw-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 flex items-center justify-between p-2 border-b bg-white">
-              <h2 className="text-lg font-semibold">Client Details - {selectedArchivedClient.id}</h2>
-              <button 
-                onClick={() => setSelectedArchivedClient(null)} 
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              {/* Basic Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Basic Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Client ID</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Company Name</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Category</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.category}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Contact Person</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.rep}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Contact Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Email</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Phone</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Mobile</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.mobile}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Website</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.website}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Billing Address */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Billing Address</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <p className="text-xs text-gray-500 font-medium mb-1">Address</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingAddress}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">City</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingCity}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">State</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingState}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Pincode</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.billingPincode}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Archive Information */}
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Archive Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Archived On</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.archivedOn}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 font-medium mb-1">Contract End Date</p>
-                    <p className="text-sm text-gray-900">{selectedArchivedClient.contractEndDate}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Badge */}
-              <div className="bg-gray-50 p-2 rounded-lg">
-                <p className="text-xs text-gray-500 font-medium mb-2">Status</p>
-                <Badge className="bg-red-100 text-red-800 capitalize">{selectedArchivedClient.status}</Badge>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 p-2 border-t">
-              <button 
-                onClick={() => setSelectedArchivedClient(null)} 
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Archived Modal */}
+      {showArchived && (
+        <ArchivedModal
+          clients={archivedClients}
+          onClose={() => setShowArchived(false)}
+          onClientClick={c => { setArchivedOverview(c); setShowArchived(false) }}
+        />
       )}
 
-      {/* Provision Portal — Credentials Dialog */}
+      {/* Archived client overview */}
+      {archivedOverview && <ClientOverviewPopup client={archivedOverview} onClose={() => setArchivedOverview(null)} />}
+
+      {/* Provision Dialog */}
       {provisionResult && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6">
-            <div className="flex justify-between items-start mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <Zap size={20} className="text-purple-600" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold">Portal Provisioned</h2>
-                  <p className="text-xs text-gray-500">{provisionResult.clientName}</p>
-                </div>
-              </div>
-              <button onClick={() => setProvisionResult(null)} className="text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-xl p-2 mb-5">
-              <p className="text-sm text-green-800 font-medium">Client portal is ready!</p>
-              <p className="text-xs text-green-700 mt-1">
-                Share the credentials below with the client admin. They can log in at the same login page.
-              </p>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              <div className="border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-1">Login Email</p>
-                <div className="flex items-center justify-between gap-3">
-                  <code className="text-sm font-mono text-gray-900 break-all">{provisionResult.email}</code>
-                  <button
-                    onClick={() => copyToClipboard(provisionResult.email, 'email')}
-                    className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
-                  >
-                    {copiedField === 'email' ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
-                  </button>
-                </div>
-              </div>
-              <div className="border border-gray-200 rounded-xl p-4">
-                <p className="text-xs text-gray-500 mb-1">Temporary Password</p>
-                <div className="flex items-center justify-between gap-3">
-                  <code className="text-sm font-mono text-gray-900">{provisionResult.password}</code>
-                  <button
-                    onClick={() => copyToClipboard(provisionResult.password, 'password')}
-                    className="shrink-0 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
-                  >
-                    {copiedField === 'password' ? <Check size={15} className="text-green-600" /> : <Copy size={15} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-2 mb-5">
-              <p className="text-xs text-amber-800">
-                <strong>Important:</strong> Save these credentials now — the password cannot be recovered later (only reset from the client's Users page).
-              </p>
-            </div>
-
-            <Button className="w-full" onClick={() => setProvisionResult(null)}>
-              Done
-            </Button>
-          </div>
-        </div>
+        <ProvisionDialog
+          result={provisionResult}
+          onClose={() => setProvisionResult(null)}
+          onDone={() => {
+            setProvisionConfirmation(provisionResult)
+            setProvisionResult(null)
+          }}
+        />
+      )}
+      {provisionConfirmation && (
+        <ConfirmPortalAccessDialog
+          result={provisionConfirmation}
+          onCancel={() => setProvisionConfirmation(null)}
+          onConfirm={(reason) => confirmProvision(provisionConfirmation, reason)}
+        />
       )}
 
       {/* Bulk Import Modal */}
       {showBulkImport && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full">
-            <div className="flex items-center justify-between p-2 border-b">
+            <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Bulk Import Clients</h2>
               <button onClick={() => setShowBulkImport(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Upload CSV File</label>
-                <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-2 cursor-pointer hover:border-gray-400 transition-colors">
-                  <Upload className="h-8 w-8 text-gray-400 mb-2" />
-                  <span className="text-sm text-gray-600">Click to upload or drag and drop</span>
-                  <span className="text-xs text-gray-500 mt-1">CSV file</span>
-                  <input 
-                    type="file" 
-                    accept=".csv" 
-                    onChange={handleBulkImport}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-              <div className="bg-blue-50 p-2 rounded-lg">
-                <p className="text-xs text-blue-700">
-                  <strong>Note:</strong> Use the template downloaded from "Download Template" option. Client IDs will be auto-generated if not provided. Blank fields will be kept as empty.
-                </p>
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 cursor-pointer hover:border-gray-400 transition-colors">
+                <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                <span className="text-sm text-gray-600">Click to upload CSV</span>
+                <span className="text-xs text-gray-500 mt-1">Use the template for correct format</span>
+                <input type="file" accept=".csv" onChange={handleBulkImport} className="hidden" />
+              </label>
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-xs text-blue-700"><strong>Note:</strong> Duplicate Client IDs are skipped. New clients are saved immediately.</p>
               </div>
             </div>
-            <div className="flex justify-end gap-2 p-2 border-t">
-              <button onClick={() => setShowBulkImport(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancel</button>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <button onClick={() => setShowBulkImport(false)} className="px-4 py-2 border rounded-lg hover:bg-gray-50 text-sm">Cancel</button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   )
 }

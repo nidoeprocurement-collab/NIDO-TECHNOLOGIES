@@ -6,7 +6,11 @@ import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
+import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
+import { reserveVendorStock } from "@/lib/vendorStore";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -31,11 +35,12 @@ function loadAddresses(clientId: string): DeliveryAddress[] {
 }
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 
 export default function ReviewPage() {
   const navigate = useNavigate();
+  useI18n();
   const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
 
@@ -47,6 +52,20 @@ export default function ReviewPage() {
   }, [clientId]);
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+
+  // Read saved payment terms (selected on the checkout page)
+  const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
+  const paymentTermsLabel = (() => {
+    const map: Record<string, string> = {
+      "Net 30": "Net 30 (Payment due in 30 days)",
+      "Net 45": "Net 45 (Payment due in 45 days)",
+      "Net 60": "Net 60 (Payment due in 60 days)",
+      "Net 90": "Net 90 (Payment due in 90 days)",
+      "Immediate": "Immediate (Payment on delivery)",
+      "Advance": "Advance (Payment before dispatch)",
+    };
+    return map[selectedPaymentTerms] || selectedPaymentTerms;
+  })();
 
   // Read saved payment selection
   const savedPayment: Record<string, string> = (() => {
@@ -107,8 +126,13 @@ export default function ReviewPage() {
   const paymentSummary = getPaymentSummary();
 
   // priceNum is tax-inclusive — extract embedded GST, don't add on top.
+  // Apply slab discount (same logic as CartPage) before computing GST.
+  const getEffectivePrice = (i: { clientId?: string; category?: string; priceNum: number; quantity: number }) => {
+    const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
+    return discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
+  };
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
-    cart.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
+    cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category }))
   );
   const subtotal = preTaxSubtotal;
   const handlePlaceOrder = () => {
@@ -143,7 +167,7 @@ export default function ReviewPage() {
       totalAmountNum: totalAmount,
       paymentMethod: paymentSummary.label,
       paymentDetail: paymentSummary.detail,
-      paymentTerms: "Net 30 (Payment due in 30 days)",
+      paymentTerms: paymentTermsLabel,
       deliveryAddress: selectedAddr
         ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
             .filter(Boolean).join(", ")
@@ -160,8 +184,28 @@ export default function ReviewPage() {
         clientId: i.clientId,
         productCode: i.productCode,
         vendorAllocations: i.vendorAllocations,
+        // Vendor snapshot locked at add-to-cart time — travels with the order
+        selectedVendorId: i.selectedVendorId,
+        selectedVendorName: i.selectedVendorName,
+        vendorPrice: i.vendorPrice,
+        landedCost: i.landedCost,
+        gstSnapshot: i.gstSnapshot,
+        hsnSnapshot: i.hsnSnapshot,
+        vendorRating: i.vendorRating,
+        stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
       })) satisfies OrderCartItem[],
     });
+
+    // Reserve stock immediately so the shop shows reduced available qty.
+    // physicalStock stays unchanged; only reservedStock increases.
+    for (const item of itemsSnapshot) {
+      if (!item.productCode) continue;
+      for (const alloc of (item.vendorAllocations || [])) {
+        if (alloc.vendorId && alloc.allocated > 0) {
+          reserveVendorStock(alloc.vendorId, item.productCode, alloc.allocated);
+        }
+      }
+    }
 
     consumeCart();
     navigate(`/shop/order-confirmation/${orderNumber}`, {
@@ -179,7 +223,7 @@ export default function ReviewPage() {
           : null,
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
-        paymentTerms: "Net 30 (Payment due in 30 days)",
+        paymentTerms: paymentTermsLabel,
         clientEmail: "owner@nidotech.com",
         clientName: "Nido Tech CorpEssentials",
       },
@@ -299,9 +343,9 @@ export default function ReviewPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">{formatPrice(item.priceNum)}</td>
+                        <td className="py-4 pr-4 align-top text-sm font-medium text-gray-900">{formatPrice(getEffectivePrice(item))}</td>
                         <td className="py-4 pr-4 align-top text-sm text-gray-700">{item.quantity}</td>
-                        <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(item.priceNum * item.quantity)}</td>
+                        <td className="py-4 pr-6 align-top text-sm font-semibold text-gray-900">{formatPrice(getEffectivePrice(item) * item.quantity)}</td>
                       </tr>
                     ))}
                   </tbody>

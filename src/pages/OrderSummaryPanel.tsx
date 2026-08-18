@@ -3,9 +3,12 @@ import { Shield, Truck, RotateCcw, Mail, Phone, Pencil } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { useOrgConfig } from "@/contexts/ConfigContext";
+import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 
 export default function OrderSummaryPanel({
@@ -13,6 +16,7 @@ export default function OrderSummaryPanel({
 }: {
   showItemList?: boolean;
 }) {
+  useI18n();
   const navigate = useNavigate();
   const { items: cart } = useCart();
   const org = useOrgConfig();
@@ -20,8 +24,13 @@ export default function OrderSummaryPanel({
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
   // priceNum is tax-inclusive — extract embedded GST, don't add on top.
+  // Apply slab discount (same logic as CartPage) before computing GST.
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
-    cart.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
+    cart.map(i => {
+      const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
+      const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
+      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category };
+    })
   );
   const subtotal = preTaxSubtotal;
   const total = preTaxSubtotal + totalGst;

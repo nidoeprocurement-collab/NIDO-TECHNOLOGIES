@@ -1,6 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
+import { releaseVendorReservation } from "../lib/vendorStore";
+import { savePO, generatePoNumber, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
+import { getVendorById } from "../lib/vendorDataStore";
+import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -25,6 +29,18 @@ export interface OrderCartItem {
   productCode?: string;
   /** Vendor allocation snapshot — used to restore stock if the order is cancelled. */
   vendorAllocations?: StockAllocation[];
+  // ── Vendor snapshot — locked at add-to-cart time ──────────────────────────
+  selectedVendorId?: string;
+  selectedVendorName?: string;
+  vendorPrice?: number;
+  landedCost?: number;
+  gstSnapshot?: number;
+  hsnSnapshot?: string;
+  vendorRating?: number;
+  /** Unique ID for the stock reservation placed at checkout — used for auditing and release on cancellation */
+  stockReservationId?: string;
+  /** Stable generated sub-order identifier assigned when the master order is created. */
+  subOrderId?: string;
 }
 
 export interface MyOrder {
@@ -56,6 +72,7 @@ export interface MyOrder {
   paymentDetail?: string;
   paymentTerms?: string;
   deliveryAddress?: string;
+  cancelReason?: string;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -63,8 +80,8 @@ interface MyOrdersContextType {
   orders: MyOrder[];
   addOrder: (order: Omit<MyOrder, "id"> & { id?: string }) => string;
   setOrders: React.Dispatch<React.SetStateAction<MyOrder[]>>;
-  updateOrderStatus: (orderId: string, status: MyOrderStatus) => void;
-  updateOrdersStatus: (orderIds: string[], status: MyOrderStatus) => void;
+  updateOrderStatus: (orderId: string, status: MyOrderStatus, cancelReason?: string) => void;
+  updateOrdersStatus: (orderIds: string[], status: MyOrderStatus, cancelReason?: string) => void;
 }
 
 const MyOrdersContext = createContext<MyOrdersContextType | undefined>(undefined);
@@ -96,8 +113,8 @@ function cascadeStatusToSubOrders(order: MyOrder, status: MyOrderStatus) {
     }
     const updatedOn = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     for (let i = 0; i < itemCount; i++) {
-      const soPrefix = getPrefix("salesOrder") || "SO-";
-      const subId = `${soPrefix}${order.id}-${String(i + 1).padStart(3, "0")}`;
+      const subId = order.cartItems?.[i]?.subOrderId
+        || `SO-${order.id}-${String(i + 1).padStart(3, "0")}`;
       saved[subId] = { ...(saved[subId] || {}), itemStatus: status, updatedOn };
     }
     localStorage.setItem(key, JSON.stringify(saved));
@@ -126,7 +143,128 @@ function nextOrderId(): string {
   } catch {
     /* ignore */
   }
-  return `ORD-${String(seq).padStart(6, "0")}`;
+  return `${getPrefix("order") || "ORD-"}${String(seq).padStart(6, "0")}`;
+}
+
+// ─── Auto Draft-PO creation ───────────────────────────────────────────────────
+// Called immediately after a new order is placed. Groups cart items by the
+// vendor the client selected on the Shop page and creates one Draft PO per
+// vendor. No price-engine allocation is needed — vendor info is already
+// snapshotted on each cart item.
+function autoCreateDraftPOs(
+  orderId: string,
+  cartItems: OrderCartItem[],
+  _orderDate: string,
+  paymentTerms: string,
+  _deliveryAddress: string,
+): void {
+  // Group items by selectedVendorId (skip items with no vendor selected)
+  const vendorGroups = new Map<string, OrderCartItem[]>();
+  for (const item of cartItems) {
+    if (!item.selectedVendorId) continue;
+    if (!vendorGroups.has(item.selectedVendorId)) vendorGroups.set(item.selectedVendorId, []);
+    vendorGroups.get(item.selectedVendorId)!.push(item);
+  }
+  if (vendorGroups.size === 0) return;
+
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  const displayDate = `${dd}/${mm}/${yyyy}`;
+
+  for (const [vendorId, items] of vendorGroups.entries()) {
+    const vendor = getVendorById(vendorId);
+    const poNumber = generatePoNumber();
+
+    const lineItems: POLineItem[] = items.map((item, i) => {
+      const subOrderId = item.subOrderId
+        || `${getPrefix("salesOrder") || "SO-"}${orderId}-${String(i + 1).padStart(3, "0")}`;
+      const unitPrice = item.landedCost || item.vendorPrice || item.priceNum || 0;
+      const qty = item.quantity;
+      const gstPct = item.gstSnapshot ?? getEffectiveTaxPctForCategory(item.category);
+      return {
+        subOrderId,
+        item: item.name,
+        sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
+        productCode: item.productCode || "",
+        category: item.category || "General",
+        hsnCode: item.hsnSnapshot || "",
+        specs: Array.isArray(item.specs) ? item.specs : [],
+        referenceNumber: "",
+        qty,
+        unitPrice,
+        lineSubtotal: unitPrice * qty,
+        gstPct,
+      };
+    });
+
+    const subtotal = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
+    const primaryGst = lineItems[0]?.gstPct ?? 18;
+    const halfGst = primaryGst / 2;
+    const sgstAmt = Math.round(lineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
+    const cgstAmt = sgstAmt;
+
+    const vendorAddrParts = [vendor?.addressLine1, vendor?.addressLine2, vendor?.city, vendor?.state, vendor?.zipCode].filter(Boolean);
+
+    const grandTotal = subtotal + sgstAmt + cgstAmt;
+    const creationNote: PONote = {
+      id: "audit_created_" + Date.now() + "_" + vendorId,
+      author: "System",
+      initials: "SY",
+      color: "#6b7280",
+      date: displayDate,
+      text: `Draft PO ${poNumber} automatically created for order ${orderId}. Vendor: ${vendor?.name || vendorId}. ${lineItems.length} item${lineItems.length !== 1 ? "s" : ""} — Grand Total ₹${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. Awaiting admin review and confirmation.`,
+      visibility: "Internal Note",
+    };
+
+    const po: StoredPO = {
+      poNumber,
+      orderId,
+      subOrderId: lineItems[0]?.subOrderId || "",
+      subOrderIds: lineItems.map(li => li.subOrderId),
+      items: lineItems,
+      vendorId,
+      vendorName: vendor?.name || items[0].selectedVendorName || vendorId,
+      vendorContact: vendor?.primaryContact || "",
+      vendorEmail: vendor?.email || "",
+      vendorPhone: vendor?.phone || "",
+      vendorGstin: vendor?.taxId || "",
+      vendorAddress: vendorAddrParts.join(", "),
+      vendorAddressLine1: vendor?.addressLine1 || "",
+      vendorAddressLine2: vendor?.addressLine2 || "",
+      vendorCity: vendor?.city || "",
+      vendorState: vendor?.state || "",
+      vendorPincode: vendor?.zipCode || "",
+      item: lineItems[0]?.item || "",
+      sku: lineItems[0]?.sku || "",
+      category: lineItems[0]?.category || "",
+      hsnCode: lineItems[0]?.hsnCode || "",
+      specs: lineItems[0]?.specs || [],
+      referenceNumber: "",
+      qty: lineItems[0]?.qty || 0,
+      unitPrice: lineItems[0]?.unitPrice || 0,
+      subtotal,
+      sgstPct: halfGst,
+      cgstPct: halfGst,
+      sgstAmt,
+      cgstAmt,
+      grandTotal,
+      paymentTerms: paymentTerms || "Net 30",
+      status: "Draft",
+      createdOn: now.toISOString(),
+      createdOnDisplay: displayDate,
+      requestedDelivery: "",
+      documents: [],
+      notes: [creationNote],
+    };
+
+    try {
+      savePO(po);
+    } catch {
+      /* never block order creation on a PO-save failure */
+    }
+  }
 }
 
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
@@ -161,7 +299,17 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
 
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
     const id = nextOrderId();
-    setOrders((prev) => [{ ...order, id } as MyOrder, ...prev]);
+    const cartItems = order.cartItems?.map((item, index) => ({
+      ...item,
+      subOrderId: item.subOrderId
+        || `${getPrefix("salesOrder") || "SO-"}${id}-${String(index + 1).padStart(3, "0")}`,
+    }));
+    const normalizedOrder = { ...order, id, cartItems } as MyOrder;
+    setOrders((prev) => [normalizedOrder, ...prev]);
+    // Auto-create Draft POs grouped by vendor immediately after the order is saved.
+    if (cartItems?.length) {
+      autoCreateDraftPOs(id, cartItems, order.orderDate, order.paymentTerms || "", order.deliveryAddress || "");
+    }
     return id;
   };
 
@@ -174,22 +322,38 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // guarding here (the single source of truth) protects every entry point
   // (order detail page, list bulk update) without relying on each caller
   // to re-check.
-  const updateOrderStatus = (orderId: string, status: MyOrderStatus) => {
+  const updateOrderStatus = (orderId: string, status: MyOrderStatus, cancelReason?: string) => {
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
+      // Release reserved stock when an order is cancelled before a PO is raised.
+      // If a PO was already raised for some qty, that qty's reservedStock was
+      // already cleared at PO-creation time, so the Math.max(0, ...) floor in
+      // releaseVendorReservation makes this safe to call unconditionally.
+      if (status === "Cancelled") {
+        for (const item of (target.cartItems || [])) {
+          if (!item.productCode) continue;
+          for (const alloc of (item.vendorAllocations || [])) {
+            if (alloc.vendorId && alloc.allocated > 0) {
+              releaseVendorReservation(alloc.vendorId, item.productCode, alloc.allocated);
+            }
+          }
+        }
+      }
       cascadeStatusToSubOrders(target, status);
-      return prev.map((o) => (o.id === orderId ? { ...o, status } : o));
+      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      return prev.map((o) => (o.id === orderId ? { ...o, status, ...extra } : o));
     });
   };
 
-  const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus) => {
+  const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus, cancelReason?: string) => {
     const idSet = new Set(orderIds);
     setOrders((prev) => {
       prev.forEach((o) => {
         if (idSet.has(o.id) && o.status !== "Cancelled") cascadeStatusToSubOrders(o, status);
       });
-      return prev.map((o) => (idSet.has(o.id) && o.status !== "Cancelled" ? { ...o, status } : o));
+      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      return prev.map((o) => (idSet.has(o.id) && o.status !== "Cancelled" ? { ...o, status, ...extra } : o));
     });
   };
 

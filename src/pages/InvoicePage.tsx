@@ -1,193 +1,534 @@
-import { useState, useMemo } from "react";
-import { useConfig } from "@/contexts/ConfigContext";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { Plus, Search, Download, MoreVertical, Eye, Trash2, Edit2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useConfig } from '@/contexts/ConfigContext';
+import { useI18n } from '@/i18n/I18nProvider';
+import { formatCurrency } from '@/lib/formatters';
+import {
+  archiveInvoice,
+  getArchivedInvoices,
+  getInvoices,
+  type InvoiceStatus,
+  type StoredInvoice,
+} from '@/lib/invoiceStore';
+import { downloadInvoicePdf } from '@/lib/invoicePdf';
 
-const MOCK_INVOICES = [
-  {
-    id: "inv_001",
-    invoice_number: "INV-001",
-    client_name: "Tech Solutions Inc",
-    amount: 15000,
-    status: "paid",
-    invoice_date: "2024-01-10",
-    due_date: "2024-02-10",
-  },
-  {
-    id: "inv_002",
-    invoice_number: "INV-002",
-    client_name: "Marketing Pro Agency",
-    amount: 8500,
-    status: "pending",
-    invoice_date: "2024-01-15",
-    due_date: "2024-02-15",
-  },
-  {
-    id: "inv_003",
-    invoice_number: "INV-003",
-    client_name: "Finance Corp",
-    amount: 22000,
-    status: "overdue",
-    invoice_date: "2023-12-20",
-    due_date: "2024-01-20",
-  },
-];
+const statusStyles: Record<InvoiceStatus, string> = {
+  Draft: 'bg-gray-100 text-gray-600',
+  Sent: 'bg-blue-100 text-blue-700',
+  Pending: 'bg-yellow-100 text-yellow-700',
+  Paid: 'bg-green-100 text-green-700',
+  Overdue: 'bg-red-100 text-red-700',
+  Cancelled: 'bg-gray-100 text-gray-500',
+};
 
-export default function InvoicePage() {
-  const navigate = useNavigate();
-  const { config } = useConfig();
-  const invPrefix = config.prefixes.find(p => p.key === "invoice")?.value || "INV-";
-  const [invoices, setInvoices] = useState(MOCK_INVOICES);
-  const displayedInvoices = useMemo(
-    () => invoices.map(i => ({ ...i, invoice_number: i.invoice_number.replace(/^INV-/, invPrefix) })),
-    [invoices, invPrefix]
-  );
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+function fmt(value: number) {
+  return formatCurrency(value);
+}
 
-  const filteredInvoices = displayedInvoices.filter((inv) => {
-    const matchSearch =
-      inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
-      inv.client_name.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || inv.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+function displayNumber(invoiceNumber: string, prefix: string) {
+  return invoiceNumber.replace(/^INV-/, prefix);
+}
 
-  const stats = {
-    total: invoices.length,
-    paid: invoices.filter((i) => i.status === "paid").length,
-    pending: invoices.filter((i) => i.status === "pending").length,
-    overdue: invoices.filter((i) => i.status === "overdue").length,
-  };
+function fmtDate(iso?: string) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure?")) {
-      setInvoices(invoices.filter((i) => i.id !== id));
-      toast.success("Invoice deleted");
-    }
-  };
+interface RowMenuState { top: number; right: number; invoice: StoredInvoice }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "paid":
-        return "bg-green-100 text-green-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "overdue":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
+/* ─────────────────────────────────────────────────────────────────
+   Archive Confirmation Dialog
+───────────────────────────────────────────────────────────────── */
+function ArchiveConfirmDialog({
+  invoice,
+  prefix,
+  onConfirm,
+  onCancel,
+}: {
+  invoice: StoredInvoice;
+  prefix: string;
+  onConfirm: (reason: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+
+  const canSubmit = reason.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-2 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-500">Finance / Invoices</p>
-            <h1 className="text-2xl font-bold">Invoices</h1>
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 pt-6 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-50 rounded-xl mt-0.5 shrink-0">
+              <AlertTriangle size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">Archive Invoice</h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                <span className="font-semibold text-gray-700">{displayNumber(invoice.invoiceNumber, prefix)}</span>
+                {' '}— {invoice.clientName}
+              </p>
+            </div>
           </div>
+          <button onClick={onCancel} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors -mr-1 -mt-1">
+            <X size={18} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 pb-2 space-y-4">
+          <p className="text-sm text-gray-600">
+            Archived invoices are <strong>read-only</strong> and will no longer appear in the active list.
+            This action cannot be undone.
+          </p>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Reason for archiving <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              ref={textareaRef}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Invoice cancelled by client, duplicate entry, project ended…"
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+            />
+            {!canSubmit && reason.length > 0 && (
+              <p className="text-xs text-red-500 mt-1">Please enter a reason before archiving.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button
-            onClick={() => navigate("/invoices/new")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Plus size={18} />
-            New Invoice
+            Cancel
+          </button>
+          <button
+            onClick={() => canSubmit && onConfirm(reason)}
+            disabled={!canSubmit}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 ${
+              canSubmit
+                ? 'bg-amber-600 text-white hover:bg-amber-700'
+                : 'bg-amber-100 text-amber-400 cursor-not-allowed'
+            }`}
+          >
+            <Archive size={15} /> Archive Invoice
           </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="w-full px-2 md:px-6 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mb-8">
-          {[
-            { label: "Total", value: stats.total, color: "blue" },
-            { label: "Paid", value: stats.paid, color: "green" },
-            { label: "Pending", value: stats.pending, color: "yellow" },
-            { label: "Overdue", value: stats.overdue, color: "red" },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="p-4 bg-white rounded-lg border border-gray-200"
-            >
-              <p className="text-sm text-gray-600">{stat.label}</p>
-              <p className={`text-2xl font-bold mt-2 text-${stat.color}-600`}>
-                {stat.value}
+/* ─────────────────────────────────────────────────────────────────
+   Archived Invoices Modal  (view-only)
+───────────────────────────────────────────────────────────────── */
+function ArchivedModal({
+  prefix,
+  onClose,
+}: {
+  prefix: string;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const [archived, setArchived] = useState<StoredInvoice[]>([]);
+
+  useEffect(() => {
+    const refresh = () => setArchived(getArchivedInvoices());
+    refresh();
+    window.addEventListener('nidoInvoicesUpdated', refresh);
+    return () => window.removeEventListener('nidoInvoicesUpdated', refresh);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-50 rounded-lg">
+              <Archive size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Archived Invoices</h2>
+              <p className="text-xs text-gray-500">
+                {archived.length} invoice{archived.length !== 1 ? 's' : ''} archived · read-only
               </p>
             </div>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="mb-6 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search invoices..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-            />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
-          >
-            <option value="all">All</option>
-            <option value="paid">Paid</option>
-            <option value="pending">Pending</option>
-            <option value="overdue">Overdue</option>
-          </select>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <X size={20} className="text-gray-500" />
+          </button>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-lg border">
-          <table className="w-full table-auto">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Invoice #</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Client</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Amount</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Date</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Due</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Status</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-center text-xs font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="border-b hover:bg-gray-50">
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-blue-600">
-                    {inv.invoice_number}
-                  </td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{inv.client_name}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">${inv.amount.toLocaleString()}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{inv.invoice_date}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{inv.due_date}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">
-                    <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(inv.status)}`}>
-                      {inv.status}
-                    </span>
-                  </td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-center">
-                    <button
-                      onClick={() => handleDelete(inv.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          {archived.length === 0 ? (
+            <div className="py-20 text-center">
+              <Archive size={40} className="text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-400 font-medium">No archived invoices</p>
+              <p className="text-sm text-gray-400 mt-1">Invoices you archive will appear here</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {['DATE', 'INVOICE #', 'CUSTOMER', 'STATUS', 'TOTAL', 'ARCHIVED ON', 'REASON', 'ACTIONS'].map((h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {archived.map((inv) => (
+                    <tr key={inv.id} className="border-b border-gray-100 hover:bg-amber-50/30">
+                      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{inv.invoiceDate}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className="font-semibold text-gray-700">
+                          {displayNumber(inv.invoiceNumber, prefix)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700 max-w-[160px] truncate">{inv.clientName}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusStyles[inv.status]}`}>
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-800 whitespace-nowrap">{fmt(inv.grandTotal)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{fmtDate(inv.archivedAt)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-[200px]">
+                        <span
+                          className="block truncate"
+                          title={inv.archiveReason || '—'}
+                        >
+                          {inv.archiveReason || <span className="text-gray-300 italic">—</span>}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            title="View details"
+                            onClick={() => { onClose(); navigate(`/sales/invoices/${inv.id}`); }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          <button
+                            title="Download PDF"
+                            onClick={() => downloadInvoicePdf(inv)}
+                            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            <FileText size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-gray-100 bg-amber-50/40 rounded-b-2xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-xs text-amber-700">
+            <Archive size={13} />
+            Archived invoices are permanently read-only and cannot be restored, edited, or deleted.
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Main Page
+───────────────────────────────────────────────────────────────── */
+export default function InvoicePage() {
+  useI18n();
+  const navigate = useNavigate();
+  const { config } = useConfig();
+  const prefix = config.prefixes.find((item) => item.key === 'invoice')?.value || 'INV-';
+  const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<StoredInvoice | null>(null);
+  const rowMenuRef = useRef<HTMLDivElement>(null);
+
+  const refresh = () => setInvoices(getInvoices());
+
+  useEffect(() => {
+    refresh();
+    window.addEventListener('nidoInvoicesUpdated', refresh);
+    return () => window.removeEventListener('nidoInvoicesUpdated', refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!rowMenu) return;
+    const close = (e: MouseEvent) => {
+      // Don't close if the click is inside the menu panel itself
+      if (rowMenuRef.current?.contains(e.target as Node)) return;
+      setRowMenu(null);
+    };
+    window.addEventListener('mousedown', close, true);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('mousedown', close, true);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [rowMenu]);
+
+  const filteredInvoices = useMemo(() => invoices.filter((invoice) => {
+    const query = search.toLowerCase();
+    const matchesSearch =
+      displayNumber(invoice.invoiceNumber, prefix).toLowerCase().includes(query) ||
+      invoice.clientName.toLowerCase().includes(query);
+    return matchesSearch && (statusFilter === 'all' || invoice.status === statusFilter);
+  }), [invoices, prefix, search, statusFilter]);
+
+  const exportCsv = () => {
+    const rows = [
+      ['Date', 'Invoice #', 'Customer', 'Status', 'Due Date', 'Total'],
+      ...filteredInvoices.map((invoice) => [
+        invoice.invoiceDate,
+        displayNumber(invoice.invoiceNumber, prefix),
+        invoice.clientName,
+        invoice.status,
+        invoice.dueDate,
+        invoice.grandTotal.toFixed(2),
+      ]),
+    ];
+    const csv = rows.map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    link.download = 'invoices.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const confirmArchive = (reason: string) => {
+    if (!archiveTarget) return;
+    archiveInvoice(archiveTarget.id, reason);
+    setArchiveTarget(null);
+    setRowMenu(null);
+  };
+
+  const openRowMenu = (e: React.MouseEvent<HTMLButtonElement>, invoice: StoredInvoice) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setRowMenu({ top: rect.bottom + 4, right: window.innerWidth - rect.right, invoice });
+  };
+
+  return (
+    <div className="space-y-6" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-gray-500 mb-1">Create and manage client invoices</p>
+          <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
+        </div>
+        <div className="relative" onClick={(event) => event.stopPropagation()}>
+          <button onClick={() => setHeaderMenuOpen((v) => !v)} className="p-2 hover:bg-gray-100 rounded-lg">
+            <MoreVertical size={20} className="text-gray-600" />
+          </button>
+          {headerMenuOpen && (
+            <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50">
+              <button
+                onClick={() => { navigate('/sales/invoices/new'); setHeaderMenuOpen(false); }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Plus size={16} /> New Invoice
+              </button>
+              <button
+                onClick={() => { exportCsv(); setHeaderMenuOpen(false); }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <FileDown size={16} /> Export CSV
+              </button>
+              <div className="my-1 border-t border-gray-100" />
+              <button
+                onClick={() => { setShowArchived(true); setHeaderMenuOpen(false); }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Archive size={16} className="text-amber-600" /> Archived Invoices
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search invoices..."
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        />
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as 'all' | InvoiceStatus)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        >
+          <option value="all">All statuses</option>
+          <option value="Draft">Draft</option>
+          <option value="Sent">Sent</option>
+          <option value="Pending">Pending</option>
+          <option value="Paid">Paid</option>
+          <option value="Overdue">Overdue</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {filteredInvoices.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-gray-400 mb-4">No invoices found</p>
+            <button
+              onClick={() => navigate('/sales/invoices/new')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm"
+            >
+              <Plus size={16} /> Create Invoice
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {['DATE', 'INVOICE #', 'CUSTOMER', 'STATUS', 'DUE DATE', 'TOTAL', 'ACTIONS'].map((heading) => (
+                    <th
+                      key={heading}
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap"
+                    >
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInvoices.map((invoice) => (
+                  <tr key={invoice.id} className="border-b border-gray-200 hover:bg-gray-50/50">
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{invoice.invoiceDate}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <button
+                        onClick={() => navigate(`/sales/invoices/${invoice.id}`)}
+                        className="text-blue-600 hover:underline font-semibold"
+                      >
+                        {displayNumber(invoice.invoiceNumber, prefix)}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{invoice.clientName}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusStyles[invoice.status]}`}>
+                        {invoice.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{invoice.dueDate}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{fmt(invoice.grandTotal)}</td>
+                    <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={(e) => openRowMenu(e, invoice)} className="p-1.5 hover:bg-gray-100 rounded">
+                        <MoreVertical size={16} className="text-gray-600" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Fixed-position row action menu */}
+      {rowMenu && (
+        <div
+          ref={rowMenuRef}
+          className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-xl py-2 z-[9999]"
+          style={{ top: rowMenu.top, right: rowMenu.right }}
+        >
+          <button
+            onClick={() => { navigate(`/sales/invoices/${rowMenu.invoice.id}`); setRowMenu(null); }}
+            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <Eye size={15} /> View Details
+          </button>
+          <button
+            onClick={() => { navigate(`/sales/invoices/${rowMenu.invoice.id}/edit`); setRowMenu(null); }}
+            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <Edit size={15} /> Edit
+          </button>
+          <button
+            onClick={() => { downloadInvoicePdf(rowMenu.invoice); setRowMenu(null); }}
+            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+          >
+            <FileText size={15} /> Download PDF
+          </button>
+          <div className="my-1 border-t border-gray-100" />
+          <button
+            onClick={() => { setArchiveTarget(rowMenu.invoice); setRowMenu(null); }}
+            className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2"
+          >
+            <Archive size={15} /> Archive
+          </button>
+        </div>
+      )}
+
+      {/* Archive confirmation dialog */}
+      {archiveTarget && (
+        <ArchiveConfirmDialog
+          invoice={archiveTarget}
+          prefix={prefix}
+          onConfirm={confirmArchive}
+          onCancel={() => setArchiveTarget(null)}
+        />
+      )}
+
+      {/* Archived Invoices Modal */}
+      {showArchived && (
+        <ArchivedModal
+          prefix={prefix}
+          onClose={() => setShowArchived(false)}
+        />
+      )}
     </div>
   );
 }

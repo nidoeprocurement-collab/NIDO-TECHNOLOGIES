@@ -2,12 +2,13 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
-import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
 import { getProcurementSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
-type OrderStatus = "Draft" | "Processing" | "Confirmed" | "Shipped" | "Delivered" | "Closed" | "Cancelled";
+type OrderStatus = string;
 
 interface Order {
   id: string;
@@ -51,11 +52,11 @@ const INITIAL_ORDERS: Order[] = [
   { id: "PO-10009", orderId: "ORD-8796", vendor: "Office Supplies Co.", date: "2026-03-28", dateStr: "Mar 28, 2026", status: "Processing", amount: 720.0, amountStr: "$720.00", delivery: "Apr 5, 2026", by: "Pavan (System Owner)" },
 ];
 
-const TABS: (OrderStatus | "All")[] = ["All", "Draft", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
+const LEGACY_PO_STATUSES: OrderStatus[] = ["Draft", "Processing", "Confirmed", "Shipped", "Delivered", "Closed", "Cancelled"];
 const VENDORS = ["All Vendors", "TechHub Solutions", "Office Supplies Co.", "Global Industrial", "Furniture Mart", "Printer World"];
 const PER_PAGE = 10;
 
-const badgeStyles: Record<OrderStatus, { bg: string; color: string; border: string }> = {
+const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
   Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
   Confirmed:  { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
   Shipped:    { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
@@ -66,7 +67,7 @@ const badgeStyles: Record<OrderStatus, { bg: string; color: string; border: stri
 };
 
 function Badge({ status }: { status: OrderStatus }) {
-  const s = badgeStyles[status];
+  const s = badgeStyles[status] || { bg: "#f3f4f6", color: "#4b5563", border: "#d1d5db" };
   return (
     <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
       {status}
@@ -236,11 +237,99 @@ function storedPOToOrder(po: StoredPO): Order {
   };
 }
 
+// ─── Bulk Notes Modal ─────────────────────────────────────────────────────────
+function BulkNotesModal({ selectedCount, onApply, onClose }: {
+  selectedCount: number;
+  onApply: (note: string, visibility: string) => void;
+  onClose: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [visibility, setVisibility] = useState("Internal Note");
+  const visibilityOptions = [
+    { label: "Internal Note", icon: "🔒", sub: "Only visible to internal users" },
+    { label: "External Note", icon: "🌐", sub: "Visible to the client on the portal" },
+  ];
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
+        width: 560, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
+        border: "1px solid hsl(var(--border))",
+      }}>
+        <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Notes</h2>
+        <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
+          Add a note to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
+        </p>
+
+        {/* Note composer */}
+        <div style={{ border: "1px solid hsl(var(--border))", borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 210px" }}>
+            {/* Left: textarea */}
+            <div style={{ padding: "14px 16px", borderRight: "1px solid hsl(var(--border))" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "hsl(var(--foreground))" }}>Add Note</div>
+              <textarea
+                value={note}
+                onChange={e => { if (e.target.value.length <= 500) setNote(e.target.value); }}
+                placeholder="Write your note here..."
+                rows={4}
+                style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "hsl(var(--foreground))", boxSizing: "border-box", background: "transparent", lineHeight: 1.5 }}
+              />
+              <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 4 }}>{note.length} / 500</div>
+            </div>
+
+            {/* Right: visibility */}
+            <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column" }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: "hsl(var(--foreground))", marginBottom: 12 }}>Visibility</div>
+              {visibilityOptions.map(({ label, icon, sub }) => (
+                <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                  <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "hsl(var(--border))"}`, background: visibility === label ? "#2563eb" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                    {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "hsl(var(--foreground))", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                    <div style={{ fontSize: 11.5, color: "hsl(var(--muted-foreground))", marginTop: 1 }}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
+            background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+          }}>Cancel</button>
+          <button
+            onClick={() => { if (note.trim()) { onApply(note.trim(), visibility); onClose(); } }}
+            disabled={!note.trim()}
+            style={{
+              flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
+              background: note.trim() ? "#2563eb" : "#93c5fd", color: "#fff",
+              cursor: note.trim() ? "pointer" : "not-allowed",
+              fontWeight: 600, fontSize: 14, fontFamily: "inherit",
+            }}>Save Note</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function VendorOrderList() {
   const navigate = useNavigate();
   const { config } = useConfig();
+  const orderStatusConfig = useOrderStatusConfig();
   const poPrefix = config.prefixes.find(p => p.key === "purchaseOrder")?.value || "PO-";
+  const poStatusOptions = Array.from(new Set([
+    ...orderStatusConfig.statuses
+      .filter(status => status.category === "Purchase Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    ...LEGACY_PO_STATUSES,
+  ]));
+  const poTabs: (OrderStatus | "All")[] = ["All", ...poStatusOptions];
 
   // Build orders list: real POs from store (prepended) + static demo orders
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -273,6 +362,7 @@ export default function VendorOrderList() {
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | "">("");
   const [bulkNote, setBulkNote] = useState("");
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
+  const [bulkCancelReason, setBulkCancelReason] = useState("");
   const toast = useToast();
 
   // Close dropdowns on outside click
@@ -341,24 +431,59 @@ export default function VendorOrderList() {
     performBulkStatusUpdate(bulkStatus as OrderStatus);
   };
 
-  const performBulkStatusUpdate = (status: OrderStatus) => {
+  const performBulkStatusUpdate = (status: OrderStatus, cancelReason?: string) => {
     // Orders already Cancelled are a terminal state and are skipped — they
     // can no longer be edited or processed further.
     const eligible = [...selected].filter(id => orders.find(o => o.id === id)?.status !== "Cancelled");
-    setOrders(prev => prev.map(r => eligible.includes(r.id) ? { ...r, status } : r));
+    setOrders(prev => prev.map(r => {
+      if (!eligible.includes(r.id)) return r;
+      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      return { ...r, status, ...extra };
+    }));
+    // Persist cancellations to the store so purchaseOrderStore dispatches the
+    // poCancelled event and OrderDetailsPage resets its vendor-selection state.
+    if (status === "Cancelled") {
+      for (const id of eligible) {
+        const changes: any = { status: "Cancelled" };
+        if (cancelReason) changes.cancelReason = cancelReason;
+        updatePO(id, changes);
+      }
+    }
     const skipped = selected.size - eligible.length;
     toast.show(
       skipped > 0
         ? `Status updated to "${status}" for ${eligible.length} order(s). ${skipped} already-cancelled order(s) were skipped.`
         : `Status updated to "${status}" for ${eligible.length} order(s)`
     );
-    setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false);
+    setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false); setBulkCancelReason("");
   };
 
-  const applyBulkNotes = () => {
-    if (!bulkNote.trim()) { toast.show("Please enter a note"); return; }
+  const applyBulkNotes = (note: string, visibility: string) => {
     if (selected.size === 0) { toast.show("Select at least one order first"); return; }
-    toast.show(`Notes added to ${selected.size} order(s)`);
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const newNote = {
+      id: "n" + Date.now(),
+      author: "System Owner",
+      initials: "SO",
+      color: "#2563eb",
+      date: dateStr,
+      text: note,
+      visibility,
+    };
+    let persisted = 0;
+    [...selected].forEach(poNumber => {
+      const po = getPOByNumber(poNumber);
+      if (po) {
+        updatePO(poNumber, { notes: [newNote, ...(po.notes || [])] });
+        persisted++;
+      }
+    });
+    toast.show(persisted > 0
+      ? `Note added to ${persisted} order(s)`
+      : `Note saved (orders will show it when reopened)`
+    );
     setNotesModal(false); setBulkNote("");
   };
 
@@ -452,23 +577,39 @@ export default function VendorOrderList() {
       <Modal open={statusModal} title="Bulk update status" onClose={() => setStatusModal(false)} onApply={applyBulkStatus}>
         <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as OrderStatus)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", background: card, color: fg }}>
           <option value="">Select a status...</option>
-          {(["Draft","Processing","Confirmed","Shipped","Delivered","Closed","Cancelled"] as OrderStatus[]).map(st => <option key={st}>{st}</option>)}
+          {poStatusOptions.map(st => <option key={st}>{st}</option>)}
         </select>
       </Modal>
-      <Modal open={notesModal} title="Bulk update notes" onClose={() => setNotesModal(false)} onApply={applyBulkNotes}>
-        <textarea value={bulkNote} onChange={e => setBulkNote(e.target.value)} placeholder="Enter notes for selected orders..." style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", resize: "vertical", minHeight: 80, background: card, color: fg }} />
-      </Modal>
+      {notesModal && (
+        <BulkNotesModal
+          selectedCount={selected.size}
+          onApply={(note, visibility) => applyBulkNotes(note, visibility)}
+          onClose={() => { setNotesModal(false); setBulkNote(""); }}
+        />
+      )}
 
       {confirmBulkCancel && (
-        <div onClick={e => { if (e.target === e.currentTarget) setConfirmBulkCancel(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: card, borderRadius: 14, padding: 24, width: 380, boxShadow: "0 16px 48px rgba(0,0,0,.2)", border: `1px solid ${bdr}` }}>
+        <div onClick={e => { if (e.target === e.currentTarget) { setConfirmBulkCancel(false); setBulkCancelReason(""); } }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: card, borderRadius: 14, padding: 24, width: 420, boxShadow: "0 16px 48px rgba(0,0,0,.2)", border: `1px solid ${bdr}` }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 10, color: "#dc2626" }}>Cancel {selected.size} order{selected.size !== 1 ? "s" : ""}?</h3>
-            <p style={{ fontSize: 13, color: fg, marginBottom: 18, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: fg, marginBottom: 12, lineHeight: 1.5 }}>
               This action cannot be undone. Once cancelled, these orders can no longer be edited, have their status changed, or be processed further.
             </p>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: fg, marginBottom: 5 }}>
+              Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
+            </label>
+            <textarea
+              value={bulkCancelReason}
+              onChange={e => setBulkCancelReason(e.target.value)}
+              rows={3}
+              placeholder="Enter reason for cancellation..."
+              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${bulkCancelReason.trim() ? bdr : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none", marginBottom: 4, background: card, color: fg }}
+            />
+            {!bulkCancelReason.trim() && <div style={{ fontSize: 11.5, color: "#dc2626", marginBottom: 14 }}>Reason is required before confirming cancellation.</div>}
+            {bulkCancelReason.trim() && <div style={{ marginBottom: 14 }} />}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmBulkCancel(false)} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${bdr}`, background: card, color: fg }}>Keep Orders</button>
-              <button onClick={() => performBulkStatusUpdate("Cancelled")} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: "1px solid #dc2626", background: "#dc2626", color: "#fff" }}>Yes, Cancel</button>
+              <button onClick={() => { setConfirmBulkCancel(false); setBulkCancelReason(""); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: "pointer", border: `1px solid ${bdr}`, background: card, color: fg }}>Keep Orders</button>
+              <button onClick={() => { if (!bulkCancelReason.trim()) return; performBulkStatusUpdate("Cancelled", bulkCancelReason.trim()); }} style={{ padding: "8px 18px", borderRadius: 8, fontSize: 13, cursor: bulkCancelReason.trim() ? "pointer" : "not-allowed", border: "1px solid #dc2626", background: bulkCancelReason.trim() ? "#dc2626" : "#fca5a5", color: "#fff", transition: "background 0.15s" }}>Yes, Cancel</button>
             </div>
           </div>
         </div>
@@ -492,7 +633,7 @@ export default function VendorOrderList() {
             Status ▾
           </button>
           <Dropdown id="status">
-            {(["All", ...Object.keys(badgeStyles)] as (OrderStatus | "All")[]).map(st => (
+            {(["All", ...poStatusOptions] as (OrderStatus | "All")[]).map(st => (
               <button key={st} style={s.ddItem} onClick={() => { setStatusFilter(st); setCurrentPage(1); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
             ))}
           </Dropdown>
@@ -526,7 +667,7 @@ export default function VendorOrderList() {
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: `1.5px solid ${bdr}`, gap: 0, overflowX: "auto" }}>
-        {TABS.map(t => (
+        {poTabs.map(t => (
           <div key={t} onClick={() => { setActiveTab(t); setCurrentPage(1); }}
             style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : muted, cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
             {t === "All" ? "All Orders" : t} ({tabCount(t)})

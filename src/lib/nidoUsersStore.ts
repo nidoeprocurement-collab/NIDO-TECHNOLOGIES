@@ -18,6 +18,11 @@ export interface NidoRole {
 export interface LoginHistoryEntry {
   timestamp: string;
   result: "success" | "invalid_password" | "inactive" | "suspended" | "locked";
+  ip?: string;
+  device?: string;
+  latitude?: number;
+  longitude?: number;
+  locationAccuracy?: number;
 }
 
 export interface NidoUser {
@@ -48,11 +53,21 @@ export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 
 const ROLES_KEY = "nido_config_roles";
 const USERS_KEY = "nido_config_users";
+export const SYSTEM_OWNER_ID = "user-1";
+export const SYSTEM_OWNER_ROLE = "System Owner";
 
 // ── DOM events fired on every mutation ────────────────────────────────────────
 
 export const NIDO_ROLES_EVENT = "nidoConfigRolesUpdated";
 export const NIDO_USERS_EVENT = "nidoConfigUsersUpdated";
+
+export interface LoginContext {
+  ip?: string;
+  device?: string;
+  latitude?: number;
+  longitude?: number;
+  locationAccuracy?: number;
+}
 
 // ── Seed data ─────────────────────────────────────────────────────────────────
 
@@ -71,9 +86,9 @@ const DEFAULT_ROLES: NidoRole[] = [
 
 const DEFAULT_USERS: NidoUser[] = [
   {
-    id: "user-1", employeeId: "EMP-001",
+    id: SYSTEM_OWNER_ID, employeeId: "EMP-001",
     name: "System Owner", email: "owner@nidotech.com", password: "Owner@123",
-    phone: "+91-44-1234-5678", role: "System Owner",
+    phone: "+91-44-1234-5678", role: SYSTEM_OWNER_ROLE,
     jobTitle: "CEO", designation: "Chief Executive Officer", department: "Management",
     status: "Active", createdAt: NOW, updatedAt: NOW,
   },
@@ -106,6 +121,28 @@ const DEFAULT_USERS: NidoUser[] = [
     status: "Active", createdAt: NOW, updatedAt: NOW,
   },
 ];
+
+export function isSystemOwner(user: Pick<NidoUser, "id" | "role"> | null | undefined): boolean {
+  return user?.id === SYSTEM_OWNER_ID || user?.role === SYSTEM_OWNER_ROLE;
+}
+
+/**
+ * Keep the protected owner account in the users collection even if an older
+ * UI or a stale browser tab tries to save a list without it. Authentication
+ * metadata may still change, but identity, access, status, and credentials do
+ * not.
+ */
+function preserveSystemOwner(users: NidoUser[]): NidoUser[] {
+  const incomingOwner = users.find(isSystemOwner);
+  const owner = {
+    ...DEFAULT_USERS[0],
+    lastLogin: incomingOwner?.lastLogin,
+    failedLoginAttempts: incomingOwner?.failedLoginAttempts ?? 0,
+    loginHistory: incomingOwner?.loginHistory ?? [],
+    updatedAt: incomingOwner?.updatedAt ?? DEFAULT_USERS[0].updatedAt,
+  };
+  return [owner, ...users.filter(user => !isSystemOwner(user))];
+}
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 
@@ -168,6 +205,7 @@ export function updateRole(id: string, updates: Partial<NidoRole>): void {
   const roles = getRoles();
   const idx = roles.findIndex((r) => r.id === id);
   if (idx === -1) return;
+  if (roles[idx].id === "role-system-owner" || roles[idx].name === SYSTEM_OWNER_ROLE) return;
   const oldName = roles[idx].name;
   roles[idx] = { ...roles[idx], ...updates };
   saveRoles(roles);
@@ -179,7 +217,10 @@ export function updateRole(id: string, updates: Partial<NidoRole>): void {
 }
 
 export function deleteRole(id: string): void {
-  saveRoles(getRoles().filter((r) => r.id !== id));
+  const roles = getRoles();
+  const target = roles.find(role => role.id === id);
+  if (target?.id === "role-system-owner" || target?.name === SYSTEM_OWNER_ROLE) return;
+  saveRoles(roles.filter((r) => r.id !== id));
 }
 
 export function getRoleUserCount(roleName: string): number {
@@ -196,18 +237,21 @@ export function getUsers(): NidoUser[] {
       return DEFAULT_USERS;
     }
     const parsed: any[] = JSON.parse(raw);
-    return parsed.map(migrateUser);
+    return preserveSystemOwner(parsed.map(migrateUser));
   } catch {
     return DEFAULT_USERS;
   }
 }
 
 export function saveUsers(users: NidoUser[]): void {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  localStorage.setItem(USERS_KEY, JSON.stringify(preserveSystemOwner(users)));
   window.dispatchEvent(new Event(NIDO_USERS_EVENT));
 }
 
 export function addUser(user: Omit<NidoUser, "id">): NidoUser {
+  if (user.role === SYSTEM_OWNER_ROLE) {
+    throw new Error("The System Owner role is reserved and cannot be assigned to another user.");
+  }
   const users = getUsers();
   const newUser: NidoUser = {
     ...user,
@@ -223,6 +267,26 @@ export function updateUser(id: string, updates: Partial<NidoUser>): void {
   const users = getUsers();
   const idx = users.findIndex((u) => u.id === id);
   if (idx === -1) return;
+  if (isSystemOwner(users[idx])) {
+    // Login metadata is updated by authentication, but the owner cannot be
+    // edited through user management or disabled by another action.
+    const metadata = (({
+      lastLogin,
+      failedLoginAttempts,
+      loginHistory,
+    }) => ({ lastLogin, failedLoginAttempts, loginHistory }))(updates);
+    users[idx] = {
+      ...users[idx],
+      ...metadata,
+      status: "Active",
+      locked: false,
+      forcePasswordChange: false,
+      updatedAt: new Date().toISOString().split("T")[0],
+    };
+    saveUsers(users);
+    return;
+  }
+  if (updates.role === SYSTEM_OWNER_ROLE) return;
   users[idx] = {
     ...users[idx],
     ...updates,
@@ -232,7 +296,10 @@ export function updateUser(id: string, updates: Partial<NidoUser>): void {
 }
 
 export function deleteUser(id: string): void {
-  saveUsers(getUsers().filter((u) => u.id !== id));
+  const users = getUsers();
+  const target = users.find(user => user.id === id);
+  if (target && isSystemOwner(target)) return;
+  saveUsers(users.filter((u) => u.id !== id));
 }
 
 // ── Authentication ─────────────────────────────────────────────────────────────
@@ -245,7 +312,8 @@ export function deleteUser(id: string): void {
  */
 export function authenticateNidoUser(
   email: string,
-  password: string
+  password: string,
+  context: LoginContext = {}
 ): { user: NidoUser; error?: never } | { user?: never; error: "invalid_credentials" | "inactive" | "suspended" | "locked" } {
   const users = getUsers();
   const user = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
@@ -255,7 +323,11 @@ export function authenticateNidoUser(
   }
 
   const logAttempt = (result: LoginHistoryEntry["result"], extra?: Partial<NidoUser>) => {
-    const entry: LoginHistoryEntry = { timestamp: new Date().toISOString(), result };
+    const entry: LoginHistoryEntry = {
+      timestamp: new Date().toISOString(),
+      result,
+      ...context,
+    };
     const history = [...(user.loginHistory ?? []), entry].slice(-50); // keep last 50
     updateUser(user.id, { loginHistory: history, ...extra });
   };

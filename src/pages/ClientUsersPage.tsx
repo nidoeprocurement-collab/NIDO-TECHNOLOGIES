@@ -28,6 +28,9 @@ import {
 import { servicesData } from "./ClientServicesPage";
 import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { CircleCheck } from "./ClientRolesPage";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 
 
 export const usersData = [
@@ -84,9 +87,10 @@ export type AssignedDeviceEntry = {
   status: "Active" | "In Repair";
 };
 
-function AddUserModal({ onClose }: { onClose: () => void }) {
+function AddUserModal({ onClose, onCreate }: { onClose: () => void; onCreate: (user: UserRecord) => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
+  const [notification, setNotification] = useState("");
 
   const [form, setForm] = useState({
     employeeId: "",
@@ -164,12 +168,76 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
   const labelCls = "block text-xs text-blue-600 mb-1";
   const disabledCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
 
+  const handleCreate = () => {
+    const requiredFields: Array<[keyof typeof form, string]> = [
+      ["employeeId", "Employee ID"],
+      ["fullName", "Full Name"],
+      ["email", "Email ID"],
+      ["phone", "Phone Number"],
+      ["role", "Role"],
+      ["orgAccess", "Organization Access"],
+    ];
+    const missing = requiredFields
+      .filter(([key]) => !form[key].trim())
+      .map(([, label]) => label);
+
+    if (missing.length > 0) {
+      setNotification(`Please fill in the required fields: ${missing.join(", ")}.`);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setNotification("Please enter a valid email address.");
+      return;
+    }
+
+    const initials = form.fullName
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    const newUser: UserRecord = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `user-${Date.now()}`,
+      name: form.fullName.trim(),
+      role: form.role,
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      lastActive: new Date().toISOString(),
+      status: form.status,
+      initials,
+      color: "bg-blue-500",
+    };
+
+    onCreate(newUser);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-white" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-fullmx-4 flex flex-col max-h-[92vh]"
+        className="bg-white w-full h-full flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {notification && (
+          <div className="fixed top-5 right-5 z-[60] max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg" role="alert">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 font-bold">!</span>
+              <p className="flex-1 leading-5">{notification}</p>
+              <button
+                type="button"
+                onClick={() => setNotification("")}
+                className="text-red-400 hover:text-red-700"
+                aria-label="Dismiss notification"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        )}
         {/* Modal header */}
         <div className="px-6 pt-5 pb-0 border-b border-gray-100">
           <div className="flex items-start justify-between mb-4">
@@ -605,7 +673,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
             <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+            <button onClick={handleCreate} className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
               Create User
             </button>
           </div>
@@ -2455,7 +2523,10 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
   );
 }
 
-export default function ClientUsersPage() {
+export default function ClientUsersPage({ clientId, clientName }: { clientId?: string; clientName?: string } = {}) {
+  const { user: authenticatedUser, startImpersonation } = useAuth();
+  const { hasPermission } = usePermissions();
+  const [impersonationTarget, setImpersonationTarget] = useState<UserRecord | null>(null);
   const [users, setUsers] = useState<UserRecord[]>([...usersData]);
   const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -2470,6 +2541,32 @@ export default function ClientUsersPage() {
   const [archiveTarget, setArchiveTarget] = useState<UserRecord | null>(null);
   const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
   const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
+  const canImpersonate = Boolean(
+    clientId &&
+    authenticatedUser?.userType === "nido_admin" &&
+    hasPermission("client_user_impersonation", "manage"),
+  );
+  const getPortalTarget = (row: UserRecord) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(
+      (candidate) =>
+        candidate.email.toLowerCase() === row.email.toLowerCase() &&
+        candidate.status === "active" &&
+        row.status === "Active",
+    );
+    return portalUser ? {
+      id: portalUser.id,
+      email: portalUser.email,
+      name: portalUser.name,
+      role: portalUser.role,
+      userType: portalUser.userType,
+      clientId: portalUser.clientId,
+      clientName: portalUser.clientName || clientName,
+    } : null;
+  };
+
+  const createUser = (user: UserRecord) => {
+    setUsers((prev) => [user, ...prev]);
+  };
 
   const archiveUser = (id: string) => {
     const u = users.find((u) => u.id === id);
@@ -2538,7 +2635,12 @@ export default function ClientUsersPage() {
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
-      {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} />}
+      {showAddUser && (
+        <AddUserModal
+          onClose={() => setShowAddUser(false)}
+          onCreate={createUser}
+        />
+      )}
       {showImportUsers && <ImportUsersModal onClose={() => setShowImportUsers(false)} />}
       {resetPasswordUser && <ResetPasswordModal userName={resetPasswordUser.name} onClose={() => setResetPasswordUser(null)} />}
       {archiveTarget && (
@@ -2682,6 +2784,24 @@ export default function ClientUsersPage() {
                         {user.status === "Inactive" ? "Activate" : "Deactivate"}
                       </button>
                       <div className="my-1 border-t border-gray-100" />
+                      {canImpersonate && user.status === "Active" && (
+                        <button
+                          onClick={() => {
+                            const target = getPortalTarget(user);
+                            setRowMenu(null);
+                            if (target) {
+                              setImpersonationTarget(user);
+                            } else {
+                              window.alert(
+                                "This user does not have an active Client Portal account. Provision or create Client Portal access for this email before impersonating.",
+                              );
+                            }
+                          }}
+                          className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors text-blue-600"
+                        >
+                          Impersonate
+                        </button>
+                      )}
                       <button onClick={() => { setArchiveTarget(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-orange-500">Archive User</button>
                     </div>
                   )}
@@ -2691,6 +2811,33 @@ export default function ClientUsersPage() {
           </tbody>
         </table>
       </div>
+      {impersonationTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => setImpersonationTarget(null)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-gray-900">Impersonate Client User?</h2>
+            <p className="mt-3 text-sm text-gray-600">You are about to enter the NIDO Client Portal as:</p>
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-sm font-semibold text-gray-900">{impersonationTarget.name}</p>
+              <p className="text-xs text-gray-500">{impersonationTarget.email}</p>
+              <p className="text-xs text-gray-500">{clientName || "Client portal"}</p>
+            </div>
+            <p className="mt-3 text-xs text-amber-700">The session is view-only and expires automatically after one hour.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setImpersonationTarget(null)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600">Cancel</button>
+              <button
+                onClick={() => {
+                  const target = getPortalTarget(impersonationTarget);
+                  if (target && startImpersonation(target)) window.location.assign("/portal/dashboard");
+                  else setImpersonationTarget(null);
+                }}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
+              >
+                Start Impersonation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

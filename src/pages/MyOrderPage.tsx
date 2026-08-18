@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMyOrders, type MyOrder as Order, type MyOrderStatus as OrderStatus } from "@/contexts/MyOrdersContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
@@ -286,37 +287,71 @@ function BulkStatusModal({ selectedCount, onApply, onClose }: {
 // ─── Bulk Notes Modal ──────────────────────────────────────────────────────────
 function BulkNotesModal({ selectedCount, onApply, onClose }: {
   selectedCount: number;
-  onApply: (note: string) => void;
+  onApply: (note: string, visibility: string) => void;
   onClose: () => void;
 }) {
   const [note, setNote] = useState("");
+  const [visibility, setVisibility] = useState("Internal Note");
+  const visibilityOptions = [
+    { label: "Internal Note", icon: "🔒", sub: "Only visible to internal users" },
+    { label: "External Note", icon: "🌐", sub: "Visible to the client on the portal" },
+  ];
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={onClose} />
       <div style={{
         position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px",
-        width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
+        width: 560, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit",
         border: "1px solid hsl(var(--border))",
       }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "hsl(var(--foreground))" }}>Bulk Update Notes</h2>
         <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "hsl(var(--muted-foreground))" }}>
           Add a note to <strong style={{ color: "hsl(var(--foreground))" }}>{selectedCount} selected order{selectedCount !== 1 ? "s" : ""}</strong>.
         </p>
-        <label style={labelSt}>Note</label>
-        <textarea
-          value={note}
-          onChange={e => setNote(e.target.value)}
-          placeholder="Enter note to append to selected orders..."
-          rows={4}
-          style={{ ...inputSt, resize: "vertical", marginBottom: 24, lineHeight: 1.5 }}
-        />
+
+        {/* Note composer — same layout as OrderDetailsPage */}
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 210px" }}>
+            {/* Left: textarea */}
+            <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "hsl(var(--foreground))" }}>Add Note</div>
+              <textarea
+                value={note}
+                onChange={e => { if (e.target.value.length <= 500) setNote(e.target.value); }}
+                placeholder="Write your note here..."
+                rows={4}
+                style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent", lineHeight: 1.5 }}
+              />
+              <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>{note.length} / 500</div>
+            </div>
+
+            {/* Right: visibility */}
+            <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                {visibilityOptions.map(({ label, icon, sub }) => (
+                  <div key={label} onClick={() => setVisibility(label)} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                      {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                      <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{
             flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8,
             background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit",
           }}>Cancel</button>
           <button
-            onClick={() => { if (note.trim()) { onApply(note.trim()); onClose(); } }}
+            onClick={() => { if (note.trim()) { onApply(note.trim(), visibility); onClose(); } }}
             disabled={!note.trim()}
             style={{
               flex: 1, padding: "10px 0", border: "none", borderRadius: 8,
@@ -360,6 +395,8 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrdersStatus } = useMyOrders();
+  const { user, isImpersonating } = useAuth();
+  const isViewOnly = isImpersonating;
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
@@ -371,6 +408,7 @@ export default function MyOrderPage() {
   const [showBulkStatus, setShowBulkStatus] = useState(false);
   const [showBulkNotes, setShowBulkNotes] = useState(false);
   const [pendingBulkCancel, setPendingBulkCancel] = useState(false);
+  const [bulkCancelReason, setBulkCancelReason] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
 
@@ -447,6 +485,10 @@ export default function MyOrderPage() {
 
   // ── Bulk update status ──────────────────────────────────────────────────────
   const handleBulkStatusApply = (status: OrderStatus) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      return;
+    }
     if (status === "Cancelled") {
       // Cancelling is a terminal, hard-to-undo action — confirm first.
       setPendingBulkCancel(true);
@@ -455,7 +497,13 @@ export default function MyOrderPage() {
     applyBulkStatus(status);
   };
 
-  const applyBulkStatus = (status: OrderStatus) => {
+  const applyBulkStatus = (status: OrderStatus, cancelReason?: string) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      setPendingBulkCancel(false);
+      setShowBulkStatus(false);
+      return;
+    }
     // Cascades to sub-orders (and clears vendor selection) when moving to
     // Cancelled/Draft, and stays in sync with the order detail page since
     // both read/write the same shared order + sub-order state. Orders that
@@ -463,7 +511,7 @@ export default function MyOrderPage() {
     // context itself, so they can't be edited or processed further.
     const ids = [...selected];
     const skipped = ids.filter(id => orders.find(o => o.id === id)?.status === "Cancelled").length;
-    updateOrdersStatus(ids, status);
+    updateOrdersStatus(ids, status, cancelReason);
     const applied = ids.length - skipped;
     showToast(
       skipped > 0
@@ -471,11 +519,31 @@ export default function MyOrderPage() {
         : `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}"`
     );
     setPendingBulkCancel(false);
+    setBulkCancelReason("");
   };
 
-  // ── Bulk update notes (acknowledged via toast) ──────────────────────────────
-  const handleBulkNotesApply = (note: string) => {
-    showToast(`Note added to ${totalSelected} order${totalSelected !== 1 ? "s" : ""}: "${note.slice(0, 40)}${note.length > 40 ? "…" : ""}"`);
+  // ── Bulk update notes ───────────────────────────────────────────────────────
+  const handleBulkNotesApply = (note: string, visibility: string) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      setShowBulkNotes(false);
+      return;
+    }
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const author = user?.name || "System Owner";
+    const newNote = { id: "n" + Date.now(), author, date: dateStr, text: note, visibility };
+
+    // Append to each selected order's notes in localStorage (same key as OrderDetailsPage)
+    [...selected].forEach(orderId => {
+      const key = `nido_notes_${orderId}`;
+      let existing: typeof newNote[] = [];
+      try { existing = JSON.parse(localStorage.getItem(key) || "null") || []; } catch { existing = []; }
+      localStorage.setItem(key, JSON.stringify([newNote, ...existing]));
+    });
+
+    showToast(`Note added to ${totalSelected} order${totalSelected !== 1 ? "s" : ""}`);
   };
 
   const showToast = (msg: string) => {
@@ -511,9 +579,27 @@ export default function MyOrderPage() {
             {showActions && (
               <ActionDropdown
                 onExport={handleExport}
-                onCreateOrder={() => navigate("/shop")}
-                onBulkStatus={() => setShowBulkStatus(true)}
-                onBulkNotes={() => setShowBulkNotes(true)}
+                onCreateOrder={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  navigate("/shop");
+                }}
+                onBulkStatus={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  setShowBulkStatus(true);
+                }}
+                onBulkNotes={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  setShowBulkNotes(true);
+                }}
                 onClose={() => setShowActions(false)}
               />
             )}
@@ -726,19 +812,31 @@ export default function MyOrderPage() {
       {/* Bulk cancel confirmation */}
       {pendingBulkCancel && (
         <div style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={() => setPendingBulkCancel(false)} />
-          <div style={{ position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px", width: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit", border: "1px solid hsl(var(--border))" }}>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} onClick={() => { setPendingBulkCancel(false); setBulkCancelReason(""); }} />
+          <div style={{ position: "relative", background: "hsl(var(--card))", borderRadius: 14, padding: "28px 32px", width: 420, boxShadow: "0 8px 40px rgba(0,0,0,0.22)", fontFamily: "inherit", border: "1px solid hsl(var(--border))" }}>
             <h2 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 700, color: "#dc2626" }}>
               Cancel {totalSelected} order{totalSelected !== 1 ? "s" : ""}?
             </h2>
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 22 }}>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#991b1b", marginBottom: 16 }}>
               ⚠️ This action cannot be undone. Once cancelled, an order can no longer be edited, have its status changed, or be processed further.
             </div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "hsl(var(--foreground))", marginBottom: 5 }}>
+              Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
+            </label>
+            <textarea
+              value={bulkCancelReason}
+              onChange={e => setBulkCancelReason(e.target.value)}
+              rows={3}
+              placeholder="Enter reason for cancellation..."
+              style={{ width: "100%", padding: "8px 10px", border: `1px solid ${bulkCancelReason.trim() ? "hsl(var(--border))" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none", marginBottom: 4, background: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
+            />
+            {!bulkCancelReason.trim() && <div style={{ fontSize: 11.5, color: "#dc2626", marginBottom: 14 }}>Reason is required before confirming cancellation.</div>}
+            {bulkCancelReason.trim() && <div style={{ marginBottom: 14 }} />}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setPendingBulkCancel(false)} style={{ flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
+              <button onClick={() => { setPendingBulkCancel(false); setBulkCancelReason(""); }} style={{ flex: 1, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--foreground))", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
                 Keep Orders
               </button>
-              <button onClick={() => applyBulkStatus("Cancelled")} style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 8, background: "#dc2626", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}>
+              <button onClick={() => { if (!bulkCancelReason.trim()) return; applyBulkStatus("Cancelled", bulkCancelReason.trim()); }} style={{ flex: 1, padding: "10px 0", border: "none", borderRadius: 8, background: bulkCancelReason.trim() ? "#dc2626" : "#fca5a5", color: "#fff", cursor: bulkCancelReason.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 14, fontFamily: "inherit", transition: "background 0.15s" }}>
                 Yes, Cancel
               </button>
             </div>
