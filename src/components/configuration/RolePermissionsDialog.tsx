@@ -29,6 +29,7 @@ import {
 } from '@/lib/permissionsStore';
 import {
   PLATFORM_MODULE_OPTIONS,
+  ROLE_PERMISSION_MODULE_OPTIONS,
 } from '@/lib/platformModuleCatalog';
 import type { NidoRole } from '@/lib/nidoUsersStore';
 
@@ -117,7 +118,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   };
 
   const handleAddModule = () => {
-    const selected = PLATFORM_MODULE_OPTIONS.find(module => module.key === selectedModuleKey);
+    const selected = ROLE_PERMISSION_MODULE_OPTIONS.find(module => module.key === selectedModuleKey);
     if (!selected) { setAddError('Select a platform module first.'); return; }
     if (modules.some(module => module.key === selected.key)) {
       setAddError('This module is already in the permissions list.');
@@ -148,7 +149,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   if (!role) return null;
 
   const customModules = modules.filter(m => 'custom' in m && m.custom);
-  const availablePlatformModules = PLATFORM_MODULE_OPTIONS.filter(
+  const availablePlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(
     platformModule => !modules.some(module => module.key === platformModule.key),
   );
 

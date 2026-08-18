@@ -114,6 +114,11 @@ export const PLATFORM_MODULE_OPTIONS: PlatformModuleOption[] = definitions.map(d
   key: getPlatformModuleKey(definition.path),
 }));
 
+/** Modules available for manual role assignment from the Add Module picker. */
+export const ROLE_PERMISSION_MODULE_OPTIONS = PLATFORM_MODULE_OPTIONS.filter(
+  module => !module.label.startsWith('User Management ›'),
+);
+
 /**
  * Finds the most specific platform page for a pathname. This makes nested
  * pages such as /sales/quotes/create inherit the permission selected for
