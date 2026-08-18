@@ -15,19 +15,21 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   ACTIONS,
   getRolePermissions,
   saveRolePermissions,
   isSuperAdmin,
   getAllModules,
-  addCustomModule,
   deleteCustomModule,
   CUSTOM_MODULES_EVENT,
   type ActionKey,
   type ModulePermissions,
 } from '@/lib/permissionsStore';
+import {
+  PLATFORM_MODULE_OPTIONS,
+} from '@/lib/platformModuleCatalog';
 import type { NidoRole } from '@/lib/nidoUsersStore';
 
 interface RolePermissionsDialogProps {
@@ -42,28 +44,47 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   const [matrix, setMatrix] = useState<PermMatrix>({});
   const [modules, setModules] = useState(getAllModules());
   const [showAddModule, setShowAddModule] = useState(false);
-  const [newModuleName, setNewModuleName] = useState('');
+  const [selectedModuleKey, setSelectedModuleKey] = useState('');
   const [addError, setAddError] = useState('');
 
   const superAdmin = !!(role && isSuperAdmin(role.name));
 
   useEffect(() => {
-    const handler = () => setModules(getAllModules());
+    const handler = () => {
+      setModules(previous => {
+        const builtInsAndCustom = getAllModules();
+        const currentPlatformModules = previous.filter(module =>
+          module.key.startsWith('platform_') &&
+          !builtInsAndCustom.some(existing => existing.key === module.key),
+        );
+        return [...builtInsAndCustom, ...currentPlatformModules];
+      });
+    };
     window.addEventListener(CUSTOM_MODULES_EVENT, handler);
     return () => window.removeEventListener(CUSTOM_MODULES_EVENT, handler);
   }, []);
 
   useEffect(() => {
     if (open && role) {
-      setModules(getAllModules());
       const perms = getRolePermissions(role.name);
+      const builtInsAndCustom = getAllModules();
+      const selectedPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
+        Object.prototype.hasOwnProperty.call(perms, module.key),
+      );
+      const allRoleModules = [
+        ...builtInsAndCustom,
+        ...selectedPlatformModules.filter(module =>
+          !builtInsAndCustom.some(existing => existing.key === module.key),
+        ),
+      ];
+      setModules(allRoleModules);
       const full: PermMatrix = {};
-      for (const m of getAllModules()) {
+      for (const m of allRoleModules) {
         full[m.key] = { ...(perms[m.key] ?? {}) };
       }
       setMatrix(full);
       setShowAddModule(false);
-      setNewModuleName('');
+      setSelectedModuleKey('');
       setAddError('');
     }
   }, [open, role]);
@@ -96,22 +117,24 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   };
 
   const handleAddModule = () => {
-    const trimmed = newModuleName.trim();
-    if (!trimmed) { setAddError('Module name is required.'); return; }
-    const mod = addCustomModule(trimmed);
-    if (!mod) { setAddError('A module with that name already exists.'); return; }
-    setMatrix(prev => ({ ...prev, [mod.key]: {} }));
-    setModules(getAllModules());
-    setNewModuleName('');
+    const selected = PLATFORM_MODULE_OPTIONS.find(module => module.key === selectedModuleKey);
+    if (!selected) { setAddError('Select a platform module first.'); return; }
+    if (modules.some(module => module.key === selected.key)) {
+      setAddError('This module is already in the permissions list.');
+      return;
+    }
+    setMatrix(prev => ({ ...prev, [selected.key]: {} }));
+    setModules(prev => [...prev, selected]);
+    setSelectedModuleKey('');
     setAddError('');
     setShowAddModule(false);
-    toast.success('Module added', { description: `"${mod.label}" is now available in all role permission editors.` });
+    toast.success('Module added', { description: `"${selected.label}" is now available for this role.` });
   };
 
   const handleDeleteCustomModule = (key: string, label: string) => {
     deleteCustomModule(key);
     setMatrix(prev => { const next = { ...prev }; delete next[key]; return next; });
-    setModules(getAllModules());
+    setModules(prev => prev.filter(module => module.key !== key));
     toast.info('Module removed', { description: `"${label}" has been removed from the permissions matrix.` });
   };
 
@@ -125,6 +148,9 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   if (!role) return null;
 
   const customModules = modules.filter(m => 'custom' in m && m.custom);
+  const availablePlatformModules = PLATFORM_MODULE_OPTIONS.filter(
+    platformModule => !modules.some(module => module.key === platformModule.key),
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -238,21 +264,31 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               {showAddModule && !superAdmin && (
                 <tr className="bg-blue-50/60 dark:bg-blue-950/20">
                   <td colSpan={ACTIONS.length + 2} className="px-3 py-3 border-b border-border">
-                    <div className="flex items-center gap-2 max-w-sm">
-                      <Input
-                        autoFocus
-                        value={newModuleName}
-                        onChange={e => { setNewModuleName(e.target.value); setAddError(''); }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleAddModule();
-                          if (e.key === 'Escape') { setShowAddModule(false); setNewModuleName(''); setAddError(''); }
-                        }}
-                        placeholder="Module name (e.g. Inventory)"
-                        className="h-8 text-sm"
-                      />
+                    <div className="flex items-center gap-2 max-w-2xl">
+                      <Select
+                        value={selectedModuleKey}
+                        onValueChange={value => { setSelectedModuleKey(value); setAddError(''); }}
+                      >
+                        <SelectTrigger className="h-8 flex-1 text-sm">
+                          <SelectValue placeholder="Select a platform module" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePlatformModules.length > 0 ? (
+                            availablePlatformModules.map(module => (
+                              <SelectItem key={module.key} value={module.key}>
+                                {module.label}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              All platform modules are already listed.
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
                       <Button size="sm" onClick={handleAddModule} className="h-8 shrink-0">Add</Button>
                       <button
-                        onClick={() => { setShowAddModule(false); setNewModuleName(''); setAddError(''); }}
+                        onClick={() => { setShowAddModule(false); setSelectedModuleKey(''); setAddError(''); }}
                         className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       >
                         <X size={16} />
@@ -285,7 +321,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setShowAddModule(v => !v); setNewModuleName(''); setAddError(''); }}
+              onClick={() => { setShowAddModule(v => !v); setSelectedModuleKey(''); setAddError(''); }}
               className="flex items-center gap-1.5"
             >
               <Plus size={14} />

@@ -48,6 +48,8 @@ import ActivityPage from "./ClientActivityPage";
 import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { getPlatformModuleKey } from "@/lib/platformModuleCatalog";
 
 const ADMIN_TABS = [
   "Overview",
@@ -247,6 +249,7 @@ interface ClientDetailProps {
 export default function ClientDetailPageRedesigned({ portalMode = false }: ClientDetailProps) {
   const params = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { hasRoutePermission } = usePermissions();
   const navigate = useNavigate();
   const clientId = portalMode ? user?.clientId ?? "" : params.id ?? "";
   const [activeTab, setActiveTab] = useState("Overview");
@@ -337,7 +340,13 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const address = [client.billingAddress || client.billing_address, client.billingCity || client.billing_city, client.billingState || client.billing_state, client.billingPincode || client.billing_pincode].filter(Boolean).join(", ");
   const initials = initialsFor(client);
   const formatDate = (value: string) => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-  const goTo = (tab: string) => setActiveTab(tab);
+  const visibleAdminTabs = ADMIN_TABS.filter(tab =>
+    tab === "Overview" ||
+    hasRoutePermission(getPlatformModuleKey(`/clients/${tab.toLowerCase()}`), "clients", "view"),
+  );
+  const goTo = (tab: string) => {
+    if (visibleAdminTabs.includes(tab) || tab === "Overview") setActiveTab(tab);
+  };
 
   const renderTab = () => {
     if (activeTab === "Roles") return <RolesPage key={`${clientId}-${refreshKey}-roles`} />;
@@ -380,7 +389,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     <div className="min-h-screen bg-[#fcfcfd] text-gray-900">
       <div className="border-b border-gray-200 bg-white px-3 sm:px-5">
         <div className="flex items-center gap-1 overflow-x-auto">
-          {(portalMode ? ["Overview"] : ADMIN_TABS).map((tab) => (
+          {(portalMode ? ["Overview"] : visibleAdminTabs).map((tab) => (
             <button
               key={tab}
               type="button"

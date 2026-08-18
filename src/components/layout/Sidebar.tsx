@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { getPlatformModuleKey } from '@/lib/platformModuleCatalog';
 import {
   LayoutDashboard, ShoppingCart, Wrench, Headphones, Users,
   TrendingUp, Package, DollarSign, Settings, ChevronDown,
@@ -104,7 +105,7 @@ const clientNavigationItems: NavItem[] = [
 // ── Permission-based nav filtering ────────────────────────────────────────────
 function filterNavItems(
   items: NavItem[],
-  canView: (key: string) => boolean,
+  canView: (key: string, legacyKey?: string) => boolean,
   superAdmin: boolean,
 ): NavItem[] {
   if (superAdmin) return items;
@@ -115,7 +116,8 @@ function filterNavItems(
       const kids = filterNavItems(item.children, canView, false);
       if (kids.length > 0) filtered.push({ ...item, children: kids });
     } else {
-      if (!item.moduleKey || canView(item.moduleKey)) filtered.push(item);
+      const pageKey = item.path ? getPlatformModuleKey(item.path) : item.moduleKey;
+      if (!item.moduleKey || canView(pageKey ?? item.moduleKey, item.moduleKey)) filtered.push(item);
     }
   }
   return filtered;
@@ -261,7 +263,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const { user, logout, isClientPortalUser } = useAuth();
-  const { hasPermission, isSuperAdmin } = usePermissions();
+  const { hasPermission, hasRoutePermission, isSuperAdmin } = usePermissions();
   const org = useOrgConfig();
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -273,7 +275,13 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const rawNavItems = isClientPortalUser ? clientNavigationItems : adminNavigationItems;
   const navItems = isClientPortalUser
     ? rawNavItems
-    : filterNavItems(rawNavItems, (key) => hasPermission(key, 'view'), isSuperAdmin);
+     : filterNavItems(
+       rawNavItems,
+       (key, legacyKey) => legacyKey
+         ? hasRoutePermission(key, legacyKey, 'view')
+         : hasPermission(key, 'view'),
+       isSuperAdmin,
+     );
 
   const activePath = findActivePath(location.pathname, navItems);
 
