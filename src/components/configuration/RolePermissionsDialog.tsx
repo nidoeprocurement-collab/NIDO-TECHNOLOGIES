@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Shield, CheckSquare, Square, Plus, X, Trash2 } from 'lucide-react';
+import { Shield, CheckSquare, Square, Minus, Plus, X, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -101,18 +101,18 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   const toggleRow = (moduleKey: string) => {
     if (superAdmin) return;
     const current = matrix[moduleKey] ?? {};
-    const anyOn = ACTIONS.some(a => current[a.key]);
+    const allOn = ACTIONS.every(a => current[a.key]);
     const next: ModulePermissions = {};
-    if (!anyOn) ACTIONS.forEach(a => { next[a.key] = true; });
+    if (!allOn) ACTIONS.forEach(a => { next[a.key] = true; });
     setMatrix(prev => ({ ...prev, [moduleKey]: next }));
   };
 
   const toggleColumn = (action: ActionKey) => {
     if (superAdmin) return;
-    const anyOn = modules.some(m => matrix[m.key]?.[action]);
+    const allOn = modules.length > 0 && modules.every(m => matrix[m.key]?.[action]);
     setMatrix(prev => {
       const next = { ...prev };
-      modules.forEach(m => { next[m.key] = { ...next[m.key], [action]: !anyOn }; });
+      modules.forEach(m => { next[m.key] = { ...next[m.key], [action]: !allOn }; });
       return next;
     });
   };
@@ -152,6 +152,18 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   const availablePlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(
     platformModule => !modules.some(module => module.key === platformModule.key),
   );
+  const isRowAllSelected = (moduleKey: string) =>
+    superAdmin || ACTIONS.every(action => matrix[moduleKey]?.[action.key]);
+  const isRowPartiallySelected = (moduleKey: string) =>
+    !superAdmin &&
+    ACTIONS.some(action => matrix[moduleKey]?.[action.key]) &&
+    !isRowAllSelected(moduleKey);
+  const isColumnAllSelected = (action: ActionKey) =>
+    superAdmin || (modules.length > 0 && modules.every(module => matrix[module.key]?.[action]));
+  const isColumnPartiallySelected = (action: ActionKey) =>
+    !superAdmin &&
+    modules.some(module => matrix[module.key]?.[action]) &&
+    !isColumnAllSelected(action);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -195,8 +207,18 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                     <button
                       className={`flex flex-col items-center gap-1 mx-auto text-xs ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
                       onClick={() => toggleColumn(a.key)}
-                      title={superAdmin ? undefined : `Toggle all ${a.label}`}
+                      disabled={superAdmin}
+                      aria-label={`Select all ${a.label} permissions`}
+                      aria-pressed={isColumnAllSelected(a.key)}
+                      title={superAdmin ? undefined : `Select all ${a.label} permissions`}
                     >
+                      {isColumnAllSelected(a.key) ? (
+                        <CheckSquare size={16} className="text-primary" />
+                      ) : isColumnPartiallySelected(a.key) ? (
+                        <Minus size={16} className="text-primary" />
+                      ) : (
+                        <Square size={16} className="text-muted-foreground/50" />
+                      )}
                       {a.label}
                     </button>
                   </th>
@@ -213,10 +235,20 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                     <td className="py-2.5 px-3 border-b border-border">
                       <div className="flex items-center gap-2">
                         <button
-                          className={`text-left font-medium text-foreground ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
+                          className={`flex items-center gap-2 text-left font-medium text-foreground ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
                           onClick={() => toggleRow(m.key)}
-                          title={superAdmin ? undefined : `Toggle all actions for ${m.label}`}
+                          disabled={superAdmin}
+                          aria-label={`Select all permissions for ${m.label}`}
+                          aria-pressed={isRowAllSelected(m.key)}
+                          title={superAdmin ? undefined : `Select all permissions for ${m.label}`}
                         >
+                          {isRowAllSelected(m.key) ? (
+                            <CheckSquare size={16} className="text-primary shrink-0" />
+                          ) : isRowPartiallySelected(m.key) ? (
+                            <Minus size={16} className="text-primary shrink-0" />
+                          ) : (
+                            <Square size={16} className="text-muted-foreground/50 shrink-0" />
+                          )}
                           {m.label}
                         </button>
                         {isCustom && (
