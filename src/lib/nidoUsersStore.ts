@@ -69,7 +69,10 @@ export interface LoginContext {
   locationAccuracy?: number;
 }
 
-// ── Seed data ─────────────────────────────────────────────────────────────────
+// ── Bootstrap data ────────────────────────────────────────────────────────────
+// User records are live data persisted in localStorage. Do not seed demo users
+// into the Add / Manage Users list. The protected owner is the only bootstrap
+// account because the local authentication flow needs an initial administrator.
 
 const NOW = new Date().toISOString().split("T")[0];
 
@@ -84,43 +87,30 @@ const DEFAULT_ROLES: NidoRole[] = [
   { id: "role-viewer",             name: "Viewer",             description: "Read-only access to all allowed modules",                   status: "Active" },
 ];
 
-const DEFAULT_USERS: NidoUser[] = [
-  {
-    id: SYSTEM_OWNER_ID, employeeId: "EMP-001",
-    name: "System Owner", email: "owner@nidotech.com", password: "Owner@123",
-    phone: "+91-44-1234-5678", role: SYSTEM_OWNER_ROLE,
-    jobTitle: "CEO", designation: "Chief Executive Officer", department: "Management",
-    status: "Active", createdAt: NOW, updatedAt: NOW,
-  },
-  {
-    id: "user-2", employeeId: "EMP-002",
-    name: "Mark Adams", email: "admin@nidotech.com", password: "Admin@123",
-    phone: "+91-44-1234-5679", role: "System Admin",
-    jobTitle: "System Admin", designation: "Platform Administrator", department: "IT",
-    status: "Active", createdAt: NOW, updatedAt: NOW,
-  },
-  {
-    id: "user-3", employeeId: "EMP-003",
-    name: "Jane Smith", email: "procurement@nidotech.com", password: "Procure@123",
-    phone: "+91-44-1234-5680", role: "Procurement Manager",
-    jobTitle: "Procurement Manager", designation: "Senior Procurement Manager", department: "Procurement",
-    status: "Active", createdAt: NOW, updatedAt: NOW,
-  },
-  {
-    id: "user-4", employeeId: "EMP-004",
-    name: "David Chen", email: "ap@nidotech.com", password: "Accounts@123",
-    phone: "+91-44-1234-5681", role: "Accounts Payable",
-    jobTitle: "Accounts Payable", designation: "Finance Executive", department: "Finance",
-    status: "Active", createdAt: NOW, updatedAt: NOW,
-  },
-  {
-    id: "user-5", employeeId: "EMP-005",
-    name: "Vendor User", email: "vendor@apex.com", password: "Vendor@123",
-    phone: "+91-44-1234-5682", role: "Vendor Admin",
-    jobTitle: "Vendor Manager", designation: "Vendor Relations Manager", department: "Sales",
-    status: "Active", createdAt: NOW, updatedAt: NOW,
-  },
-];
+const SYSTEM_OWNER_USER: NidoUser = {
+  id: SYSTEM_OWNER_ID, employeeId: "EMP-001",
+  name: "System Owner", email: "owner@nidotech.com", password: "Owner@123",
+  phone: "+91-44-1234-5678", role: SYSTEM_OWNER_ROLE,
+  jobTitle: "CEO", designation: "Chief Executive Officer", department: "Management",
+  status: "Active", createdAt: NOW, updatedAt: NOW,
+};
+
+// These identify only the demo records from the previous version. Users added
+// through the live form receive generated IDs and are never removed here.
+const LEGACY_DEMO_USER_IDS = new Set(["user-2", "user-3", "user-4", "user-5"]);
+const LEGACY_DEMO_USER_EMAILS = new Set([
+  "admin@nidotech.com",
+  "procurement@nidotech.com",
+  "ap@nidotech.com",
+  "vendor@apex.com",
+]);
+
+function removeLegacyDemoUsers(users: NidoUser[]): NidoUser[] {
+  return users.filter((user) =>
+    !LEGACY_DEMO_USER_IDS.has(user.id) &&
+    !LEGACY_DEMO_USER_EMAILS.has(user.email.trim().toLowerCase())
+  );
+}
 
 export function isSystemOwner(user: Pick<NidoUser, "id" | "role"> | null | undefined): boolean {
   return user?.id === SYSTEM_OWNER_ID || user?.role === SYSTEM_OWNER_ROLE;
@@ -135,11 +125,11 @@ export function isSystemOwner(user: Pick<NidoUser, "id" | "role"> | null | undef
 function preserveSystemOwner(users: NidoUser[]): NidoUser[] {
   const incomingOwner = users.find(isSystemOwner);
   const owner = {
-    ...DEFAULT_USERS[0],
+    ...SYSTEM_OWNER_USER,
     lastLogin: incomingOwner?.lastLogin,
     failedLoginAttempts: incomingOwner?.failedLoginAttempts ?? 0,
     loginHistory: incomingOwner?.loginHistory ?? [],
-    updatedAt: incomingOwner?.updatedAt ?? DEFAULT_USERS[0].updatedAt,
+    updatedAt: incomingOwner?.updatedAt ?? SYSTEM_OWNER_USER.updatedAt,
   };
   return [owner, ...users.filter(user => !isSystemOwner(user))];
 }
@@ -233,13 +223,19 @@ export function getUsers(): NidoUser[] {
   try {
     const raw = localStorage.getItem(USERS_KEY);
     if (!raw) {
-      localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
-      return DEFAULT_USERS;
+      const initialUsers = [SYSTEM_OWNER_USER];
+      localStorage.setItem(USERS_KEY, JSON.stringify(initialUsers));
+      return initialUsers;
     }
     const parsed: any[] = JSON.parse(raw);
-    return preserveSystemOwner(parsed.map(migrateUser));
+    const users = preserveSystemOwner(removeLegacyDemoUsers(parsed.map(migrateUser)));
+    // Persist normalization so legacy demo rows do not return after refresh,
+    // including when one removed demo row is replaced by the owner bootstrap.
+    const normalized = JSON.stringify(users);
+    if (normalized !== raw) localStorage.setItem(USERS_KEY, normalized);
+    return users;
   } catch {
-    return DEFAULT_USERS;
+    return [SYSTEM_OWNER_USER];
   }
 }
 

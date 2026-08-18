@@ -68,4 +68,31 @@ describe("NIDO users live store", () => {
 
     expect(getUsers().some(user => user.email === "live.user@nidotech.com")).toBe(true);
   });
+
+  it("does not seed or retain legacy demo users", () => {
+    localStorage.setItem("nido_config_users", JSON.stringify([
+      {
+        id: "user-2",
+        employeeId: "EMP-002",
+        name: "Mark Adams",
+        email: "admin@nidotech.com",
+        password: "Admin@123",
+        phone: "",
+        role: "System Admin",
+        jobTitle: "",
+        designation: "",
+        department: "IT",
+        status: "Active",
+        createdAt: "",
+        updatedAt: "",
+      },
+    ]));
+
+    const users = getUsers();
+
+    expect(users).toHaveLength(1);
+    expect(users[0].id).toBe(SYSTEM_OWNER_ID);
+    expect(users.some(user => user.email === "admin@nidotech.com")).toBe(false);
+    expect(JSON.parse(localStorage.getItem("nido_config_users") || "[]")).toHaveLength(1);
+  });
 });
