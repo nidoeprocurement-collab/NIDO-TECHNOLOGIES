@@ -22,7 +22,7 @@ import {
   Users, Building2, ChevronDown, X, Mail, MapPin, Calendar,
   Archive, MoreVertical, CheckCircle, Clock, XCircle, Edit,
   Plus, Download, Upload, FileDown, Zap, Copy, Check,
-  IndianRupee, Star,
+  IndianRupee, Star, FileText,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import {
