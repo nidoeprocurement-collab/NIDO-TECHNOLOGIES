@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { toast } from "sonner"
 import {
   Search, Plus, Download, FileText, MoreHorizontal,
@@ -146,17 +147,38 @@ function ActionsMenu({
   onRefresh,
 }: { user: NidoUser; onEdit: () => void; onRefresh: () => void }) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 16 });
   const [resetPwOpen, setResetPwOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 4,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
     };
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!ref.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
+    };
+    updatePosition();
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [open]);
 
   const act = (fn: () => void) => { fn(); setOpen(false); };
@@ -185,9 +207,13 @@ function ActionsMenu({
   };
 
   const handleDelete = () => {
-    if (!window.confirm(`Remove ${user.name} (${user.email})? This cannot be undone.`)) return;
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = () => {
     deleteUser(user.id);
     onRefresh();
+    setDeleteOpen(false);
     toast.success("User removed");
   };
 
@@ -196,12 +222,24 @@ function ActionsMenu({
   return (
     <>
       <div className="relative" ref={ref}>
-        <Button variant="ghost" size="icon" onClick={() => setOpen(v => !v)}>
+        <Button
+          ref={triggerRef}
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions for ${user.name}`}
+          aria-expanded={open}
+          onClick={() => setOpen(v => !v)}
+        >
           <MoreHorizontal size={16} />
         </Button>
 
-        {open && (
-          <div className="absolute right-0 top-9 bg-card border border-border rounded-lg shadow-lg z-50 min-w-[190px] py-1">
+        {open && createPortal(
+          <div
+            ref={menuRef}
+            className="fixed bg-card border border-border rounded-lg shadow-2xl z-[120] w-[220px] py-1"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+            role="menu"
+          >
             <button className={itemCls} onClick={() => act(onEdit)}>
               <Pencil size={14} className="text-muted-foreground" /> Edit User
             </button>
@@ -243,12 +281,28 @@ function ActionsMenu({
             <button className={`${itemCls} text-red-600`} onClick={() => act(handleDelete)}>
               <Trash2 size={14} /> Delete User
             </button>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
 
       <ResetPasswordDialog user={user} open={resetPwOpen} onOpenChange={setResetPwOpen} />
       <LoginHistoryDialog user={user} open={historyOpen} onOpenChange={setHistoryOpen} />
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{user.name}</strong> ({user.email})?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete User</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
