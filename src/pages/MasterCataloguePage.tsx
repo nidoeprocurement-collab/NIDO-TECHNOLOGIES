@@ -753,7 +753,11 @@ export default function CatalogUpdatesTab() {
     const csvCell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
     const headers = CATALOGUE_CSV_HEADERS;
 
-    const raw = getCatalogProducts();
+    const raw = getCatalogProducts().filter(product => product.publishStatus === 'published');
+    if (!raw.length) {
+      toast.error('No published products to export');
+      return;
+    }
     const dataRows = raw.map(p => {
       const specs = p.specifications || [];
       const gens = p.generalSpecs || [];
