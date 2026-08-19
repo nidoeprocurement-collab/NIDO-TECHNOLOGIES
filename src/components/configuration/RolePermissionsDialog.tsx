@@ -384,7 +384,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setShowAddModule(v => !v); setSelectedModuleKey(''); setAddError(''); }}
+              onClick={() => { setShowAddModule(v => !v); setSelectedModuleKeys([]); setAddError(''); }}
               className="flex items-center gap-1.5"
             >
               <Plus size={14} />
