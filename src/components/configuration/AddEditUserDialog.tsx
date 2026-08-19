@@ -5,9 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui/select"
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
@@ -129,14 +126,16 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </div>
           <div>
             <Label className="mb-2 block text-sm font-medium">Role <span className="text-red-500">*</span></Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-              <SelectContent>
-                {roles.filter(r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE).map(r => (
-                  <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {!role && <option value="">Select a role</option>}
+              {roles.filter(r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE).map(r => (
+                <option key={r.id} value={r.name}>{r.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Row 4 */}
@@ -156,14 +155,15 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </div>
           <div>
             <Label className="mb-2 block text-sm font-medium">Status</Label>
-            <Select value={status} onValueChange={v => setStatus(v as NidoUser["status"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value as NidoUser["status"])}
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Suspended">Suspended</option>
+            </select>
           </div>
         </div>
 
