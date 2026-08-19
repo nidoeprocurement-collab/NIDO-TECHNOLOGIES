@@ -120,7 +120,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   const handleAddModule = () => {
     const selected = ROLE_PERMISSION_MODULE_OPTIONS.find(module => module.key === selectedModuleKey);
     if (!selected) { setAddError('Select a platform module first.'); return; }
-    if (modules.some(module => module.key === selected.key)) {
+    if (modules.some(module => module.key === selected.key || module.label === selected.label)) {
       setAddError('This module is already in the permissions list.');
       return;
     }
@@ -149,8 +149,12 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   if (!role) return null;
 
   const customModules = modules.filter(m => 'custom' in m && m.custom);
+  const listedModuleKeys = new Set(modules.map(module => module.key));
+  const listedModuleLabels = new Set(modules.map(module => module.label));
   const availablePlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(
-    platformModule => !modules.some(module => module.key === platformModule.key),
+    platformModule =>
+      !listedModuleKeys.has(platformModule.key) &&
+      !listedModuleLabels.has(platformModule.label),
   );
   const isRowAllSelected = (moduleKey: string) =>
     superAdmin || ACTIONS.every(action => matrix[moduleKey]?.[action.key]);
