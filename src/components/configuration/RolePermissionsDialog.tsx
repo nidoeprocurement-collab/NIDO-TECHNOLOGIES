@@ -15,7 +15,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ACTIONS,
   getRolePermissions,
@@ -45,7 +50,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   const [matrix, setMatrix] = useState<PermMatrix>({});
   const [modules, setModules] = useState(getAllModules());
   const [showAddModule, setShowAddModule] = useState(false);
-  const [selectedModuleKey, setSelectedModuleKey] = useState('');
+  const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [addError, setAddError] = useState('');
 
   const superAdmin = !!(role && isSuperAdmin(role.name));
@@ -85,7 +90,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       }
       setMatrix(full);
       setShowAddModule(false);
-      setSelectedModuleKey('');
+      setSelectedModuleKeys([]);
       setAddError('');
     }
   }, [open, role]);
@@ -118,18 +123,26 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   };
 
   const handleAddModule = () => {
-    const selected = ROLE_PERMISSION_MODULE_OPTIONS.find(module => module.key === selectedModuleKey);
-    if (!selected) { setAddError('Select a platform module first.'); return; }
-    if (modules.some(module => module.key === selected.key || module.label === selected.label)) {
-      setAddError('This module is already in the permissions list.');
+    const selected = ROLE_PERMISSION_MODULE_OPTIONS.filter(module => selectedModuleKeys.includes(module.key));
+    if (!selected.length) { setAddError('Select at least one platform module first.'); return; }
+    const duplicates = selected.filter(module =>
+      modules.some(existing => existing.key === module.key || existing.label === module.label),
+    );
+    if (duplicates.length > 0) {
+      setAddError('One or more selected modules are already in the permissions list.');
       return;
     }
-    setMatrix(prev => ({ ...prev, [selected.key]: {} }));
-    setModules(prev => [...prev, selected]);
-    setSelectedModuleKey('');
+    setMatrix(prev => ({
+      ...prev,
+      ...Object.fromEntries(selected.map(module => [module.key, {}])),
+    }));
+    setModules(prev => [...prev, ...selected]);
+    setSelectedModuleKeys([]);
     setAddError('');
     setShowAddModule(false);
-    toast.success('Module added', { description: `"${selected.label}" is now available for this role.` });
+    toast.success(`${selected.length} module${selected.length === 1 ? '' : 's'} added`, {
+      description: selected.map(module => module.label).join(', '),
+    });
   };
 
   const handleDeleteCustomModule = (key: string, label: string) => {
@@ -302,30 +315,43 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                 <tr className="bg-blue-50/60 dark:bg-blue-950/20">
                   <td colSpan={ACTIONS.length + 2} className="px-3 py-3 border-b border-border">
                     <div className="flex items-center gap-2 max-w-2xl">
-                      <Select
-                        value={selectedModuleKey}
-                        onValueChange={value => { setSelectedModuleKey(value); setAddError(''); }}
-                      >
-                        <SelectTrigger className="h-8 flex-1 text-sm">
-                          <SelectValue placeholder="Select a platform module" />
-                        </SelectTrigger>
-                        <SelectContent>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="h-8 flex-1 justify-start text-sm font-normal">
+                            {selectedModuleKeys.length > 0
+                              ? `${selectedModuleKeys.length} module${selectedModuleKeys.length === 1 ? '' : 's'} selected`
+                              : 'Select platform modules'}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[360px] max-h-80 overflow-y-auto">
                           {availablePlatformModules.length > 0 ? (
                             availablePlatformModules.map(module => (
-                              <SelectItem key={module.key} value={module.key}>
+                              <DropdownMenuCheckboxItem
+                                key={module.key}
+                                checked={selectedModuleKeys.includes(module.key)}
+                                onCheckedChange={checked => {
+                                  setSelectedModuleKeys(previous =>
+                                    checked
+                                      ? [...previous, module.key]
+                                      : previous.filter(key => key !== module.key),
+                                  );
+                                  setAddError('');
+                                }}
+                                onSelect={event => event.preventDefault()}
+                              >
                                 {module.label}
-                              </SelectItem>
+                              </DropdownMenuCheckboxItem>
                             ))
                           ) : (
                             <div className="px-3 py-2 text-sm text-muted-foreground">
                               All platform modules are already listed.
                             </div>
                           )}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button size="sm" onClick={handleAddModule} className="h-8 shrink-0">Add</Button>
                       <button
-                        onClick={() => { setShowAddModule(false); setSelectedModuleKey(''); setAddError(''); }}
+                        onClick={() => { setShowAddModule(false); setSelectedModuleKeys([]); setAddError(''); }}
                         className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       >
                         <X size={16} />
