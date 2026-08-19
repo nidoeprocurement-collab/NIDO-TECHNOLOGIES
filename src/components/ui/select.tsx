@@ -58,7 +58,8 @@ const Select: React.FC<SelectProps> = ({ value, onValueChange, disabled, childre
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       const inContainer = containerRef.current?.contains(target);
-      const inContent = contentRef.current?.contains(target);
+      const inContent = contentRef.current?.contains(target) ||
+        (target instanceof Element && !!target.closest("[data-select-content]"));
       if (!inContainer && !inContent) {
         setIsOpen(false);
       }
@@ -165,6 +166,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
           else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
         }}
         style={fixedStyle}
+        data-select-content="true"
         className={`rounded-md border border-border bg-background text-foreground shadow-xl overflow-y-auto ${className || ""}`}
         {...props}
       >
@@ -194,12 +196,12 @@ const SelectItem = React.forwardRef<
     }
   }, [value]);
 
-  const handleSelect = (e: React.MouseEvent) => {
+  const handleSelect = (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
     context.onValueChange?.(value || "");
     context.closeDropdown();
-    onClick?.({} as React.MouseEvent<HTMLDivElement>);
+    onClick?.(e as React.MouseEvent<HTMLDivElement>);
   };
 
   const isSelected = context.value === value;
@@ -207,6 +209,7 @@ const SelectItem = React.forwardRef<
   return (
     <div
       ref={ref}
+      onMouseDown={handleSelect}
       onClick={handleSelect}
       className={`px-3 py-2 cursor-pointer text-foreground text-sm hover:bg-accent hover:text-accent-foreground ${isSelected ? "bg-primary/10 font-semibold text-primary" : ""} ${className || ""}`}
       data-value={value}
