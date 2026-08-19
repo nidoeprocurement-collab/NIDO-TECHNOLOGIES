@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "PTHHGVeZzHRpHlHg2SR2w"
+uri = "file://generated/Nido_Tech_Current_Platform_Process_Flow.docx"
+type = "word_document"
+title = "Nido Tech Current Platform Process Flow"
+description = "Updated Word document matching the attached format and reflecting the current platform process flow."
