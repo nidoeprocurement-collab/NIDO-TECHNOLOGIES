@@ -101,20 +101,20 @@ export default function ServicesPage() {
   }, []);
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-5 p-4 md:p-6">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-sm">
-        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-blue-100 opacity-60 blur-3xl pointer-events-none" />
-        <div className="absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-teal-100 opacity-50 blur-3xl pointer-events-none" />
-        <div className="relative flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl space-y-3">
-            <div className="w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-blue-600 text-xs font-semibold">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm md:px-6 md:py-5">
+        <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-blue-100 opacity-60 blur-3xl pointer-events-none" />
+        <div className="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-teal-100 opacity-50 blur-3xl pointer-events-none" />
+        <div className="relative">
+          <div className="max-w-5xl space-y-2">
+            <div className="w-fit rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-blue-600 text-[11px] font-semibold">
               Services Hub
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-800 md:text-4xl">
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-800 md:text-3xl">
               One Place for AMC, Repair Service, Recycle / Disposal, Rental Service and Regular Purchase
             </h1>
-            <p className="max-w-xl text-sm text-slate-500 md:text-base">
+            <p className="max-w-4xl text-xs leading-relaxed text-slate-500 md:text-sm">
               Manage all your service requests through a single platform with faster approvals, seamless tracking, and complete lifecycle management.
             </p>
           </div>
