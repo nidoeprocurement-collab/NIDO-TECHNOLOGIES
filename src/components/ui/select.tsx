@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 
 interface SelectContextType {
@@ -156,7 +157,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         : { top: rect.bottom + 4 }),
     };
 
-    return (
+    const content = (
       <div
         ref={(el) => {
           context.contentRef.current = el;
@@ -170,6 +171,12 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         {children}
       </div>
     );
+
+    // Dialogs use a transform for centering. A fixed-position menu rendered
+    // inside that transformed subtree is positioned against the dialog rather
+    // than the viewport, which makes it appear in a corner. Portal the menu to
+    // the document body so the trigger rect is always interpreted correctly.
+    return createPortal(content, document.body);
   }
 );
 SelectContent.displayName = "SelectContent";
