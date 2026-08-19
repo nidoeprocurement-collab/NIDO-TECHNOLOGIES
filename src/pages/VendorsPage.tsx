@@ -307,6 +307,7 @@ export default function App() {
   const navigate = useNavigate();
   const [vendors, setVendors] = useState<Vendor[]>(() => getVendors());
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
+  const [archiveConfirmVendor, setArchiveConfirmVendor] = useState<Vendor | null>(null);
 
   useEffect(() => {
     // Re-read on mount to always pick up latest store data
@@ -350,10 +351,16 @@ export default function App() {
     setCurrentPage(1);
   };
 
-  const archiveVendor = (id: string) => {
-    const updated = vendors.map(v => v.id === id ? { ...v, archived: true } : v);
+  const requestArchiveVendor = (id: string) => {
+    const vendor = vendors.find(v => v.id === id);
+    if (vendor) setArchiveConfirmVendor(vendor);
+  };
+  const confirmArchiveVendor = () => {
+    if (!archiveConfirmVendor) return;
+    const updated = vendors.map(v => v.id === archiveConfirmVendor.id ? { ...v, archived: true } : v);
     saveVendors(updated);
     setVendors(updated);
+    setArchiveConfirmVendor(null);
   };
   const setVendorStatus = (id: string, status: VendorStatus) => {
     const updated = vendors.map(v => v.id === id ? { ...v, status } : v);
@@ -513,7 +520,7 @@ export default function App() {
                       <span className={`text-sm font-semibold ${v.monthSpend > 0 ? "text-gray-800" : "text-gray-300"}`}>{formatLakhs(v.monthSpend)}</span>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <RowActionsMenu vendor={v} onEdit={() => navigate(`/vendors/${v.id}/edit`)} onArchive={() => archiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
+                      <RowActionsMenu vendor={v} onEdit={() => navigate(`/vendors/${v.id}/edit`)} onArchive={() => requestArchiveVendor(v.id)} onSetStatus={s => setVendorStatus(v.id, s)} />
                     </td>
                   </tr>
                 ))}
@@ -557,6 +564,48 @@ export default function App() {
 
       {/* Archived vendor overview popup */}
       {archivedOverview && <VendorOverviewPopup vendor={archivedOverview} onClose={() => setArchivedOverview(null)} />}
+
+      {/* Archive confirmation popup */}
+      {archiveConfirmVendor && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          role="presentation"
+          onClick={() => setArchiveConfirmVendor(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="archive-vendor-title"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 border-b border-gray-100 px-5 py-4">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-50">
+                <Archive className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h2 id="archive-vendor-title" className="text-base font-semibold text-gray-900">
+                  Archive vendor?
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Are you sure you want to archive <strong className="text-gray-700">{archiveConfirmVendor.name}</strong>?
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-4 text-sm text-gray-500">
+              This vendor will be removed from the active vendor list and moved to Archived Vendors.
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 rounded-b-2xl">
+              <Button variant="outline" onClick={() => setArchiveConfirmVendor(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmArchiveVendor}>
+                <Archive className="mr-2 h-4 w-4" /> Archive Vendor
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
