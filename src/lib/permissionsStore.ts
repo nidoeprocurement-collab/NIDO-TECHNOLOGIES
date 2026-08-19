@@ -194,13 +194,11 @@ export function getRolePermissions(roleName: string): Record<string, ModulePermi
     return Object.fromEntries(MODULES.map(m => [m.key, ALL]));
   }
   const stored = getAllRolePermissions();
-  const defaults = DEFAULTS[roleName] ?? {};
   const existing = stored[roleName] ?? {};
-  const moduleKeys = new Set([...Object.keys(defaults), ...Object.keys(existing)]);
   return Object.fromEntries(
-    [...moduleKeys].map(moduleKey => [
+    Object.entries(existing).map(([moduleKey, permissions]) => [
       moduleKey,
-      { ...(defaults[moduleKey] ?? {}), ...(existing[moduleKey] ?? {}) },
+      { ...permissions },
     ]),
   );
 }
@@ -218,20 +216,7 @@ export function hasPermission(roleName: string, moduleKey: string, action: Actio
   return !!getRolePermissions(roleName)[moduleKey]?.[action];
 }
 
-/** Seed default permissions for built-in roles that haven't been customised yet. */
+/** Compatibility hook retained for existing callers; permissions are live-only. */
 export function initDefaultPermissions(): void {
-  const all = getAllRolePermissions();
-  let changed = false;
-  for (const [name, perms] of Object.entries(DEFAULTS)) {
-    const existing = all[name] ?? {};
-    const merged: Record<string, ModulePermissions> = { ...existing };
-    for (const [moduleKey, modulePerms] of Object.entries(perms)) {
-      merged[moduleKey] = { ...(modulePerms ?? {}), ...(existing[moduleKey] ?? {}) };
-    }
-    if (JSON.stringify(merged) !== JSON.stringify(existing)) {
-      all[name] = merged;
-      changed = true;
-    }
-  }
-  if (changed) localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(all));
+  // No seeded/mock permission rows are created.
 }
