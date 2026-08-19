@@ -161,8 +161,12 @@ function ActionsMenu({
       const trigger = triggerRef.current;
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
+      const menuHeight = 390;
+      const opensAbove = rect.bottom + menuHeight + 4 > window.innerHeight;
       setMenuPosition({
-        top: rect.bottom + 4,
+        top: opensAbove
+          ? Math.max(8, rect.top - menuHeight - 4)
+          : rect.bottom + 4,
         right: Math.max(8, window.innerWidth - rect.right),
       });
     };
@@ -217,7 +221,7 @@ function ActionsMenu({
     toast.success("User removed");
   };
 
-  const itemCls = "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-muted rounded transition-colors cursor-pointer";
+  const itemCls = "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-foreground hover:bg-muted rounded transition-colors cursor-pointer";
 
   return (
     <>
@@ -236,7 +240,7 @@ function ActionsMenu({
         {open && createPortal(
           <div
             ref={menuRef}
-            className="fixed bg-card border border-border rounded-lg shadow-2xl z-[120] w-[220px] py-1"
+            className="fixed max-h-[calc(100vh-16px)] overflow-y-auto bg-card text-foreground border border-border rounded-lg shadow-2xl z-[9999] w-[240px] py-1"
             style={{ top: menuPosition.top, right: menuPosition.right }}
             role="menu"
           >
