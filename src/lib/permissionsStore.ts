@@ -194,7 +194,10 @@ export function getRolePermissions(roleName: string): Record<string, ModulePermi
     return Object.fromEntries(MODULES.map(m => [m.key, ALL]));
   }
   const stored = getAllRolePermissions();
-  const existing = stored[roleName] ?? {};
+  // Keep the permission policy available for a fresh browser without writing
+  // seeded/mock rows to storage. Explicit role edits in the Roles UI continue
+  // to override these defaults.
+  const existing = stored[roleName] ?? DEFAULTS[roleName] ?? {};
   return Object.fromEntries(
     Object.entries(existing).map(([moduleKey, permissions]) => [
       moduleKey,

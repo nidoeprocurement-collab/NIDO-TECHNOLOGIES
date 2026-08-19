@@ -323,20 +323,26 @@ export default function ManageUsersPanel() {
   }
 
   const handleSaveUser = (values: Omit<NidoUser, "id">) => {
-    if (editingUser) {
-      if (isSystemOwner(editingUser)) {
-        toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
-        return
+    try {
+      if (editingUser) {
+        if (isSystemOwner(editingUser)) {
+          toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
+          return
+        }
+        const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
+        if (duplicate) { toast.error("Email already in use"); return; }
+        updateUser(editingUser.id, values)
+        toast.success("User updated", { description: `${values.name}'s details have been saved.` })
+      } else {
+        const duplicate = users.some(u => u.email.toLowerCase() === values.email.toLowerCase())
+        if (duplicate) { toast.error("Email already in use"); return; }
+        addUser(values)
+        toast.success("User added", { description: `${values.name} can now access the platform.` })
       }
-      const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
-      if (duplicate) { toast.error("Email already in use"); return; }
-      updateUser(editingUser.id, values)
-      toast.success("User updated", { description: `${values.name}'s details have been saved.` })
-    } else {
-      const duplicate = users.some(u => u.email.toLowerCase() === values.email.toLowerCase())
-      if (duplicate) { toast.error("Email already in use"); return; }
-      addUser(values)
-      toast.success("User added", { description: `${values.name} can now access the platform.` })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save this user."
+      toast.error("User could not be saved", { description: message })
+      return
     }
     refresh()
   }

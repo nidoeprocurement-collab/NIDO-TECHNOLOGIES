@@ -37,12 +37,15 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
 
   useEffect(() => {
     if (open) {
+      const assignableRole = roles.find(
+        r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE,
+      )?.name ?? ""
       setEmployeeId(user?.employeeId   ?? "")
       setName(      user?.name         ?? "")
       setEmail(     user?.email        ?? "")
       setPhone(     user?.phone        ?? "")
       setPassword(  "")           // never pre-fill password
-      setRole(      user?.role         ?? roles[0]?.name ?? "")
+      setRole(      user?.role         ?? assignableRole)
       setJobTitle(  user?.jobTitle     ?? "")
       setDesignation(user?.designation ?? "")
       setDepartment(user?.department   ?? "")
@@ -56,6 +59,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
     if (!EMAIL_RE.test(email.trim()))  { setError("Enter a valid email address.");  return; }
     if (!role)                         { setError("Select a role for this user.");  return; }
     if (!isEdit && !password.trim())   { setError("Password is required for new users."); return; }
+    if (role === SYSTEM_OWNER_ROLE)    { setError("The System Owner role is reserved."); return; }
 
     const now = new Date().toISOString().split("T")[0]
 
