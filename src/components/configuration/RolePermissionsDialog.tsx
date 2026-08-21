@@ -83,9 +83,12 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
         Object.keys(perms).length > 0 || selectedPlatformModules.length > 0;
       const allRoleModules = hasConfiguredModules
         ? [
-            ...builtInsAndCustom,
+            ...builtInsAndCustom.filter(module =>
+              Object.prototype.hasOwnProperty.call(perms, module.key),
+            ),
             ...selectedPlatformModules.filter(module =>
-              !builtInsAndCustom.some(existing => existing.key === module.key),
+              !builtInsAndCustom.some(existing => existing.key === module.key) &&
+              !Object.prototype.hasOwnProperty.call(perms, module.key),
             ),
           ]
         : [];
