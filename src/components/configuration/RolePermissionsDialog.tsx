@@ -77,12 +77,19 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       const selectedPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
         Object.prototype.hasOwnProperty.call(perms, module.key),
       );
-      const allRoleModules = [
-        ...builtInsAndCustom,
-        ...selectedPlatformModules.filter(module =>
-          !builtInsAndCustom.some(existing => existing.key === module.key),
-        ),
-      ];
+      // A role without a saved permission map is newly created. Start with an
+      // empty module list so permissions are explicitly granted by an admin.
+      // Existing roles keep their current module list and defaults.
+      const hasConfiguredModules =
+        Object.keys(perms).length > 0 || selectedPlatformModules.length > 0;
+      const allRoleModules = hasConfiguredModules
+        ? [
+            ...builtInsAndCustom,
+            ...selectedPlatformModules.filter(module =>
+              !builtInsAndCustom.some(existing => existing.key === module.key),
+            ),
+          ]
+        : [];
       setModules(allRoleModules);
       const full: PermMatrix = {};
       for (const m of allRoleModules) {
