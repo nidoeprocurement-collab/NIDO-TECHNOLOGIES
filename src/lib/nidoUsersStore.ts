@@ -5,6 +5,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { importFrontendRbacData } from "./rbacFrontendImport";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ function migrateUser(raw: any): NidoUser {
 // ── Roles CRUD ─────────────────────────────────────────────────────────────────
 
 export function getRoles(): NidoRole[] {
+  importFrontendRbacData();
   try {
     const raw = localStorage.getItem(ROLES_KEY);
     if (!raw) {
