@@ -151,6 +151,7 @@ function ActionsMenu({
   const [resetPwOpen, setResetPwOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [invitationSentOpen, setInvitationSentOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -201,7 +202,7 @@ function ActionsMenu({
   };
 
   const handleSendInvitation = () => {
-    toast.success("Invitation sent", { description: `An invitation email has been sent to ${user.email}.` });
+    setInvitationSentOpen(true);
   };
 
   const handleUnlock = () => {
@@ -292,6 +293,22 @@ function ActionsMenu({
 
       <ResetPasswordDialog user={user} open={resetPwOpen} onOpenChange={setResetPwOpen} />
       <LoginHistoryDialog user={user} open={historyOpen} onOpenChange={setHistoryOpen} />
+      <Dialog open={invitationSentOpen} onOpenChange={setInvitationSentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MailPlus size={18} className="text-green-600" />
+              Invitation Sent
+            </DialogTitle>
+            <DialogDescription>
+              An invitation email has been sent to <strong>{user.email}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setInvitationSentOpen(false)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
