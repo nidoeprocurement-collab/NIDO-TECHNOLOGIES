@@ -6,6 +6,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { importFrontendRbacData } from "./rbacFrontendImport";
+import { importFrontendUsers } from "./usersFrontendImport";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -235,6 +236,7 @@ export function getRoleUserCount(roleName: string): number {
 // ── Users CRUD ────────────────────────────────────────────────────────────────
 
 export function getUsers(): NidoUser[] {
+  importFrontendUsers();
   try {
     const raw = localStorage.getItem(USERS_KEY);
     if (!raw) {
