@@ -102,7 +102,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       setSelectedModuleKeys([]);
       setAddError('');
     }
-  }, [open, role]);
+  }, [open, role?.id, role?.name]);
 
   const toggle = (moduleKey: string, action: ActionKey) => {
     if (superAdmin) return;
