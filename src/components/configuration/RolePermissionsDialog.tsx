@@ -27,7 +27,6 @@ import {
   saveRolePermissions,
   isSuperAdmin,
   getAllModules,
-  deleteCustomModule,
   CUSTOM_MODULES_EVENT,
   type ActionKey,
   type ModulePermissions,
@@ -152,11 +151,10 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
     });
   };
 
-  const handleDeleteCustomModule = (key: string, label: string) => {
-    deleteCustomModule(key);
+  const handleRemoveModuleFromRole = (key: string, label: string) => {
     setMatrix(prev => { const next = { ...prev }; delete next[key]; return next; });
     setModules(prev => prev.filter(module => module.key !== key));
-    toast.info('Module removed', { description: `"${label}" has been removed from the permissions matrix.` });
+    toast.info('Module removed from role', { description: `"${label}" has been removed from this role's permissions.` });
   };
 
   const handleSave = () => {
@@ -303,11 +301,11 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                       );
                     })}
                     <td className="py-2.5 px-1 border-b border-border text-center">
-                      {isCustom && !superAdmin && (
+                      {!superAdmin && (
                         <button
-                          onClick={() => handleDeleteCustomModule(m.key, m.label)}
+                          onClick={() => handleRemoveModuleFromRole(m.key, m.label)}
                           className="text-muted-foreground/40 hover:text-red-500 transition-colors"
-                          title={`Remove "${m.label}" module`}
+                          title={`Remove "${m.label}" from this role`}
                         >
                           <Trash2 size={13} />
                         </button>
