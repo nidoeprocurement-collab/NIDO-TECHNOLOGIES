@@ -5,6 +5,7 @@ import {
   addPortalUser,
   updatePortalUser,
   deletePortalUser,
+  getPortalRoleNames,
   type PortalUser,
 } from '@/lib/portalUserStore';
 import { Button } from '@/components/ui/button';
@@ -26,17 +27,6 @@ import {
   KeyRound,
   X,
 } from 'lucide-react';
-
-const DEFAULT_ROLES = [
-  'Client Admin',
-  'Procurement Manager',
-  'Purchase Executive',
-  'Finance',
-  'Store Manager',
-  'Employee',
-  'Approver',
-  'Viewer',
-];
 
 interface UserFormState {
   name: string;
@@ -61,19 +51,27 @@ export default function ClientPortalUsersPage() {
   const isAdmin = user?.userType === 'client_admin' || user?.userType === 'nido_admin';
 
   const [users, setUsers] = useState<PortalUser[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(BLANK_FORM);
   const [resetTarget, setResetTarget] = useState<PortalUser | null>(null);
   const [newPwd, setNewPwd] = useState('');
 
-  const refresh = () => setUsers(getPortalUsersByClient(clientId));
+  const refresh = () => {
+    setUsers(getPortalUsersByClient(clientId));
+    setRoles(getPortalRoleNames(clientId));
+  };
 
   useEffect(() => {
     refresh();
     const handler = () => refresh();
     window.addEventListener('nidoPortalUsersUpdated', handler);
-    return () => window.removeEventListener('nidoPortalUsersUpdated', handler);
+    window.addEventListener('nidoPortalRolesUpdated', handler);
+    return () => {
+      window.removeEventListener('nidoPortalUsersUpdated', handler);
+      window.removeEventListener('nidoPortalRolesUpdated', handler);
+    };
   }, [clientId]);
 
   const openAdd = () => {
@@ -326,7 +324,7 @@ export default function ClientPortalUsersPage() {
                   value={form.role}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 >
-                  {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                   {roles.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>

@@ -98,6 +98,7 @@ import { Suspense, lazy, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
 import { I18nProvider } from "./i18n/I18nProvider";
+import { hasPortalPermission } from "@/lib/portalUserStore";
 
 const queryClient = new QueryClient();
 
@@ -139,10 +140,35 @@ function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
 
 /** Guards client portal routes: redirects NIDO admins to /dashboard */
 function ClientPortalRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isClientPortalUser, isImpersonating } = useAuth();
+  const { isAuthenticated, isClientPortalUser, isImpersonating, user } = useAuth();
   const location = useLocation();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
+  const adminOnly = /\/(users|roles|addresses)(\/|$)/.test(location.pathname);
+  const moduleByPath: Array<[string, string]> = [
+    ["catalog", "Catalog"], ["orders", "Orders"], ["invoices", "Invoices"],
+    ["services", "Services"], ["support", "Support"], ["contracts", "Contracts"],
+    ["approvals", "Orders"], ["reports", "Reports"], ["dashboard", "Dashboard"],
+  ];
+  const portalModule = moduleByPath.find(([segment]) =>
+    location.pathname.includes(`/portal/${segment}`)
+  )?.[1];
+  const permitted = isImpersonating || (
+    !!user?.clientId &&
+    (adminOnly
+      ? user.userType === "client_admin"
+      : !portalModule || hasPortalPermission(user.clientId, user.role ?? "", portalModule, "view"))
+  );
+  if (!permitted) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-6">
+        <div className="max-w-md rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="text-base font-semibold text-gray-900">Access Denied</h1>
+          <p className="mt-2 text-sm text-gray-500">Your portal role does not have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
   const readOnlyBlocked = isImpersonating && (
     location.pathname.includes("/shop/cart") ||
     location.pathname.includes("/checkout") ||

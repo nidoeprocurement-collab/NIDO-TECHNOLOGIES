@@ -16,6 +16,82 @@ export interface PortalUser {
 }
 
 const STORE_KEY = 'nido_portal_users';
+const ROLE_STORE_PREFIX = 'nido_portal_roles_';
+
+export interface PortalRolePermission {
+  module: string;
+  view: boolean;
+  create: boolean;
+  edit: boolean;
+  delete: boolean;
+}
+
+export interface PortalRole {
+  id: string;
+  name: string;
+  description: string;
+  permissions: PortalRolePermission[];
+}
+
+export const PORTAL_MODULES = [
+  'Dashboard', 'Catalog', 'Orders', 'Services', 'Invoices',
+  'Reports', 'Notifications', 'Addresses', 'Contracts',
+] as const;
+
+const ROLE_BLUEPRINTS: Array<Pick<PortalRole, 'id' | 'name' | 'description'> & { view: string[]; create?: string[]; edit?: string[] }> = [
+  { id: 'r1', name: 'Client Admin', description: 'Full access to all portal modules', view: [...PORTAL_MODULES], create: [...PORTAL_MODULES], edit: [...PORTAL_MODULES] },
+  { id: 'r2', name: 'Procurement Manager', description: 'Can manage orders and catalog', view: [...PORTAL_MODULES], create: ['Catalog', 'Orders'], edit: ['Catalog', 'Orders'] },
+  { id: 'r3', name: 'Purchase Executive', description: 'Can place and track orders', view: ['Dashboard', 'Catalog', 'Orders', 'Notifications'], create: ['Orders'], edit: ['Orders'] },
+  { id: 'r4', name: 'Finance', description: 'Access to invoices and reports', view: ['Dashboard', 'Invoices', 'Reports'] },
+  { id: 'r5', name: 'Store Manager', description: 'Manages catalog and services', view: ['Dashboard', 'Catalog', 'Services', 'Orders'], create: ['Catalog', 'Services'], edit: ['Catalog', 'Services'] },
+  { id: 'r6', name: 'Approver', description: 'Reviews and approves orders', view: ['Dashboard', 'Orders', 'Services'], edit: ['Orders'] },
+  { id: 'r7', name: 'Employee', description: 'Browse catalog and submit requests', view: ['Dashboard', 'Catalog', 'Orders', 'Services', 'Notifications'], create: ['Orders'] },
+  { id: 'r8', name: 'Viewer', description: 'Read-only access across all modules', view: [...PORTAL_MODULES] },
+];
+
+function defaultPortalRoles(): PortalRole[] {
+  return ROLE_BLUEPRINTS.map(r => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    permissions: PORTAL_MODULES.map(module => ({
+      module,
+      view: r.view.includes(module),
+      create: r.create?.includes(module) ?? false,
+      edit: r.edit?.includes(module) ?? false,
+      delete: false,
+    })),
+  }));
+}
+
+export function getPortalRoles(clientId: string): PortalRole[] {
+  try {
+    const raw = localStorage.getItem(`${ROLE_STORE_PREFIX}${clientId}`);
+    return raw ? JSON.parse(raw) : defaultPortalRoles();
+  } catch {
+    return defaultPortalRoles();
+  }
+}
+
+export function savePortalRoles(clientId: string, roles: PortalRole[]): void {
+  localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(roles));
+  window.dispatchEvent(new Event('nidoPortalRolesUpdated'));
+}
+
+export function getPortalRoleNames(clientId: string): string[] {
+  return getPortalRoles(clientId).map(role => role.name);
+}
+
+export function hasPortalPermission(
+  clientId: string,
+  roleName: string,
+  module: string,
+  action: keyof Omit<PortalRolePermission, 'module'> = 'view',
+): boolean {
+  if (roleName === 'Client Admin') return true;
+  const role = getPortalRoles(clientId).find(item => item.name === roleName);
+  return !!role?.permissions.find(permission => permission.module === module)?.[action];
+}
 
 export function getPortalUsers(): PortalUser[] {
   try {

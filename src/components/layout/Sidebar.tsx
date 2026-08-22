@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { getPlatformModuleKey } from '@/lib/platformModuleCatalog';
+import { hasPortalPermission } from '@/lib/portalUserStore';
 import {
   LayoutDashboard, ShoppingCart, Wrench, Headphones, Users,
   TrendingUp, Package, DollarSign, Settings, ChevronDown,
@@ -90,16 +91,16 @@ const adminNavigationItems: NavItem[] = [
 
 // ── Client Portal navigation ──────────────────────────────────────────────────
 const clientNavigationItems: NavItem[] = [
-  { label: 'Dashboard',   icon: <LayoutDashboard size={20} />, path: '/portal/dashboard' },
-  { label: 'Shop',        icon: <ShoppingCart size={20} />,    path: '/portal/catalog' },
-  { label: 'My Requests', icon: <ClipboardList size={20} />,   path: '/portal/orders' },
-  { label: 'My Invoices', icon: <Receipt size={20} />,         path: '/portal/invoices' },
-  { label: 'Services',    icon: <Wrench size={20} />,          path: '/portal/services' },
-  { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support' },
-  { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts' },
-  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals' },
-  { label: 'Reports',     icon: <TrendingUp size={20} />,      path: '/portal/reports' },
-  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile' },
+  { label: 'Dashboard',   icon: <LayoutDashboard size={20} />, path: '/portal/dashboard', moduleKey: 'Dashboard' },
+  { label: 'Shop',        icon: <ShoppingCart size={20} />,    path: '/portal/catalog', moduleKey: 'Catalog' },
+  { label: 'My Requests', icon: <ClipboardList size={20} />,   path: '/portal/orders', moduleKey: 'Orders' },
+  { label: 'My Invoices', icon: <Receipt size={20} />,         path: '/portal/invoices', moduleKey: 'Invoices' },
+  { label: 'Services',    icon: <Wrench size={20} />,          path: '/portal/services', moduleKey: 'Services' },
+  { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support', moduleKey: 'Support' },
+  { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts', moduleKey: 'Contracts' },
+  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals', moduleKey: 'Orders' },
+  { label: 'Reports',     icon: <TrendingUp size={20} />,      path: '/portal/reports', moduleKey: 'Reports' },
+  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile', moduleKey: 'Dashboard' },
 ];
 
 // ── Permission-based nav filtering ────────────────────────────────────────────
@@ -271,10 +272,13 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
-  // Build filtered nav for admin users; client portal nav is always unfiltered
+  // Apply each tenant's portal role permissions to client navigation.
   const rawNavItems = isClientPortalUser ? clientNavigationItems : adminNavigationItems;
   const navItems = isClientPortalUser
-    ? rawNavItems
+    ? rawNavItems.filter(item =>
+        !item.moduleKey ||
+        hasPortalPermission(user?.clientId ?? '', user?.role ?? '', item.moduleKey, 'view')
+      )
      : filterNavItems(
        rawNavItems,
        (key, legacyKey) => legacyKey
