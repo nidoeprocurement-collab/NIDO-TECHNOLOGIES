@@ -19,7 +19,7 @@ import {
   type ProvisionResult,
 } from "@/lib/portalUserStore"
 import {
-  Users, Building2, ChevronDown, X, Mail, MapPin, Calendar,
+  Users, Building2, ChevronDown, ChevronRight, X, Mail, MapPin, Calendar,
   Archive, MoreVertical, CheckCircle, Clock, XCircle, Edit,
   Plus, Download, Upload, FileDown, Zap, Copy, Check,
   IndianRupee, Star, FileText,
