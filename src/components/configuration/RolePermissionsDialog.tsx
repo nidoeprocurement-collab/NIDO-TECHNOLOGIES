@@ -254,7 +254,6 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
             <tbody>
               {modules.map((m, idx) => {
                 const modPerms = matrix[m.key] ?? {};
-                const isCustom = 'custom' in m && m.custom;
                 return (
                   <tr key={m.key} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
                     <td className="py-2.5 px-3 border-b border-border">
@@ -276,11 +275,6 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                           )}
                           {m.label}
                         </button>
-                        {isCustom && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-blue-600 border-blue-300">
-                            custom
-                          </Badge>
-                        )}
                       </div>
                     </td>
                     {ACTIONS.map(a => {
