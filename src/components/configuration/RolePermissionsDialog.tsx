@@ -48,11 +48,16 @@ type PermMatrix = Record<string, ModulePermissions>;
 export default function RolePermissionsDialog({ open, onOpenChange, role }: RolePermissionsDialogProps) {
   const [matrix, setMatrix] = useState<PermMatrix>({});
   const [modules, setModules] = useState(getAllModules());
+  const [removedModuleKeys, setRemovedModuleKeys] = useState<Set<string>>(new Set());
   const [showAddModule, setShowAddModule] = useState(false);
   const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [addError, setAddError] = useState('');
 
   const superAdmin = !!(role && isSuperAdmin(role.name));
+
+  useEffect(() => {
+    if (open && role) setRemovedModuleKeys(new Set());
+  }, [open, role?.id, role?.name]);
 
   useEffect(() => {
     const handler = () => {
@@ -156,6 +161,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
 
   const handleRemoveModuleFromRole = (key: string, label: string) => {
     setMatrix(prev => { const next = { ...prev }; delete next[key]; return next; });
+    setRemovedModuleKeys(prev => new Set(prev).add(key));
     setModules(prev => prev.filter(module => module.key !== key));
     toast.info('Module removed from role', { description: `"${label}" has been removed from this role's permissions.` });
   };
@@ -170,6 +176,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   if (!role) return null;
 
   const customModules = modules.filter(m => 'custom' in m && m.custom);
+  const visibleModules = modules.filter(module => !removedModuleKeys.has(module.key));
   const listedModuleKeys = new Set(modules.map(module => module.key));
   const listedModuleLabels = new Set(modules.map(module => module.label));
   const availablePlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(
