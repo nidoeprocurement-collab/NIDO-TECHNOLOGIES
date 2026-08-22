@@ -64,9 +64,8 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
 }
 
 // ── Row Actions Menu ───────────────────────────────────────────────────────
-function RowActionsMenu({ client, onViewOverview, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
+function RowActionsMenu({ client, onEdit, onArchive, onSetStatus, onProvision, provisioned }: {
   client: StoredClient
-  onViewOverview: () => void
   onEdit: () => void
   onArchive: () => void
   onSetStatus: (s: ClientStatus) => void
@@ -101,13 +100,6 @@ function RowActionsMenu({ client, onViewOverview, onEdit, onArchive, onSetStatus
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
-          <button
-            type="button"
-            onClick={() => { onViewOverview(); setOpen(false) }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
-          >
-            <FileText className="w-3.5 h-3.5 opacity-60" /> View Overview
-          </button>
           {isSharedClient(client.id) ? (
             <div className="px-3 py-2 text-xs text-gray-500">
               Shared demo client · read only
@@ -780,7 +772,6 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
                     <td className="px-3 py-3 text-center">
                       <RowActionsMenu
                         client={c}
-                        onViewOverview={() => setOverviewClient(c)}
                         onEdit={() => navigate(`/clients/${c.id}/edit`)}
                         onArchive={() => archiveClient(c)}
                         onSetStatus={s => setClientStatus(c.id, s)}
