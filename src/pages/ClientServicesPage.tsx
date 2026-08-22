@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Filter, X } from "lucide-react";
 import { getClientServices, saveClientService, type ClientServiceRecord } from "@/lib/clientDataStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const servicesData = [
   { id: "SRV-001", name: "Cloud Hosting Premium", provider: "CloudServe Inc", startDate: "2024-01-01", endDate: "2024-12-31", amount: "$12,000/year", status: "Active", category: "Hosting" },
@@ -164,7 +165,9 @@ function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (serv
   );
 }
 
-export default function ClientServicesPage({ clientId, dateRange }: { clientId: string; dateRange?: ClientDateRange }) {
+export default function ClientServicesPage({ clientId: requestedClientId, dateRange }: { clientId?: string; dateRange?: ClientDateRange }) {
+  const { user, isClientPortalUser } = useAuth();
+  const clientId = isClientPortalUser ? (user?.clientId ?? "") : (requestedClientId ?? "");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Category");

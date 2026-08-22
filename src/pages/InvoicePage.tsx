@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
@@ -284,6 +285,7 @@ function ArchivedModal({
 export default function InvoicePage() {
   useI18n();
   const navigate = useNavigate();
+  const { user, isClientPortalUser } = useAuth();
   const { config } = useConfig();
   const prefix = config.prefixes.find((item) => item.key === 'invoice')?.value || 'INV-';
   const [invoices, setInvoices] = useState<StoredInvoice[]>([]);
@@ -318,13 +320,21 @@ export default function InvoicePage() {
     };
   }, [rowMenu]);
 
-  const filteredInvoices = useMemo(() => invoices.filter((invoice) => {
+  const clientInvoices = useMemo(() => {
+    if (!isClientPortalUser || !user?.clientName) return invoices;
+    return invoices.filter(invoice =>
+      invoice.clientName === user.clientName ||
+      (invoice as StoredInvoice & { clientId?: string }).clientId === user.clientId
+    );
+  }, [invoices, isClientPortalUser, user?.clientId, user?.clientName]);
+
+  const filteredInvoices = useMemo(() => clientInvoices.filter((invoice) => {
     const query = search.toLowerCase();
     const matchesSearch =
       displayNumber(invoice.invoiceNumber, prefix).toLowerCase().includes(query) ||
       invoice.clientName.toLowerCase().includes(query);
     return matchesSearch && (statusFilter === 'all' || invoice.status === statusFilter);
-  }), [invoices, prefix, search, statusFilter]);
+  }), [clientInvoices, prefix, search, statusFilter]);
 
   const exportCsv = () => {
     const rows = [

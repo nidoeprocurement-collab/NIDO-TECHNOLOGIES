@@ -236,6 +236,7 @@ const ChildTicketDetailPage = lazy(() => import("@/pages/ChildTicketDetailPage")
 const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
 const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
+const ClientServicesPage = lazy(() => import("@/pages/ClientServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
 const NewRepairServicePage = lazy(() => import("@/pages/NewRepairServicePage"));
 const NewRecycleDisposalPage = lazy(() => import("@/pages/NewRecycleDisposalPage"));
@@ -1091,7 +1092,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Services failed to load" resetKey={location.pathname}>
-                  <ServicesPage />
+                  <ClientServicesPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }

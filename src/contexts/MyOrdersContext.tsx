@@ -45,6 +45,8 @@ export interface OrderCartItem {
 
 export interface MyOrder {
   id: string;
+  /** Client tenant that owns this order. */
+  clientId?: string;
   client: string;
   clientColor: string;
   clientInitial: string;

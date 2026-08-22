@@ -146,6 +146,7 @@ export default function ReviewPage() {
     const poRef = Date.now().toString().slice(-6);
 
     const orderNumber = addOrder({
+      clientId: cart[0]?.clientId,
       client: "Nido Tech CorpEssentials",
       clientColor: "#2563eb",
       clientInitial: "N",
