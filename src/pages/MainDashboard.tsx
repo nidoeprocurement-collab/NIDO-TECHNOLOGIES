@@ -8,6 +8,7 @@ import { getClients } from '@/lib/clientStore';
 import { getAllPOs, type StoredPO } from '@/lib/purchaseOrderStore';
 import { getServiceRequests } from '@/lib/serviceRequestsStore';
 import { useI18n } from '@/i18n/I18nProvider';
+import { useAuth } from '@/contexts/AuthContext';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'];
 const CATEGORY_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#6b7280', '#ec4899'];
@@ -255,6 +256,8 @@ function timeAgo(timestamp: number): string {
 
 export default function MainDashboard() {
   const { fmt } = useI18n();
+  const { user } = useAuth();
+  const displayName = user?.name?.trim() || 'there';
   const formatRupees = (v: number) => fmt(v, true);
   const { orders } = useMyOrders();
   const vendors = useMemo(() => getVendors().filter(v => !v.archived), []);
@@ -384,7 +387,7 @@ export default function MainDashboard() {
       <div className="bg-white rounded-lg border border-gray-200 p-3">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-1">Welcome back, System Owner! 👋</h1>
+            <h1 className="text-4xl font-bold text-gray-900 mb-1">Welcome back, {displayName}! 👋</h1>
             <p className="text-gray-600">Here&apos;s what&apos;s happening with your organization today.</p>
           </div>
         </div>

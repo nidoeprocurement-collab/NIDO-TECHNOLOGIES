@@ -259,7 +259,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               </tr>
             </thead>
             <tbody>
-              {modules.map((m, idx) => {
+              {visibleModules.map((m, idx) => {
                 const modPerms = matrix[m.key] ?? {};
                 return (
                   <tr key={m.key} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
