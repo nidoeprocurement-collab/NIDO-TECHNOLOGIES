@@ -423,13 +423,6 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome back, {client.name}! <span aria-hidden="true">👋</span></h1>
               <p className="mt-1 text-xs text-gray-500">Here's what's happening with your account today.</p>
             </div>
-            <div className="flex items-start gap-2 text-right text-[10px] text-gray-500">
-              <div>
-                <p>{new Date().toLocaleDateString("en-US", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</p>
-                <p className="mt-0.5 text-base font-bold text-gray-900">{new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
-              </div>
-              <span className="mt-1 text-amber-500">☼</span>
-            </div>
           </header>
 
           <div className="mt-5 flex flex-wrap items-center gap-1.5">
