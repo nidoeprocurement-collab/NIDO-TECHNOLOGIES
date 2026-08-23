@@ -31,6 +31,7 @@ import { CircleCheck } from "./ClientRolesPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getPortalUsersByClient, getPortalRoles, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
+import { getClients, addClient } from "@/lib/clientStore";
 
 
 export const usersData = [
@@ -87,7 +88,7 @@ export type AssignedDeviceEntry = {
   status: "Active" | "In Repair";
 };
 
-function AddUserModal({ clientId, onClose, onCreate }: { clientId?: string; onClose: () => void; onCreate: (user: UserRecord) => void }) {
+function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: string; clientName?: string; onClose: () => void; onCreate: (user: UserRecord) => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [notification, setNotification] = useState("");
@@ -103,7 +104,7 @@ function AddUserModal({ clientId, onClose, onCreate }: { clientId?: string; onCl
     gender: "",
     joiningDate: "",
     role:"",
-    orgAccess: "",
+    orgAccess: clientName || "",
     dataVisibility: "All Data",
     locationAccess: "All Locations",
     status: "Active",
@@ -112,6 +113,37 @@ function AddUserModal({ clientId, onClose, onCreate }: { clientId?: string; onCl
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const [availableClients, setAvailableClients] = useState(() => getClients());
+  useEffect(() => {
+    const refreshClients = () => setAvailableClients(getClients());
+    refreshClients();
+    window.addEventListener("nidoClientsUpdated", refreshClients);
+    return () => window.removeEventListener("nidoClientsUpdated", refreshClients);
+  }, []);
+
+  const handleOrganizationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value !== "__add_new__") {
+      setForm((p) => ({ ...p, orgAccess: e.target.value }));
+      return;
+    }
+    const name = window.prompt("Enter the new client name");
+    if (!name?.trim()) return;
+    const trimmedName = name.trim();
+    const existing = availableClients.find(client => client.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      setForm((p) => ({ ...p, orgAccess: existing.name }));
+      return;
+    }
+    const newClient = {
+      id: `CI-${Date.now()}`,
+      name: trimmedName,
+      status: "active",
+    };
+    addClient(newClient);
+    setAvailableClients(getClients());
+    setForm((p) => ({ ...p, orgAccess: newClient.name }));
+  };
 
   // Permissions
   const addUserModules = ["Dashboard", "Purchase Orders", "Shop", "Vendors", "Clients", "Inventory", "Transactions", "Invoices", "Reports & Analytics", "User Management"];
@@ -377,11 +409,12 @@ function AddUserModal({ clientId, onClose, onCreate }: { clientId?: string; onCl
                     </div>
                     <div>
                       <label className={labelCls}>Organization Access <span className="text-red-400">*</span></label>
-                      <select value={form.orgAccess} onChange={set("orgAccess")} className={inputCls + " appearance-none text-gray-500"}>
+                      <select value={form.orgAccess} onChange={handleOrganizationChange} className={inputCls + " appearance-none text-gray-500"}>
                         <option value="">Select organization</option>
-                        <option>Nitin Supplies HQ</option>
-                        <option>Nitin Supplies — South Division</option>
-                        <option>Nitin Supplies — North Division</option>
+                        {availableClients.map(client => (
+                          <option key={client.id} value={client.name}>{client.name}</option>
+                        ))}
+                        <option value="__add_new__">＋ Add New Client</option>
                       </select>
                     </div>
                   </div>
@@ -2689,6 +2722,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
       {showAddUser && (
         <AddUserModal
           clientId={clientId}
+          clientName={clientName}
           onClose={() => setShowAddUser(false)}
           onCreate={createUser}
         />
