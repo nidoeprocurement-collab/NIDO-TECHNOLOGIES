@@ -197,6 +197,8 @@ const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
+const ClientPortalReportsPage = lazy(() => import("@/pages/ClientPortalReportsPage"));
+const ClientPortalApprovalsPage = lazy(() => import("@/pages/ClientPortalApprovalsPage"));
 const ClientPortalUsersPage = lazy(() => import("@/pages/ClientPortalUsersPage"));
 const ClientPortalRolesPage = lazy(() => import("@/pages/ClientPortalRolesPage"));
 const ClientPortalAddressesPage = lazy(() => import("@/pages/ClientPortalAddressesPage"));
@@ -1151,7 +1153,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Approvals failed to load" resetKey={location.pathname}>
-                  <ApprovalWorkflowsPage />
+                  <ClientPortalApprovalsPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
@@ -1162,7 +1164,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Reports failed to load" resetKey={location.pathname}>
-                  <AuditTrailPage />
+                  <ClientPortalReportsPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }

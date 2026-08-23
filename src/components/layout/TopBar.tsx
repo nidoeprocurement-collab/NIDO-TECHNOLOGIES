@@ -133,20 +133,20 @@ export default function TopBar() {
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2.5">
+          {!isClientPortalUser && <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2.5">
             <Search size={18} className="text-muted-foreground" />
             <input
               type="text"
               placeholder="Search users, orders, vendors, clients, invoices..."
               className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
             />
-          </div>
+          </div>}
         </div>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-3">
-          {/* SLA Notifications */}
-          <SLANotificationPopup />
+          {/* SLA alerts are internal to the owner platform. */}
+          {!isClientPortalUser && <SLANotificationPopup />}
 
           {/* Live Date & Time */}
           <div className="flex items-center gap-3 pl-4 border-l border-border">
