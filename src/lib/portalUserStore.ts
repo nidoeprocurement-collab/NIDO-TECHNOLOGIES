@@ -96,7 +96,18 @@ export function hasPortalPermission(
 export function getPortalUsers(): PortalUser[] {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // Normalize records created by older versions of the portal user screen.
+    // In particular, login must not fail because an email was saved with
+    // accidental whitespace or status used a different casing.
+    return parsed.map((user: Partial<PortalUser>) => ({
+      ...user,
+      email: String(user.email ?? '').trim(),
+      name: String(user.name ?? '').trim(),
+      status: String(user.status ?? 'active').toLowerCase() === 'active' ? 'active' : 'inactive',
+    })) as PortalUser[];
   } catch {
     return [];
   }
@@ -134,12 +145,13 @@ export function deletePortalUser(id: string): void {
 
 export function findPortalUser(email: string, password: string): PortalUser | null {
   const users = getPortalUsers();
+  const normalizedEmail = email.trim().toLowerCase();
   return (
     users.find(
       u =>
-        u.email.toLowerCase() === email.toLowerCase() &&
+        u.email.trim().toLowerCase() === normalizedEmail &&
         u.password === password &&
-        u.status === 'active'
+        String(u.status).toLowerCase() === 'active'
     ) ?? null
   );
 }

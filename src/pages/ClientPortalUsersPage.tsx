@@ -87,12 +87,16 @@ export default function ClientPortalUsersPage() {
   };
 
   const handleSave = () => {
-    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) return;
+    const normalizedEmail = form.email.trim().toLowerCase();
+    const duplicate = users.some(u =>
+      u.id !== editingId && u.email.trim().toLowerCase() === normalizedEmail
+    );
+    if (!form.name.trim() || !normalizedEmail || !form.password.trim() || duplicate) return;
 
     if (editingId) {
       updatePortalUser(editingId, {
         name: form.name,
-        email: form.email,
+        email: normalizedEmail,
         password: form.password,
         role: form.role,
         userType: form.userType,
@@ -102,7 +106,7 @@ export default function ClientPortalUsersPage() {
       addPortalUser({
         id,
         name: form.name,
-        email: form.email,
+         email: normalizedEmail,
         password: form.password,
         role: form.role,
         userType: form.userType,
