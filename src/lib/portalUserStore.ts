@@ -237,3 +237,30 @@ export function provisionClientPortal(
   activateClientPortal(clientId, clientName, credentials);
   return credentials;
 }
+
+/** Creates an active portal login for an owner-managed client user. */
+export function provisionPortalUser(
+  clientId: string,
+  clientName: string,
+  details: { email: string; name: string; role?: string },
+): ProvisionResult {
+  const email = details.email.trim().toLowerCase();
+  const password = `User@${randomSuffix()}!`;
+  const existing = getPortalUsers().find(
+    user => user.clientId === clientId && user.email.trim().toLowerCase() === email,
+  );
+  addPortalUser({
+    id: existing?.id || `portal-${clientId}-${Date.now()}`,
+    email,
+    password,
+    name: details.name.trim(),
+    userType: existing?.userType || 'client_user',
+    clientId,
+    clientName,
+    role: details.role || existing?.role || 'Employee',
+    status: 'active',
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    provisionedAt: new Date().toISOString(),
+  });
+  return { email, password, userId: existing?.id || `portal-${clientId}-${Date.now()}` };
+}

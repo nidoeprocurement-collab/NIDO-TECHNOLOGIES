@@ -30,7 +30,7 @@ import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { CircleCheck } from "./ClientRolesPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { getPortalUsersByClient, provisionPortalUser } from "@/lib/portalUserStore";
 
 
 export const usersData = [
@@ -2564,6 +2564,19 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     } : null;
   };
 
+  const provisionPortalAccess = (row: UserRecord) => {
+    if (!clientId || row.status !== "Active") return;
+    const credentials = provisionPortalUser(clientId, clientName || "Client", {
+      email: row.email,
+      name: row.name,
+      role: "Employee",
+    });
+    setRowMenu(null);
+    window.alert(
+      `Client Portal access is active.\n\nEmail: ${credentials.email}\nPassword: ${credentials.password}\n\nSave these credentials. The password is shown only now.`,
+    );
+  };
+
   const createUser = (user: UserRecord) => {
     setUsers((prev) => [user, ...prev]);
   };
@@ -2785,6 +2798,18 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                       </button>
                       <div className="my-1 border-t border-gray-100" />
                       {canImpersonate && user.status === "Active" && (
+                         <>
+                           {!getPortalTarget(user) && (
+                             <button
+                               onClick={() => provisionPortalAccess(user)}
+                               className="w-full text-left px-2 py-1.5 text-xs hover:bg-green-50 transition-colors text-green-700"
+                             >
+                               Provision Portal Access
+                             </button>
+                           )}
+                         </>
+                       )}
+                       {canImpersonate && user.status === "Active" && (
                         <button
                           onClick={() => {
                             const target = getPortalTarget(user);
