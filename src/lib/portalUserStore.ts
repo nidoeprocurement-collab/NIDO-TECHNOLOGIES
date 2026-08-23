@@ -82,6 +82,11 @@ export function getPortalRoleNames(clientId: string): string[] {
   return getPortalRoles(clientId).map(role => role.name);
 }
 
+export function getUsersWithInvalidPortalRoles(clientId: string): PortalUser[] {
+  const validRoles = new Set(getPortalRoleNames(clientId));
+  return getPortalUsersByClient(clientId).filter(user => !validRoles.has(user.role));
+}
+
 export function hasPortalPermission(
   clientId: string,
   roleName: string,

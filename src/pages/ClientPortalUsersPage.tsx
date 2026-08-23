@@ -6,6 +6,7 @@ import {
   updatePortalUser,
   deletePortalUser,
   getPortalRoleNames,
+  getUsersWithInvalidPortalRoles,
   type PortalUser,
 } from '@/lib/portalUserStore';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ export default function ClientPortalUsersPage() {
 
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [invalidRoleUsers, setInvalidRoleUsers] = useState<PortalUser[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(BLANK_FORM);
@@ -61,6 +63,7 @@ export default function ClientPortalUsersPage() {
   const refresh = () => {
     setUsers(getPortalUsersByClient(clientId));
     setRoles(getPortalRoleNames(clientId));
+    setInvalidRoleUsers(getUsersWithInvalidPortalRoles(clientId));
   };
 
   useEffect(() => {
@@ -157,6 +160,13 @@ export default function ClientPortalUsersPage() {
       </div>
 
       <div className="max-w-7xlpx-6">
+        {invalidRoleUsers.length > 0 && (
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <strong>{invalidRoleUsers.length} user{invalidRoleUsers.length === 1 ? '' : 's'}</strong> have a role that is no longer present in this client’s role list:
+            <span className="ml-1">{invalidRoleUsers.map(u => `${u.name} (${u.role})`).join(', ')}</span>.
+            Update their role before they sign in so portal permissions are applied correctly.
+          </div>
+        )}
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-8">
           <Card>

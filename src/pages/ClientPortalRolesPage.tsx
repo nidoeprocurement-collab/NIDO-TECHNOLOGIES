@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ShieldCheck, Plus, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getPortalUsersByClient } from '@/lib/portalUserStore';
+import { getPortalUsersByClient, updatePortalUser } from '@/lib/portalUserStore';
 
 interface RolePermission {
   module: string;
@@ -192,6 +192,11 @@ export default function ClientPortalRolesPage() {
     const updated = roles.map(item => item.id === role.id
       ? { ...item, name: name.trim(), description: description?.trim() ?? item.description }
       : item);
+    if (name.trim() !== role.name) {
+      getPortalUsersByClient(clientId)
+        .filter(user => user.role === role.name)
+        .forEach(user => updatePortalUser(user.id, { role: name.trim() }));
+    }
     saveRoles(clientId, updated);
     setRoles(updated);
     setSelected(updated.find(item => item.id === role.id) ?? null);
