@@ -30,7 +30,7 @@ import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { CircleCheck } from "./ClientRolesPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { getPortalUsersByClient, getPortalRoles, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
+import { getPortalUsersByClient, getPortalRoles, PORTAL_MODULES, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
 import { getClients, addClient } from "@/lib/clientStore";
 
 
@@ -146,7 +146,9 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   };
 
   // Permissions
-  const addUserModules = ["Dashboard", "Purchase Orders", "Shop", "Vendors", "Clients", "Inventory", "Transactions", "Invoices", "Reports & Analytics", "User Management"];
+  // Client users only receive permissions for modules available in their
+  // client portal, never the internal NIDO platform modules.
+  const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"];
   const initPerms = () => {
     const out: Record<string, Record<string, boolean>> = {};
@@ -953,7 +955,7 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const addUserModules = ["Dashboard", "Purchase Orders", "Shop", "Vendors", "Clients", "Inventory", "Transactions", "Invoices", "Reports & Analytics", "User Management"];
+  const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"];
   const initPerms = () => {
     const out: Record<string, Record<string, boolean>> = {};
