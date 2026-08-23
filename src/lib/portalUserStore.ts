@@ -24,6 +24,11 @@ export interface PortalRolePermission {
   create: boolean;
   edit: boolean;
   delete: boolean;
+  approve?: boolean;
+  export?: boolean;
+  import?: boolean;
+  manage?: boolean;
+  configure?: boolean;
 }
 
 export interface PortalRole {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Mail,
   Phone,
@@ -30,7 +30,7 @@ import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { CircleCheck } from "./ClientRolesPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { getPortalUsersByClient, provisionPortalUser } from "@/lib/portalUserStore";
+import { getPortalUsersByClient, getPortalRoles, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
 
 
 export const usersData = [
@@ -87,7 +87,7 @@ export type AssignedDeviceEntry = {
   status: "Active" | "In Repair";
 };
 
-function AddUserModal({ onClose, onCreate }: { onClose: () => void; onCreate: (user: UserRecord) => void }) {
+function AddUserModal({ clientId, onClose, onCreate }: { clientId?: string; onClose: () => void; onCreate: (user: UserRecord) => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [notification, setNotification] = useState("");
@@ -371,14 +371,7 @@ function AddUserModal({ onClose, onCreate }: { onClose: () => void; onCreate: (u
                       <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                       <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-600"}>
                         <option value="">Select role</option>
-                        <option>Administrator</option>
-                        <option>Procurement Manager</option>
-                        <option>Procurement Specialist</option>
-                        <option>Accounts Payable Officer</option>
-                        <option>Finance Manager</option>
-                        <option>Employee</option>
-                        <option>Client Administrator</option>
-                        <option>Client User</option>
+                        {getPortalRoles(clientId || "").map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                       </select>
                       <button className="text-[11px] text-blue-500 hover:underline mt-1">+ Add New Role</button>
                     </div>
@@ -888,7 +881,22 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
 
 export type UserRecord = typeof usersData[0];
 
-function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
+function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[number]): UserRecord {
+  const initials = user.name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "U";
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    email: user.email,
+    phone: "",
+    lastActive: user.createdAt,
+    status: user.status === "active" ? "Active" : "Inactive",
+    initials,
+    color: "bg-blue-500",
+  };
+}
+
+function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [activeTab, setActiveTab] = useState("Overview");
 
@@ -1046,11 +1054,7 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
                   <div>
                     <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                     <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-700"}>
-                      <option>Administrator</option><option>Procurement Manager</option><option>Procurement Specialist</option>
-                      <option>Accounts Payable Officer</option><option>Finance Manager</option><option>Employee</option>
-                      <option>Client Administrator</option><option>Client User</option><option>Manager</option>
-                      <option>IT Specialist</option><option>Accountant</option><option>Sales Rep</option>
-                      <option>Support Agent</option><option>HR Specialist</option><option>IT Director</option><option>Procurement</option>
+                      {getPortalRoles(clientId || "").map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -2527,7 +2531,9 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const { user: authenticatedUser, startImpersonation } = useAuth();
   const { hasPermission } = usePermissions();
   const [impersonationTarget, setImpersonationTarget] = useState<UserRecord | null>(null);
-  const [users, setUsers] = useState<UserRecord[]>([...usersData]);
+  const [users, setUsers] = useState<UserRecord[]>(() =>
+    clientId ? getPortalUsersByClient(clientId).map(portalUserToRecord) : []
+  );
   const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -2541,6 +2547,18 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const [archiveTarget, setArchiveTarget] = useState<UserRecord | null>(null);
   const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
   const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
+  useEffect(() => {
+    const refreshUsers = () => {
+      if (clientId) setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
+    };
+    refreshUsers();
+    window.addEventListener("nidoPortalUsersUpdated", refreshUsers);
+    window.addEventListener("nidoPortalRolesUpdated", refreshUsers);
+    return () => {
+      window.removeEventListener("nidoPortalUsersUpdated", refreshUsers);
+      window.removeEventListener("nidoPortalRolesUpdated", refreshUsers);
+    };
+  }, [clientId]);
   const canImpersonate = Boolean(
     clientId &&
     authenticatedUser?.userType === "nido_admin" &&
@@ -2578,6 +2596,13 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   };
 
   const createUser = (user: UserRecord) => {
+    if (clientId) {
+      provisionPortalUser(clientId, clientName || "Client", {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      });
+    }
     setUsers((prev) => [user, ...prev]);
   };
 
@@ -2592,12 +2617,25 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   };
 
   const deactivateUser = (id: string) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(item => item.id === id);
+    if (portalUser) {
+      updatePortalUser(id, { status: portalUser.status === "active" ? "inactive" : "active" });
+    }
     setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: u.status === "Inactive" ? "Active" : "Inactive" } : u));
     if (selectedUser?.id === id) setSelectedUser((prev) => prev ? { ...prev, status: prev.status === "Inactive" ? "Active" : "Inactive" } : prev);
     setRowMenu(null);
   };
 
   const saveEditedUser = (updated: UserRecord) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(item => item.id === updated.id);
+    if (portalUser) {
+      updatePortalUser(updated.id, {
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        status: updated.status === "Active" ? "active" : "inactive",
+      });
+    }
     setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u));
     if (selectedUser?.id === updated.id) setSelectedUser(updated);
   };
@@ -2605,7 +2643,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const liveSelectedUser = selectedUser ? (users.find((u) => u.id === selectedUser.id) ?? selectedUser) : null;
 
   if (showArchivedUsers) return <ArchivedUsersPage onBack={() => setShowArchivedUsers(false)} archivedUsers={archived} />;
-  if (editingUser) return <EditUserPage user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
+  if (editingUser) return <EditUserPage clientId={clientId} user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
   if (assigningDeviceFor) return (
     <AssignDevicePage
       userName={assigningDeviceFor.name}
@@ -2650,6 +2688,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     <div className="p-5 flex flex-col gap-4" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
       {showAddUser && (
         <AddUserModal
+          clientId={clientId}
           onClose={() => setShowAddUser(false)}
           onCreate={createUser}
         />
