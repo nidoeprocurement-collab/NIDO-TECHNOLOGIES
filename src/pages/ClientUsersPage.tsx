@@ -1260,7 +1260,7 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
         <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium">{archivedUsers.length} archived</span>
       </div>
 
-      <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="border border-gray-200 rounded-xl overflow-visible">
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
@@ -2865,7 +2865,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                     <MoreVertical size={13} />
                   </button>
                   {rowMenu === user.id && (
-                    <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-40" onClick={(e) => e.stopPropagation()}>
+                    <div className="absolute right-2 bottom-2 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 w-48" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => { setEditingUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit User</button>
                       <button onClick={() => { setResetPasswordUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Reset Password</button>
                       <button onClick={() => deactivateUser(user.id)} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">
