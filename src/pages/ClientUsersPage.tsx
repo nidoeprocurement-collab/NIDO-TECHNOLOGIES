@@ -2573,6 +2573,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
+  const [rowMenuPosition, setRowMenuPosition] = useState({ top: 8, right: 8 });
   const [showAddUser, setShowAddUser] = useState(false);
   const [showImportUsers, setShowImportUsers] = useState(false);
   const [showArchivedUsers, setShowArchivedUsers] = useState(false);
@@ -2859,13 +2860,34 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                 </td>
                 <td className="px-3 py-2 relative">
                   <button
-                    onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === user.id ? null : user.id); setHeaderMenuOpen(false); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (rowMenu === user.id) {
+                        setRowMenu(null);
+                        return;
+                      }
+                      const buttonRect = e.currentTarget.getBoundingClientRect();
+                      const menuHeight = 220;
+                      const opensBelow = buttonRect.bottom + 8 + menuHeight <= window.innerHeight;
+                      setRowMenuPosition({
+                        top: opensBelow
+                          ? buttonRect.bottom + 8
+                          : Math.max(8, buttonRect.top - menuHeight - 8),
+                        right: Math.max(8, window.innerWidth - buttonRect.right),
+                      });
+                      setRowMenu(user.id);
+                      setHeaderMenuOpen(false);
+                    }}
                     className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
                   >
                     <MoreVertical size={13} />
                   </button>
                   {rowMenu === user.id && (
-                    <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50 w-48" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="fixed bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-[60] w-48 max-h-[calc(100vh-1rem)] overflow-y-auto"
+                      style={rowMenuPosition}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button onClick={() => { setEditingUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit User</button>
                       <button onClick={() => { setResetPasswordUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Reset Password</button>
                       <button onClick={() => deactivateUser(user.id)} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">
