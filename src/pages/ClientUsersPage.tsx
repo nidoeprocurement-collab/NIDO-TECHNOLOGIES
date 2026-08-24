@@ -2584,6 +2584,22 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
   const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
   useEffect(() => {
+    if (!rowMenu) return;
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        (target as Element).closest("[data-user-row-menu]") ||
+        (target as Element).closest("[data-user-row-menu-trigger]")
+      ) {
+        return;
+      }
+      setRowMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+  }, [rowMenu]);
+  useEffect(() => {
     const refreshUsers = () => {
       if (clientId) setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
     };
@@ -2878,6 +2894,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                       setRowMenu(user.id);
                       setHeaderMenuOpen(false);
                     }}
+                    data-user-row-menu-trigger
                     className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
                   >
                     <MoreVertical size={13} />
@@ -2886,6 +2903,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                     <div
                       className="fixed bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-[60] w-48 max-h-[calc(100vh-1rem)] overflow-y-auto"
                       style={rowMenuPosition}
+                      data-user-row-menu
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button onClick={() => { setEditingUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit User</button>
