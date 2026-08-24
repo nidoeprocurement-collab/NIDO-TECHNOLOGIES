@@ -512,6 +512,7 @@ export default function AddClient() {
         client_logo_url: formData.client_logo_url,
         gst_treatment: formData.gst_treatment,
         gstin: formData.gstin,
+        id_reference_number: formData.id_reference_number,
         source_of_supply: formData.source_of_supply,
         pan_number: formData.pan_number,
         currency: formData.currency,

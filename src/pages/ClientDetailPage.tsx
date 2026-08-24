@@ -755,6 +755,13 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                       </div>
                     )}
                     <div className="flex flex-col gap-0.5">
+                      <span className="text-gray-400">Contact Person</span>
+                      <div className="flex items-center gap-2">
+                        <Users size={14} className="text-gray-400 shrink-0" />
+                        <span>{client.contact_person || client.rep || "—"}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
                       <span className="text-gray-400">Phone</span>
                       <div className="flex items-center gap-2">
                         <Phone size={14} className="text-gray-400 shrink-0" />
