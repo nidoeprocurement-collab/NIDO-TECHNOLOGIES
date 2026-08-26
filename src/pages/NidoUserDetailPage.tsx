@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Activity,
   BriefcaseBusiness,
   Check,
+  Download,
   FileText,
   KeyRound,
   LockKeyhole,
@@ -12,12 +13,19 @@ import {
   Shield,
   ShieldCheck,
   Users,
+  Upload,
   UserRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActionsMenu, ResetPasswordDialog } from "@/components/configuration/ManageUsersPanel";
 import { getUsers, type NidoUser, NIDO_USERS_EVENT } from "@/lib/nidoUsersStore";
+import {
+  addUserDocuments,
+  getUserDocuments,
+  NIDO_USER_DOCUMENTS_EVENT,
+  type NidoUserDocument,
+} from "@/lib/nidoUserDocumentsStore";
 import { getRolePermissions, MODULES, PERMISSIONS_EVENT } from "@/lib/permissionsStore";
 
 type DetailTab = "overview" | "documents" | "notes";
@@ -83,12 +91,38 @@ function EmptyTab({ label }: { label: string }) {
   );
 }
 
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error(`Unable to read ${file.name}.`));
+    };
+    reader.onerror = () => reject(new Error(`Unable to read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function createDocumentId() {
+  return `document-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export default function NidoUserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const [users, setUsers] = useState<NidoUser[]>(() => getUsers());
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [documents, setDocuments] = useState<NidoUserDocument[]>([]);
+  const [documentsError, setDocumentsError] = useState("");
+  const [uploadingDocuments, setUploadingDocuments] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => setUsers(getUsers());
 
@@ -102,6 +136,19 @@ export default function NidoUserDetailPage() {
       window.removeEventListener("storage", refresh);
     };
   }, []);
+
+  useEffect(() => {
+    const refreshDocuments = () => {
+      if (userId) setDocuments(getUserDocuments(userId));
+    };
+    refreshDocuments();
+    window.addEventListener(NIDO_USER_DOCUMENTS_EVENT, refreshDocuments);
+    window.addEventListener("storage", refreshDocuments);
+    return () => {
+      window.removeEventListener(NIDO_USER_DOCUMENTS_EVENT, refreshDocuments);
+      window.removeEventListener("storage", refreshDocuments);
+    };
+  }, [userId]);
 
   const selectedUser = users.find((candidate) => candidate.id === userId);
   const permissions = useMemo(
@@ -139,6 +186,48 @@ export default function NidoUserDetailPage() {
     { action: "PROFILE UPDATED", by: "System", details: "User details saved", date: formatDate(selectedUser.updatedAt) },
     { action: "ACCOUNT CREATED", by: "System", details: "User account created", date: formatDate(selectedUser.createdAt) },
   ];
+
+  const handleDocumentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) return;
+
+    setUploadingDocuments(true);
+    setDocumentsError("");
+    try {
+      const uploadedAt = new Date().toISOString();
+      const newDocuments = await Promise.all(
+        files.map(async (file): Promise<NidoUserDocument> => ({
+          id: createDocumentId(),
+          userId: selectedUser.id,
+          name: file.name,
+          type: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          dataUrl: await readFileAsDataUrl(file),
+          uploadedAt,
+        })),
+      );
+      addUserDocuments(selectedUser.id, newDocuments);
+      setDocuments(getUserDocuments(selectedUser.id));
+    } catch (error) {
+      setDocumentsError(
+        error instanceof DOMException && error.name === "QuotaExceededError"
+          ? "These files are too large to store in this browser. Try uploading smaller files."
+          : error instanceof Error
+            ? error.message
+            : "Unable to upload the selected documents.",
+      );
+    } finally {
+      setUploadingDocuments(false);
+    }
+  };
+
+  const downloadDocument = (document: NidoUserDocument) => {
+    const link = window.document.createElement("a");
+    link.href = document.dataUrl;
+    link.download = document.name;
+    link.click();
+  };
 
   return (
     <div className="min-h-screen bg-background px-3 py-4 sm:px-5 md:px-6 md:py-6">
@@ -268,7 +357,66 @@ export default function NidoUserDetailPage() {
           </>
         )}
 
-        {activeTab === "documents" && <EmptyTab label="documents" />}
+        {activeTab === "documents" && (
+          <section className={`${cardClass} overflow-hidden`}>
+            <div className="flex flex-col gap-4 border-b border-border p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div>
+                <h2 className="text-h3">Documents</h2>
+                <p className="mt-1 text-body-sm text-muted-foreground">
+                  Upload and download documents for {selectedUser.name}.
+                </p>
+              </div>
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleDocumentUpload}
+                />
+                <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingDocuments}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  {uploadingDocuments ? "Uploading…" : "Add Documents"}
+                </Button>
+              </div>
+            </div>
+            {documentsError && (
+              <p className="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">{documentsError}</p>
+            )}
+            {documents.length === 0 ? (
+              <div className="flex min-h-48 items-center justify-center p-8">
+                <div className="text-center">
+                  <FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground/60" />
+                  <p className="text-sm font-medium text-foreground">No documents uploaded</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Select one or more files to add them to this employee&apos;s profile.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {documents.map((document) => (
+                  <div key={document.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground" title={document.name}>{document.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatFileSize(document.sizeBytes)} · Added {formatDate(document.uploadedAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => downloadDocument(document)}>
+                      <Download className="mr-2 h-4 w-4" /> Download
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
         {activeTab === "notes" && <EmptyTab label="notes" />}
       </div>
       <ResetPasswordDialog user={selectedUser} open={resetPasswordOpen} onOpenChange={setResetPasswordOpen} />
