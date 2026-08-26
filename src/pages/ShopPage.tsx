@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,7 +57,25 @@ type Product = {
   preference?: string;
 };
 
+type ProductGroup = "physical" | "digital";
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function getProductGroup(product: Pick<Product, "productType" | "physicalType">): ProductGroup {
+  const physicalType = (product.physicalType || "").trim().toLowerCase();
+  const productType = (product.productType || "").trim().toLowerCase();
+
+  // physicalType is the authoritative field when it is present. Services are
+  // treated as digital/non-physical products so they do not appear with stock
+  // based physical goods.
+  if (physicalType.includes("digital") || physicalType.includes("service")) return "digital";
+  if (physicalType.includes("physical")) return "physical";
+  if (productType.includes("digital") || productType.includes("service")) return "digital";
+
+  // Older catalog entries may not have either field populated. Keep those
+  // products discoverable in the physical section for backwards compatibility.
+  return "physical";
+}
 
 function getCategoryColor(cat: string): string {
   const c = cat.toLowerCase();
@@ -1044,8 +1062,15 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
 export default function ShopPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isClientPortalUser } = useAuth();
   useI18n();
+  const activeProductGroup: ProductGroup | null = location.pathname.endsWith("/physical")
+    ? "physical"
+    : location.pathname.endsWith("/digital")
+      ? "digital"
+      : null;
+  const shopBasePath = location.pathname.startsWith("/portal/") ? "/portal/catalog" : "/shop";
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>(
     () => (isClientPortalUser ? user?.clientId ?? "" : localStorage.getItem("nido_shop_selected_client") ?? "")
@@ -1099,10 +1124,20 @@ export default function ShopPage() {
   // Reset page on filter change
   const resetPage = () => setCurrentPage(1);
 
-  const selectedClient = clients.find(c => c.id === selectedClientId);
-  const allCats = ["All Categories", ...Array.from(new Set(catalogProducts.map(p => p.category)))];
+  useEffect(() => {
+    setSearch("");
+    setCategory("All Categories");
+    setAvailability("All");
+    setCurrentPage(1);
+  }, [activeProductGroup]);
 
-  const filtered = catalogProducts
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+  const groupedProducts = activeProductGroup
+    ? catalogProducts.filter(p => getProductGroup(p) === activeProductGroup)
+    : [];
+  const allCats = ["All Categories", ...Array.from(new Set(groupedProducts.map(p => p.category)))];
+
+  const filtered = groupedProducts
     .filter(p => {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (category !== "All Categories" && p.category !== category) return false;
@@ -1126,6 +1161,10 @@ export default function ShopPage() {
     setClientOpen(false);
   };
 
+  const openProductGroup = (group: ProductGroup) => {
+    navigate(`${shopBasePath}/${group}`);
+  };
+
   const pageNums = () => {
     const pages: (number | '...')[] = [];
     if (totalPages <= 7) { for (let i = 1; i <= totalPages; i++) pages.push(i); }
@@ -1146,28 +1185,49 @@ export default function ShopPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-5 gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+          <div className="flex items-center gap-2">
+            {activeProductGroup && (
+              <button
+                onClick={() => navigate(shopBasePath)}
+                className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors"
+                aria-label="Back to Shop"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            )}
+            <h1 className="text-2xl font-bold text-gray-900">
+              {activeProductGroup === "physical"
+                ? "Physical Products"
+                : activeProductGroup === "digital"
+                  ? "Digital Products"
+                  : "Shop"}
+            </h1>
+          </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            {selectedClient
+            {!activeProductGroup
+              ? "Choose a product type to browse the catalog"
+              : selectedClient
               ? `Showing catalog for ${selectedClient.name}`
               : "Select a client to view their catalog"}
           </p>
         </div>
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2 py-2 w-72 bg-white shadow-sm">
-          <Search size={15} className="text-gray-400 shrink-0" />
-          <input
-            type="text"
-            placeholder="Search products by name or category..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); resetPage(); }}
-            className="text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none w-full"
-          />
-          {search && (
-            <button onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
-              <X size={13} />
-            </button>
-          )}
-        </div>
+        {activeProductGroup && (
+          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2 py-2 w-72 bg-white shadow-sm">
+            <Search size={15} className="text-gray-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search products by name or category..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); resetPage(); }}
+              className="text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none w-full"
+            />
+            {search && (
+              <button onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filters row */}
@@ -1202,8 +1262,8 @@ export default function ShopPage() {
           </div>
         )}
 
-        {/* Category dropdown — only when client selected */}
-        {selectedClientId && (
+        {/* Category and availability filters are only shown inside a product group. */}
+        {activeProductGroup && selectedClientId && (
           <div className="relative">
             <button
               onClick={() => { setCatOpen(o => !o); setAvailOpen(false); setClientOpen(false); }}
@@ -1226,7 +1286,7 @@ export default function ShopPage() {
         )}
 
         {/* Availability dropdown — only when client selected */}
-        {selectedClientId && (
+        {activeProductGroup && selectedClientId && (
           <div className="relative">
             <button
               onClick={() => { setAvailOpen(o => !o); setCatOpen(false); setClientOpen(false); }}
@@ -1249,7 +1309,7 @@ export default function ShopPage() {
         )}
 
         {/* More Filters */}
-        {selectedClientId && (
+        {activeProductGroup && selectedClientId && (
           <button className="flex items-center gap-2 text-sm border border-gray-200 rounded-lg px-2 py-2 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             <Filter size={14} />
             More Filters
@@ -1258,7 +1318,49 @@ export default function ShopPage() {
       </div>
 
       {/* Content */}
-      {!selectedClientId ? (
+      {!activeProductGroup ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 mt-8 max-w-5xl mx-auto">
+          <button
+            type="button"
+            onClick={() => openProductGroup("physical")}
+            className="rounded-2xl border border-blue-100 bg-[#f0f4ff] p-6 md:p-8 flex flex-col items-center text-center hover:shadow-md hover:border-blue-200 transition-all group"
+          >
+            <div className="w-16 h-16 rounded-full bg-[#dce6ff] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <Package size={29} className="text-[#3b5bdb]" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">Physical Products</h2>
+            <p className="text-sm text-gray-500 leading-relaxed mt-2 max-w-xs">
+              Browse hardware, office supplies, equipment, and other products that can be physically delivered.
+            </p>
+            {selectedClientId && (
+              <span className="text-xs font-semibold text-blue-600 mt-5">
+                {catalogProducts.filter(p => getProductGroup(p) === "physical").length} products available
+              </span>
+            )}
+            <span className="mt-4 text-sm font-semibold text-blue-600 group-hover:underline">View Physical Products <ChevronRight size={15} className="inline-block ml-1" /></span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openProductGroup("digital")}
+            className="rounded-2xl border border-violet-100 bg-[#f5f0ff] p-6 md:p-8 flex flex-col items-center text-center hover:shadow-md hover:border-violet-200 transition-all group"
+          >
+            <div className="w-16 h-16 rounded-full bg-[#e3d9ff] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+              <FileText size={29} className="text-[#7c3aed]" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">Digital Products</h2>
+            <p className="text-sm text-gray-500 leading-relaxed mt-2 max-w-xs">
+              Explore software, subscriptions, services, licenses, and other non-physical products.
+            </p>
+            {selectedClientId && (
+              <span className="text-xs font-semibold text-violet-600 mt-5">
+                {catalogProducts.filter(p => getProductGroup(p) === "digital").length} products available
+              </span>
+            )}
+            <span className="mt-4 text-sm font-semibold text-violet-600 group-hover:underline">View Digital Products <ChevronRight size={15} className="inline-block ml-1" /></span>
+          </button>
+        </div>
+      ) : !selectedClientId ? (
         /* No client selected — empty state */
         <div className="text-center py-32 text-gray-400">
           <Building2 size={56} className=" mb-4 opacity-20" />
@@ -1270,12 +1372,12 @@ export default function ShopPage() {
         <div className="text-center py-24 text-gray-400">
           <ShoppingCart size={48} className=" mb-3 opacity-30" />
           <p className="font-medium text-gray-500">
-            {catalogProducts.length === 0
+            {groupedProducts.length === 0
               ? `No products have been added to ${selectedClient?.name}'s catalog yet`
               : "No products match your filters"}
           </p>
           <p className="text-sm mt-1">
-            {catalogProducts.length === 0
+            {groupedProducts.length === 0
               ? "Go to the client's Catalog tab to add products from the master catalog."
               : "Try adjusting your search or filters."}
           </p>
