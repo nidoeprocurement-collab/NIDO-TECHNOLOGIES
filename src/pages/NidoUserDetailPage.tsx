@@ -9,6 +9,7 @@ import {
   FileText,
   KeyRound,
   LockKeyhole,
+  Plus,
   Pencil,
   Shield,
   ShieldCheck,
@@ -27,6 +28,13 @@ import {
   type NidoUserDocument,
 } from "@/lib/nidoUserDocumentsStore";
 import { getRolePermissions, MODULES, PERMISSIONS_EVENT } from "@/lib/permissionsStore";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  addUserNote,
+  getUserNotes,
+  NIDO_USER_NOTES_EVENT,
+  type NidoUserNote,
+} from "@/lib/nidoUserNotesStore";
 
 type DetailTab = "overview" | "documents" | "notes";
 
@@ -113,15 +121,23 @@ function createDocumentId() {
   return `document-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function createNoteId() {
+  return `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export default function NidoUserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<NidoUser[]>(() => getUsers());
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [documents, setDocuments] = useState<NidoUserDocument[]>([]);
   const [documentsError, setDocumentsError] = useState("");
   const [uploadingDocuments, setUploadingDocuments] = useState(false);
+  const [notes, setNotes] = useState<NidoUserNote[]>([]);
+  const [noteText, setNoteText] = useState("");
+  const [notesError, setNotesError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => setUsers(getUsers());
@@ -147,6 +163,19 @@ export default function NidoUserDetailPage() {
     return () => {
       window.removeEventListener(NIDO_USER_DOCUMENTS_EVENT, refreshDocuments);
       window.removeEventListener("storage", refreshDocuments);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    const refreshNotes = () => {
+      if (userId) setNotes(getUserNotes(userId));
+    };
+    refreshNotes();
+    window.addEventListener(NIDO_USER_NOTES_EVENT, refreshNotes);
+    window.addEventListener("storage", refreshNotes);
+    return () => {
+      window.removeEventListener(NIDO_USER_NOTES_EVENT, refreshNotes);
+      window.removeEventListener("storage", refreshNotes);
     };
   }, [userId]);
 
@@ -227,6 +256,27 @@ export default function NidoUserDetailPage() {
     link.href = document.dataUrl;
     link.download = document.name;
     link.click();
+  };
+
+  const handleAddNote = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const text = noteText.trim();
+    if (!text || !selectedUser) {
+      setNotesError(text ? "Unable to add this note." : "Enter a note before adding it.");
+      return;
+    }
+
+    const note: NidoUserNote = {
+      id: createNoteId(),
+      userId: selectedUser.id,
+      text,
+      author: currentUser?.name || currentUser?.email || "NIDO Admin",
+      createdAt: new Date().toISOString(),
+    };
+    addUserNote(selectedUser.id, note);
+    setNotes(getUserNotes(selectedUser.id));
+    setNoteText("");
+    setNotesError("");
   };
 
   return (
@@ -417,7 +467,75 @@ export default function NidoUserDetailPage() {
             )}
           </section>
         )}
-        {activeTab === "notes" && <EmptyTab label="notes" />}
+        {activeTab === "notes" && (
+          <section className={`${cardClass} overflow-hidden`}>
+            <div className="border-b border-border p-5 sm:p-6">
+              <h2 className="text-h3">Notes</h2>
+              <p className="mt-1 text-body-sm text-muted-foreground">
+                Add notes about {selectedUser.name}. Notes are saved to this employee&apos;s profile.
+              </p>
+            </div>
+
+            <form onSubmit={handleAddNote} className="border-b border-border p-5 sm:p-6">
+              <label htmlFor="nido-user-note" className="mb-2 block text-sm font-semibold text-foreground">
+                Add Note
+              </label>
+              <textarea
+                id="nido-user-note"
+                value={noteText}
+                onChange={(event) => {
+                  setNoteText(event.target.value);
+                  if (notesError) setNotesError("");
+                }}
+                placeholder="Write a note about this employee..."
+                rows={4}
+                maxLength={2000}
+                className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-muted-foreground">
+                  {noteText.length}/2000 characters
+                  {notesError && <span className="ml-3 text-red-600">{notesError}</span>}
+                </div>
+                <Button type="submit" disabled={!noteText.trim()}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Note
+                </Button>
+              </div>
+            </form>
+
+            {notes.length === 0 ? (
+              <div className="flex min-h-48 items-center justify-center p-8">
+                <div className="text-center">
+                  <FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground/60" />
+                  <p className="text-sm font-medium text-foreground">No notes added</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Add the first note using the form above.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {notes.map((note) => (
+                  <article key={note.id} className="p-5 sm:p-6">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{note.text}</p>
+                      <time
+                        dateTime={note.createdAt}
+                        className="shrink-0 text-xs text-muted-foreground sm:pl-5"
+                      >
+                        {new Date(note.createdAt).toLocaleString("en-IN", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </time>
+                    </div>
+                    <p className="mt-3 text-xs font-medium text-muted-foreground">Added by {note.author}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
       <ResetPasswordDialog user={selectedUser} open={resetPasswordOpen} onOpenChange={setResetPasswordOpen} />
     </div>
