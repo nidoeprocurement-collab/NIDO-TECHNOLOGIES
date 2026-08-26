@@ -332,6 +332,7 @@ const OrderConfirmationPage = lazy(
 );
 const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
 const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
+const NidoUserDetailPage = lazy(() => import("@/pages/NidoUserDetailPage"));
 const TaxSettingsPage = lazy(() => import("@/pages/TaxSettingsPage"));
 const SLASettingsPage = lazy(() => import("@/pages/SLASettingsPage"));
 
@@ -573,7 +574,7 @@ function AppRoutes() {
                 title="Nido user profile failed to load"
                 resetKey={location.pathname}
               >
-                <NidoUserProfilePage />
+                <NidoUserDetailPage />
               </PageErrorBoundary>
             }
           />

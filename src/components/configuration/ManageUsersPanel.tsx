@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
+import { useNavigate } from "react-router-dom"
 import {
   Search, Plus, Download, FileText, MoreHorizontal,
   Pencil, Trash2, Key, UserCheck, UserX, PauseCircle,
@@ -345,6 +346,7 @@ const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
 
 export default function ManageUsersPanel() {
   const { user: currentUser } = useAuth()
+  const navigate = useNavigate()
   const canViewPasswords = SHOW_PASSWORD_ROLES.has(currentUser?.role ?? "")
 
   const [search, setSearch] = useState("")
@@ -458,7 +460,18 @@ export default function ManageUsersPanel() {
             <tbody>
               {filteredUsers.map(user => (
                 <tr key={user.id} className="border-b hover:bg-muted/20">
-                  <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{user.employeeId || "—"}</td>
+                  <td className="px-4 py-3 text-xs font-mono">
+                    {user.employeeId ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/configuration/nido-users/users/${encodeURIComponent(user.id)}/profile`)}
+                        className="text-primary hover:underline font-semibold"
+                        title={`View ${user.name}'s profile`}
+                      >
+                        {user.employeeId}
+                      </button>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-sm">{user.name}</div>
                     {user.designation && <div className="text-xs text-muted-foreground">{user.designation}</div>}
