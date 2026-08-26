@@ -18,7 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getUsers, type NidoUser, NIDO_USERS_EVENT } from "@/lib/nidoUsersStore";
-import { getRolePermissions, MODULES } from "@/lib/permissionsStore";
+import { getRolePermissions, MODULES, PERMISSIONS_EVENT } from "@/lib/permissionsStore";
 
 type DetailTab = "overview" | "documents" | "notes";
 
@@ -92,9 +92,11 @@ export default function NidoUserDetailPage() {
   useEffect(() => {
     const refresh = () => setUsers(getUsers());
     window.addEventListener(NIDO_USERS_EVENT, refresh);
+    window.addEventListener(PERMISSIONS_EVENT, refresh);
     window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener(NIDO_USERS_EVENT, refresh);
+      window.removeEventListener(PERMISSIONS_EVENT, refresh);
       window.removeEventListener("storage", refresh);
     };
   }, []);
@@ -126,9 +128,14 @@ export default function NidoUserDetailPage() {
 
   const initials = selectedUser.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "?";
   const activity = [
-    { action: "LOGIN", by: selectedUser.name, details: "Logged in to the system", date: selectedUser.lastLogin || "—" },
-    { action: "PROFILE VIEW", by: "System", details: "Profile viewed by System Owner", date: formatDate(selectedUser.updatedAt) },
-    { action: "ACCOUNT CREATED", by: "System Owner", details: "User account created", date: formatDate(selectedUser.createdAt) },
+    ...(selectedUser.loginHistory ?? []).slice(-3).reverse().map((entry) => ({
+      action: entry.result === "success" ? "LOGIN" : "LOGIN ATTEMPT",
+      by: selectedUser.name,
+      details: entry.result === "success" ? "Logged in to the system" : `Sign-in attempt: ${entry.result.replaceAll("_", " ")}`,
+      date: new Date(entry.timestamp).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+    })),
+    { action: "PROFILE UPDATED", by: "System", details: "User details saved", date: formatDate(selectedUser.updatedAt) },
+    { action: "ACCOUNT CREATED", by: "System", details: "User account created", date: formatDate(selectedUser.createdAt) },
   ];
 
   return (
@@ -198,11 +205,11 @@ export default function NidoUserDetailPage() {
                     ["Phone", selectedUser.phone || "—"],
                     ["Role", selectedUser.role || "—"],
                     ["Department", selectedUser.department || "—"],
+                    ["Job Title", selectedUser.jobTitle || "—"],
                     ["Designation", selectedUser.designation || selectedUser.jobTitle || "—"],
                     ["Date of Joining", formatDate(selectedUser.createdAt)],
-                    ["Reporting Manager", "—"],
-                    ["Employee Type", "Full-time"],
-                    ["Location", "Head Office"],
+                    ["Password", selectedUser.password ? "••••••••" : "Not set"],
+                    ["Last Login", selectedUser.lastLogin || "Never"],
                     ["Status", <StatusBadge key="status" status={selectedUser.status} />],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="border-b border-border pb-3 last:border-0">
