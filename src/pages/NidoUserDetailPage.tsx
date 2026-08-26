@@ -214,7 +214,7 @@ export default function NidoUserDetailPage() {
                     ["Department", selectedUser.department || "—"],
                     ["Job Title", selectedUser.jobTitle || "—"],
                     ["Designation", selectedUser.designation || selectedUser.jobTitle || "—"],
-                    ["Date of Joining", formatDate(selectedUser.createdAt)],
+                    ["Date of Joining", formatDate(selectedUser.dateOfJoining || selectedUser.createdAt)],
                     ["Password", selectedUser.password ? "••••••••" : "Not set"],
                     ["Last Login", selectedUser.lastLogin || "Never"],
                     ["Status", <StatusBadge key="status" status={selectedUser.status} />],

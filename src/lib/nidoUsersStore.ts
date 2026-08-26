@@ -39,6 +39,8 @@ export interface NidoUser {
   designation: string;
   department: string;
   status: "Active" | "Inactive" | "Suspended";
+  /** Calendar date the employee joined the organization. */
+  dateOfJoining?: string;
   lastLogin?: string;
   createdAt: string;
   updatedAt: string;
@@ -104,7 +106,7 @@ const SYSTEM_OWNER_USER: NidoUser = {
   name: "System Owner", email: "owner@nidotech.com", password: "Owner@123",
   phone: "+91-44-1234-5678", role: SYSTEM_OWNER_ROLE,
   jobTitle: "CEO", designation: "Chief Executive Officer", department: "Management",
-  status: "Active", createdAt: NOW, updatedAt: NOW,
+  status: "Active", dateOfJoining: NOW, createdAt: NOW, updatedAt: NOW,
 };
 
 // These identify only the demo records from the previous version. Users added
@@ -166,6 +168,7 @@ function migrateUser(raw: any): NidoUser {
     designation:         raw.designation         ?? raw.jobTitle ?? "",
     department:          raw.department          ?? "",
     status:              raw.status              ?? "Active",
+    dateOfJoining:       raw.dateOfJoining       ?? raw.createdAt ?? NOW,
     lastLogin:           raw.lastLogin,
     createdAt:           raw.createdAt           ?? NOW,
     updatedAt:           raw.updatedAt           ?? NOW,

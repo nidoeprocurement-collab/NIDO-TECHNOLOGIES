@@ -30,6 +30,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
   const [jobTitle, setJobTitle]       = useState("")
   const [designation, setDesignation] = useState("")
   const [department, setDepartment]   = useState("")
+  const [dateOfJoining, setDateOfJoining] = useState("")
   const [status, setStatus]           = useState<NidoUser["status"]>("Active")
   const [error, setError]             = useState("")
 
@@ -49,6 +50,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       setJobTitle(  user?.jobTitle     ?? "")
       setDesignation(user?.designation ?? "")
       setDepartment(user?.department   ?? "")
+      setDateOfJoining(user?.dateOfJoining ?? user?.createdAt?.slice(0, 10) ?? new Date().toISOString().split("T")[0])
       setStatus(    user?.status       ?? "Active")
       setError("")
     }
@@ -74,6 +76,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       jobTitle:            jobTitle.trim(),
       designation:         designation.trim() || jobTitle.trim(),
       department:          department.trim(),
+      dateOfJoining:       dateOfJoining || now,
       status,
       lastLogin:           user?.lastLogin,
       createdAt:           user?.createdAt ?? now,
@@ -158,6 +161,10 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
             <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Procurement" />
           </div>
           <div>
+            <Label className="mb-2 block text-sm font-medium">Date of Joining</Label>
+            <Input type="date" value={dateOfJoining} onChange={e => setDateOfJoining(e.target.value)} />
+          </div>
+          <div>
             <Label className="mb-2 block text-sm font-medium">Status</Label>
             <select
               value={status}
@@ -168,6 +175,10 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
               <option value="Inactive">Inactive</option>
               <option value="Suspended">Suspended</option>
             </select>
+          </div>
+          <div>
+            <Label className="mb-2 block text-sm font-medium">Last Login <span className="text-xs text-muted-foreground">(system-managed)</span></Label>
+            <Input value={user?.lastLogin || "Never"} disabled />
           </div>
         </div>
 

@@ -37,6 +37,7 @@ export default function NidoUserEditPage() {
   const [jobTitle, setJobTitle] = useState("");
   const [designation, setDesignation] = useState("");
   const [department, setDepartment] = useState("");
+  const [dateOfJoining, setDateOfJoining] = useState("");
   const [status, setStatus] = useState<NidoUser["status"]>("Active");
 
   const selectedUser = users.find((candidate) => candidate.id === userId);
@@ -67,6 +68,7 @@ export default function NidoUserEditPage() {
     setJobTitle(selectedUser.jobTitle ?? "");
     setDesignation(selectedUser.designation ?? "");
     setDepartment(selectedUser.department ?? "");
+    setDateOfJoining(selectedUser.dateOfJoining ?? selectedUser.createdAt?.slice(0, 10) ?? "");
     setStatus(selectedUser.status ?? "Active");
     setError("");
   }, [selectedUser]);
@@ -117,6 +119,7 @@ export default function NidoUserEditPage() {
       jobTitle: jobTitle.trim(),
       designation: designation.trim() || jobTitle.trim(),
       department: department.trim(),
+      dateOfJoining: dateOfJoining || selectedUser.dateOfJoining || selectedUser.createdAt,
       status,
       forcePasswordChange: selectedUser.forcePasswordChange ?? false,
     });
@@ -202,12 +205,20 @@ export default function NidoUserEditPage() {
               <Input className={inputClass} value={department} onChange={(event) => setDepartment(event.target.value)} placeholder="e.g. Procurement" />
             </div>
             <div>
+              <Label>Date of Joining</Label>
+              <Input className={inputClass} type="date" value={dateOfJoining} onChange={(event) => setDateOfJoining(event.target.value)} />
+            </div>
+            <div>
               <Label>Status</Label>
               <select className={selectClass} value={status} onChange={(event) => setStatus(event.target.value as NidoUser["status"])}>
                 <option value="Active">Active</option>
                 <option value="Inactive">Inactive</option>
                 <option value="Suspended">Suspended</option>
               </select>
+            </div>
+            <div>
+              <Label>Last Login <span className="text-xs text-muted-foreground">(system-managed)</span></Label>
+              <Input className={inputClass} value={selectedUser.lastLogin || "Never"} disabled />
             </div>
           </div>
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
