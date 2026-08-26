@@ -50,7 +50,7 @@ function StatusBadge({ status, locked }: { status: NidoUser["status"]; locked?: 
 }
 
 // ── Reset Password dialog ──────────────────────────────────────────────────────
-function ResetPasswordDialog({
+export function ResetPasswordDialog({
   user, open, onOpenChange,
 }: { user: NidoUser | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [newPw, setNewPw] = useState("");
@@ -94,7 +94,7 @@ function ResetPasswordDialog({
 }
 
 // ── View Login History dialog ──────────────────────────────────────────────────
-function LoginHistoryDialog({
+export function LoginHistoryDialog({
   user, open, onOpenChange,
 }: { user: NidoUser | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const history = [...(user?.loginHistory ?? [])].reverse();
@@ -142,7 +142,7 @@ function LoginHistoryDialog({
 }
 
 // ── Per-row actions dropdown ───────────────────────────────────────────────────
-function ActionsMenu({
+export function ActionsMenu({
   user,
   onEdit,
   onRefresh,

@@ -333,6 +333,7 @@ const OrderConfirmationPage = lazy(
 const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
 const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
 const NidoUserDetailPage = lazy(() => import("@/pages/NidoUserDetailPage"));
+const NidoUserEditPage = lazy(() => import("@/pages/NidoUserEditPage"));
 const TaxSettingsPage = lazy(() => import("@/pages/TaxSettingsPage"));
 const SLASettingsPage = lazy(() => import("@/pages/SLASettingsPage"));
 
@@ -575,6 +576,17 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <NidoUserDetailPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="configuration/nido-users/users/:userId/edit"
+            element={
+              <PageErrorBoundary
+                title="Nido user edit page failed to load"
+                resetKey={location.pathname}
+              >
+                <NidoUserEditPage />
               </PageErrorBoundary>
             }
           />

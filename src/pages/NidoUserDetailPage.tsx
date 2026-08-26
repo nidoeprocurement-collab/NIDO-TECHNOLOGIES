@@ -8,7 +8,6 @@ import {
   FileText,
   KeyRound,
   LockKeyhole,
-  MoreVertical,
   Pencil,
   Shield,
   ShieldCheck,
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ActionsMenu, ResetPasswordDialog } from "@/components/configuration/ManageUsersPanel";
 import { getUsers, type NidoUser, NIDO_USERS_EVENT } from "@/lib/nidoUsersStore";
 import { getRolePermissions, MODULES, PERMISSIONS_EVENT } from "@/lib/permissionsStore";
 
@@ -88,9 +88,11 @@ export default function NidoUserDetailPage() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<NidoUser[]>(() => getUsers());
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+
+  const refresh = () => setUsers(getUsers());
 
   useEffect(() => {
-    const refresh = () => setUsers(getUsers());
     window.addEventListener(NIDO_USERS_EVENT, refresh);
     window.addEventListener(PERMISSIONS_EVENT, refresh);
     window.addEventListener("storage", refresh);
@@ -160,15 +162,20 @@ export default function NidoUserDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Button variant="outline" onClick={() => navigate("/configuration/nido-users?tab=users")}>
+            <Button
+              variant="outline"
+              onClick={() => navigate(`/configuration/nido-users/users/${encodeURIComponent(selectedUser.id)}/edit`)}
+            >
               <Pencil className="mr-2 h-4 w-4" /> Edit
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => setResetPasswordOpen(true)}>
               <LockKeyhole className="mr-2 h-4 w-4" /> Reset Password
             </Button>
-            <Button variant="outline" size="icon" aria-label="More actions">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
+            <ActionsMenu
+              user={selectedUser}
+              onEdit={() => navigate(`/configuration/nido-users/users/${encodeURIComponent(selectedUser.id)}/edit`)}
+              onRefresh={refresh}
+            />
           </div>
         </div>
 
@@ -264,6 +271,7 @@ export default function NidoUserDetailPage() {
         {activeTab === "documents" && <EmptyTab label="documents" />}
         {activeTab === "notes" && <EmptyTab label="notes" />}
       </div>
+      <ResetPasswordDialog user={selectedUser} open={resetPasswordOpen} onOpenChange={setResetPasswordOpen} />
     </div>
   );
 }
