@@ -4,13 +4,15 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgConfig } from '@/contexts/ConfigContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { getPlatformModuleKey } from '@/lib/platformModuleCatalog';
+import { hasPortalPermission } from '@/lib/portalUserStore';
 import {
   LayoutDashboard, ShoppingCart, Wrench, Headphones, Users,
   TrendingUp, Package, DollarSign, Settings, ChevronDown,
   ChevronRight, ChevronLeft, Menu, X, Zap, List,
   ClipboardList, Tags, ShoppingBag, Gauge, FileText, Receipt,
   Repeat, Truck, FileMinus, FileCheck, Wallet, CreditCard,
-  Banknote, ShieldCheck, Building2, Mail, History, LogOut,
+  Banknote, LogOut,
   Bell, User, KeyRound, ShieldAlert,
 } from 'lucide-react';
 
@@ -47,7 +49,7 @@ const adminNavigationItems: NavItem[] = [
     icon: <TrendingUp size={20} />,
     children: [
       { label: 'My Orders',   icon: <ShoppingBag size={16} />, path: '/orders',      moduleKey: 'orders' },
-      { label: 'My Services', icon: <Wrench size={16} />,      path: '/services',    moduleKey: 'services' },
+      { label: 'My Services', icon: <Wrench size={16} />,      path: '/my-services', moduleKey: 'services' },
       { label: 'SLA Overview',icon: <Gauge size={16} />,       path: '/sla-overview',moduleKey: 'orders' },
     ],
   },
@@ -84,38 +86,27 @@ const adminNavigationItems: NavItem[] = [
       },
     ],
   },
-  {
-    label: 'User Management',
-    icon: <Users size={20} />,
-    children: [
-      { label: 'Users',      icon: <Users size={16} />,      path: '/configuration/nido-users?tab=users', moduleKey: 'users' },
-      { label: 'Roles',      icon: <ShieldCheck size={16} />,path: '/configuration/nido-users?tab=roles', moduleKey: 'roles' },
-      { label: 'Departments',icon: <Building2 size={16} />,  path: '/departments',       moduleKey: 'departments' },
-      { label: 'Invitations',icon: <Mail size={16} />,       path: '/user-invitations',  moduleKey: 'users' },
-      { label: 'Audit Trail',icon: <History size={16} />,    path: '/audit-logs',        moduleKey: 'audit_logs' },
-    ],
-  },
   { label: 'Configuration', icon: <Settings size={20} />, path: '/configuration', moduleKey: 'configuration' },
 ];
 
 // ── Client Portal navigation ──────────────────────────────────────────────────
 const clientNavigationItems: NavItem[] = [
-  { label: 'Dashboard',   icon: <LayoutDashboard size={20} />, path: '/portal/dashboard' },
-  { label: 'Shop',        icon: <ShoppingCart size={20} />,    path: '/portal/catalog' },
-  { label: 'My Requests', icon: <ClipboardList size={20} />,   path: '/portal/orders' },
-  { label: 'My Invoices', icon: <Receipt size={20} />,         path: '/portal/invoices' },
-  { label: 'Services',    icon: <Wrench size={20} />,          path: '/portal/services' },
-  { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support' },
-  { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts' },
-  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals' },
-  { label: 'Reports',     icon: <TrendingUp size={20} />,      path: '/portal/reports' },
-  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile' },
+  { label: 'Dashboard',   icon: <LayoutDashboard size={20} />, path: '/portal/dashboard', moduleKey: 'Dashboard' },
+  { label: 'Shop',        icon: <ShoppingCart size={20} />,    path: '/portal/catalog', moduleKey: 'Catalog' },
+  { label: 'My Requests', icon: <ClipboardList size={20} />,   path: '/portal/orders', moduleKey: 'Orders' },
+  { label: 'My Invoices', icon: <Receipt size={20} />,         path: '/portal/invoices', moduleKey: 'Invoices' },
+  { label: 'Services',    icon: <Wrench size={20} />,          path: '/portal/services', moduleKey: 'Services' },
+  { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support', moduleKey: 'Support' },
+  { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts', moduleKey: 'Contracts' },
+  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals', moduleKey: 'Orders' },
+  { label: 'Reports',     icon: <TrendingUp size={20} />,      path: '/portal/reports', moduleKey: 'Reports' },
+  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile', moduleKey: 'Dashboard' },
 ];
 
 // ── Permission-based nav filtering ────────────────────────────────────────────
 function filterNavItems(
   items: NavItem[],
-  canView: (key: string) => boolean,
+  canView: (key: string, legacyKey?: string) => boolean,
   superAdmin: boolean,
 ): NavItem[] {
   if (superAdmin) return items;
@@ -126,7 +117,8 @@ function filterNavItems(
       const kids = filterNavItems(item.children, canView, false);
       if (kids.length > 0) filtered.push({ ...item, children: kids });
     } else {
-      if (!item.moduleKey || canView(item.moduleKey)) filtered.push(item);
+      const pageKey = item.path ? getPlatformModuleKey(item.path) : item.moduleKey;
+      if (!item.moduleKey || canView(pageKey ?? item.moduleKey, item.moduleKey)) filtered.push(item);
     }
   }
   return filtered;
@@ -272,7 +264,7 @@ interface SidebarProps {
 
 export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   const { user, logout, isClientPortalUser } = useAuth();
-  const { hasPermission, isSuperAdmin } = usePermissions();
+  const { hasPermission, hasRoutePermission, isSuperAdmin } = usePermissions();
   const org = useOrgConfig();
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -280,11 +272,20 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
-  // Build filtered nav for admin users; client portal nav is always unfiltered
+  // Apply each tenant's portal role permissions to client navigation.
   const rawNavItems = isClientPortalUser ? clientNavigationItems : adminNavigationItems;
   const navItems = isClientPortalUser
-    ? rawNavItems
-    : filterNavItems(rawNavItems, (key) => hasPermission(key, 'view'), isSuperAdmin);
+    ? rawNavItems.filter(item =>
+        !item.moduleKey ||
+        hasPortalPermission(user?.clientId ?? '', user?.role ?? '', item.moduleKey, 'view')
+      )
+     : filterNavItems(
+       rawNavItems,
+       (key, legacyKey) => legacyKey
+         ? hasRoutePermission(key, legacyKey, 'view')
+         : hasPermission(key, 'view'),
+       isSuperAdmin,
+     );
 
   const activePath = findActivePath(location.pathname, navItems);
 

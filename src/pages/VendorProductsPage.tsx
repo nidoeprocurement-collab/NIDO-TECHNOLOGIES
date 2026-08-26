@@ -109,17 +109,22 @@ function EditProductScreen({
 }: {
   product: VendorProduct;
   onClose: () => void;
-  onSave: (updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock">) => void;
+  onSave: (updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => void;
 }) {
   const [price, setPrice] = useState(product.price || "");
   const [moq, setMoq] = useState(product.moq || "");
   const [leadTime, setLeadTime] = useState(product.leadTime || "");
   const [stock, setStock] = useState(product.stock || "");
+  const [incomingStock, setIncomingStock] = useState(product.incomingStock || "0");
+
+  const reservedStock = parseInt(product.reservedStock || "0") || 0;
+  const currentStockNum = parseInt(stock) || 0;
+  const availableStock = Math.max(0, currentStockNum - reservedStock);
 
   const initials = product.productName.slice(0, 2).toUpperCase();
 
   const handleSave = () => {
-    onSave({ price: price.trim(), moq: moq.trim(), leadTime: leadTime.trim(), stock: stock.trim() });
+    onSave({ price: price.trim(), moq: moq.trim(), leadTime: leadTime.trim(), stock: stock.trim(), incomingStock: incomingStock.trim() });
     onClose();
   };
 
@@ -259,12 +264,12 @@ function EditProductScreen({
                   </div>
                 </div>
 
-                {/* Stock */}
+                {/* Current Stock */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Stock
+                    Current Stock (Physical)
                   </label>
-                  <p className="text-xs text-gray-400 mb-2">Current units available</p>
+                  <p className="text-xs text-gray-400 mb-2">Total units physically held by vendor</p>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <Warehouse className="w-4 h-4" />
@@ -275,6 +280,66 @@ function EditProductScreen({
                       value={stock}
                       onChange={(e) => setStock(e.target.value)}
                       placeholder="e.g. 120"
+                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                    />
+                  </div>
+                </div>
+
+                {/* Reserved Stock — read-only */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Reserved Stock
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Units reserved by client orders (not yet PO'd) — auto-managed</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Layers className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      readOnly
+                      value={reservedStock}
+                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                {/* Available Stock — computed, read-only */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Available Stock
+                    <span className="ml-2 text-[10px] font-normal text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">Computed</span>
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">= Current − Reserved · shown in client shop</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Warehouse className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      readOnly
+                      value={availableStock}
+                      className={`w-full pl-9 pr-4 py-2.5 text-sm border rounded-xl bg-gray-50 cursor-not-allowed font-semibold ${availableStock > 0 ? "border-green-200 text-green-700" : "border-orange-200 text-orange-600"}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Incoming Stock */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Incoming Stock
+                  </label>
+                  <p className="text-xs text-gray-400 mb-2">Units on order / in transit (informational)</p>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Timer className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={incomingStock}
+                      onChange={(e) => setIncomingStock(e.target.value)}
+                      placeholder="e.g. 200"
                       className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
                     />
                   </div>
@@ -407,8 +472,8 @@ export default function VendorProductsPage() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleSaveEdit = (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock">) => {
-    updateVendorProduct(vendorId, id, updates);
+  const handleSaveEdit = (id: string, updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => {
+    updateVendorProduct(vendorId, id, { ...updates, lastStockUpdate: new Date().toISOString() });
     setVendorProducts((prev) => prev.map((p) => p.id === id ? { ...p, ...updates } : p));
   };
 
@@ -544,12 +609,30 @@ export default function VendorProductsPage() {
                         {product.leadTime ? `${product.leadTime} day${product.leadTime !== "1" ? "s" : ""}` : "—"}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap">
-                        {product.stock ? (
-                          <StockBadge
-                            status={parseInt(product.stock) > 10 ? "In Stock" : parseInt(product.stock) > 0 ? "Low Stock" : "Out of Stock"}
-                            count={parseInt(product.stock)}
-                          />
-                        ) : <span className="text-gray-400 text-sm">—</span>}
+                        {(() => {
+                          const current = parseInt(product.stock || "0") || 0;
+                          const reserved = parseInt(product.reservedStock || "0") || 0;
+                          const available = Math.max(0, current - reserved);
+                          const status: StockStatus = available > 10 ? "In Stock" : available > 0 ? "Low Stock" : "Out of Stock";
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <StockBadge status={status} count={available} />
+                              <div className="text-[10px] text-gray-400 space-y-0.5 mt-1">
+                                <div className="flex justify-between gap-3">
+                                  <span>Current</span><span className="font-medium text-gray-600">{current}</span>
+                                </div>
+                                <div className="flex justify-between gap-3">
+                                  <span>Reserved</span><span className="font-medium text-amber-600">{reserved}</span>
+                                </div>
+                                {(parseInt(product.incomingStock || "0") || 0) > 0 && (
+                                  <div className="flex justify-between gap-3">
+                                    <span>Incoming</span><span className="font-medium text-blue-600">{product.incomingStock}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-gray-500 text-sm">{product.addedAt}</td>
                       <td className="px-4 py-3.5 whitespace-nowrap">

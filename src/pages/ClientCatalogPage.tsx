@@ -860,6 +860,11 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
       sku: row.product.skuCode,
       name: row.product.productName,
       category: row.product.category,
+      subcategory: row.product.subcategory,
+      brand: row.product.brand,
+      tags: row.product.tags,
+      productType: row.product.productType,
+      physicalType: row.product.physicalType,
       roles: row.roles,
       preference: row.preference,
       cpc: cpcs[i],
@@ -878,6 +883,9 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
       generalSpecs: row.product.generalSpecs
         .filter(g => g.category || g.attributeValue)
         .map(g => ({ label: g.category, value: g.attributeValue })),
+      productNotes: row.product.productNotes,
+      videoUrl: row.product.videoUrl,
+      warranty: row.product.warranty,
     }));
     onAdd(entries);
     onClose();

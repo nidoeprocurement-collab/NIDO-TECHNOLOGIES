@@ -2,16 +2,19 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, type StoredPO } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
-import { deductPhysicalStock, restorePhysicalStock } from "@/lib/vendorStore";
+import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
+import { getPrefix } from "@/lib/configService";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
+import { createApprovalRequest } from "@/lib/approvalEngine";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -150,16 +153,10 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
 function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
-    // usePhysicalStock=true: the reservation for this order was already created
-    // at checkout time (reserveVendorStock). Showing available stock here would
-    // double-count that reservation and incorrectly cap the admin's allocation.
-    // The admin must see each vendor's full physical stock so they can allocate
-    // the ordered quantity without hitting an artificial limit.
-    return computeVendorComparisons(sub.productCode, undefined, true);
+    return computeVendorComparisons(sub.productCode).slice(0, 4);
   }, [sub.productCode]);
 
-  // c.stock = physicalStock (not available), because reservations are
-  // already accounted for at order creation; admin allocates against real stock.
+  // Use the stock value exactly as entered in vendor product assignment.
   const getVendorStock = (c: VendorComparisonRow): number => c.stock;
 
   const fmt = (n: number) =>
@@ -179,46 +176,47 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const [rowQtys, setRowQtys] = useState<Record<string, number>>(() => {
     const q: Record<string, number> = {};
     for (const c of comparisons) q[c.vendorId] = 0;
-    if (selectedVendorId) {
-      // Re-opening after a prior selection — keep that vendor at full qty.
-      q[selectedVendorId] = sub.qty;
-    } else {
-      // Auto-select cheapest vendor first; if its stock is insufficient,
-      // spill the remaining qty to the next cheapest, and so on.
-      let remaining = sub.qty;
-      for (const c of comparisons) {
-        if (remaining <= 0) break;
-        const assign = Math.min(remaining, c.stock);
-        if (assign > 0) {
-          q[c.vendorId] = assign;
-          remaining -= assign;
-        }
-      }
-    }
+    const pre = selectedVendorId || comparisons[0]?.vendorId;
+    if (pre) q[pre] = sub.qty;
     return q;
   });
   const [checkedSet, setCheckedSet] = useState<Set<string>>(() => {
     const s = new Set<string>();
-    if (selectedVendorId) {
-      s.add(selectedVendorId);
-    } else {
-      // Check every vendor that received an auto-allocated qty above.
-      let remaining = sub.qty;
-      for (const c of comparisons) {
-        if (remaining <= 0) break;
-        const assign = Math.min(remaining, c.stock);
-        if (assign > 0) {
-          s.add(c.vendorId);
-          remaining -= assign;
-        }
-      }
-    }
+    const pre = selectedVendorId || comparisons[0]?.vendorId;
+    if (pre) s.add(pre);
     return s;
   });
   // Which vendor's details are shown at the bottom
   const [detailVendorId, setDetailVendorId] = useState<string>(
     selectedVendorId || comparisons[0]?.vendorId || ""
   );
+
+  // ── Auto Allocate ─────────────────────────────────────────────────────────
+  const handleAutoAllocate = () => {
+    // Sort vendors by score descending (highest score fills first)
+    const sorted = [...comparisons].sort((a, b) => b.score - a.score);
+    const newQtys: Record<string, number> = {};
+    const newChecked = new Set<string>();
+    let remaining = sub.qty;
+
+    for (const c of sorted) {
+      if (remaining <= 0) break;
+      const avail = c.stock; // c.stock = availableStock
+      if (avail <= 0) continue;
+      const take = Math.min(remaining, avail);
+      newQtys[c.vendorId] = take;
+      newChecked.add(c.vendorId);
+      remaining -= take;
+    }
+
+    // Zero out vendors not allocated
+    for (const c of comparisons) {
+      if (!newQtys[c.vendorId]) newQtys[c.vendorId] = 0;
+    }
+
+    setRowQtys(newQtys);
+    setCheckedSet(newChecked);
+  };
 
   const handleToggleCheck = (vendorId: string) => {
     setCheckedSet(prev => {
@@ -288,8 +286,8 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
   const detailVendorInfo = detailVendorId ? getVendorById(detailVendorId) : undefined;
   const canConfirm = selectedComps.length > 0 && totalAllocated === sub.qty;
 
-  // 13-column grid: cb | # | Vendor | Price | Stock | LeadTime | Rating | OnTime | PayTerms | MOQ | AllocQty | Total | chevron
-  const GRID = "36px 32px 1fr 100px 88px 110px 62px 72px 106px 66px 106px 98px 28px";
+  // 15-column grid: cb | # | Vendor | Price | Current | Reserved | Available | LeadTime | Rating | OnTime | PayTerms | MOQ | Score | AllocQty | Total
+  const GRID = "36px 32px 1fr 100px 72px 72px 72px 110px 62px 72px 106px 56px 60px 106px 90px";
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.48)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
@@ -359,13 +357,13 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                 <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }} />
                 <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }}>#</div>
                 <div style={{ padding: "9px 12px", textAlign: "left", borderRight: "1px solid #e5e7eb" }}>Vendor</div>
-                <div style={{ padding: "9px 6px", background: "#fffbeb", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Price Summary (₹)</div>
-                <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Availability &amp; Delivery</div>
+                <div style={{ padding: "9px 6px", background: "#fffbeb", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Price (₹)</div>
+                <div style={{ padding: "9px 6px", gridColumn: "span 4", background: "#eff6ff", color: "#1d4ed8", borderRight: "1px solid #e5e7eb" }}>Stock Breakdown &amp; Delivery</div>
                 <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#f0fdf4", color: "#15803d", borderRight: "1px solid #e5e7eb" }}>Vendor Performance</div>
                 <div style={{ padding: "9px 6px", gridColumn: "span 2", background: "#faf5ff", color: "#7e22ce", borderRight: "1px solid #e5e7eb" }}>Commercial Terms</div>
+                <div style={{ padding: "9px 6px", background: "#fef3c7", color: "#92400e", borderRight: "1px solid #e5e7eb" }}>Score</div>
                 <div style={{ padding: "9px 6px", borderRight: "1px solid #e5e7eb" }}>Allocate Qty</div>
-                <div style={{ padding: "9px 6px" }}>Total Cost (₹)</div>
-                <div />
+                <div style={{ padding: "9px 6px" }}>Total (₹)</div>
               </div>
 
               {/* Sub-header row */}
@@ -373,16 +371,18 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                 <div style={{ padding: "6px 0" }} />
                 <div style={{ padding: "6px 0" }} />
                 <div style={{ padding: "6px 12px", textAlign: "left" }} />
-                <div style={{ padding: "6px 4px", background: "#fffef5" }}>Client Selling Price<br />(Per Unit)</div>
-                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Available<br />Stock</div>
+                <div style={{ padding: "6px 4px", background: "#fffef5" }}>Client Price<br />(Per Unit)</div>
+                <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Current<br />Stock</div>
+                <div style={{ padding: "6px 4px", background: "#fff7ed", color: "#c2410c" }}>Already<br />Reserved</div>
+                <div style={{ padding: "6px 4px", background: "#f0fdf4", color: "#166534" }}>Available<br />Stock</div>
                 <div style={{ padding: "6px 4px", background: "#f0f7ff" }}>Lead Time<br />(Dispatch + Transit)</div>
                 <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>Rating</div>
                 <div style={{ padding: "6px 4px", background: "#f0fdf4" }}>On-Time<br />Delivery</div>
                 <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>Payment Terms</div>
                 <div style={{ padding: "6px 4px", background: "#fdf4ff" }}>MOQ</div>
+                <div style={{ padding: "6px 4px", background: "#fef9c3" }} />
                 <div style={{ padding: "6px 4px" }} />
                 <div style={{ padding: "6px 4px" }} />
-                <div />
               </div>
 
               {/* Data rows */}
@@ -429,16 +429,28 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>{fmt(c.landedCostPerUnit)}</div>
                     </div>
 
+                    {/* Current Stock */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{c.currentStock}</div>
+                      <div style={{ fontSize: 10, color: "#9ca3af" }}>Physical</div>
+                    </div>
+
+                    {/* Already Reserved */}
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: c.reservedStock > 0 ? "#c2410c" : "#6b7280" }}>{c.reservedStock}</div>
+                      <div style={{ fontSize: 10, color: "#9ca3af" }}>Reserved</div>
+                    </div>
+
                     {/* Available Stock */}
                     <div style={{ textAlign: "center" }}>
-                      <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
-                        {`${stock} Nos`}
+                      <span style={{ display: "inline-block", padding: "3px 8px", borderRadius: 10, fontSize: 12, fontWeight: 600, background: stockOk ? "#f0fdf4" : "#fff7ed", color: stockOk ? "#166534" : "#c2410c", border: `1px solid ${stockOk ? "#bbf7d0" : "#fed7aa"}` }}>
+                        {stock}
                       </span>
                     </div>
 
                     {/* Lead Time */}
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t} Days</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#0369a1" }}>{lt.d} + {lt.t}d</div>
                       <div style={{ fontSize: 11, color: "#6b7280" }}>({lt.total} Days)</div>
                     </div>
 
@@ -460,11 +472,18 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
 
                     {/* MOQ */}
                     <div style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal} Nos` : "—"}</div>
+                      <div style={{ fontSize: 12, color: "#374151" }}>{moqVal > 0 ? `${moqVal}` : "—"}</div>
+                    </div>
+
+                    {/* Score */}
+                    <div style={{ textAlign: "center" }}>
+                      <span style={{ display: "inline-block", padding: "2px 6px", borderRadius: 8, fontSize: 12, fontWeight: 700, background: "#fef9c3", color: "#92400e" }}>
+                        {Math.round(c.score)}
+                      </span>
                     </div>
 
                     {/* Allocate Qty — stepper input capped to vendor available stock */}
-                    <div style={{ padding: "10px 8px" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ padding: "10px 6px" }} onClick={e => e.stopPropagation()}>
                       <div style={{ display: "flex", alignItems: "center", border: `1px solid ${qty > stock ? "#f87171" : "#d1d5db"}`, borderRadius: 6, overflow: "hidden", background: "#fff" }}>
                         <input
                           type="number"
@@ -479,23 +498,16 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
                           <button onClick={() => handleQtyChange(c.vendorId, Math.max(0, qty - 1))} style={{ border: "none", background: "#f9fafb", cursor: "pointer", padding: "3px 6px", fontSize: 8, lineHeight: 1, color: "#374151" }}>▼</button>
                         </div>
                       </div>
-                      <div style={{ fontSize: 10.5, marginTop: 3, display: "flex", flexDirection: "column", gap: 1 }}>
-                        <span style={{ color: "#9ca3af" }}>Max: {stock} Nos</span>
-                        {isChecked && moqVal > 0 && (
-                          <span style={{ color: moqOk ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
-                            {moqOk ? "✓ Within MOQ" : "▲ Below Required"}
-                          </span>
-                        )}
-                      </div>
+                      <div style={{ fontSize: 10, marginTop: 3, color: "#9ca3af" }}>Max: {stock}</div>
+                      {isChecked && moqVal > 0 && !moqOk && (
+                        <div style={{ fontSize: 10, color: "#dc2626", fontWeight: 600 }}>▲ Below MOQ</div>
+                      )}
                     </div>
 
                     {/* Total Cost */}
                     <div style={{ textAlign: "right", paddingRight: 8 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{fmt(lineTotal)}</div>
                     </div>
-
-                    {/* Chevron */}
-                    <div style={{ textAlign: "center", color: "#9ca3af", fontSize: 14 }}>∨</div>
                   </div>
                 );
               })}
@@ -583,6 +595,15 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
             style={{ padding: "9px 26px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
           >
             Cancel
+          </button>
+
+          {/* Auto Allocate button */}
+          <button
+            onClick={handleAutoAllocate}
+            title="Fills quantities automatically: highest-scored vendor fills first, then next, until the required qty is met."
+            style={{ padding: "9px 20px", border: "1px solid #7c3aed", borderRadius: 8, background: "#f5f3ff", color: "#7c3aed", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
+          >
+            ⚡ Auto Allocate
           </button>
 
           {/* Allocation progress */}
@@ -796,46 +817,9 @@ function ViewItemsModal({ group, onClose }) {
   );
 }
 
-// ── Cancel PO Modal (Summary Tab) ─────────────────────────────────────────────
-function CancelPOModal({ poNumber, onConfirm, onClose }: { poNumber: string; onConfirm: (reason: string) => void; onClose: () => void }) {
-  const [reason, setReason] = useState("");
-  const ok = reason.trim().length > 0;
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 440, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#dc2626" }}>Cancel Purchase Order</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
-        </div>
-        <div style={{ padding: "20px 22px" }}>
-          <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, marginBottom: 16 }}>
-            Are you sure you want to cancel <strong>{poNumber}</strong>? This action cannot be undone and the vendor will be notified.
-          </div>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 5 }}>
-            Reason for Cancellation <span style={{ color: "#dc2626" }}>*</span>
-          </label>
-          <textarea
-            value={reason}
-            onChange={e => setReason(e.target.value)}
-            rows={3}
-            placeholder="Enter reason for cancellation..."
-            style={{ width: "100%", padding: "8px 10px", border: `1px solid ${ok ? "#d1d5db" : "#fca5a5"}`, borderRadius: 7, fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", outline: "none" }}
-          />
-          {!ok && <div style={{ fontSize: 11.5, color: "#dc2626", marginTop: 4 }}>Reason is required before confirming cancellation.</div>}
-        </div>
-        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep PO</button>
-          <button onClick={() => { if (!ok) return; onConfirm(reason.trim()); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: ok ? "#dc2626" : "#fca5a5", color: "#fff", cursor: ok ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit", transition: "background 0.15s" }}>Cancel PO</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Vendor Selected Summary Tab ───────────────────────────────────────────────
 // Simplified: shows ordered qty only. No checkboxes, no stock column, no custom qty input.
 function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMeta, vendorAllocations, createdPOs, onCreatePurchaseOrders, onCancelPO }) {
-  const [cancelPOTarget, setCancelPOTarget] = useState<{ poNumber: string; subOrderId: string } | null>(null);
   const fmtINR = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 
   // ── Pending items: vendor selected but PO not yet raised ──
@@ -846,7 +830,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
   const pendingItems: PendingItem[] = [];
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
-    if (!vid || Object.values(createdPOs).some((p: any) => p.subOrderId === sub.id)) continue;
+    if (!vid || createdPOs[sub.id]) continue;
     const allocs = vendorAllocations?.[sub.id];
     if (allocs && allocs.length > 0) {
       pendingItems.push({
@@ -940,7 +924,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
                 </div>
                 <div>
                   <button
-                    onClick={() => setCancelPOTarget({ poNumber: po.poNumber, subOrderId: po.subOrderId })}
+                    onClick={() => { if (window.confirm(`Cancel ${po.poNumber}? This will remove the PO and allow vendor re-selection.`)) onCancelPO(po.subOrderId); }}
                     style={{ background: "none", border: "1px solid #fca5a5", borderRadius: 6, color: "#dc2626", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 10px", fontFamily: "inherit" }}
                   >Cancel PO</button>
                 </div>
@@ -987,77 +971,55 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
               const totalQty = pi.allocations.reduce((s, a) => s + a.qty, 0);
               const estTotal = pi.allocations.reduce((s, a) => s + a.unitPrice * a.qty, 0);
               const primaryAlloc = pi.allocations[0];
-              const VENDOR_COLORS = ["#2563eb", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
               return (
                 <div key={pi.sub.id} style={{ borderBottom: idx < pendingItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-                  {isMulti ? (
-                    /* ── Multi-vendor: item header + one sub-row per vendor ── */
-                    <>
-                      {/* Item header */}
-                      <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "12px 20px 8px", alignItems: "start", borderBottom: "1px dashed #f3f4f6" }}>
-                        <div style={{ gridColumn: "1 / 3" }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
-                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}{pi.sub.category ? ` · ${pi.sub.category}` : ""}</div>
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{totalQty} Nos</div>
-                        <div style={{ fontSize: 11.5, color: "#6b7280" }}>Split across {pi.allocations.length} vendors</div>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827" }}>{fmtINR(estTotal)}</div>
-                      </div>
-                      {/* Per-vendor sub-rows */}
-                      {pi.allocations.map((a, ai) => {
-                        const vendorColor = VENDOR_COLORS[ai % VENDOR_COLORS.length];
-                        const lineTotal = a.unitPrice * a.qty;
-                        return (
-                          <div key={ai} style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "9px 20px 9px 32px", alignItems: "center", background: ai % 2 === 0 ? "#fafafa" : "#fff", borderBottom: ai < pi.allocations.length - 1 ? "1px dashed #f3f4f6" : "none" }}>
-                            {/* Item sub-label */}
-                            <div style={{ fontSize: 11, color: "#9ca3af" }}>└ Vendor {ai + 1}</div>
-                            {/* Vendor */}
-                            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                              <div style={{ width: 22, height: 22, borderRadius: "50%", background: vendorColor, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                {(a.vendorName[0] || "V").toUpperCase()}
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{a.vendorName}</div>
-                                {a.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{a.location}</div>}
-                              </div>
-                            </div>
-                            {/* Qty for this vendor */}
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{a.qty} Nos</div>
-                            {/* Unit price */}
-                            <div style={{ fontSize: 13, color: "#374151" }}>{fmtINR(a.unitPrice)}</div>
-                            {/* Est. total for this vendor */}
-                            <div style={{ fontSize: 13, fontWeight: 700, color: "#111827" }}>{fmtINR(lineTotal)}</div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  ) : (
-                    /* ── Single vendor: original grid row ── */
-                    <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "14px 20px", alignItems: "start" }}>
-                      {/* Item */}
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
-                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}</div>
-                        {pi.sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{pi.sub.category}</div>}
-                      </div>
-                      {/* Vendor */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                          {(primaryAlloc.vendorName[0] || "V").toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{primaryAlloc.vendorName}</div>
-                          {primaryAlloc.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{primaryAlloc.location}</div>}
-                        </div>
-                      </div>
-                      {/* Ordered Qty */}
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", paddingTop: 2 }}>{totalQty} Nos</div>
-                      {/* Unit Price */}
-                      <div style={{ fontSize: 13, color: "#374151", paddingTop: 2 }}>{fmtINR(primaryAlloc.unitPrice)}</div>
-                      {/* Est. Total */}
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827", paddingTop: 2 }}>{fmtINR(estTotal)}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: COL_PND, padding: "14px 20px", alignItems: "start" }}>
+                    {/* Item */}
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "#111827", marginBottom: 2 }}>{pi.sub.itemName}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{pi.sub.id}</div>
+                      {pi.sub.category && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{pi.sub.category}</div>}
                     </div>
-                  )}
+                    {/* Vendor(s) */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {isMulti
+                        ? pi.allocations.map((a, ai) => (
+                          <div key={ai} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", background: ai === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                              {(a.vendorName[0] || "V").toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{a.vendorName}</div>
+                              <div style={{ fontSize: 11, color: "#6b7280" }}>{a.qty} Nos</div>
+                            </div>
+                          </div>
+                        ))
+                        : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              {(primaryAlloc.vendorName[0] || "V").toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111827" }}>{primaryAlloc.vendorName}</div>
+                              {primaryAlloc.location && <div style={{ fontSize: 11, color: "#6b7280" }}>{primaryAlloc.location}</div>}
+                            </div>
+                          </div>
+                        )
+                      }
+                      {isMulti && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{pi.allocations.length} vendors · {pi.allocations.length} POs will be raised</div>}
+                    </div>
+                    {/* Ordered Qty */}
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", paddingTop: 2 }}>{totalQty} Nos</div>
+                    {/* Unit Price */}
+                    <div style={{ fontSize: 13, color: "#374151", paddingTop: 2 }}>
+                      {isMulti
+                        ? <span style={{ fontSize: 12, color: "#6b7280" }}>Split</span>
+                        : fmtINR(primaryAlloc.unitPrice)
+                      }
+                    </div>
+                    {/* Est. Total */}
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111827", paddingTop: 2 }}>{fmtINR(estTotal)}</div>
+                  </div>
                 </div>
               );
             })}
@@ -1086,14 +1048,6 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
             <strong>What's next?</strong> The vendors will receive their POs shortly and confirm delivery timelines. Track each order's status under the <strong>Sub Orders / Items</strong> tab.
           </div>
         </div>
-      )}
-
-      {cancelPOTarget && (
-        <CancelPOModal
-          poNumber={cancelPOTarget.poNumber}
-          onConfirm={(reason) => { onCancelPO(cancelPOTarget.subOrderId, reason); }}
-          onClose={() => setCancelPOTarget(null)}
-        />
       )}
     </div>
   );
@@ -1600,12 +1554,19 @@ const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "
 function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, referenceLocked, onCancel, onRaiseReturn, returnAllowed }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const ref = useRef<any>(null);
+  const statusConfig = useOrderStatusConfig();
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setStatusSub(false); } };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-  const statuses = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered"];
+  const statuses = Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    "Pending", "Confirmed", "Processing", "Shipped", "Delivered",
+  ]));
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button onClick={e => { e.stopPropagation(); setOpen(v => !v); setStatusSub(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
@@ -1663,31 +1624,42 @@ function Field({ label, value }) {
 function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: string, poNumber: string) {
   return (cartItems || []).map((item: any, idx: number) => ({
     num: idx + 1,
-    id: `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
+    // New orders carry a stable generated ID. The legacy fallback intentionally
+    // retains the historical SO- value for existing stored orders.
+    id: item.subOrderId || `SO-${orderId}-${String(idx + 1).padStart(3, "0")}`,
     itemName: item.name,
     image: item.image || "",
-    sku: `SKU/SHOP-${item.id}`,
+    sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
     category: item.category || "General",
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
     productCode: item.productCode || "",
     referenceNumber: "",
-    vendorName: "Pending Assignment",
-    vendorInitial: "P",
-    vendorColor: "#6b7280",
+    // Vendor snapshot — set at add-to-cart time by the client's vendor selection.
+    selectedVendorId: item.selectedVendorId || null,
+    selectedVendorName: item.selectedVendorName || null,
+    vendorName: item.selectedVendorName || "—",
+    vendorInitial: item.selectedVendorName ? item.selectedVendorName[0].toUpperCase() : "—",
+    vendorColor: item.selectedVendorId ? "#2563eb" : "#9ca3af",
     poNumber: poNumber,
     qty: item.quantity,
-    unitPrice: `₹${Number(item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    total: `₹${(item.priceNum * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    unitPrice: `₹${Number(item.landedCost || item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    total: `₹${((item.landedCost || item.priceNum) * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
     itemStatus: "Processing",
     updatedOn: orderDate,
     deliveredAt: null,
     tracking: null,
-    // Stock reservations made at order-placement time (StockAllocation[]).
-    // Used by Nido's vendor selection to add back reserved qty and show
-    // the vendor's true supply capacity (currentStock + reservedForThisOrder).
     stockAllocations: item.vendorAllocations || [],
   }));
+}
+
+// Returns are allowed for Delivered items within a 7-day window
+function isReturnAllowed(sub: any): boolean {
+  if (sub.itemStatus !== "Delivered") return false;
+  if (!sub.deliveredAt) return true; // deliveredAt not set yet — allow
+  const deliveredMs = sub.deliveredAt instanceof Date ? sub.deliveredAt.getTime() : new Date(sub.deliveredAt).getTime();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  return Date.now() - deliveredMs <= sevenDaysMs;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -1696,6 +1668,7 @@ export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrderStatus } = useMyOrders();
   const { user, isClientPortalUser } = useAuth();
+  const statusConfig = useOrderStatusConfig();
   const orderId = id || "";
 
   // Find the real order from context
@@ -1763,7 +1736,7 @@ export default function MyOrderPage() {
 
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
-  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Vendor Selected Summary"];
+  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Draft Purchase Orders"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   // Master status lives on the shared order record itself (single source of
   // truth) so a change made on the owner platform is visible immediately on
@@ -1782,7 +1755,15 @@ export default function MyOrderPage() {
     updateOrderStatus(orderId, status as any);
   };
   const [showStatusDd, setShowStatusDd] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
+  const masterStatusOptions = Array.from(new Set([
+    ...statusConfig.statuses
+      .filter(status => status.category === "Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
+  ]));
 
   // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
   // Stock is no longer reserved at cart time, so no stock release is needed here.
@@ -1808,30 +1789,40 @@ export default function MyOrderPage() {
       : []
   );
   const [subSearch, setSubSearch] = useState("");
+  const filtered = subSearch
+    ? subOrders.filter(s =>
+        s.itemName?.toLowerCase().includes(subSearch.toLowerCase()) ||
+        s.id?.toLowerCase().includes(subSearch.toLowerCase()) ||
+        s.category?.toLowerCase().includes(subSearch.toLowerCase())
+      )
+    : subOrders;
   const [expandedItems, setExpandedItems] = useState(new Set<string>());
-  const [createdPOs, setCreatedPOs] = useState<Record<string, any>>(() => {
-    try { return JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}"); } catch { return {}; }
-  });
-  const [selectedVendors, setSelectedVendors] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}"); } catch { return {}; }
-  });
-  // Rich vendor info (unit price, address, etc.) — not persisted, set when user picks a vendor
-  const [selectedVendorMeta, setSelectedVendorMeta] = useState<Record<string, {
-    vendorId: string; vendorName: string; unitPrice: number; location: string;
-    gstin: string; contact: string; email: string; phone: string;
-    addressLine1: string; addressLine2: string; city: string; state: string; pincode: string;
-  }>>({});
-  // Multi-vendor allocations per sub-order: [{vendorId, qty, meta}]
-  const [vendorAllocations, setVendorAllocations] = useState<Record<string, Array<{ vendorId: string; qty: number; meta: any }>>>({});
+  // Incremented whenever a PO is created or updated so getAllPOs() inline calls
+  // re-run and the Draft Purchase Orders tab / badge reflects the latest data
+  // without needing a page reload.
+  const [poRefreshKey, setPoRefreshKey] = useState(0);
 
-  // Reload per-order localStorage state when navigating between orders
-  useEffect(() => {
-    try { setCreatedPOs(JSON.parse(localStorage.getItem(`nido_pos_${orderId}`) || "{}")); } catch { setCreatedPOs({}); }
-    try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
-    setSelectedVendorMeta({});
-    setVendorAllocations({});
-  }, [orderId]);
-  const [vendorModalSub, setVendorModalSub] = useState<any>(null);
+  // Derived maps used in the sub-orders table — built from the sub-orders list
+  // so they stay in sync with any status/tracking changes without extra state.
+  const createdPOs: Record<string, any> = useMemo(
+    () => Object.fromEntries((poRefreshKey >= 0 ? getAllPOs() : []).filter(p => p.orderId === orderId).map(p => [p.id, p])),
+    [poRefreshKey, orderId]
+  );
+  const selectedVendors: Record<string, string> = useMemo(
+    () => Object.fromEntries(subOrders.filter(s => s.selectedVendorId).map(s => [s.id, s.selectedVendorId])),
+    [subOrders]
+  );
+  const selectedVendorMeta: Record<string, any> = useMemo(
+    () => Object.fromEntries(subOrders.filter(s => s.selectedVendorId).map(s => [s.id, { vendorId: s.selectedVendorId, vendorName: s.selectedVendorName || s.vendorName, location: "" }])),
+    [subOrders]
+  );
+  const vendorAllocations: Record<string, any[]> = useMemo(
+    () => Object.fromEntries(subOrders.filter(s => s.stockAllocations?.length).map(s => [s.id, s.stockAllocations])),
+    [subOrders]
+  );
+  const updateStatus = (subId: string, status: string) =>
+    setSubOrders(prev => prev.map(s => s.id === subId ? { ...s, itemStatus: status, updatedOn: new Date().toLocaleDateString("en-IN") } : s));
+
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [referenceTarget, setReferenceTarget] = useState(null);
@@ -1862,13 +1853,6 @@ export default function MyOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, order?.id]);
 
-  useEffect(() => {
-    localStorage.setItem(`nido_pos_${orderId}`, JSON.stringify(createdPOs));
-  }, [createdPOs, orderId]);
-
-  useEffect(() => {
-    localStorage.setItem(`nido_vendors_${orderId}`, JSON.stringify(selectedVendors));
-  }, [selectedVendors, orderId]);
 
   // Persist per-item status/tracking changes (cancel, status update, add
   // tracking) so they are visible immediately to the other platform (owner
@@ -1902,34 +1886,28 @@ export default function MyOrderPage() {
       const detailOrderId = (e as CustomEvent).detail?.orderId;
       if (detailOrderId && detailOrderId !== orderId) return;
       setSubOrders(prev => applyItemState(prev, loadItemState()));
-      try { setSelectedVendors(JSON.parse(localStorage.getItem(`nido_vendors_${orderId}`) || "{}")); } catch { setSelectedVendors({}); }
-      setSelectedVendorMeta({});
     };
     window.addEventListener("orderSubItemsUpdated", onSubItemsUpdated);
     return () => window.removeEventListener("orderSubItemsUpdated", onSubItemsUpdated);
   }, [orderId]);
 
-  const handleOpenVendorModal = (sub: any) => {
-    // Vendor sourcing is not applicable once the order is Cancelled/Draft.
-    if (isOrderInactive) return;
-    setVendorModalSub(sub);
-  };
 
-  const isReturnAllowed = sub => sub.itemStatus === "Delivered" && sub.deliveredAt && Date.now() - sub.deliveredAt.getTime() <= 3 * 24 * 60 * 60 * 1000;
-  const updateStatus = (id, status) => setSubOrders(prev => prev.map(s => s.id === id ? { ...s, itemStatus: status, deliveredAt: status === "Delivered" ? new Date() : s.deliveredAt, updatedOn: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) } : s));
-  const filtered = subOrders.filter(s => !subSearch || s.itemName.toLowerCase().includes(subSearch.toLowerCase()) || s.id.toLowerCase().includes(subSearch.toLowerCase()));
+  // Re-render whenever a PO is saved (same tab) or written from another tab,
+  // so the Draft Purchase Orders tab badge and content stay in sync without
+  // a page reload.
+  useEffect(() => {
+    const refresh = () => setPoRefreshKey(k => k + 1);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "nido_all_purchase_orders") refresh();
+    };
+    window.addEventListener("poCreated", refresh);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
-  // Accepts an array of allocations from the modal (one per vendor split).
-  // Primary vendor kept in selectedVendors/Meta for display in VendorSelectionTab.
-  const handleSelectVendor = (subId: string, allocations: Array<{ vendorId: string; qty: number; meta: any }>) => {
-    if (Object.values(createdPOs).some((p: any) => p.subOrderId === subId)) return;
-    const primary = allocations[0];
-    if (primary) {
-      setSelectedVendors(prev => ({ ...prev, [subId]: primary.vendorId }));
-      setSelectedVendorMeta(prev => ({ ...prev, [subId]: primary.meta }));
-    }
-    setVendorAllocations(prev => ({ ...prev, [subId]: allocations }));
-  };
 
   // One PO per unique vendor across all selected sub-orders (handles multi-vendor splits).
   const handleCreatePurchaseOrders = (subIds: string[]) => {
@@ -1945,7 +1923,7 @@ export default function MyOrderPage() {
     const vendorLines = new Map<string, { meta: any; lines: LineEntry[] }>();
 
     for (const sub of subOrders) {
-      if (!selectedSet.has(sub.id) || Object.values(createdPOs).some((p: any) => p.subOrderId === sub.id)) continue;
+      if (!selectedSet.has(sub.id) || createdPOs[sub.id]) continue;
 
       // Get allocations: multi-vendor array or single-vendor fallback
       const allocs: Array<{ vendorId: string; qty: number; meta: any }> =
@@ -1977,7 +1955,6 @@ export default function MyOrderPage() {
           subOrderId: sub.id,
           item: sub.itemName,
           sku: sub.sku,
-          productCode: sub.productCode || "",
           category: sub.category,
           hsnCode: "",
           specs: sub.specs,
@@ -2054,18 +2031,19 @@ export default function MyOrderPage() {
 
       savePO(po);
 
-      // Deduct physicalStock AND release reservedStock now that the PO is raised.
-      // This is the ONLY point where physical inventory decreases.
-      // Available stock (physical − reserved) stays the same because both drop equally,
-      // so the shop display does not change at this moment (reservation already did that).
-      for (const { sub, qty: lineQty } of lines) {
-        if (!sub.productCode) continue;
-        deductPhysicalStock(vendorId, sub.productCode, lineQty);
-      }
+      // Reduce vendor currentStock and reservedStock now that a PO has been raised.
+      // This is the only point where physical stock is actually consumed.
+      consumeStockForPO(
+        lines.map(({ sub, qty }) => ({
+          vendorId,
+          masterProductCode: sub.productCode,
+          qty,
+        }))
+      );
 
       for (const { sub } of lines) {
         const li = lineItems.find(x => x.subOrderId === sub.id)!;
-        newPOs[`${sub.id}__${vendorId}`] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, productCode: sub.productCode, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
+        newPOs[sub.id] = { vendorId, vendorName: meta.vendorName, poNumber, item: sub.itemName, qty: li.qty, unitPrice: li.unitPrice, grandTotal, total: grandTotal, subOrderId: sub.id };
       }
     }
 
@@ -2075,20 +2053,7 @@ export default function MyOrderPage() {
   };
 
   const handleCancelPO = (subId: string) => {
-    // Restore physicalStock so vendor inventory returns to its pre-PO level.
-    // reservedStock is NOT touched — it was already cleared when the PO was raised.
-    // A sub-order may have multiple PO entries (split across vendors) — cancel all.
-    const matchingEntries = Object.entries(createdPOs).filter(([, p]: [string, any]) => p.subOrderId === subId);
-    for (const [, po] of matchingEntries as [string, any][]) {
-      if (po?.vendorId && po?.productCode && po?.qty > 0) {
-        restorePhysicalStock(po.vendorId, po.productCode, po.qty);
-      }
-    }
-    setCreatedPOs(prev => {
-      const n = { ...prev };
-      for (const [key] of matchingEntries) delete n[key];
-      return n;
-    });
+    setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendors(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setSelectedVendorMeta(prev => { const n = { ...prev }; delete n[subId]; return n; });
     setVendorAllocations(prev => { const n = { ...prev }; delete n[subId]; return n; });
@@ -2096,13 +2061,15 @@ export default function MyOrderPage() {
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
 
-  const selectedSummaryCount = Object.keys(selectedVendors).length;
+  // poRefreshKey is updated by the poCreated/storage listeners above so this
+  // expression re-runs whenever POs are added or changed.
+  const draftPOCount = (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId && po.status === "Draft").length;
 
   // Client portal: no PO number or vendor-selection columns — it's a
   // read-only, vendor-agnostic view of the sub-orders.
   const subOrdersColumns = isClientPortalUser
     ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
-    : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "SELECT VENDOR", "ACTIONS"];
+    : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"];
   // Explicit min widths (via minmax) on every column plus a real column gap
   // prevent long values (prices, badges, buttons) from visually overlapping
   // into the neighboring column — a plain "1fr"/px template with no gap lets
@@ -2278,7 +2245,7 @@ export default function MyOrderPage() {
                     <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid hsl(var(--primary))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--primary))", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
                     {showStatusDd && (
                       <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                        {["Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft"].map(opt => (
+                        {masterStatusOptions.map(opt => (
                           <button key={opt} onClick={() => {
                             setShowStatusDd(false);
                             if (opt === "Cancelled") { setPendingCancelStatus(true); return; }
@@ -2323,7 +2290,7 @@ export default function MyOrderPage() {
               {TABS.map(tab => {
                 let label = tab;
                 if (tab === "Sub Orders / Items") label = `Sub Orders / Items (${subOrders.length})`;
-                if (tab === "Vendor Selected Summary") label = selectedSummaryCount > 0 ? `Vendor Selected Summary (${selectedSummaryCount})` : "Vendor Selected Summary";
+                if (tab === "Draft Purchase Orders") label = draftPOCount > 0 ? `Draft Purchase Orders (${draftPOCount})` : "Draft Purchase Orders";
                 return (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))", borderBottom: activeTab === tab ? "2px solid hsl(var(--primary))" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -2420,10 +2387,8 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {isOrderInactive ? (
-                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
-                          ) : hasPO ? (
-                            // PO already issued — lock the vendor, no change allowed until PO is cancelled
+                          {hasPO ? (
+                            // PO already confirmed — show the vendor from the PO
                             <div>
                               {subPOs.map((po: any, pi: number) => (
                                 <div key={po.poNumber} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
@@ -2433,44 +2398,21 @@ export default function MyOrderPage() {
                                   <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName}</span>
                                 </div>
                               ))}
-                              <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued · Cancel PO to change</span>
+                              <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued</span>
                             </div>
-                          ) : selVendor ? (
-                            <div>
-                              {isMultiVendor ? (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                                  {subAllocs.map((a: any, ai: number) => (
-                                    <div key={ai} style={{ display: "flex", alignItems: "flex-start", gap: 5 }}>
-                                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: ai === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, flexShrink: 0, marginTop: 1 }}>
-                                        {(a.meta?.vendorName?.[0] || "V").toUpperCase()}
-                                      </div>
-                                      <div>
-                                        <div style={{ fontSize: 11.5, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{a.meta?.vendorName || a.vendorId}</div>
-                                        <div style={{ fontSize: 10.5, color: "#6b7280" }}>{a.qty} Nos</div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0, textAlign: "left" }}>Change ›</button>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                      {(selVendor.name?.[0] || "V").toUpperCase()}
-                                    </div>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{selVendor.name}</span>
-                                  </div>
-                                  <button onClick={() => handleOpenVendorModal(sub)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: 0 }}>Change ›</button>
-                                </div>
-                              )}
+                          ) : sub.selectedVendorName ? (
+                            // Vendor was locked at cart add-to-cart time — display only
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                {(sub.selectedVendorName[0] || "V").toUpperCase()}
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{sub.selectedVendorName}</div>
+                                <div style={{ fontSize: 10, color: "#9ca3af" }}>Selected at order</div>
+                              </div>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleOpenVendorModal(sub)}
-                              style={{ padding: "5px 10px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
-                            >
-                              Select Vendor
-                            </button>
+                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                           )}
                         </div>
                       )}
@@ -2538,18 +2480,143 @@ export default function MyOrderPage() {
             </>
           )}
 
-          {/* Vendor Selected Summary tab */}
-          {activeTab === "Vendor Selected Summary" && (
-            <VendorSelectedSummaryTab
-              subOrders={subOrders}
-              selectedVendors={selectedVendors}
-              selectedVendorMeta={selectedVendorMeta}
-              vendorAllocations={vendorAllocations}
-              createdPOs={createdPOs}
-              onCreatePurchaseOrders={handleCreatePurchaseOrders}
-              onCancelPO={handleCancelPO}
-            />
-          )}
+          {/* Draft Purchase Orders tab */}
+          {activeTab === "Draft Purchase Orders" && (() => {
+            const draftPOs = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft");
+            return (
+              <div style={{ padding: 20 }}>
+                {draftPOs.length === 0 ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No Draft Purchase Orders</p>
+                    <p style={{ fontSize: 12, marginTop: 6, maxWidth: 380, margin: "8px auto 0" }}>
+                      Draft POs are created automatically when an order is placed with vendor-selected items.
+                      Each vendor gets their own Draft PO for review.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
+                      {draftPOs.length} Draft PO{draftPOs.length !== 1 ? "s" : ""} pending your confirmation.
+                      Confirm to lock the vendor and send; Reject to cancel this PO.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      {draftPOs.map(po => (
+                        <div key={po.poNumber} style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                          {/* PO header */}
+                          <div style={{ padding: "12px 18px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontWeight: 700, fontSize: 14 }}>{po.poNumber}</span>
+                                <span style={{ fontSize: 10, background: "#fef9c3", color: "#92400e", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>Draft</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
+                                <span style={{ fontWeight: 600 }}>Vendor:</span> {po.vendorName}
+                              </div>
+                              {po.vendorEmail && <div style={{ fontSize: 11, color: "#9ca3af" }}>{po.vendorEmail}</div>}
+                              <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Created: {po.createdOnDisplay}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>
+                                ₹{po.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                                {po.items.length} item{po.items.length !== 1 ? "s" : ""}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Line items */}
+                          <div style={{ padding: "0 18px" }}>
+                            {po.items.map((li, i) => (
+                              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: i < po.items.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                                <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
+                                  <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{li.item}</div>
+                                  {li.sku && <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 1 }}>SKU: {li.sku}</div>}
+                                  {li.hsnCode && <div style={{ fontSize: 10.5, color: "#9ca3af" }}>HSN: {li.hsnCode} · GST {li.gstPct ?? 18}%</div>}
+                                </div>
+                                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                  <div style={{ fontSize: 11.5, color: "#6b7280" }}>{li.qty} × ₹{li.unitPrice.toLocaleString("en-IN")}</div>
+                                  <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>₹{li.lineSubtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                                </div>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", fontSize: 12, color: "#6b7280", borderTop: "1px solid #f3f4f6" }}>
+                              <span>Subtotal</span>
+                              <span>₹{po.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12, color: "#6b7280" }}>
+                              <span>SGST ({po.sgstPct}%) + CGST ({po.cgstPct}%)</span>
+                              <span>₹{(po.sgstAmt + po.cgstAmt).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 12px", fontWeight: 700, fontSize: 13, borderTop: "1px solid #e5e7eb", marginTop: 4 }}>
+                              <span>Grand Total</span>
+                              <span>₹{po.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          {!isOrderInactive && (
+                            <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                              <button
+                                onClick={() => { updatePO(po.poNumber, { status: "Cancelled", cancelReason: "Rejected by admin" }); setCreatedPOs(p => ({ ...p })); }}
+                                style={{ padding: "7px 16px", border: "1px solid #fca5a5", borderRadius: 7, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}
+                              >
+                                Reject
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setApprovalError("");
+                                  try {
+                                    // The central engine decides whether this PO
+                                    // needs approval. With no matching active
+                                    // workflow, the existing confirmation flow
+                                    // continues unchanged.
+                                    const requests = await createApprovalRequest({
+                                      module: "Purchase Order",
+                                      trigger: "PO created",
+                                      reference: po.poNumber,
+                                      amount: po.grandTotal,
+                                      requestedBy: user?.id || "system",
+                                      requestedByName: user?.name || "System",
+                                      requestedByRole: user?.role || "",
+                                      context: {
+                                        amount: po.grandTotal,
+                                        poNumber: po.poNumber,
+                                        vendor: po.vendorName,
+                                        orderId: po.orderId,
+                                      },
+                                    });
+                                    if (requests.length) {
+                                      setApprovalError(`${po.poNumber} is pending approval. Review it from Configuration → Approval Workflow.`);
+                                      setPoRefreshKey(k => k + 1);
+                                      return;
+                                    }
+                                    updatePO(po.poNumber, { status: "Confirmed" });
+                                    navigate(`/vendor-orders/${po.poNumber}`);
+                                  } catch (error: any) {
+                                    setApprovalError(error?.message || "Approval service is unavailable. The PO was not confirmed.");
+                                  }
+                                }}
+                                style={{ padding: "7px 18px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}
+                              >
+                                Confirm PO →
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {approvalError && (
+                  <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 7, background: "#fffbeb", border: "1px solid #fcd34d", color: "#92400e", fontSize: 12.5 }}>
+                    {approvalError}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
         </div>
 
@@ -2562,15 +2629,6 @@ export default function MyOrderPage() {
         </div>
       </div>
 
-      {/* Vendor Selection Popup Modal — owner platform only */}
-      {!isClientPortalUser && vendorModalSub && (
-        <VendorSelectionModal
-          sub={vendorModalSub}
-          selectedVendorId={selectedVendors[vendorModalSub.id] || null}
-          onSelect={handleSelectVendor}
-          onClose={() => setVendorModalSub(null)}
-        />
-      )}
 
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}

@@ -213,12 +213,26 @@ function AddressFormBlock({
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
+const PAYMENT_TERMS_OPTIONS = [
+  { value: "Net 30", label: "Net 30 – Payment due in 30 days" },
+  { value: "Net 45", label: "Net 45 – Payment due in 45 days" },
+  { value: "Net 60", label: "Net 60 – Payment due in 60 days" },
+  { value: "Net 90", label: "Net 90 – Payment due in 90 days" },
+  { value: "Immediate", label: "Immediate – Payment on delivery" },
+  { value: "Advance", label: "Advance – Payment before dispatch" },
+];
+
+const PAYMENT_TERMS_KEY = "nido_payment_terms";
+
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const [notesOpen, setNotesOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState<string>(() => {
+    return localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
+  });
 
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -417,6 +431,39 @@ export default function CheckoutPage() {
                   />
                 </div>
               )}
+            </div>
+
+            {/* Payment Terms */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h2 className="font-semibold text-gray-900 text-base mb-1">Payment Terms</h2>
+              <p className="text-xs text-gray-500 mb-3">Select the payment terms that apply to this order.</p>
+              <div className="space-y-2">
+                {PAYMENT_TERMS_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
+                      paymentTerms === opt.value
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentTerms"
+                      className="accent-blue-600"
+                      checked={paymentTerms === opt.value}
+                      onChange={() => {
+                        setPaymentTerms(opt.value);
+                        localStorage.setItem(PAYMENT_TERMS_KEY, opt.value);
+                      }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{opt.value}</p>
+                      <p className="text-xs text-gray-500">{opt.label.split("–")[1]?.trim()}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
 
             {/* Actions */}

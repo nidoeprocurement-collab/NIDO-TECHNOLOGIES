@@ -28,12 +28,17 @@ A modern, professional procurement management application built with React, Type
 ### Installation
 
 ```bash
-npm install
+npm ci
 # or
 pnpm install
 # or
 yarn install
 ```
+
+For a Replit import, prefer `npm ci`: this uses the committed
+`package-lock.json` exactly and avoids dependency-resolution work. The
+repository already includes its Replit workflow and does not need project
+migration or restructuring.
 
 ### Development
 

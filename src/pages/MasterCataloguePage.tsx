@@ -753,7 +753,11 @@ export default function CatalogUpdatesTab() {
     const csvCell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
     const headers = CATALOGUE_CSV_HEADERS;
 
-    const raw = getCatalogProducts();
+    const raw = getCatalogProducts().filter(product => product.publishStatus === 'published');
+    if (!raw.length) {
+      toast.error('No published products to export');
+      return;
+    }
     const dataRows = raw.map(p => {
       const specs = p.specifications || [];
       const gens = p.generalSpecs || [];
@@ -1061,13 +1065,19 @@ export default function CatalogUpdatesTab() {
                           data-testid={`checkbox-product-${item.id}`}
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      <TableCell className="py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                             {item.image ? (
-                              <img src={item.image} alt={item.name} className="w-8 h-8 object-cover rounded" />
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-full object-contain p-1.5"
+                              />
                             ) : (
-                              <ImageIcon size={14} className="text-gray-500" />
+                              <ImageIcon size={24} className="text-gray-300" />
                             )}
                           </div>
                           <span className="font-medium text-sm">{item.name}</span>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Mail,
   Phone,
@@ -28,6 +28,10 @@ import {
 import { servicesData } from "./ClientServicesPage";
 import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { CircleCheck } from "./ClientRolesPage";
+import { useAuth } from "@/contexts/AuthContext";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { getPortalUsersByClient, getPortalRoles, PORTAL_MODULES, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
+import { getClients, addClient } from "@/lib/clientStore";
 
 
 export const usersData = [
@@ -84,9 +88,10 @@ export type AssignedDeviceEntry = {
   status: "Active" | "In Repair";
 };
 
-function AddUserModal({ onClose }: { onClose: () => void }) {
+function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: string; clientName?: string; onClose: () => void; onCreate: (user: UserRecord) => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
+  const [notification, setNotification] = useState("");
 
   const [form, setForm] = useState({
     employeeId: "",
@@ -99,7 +104,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
     gender: "",
     joiningDate: "",
     role:"",
-    orgAccess: "",
+    orgAccess: clientName || "",
     dataVisibility: "All Data",
     locationAccess: "All Locations",
     status: "Active",
@@ -109,8 +114,41 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
+  const [availableClients, setAvailableClients] = useState(() => getClients());
+  useEffect(() => {
+    const refreshClients = () => setAvailableClients(getClients());
+    refreshClients();
+    window.addEventListener("nidoClientsUpdated", refreshClients);
+    return () => window.removeEventListener("nidoClientsUpdated", refreshClients);
+  }, []);
+
+  const handleOrganizationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value !== "__add_new__") {
+      setForm((p) => ({ ...p, orgAccess: e.target.value }));
+      return;
+    }
+    const name = window.prompt("Enter the new client name");
+    if (!name?.trim()) return;
+    const trimmedName = name.trim();
+    const existing = availableClients.find(client => client.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      setForm((p) => ({ ...p, orgAccess: existing.name }));
+      return;
+    }
+    const newClient = {
+      id: `CI-${Date.now()}`,
+      name: trimmedName,
+      status: "active",
+    };
+    addClient(newClient);
+    setAvailableClients(getClients());
+    setForm((p) => ({ ...p, orgAccess: newClient.name }));
+  };
+
   // Permissions
-  const addUserModules = ["Dashboard", "Purchase Orders", "Shop", "Vendors", "Clients", "Inventory", "Transactions", "Invoices", "Reports & Analytics", "User Management"];
+  // Client users only receive permissions for modules available in their
+  // client portal, never the internal NIDO platform modules.
+  const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"];
   const initPerms = () => {
     const out: Record<string, Record<string, boolean>> = {};
@@ -164,12 +202,76 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
   const labelCls = "block text-xs text-blue-600 mb-1";
   const disabledCls = "w-full px-2 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed";
 
+  const handleCreate = () => {
+    const requiredFields: Array<[keyof typeof form, string]> = [
+      ["employeeId", "Employee ID"],
+      ["fullName", "Full Name"],
+      ["email", "Email ID"],
+      ["phone", "Phone Number"],
+      ["role", "Role"],
+      ["orgAccess", "Organization Access"],
+    ];
+    const missing = requiredFields
+      .filter(([key]) => !form[key].trim())
+      .map(([, label]) => label);
+
+    if (missing.length > 0) {
+      setNotification(`Please fill in the required fields: ${missing.join(", ")}.`);
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setNotification("Please enter a valid email address.");
+      return;
+    }
+
+    const initials = form.fullName
+      .trim()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    const newUser: UserRecord = {
+      id: typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `user-${Date.now()}`,
+      name: form.fullName.trim(),
+      role: form.role,
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      lastActive: new Date().toISOString(),
+      status: form.status,
+      initials,
+      color: "bg-blue-500",
+    };
+
+    onCreate(newUser);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-white" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-fullmx-4 flex flex-col max-h-[92vh]"
+        className="bg-white w-full h-full flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+        {notification && (
+          <div className="fixed top-5 right-5 z-[60] max-w-md rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg" role="alert">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 font-bold">!</span>
+              <p className="flex-1 leading-5">{notification}</p>
+              <button
+                type="button"
+                onClick={() => setNotification("")}
+                className="text-red-400 hover:text-red-700"
+                aria-label="Dismiss notification"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        )}
         {/* Modal header */}
         <div className="px-6 pt-5 pb-0 border-b border-gray-100">
           <div className="flex items-start justify-between mb-4">
@@ -303,24 +405,18 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
                       <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                       <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-600"}>
                         <option value="">Select role</option>
-                        <option>Administrator</option>
-                        <option>Procurement Manager</option>
-                        <option>Procurement Specialist</option>
-                        <option>Accounts Payable Officer</option>
-                        <option>Finance Manager</option>
-                        <option>Employee</option>
-                        <option>Client Administrator</option>
-                        <option>Client User</option>
+                        {getPortalRoles(clientId || "").map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                       </select>
                       <button className="text-[11px] text-blue-500 hover:underline mt-1">+ Add New Role</button>
                     </div>
                     <div>
                       <label className={labelCls}>Organization Access <span className="text-red-400">*</span></label>
-                      <select value={form.orgAccess} onChange={set("orgAccess")} className={inputCls + " appearance-none text-gray-500"}>
+                      <select value={form.orgAccess} onChange={handleOrganizationChange} className={inputCls + " appearance-none text-gray-500"}>
                         <option value="">Select organization</option>
-                        <option>Nitin Supplies HQ</option>
-                        <option>Nitin Supplies — South Division</option>
-                        <option>Nitin Supplies — North Division</option>
+                        {availableClients.map(client => (
+                          <option key={client.id} value={client.name}>{client.name}</option>
+                        ))}
+                        <option value="__add_new__">＋ Add New Client</option>
                       </select>
                     </div>
                   </div>
@@ -605,7 +701,7 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
             <button onClick={onClose} className="px-4 py-2 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
               Cancel
             </button>
-            <button className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+            <button onClick={handleCreate} className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
               Create User
             </button>
           </div>
@@ -820,7 +916,22 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
 
 export type UserRecord = typeof usersData[0];
 
-function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
+function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[number]): UserRecord {
+  const initials = user.name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "U";
+  return {
+    id: user.id,
+    name: user.name,
+    role: user.role,
+    email: user.email,
+    phone: "",
+    lastActive: user.createdAt,
+    status: user.status === "active" ? "Active" : "Inactive",
+    initials,
+    color: "bg-blue-500",
+  };
+}
+
+function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [activeTab, setActiveTab] = useState("Overview");
 
@@ -844,7 +955,7 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const addUserModules = ["Dashboard", "Purchase Orders", "Shop", "Vendors", "Clients", "Inventory", "Transactions", "Invoices", "Reports & Analytics", "User Management"];
+  const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"];
   const initPerms = () => {
     const out: Record<string, Record<string, boolean>> = {};
@@ -978,11 +1089,7 @@ function EditUserPage({ user, onBack, onSave }: { user: UserRecord; onBack: () =
                   <div>
                     <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                     <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-700"}>
-                      <option>Administrator</option><option>Procurement Manager</option><option>Procurement Specialist</option>
-                      <option>Accounts Payable Officer</option><option>Finance Manager</option><option>Employee</option>
-                      <option>Client Administrator</option><option>Client User</option><option>Manager</option>
-                      <option>IT Specialist</option><option>Accountant</option><option>Sales Rep</option>
-                      <option>Support Agent</option><option>HR Specialist</option><option>IT Director</option><option>Procurement</option>
+                      {getPortalRoles(clientId || "").map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -1153,7 +1260,7 @@ function ArchivedUsersPage({ onBack, archivedUsers }: { onBack: () => void; arch
         <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium">{archivedUsers.length} archived</span>
       </div>
 
-      <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="border border-gray-200 rounded-xl overflow-visible">
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
@@ -2455,12 +2562,18 @@ function AssignDevicePage({ userName, onBack, onAssign }: { userName: string; on
   );
 }
 
-export default function ClientUsersPage() {
-  const [users, setUsers] = useState<UserRecord[]>([...usersData]);
+export default function ClientUsersPage({ clientId, clientName }: { clientId?: string; clientName?: string } = {}) {
+  const { user: authenticatedUser, startImpersonation } = useAuth();
+  const { hasPermission } = usePermissions();
+  const [impersonationTarget, setImpersonationTarget] = useState<UserRecord | null>(null);
+  const [users, setUsers] = useState<UserRecord[]>(() =>
+    clientId ? getPortalUsersByClient(clientId).map(portalUserToRecord) : []
+  );
   const [archived, setArchived] = useState<typeof archivedUsersData>([...archivedUsersData]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
+  const [rowMenuPosition, setRowMenuPosition] = useState({ top: 8, right: 8 });
   const [showAddUser, setShowAddUser] = useState(false);
   const [showImportUsers, setShowImportUsers] = useState(false);
   const [showArchivedUsers, setShowArchivedUsers] = useState(false);
@@ -2470,6 +2583,80 @@ export default function ClientUsersPage() {
   const [archiveTarget, setArchiveTarget] = useState<UserRecord | null>(null);
   const [userDevices, setUserDevices] = useState<Record<string, AssignedDeviceEntry[]>>({});
   const [assigningDeviceFor, setAssigningDeviceFor] = useState<UserRecord | null>(null);
+  useEffect(() => {
+    if (!rowMenu) return;
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        (target as Element).closest("[data-user-row-menu]") ||
+        (target as Element).closest("[data-user-row-menu-trigger]")
+      ) {
+        return;
+      }
+      setRowMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+  }, [rowMenu]);
+  useEffect(() => {
+    const refreshUsers = () => {
+      if (clientId) setUsers(getPortalUsersByClient(clientId).map(portalUserToRecord));
+    };
+    refreshUsers();
+    window.addEventListener("nidoPortalUsersUpdated", refreshUsers);
+    window.addEventListener("nidoPortalRolesUpdated", refreshUsers);
+    return () => {
+      window.removeEventListener("nidoPortalUsersUpdated", refreshUsers);
+      window.removeEventListener("nidoPortalRolesUpdated", refreshUsers);
+    };
+  }, [clientId]);
+  const canImpersonate = Boolean(
+    clientId &&
+    authenticatedUser?.userType === "nido_admin" &&
+    hasPermission("client_user_impersonation", "manage"),
+  );
+  const getPortalTarget = (row: UserRecord) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(
+      (candidate) =>
+        candidate.email.toLowerCase() === row.email.toLowerCase() &&
+        candidate.status === "active" &&
+        row.status === "Active",
+    );
+    return portalUser ? {
+      id: portalUser.id,
+      email: portalUser.email,
+      name: portalUser.name,
+      role: portalUser.role,
+      userType: portalUser.userType,
+      clientId: portalUser.clientId,
+      clientName: portalUser.clientName || clientName,
+    } : null;
+  };
+
+  const provisionPortalAccess = (row: UserRecord) => {
+    if (!clientId || row.status !== "Active") return;
+    const credentials = provisionPortalUser(clientId, clientName || "Client", {
+      email: row.email,
+      name: row.name,
+      role: "Employee",
+    });
+    setRowMenu(null);
+    window.alert(
+      `Client Portal access is active.\n\nEmail: ${credentials.email}\nPassword: ${credentials.password}\n\nSave these credentials. The password is shown only now.`,
+    );
+  };
+
+  const createUser = (user: UserRecord) => {
+    if (clientId) {
+      provisionPortalUser(clientId, clientName || "Client", {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      });
+    }
+    setUsers((prev) => [user, ...prev]);
+  };
 
   const archiveUser = (id: string) => {
     const u = users.find((u) => u.id === id);
@@ -2482,12 +2669,25 @@ export default function ClientUsersPage() {
   };
 
   const deactivateUser = (id: string) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(item => item.id === id);
+    if (portalUser) {
+      updatePortalUser(id, { status: portalUser.status === "active" ? "inactive" : "active" });
+    }
     setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: u.status === "Inactive" ? "Active" : "Inactive" } : u));
     if (selectedUser?.id === id) setSelectedUser((prev) => prev ? { ...prev, status: prev.status === "Inactive" ? "Active" : "Inactive" } : prev);
     setRowMenu(null);
   };
 
   const saveEditedUser = (updated: UserRecord) => {
+    const portalUser = getPortalUsersByClient(clientId || "").find(item => item.id === updated.id);
+    if (portalUser) {
+      updatePortalUser(updated.id, {
+        name: updated.name,
+        email: updated.email,
+        role: updated.role,
+        status: updated.status === "Active" ? "active" : "inactive",
+      });
+    }
     setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u));
     if (selectedUser?.id === updated.id) setSelectedUser(updated);
   };
@@ -2495,7 +2695,7 @@ export default function ClientUsersPage() {
   const liveSelectedUser = selectedUser ? (users.find((u) => u.id === selectedUser.id) ?? selectedUser) : null;
 
   if (showArchivedUsers) return <ArchivedUsersPage onBack={() => setShowArchivedUsers(false)} archivedUsers={archived} />;
-  if (editingUser) return <EditUserPage user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
+  if (editingUser) return <EditUserPage clientId={clientId} user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
   if (assigningDeviceFor) return (
     <AssignDevicePage
       userName={assigningDeviceFor.name}
@@ -2538,7 +2738,14 @@ export default function ClientUsersPage() {
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
-      {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} />}
+      {showAddUser && (
+        <AddUserModal
+          clientId={clientId}
+          clientName={clientName}
+          onClose={() => setShowAddUser(false)}
+          onCreate={createUser}
+        />
+      )}
       {showImportUsers && <ImportUsersModal onClose={() => setShowImportUsers(false)} />}
       {resetPasswordUser && <ResetPasswordModal userName={resetPasswordUser.name} onClose={() => setResetPasswordUser(null)} />}
       {archiveTarget && (
@@ -2669,19 +2876,72 @@ export default function ClientUsersPage() {
                 </td>
                 <td className="px-3 py-2 relative">
                   <button
-                    onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === user.id ? null : user.id); setHeaderMenuOpen(false); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (rowMenu === user.id) {
+                        setRowMenu(null);
+                        return;
+                      }
+                      const buttonRect = e.currentTarget.getBoundingClientRect();
+                      const menuHeight = 220;
+                      const opensBelow = buttonRect.bottom + 8 + menuHeight <= window.innerHeight;
+                      setRowMenuPosition({
+                        top: opensBelow
+                          ? buttonRect.bottom + 8
+                          : Math.max(8, buttonRect.top - menuHeight - 8),
+                        right: Math.max(8, window.innerWidth - buttonRect.right),
+                      });
+                      setRowMenu(user.id);
+                      setHeaderMenuOpen(false);
+                    }}
+                    data-user-row-menu-trigger
                     className="p-1 rounded hover:bg-gray-100 text-gray-400 transition-colors"
                   >
                     <MoreVertical size={13} />
                   </button>
                   {rowMenu === user.id && (
-                    <div className="absolute right-8 top-2 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-40" onClick={(e) => e.stopPropagation()}>
+                    <div
+                      className="fixed bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-[60] w-48 max-h-[calc(100vh-1rem)] overflow-y-auto"
+                      style={rowMenuPosition}
+                      data-user-row-menu
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button onClick={() => { setEditingUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Edit User</button>
                       <button onClick={() => { setResetPasswordUser(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">Reset Password</button>
                       <button onClick={() => deactivateUser(user.id)} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-gray-700">
                         {user.status === "Inactive" ? "Activate" : "Deactivate"}
                       </button>
                       <div className="my-1 border-t border-gray-100" />
+                      {canImpersonate && user.status === "Active" && (
+                         <>
+                           {!getPortalTarget(user) && (
+                             <button
+                               onClick={() => provisionPortalAccess(user)}
+                               className="w-full text-left px-2 py-1.5 text-xs hover:bg-green-50 transition-colors text-green-700"
+                             >
+                               Provision Portal Access
+                             </button>
+                           )}
+                         </>
+                       )}
+                       {canImpersonate && user.status === "Active" && (
+                        <button
+                          onClick={() => {
+                            const target = getPortalTarget(user);
+                            setRowMenu(null);
+                            if (target) {
+                              setImpersonationTarget(user);
+                            } else {
+                              window.alert(
+                                "This user does not have an active Client Portal account. Provision or create Client Portal access for this email before impersonating.",
+                              );
+                            }
+                          }}
+                          className="w-full text-left px-2 py-1.5 text-xs hover:bg-blue-50 transition-colors text-blue-600"
+                        >
+                          Impersonate
+                        </button>
+                      )}
                       <button onClick={() => { setArchiveTarget(user); setRowMenu(null); }} className="w-full text-left px-2 py-1.5 text-xs hover:bg-gray-50 transition-colors text-orange-500">Archive User</button>
                     </div>
                   )}
@@ -2691,6 +2951,33 @@ export default function ClientUsersPage() {
           </tbody>
         </table>
       </div>
+      {impersonationTarget && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" onClick={() => setImpersonationTarget(null)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-gray-900">Impersonate Client User?</h2>
+            <p className="mt-3 text-sm text-gray-600">You are about to enter the NIDO Client Portal as:</p>
+            <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <p className="text-sm font-semibold text-gray-900">{impersonationTarget.name}</p>
+              <p className="text-xs text-gray-500">{impersonationTarget.email}</p>
+              <p className="text-xs text-gray-500">{clientName || "Client portal"}</p>
+            </div>
+            <p className="mt-3 text-xs text-amber-700">The session is view-only and expires automatically after one hour.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setImpersonationTarget(null)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600">Cancel</button>
+              <button
+                onClick={() => {
+                  const target = getPortalTarget(impersonationTarget);
+                  if (target && startImpersonation(target)) window.location.assign("/portal/dashboard");
+                  else setImpersonationTarget(null);
+                }}
+                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
+              >
+                Start Impersonation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

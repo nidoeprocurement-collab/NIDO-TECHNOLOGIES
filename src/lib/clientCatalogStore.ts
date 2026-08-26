@@ -6,12 +6,18 @@ export interface ClientCatalogEntry {
   sku: string;
   name: string;
   category: string;
+  subcategory?: string;
+  brand?: string;
+  tags?: string[];
+  productType?: string;
+  physicalType?: string;
   roles: string[];
   preference?: string;
   cpc?: string;
   price: string;
   availability: string;
   img: string;
+  images?: string[];   // all product images from master catalog
   // enriched from master catalog for Shop display
   description?: string;
   specs?: string[];        // "Key: Value" formatted
@@ -19,6 +25,9 @@ export interface ClientCatalogEntry {
   moq?: number;
   priceNum?: number;
   generalSpecs?: { label: string; value: string }[];
+  productNotes?: string;
+  videoUrl?: string;
+  warranty?: string;
 }
 
 const STORE_KEY = 'nido_client_catalogs';
@@ -66,7 +75,16 @@ export function removeFromClientCatalog(clientId: string, productCode: string): 
 // are removed or edited. Bootstrapped from existing entries on first use.
 
 const CPC_COUNTER_KEY = 'nido_cpc_counter';
-const CPC_RE = /^CPC-(\d+)$/i;
+import { getPrefix } from './configService';
+
+function getClientProductPrefix(): string {
+  return getPrefix('clientProductCode') || 'CPC-';
+}
+
+function getCpcRegex(): RegExp {
+  const escaped = getClientProductPrefix().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped}(\\d+)$`, 'i');
+}
 
 function readCpcCounter(): number {
   try {
@@ -78,7 +96,7 @@ function readCpcCounter(): number {
   let max = 0;
   for (const entries of Object.values(store)) {
     for (const e of entries) {
-      const m = CPC_RE.exec(e.cpc?.trim() ?? '');
+      const m = getCpcRegex().exec(e.cpc?.trim() ?? '');
       if (m) {
         const n = parseInt(m[1], 10);
         if (n > max) max = n;
@@ -112,7 +130,7 @@ export function reserveClientProductCodes(count: number): string[] {
   if (count <= 0) return [];
   const current = readCpcCounter();
   const codes = Array.from({ length: count }, (_, i) =>
-    `CPC-${String(current + 1 + i).padStart(5, '0')}`
+    `${getClientProductPrefix()}${String(current + 1 + i).padStart(5, '0')}`
   );
   writeCpcCounter(current + count);
   return codes;
@@ -124,7 +142,11 @@ export function reserveClientProductCode(): string {
 }
 
 /** CPC format regex — exported so the UI can validate user-edited codes. */
-export const CPC_FORMAT_RE = CPC_RE;
+// Consumers call this at validation time so a prefix changed in General
+// Settings is reflected without a page reload.
+export function getClientProductCodeFormatRegex(): RegExp {
+  return getCpcRegex();
+}
 
 export function updateClientCatalogProductPrice(
   clientId: string,

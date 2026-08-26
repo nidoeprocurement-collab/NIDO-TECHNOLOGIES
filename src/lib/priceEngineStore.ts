@@ -404,15 +404,70 @@ export function getLandedCost(
 export interface VendorComparisonRow {
   vendorId: string;
   vendorName: string;
+  primaryContact: string;
   vendorProductCode: string;
   basePrice: number;
   moq: number;
   leadTime: number;
+  /** Available stock = currentStock − reservedStock. This is what clients see in the shop. */
   stock: number;
+  /** Physical stock held by vendor (only reduced when a PO is raised). */
+  currentStock: number;
+  /** Units reserved by client orders not yet converted to a PO. */
+  reservedStock: number;
+  /** Incoming / on-order stock. */
+  incomingStock: number;
   rating: number;
   paymentTerms: string;
   landedCostPerUnit: number;
   score: number;
+}
+
+/** A vendor is usable for Shop checkout only when it can satisfy its own MOQ. */
+export function canVendorFulfillMoq(row: VendorComparisonRow): boolean {
+  const moq = Math.max(1, row.moq || 0);
+  return row.stock >= moq;
+}
+
+/**
+ * The price engine's recommendation is the first vendor in its ranked list
+ * that can actually fulfill the vendor's MOQ. Out-of-stock and below-MOQ
+ * vendors remain visible for comparison, but can never be recommended.
+ */
+export function getRecommendedVendor(
+  comparisons: VendorComparisonRow[],
+): VendorComparisonRow | null {
+  return comparisons.find(canVendorFulfillMoq) ?? null;
+}
+
+/**
+ * Return the single comparison badge for a vendor. Recommendation is based on
+ * the price-engine ranking; the other badges describe eligible alternatives.
+ */
+export function getVendorComparisonBadge(
+  comparison: VendorComparisonRow,
+  comparisons: VendorComparisonRow[],
+): "Recommended" | "Fastest" | "Best Price" | "Top Rated" | null {
+  const eligible = comparisons.filter(canVendorFulfillMoq);
+  const recommended = getRecommendedVendor(comparisons);
+  if (!recommended || !canVendorFulfillMoq(comparison)) return null;
+  if (comparison.vendorId === recommended.vendorId) return "Recommended";
+
+  const fastest = eligible.reduce((best, row) =>
+    row.leadTime > 0 && (best === null || row.leadTime < best.leadTime) ? row : best,
+  null as VendorComparisonRow | null);
+  if (fastest && comparison.vendorId === fastest.vendorId) return "Fastest";
+
+  const bestPrice = eligible.reduce((best, row) =>
+    best === null || row.landedCostPerUnit < best.landedCostPerUnit ? row : best,
+  null as VendorComparisonRow | null);
+  if (bestPrice && comparison.vendorId === bestPrice.vendorId) return "Best Price";
+
+  const topRated = eligible.reduce((best, row) =>
+    best === null || row.rating > best.rating ? row : best,
+  null as VendorComparisonRow | null);
+  if (topRated && topRated.rating > 0 && comparison.vendorId === topRated.vendorId) return "Top Rated";
+  return null;
 }
 
 export function computeVendorComparisons(
@@ -434,17 +489,25 @@ export function computeVendorComparisons(
     const rawTerms = info?.paymentTerms || '';
     const basePrice = parseFloat(match.price) || 0;
     const vendorSettings = getVendorCommonSettings(vendorId);
+    const currentStock = parseInt(match.stock || '0') || 0;
+    const reservedStock = parseInt(match.reservedStock || '0') || 0;
     const stockValue = usePhysicalStock
       ? (parseInt(match.physicalStock ?? match.stock ?? '0') || 0)
       : getAvailableStock(match);
+    const availableStock = getAvailableStock(match);
     rows.push({
       vendorId,
       vendorName: info?.name || vendorId,
+      primaryContact: info?.primaryContact || info?.name || vendorId,
       vendorProductCode: match.vendorProductCode || '—',
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
-      stock: stockValue,
+      /** stock = availableStock (what clients/shop see) */
+      stock: usePhysicalStock ? stockValue : availableStock,
+      currentStock,
+      reservedStock,
+      incomingStock: parseInt(match.incomingStock || '0') || 0,
       rating: info?.rating || 0,
       paymentTerms: TERMS_MAP[rawTerms] || rawTerms || '—',
       // Pass category to Tax Engine for accurate, category-specific vendor tax rates
@@ -546,24 +609,6 @@ export function getProductStockInfo(masterProductCode: string, productCategory?:
   };
 }
 
-/**
- * Given an ordered quantity and the cheapest-first vendor list, return which
- * vendors fulfill how much.  Fills cheapest vendor first until its stock runs
- * out, then spills into the next vendor, and so on.
- */
-export function allocateQtyAcrossVendors(
-  qty: number,
-  allocations: VendorStockAllocation[],
-): Array<VendorStockAllocation & { allocated: number }> {
-  let remaining = qty;
-  return allocations
-    .map(a => {
-      const allocated = Math.min(remaining, a.stock);
-      remaining -= allocated;
-      return { ...a, allocated };
-    })
-    .filter(a => a.allocated > 0);
-}
 
 export function getAllProductPricing(): ProductPricing[] {
   const catalog = getCatalogProducts();

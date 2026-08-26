@@ -5,13 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui/select"
-import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
-import type { NidoRole, NidoUser } from "@/lib/nidoUsersStore"
+import { SYSTEM_OWNER_ROLE, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore"
 
 interface AddEditUserDialogProps {
   open: boolean
@@ -33,6 +30,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
   const [jobTitle, setJobTitle]       = useState("")
   const [designation, setDesignation] = useState("")
   const [department, setDepartment]   = useState("")
+  const [dateOfJoining, setDateOfJoining] = useState("")
   const [status, setStatus]           = useState<NidoUser["status"]>("Active")
   const [error, setError]             = useState("")
 
@@ -40,15 +38,19 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
 
   useEffect(() => {
     if (open) {
+      const assignableRole = roles.find(
+        r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE,
+      )?.name ?? ""
       setEmployeeId(user?.employeeId   ?? "")
       setName(      user?.name         ?? "")
       setEmail(     user?.email        ?? "")
       setPhone(     user?.phone        ?? "")
       setPassword(  "")           // never pre-fill password
-      setRole(      user?.role         ?? roles[0]?.name ?? "")
+      setRole(      user?.role         ?? assignableRole)
       setJobTitle(  user?.jobTitle     ?? "")
       setDesignation(user?.designation ?? "")
       setDepartment(user?.department   ?? "")
+      setDateOfJoining(user?.dateOfJoining ?? user?.createdAt?.slice(0, 10) ?? new Date().toISOString().split("T")[0])
       setStatus(    user?.status       ?? "Active")
       setError("")
     }
@@ -59,6 +61,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
     if (!EMAIL_RE.test(email.trim()))  { setError("Enter a valid email address.");  return; }
     if (!role)                         { setError("Select a role for this user.");  return; }
     if (!isEdit && !password.trim())   { setError("Password is required for new users."); return; }
+    if (role === SYSTEM_OWNER_ROLE)    { setError("The System Owner role is reserved."); return; }
 
     const now = new Date().toISOString().split("T")[0]
 
@@ -73,6 +76,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       jobTitle:            jobTitle.trim(),
       designation:         designation.trim() || jobTitle.trim(),
       department:          department.trim(),
+      dateOfJoining:       dateOfJoining || now,
       status,
       lastLogin:           user?.lastLogin,
       createdAt:           user?.createdAt ?? now,
@@ -129,14 +133,16 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </div>
           <div>
             <Label className="mb-2 block text-sm font-medium">Role <span className="text-red-500">*</span></Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-              <SelectContent>
-                {roles.filter(r => r.status === "Active").map(r => (
-                  <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={role}
+              onChange={e => setRole(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              {!role && <option value="">Select a role</option>}
+              {roles.filter(r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE).map(r => (
+                <option key={r.id} value={r.name}>{r.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Row 4 */}
@@ -155,15 +161,24 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
             <Input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Procurement" />
           </div>
           <div>
+            <Label className="mb-2 block text-sm font-medium">Date of Joining</Label>
+            <Input type="date" value={dateOfJoining} onChange={e => setDateOfJoining(e.target.value)} />
+          </div>
+          <div>
             <Label className="mb-2 block text-sm font-medium">Status</Label>
-            <Select value={status} onValueChange={v => setStatus(v as NidoUser["status"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              value={status}
+              onChange={e => setStatus(e.target.value as NidoUser["status"])}
+              className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Suspended">Suspended</option>
+            </select>
+          </div>
+          <div>
+            <Label className="mb-2 block text-sm font-medium">Last Login <span className="text-xs text-muted-foreground">(system-managed)</span></Label>
+            <Input value={user?.lastLogin || "Never"} disabled />
           </div>
         </div>
 

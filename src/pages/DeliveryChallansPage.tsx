@@ -1,147 +1,169 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Search, MoreVertical, Trash2, Eye } from "lucide-react";
+import { Archive, Download, Eye, MoreHorizontal, Pencil, Plus, Upload } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { downloadDCPdf } from "@/lib/dcPdfGenerator";
+import { getChallans, getDCDetail, removeChallan, type DCListItem } from "@/lib/dcStore";
 
-const MOCK_CHALLANS = [
-  {
-    id: "dc_001",
-    number: "DC-001",
-    order_id: "ORD-001",
-    client_name: "Tech Solutions Inc",
-    items_count: 5,
-    status: "delivered",
-    created_date: "2024-01-10",
-  },
-  {
-    id: "dc_002",
-    number: "DC-002",
-    order_id: "ORD-002",
-    client_name: "Marketing Pro Agency",
-    items_count: 3,
-    status: "in_transit",
-    created_date: "2024-01-15",
-  },
-  {
-    id: "dc_003",
-    number: "DC-003",
-    order_id: "ORD-003",
-    client_name: "Finance Corp",
-    items_count: 8,
-    status: "pending",
-    created_date: "2024-01-20",
-  },
-];
-
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function DeliveryChallansPage() {
-  const [challans, setChallans] = useState(MOCK_CHALLANS);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const navigate = useNavigate();
 
-  const filtered = challans.filter((c) => {
-    const match =
-      c.number.includes(search) ||
-      c.client_name.toLowerCase().includes(search.toLowerCase());
-    const statusMatch = statusFilter === "all" || c.status === statusFilter;
-    return match && statusMatch;
-  });
+  // Always read fresh from store on mount (picks up newly created challans)
+  const [challans, setChallans] = useState<DCListItem[]>(() => getChallans());
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "delivered":
-        return "bg-green-100 text-green-800";
-      case "in_transit":
-        return "bg-blue-100 text-blue-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+  const handleArchive = (id: string) => {
+    removeChallan(id);
+    setChallans(getChallans());
+    toast.success("Challan archived");
+  };
+
+  const handleDownload = async (challan: DCListItem) => {
+    const dc = getDCDetail(challan.id);
+    if (!dc) { toast.error("DC data not found"); return; }
+    setLoadingId(challan.id + "_dl");
+    try {
+      await downloadDCPdf(dc, `${dc.challanNo}.pdf`);
+      toast.success(`${dc.challanNo}.pdf downloaded`);
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setLoadingId(null);
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Delete challan?")) {
-      setChallans(challans.filter((c) => c.id !== id));
-      toast.success("Challan deleted");
-    }
+  const handlePreview = (challan: DCListItem) => {
+    navigate(`/sales/delivery-challans/${challan.id}/preview`);
   };
+
+  const statusBadge = (status: string) => (
+    <span
+      className={`inline-flex items-center px-3 py-0.5 rounded-full text-xs font-semibold ${
+        status === "OPEN" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {status}
+    </span>
+  );
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="bg-transparent border-b border-gray-200/70">
-        <div className="w-full px-2 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-500">Logistics / Delivery Challans</p>
-            <h1 className="text-2xl font-bold">Delivery Challans</h1>
+    <>
+      <div className="min-h-screen bg-white">
+        {/* ── Header ── */}
+        <div className="border-b border-gray-200/70">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900">Delivery Challans</h1>
+            <div className="flex items-center gap-2">
+              <button className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <Upload size={15} /> Export
+              </button>
+              <button
+                onClick={() => navigate("/sales/delivery-challans/create")}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={15} /> New
+              </button>
+              <button className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+                <MoreHorizontal size={16} />
+              </button>
+            </div>
           </div>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-            <Plus size={18} />
-            New Challan
-          </button>
-        </div>
-      </div>
-
-      <div className="w-full px-2 md:px-6 py-8">
-        <div className="mb-6 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="in_transit">In Transit</option>
-            <option value="delivered">Delivered</option>
-          </select>
         </div>
 
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <table className="w-full table-auto">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Challan #</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Client</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Items</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Date</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-left text-xs font-semibold">Status</th>
-                <th className="px-3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-center text-xs font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="border-b hover:bg-gray-50">
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-blue-600">{c.number}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{c.client_name}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{c.items_count}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">{c.created_date}</td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-sm">
-                    <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusColor(c.status)}`}>
-                      {c.status.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td className="px- truncate3 md:px-4 lg:px-4 md:px-6 py-2 md:py-4 text-center">
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      className="text-red-600 hover:text-red-700"
+        {/* ── Table ── */}
+        <div className="px-6 py-6">
+          <div className="rounded-xl border border-gray-200 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  {["Date", "Delivery Challan#", "Reference Number", "Customer Name", "Status", "Invoice Status", "Amount", "Actions"].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-3 text-[11px] font-semibold uppercase tracking-widest text-gray-500 ${
+                        i === 6 ? "text-right" : i === 7 ? "text-center" : "text-left"
+                      }`}
                     >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {challans.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
+                      No delivery challans found.
+                    </td>
+                  </tr>
+                )}
+                {challans.map((c) => {
+                  const isLoading = loadingId?.startsWith(c.id);
+                  return (
+                    <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50/60 transition-colors last:border-0">
+                      <td className="px-4 py-3 text-gray-600">{c.date}</td>
+                      <td
+                        className="px-4 py-3 font-medium text-blue-600 cursor-pointer hover:underline"
+                        onClick={() => handlePreview(c)}
+                      >
+                        {c.number}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{c.referenceNumber}</td>
+                      <td className="px-4 py-3 text-gray-700">{c.customerName}</td>
+                      <td className="px-4 py-3">{statusBadge(c.status)}</td>
+                      <td className="px-4 py-3 text-gray-600">{c.invoiceStatus}</td>
+                      <td className="px-4 py-3 text-right text-gray-900 font-medium">
+                        ₹{c.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              disabled={!!isLoading}
+                              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-40"
+                            >
+                              {isLoading ? (
+                                <span className="block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+                              ) : (
+                                <MoreHorizontal size={16} />
+                              )}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={() => handlePreview(c)}>
+                              <Eye size={14} /> Preview
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={() => toast.info(`Edit ${c.number}`)}>
+                              <Pencil size={14} /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onSelect={() => handleDownload(c)}>
+                              <Download size={14} /> Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="gap-2 cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                              onSelect={() => handleArchive(c.id)}
+                            >
+                              <Archive size={14} /> Archive
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

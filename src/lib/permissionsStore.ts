@@ -27,6 +27,7 @@ export const MODULES = [
   { key: 'audit_logs',      label: 'Audit Logs' },
   { key: 'notifications',   label: 'Notifications' },
   { key: 'configuration',   label: 'Configuration' },
+  { key: 'client_user_impersonation', label: 'Client User Impersonation' },
 ] as const;
 
 export type ModuleKey = typeof MODULES[number]['key'];
@@ -117,7 +118,11 @@ const DEFAULTS: Record<string, Record<string, ModulePermissions>> = {
     users:MGR, roles:{ view:true, manage:true },
     departments:ALL, audit_logs:READ_EXP,
     notifications:ALL, configuration:{ view:true, manage:true, configure:true },
+    client_user_impersonation:ALL,
   },
+  // Keep the policy explicit: managers can be granted this permission from
+  // the Roles UI, but it is off by default. Procurement and other roles are
+  // denied unless an administrator deliberately changes their role matrix.
   'Procurement Manager': {
     dashboard:VIEW, shop:CRUD, services:CRUD, support:VIEW,
     clients:VIEW, vendors:{ view:true, create:true, edit:true },
@@ -126,6 +131,7 @@ const DEFAULTS: Record<string, Record<string, ModulePermissions>> = {
     contracts:VIEW, approvals:CRUD_APR, master_catalogue:VIEW,
     users:VIEW, roles:NONE, departments:VIEW,
     audit_logs:NONE, notifications:VIEW, configuration:VIEW,
+    client_user_impersonation:NONE,
   },
   'Accounts Payable': {
     dashboard:VIEW, shop:VIEW, services:VIEW, support:VIEW,
@@ -188,8 +194,16 @@ export function getRolePermissions(roleName: string): Record<string, ModulePermi
     return Object.fromEntries(MODULES.map(m => [m.key, ALL]));
   }
   const stored = getAllRolePermissions();
-  if (stored[roleName]) return stored[roleName];
-  return DEFAULTS[roleName] ?? {};
+  // Keep the permission policy available for a fresh browser without writing
+  // seeded/mock rows to storage. Explicit role edits in the Roles UI continue
+  // to override these defaults.
+  const existing = stored[roleName] ?? DEFAULTS[roleName] ?? {};
+  return Object.fromEntries(
+    Object.entries(existing).map(([moduleKey, permissions]) => [
+      moduleKey,
+      { ...permissions },
+    ]),
+  );
 }
 
 export function saveRolePermissions(roleName: string, perms: Record<string, ModulePermissions>): void {
@@ -205,12 +219,7 @@ export function hasPermission(roleName: string, moduleKey: string, action: Actio
   return !!getRolePermissions(roleName)[moduleKey]?.[action];
 }
 
-/** Seed default permissions for built-in roles that haven't been customised yet. */
+/** Compatibility hook retained for existing callers; permissions are live-only. */
 export function initDefaultPermissions(): void {
-  const all = getAllRolePermissions();
-  let changed = false;
-  for (const [name, perms] of Object.entries(DEFAULTS)) {
-    if (!all[name]) { all[name] = perms; changed = true; }
-  }
-  if (changed) localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(all));
+  // No seeded/mock permission rows are created.
 }

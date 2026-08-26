@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Filter, X } from "lucide-react";
+import { getClientServices, saveClientService, type ClientServiceRecord } from "@/lib/clientDataStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const servicesData = [
   { id: "SRV-001", name: "Cloud Hosting Premium", provider: "CloudServe Inc", startDate: "2024-01-01", endDate: "2024-12-31", amount: "$12,000/year", status: "Active", category: "Hosting" },
@@ -8,8 +10,16 @@ export const servicesData = [
 ];
 
 const serviceCategories = ["All", "Hosting", "Support", "Software", "Networking", "Security"];
+type ClientDateRange = { start: string; end: string };
 
-function AddServiceModal({ onClose }: { onClose: () => void }) {
+function overlapsDateRange(startDate: string, endDate: string, range?: ClientDateRange): boolean {
+  if (!range) return true;
+  const start = startDate.slice(0, 10);
+  const end = (endDate || startDate).slice(0, 10);
+  return Boolean(range.start && range.end && range.start <= range.end && start && end && start <= range.end && end >= range.start);
+}
+
+function AddServiceModal({ onClose, onAdd }: { onClose: () => void; onAdd: (service: ClientServiceRecord) => void }) {
   const [form, setForm] = useState({
     name: "",
     provider: "",
@@ -128,7 +138,25 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
           >
             Cancel
           </button>
-          <button className="px-4 py-2 text-xs bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors">
+          <button
+            onClick={() => {
+              if (!form.name.trim() || !form.provider.trim() || !form.startDate || !form.endDate || !form.amount) return;
+              onAdd({
+                id: `SRV-${String(Date.now()).slice(-6)}`,
+                clientId: "",
+                name: form.name.trim(),
+                provider: form.provider.trim(),
+                startDate: form.startDate,
+                endDate: form.endDate,
+                amount: `₹${Number(form.amount).toLocaleString("en-IN")}/year`,
+                status: "Active",
+                category: "Other",
+                description: form.description.trim(),
+              });
+              onClose();
+            }}
+            className="px-4 py-2 text-xs bg-gray-900 hover:bg-gray-800 text-white font-medium rounded-lg transition-colors"
+          >
             Add Service
           </button>
         </div>
@@ -137,20 +165,36 @@ function AddServiceModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-export default function ClientServicesPage() {
+export default function ClientServicesPage({ clientId: requestedClientId, dateRange }: { clientId?: string; dateRange?: ClientDateRange }) {
+  const { user, isClientPortalUser } = useAuth();
+  const clientId = isClientPortalUser ? (user?.clientId ?? "") : (requestedClientId ?? "");
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Category");
   const [page, setPage] = useState(1);
   const [showAddService, setShowAddService] = useState(false);
+  const [services, setServices] = useState<ClientServiceRecord[]>(() => getClientServices(clientId));
 
+  const reload = () => setServices(getClientServices(clientId));
+  useEffect(() => {
+    reload();
+    window.addEventListener("nidoClientDataUpdated", reload);
+    return () => window.removeEventListener("nidoClientDataUpdated", reload);
+  }, [clientId]);
+
+  const handleAdd = (service: ClientServiceRecord) => {
+    saveClientService({ ...service, clientId });
+    reload();
+  };
+
+  const periodServices = services.filter((service) => overlapsDateRange(service.startDate, service.endDate, dateRange));
   const filtered = selectedCategory === "Category" || selectedCategory === "All"
-    ? servicesData
-    : servicesData.filter((s) => s.category === selectedCategory);
+    ? periodServices
+    : periodServices.filter((s) => s.category === selectedCategory);
 
   return (
     <div className="p-5 flex flex-col gap-4" onClick={() => { setRowMenu(null); setCategoryOpen(false); }}>
-      {showAddService && <AddServiceModal onClose={() => setShowAddService(false)} />}
+      {showAddService && <AddServiceModal onAdd={handleAdd} onClose={() => setShowAddService(false)} />}
       {/* Header */}
       <div className="flex items-start justify-between">
         <h2 className="text-base font-semibold text-gray-900">Service History</h2>
@@ -219,7 +263,7 @@ export default function ClientServicesPage() {
                 <td className="px-4 py-2 font-semibold text-gray-900">{svc.amount}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
-                    Active
+                    {svc.status}
                   </span>
                 </td>
               </tr>

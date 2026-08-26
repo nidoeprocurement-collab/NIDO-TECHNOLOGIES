@@ -5,6 +5,8 @@ import {
   addPortalUser,
   updatePortalUser,
   deletePortalUser,
+  getPortalRoleNames,
+  getUsersWithInvalidPortalRoles,
   type PortalUser,
 } from '@/lib/portalUserStore';
 import { Button } from '@/components/ui/button';
@@ -26,17 +28,6 @@ import {
   KeyRound,
   X,
 } from 'lucide-react';
-
-const DEFAULT_ROLES = [
-  'Client Admin',
-  'Procurement Manager',
-  'Purchase Executive',
-  'Finance',
-  'Store Manager',
-  'Employee',
-  'Approver',
-  'Viewer',
-];
 
 interface UserFormState {
   name: string;
@@ -61,19 +52,29 @@ export default function ClientPortalUsersPage() {
   const isAdmin = user?.userType === 'client_admin' || user?.userType === 'nido_admin';
 
   const [users, setUsers] = useState<PortalUser[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [invalidRoleUsers, setInvalidRoleUsers] = useState<PortalUser[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(BLANK_FORM);
   const [resetTarget, setResetTarget] = useState<PortalUser | null>(null);
   const [newPwd, setNewPwd] = useState('');
 
-  const refresh = () => setUsers(getPortalUsersByClient(clientId));
+  const refresh = () => {
+    setUsers(getPortalUsersByClient(clientId));
+    setRoles(getPortalRoleNames(clientId));
+    setInvalidRoleUsers(getUsersWithInvalidPortalRoles(clientId));
+  };
 
   useEffect(() => {
     refresh();
     const handler = () => refresh();
     window.addEventListener('nidoPortalUsersUpdated', handler);
-    return () => window.removeEventListener('nidoPortalUsersUpdated', handler);
+    window.addEventListener('nidoPortalRolesUpdated', handler);
+    return () => {
+      window.removeEventListener('nidoPortalUsersUpdated', handler);
+      window.removeEventListener('nidoPortalRolesUpdated', handler);
+    };
   }, [clientId]);
 
   const openAdd = () => {
@@ -89,12 +90,16 @@ export default function ClientPortalUsersPage() {
   };
 
   const handleSave = () => {
-    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) return;
+    const normalizedEmail = form.email.trim().toLowerCase();
+    const duplicate = users.some(u =>
+      u.id !== editingId && u.email.trim().toLowerCase() === normalizedEmail
+    );
+    if (!form.name.trim() || !normalizedEmail || !form.password.trim() || duplicate) return;
 
     if (editingId) {
       updatePortalUser(editingId, {
         name: form.name,
-        email: form.email,
+        email: normalizedEmail,
         password: form.password,
         role: form.role,
         userType: form.userType,
@@ -104,7 +109,7 @@ export default function ClientPortalUsersPage() {
       addPortalUser({
         id,
         name: form.name,
-        email: form.email,
+         email: normalizedEmail,
         password: form.password,
         role: form.role,
         userType: form.userType,
@@ -155,6 +160,13 @@ export default function ClientPortalUsersPage() {
       </div>
 
       <div className="max-w-7xlpx-6">
+        {invalidRoleUsers.length > 0 && (
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <strong>{invalidRoleUsers.length} user{invalidRoleUsers.length === 1 ? '' : 's'}</strong> have a role that is no longer present in this client’s role list:
+            <span className="ml-1">{invalidRoleUsers.map(u => `${u.name} (${u.role})`).join(', ')}</span>.
+            Update their role before they sign in so portal permissions are applied correctly.
+          </div>
+        )}
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mb-8">
           <Card>
@@ -326,7 +338,7 @@ export default function ClientPortalUsersPage() {
                   value={form.role}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 >
-                  {DEFAULT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                   {roles.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
               <div>

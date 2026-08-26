@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { toast } from "sonner"
+import { useNavigate } from "react-router-dom"
 import {
   Search, Plus, Download, FileText, MoreHorizontal,
   Pencil, Trash2, Key, UserCheck, UserX, PauseCircle,
@@ -25,6 +27,7 @@ import {
   exportUsersCsv, exportUsersPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
   MAX_FAILED_LOGIN_ATTEMPTS,
+  isSystemOwner,
 } from "@/lib/nidoUsersStore"
 
 /** Returns true when a user should be treated as locked — covers both the explicit
@@ -47,7 +50,7 @@ function StatusBadge({ status, locked }: { status: NidoUser["status"]; locked?: 
 }
 
 // ── Reset Password dialog ──────────────────────────────────────────────────────
-function ResetPasswordDialog({
+export function ResetPasswordDialog({
   user, open, onOpenChange,
 }: { user: NidoUser | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [newPw, setNewPw] = useState("");
@@ -91,7 +94,7 @@ function ResetPasswordDialog({
 }
 
 // ── View Login History dialog ──────────────────────────────────────────────────
-function LoginHistoryDialog({
+export function LoginHistoryDialog({
   user, open, onOpenChange,
 }: { user: NidoUser | null; open: boolean; onOpenChange: (v: boolean) => void }) {
   const history = [...(user?.loginHistory ?? [])].reverse();
@@ -139,23 +142,49 @@ function LoginHistoryDialog({
 }
 
 // ── Per-row actions dropdown ───────────────────────────────────────────────────
-function ActionsMenu({
+export function ActionsMenu({
   user,
   onEdit,
   onRefresh,
 }: { user: NidoUser; onEdit: () => void; onRefresh: () => void }) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 16 });
   const [resetPwOpen, setResetPwOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [invitationSentOpen, setInvitationSentOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const menuHeight = 390;
+      const opensAbove = rect.bottom + menuHeight + 4 > window.innerHeight;
+      setMenuPosition({
+        top: opensAbove
+          ? Math.max(8, rect.top - menuHeight - 4)
+          : rect.bottom + 4,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
     };
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!ref.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false);
+    };
+    updatePosition();
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [open]);
 
   const act = (fn: () => void) => { fn(); setOpen(false); };
@@ -174,7 +203,7 @@ function ActionsMenu({
   };
 
   const handleSendInvitation = () => {
-    toast.success("Invitation sent", { description: `An invitation email has been sent to ${user.email}.` });
+    setInvitationSentOpen(true);
   };
 
   const handleUnlock = () => {
@@ -184,23 +213,39 @@ function ActionsMenu({
   };
 
   const handleDelete = () => {
-    if (!window.confirm(`Remove ${user.name} (${user.email})? This cannot be undone.`)) return;
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = () => {
     deleteUser(user.id);
     onRefresh();
+    setDeleteOpen(false);
     toast.success("User removed");
   };
 
-  const itemCls = "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-muted rounded transition-colors cursor-pointer";
+  const itemCls = "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-foreground hover:bg-muted rounded transition-colors cursor-pointer";
 
   return (
     <>
       <div className="relative" ref={ref}>
-        <Button variant="ghost" size="icon" onClick={() => setOpen(v => !v)}>
+        <Button
+          ref={triggerRef}
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions for ${user.name}`}
+          aria-expanded={open}
+          onClick={() => setOpen(v => !v)}
+        >
           <MoreHorizontal size={16} />
         </Button>
 
-        {open && (
-          <div className="absolute right-0 top-9 bg-card border border-border rounded-lg shadow-lg z-50 min-w-[190px] py-1">
+        {open && createPortal(
+          <div
+            ref={menuRef}
+            className="fixed max-h-[calc(100vh-16px)] overflow-y-auto bg-card text-foreground border border-border rounded-lg shadow-2xl z-[9999] w-[240px] py-1"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+            role="menu"
+          >
             <button className={itemCls} onClick={() => act(onEdit)}>
               <Pencil size={14} className="text-muted-foreground" /> Edit User
             </button>
@@ -242,13 +287,56 @@ function ActionsMenu({
             <button className={`${itemCls} text-red-600`} onClick={() => act(handleDelete)}>
               <Trash2 size={14} /> Delete User
             </button>
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
 
       <ResetPasswordDialog user={user} open={resetPwOpen} onOpenChange={setResetPwOpen} />
       <LoginHistoryDialog user={user} open={historyOpen} onOpenChange={setHistoryOpen} />
+      <Dialog open={invitationSentOpen} onOpenChange={setInvitationSentOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MailPlus size={18} className="text-green-600" />
+              Invitation Sent
+            </DialogTitle>
+            <DialogDescription>
+              An invitation email has been sent to <strong>{user.email}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setInvitationSentOpen(false)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{user.name}</strong> ({user.email})?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete User</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
+  );
+}
+
+function ProtectedOwnerBadge() {
+  return (
+    <span
+      title="System Owner is protected and cannot be changed or removed"
+      className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+    >
+      <Lock size={13} /> Protected
+    </span>
   );
 }
 
@@ -258,6 +346,7 @@ const SHOW_PASSWORD_ROLES = new Set(["System Owner", "System Admin"])
 
 export default function ManageUsersPanel() {
   const { user: currentUser } = useAuth()
+  const navigate = useNavigate()
   const canViewPasswords = SHOW_PASSWORD_ROLES.has(currentUser?.role ?? "")
 
   const [search, setSearch] = useState("")
@@ -279,11 +368,16 @@ export default function ManageUsersPanel() {
   useEffect(() => {
     refresh()
     const handler = () => refresh()
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "nido_config_users" || event.key === "nido_config_roles") handler()
+    }
     window.addEventListener(NIDO_ROLES_EVENT, handler)
     window.addEventListener(NIDO_USERS_EVENT, handler)
+    window.addEventListener("storage", handleStorage)
     return () => {
       window.removeEventListener(NIDO_ROLES_EVENT, handler)
       window.removeEventListener(NIDO_USERS_EVENT, handler)
+      window.removeEventListener("storage", handleStorage)
     }
   }, [])
 
@@ -296,19 +390,36 @@ export default function ManageUsersPanel() {
   )
 
   const handleAddUser = () => { setEditingUser(null); setUserDialogOpen(true); }
-  const handleEditUser = (user: NidoUser) => { setEditingUser(user); setUserDialogOpen(true); }
+  const handleEditUser = (user: NidoUser) => {
+    if (isSystemOwner(user)) {
+      toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
+      return
+    }
+    setEditingUser(user)
+    setUserDialogOpen(true)
+  }
 
   const handleSaveUser = (values: Omit<NidoUser, "id">) => {
-    if (editingUser) {
-      const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
-      if (duplicate) { toast.error("Email already in use"); return; }
-      updateUser(editingUser.id, values)
-      toast.success("User updated", { description: `${values.name}'s details have been saved.` })
-    } else {
-      const duplicate = users.some(u => u.email.toLowerCase() === values.email.toLowerCase())
-      if (duplicate) { toast.error("Email already in use"); return; }
-      addUser(values)
-      toast.success("User added", { description: `${values.name} can now access the platform.` })
+    try {
+      if (editingUser) {
+        if (isSystemOwner(editingUser)) {
+          toast.error("System Owner is protected", { description: "The System Owner account must remain unchanged." })
+          return
+        }
+        const duplicate = users.some(u => u.id !== editingUser.id && u.email.toLowerCase() === values.email.toLowerCase())
+        if (duplicate) { toast.error("Email already in use"); return; }
+        updateUser(editingUser.id, values)
+        toast.success("User updated", { description: `${values.name}'s details have been saved.` })
+      } else {
+        const duplicate = users.some(u => u.email.toLowerCase() === values.email.toLowerCase())
+        if (duplicate) { toast.error("Email already in use"); return; }
+        addUser(values)
+        toast.success("User added", { description: `${values.name} can now access the platform.` })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to save this user."
+      toast.error("User could not be saved", { description: message })
+      return
     }
     refresh()
   }
@@ -349,7 +460,18 @@ export default function ManageUsersPanel() {
             <tbody>
               {filteredUsers.map(user => (
                 <tr key={user.id} className="border-b hover:bg-muted/20">
-                  <td className="px-4 py-3 text-xs text-muted-foreground font-mono">{user.employeeId || "—"}</td>
+                  <td className="px-4 py-3 text-xs font-mono">
+                    {user.employeeId ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/configuration/nido-users/users/${encodeURIComponent(user.id)}/profile`)}
+                        className="text-primary hover:underline font-semibold"
+                        title={`View ${user.name}'s profile`}
+                      >
+                        {user.employeeId}
+                      </button>
+                    ) : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium text-sm">{user.name}</div>
                     {user.designation && <div className="text-xs text-muted-foreground">{user.designation}</div>}
@@ -389,7 +511,11 @@ export default function ManageUsersPanel() {
                   <td className="px-4 py-3"><StatusBadge status={user.status} locked={isUserLocked(user)} /></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{user.lastLogin ?? "Never"}</td>
                   <td className="px-4 py-3">
-                    <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
+                     {isSystemOwner(user) ? (
+                       <ProtectedOwnerBadge />
+                     ) : (
+                       <ActionsMenu user={user} onEdit={() => handleEditUser(user)} onRefresh={refresh} />
+                     )}
                   </td>
                 </tr>
               ))}

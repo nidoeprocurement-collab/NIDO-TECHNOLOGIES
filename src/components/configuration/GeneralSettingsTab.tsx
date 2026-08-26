@@ -7,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
-import { Eye, Save, Upload, AlertCircle, RotateCcw, Plus, Trash2 } from "lucide-react"
+import { Save, Upload, AlertCircle, RotateCcw, Plus, Trash2 } from "lucide-react"
 import { useConfig } from "@/contexts/ConfigContext"
 import type { GeneralSettings, PrefixEntry } from "@/lib/configService"
+import AddressPairFields from "@/components/shared/AddressPairFields"
+import { formatAddressDetails, isValidGst, isValidPan, normalizeGstInput, normalizePanInput } from "@/lib/addressTypes"
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -65,6 +67,14 @@ export default function GeneralSettingsPage() {
   const isDirty = JSON.stringify(draft) !== JSON.stringify(config)
 
   const handleSave = () => {
+    if (org.gstNumber && !isValidGst(org.gstNumber)) {
+      toast.error("GST Number must be exactly 15 alphanumeric characters.")
+      return
+    }
+    if (org.panNumber && !isValidPan(org.panNumber)) {
+      toast.error("PAN Number must follow the format AAAAA9999A.")
+      return
+    }
     commitSettings(draft)
     toast.success("Settings saved", { description: "Changes applied across the entire platform." })
   }
@@ -118,6 +128,24 @@ export default function GeneralSettingsPage() {
 
   const { organization: org, theme, localization, procurement, notifications, security } = draft
 
+  const updateOrgAddress = (
+    key: "billingAddressDetails" | "shippingAddressDetails",
+    patch: Partial<GeneralSettings["organization"]["billingAddressDetails"]>,
+  ) => {
+    setDraft(prev => {
+      const details = { ...prev.organization[key], ...patch }
+      const legacyKey = key === "billingAddressDetails" ? "registeredAddress" : "billingAddress"
+      return {
+        ...prev,
+        organization: {
+          ...prev.organization,
+          [key]: details,
+          [legacyKey]: formatAddressDetails(details),
+        },
+      }
+    })
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -135,10 +163,6 @@ export default function GeneralSettingsPage() {
               Unsaved changes
             </div>
           )}
-          <Button variant="outline" onClick={() => toast.message(org.companyName, { description: `${org.email} • ${org.phone}` })}>
-            <Eye className="mr-2 h-4 w-4" />
-            View Company Profile
-          </Button>
           {isDirty && (
             <Button variant="outline" onClick={handleDiscard}>
               <RotateCcw className="mr-2 h-4 w-4" />
@@ -205,11 +229,29 @@ export default function GeneralSettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="mb-2 block text-sm font-medium">GST Number</Label>
-                <Input value={org.gstNumber} onChange={e => update("organization", { gstNumber: e.target.value })} />
+                <Input
+                  value={org.gstNumber}
+                  maxLength={15}
+                  pattern="[A-Za-z0-9]{15}"
+                  placeholder="15 alphanumeric characters"
+                  onChange={e => update("organization", { gstNumber: normalizeGstInput(e.target.value) })}
+                />
+                <p className={`mt-1 text-xs ${org.gstNumber.length === 15 ? "text-green-600" : "text-muted-foreground"}`}>
+                  {org.gstNumber.length}/15 characters
+                </p>
               </div>
               <div>
                 <Label className="mb-2 block text-sm font-medium">PAN Number</Label>
-                <Input value={org.panNumber} onChange={e => update("organization", { panNumber: e.target.value })} />
+                <Input
+                  value={org.panNumber}
+                  maxLength={10}
+                  pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
+                  placeholder="AAAAA9999A"
+                  onChange={e => update("organization", { panNumber: normalizePanInput(e.target.value) })}
+                />
+                <p className={`mt-1 text-xs ${org.panNumber.length === 10 ? "text-green-600" : "text-muted-foreground"}`}>
+                  {org.panNumber.length}/10 characters · 5 letters, 4 numbers, 1 letter
+                </p>
               </div>
               <div>
                 <Label className="mb-2 block text-sm font-medium">CIN</Label>
@@ -257,16 +299,12 @@ export default function GeneralSettingsPage() {
           </Section>
 
           <Section title="Addresses">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Registered Address</Label>
-                <Textarea rows={3} value={org.registeredAddress} onChange={e => update("organization", { registeredAddress: e.target.value })} />
-              </div>
-              <div>
-                <Label className="mb-2 block text-sm font-medium">Billing Address</Label>
-                <Textarea rows={3} value={org.billingAddress} onChange={e => update("organization", { billingAddress: e.target.value })} placeholder="Leave blank to use registered address" />
-              </div>
-            </div>
+            <AddressPairFields
+              billing={org.billingAddressDetails}
+              shipping={org.shippingAddressDetails}
+              onBillingChange={patch => updateOrgAddress("billingAddressDetails", patch)}
+              onShippingChange={patch => updateOrgAddress("shippingAddressDetails", patch)}
+            />
           </Section>
         </TabsContent>
 
@@ -355,6 +393,7 @@ export default function GeneralSettingsPage() {
                 <Select value={localization.currency} onValueChange={v => {
                   const sym = v.match(/\((.+?)\)/)?.[1] ?? v
                   update("localization", { currency: v, currencySymbol: sym })
+                  update("procurement", { defaultCurrency: v })
                 }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

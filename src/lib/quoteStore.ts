@@ -3,6 +3,7 @@
 
 const STORE_KEY = 'nido_sales_quotes';
 const COUNTER_KEY = 'nido_quote_counter';
+import { getPrefix } from './configService';
 
 export interface QuoteLineItem {
   id: string;
@@ -47,6 +48,9 @@ export interface StoredQuote {
   gstSlabs: QuoteGstSlab[];
   totalTax: number;
   adjustment: number;
+  shippingCharges?: number;
+  /** False for quotes created without GST on shipping; undefined is a legacy quote. */
+  shippingGstIncluded?: boolean;
   grandTotal: number;
   termsConditions: string;
   customerNotes: string;
@@ -56,14 +60,41 @@ export interface StoredQuote {
   placeOfSupply?: string;
   createdAt: string;
   updatedAt: string;
+  archived?: boolean;
+  archivedAt?: string;
 }
 
 export function getQuotes(): StoredQuote[] {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    const quotes = JSON.parse(localStorage.getItem(STORE_KEY) || '[]') as StoredQuote[];
+    let normalizedLegacyQuote = false;
+    const normalizedQuotes = quotes.map((quote) => {
+      if (quote.shippingGstIncluded !== undefined) return quote;
+
+      normalizedLegacyQuote = true;
+      const shippingCharges = quote.shippingCharges ?? 0;
+      return {
+        ...quote,
+        shippingGstIncluded: false,
+        grandTotal: quote.grandTotal - shippingCharges * 0.18,
+      };
+    });
+
+    if (normalizedLegacyQuote) {
+      localStorage.setItem(STORE_KEY, JSON.stringify(normalizedQuotes));
+    }
+    return normalizedQuotes;
   } catch {
     return [];
   }
+}
+
+export function getActiveQuotes(): StoredQuote[] {
+  return getQuotes().filter(quote => !quote.archived);
+}
+
+export function getArchivedQuotes(): StoredQuote[] {
+  return getQuotes().filter(quote => quote.archived === true);
 }
 
 export function getQuoteById(id: string): StoredQuote | undefined {
@@ -82,8 +113,22 @@ export function saveQuote(quote: StoredQuote): void {
   window.dispatchEvent(new Event('nidoQuotesUpdated'));
 }
 
-export function deleteQuote(id: string): void {
-  const quotes = getQuotes().filter(q => q.id !== id);
+export function archiveQuote(id: string): void {
+  const quotes = getQuotes().map(quote =>
+    quote.id === id
+      ? { ...quote, archived: true, archivedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+      : quote,
+  );
+  localStorage.setItem(STORE_KEY, JSON.stringify(quotes));
+  window.dispatchEvent(new Event('nidoQuotesUpdated'));
+}
+
+export function restoreQuote(id: string): void {
+  const quotes = getQuotes().map(quote =>
+    quote.id === id
+      ? { ...quote, archived: false, archivedAt: undefined, updatedAt: new Date().toISOString() }
+      : quote,
+  );
   localStorage.setItem(STORE_KEY, JSON.stringify(quotes));
   window.dispatchEvent(new Event('nidoQuotesUpdated'));
 }
@@ -91,5 +136,5 @@ export function deleteQuote(id: string): void {
 export function generateQuoteNumber(): string {
   const counter = parseInt(localStorage.getItem(COUNTER_KEY) || '0', 10) + 1;
   localStorage.setItem(COUNTER_KEY, String(counter));
-  return `EST-${String(counter).padStart(6, '0')}`;
+  return `${getPrefix('salesQuote') || 'QT-'}${String(counter).padStart(6, '0')}`;
 }

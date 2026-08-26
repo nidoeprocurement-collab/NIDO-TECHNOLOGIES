@@ -1,3 +1,6 @@
+import type { AddressDetails } from "@/lib/addressTypes";
+import { createEmptyAddress, formatAddressDetails } from "@/lib/addressTypes";
+
 // ── Centralized Configuration Service ─────────────────────────────────────────
 // Single source of truth for all platform settings.
 // Persists to localStorage. Fires a DOM event on every save so every
@@ -17,6 +20,8 @@ export interface OrgSettings {
   cin: string;
   registeredAddress: string;
   billingAddress: string;
+  billingAddressDetails: AddressDetails;
+  shippingAddressDetails: AddressDetails;
   phone: string;
   supportPhone: string;
   email: string;
@@ -42,6 +47,11 @@ export interface LocalizationSettings {
   timeFormat: string;
   currency: string;
   currencySymbol: string;
+  /** Stored monetary amounts use this base currency. */
+  baseCurrency: string;
+  /** Target-currency units received for one unit of baseCurrency. */
+  exchangeRates: Record<string, number>;
+  exchangeRatesUpdatedAt: string;
   numberFormat: string;
   weekStartDay: string;
   measurementUnit: string;
@@ -113,11 +123,13 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
   organization: {
     companyName: "Nido Tech Pvt. Ltd.",
     displayName: "Nido Tech",
-    gstNumber: "27AACCN1234A11ZD",
+    gstNumber: "27AACCN1234A1Z5",
     panNumber: "AACCN1234A",
     cin: "",
-    registeredAddress: "123 Corporate Ave, Chennai",
+    registeredAddress: "",
     billingAddress: "",
+    billingAddressDetails: createEmptyAddress(),
+    shippingAddressDetails: createEmptyAddress(),
     phone: "+91-44-1234-5678",
     supportPhone: "",
     email: "info@nido-tech.com",
@@ -141,6 +153,15 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     timeFormat: "12h",
     currency: "INR (₹)",
     currencySymbol: "₹",
+    baseCurrency: "INR",
+    exchangeRates: {
+      INR: 1,
+      USD: 0.010471,
+      EUR: 0.009061,
+      GBP: 0.007743,
+      AED: 0.038454,
+    },
+    exchangeRatesUpdatedAt: "",
     numberFormat: "1,23,456.00 (Indian)",
     weekStartDay: "Monday",
     measurementUnit: "Metric",
@@ -187,6 +208,7 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
   prefixes: [
     { key: "purchaseOrder",    label: "Purchase Order",          value: "PO-",   description: "Purchase Order documents",          builtIn: true },
     { key: "purchaseRequest",  label: "Purchase Request",        value: "PR-",   description: "Purchase Request documents",        builtIn: true },
+    { key: "order",             label: "Order",                   value: "ORD-",  description: "Customer order IDs",                 builtIn: true },
     { key: "invoice",          label: "Invoice",                 value: "INV-",  description: "Invoice documents",                 builtIn: true },
     { key: "salesOrder",       label: "Sales Order / Sub-order", value: "SO-",   description: "Sales Orders and Sub-order IDs",    builtIn: true },
     { key: "salesQuote",       label: "Sales Quote",             value: "QT-",   description: "Sales Quotation documents",         builtIn: true },
@@ -195,8 +217,10 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     { key: "expense",          label: "Expense",                 value: "EXP-",  description: "Expense records",                   builtIn: true },
     { key: "payment",          label: "Payment",                 value: "PMT-",  description: "Payment records",                   builtIn: true },
     { key: "creditNote",       label: "Credit Note",             value: "CR-",   description: "Credit Note documents",             builtIn: true },
+    { key: "vendorCredit",     label: "Vendor Credit",           value: "VC-",   description: "Vendor credit documents",             builtIn: true },
     { key: "debitNote",        label: "Debit Note",              value: "DN-",   description: "Debit Note documents",              builtIn: true },
     { key: "goodsReceipt",     label: "Goods Receipt Note",      value: "GRN-",  description: "Goods Receipt Note documents",      builtIn: true },
+    { key: "deliveryChallan",  label: "Delivery Challan",        value: "DC-",   description: "Delivery Challan documents",          builtIn: true },
     { key: "contract",         label: "Contract",                value: "CTR-",  description: "Contract documents",                builtIn: true },
     { key: "serviceRequest",   label: "Service Request",         value: "SVC-",  description: "Service Request numbers",           builtIn: true },
     { key: "supportTicket",    label: "Support Ticket",          value: "TKT-",  description: "Support Ticket numbers",            builtIn: true },
@@ -204,6 +228,7 @@ export const CONFIG_DEFAULTS: GeneralSettings = {
     { key: "client",              label: "Client",                  value: "CL-",   description: "Client IDs",                              builtIn: true },
     { key: "department",          label: "Department",              value: "DEPT-", description: "Department IDs",                          builtIn: true },
     { key: "vendorProductCode",   label: "Vendor Product Code",     value: "VPC-",  description: "Vendor-specific product codes",           builtIn: true },
+    { key: "clientProductCode",   label: "Client Product Code",     value: "CPC-",  description: "Client catalogue product codes",          builtIn: true },
     { key: "masterProductCode",   label: "Master Product Code",     value: "MPC-",  description: "Master catalogue product codes",          builtIn: true },
     { key: "sku",                 label: "SKU",                     value: "SKU-",  description: "Stock Keeping Unit codes",                builtIn: true },
   ],
@@ -228,8 +253,24 @@ export function loadConfig(): GeneralSettings {
     const defaultKeys = new Set(CONFIG_DEFAULTS.prefixes.map((p) => p.key));
     const customPrefixes = savedPrefixes.filter((p) => !defaultKeys.has(p.key));
 
+    const savedOrganization = parsed.organization ?? {};
+    const organization = { ...CONFIG_DEFAULTS.organization, ...savedOrganization };
+    const savedBillingDetails = savedOrganization.billingAddressDetails as Partial<AddressDetails> | undefined;
+    const savedShippingDetails = savedOrganization.shippingAddressDetails as Partial<AddressDetails> | undefined;
+
+    // Load only explicitly saved structured addresses. New/default forms stay
+    // empty instead of being populated from the old demo address fields.
+    organization.billingAddressDetails = {
+      ...CONFIG_DEFAULTS.organization.billingAddressDetails,
+      ...savedBillingDetails,
+    };
+    organization.shippingAddressDetails = {
+      ...CONFIG_DEFAULTS.organization.shippingAddressDetails,
+      ...savedShippingDetails,
+    };
+
     return {
-      organization: { ...CONFIG_DEFAULTS.organization, ...parsed.organization },
+      organization,
       theme: { ...CONFIG_DEFAULTS.theme, ...parsed.theme },
       localization: { ...CONFIG_DEFAULTS.localization, ...parsed.localization },
       procurement: { ...CONFIG_DEFAULTS.procurement, ...parsed.procurement },

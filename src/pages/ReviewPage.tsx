@@ -9,6 +9,8 @@ import { computeCartGST } from "@/lib/cartGstHelper";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 import { reserveVendorStock } from "@/lib/vendorStore";
+import { useI18n } from "@/i18n/I18nProvider";
+import { formatCurrency } from "@/lib/formatters";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -33,11 +35,12 @@ function loadAddresses(clientId: string): DeliveryAddress[] {
 }
 
 function formatPrice(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+  return formatCurrency(n, undefined, { decimals: 0 });
 }
 
 export default function ReviewPage() {
   const navigate = useNavigate();
+  useI18n();
   const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
 
@@ -49,6 +52,20 @@ export default function ReviewPage() {
   }, [clientId]);
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+
+  // Read saved payment terms (selected on the checkout page)
+  const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
+  const paymentTermsLabel = (() => {
+    const map: Record<string, string> = {
+      "Net 30": "Net 30 (Payment due in 30 days)",
+      "Net 45": "Net 45 (Payment due in 45 days)",
+      "Net 60": "Net 60 (Payment due in 60 days)",
+      "Net 90": "Net 90 (Payment due in 90 days)",
+      "Immediate": "Immediate (Payment on delivery)",
+      "Advance": "Advance (Payment before dispatch)",
+    };
+    return map[selectedPaymentTerms] || selectedPaymentTerms;
+  })();
 
   // Read saved payment selection
   const savedPayment: Record<string, string> = (() => {
@@ -129,6 +146,7 @@ export default function ReviewPage() {
     const poRef = Date.now().toString().slice(-6);
 
     const orderNumber = addOrder({
+      clientId: cart[0]?.clientId,
       client: "Nido Tech CorpEssentials",
       clientColor: "#2563eb",
       clientInitial: "N",
@@ -150,7 +168,7 @@ export default function ReviewPage() {
       totalAmountNum: totalAmount,
       paymentMethod: paymentSummary.label,
       paymentDetail: paymentSummary.detail,
-      paymentTerms: "Net 30 (Payment due in 30 days)",
+      paymentTerms: paymentTermsLabel,
       deliveryAddress: selectedAddr
         ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
             .filter(Boolean).join(", ")
@@ -167,6 +185,15 @@ export default function ReviewPage() {
         clientId: i.clientId,
         productCode: i.productCode,
         vendorAllocations: i.vendorAllocations,
+        // Vendor snapshot locked at add-to-cart time — travels with the order
+        selectedVendorId: i.selectedVendorId,
+        selectedVendorName: i.selectedVendorName,
+        vendorPrice: i.vendorPrice,
+        landedCost: i.landedCost,
+        gstSnapshot: i.gstSnapshot,
+        hsnSnapshot: i.hsnSnapshot,
+        vendorRating: i.vendorRating,
+        stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
       })) satisfies OrderCartItem[],
     });
 
@@ -197,7 +224,7 @@ export default function ReviewPage() {
           : null,
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
-        paymentTerms: "Net 30 (Payment due in 30 days)",
+        paymentTerms: paymentTermsLabel,
         clientEmail: "owner@nidotech.com",
         clientName: "Nido Tech CorpEssentials",
       },

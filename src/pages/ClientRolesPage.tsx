@@ -1,5 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Download, X } from "lucide-react";
+import {
+  getPortalRoles,
+  savePortalRoles,
+  getPortalUsersByClient,
+  PORTAL_MODULES,
+  type PortalRole,
+  type PortalRolePermission,
+} from "@/lib/portalUserStore";
 
 const roles = [
   {
@@ -591,7 +600,7 @@ export function NewRolePage({ onBack, onSave, initialData, isEdit }: { onBack: (
   );
 }
 
-export default function ClientRolesPage() {
+function LegacyClientRolesPage() {
   const [rolesState, setRolesState] = useState(roles);
   const [showNewRole, setShowNewRole] = useState(false);
   const [editingRole, setEditingRole] = useState<typeof roles[0] | null>(null);
@@ -804,6 +813,193 @@ export default function ClientRolesPage() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Live client-scoped roles view. This is intentionally backed by the same
+// portal role store used by ClientPortalRolesPage, so users and permissions
+// never drift between the Clients area and the portal.
+const CLIENT_MODULES = [
+  ...PORTAL_MODULES,
+  "Purchase Orders",
+  "Vendors",
+  "Clients",
+  "Inventory",
+  "Transactions",
+  "User Management",
+  "Configuration",
+  "Approvals",
+  "Audit Trail",
+].filter((module, index, all) => all.indexOf(module) === index);
+
+const CLIENT_ACTIONS: Array<keyof Omit<PortalRolePermission, "module">> = [
+  "view", "create", "edit", "delete", "approve", "export", "import", "manage", "configure",
+];
+
+export default function ClientRolesPage() {
+  const { id: routeClientId } = useParams<{ id: string }>();
+  const clientId = routeClientId || localStorage.getItem("nido_shop_selected_client") || "";
+  const [roles, setRoles] = useState<PortalRole[]>(() => getPortalRoles(clientId));
+  const [selectedId, setSelectedId] = useState(roles[0]?.id || "");
+  const [showAddRole, setShowAddRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDescription, setNewRoleDescription] = useState("");
+  const [moduleToAdd, setModuleToAdd] = useState("");
+
+  useEffect(() => {
+    const refresh = () => {
+      const next = getPortalRoles(clientId);
+      setRoles(next);
+      setSelectedId(current => next.some(role => role.id === current) ? current : next[0]?.id || "");
+    };
+    refresh();
+    window.addEventListener("nidoPortalRolesUpdated", refresh);
+    return () => window.removeEventListener("nidoPortalRolesUpdated", refresh);
+  }, [clientId]);
+
+  const selected = roles.find(role => role.id === selectedId) || null;
+  const persist = (next: PortalRole[]) => {
+    setRoles(next);
+    savePortalRoles(clientId, next);
+  };
+
+  const togglePermission = (module: string, action: keyof Omit<PortalRolePermission, "module">) => {
+    if (!selected) return;
+    persist(roles.map(role => role.id !== selected.id ? role : {
+      ...role,
+      permissions: role.permissions.map(permission =>
+        permission.module === module ? { ...permission, [action]: !permission[action] } : permission
+      ),
+    }));
+  };
+
+  const addModule = () => {
+    if (!selected || !moduleToAdd) return;
+    const permission: PortalRolePermission = { module: moduleToAdd, view: false, create: false, edit: false, delete: false };
+    persist(roles.map(role => role.id !== selected.id ? role : (
+      role.permissions.some(item => item.module === moduleToAdd)
+        ? role
+        : { ...role, permissions: [...role.permissions, permission] }
+    )));
+    setModuleToAdd("");
+  };
+
+  const addRole = () => {
+    if (!newRoleName.trim()) return;
+    const role: PortalRole = {
+      id: `client-role-${Date.now()}`,
+      name: newRoleName.trim(),
+      description: newRoleDescription.trim(),
+      permissions: CLIENT_MODULES.map(module => ({ module, view: false, create: false, edit: false, delete: false })),
+    };
+    persist([...roles, role]);
+    setSelectedId(role.id);
+    setNewRoleName("");
+    setNewRoleDescription("");
+    setShowAddRole(false);
+  };
+
+  const renameRole = () => {
+    if (!selected) return;
+    const name = window.prompt("Role name", selected.name)?.trim();
+    if (!name || name === selected.name) return;
+    const description = window.prompt("Role description", selected.description) ?? selected.description;
+    getPortalUsersByClient(clientId).filter(user => user.role === selected.name)
+      .forEach(user => {
+        // Keep every assigned user aligned with the role being renamed.
+        const allUsers = JSON.parse(localStorage.getItem("nido_portal_users") || "[]");
+        const index = allUsers.findIndex((item: { id: string }) => item.id === user.id);
+        if (index >= 0) allUsers[index] = { ...allUsers[index], role: name };
+        localStorage.setItem("nido_portal_users", JSON.stringify(allUsers));
+      });
+    persist(roles.map(role => role.id === selected.id ? { ...role, name, description } : role));
+    window.dispatchEvent(new Event("nidoPortalUsersUpdated"));
+  };
+
+  return (
+    <div className="p-5 flex flex-col gap-5">
+      <div className="flex items-start justify-between border-b border-gray-200 pb-4">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">Roles & Permissions</h2>
+          <p className="text-xs text-gray-500 mt-1">Live roles assigned to users in this client account.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => setShowAddRole(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Role</button>
+          <button className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1"><Download size={11} /> Export CSV</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[240px_1fr] gap-5">
+        <div className="space-y-1">
+          {roles.map(role => {
+            const assigned = getPortalUsersByClient(clientId).filter(user => user.role === role.name).length;
+            return (
+              <button key={role.id} onClick={() => setSelectedId(role.id)}
+                className={`w-full text-left px-3 py-2.5 rounded-lg border ${selectedId === role.id ? "border-blue-300 bg-blue-50" : "border-transparent hover:bg-gray-50"}`}>
+                <div className="text-sm font-medium text-gray-800">{role.name}</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">{assigned} assigned user{assigned === 1 ? "" : "s"}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {selected && (
+          <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 flex items-start justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{selected.name}</h3>
+                <p className="text-xs text-gray-500 mt-1">{selected.description || "No description"}</p>
+              </div>
+              <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit role</button>
+            </div>
+            <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
+              <select value={moduleToAdd} onChange={event => setModuleToAdd(event.target.value)}
+                className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+                <option value="">Add module...</option>
+                {CLIENT_MODULES.filter(module => !selected.permissions.some(item => item.module === module))
+                  .map(module => <option key={module} value={module}>{module}</option>)}
+              </select>
+              <button onClick={addModule} disabled={!moduleToAdd} className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40">Add Module</button>
+              <span className="text-[11px] text-gray-400 ml-auto">{selected.permissions.length} modules</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-2.5 font-semibold text-gray-500">MODULE</th>
+                  {CLIENT_ACTIONS.map(action => <th key={action} className="text-center px-3 py-2.5 font-semibold text-gray-500 uppercase">{action}</th>)}
+                </tr></thead>
+                <tbody>
+                  {selected.permissions.map((permission, index) => (
+                    <tr key={permission.module} className={index % 2 ? "bg-gray-50/50" : "bg-white"}>
+                      <td className="px-4 py-2.5 font-medium text-gray-700">{permission.module}</td>
+                      {CLIENT_ACTIONS.map(action => (
+                        <td key={action} className="text-center px-3 py-2.5">
+                          <button onClick={() => togglePermission(permission.module, action)} className={`w-4 h-4 rounded-full border-2 inline-flex items-center justify-center ${permission[action] ? "bg-blue-600 border-blue-600" : "border-gray-300 hover:border-blue-300"}`}>
+                            {permission[action] && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
+                          </button>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="px-4 py-3 text-[11px] text-gray-400 border-t border-gray-100">Changes save automatically and are used by client users when they access the portal.</p>
+          </div>
+        )}
+      </div>
+
+      {showAddRole && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl p-5 w-full max-w-sm shadow-xl">
+            <div className="flex justify-between items-center mb-4"><h3 className="font-semibold">Add Client Role</h3><button onClick={() => setShowAddRole(false)}><X size={18} /></button></div>
+            <input value={newRoleName} onChange={event => setNewRoleName(event.target.value)} placeholder="Role name" className="w-full border rounded-lg px-3 py-2 text-sm mb-3" />
+            <textarea value={newRoleDescription} onChange={event => setNewRoleDescription(event.target.value)} placeholder="Description (optional)" className="w-full border rounded-lg px-3 py-2 text-sm resize-none" rows={3} />
+            <div className="flex justify-end gap-2 mt-4"><button onClick={() => setShowAddRole(false)} className="px-3 py-2 text-sm border rounded-lg">Cancel</button><button onClick={addRole} disabled={!newRoleName.trim()} className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40">Create Role</button></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

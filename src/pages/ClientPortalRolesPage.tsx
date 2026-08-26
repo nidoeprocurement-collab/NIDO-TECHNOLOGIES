@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShieldCheck, Plus, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { getPortalUsersByClient, updatePortalUser } from '@/lib/portalUserStore';
 
 interface RolePermission {
   module: string;
@@ -136,6 +137,20 @@ export default function ClientPortalRolesPage() {
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
 
+  useEffect(() => {
+    const refresh = () => {
+      const next = getRoles(clientId);
+      setRoles(next);
+      setSelected(current => current ? next.find(r => r.id === current.id) ?? next[0] ?? null : next[0] ?? null);
+    };
+    window.addEventListener('nidoPortalRolesUpdated', refresh);
+    window.addEventListener('nidoPortalUsersUpdated', refresh);
+    return () => {
+      window.removeEventListener('nidoPortalRolesUpdated', refresh);
+      window.removeEventListener('nidoPortalUsersUpdated', refresh);
+    };
+  }, [clientId]);
+
   const handleAddRole = () => {
     if (!newRoleName.trim()) return;
     const r: Role = {
@@ -167,6 +182,38 @@ export default function ClientPortalRolesPage() {
     setRoles(updated);
     saveRoles(clientId, updated);
     setSelected(updated.find(r => r.id === roleId) ?? null);
+  };
+
+  const editRole = (role: Role) => {
+    if (!isAdmin) return;
+    const name = window.prompt('Role name', role.name);
+    if (!name?.trim()) return;
+    const description = window.prompt('Role description', role.description);
+    const updated = roles.map(item => item.id === role.id
+      ? { ...item, name: name.trim(), description: description?.trim() ?? item.description }
+      : item);
+    if (name.trim() !== role.name) {
+      getPortalUsersByClient(clientId)
+        .filter(user => user.role === role.name)
+        .forEach(user => updatePortalUser(user.id, { role: name.trim() }));
+    }
+    saveRoles(clientId, updated);
+    setRoles(updated);
+    setSelected(updated.find(item => item.id === role.id) ?? null);
+  };
+
+  const deleteRole = (role: Role) => {
+    if (!isAdmin) return;
+    const assigned = getPortalUsersByClient(clientId).filter(user => user.role === role.name).length;
+    if (assigned > 0) {
+      window.alert(`Cannot delete "${role.name}". Reassign ${assigned} user${assigned === 1 ? '' : 's'} first.`);
+      return;
+    }
+    if (!window.confirm(`Delete the role "${role.name}"? This cannot be undone.`)) return;
+    const updated = roles.filter(item => item.id !== role.id);
+    saveRoles(clientId, updated);
+    setRoles(updated);
+    setSelected(updated[0] ?? null);
   };
 
   return (
@@ -207,6 +254,18 @@ export default function ClientPortalRolesPage() {
                 </div>
                 {r.description && (
                   <p className="text-xs text-gray-400 mt-0.5 pl-[23px] truncate">{r.description}</p>
+                )}
+                {isAdmin && (
+                  <span className="flex gap-2 pl-[23px] mt-1 text-[11px]">
+                    <span
+                      className="text-blue-600 hover:underline"
+                      onClick={(event) => { event.stopPropagation(); editRole(r); }}
+                    >Edit</span>
+                    <span
+                      className="text-red-600 hover:underline"
+                      onClick={(event) => { event.stopPropagation(); deleteRole(r); }}
+                    >Delete</span>
+                  </span>
                 )}
               </button>
             ))}

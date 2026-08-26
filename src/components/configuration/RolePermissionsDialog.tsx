@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Shield, CheckSquare, Square, Plus, X, Trash2 } from 'lucide-react';
+import { Shield, CheckSquare, Square, Minus, Plus, X, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,19 +15,26 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ACTIONS,
   getRolePermissions,
   saveRolePermissions,
   isSuperAdmin,
   getAllModules,
-  addCustomModule,
-  deleteCustomModule,
   CUSTOM_MODULES_EVENT,
   type ActionKey,
   type ModulePermissions,
 } from '@/lib/permissionsStore';
+import {
+  PLATFORM_MODULE_OPTIONS,
+  ROLE_PERMISSION_MODULE_OPTIONS,
+} from '@/lib/platformModuleCatalog';
 import type { NidoRole } from '@/lib/nidoUsersStore';
 
 interface RolePermissionsDialogProps {
@@ -41,32 +48,66 @@ type PermMatrix = Record<string, ModulePermissions>;
 export default function RolePermissionsDialog({ open, onOpenChange, role }: RolePermissionsDialogProps) {
   const [matrix, setMatrix] = useState<PermMatrix>({});
   const [modules, setModules] = useState(getAllModules());
+  const [removedModuleKeys, setRemovedModuleKeys] = useState<Set<string>>(new Set());
   const [showAddModule, setShowAddModule] = useState(false);
-  const [newModuleName, setNewModuleName] = useState('');
+  const [selectedModuleKeys, setSelectedModuleKeys] = useState<string[]>([]);
   const [addError, setAddError] = useState('');
 
   const superAdmin = !!(role && isSuperAdmin(role.name));
 
   useEffect(() => {
-    const handler = () => setModules(getAllModules());
+    if (open && role) setRemovedModuleKeys(new Set());
+  }, [open, role?.id, role?.name]);
+
+  useEffect(() => {
+    const handler = () => {
+      setModules(previous => {
+        const builtInsAndCustom = getAllModules();
+        const currentPlatformModules = previous.filter(module =>
+          module.key.startsWith('platform_') &&
+          !builtInsAndCustom.some(existing => existing.key === module.key),
+        );
+        return [...builtInsAndCustom, ...currentPlatformModules];
+      });
+    };
     window.addEventListener(CUSTOM_MODULES_EVENT, handler);
     return () => window.removeEventListener(CUSTOM_MODULES_EVENT, handler);
   }, []);
 
   useEffect(() => {
     if (open && role) {
-      setModules(getAllModules());
       const perms = getRolePermissions(role.name);
+      const builtInsAndCustom = getAllModules();
+      const selectedPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
+        Object.prototype.hasOwnProperty.call(perms, module.key),
+      );
+      // A role without a saved permission map is newly created. Start with an
+      // empty module list so permissions are explicitly granted by an admin.
+      // Existing roles keep their current module list and defaults.
+      const hasConfiguredModules =
+        Object.keys(perms).length > 0 || selectedPlatformModules.length > 0;
+      const allRoleModules = hasConfiguredModules
+        ? [
+            ...builtInsAndCustom.filter(module =>
+              Object.prototype.hasOwnProperty.call(perms, module.key),
+            ),
+            ...selectedPlatformModules.filter(module =>
+              !builtInsAndCustom.some(existing => existing.key === module.key) &&
+              !Object.prototype.hasOwnProperty.call(perms, module.key),
+            ),
+          ]
+        : [];
+      setModules(allRoleModules);
       const full: PermMatrix = {};
-      for (const m of getAllModules()) {
+      for (const m of allRoleModules) {
         full[m.key] = { ...(perms[m.key] ?? {}) };
       }
       setMatrix(full);
       setShowAddModule(false);
-      setNewModuleName('');
+      setSelectedModuleKeys([]);
       setAddError('');
     }
-  }, [open, role]);
+  }, [open, role?.id, role?.name]);
 
   const toggle = (moduleKey: string, action: ActionKey) => {
     if (superAdmin) return;
@@ -79,40 +120,50 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   const toggleRow = (moduleKey: string) => {
     if (superAdmin) return;
     const current = matrix[moduleKey] ?? {};
-    const anyOn = ACTIONS.some(a => current[a.key]);
+    const allOn = ACTIONS.every(a => current[a.key]);
     const next: ModulePermissions = {};
-    if (!anyOn) ACTIONS.forEach(a => { next[a.key] = true; });
+    if (!allOn) ACTIONS.forEach(a => { next[a.key] = true; });
     setMatrix(prev => ({ ...prev, [moduleKey]: next }));
   };
 
   const toggleColumn = (action: ActionKey) => {
     if (superAdmin) return;
-    const anyOn = modules.some(m => matrix[m.key]?.[action]);
+    const allOn = modules.length > 0 && modules.every(m => matrix[m.key]?.[action]);
     setMatrix(prev => {
       const next = { ...prev };
-      modules.forEach(m => { next[m.key] = { ...next[m.key], [action]: !anyOn }; });
+      modules.forEach(m => { next[m.key] = { ...next[m.key], [action]: !allOn }; });
       return next;
     });
   };
 
   const handleAddModule = () => {
-    const trimmed = newModuleName.trim();
-    if (!trimmed) { setAddError('Module name is required.'); return; }
-    const mod = addCustomModule(trimmed);
-    if (!mod) { setAddError('A module with that name already exists.'); return; }
-    setMatrix(prev => ({ ...prev, [mod.key]: {} }));
-    setModules(getAllModules());
-    setNewModuleName('');
+    const selected = ROLE_PERMISSION_MODULE_OPTIONS.filter(module => selectedModuleKeys.includes(module.key));
+    if (!selected.length) { setAddError('Select at least one platform module first.'); return; }
+    const duplicates = selected.filter(module =>
+      modules.some(existing => existing.key === module.key || existing.label === module.label),
+    );
+    if (duplicates.length > 0) {
+      setAddError('One or more selected modules are already in the permissions list.');
+      return;
+    }
+    setMatrix(prev => ({
+      ...prev,
+      ...Object.fromEntries(selected.map(module => [module.key, {}])),
+    }));
+    setModules(prev => [...prev, ...selected]);
+    setSelectedModuleKeys([]);
     setAddError('');
     setShowAddModule(false);
-    toast.success('Module added', { description: `"${mod.label}" is now available in all role permission editors.` });
+    toast.success(`${selected.length} module${selected.length === 1 ? '' : 's'} added`, {
+      description: selected.map(module => module.label).join(', '),
+    });
   };
 
-  const handleDeleteCustomModule = (key: string, label: string) => {
-    deleteCustomModule(key);
+  const handleRemoveModuleFromRole = (key: string, label: string) => {
     setMatrix(prev => { const next = { ...prev }; delete next[key]; return next; });
-    setModules(getAllModules());
-    toast.info('Module removed', { description: `"${label}" has been removed from the permissions matrix.` });
+    setRemovedModuleKeys(prev => new Set(prev).add(key));
+    setModules(prev => prev.filter(module => module.key !== key));
+    toast.info('Module removed from role', { description: `"${label}" has been removed from this role's permissions.` });
   };
 
   const handleSave = () => {
@@ -125,6 +176,26 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
   if (!role) return null;
 
   const customModules = modules.filter(m => 'custom' in m && m.custom);
+  const visibleModules = modules.filter(module => !removedModuleKeys.has(module.key));
+  const listedModuleKeys = new Set(modules.map(module => module.key));
+  const listedModuleLabels = new Set(modules.map(module => module.label));
+  const availablePlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(
+    platformModule =>
+      !listedModuleKeys.has(platformModule.key) &&
+      !listedModuleLabels.has(platformModule.label),
+  );
+  const isRowAllSelected = (moduleKey: string) =>
+    superAdmin || ACTIONS.every(action => matrix[moduleKey]?.[action.key]);
+  const isRowPartiallySelected = (moduleKey: string) =>
+    !superAdmin &&
+    ACTIONS.some(action => matrix[moduleKey]?.[action.key]) &&
+    !isRowAllSelected(moduleKey);
+  const isColumnAllSelected = (action: ActionKey) =>
+    superAdmin || (modules.length > 0 && modules.every(module => matrix[module.key]?.[action]));
+  const isColumnPartiallySelected = (action: ActionKey) =>
+    !superAdmin &&
+    modules.some(module => matrix[module.key]?.[action]) &&
+    !isColumnAllSelected(action);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -168,8 +239,18 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                     <button
                       className={`flex flex-col items-center gap-1 mx-auto text-xs ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
                       onClick={() => toggleColumn(a.key)}
-                      title={superAdmin ? undefined : `Toggle all ${a.label}`}
+                      disabled={superAdmin}
+                      aria-label={`Select all ${a.label} permissions`}
+                      aria-pressed={isColumnAllSelected(a.key)}
+                      title={superAdmin ? undefined : `Select all ${a.label} permissions`}
                     >
+                      {isColumnAllSelected(a.key) ? (
+                        <CheckSquare size={16} className="text-primary" />
+                      ) : isColumnPartiallySelected(a.key) ? (
+                        <Minus size={16} className="text-primary" />
+                      ) : (
+                        <Square size={16} className="text-muted-foreground/50" />
+                      )}
                       {a.label}
                     </button>
                   </th>
@@ -178,25 +259,29 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               </tr>
             </thead>
             <tbody>
-              {modules.map((m, idx) => {
+              {visibleModules.map((m, idx) => {
                 const modPerms = matrix[m.key] ?? {};
-                const isCustom = 'custom' in m && m.custom;
                 return (
                   <tr key={m.key} className={idx % 2 === 0 ? 'bg-muted/20' : ''}>
                     <td className="py-2.5 px-3 border-b border-border">
                       <div className="flex items-center gap-2">
                         <button
-                          className={`text-left font-medium text-foreground ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
+                          className={`flex items-center gap-2 text-left font-medium text-foreground ${superAdmin ? 'cursor-default' : 'hover:text-primary transition-colors cursor-pointer'}`}
                           onClick={() => toggleRow(m.key)}
-                          title={superAdmin ? undefined : `Toggle all actions for ${m.label}`}
+                          disabled={superAdmin}
+                          aria-label={`Select all permissions for ${m.label}`}
+                          aria-pressed={isRowAllSelected(m.key)}
+                          title={superAdmin ? undefined : `Select all permissions for ${m.label}`}
                         >
+                          {isRowAllSelected(m.key) ? (
+                            <CheckSquare size={16} className="text-primary shrink-0" />
+                          ) : isRowPartiallySelected(m.key) ? (
+                            <Minus size={16} className="text-primary shrink-0" />
+                          ) : (
+                            <Square size={16} className="text-muted-foreground/50 shrink-0" />
+                          )}
                           {m.label}
                         </button>
-                        {isCustom && (
-                          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-blue-600 border-blue-300">
-                            custom
-                          </Badge>
-                        )}
                       </div>
                     </td>
                     {ACTIONS.map(a => {
@@ -220,11 +305,11 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                       );
                     })}
                     <td className="py-2.5 px-1 border-b border-border text-center">
-                      {isCustom && !superAdmin && (
+                      {!superAdmin && (
                         <button
-                          onClick={() => handleDeleteCustomModule(m.key, m.label)}
+                          onClick={() => handleRemoveModuleFromRole(m.key, m.label)}
                           className="text-muted-foreground/40 hover:text-red-500 transition-colors"
-                          title={`Remove "${m.label}" module`}
+                          title={`Remove "${m.label}" from this role`}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -238,21 +323,44 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               {showAddModule && !superAdmin && (
                 <tr className="bg-blue-50/60 dark:bg-blue-950/20">
                   <td colSpan={ACTIONS.length + 2} className="px-3 py-3 border-b border-border">
-                    <div className="flex items-center gap-2 max-w-sm">
-                      <Input
-                        autoFocus
-                        value={newModuleName}
-                        onChange={e => { setNewModuleName(e.target.value); setAddError(''); }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleAddModule();
-                          if (e.key === 'Escape') { setShowAddModule(false); setNewModuleName(''); setAddError(''); }
-                        }}
-                        placeholder="Module name (e.g. Inventory)"
-                        className="h-8 text-sm"
-                      />
+                    <div className="flex items-center gap-2 max-w-2xl">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="h-8 flex-1 justify-start text-sm font-normal">
+                            {selectedModuleKeys.length > 0
+                              ? `${selectedModuleKeys.length} module${selectedModuleKeys.length === 1 ? '' : 's'} selected`
+                              : 'Select platform modules'}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-[360px] max-h-80 overflow-y-auto">
+                          {availablePlatformModules.length > 0 ? (
+                            availablePlatformModules.map(module => (
+                              <DropdownMenuCheckboxItem
+                                key={module.key}
+                                checked={selectedModuleKeys.includes(module.key)}
+                                onCheckedChange={checked => {
+                                  setSelectedModuleKeys(previous =>
+                                    checked
+                                      ? [...previous, module.key]
+                                      : previous.filter(key => key !== module.key),
+                                  );
+                                  setAddError('');
+                                }}
+                                onSelect={event => event.preventDefault()}
+                              >
+                                {module.label}
+                              </DropdownMenuCheckboxItem>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-muted-foreground">
+                              All platform modules are already listed.
+                            </div>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button size="sm" onClick={handleAddModule} className="h-8 shrink-0">Add</Button>
                       <button
-                        onClick={() => { setShowAddModule(false); setNewModuleName(''); setAddError(''); }}
+                        onClick={() => { setShowAddModule(false); setSelectedModuleKeys([]); setAddError(''); }}
                         className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       >
                         <X size={16} />
@@ -285,7 +393,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setShowAddModule(v => !v); setNewModuleName(''); setAddError(''); }}
+              onClick={() => { setShowAddModule(v => !v); setSelectedModuleKeys([]); setAddError(''); }}
               className="flex items-center gap-1.5"
             >
               <Plus size={14} />

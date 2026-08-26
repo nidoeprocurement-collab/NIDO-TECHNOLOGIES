@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FileText, MessageSquare, RefreshCw, CheckSquare, AtSign, MoreVertical,
   Bold, Italic, List, Link, AtSignIcon, Smile, Paperclip, Download,
   ChevronDown, ArrowRight, CheckCircle2, Calendar,
 } from "lucide-react";
+import { getClientActivities, saveClientActivity, type ClientActivityRecord } from "@/lib/clientDataStore";
 
 const STATS = [
   { icon: <FileText size={18} className="text-blue-500" />, value: "36", label: "Total Notes", sub: "Across Contract", bg: "bg-blue-50" },
@@ -31,6 +32,7 @@ interface Activity {
   visibility: string;
   replies?: number;
   group: string;
+  createdAt?: string;
 }
 
 const ACTIVITIES: Activity[] = [
@@ -101,13 +103,13 @@ function Avatar({ initials }: { initials: string }) {
   );
 }
 
-function DonutChart() {
+function DonutChart({ data = DONUT }: { data?: typeof DONUT }) {
   const size = 100;
   const cx = size / 2, cy = size / 2;
   const outerR = 44, innerR = 28;
-  const total = DONUT.reduce((s, d) => s + d.count, 0);
+  const total = data.reduce((s, d) => s + d.count, 0) || 1;
   let angle = -Math.PI / 2;
-  const slices = DONUT.map((d) => {
+  const slices = data.map((d) => {
     const sweep = (d.count / total) * 2 * Math.PI;
     const x1 = cx + outerR * Math.cos(angle), y1 = cy + outerR * Math.sin(angle);
     const x2 = cx + outerR * Math.cos(angle + sweep), y2 = cy + outerR * Math.sin(angle + sweep);
@@ -125,7 +127,7 @@ function DonutChart() {
   );
 }
 
-export default function ClientActivityPage() {
+export default function ClientActivityPage({ clientId }: { clientId?: string }) {
   const [activeTab, setActiveTab] = useState("All Activity");
   const [noteText, setNoteText] = useState("");
   const [visibility, setVisibility] = useState("Select Visibility");
@@ -134,7 +136,17 @@ export default function ClientActivityPage() {
   const [visibilityFilter, setVisibilityFilter] = useState("All");
   const [userFilter, setUserFilter] = useState("All Users");
   const [visibleCount, setVisibleCount] = useState(9);
-  const [activities, setActivities] = useState<Activity[]>(ACTIVITIES);
+  const [activities, setActivities] = useState<Activity[]>(() =>
+    clientId ? getClientActivities(clientId) : ACTIVITIES
+  );
+
+  useEffect(() => {
+    if (!clientId) return;
+    const reload = () => setActivities(getClientActivities(clientId));
+    reload();
+    window.addEventListener("nidoClientDataUpdated", reload);
+    return () => window.removeEventListener("nidoClientDataUpdated", reload);
+  }, [clientId]);
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
@@ -151,8 +163,19 @@ export default function ClientActivityPage() {
       description: noteText.trim(),
       visibility: visibility === "Select Visibility" ? "Visible to All" : visibility,
       group: "Today",
+      createdAt: now.toISOString(),
     };
-    setActivities((prev) => [newNote, ...prev]);
+    if (clientId) {
+      const record: ClientActivityRecord = {
+        ...newNote,
+        clientId,
+        createdAt: newNote.createdAt || now.toISOString(),
+      };
+      saveClientActivity(record);
+      setActivities(getClientActivities(clientId));
+    } else {
+      setActivities((prev) => [newNote, ...prev]);
+    }
     setNoteText("");
     setActiveTab("All Activity");
   };
@@ -164,6 +187,9 @@ export default function ClientActivityPage() {
     if (activeTab === "Updates") return a.type === "Update";
     if (activeTab === "Tasks") return a.type === "Task";
     if (activeTab === "Mentions") return a.type === "Mention";
+    if (activityType !== "All Types" && a.type !== activityType.replace(/s$/, "")) return false;
+    if (visibilityFilter !== "All" && a.visibility !== visibilityFilter) return false;
+    if (userFilter !== "All Users" && a.name !== userFilter) return false;
     return true;
   }).slice(0, visibleCount);
 
@@ -173,13 +199,35 @@ export default function ClientActivityPage() {
     return acc;
   }, {});
 
-  const groupOrder = ["Today", "Yesterday", "May 30, 2025", "May 29, 2025"];
+  const groupOrder = Object.keys(groups);
+  const noteCount = activities.filter((a) => a.type === "Note").length;
+  const commentCount = activities.filter((a) => a.type === "Comment").length;
+  const updateCount = activities.filter((a) => a.type === "Update").length;
+  const taskCount = activities.filter((a) => a.type === "Task").length;
+  const mentionCount = activities.filter((a) => a.type === "Mention").length;
+  const liveStats = [
+    { ...STATS[0], value: String(noteCount) },
+    { ...STATS[1], value: String(activities.length) },
+    { ...STATS[2], value: String(commentCount) },
+    { ...STATS[3], value: activities[0]?.time || "No activity", sub: activities[0] ? `By ${activities[0].name}` : "No activity yet" },
+    { ...STATS[4], value: String(taskCount), sub: "Open tasks" },
+    { ...STATS[5], value: String(mentionCount) },
+  ];
+  const liveDonut = [
+    { label: "Notes", count: noteCount, pct: activities.length ? Math.round(noteCount / activities.length * 100) : 0, color: "#3b82f6" },
+    { label: "Comments", count: commentCount, pct: activities.length ? Math.round(commentCount / activities.length * 100) : 0, color: "#a78bfa" },
+    { label: "Updates", count: updateCount, pct: activities.length ? Math.round(updateCount / activities.length * 100) : 0, color: "#22c55e" },
+    { label: "Tasks", count: taskCount, pct: activities.length ? Math.round(taskCount / activities.length * 100) : 0, color: "#f97316" },
+    { label: "Mentions", count: mentionCount, pct: activities.length ? Math.round(mentionCount / activities.length * 100) : 0, color: "#ef4444" },
+  ];
+  const recentNotes = activities.filter((a) => a.type === "Note").slice(0, 3);
+  const upcomingTasks = activities.filter((a) => a.type === "Task" && a.completedBadge !== "Completed").slice(0, 5);
 
   return (
     <div className="p-5 flex flex-col gap-4">
       {/* Stat cards */}
       <div className="grid grid-cols-6 gap-3">
-        {STATS.map((s) => (
+        {liveStats.map((s) => (
           <div key={s.label} className="bg-white border border-gray-200 rounded-xl p-2 flex flex-col gap-1.5">
             <div className={`w-8 h-8 rounded-lg ${s.bg} flex items-center justify-center`}>{s.icon}</div>
             <p className="text-sm font-bold text-gray-900 leading-tight">{s.value}</p>
@@ -312,7 +360,7 @@ export default function ClientActivityPage() {
           </div>
 
           {/* Load more */}
-          {visibleCount < ACTIVITIES.length && (
+          {visibleCount < activities.length && (
             <div className="flex justify-center mt-2">
               <button
                 onClick={() => setVisibleCount((v) => v + 5)}
@@ -330,9 +378,9 @@ export default function ClientActivityPage() {
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-gray-800 mb-3">Activity Summary</p>
             <div className="flex items-center gap-3 mb-3">
-              <DonutChart />
+              <DonutChart data={liveDonut} />
               <div className="flex flex-col gap-1">
-                {DONUT.map((d) => (
+                {liveDonut.map((d) => (
                   <div key={d.label} className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
                     <span className="text-[10px] text-gray-600">{d.label} {d.count} ({d.pct}%)</span>
@@ -342,7 +390,7 @@ export default function ClientActivityPage() {
             </div>
             <div className="flex items-center justify-between border-t border-gray-100 pt-2 mt-1">
               <span className="text-[11px] text-gray-500">Total Activities</span>
-              <span className="text-xs font-bold text-gray-800">128</span>
+               <span className="text-xs font-bold text-gray-800">{activities.length}</span>
             </div>
           </div>
 
@@ -350,12 +398,12 @@ export default function ClientActivityPage() {
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-gray-800 mb-3">Recent Notes</p>
             <div className="flex flex-col gap-3">
-              {RECENT_NOTES.map((n, i) => (
+              {recentNotes.map((n, i) => (
                 <div key={i} className="flex gap-2">
                   <FileText size={12} className="text-gray-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[11px] text-gray-700 leading-snug">{n.text}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">By {n.by} • {n.when}</p>
+                    <p className="text-[11px] text-gray-700 leading-snug">{n.description}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">By {n.name} • {n.time}</p>
                   </div>
                 </div>
               ))}
@@ -369,12 +417,12 @@ export default function ClientActivityPage() {
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <p className="text-xs font-semibold text-gray-800 mb-3">Upcoming Tasks</p>
             <div className="flex flex-col gap-2.5">
-              {UPCOMING_TASKS.map((t, i) => (
+              {upcomingTasks.map((t, i) => (
                 <div key={i} className="flex gap-2 items-start">
                   <CheckCircle2 size={13} className="text-green-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-[11px] text-gray-700 leading-snug">{t.label}</p>
-                    <p className="text-[10px] text-gray-400">{t.due}</p>
+                    <p className="text-[11px] text-gray-700 leading-snug">{t.boldPart || t.description}</p>
+                    <p className="text-[10px] text-gray-400">{t.time}</p>
                   </div>
                 </div>
               ))}

@@ -395,7 +395,16 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrdersStatus } = useMyOrders();
-  const { user } = useAuth();
+  const { user, isImpersonating, isClientPortalUser } = useAuth();
+  const isViewOnly = isImpersonating;
+  const visibleOrders = useMemo(() => {
+    if (!isClientPortalUser || !user?.clientId) return orders;
+    return orders.filter(o =>
+      o.clientId === user.clientId ||
+      o.cartItems?.some(item => item.clientId === user.clientId) ||
+      o.client === user.clientName
+    );
+  }, [orders, isClientPortalUser, user?.clientId, user?.clientName]);
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
@@ -417,13 +426,13 @@ export default function MyOrderPage() {
   const ALL_TABS = useMemo(() => {
     const statuses: OrderStatus[] = ["Draft", "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled"];
     return [
-      { key: "All Orders", label: "All Orders", count: orders.length },
-      ...statuses.map(s => ({ key: s, label: s, count: orders.filter(o => o.status === s).length })),
+       { key: "All Orders", label: "All Orders", count: visibleOrders.length },
+       ...statuses.map(s => ({ key: s, label: s, count: visibleOrders.filter(o => o.status === s).length })),
     ];
-  }, [orders]);
+  }, [visibleOrders]);
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(o => {
+    return visibleOrders.filter(o => {
       if (activeTab !== "All Orders" && o.status !== activeTab) return false;
       const q = search.toLowerCase();
       if (q && !o.id.toLowerCase().includes(q) && !o.client.toLowerCase().includes(q) &&
@@ -444,7 +453,7 @@ export default function MyOrderPage() {
       }
       return true;
     });
-  }, [orders, activeTab, search, appliedFilters]);
+  }, [visibleOrders, activeTab, search, appliedFilters]);
 
   const allChecked = filteredOrders.length > 0 && filteredOrders.every(o => selected.has(o.id));
   const someChecked = filteredOrders.some(o => selected.has(o.id)) && !allChecked;
@@ -484,6 +493,10 @@ export default function MyOrderPage() {
 
   // ── Bulk update status ──────────────────────────────────────────────────────
   const handleBulkStatusApply = (status: OrderStatus) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      return;
+    }
     if (status === "Cancelled") {
       // Cancelling is a terminal, hard-to-undo action — confirm first.
       setPendingBulkCancel(true);
@@ -493,6 +506,12 @@ export default function MyOrderPage() {
   };
 
   const applyBulkStatus = (status: OrderStatus, cancelReason?: string) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      setPendingBulkCancel(false);
+      setShowBulkStatus(false);
+      return;
+    }
     // Cascades to sub-orders (and clears vendor selection) when moving to
     // Cancelled/Draft, and stays in sync with the order detail page since
     // both read/write the same shared order + sub-order state. Orders that
@@ -513,6 +532,11 @@ export default function MyOrderPage() {
 
   // ── Bulk update notes ───────────────────────────────────────────────────────
   const handleBulkNotesApply = (note: string, visibility: string) => {
+    if (isViewOnly) {
+      showToast("This action is disabled while using client-user impersonation.");
+      setShowBulkNotes(false);
+      return;
+    }
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -563,9 +587,27 @@ export default function MyOrderPage() {
             {showActions && (
               <ActionDropdown
                 onExport={handleExport}
-                onCreateOrder={() => navigate("/shop")}
-                onBulkStatus={() => setShowBulkStatus(true)}
-                onBulkNotes={() => setShowBulkNotes(true)}
+                onCreateOrder={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  navigate("/shop");
+                }}
+                onBulkStatus={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  setShowBulkStatus(true);
+                }}
+                onBulkNotes={() => {
+                  if (isViewOnly) {
+                    showToast("This action is disabled while using client-user impersonation.");
+                    return;
+                  }
+                  setShowBulkNotes(true);
+                }}
                 onClose={() => setShowActions(false)}
               />
             )}

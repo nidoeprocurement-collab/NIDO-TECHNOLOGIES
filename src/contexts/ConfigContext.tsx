@@ -15,6 +15,7 @@ import {
   type NotificationSettings,
   type SecuritySettings,
 } from "@/lib/configService";
+import { getCurrencyCode } from "@/lib/formatters";
 
 // ── Context shape ──────────────────────────────────────────────────────────────
 
@@ -72,9 +73,39 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }, [config]);
 
   const commitSettings = useCallback((newConfig: GeneralSettings) => {
+    const previousConfig = loadConfig();
     setConfig(newConfig);
     setSavedConfig(newConfig);
     saveConfig(newConfig);
+
+    const previousCurrency = getCurrencyCode(previousConfig.localization.currency);
+    const selectedCurrency = getCurrencyCode(newConfig.localization.currency);
+    if (previousCurrency === selectedCurrency) return;
+
+    // Apply the bundled rate immediately, then replace it with the latest
+    // server-fetched rates when available.
+    void fetch("/api/exchange-rates?base=INR")
+      .then((response) => {
+        if (!response.ok) throw new Error(`Exchange-rate request failed (${response.status})`);
+        return response.json() as Promise<{ rates?: Record<string, number>; fetchedAt?: string }>;
+      })
+      .then((payload) => {
+        if (!payload.rates || typeof payload.rates[selectedCurrency] !== "number") return;
+        const updatedConfig: GeneralSettings = {
+          ...newConfig,
+          localization: {
+            ...newConfig.localization,
+            exchangeRates: { ...newConfig.localization.exchangeRates, ...payload.rates, INR: 1 },
+            exchangeRatesUpdatedAt: payload.fetchedAt ?? new Date().toISOString(),
+          },
+        };
+        setConfig(updatedConfig);
+        setSavedConfig(updatedConfig);
+        saveConfig(updatedConfig);
+      })
+      .catch((error) => {
+        console.warn("[currency] live exchange rates unavailable; using cached rates", error);
+      });
   }, []);
 
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);

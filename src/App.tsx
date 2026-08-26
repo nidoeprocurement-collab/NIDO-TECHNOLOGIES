@@ -86,16 +86,19 @@ import { DataProvider } from "@/contexts/DataContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { OrdersProvider } from "@/contexts/OrdersContext";
 import { MyOrdersProvider } from "@/contexts/MyOrdersContext";
+import ImpersonationBanner from "@/components/ImpersonationBanner";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ConfigProvider } from "@/contexts/ConfigContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { PageMetaProvider } from "@/contexts/PageMetaContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
 import { Suspense, lazy, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
 import { I18nProvider } from "./i18n/I18nProvider";
+import { hasPortalPermission } from "@/lib/portalUserStore";
 
 const queryClient = new QueryClient();
 
@@ -137,14 +140,65 @@ function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
 
 /** Guards client portal routes: redirects NIDO admins to /dashboard */
 function ClientPortalRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isNidoAdmin } = useAuth();
+  const { isAuthenticated, isClientPortalUser, isImpersonating, user } = useAuth();
+  const location = useLocation();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (isNidoAdmin) return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
+  if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
+  const adminOnly = /\/(users|roles|addresses)(\/|$)/.test(location.pathname);
+  const moduleByPath: Array<[string, string]> = [
+    ["catalog", "Catalog"], ["orders", "Orders"], ["invoices", "Invoices"],
+    ["services", "Services"], ["support", "Support"], ["contracts", "Contracts"],
+    ["approvals", "Orders"], ["reports", "Reports"], ["dashboard", "Dashboard"],
+  ];
+  const portalModule = moduleByPath.find(([segment]) =>
+    location.pathname.includes(`/portal/${segment}`)
+  )?.[1];
+  const permitted = isImpersonating || (
+    !!user?.clientId &&
+    (adminOnly
+      ? user.userType === "client_admin"
+      : !portalModule || hasPortalPermission(user.clientId, user.role ?? "", portalModule, "view"))
+  );
+  if (!permitted) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-6">
+        <div className="max-w-md rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+          <h1 className="text-base font-semibold text-gray-900">Access Denied</h1>
+          <p className="mt-2 text-sm text-gray-500">Your portal role does not have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
+  const readOnlyBlocked = isImpersonating && (
+    location.pathname.includes("/shop/cart") ||
+    location.pathname.includes("/checkout") ||
+    location.pathname.includes("/order-confirmation") ||
+    location.pathname.endsWith("/users") ||
+    location.pathname.endsWith("/roles") ||
+    location.pathname.endsWith("/addresses") ||
+    location.pathname.endsWith("/profile")
+  );
+  return (
+    <>
+      <ImpersonationBanner />
+      {readOnlyBlocked ? (
+        <div className="min-h-[70vh] flex items-center justify-center p-6">
+          <div className="max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
+            <h1 className="text-base font-semibold text-amber-900">View-only impersonation</h1>
+            <p className="mt-2 text-sm text-amber-800">This action is disabled while using client-user impersonation.</p>
+          </div>
+        </div>
+      ) : children}
+    </>
+  );
 }
 
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
+const ClientPortalReportsPage = lazy(() => import("@/pages/ClientPortalReportsPage"));
+const ClientPortalApprovalsPage = lazy(() => import("@/pages/ClientPortalApprovalsPage"));
 const ClientPortalUsersPage = lazy(() => import("@/pages/ClientPortalUsersPage"));
 const ClientPortalRolesPage = lazy(() => import("@/pages/ClientPortalRolesPage"));
 const ClientPortalAddressesPage = lazy(() => import("@/pages/ClientPortalAddressesPage"));
@@ -156,6 +210,20 @@ const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
 const VendorOrderDetailPage = lazy(() => import("@/pages/VendorOrderDetailPage"));
 const LocationsPage = lazy(() => import("@/pages/LocationsPage"));
 const AuditTrailPage = lazy(() => import("@/pages/AuditTrailPage"));
+const ReportsPage = lazy(() => import("@/pages/ReportsPage"));
+const CreateReportPage = lazy(() => import("@/pages/CreateReportPage"));
+const ExecutiveDashboardPage = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
+const SalesReportPage = lazy(() => import("@/pages/reports/SalesReportPage"));
+const ProcurementReportPage = lazy(() => import("@/pages/reports/ProcurementReportPage"));
+const VendorPerformancePage = lazy(() => import("@/pages/reports/VendorPerformancePage"));
+const ClientReportPage = lazy(() => import("@/pages/reports/ClientReportPage"));
+const InventoryReportPage = lazy(() => import("@/pages/reports/InventoryReportPage"));
+const FinanceReportPage = lazy(() => import("@/pages/reports/FinanceReportPage"));
+const SupportReportPage = lazy(() => import("@/pages/reports/SupportReportPage"));
+const SlaReportPage = lazy(() => import("@/pages/reports/SlaReportPage"));
+const ApprovalReportPage = lazy(() => import("@/pages/reports/ApprovalReportPage"));
+const TaxReportPage = lazy(() => import("@/pages/reports/TaxReportPage"));
+const CustomReportDetailPage = lazy(() => import("@/pages/reports/CustomReportDetailPage"));
 const OrderStatusesPage = lazy(() => import("@/pages/OrderStatusesPage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const ApprovalWorkflowsPage = lazy(
@@ -170,7 +238,7 @@ const VendorEditPage = lazy(() => import("@/pages/VendorEditPage"));
 const AddVendorProductsPage = lazy(() => import("@/pages/AddVendorProductsPage"));
 const ClientsPage = lazy(() => import("@/pages/ClientsPage"));
 const AddClient = lazy(() => import("@/pages/AddClient"));
-const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPage"));
+const ClientDetailPage = lazy(() => import("@/pages/ClientDetailPageRedesigned"));
 const ClientContractsPage = lazy(() => import("@/pages/ClientContractsPage"));
 const ContractDetailsPage = lazy(() => import("@/pages/ContractDetailsPage"));
 const UsersPage = lazy(() => import("@/pages/UsersPage"));
@@ -188,15 +256,31 @@ const UserRolesTab = lazy(
 );
 const IntegrationsPage = lazy(() => import("@/pages/IntegrationsPage"));
 const SupportPage = lazy(() => import("@/pages/SupportPage"));
+const SupportTicketsPage = lazy(() => import("@/pages/SupportTicketsPage"));
+const CreateSupportTicketPage = lazy(() => import("@/pages/CreateSupportTicketPage"));
+const TicketDetailPage = lazy(() => import("@/pages/TicketDetailPage"));
+const CreateChildTicketPage = lazy(() => import("@/pages/CreateChildTicketPage"));
+const ChildTicketDetailPage = lazy(() => import("@/pages/ChildTicketDetailPage"));
+const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
+const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
+const ClientServicesPage = lazy(() => import("@/pages/ClientServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
+const NewRepairServicePage = lazy(() => import("@/pages/NewRepairServicePage"));
+const NewRecycleDisposalPage = lazy(() => import("@/pages/NewRecycleDisposalPage"));
+const NewRentalServicePage = lazy(() => import("@/pages/NewRentalServicePage"));
+const NewRegularPurchasePage = lazy(() => import("@/pages/NewRegularPurchasePage"));
 const InvoicePage = lazy(() => import("@/pages/InvoicePage"));
 const InvoiceDetails = lazy(() => import("@/pages/InvoiceDetails"));
+const InvoiceFormPage = lazy(() => import("@/pages/InvoiceFormPage"));
 const SalesQuotesPage = lazy(() => import("@/pages/SalesQuotesPage"));
+const ArchivedQuotesPage = lazy(() => import("@/pages/ArchivedQuotesPage"));
 const SalesQuoteDetailPage = lazy(() => import("@/pages/SalesQuoteDetailPage"));
 const SalesOrdersPage = lazy(() => import("@/pages/SalesOrdersPage"));
 const SalesOrderDetails = lazy(() => import("@/pages/SalesOrderDetails"));
+const SalesOrderFormPage = lazy(() => import("@/pages/SalesOrderFormPage"));
 const ExpensesPage = lazy(() => import("@/pages/ExpensesPage"));
+const NewExpensePage = lazy(() => import("@/pages/NewExpensePage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
 const CartPage = lazy(() => import("@/pages/CartPage"));
@@ -214,9 +298,16 @@ const SalesQuoteFormPage = lazy(() => import("@/pages/SalesQuoteFormPage"));
 const RecurringInvoicesPage = lazy(
   () => import("@/pages/RecurringInvoicesPage"),
 );
+const RecurringInvoiceFormPage = lazy(
+  () => import("@/pages/RecurringInvoiceFormPage"),
+);
 const DeliveryChallansPage = lazy(() => import("@/pages/DeliveryChallansPage"));
+const NewDeliveryChallanPage = lazy(() => import("@/pages/NewDeliveryChallanPage"));
+const DCPreviewPage = lazy(() => import("@/pages/DCPreviewPage"));
 const PaymentReceiptsPage = lazy(() => import("@/pages/PaymentReceiptsPage"));
+const NewPaymentReceiptPage = lazy(() => import("@/pages/NewPaymentReceiptPage"));
 const CreditNotesPage = lazy(() => import("@/pages/CreditNotesPage"));
+const CreditNoteFormPage = lazy(() => import("@/pages/CreditNoteFormPage"));
 const EWayBillsPage = lazy(() => import("@/pages/EWayBillsPage"));
 const RecurringExpensesPage = lazy(
   () => import("@/pages/RecurringExpensesPage"),
@@ -241,6 +332,8 @@ const OrderConfirmationPage = lazy(
 );
 const UserOnboardingPage = lazy(() => import("@/pages/UserOnboardingPage"));
 const NidoUserProfilePage = lazy(() => import("@/pages/NidoUserProfilePage"));
+const NidoUserDetailPage = lazy(() => import("@/pages/NidoUserDetailPage"));
+const NidoUserEditPage = lazy(() => import("@/pages/NidoUserEditPage"));
 const TaxSettingsPage = lazy(() => import("@/pages/TaxSettingsPage"));
 const SLASettingsPage = lazy(() => import("@/pages/SLASettingsPage"));
 
@@ -285,8 +378,50 @@ function AppRoutes() {
             )
           }
         />
+        <Route
+          path="/forgot-password"
+          element={
+            <PageErrorBoundary
+              title="Forgot password page failed to load"
+              resetKey={location.pathname}
+            >
+              <ForgotPasswordPage />
+            </PageErrorBoundary>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <PageErrorBoundary
+              title="Reset password page failed to load"
+              resetKey={location.pathname}
+            >
+              <ResetPasswordPage />
+            </PageErrorBoundary>
+          }
+        />
         <Route path="/onboarding/:token" element={<UserOnboardingPage />} />
         <Route path="/preview-product" element={<ProductPreviewPage />} />
+        <Route
+          path="/sales/delivery-challans/create"
+          element={
+            isAuthenticated ? (
+              <NewDeliveryChallanPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/sales/delivery-challans/:id/preview"
+          element={
+            isAuthenticated ? (
+              <DCPreviewPage />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route
           path="/support/track/:ticketId"
           element={<TicketTrackingPage />}
@@ -440,7 +575,18 @@ function AppRoutes() {
                 title="Nido user profile failed to load"
                 resetKey={location.pathname}
               >
-                <NidoUserProfilePage />
+                <NidoUserDetailPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="configuration/nido-users/users/:userId/edit"
+            element={
+              <PageErrorBoundary
+                title="Nido user edit page failed to load"
+                resetKey={location.pathname}
+              >
+                <NidoUserEditPage />
               </PageErrorBoundary>
             }
           />
@@ -625,7 +771,18 @@ function AppRoutes() {
           />
           <Route path="services" element={<ServicesPage />} />
           <Route path="services/amc/new" element={<NewAMCRequestPage />} />
+         <Route path="services/repair/new" element={<NewRepairServicePage />} />
+         <Route path="services/recycle/new" element={<NewRecycleDisposalPage />} />
+         <Route path="services/rental/new" element={<NewRentalServicePage />} />
+         <Route path="services/purchase/new" element={<NewRegularPurchasePage />} />
+          <Route path="my-services" element={<MyRequestsPage />} />
+          <Route path="my-services/requests/:requestId" element={<MyRequestDetailPage />} />
           <Route path="support" element={<SupportPage />} />
+          <Route path="support/tickets" element={<SupportTicketsPage />} />
+          <Route path="support/create" element={<CreateSupportTicketPage />} />
+          <Route path="support/ticket/:ticketId" element={<TicketDetailPage />} />
+          <Route path="support/create-child-ticket/:parentNumber" element={<CreateChildTicketPage />} />
+          <Route path="support/child-ticket/:childTicketId" element={<ChildTicketDetailPage />} />
           <Route
             path="transactions"
             element={<Navigate to="/sales/quotes" replace />}
@@ -663,7 +820,7 @@ function AppRoutes() {
           />
           <Route
             path="transactions/purchase/expenses/create"
-            element={<ExpensesPage />}
+            element={<NewExpensePage />}
           />
           <Route
             path="transactions/purchase/expenses/:id"
@@ -719,6 +876,10 @@ function AppRoutes() {
             element={<PaymentsMadePage />}
           />
           <Route
+            path="transactions/purchase/payments-made/:id"
+            element={<PaymentsMadePage />}
+          />
+          <Route
             path="transactions/purchase/vendor-credits"
             element={<VendorCreditsPage />}
           />
@@ -728,6 +889,10 @@ function AppRoutes() {
           />
           <Route
             path="transactions/purchase/vendor-credits/:id"
+            element={<VendorCreditsPage />}
+          />
+          <Route
+            path="transactions/purchase/vendor-credits/:id/edit"
             element={<VendorCreditsPage />}
           />
           <Route
@@ -742,6 +907,17 @@ function AppRoutes() {
                 resetKey={location.pathname}
               >
                 <SalesQuotesPage />
+              </PageErrorBoundary>
+            }
+          />
+          <Route
+            path="sales/quotes/archived"
+            element={
+              <PageErrorBoundary
+                title="Archived quotes failed to load"
+                resetKey={location.pathname}
+              >
+                <ArchivedQuotesPage />
               </PageErrorBoundary>
             }
           />
@@ -779,6 +955,8 @@ function AppRoutes() {
             }
           />
           <Route path="sales/orders" element={<SalesOrdersPage />} />
+          <Route path="sales/orders/create" element={<SalesOrderFormPage />} />
+          <Route path="sales/orders/:id/edit" element={<SalesOrderFormPage />} />
           <Route path="sales/orders/:id" element={<SalesOrderDetails />} />
           <Route
             path="sales/invoices"
@@ -791,6 +969,8 @@ function AppRoutes() {
               </PageErrorBoundary>
             }
           />
+          <Route path="sales/invoices/new" element={<InvoiceFormPage />} />
+          <Route path="sales/invoices/:id/edit" element={<InvoiceFormPage />} />
           <Route
             path="sales/invoices/:id"
             element={
@@ -808,18 +988,14 @@ function AppRoutes() {
           />
           <Route
             path="sales/recurring-invoices/create"
-            element={<RecurringInvoicesPage />}
+            element={<RecurringInvoiceFormPage />}
           />
           <Route
             path="sales/recurring-invoices/:id/edit"
-            element={<RecurringInvoicesPage />}
+            element={<RecurringInvoiceFormPage />}
           />
           <Route
             path="sales/delivery-challans"
-            element={<DeliveryChallansPage />}
-          />
-          <Route
-            path="sales/delivery-challans/create"
             element={<DeliveryChallansPage />}
           />
           <Route
@@ -832,21 +1008,21 @@ function AppRoutes() {
           />
           <Route
             path="sales/payment-receipts/create"
-            element={<PaymentReceiptsPage />}
+            element={<NewPaymentReceiptPage />}
           />
           <Route
             path="sales/payment-receipts/:id"
-            element={<PaymentReceiptsPage />}
+            element={<NewPaymentReceiptPage />}
           />
           <Route path="sales/credit-notes" element={<CreditNotesPage />} />
           <Route
             path="sales/credit-notes/create"
-            element={<CreditNotesPage />}
+            element={<CreditNoteFormPage />}
           />
           <Route path="sales/credit-notes/:id" element={<CreditNotesPage />} />
           <Route
             path="sales/credit-notes/:id/edit"
-            element={<CreditNotesPage />}
+            element={<CreditNoteFormPage />}
           />
           <Route path="sales/e-way-bills" element={<EWayBillsPage />} />
           <Route path="sales/e-way-bills/create" element={<EWayBillsPage />} />
@@ -855,6 +1031,7 @@ function AppRoutes() {
             path="invoices"
             element={<Navigate to="/sales/invoices" replace />}
           />
+          <Route path="invoices/new" element={<Navigate to="/sales/invoices/new" replace />} />
           <Route path="procure/requests" element={<MyOrderPage />} />
           <Route path="procure/approvals" element={<ApprovalWorkflowsPage />} />
           <Route path="organizations" element={<OrganizationsPage />} />
@@ -879,7 +1056,21 @@ function AppRoutes() {
           <Route path="credit-notes" element={<CreditNotesPage />} />
           <Route path="eway-bills" element={<EWayBillsPage />} />
           <Route path="invoices" element={<InvoicePage />} />
-          <Route path="reports" element={<AuditTrailPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="reports/create" element={<CreateReportPage />} />
+          <Route path="reports/custom/:id" element={<CustomReportDetailPage />} />
+          <Route path="reports/executive" element={<ExecutiveDashboardPage />} />
+          <Route path="reports/sales" element={<SalesReportPage />} />
+          <Route path="reports/procurement" element={<ProcurementReportPage />} />
+          <Route path="reports/vendors" element={<VendorPerformancePage />} />
+          <Route path="reports/clients" element={<ClientReportPage />} />
+          <Route path="reports/inventory" element={<InventoryReportPage />} />
+          <Route path="reports/finance" element={<FinanceReportPage />} />
+          <Route path="reports/support" element={<SupportReportPage />} />
+          <Route path="reports/sla" element={<SlaReportPage />} />
+          <Route path="reports/approvals" element={<ApprovalReportPage />} />
+          <Route path="reports/tax" element={<TaxReportPage />} />
+          <Route path="reports/audit" element={<AuditTrailPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
           {/* Dashboard: reuses ClientDetailPage in portal mode — single source of truth */}
@@ -942,7 +1133,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Services failed to load" resetKey={location.pathname}>
-                  <ServicesPage />
+                  <ClientServicesPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
@@ -975,7 +1166,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Approvals failed to load" resetKey={location.pathname}>
-                  <ApprovalWorkflowsPage />
+                  <ClientPortalApprovalsPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
@@ -986,7 +1177,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Reports failed to load" resetKey={location.pathname}>
-                  <AuditTrailPage />
+                  <ClientPortalReportsPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
@@ -998,6 +1189,37 @@ function AppRoutes() {
               <ClientPortalRoute>
                 <PageErrorBoundary title="My Profile failed to load" resetKey={location.pathname}>
                   <UserProfilePage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          {/* Client user administration — existing pages, protected by portal auth */}
+          <Route
+            path="portal/users"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal users failed to load" resetKey={location.pathname}>
+                  <ClientPortalUsersPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/roles"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal roles failed to load" resetKey={location.pathname}>
+                  <ClientPortalRolesPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/addresses"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Portal addresses failed to load" resetKey={location.pathname}>
+                  <ClientPortalAddressesPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
@@ -1034,7 +1256,9 @@ const App = () => (
                         <OrdersProvider>
                           <MyOrdersProvider>
                             <OrganizationProvider>
-                              <AppRoutes />
+                              <PageMetaProvider>
+                                <AppRoutes />
+                              </PageMetaProvider>
                             </OrganizationProvider>
                           </MyOrdersProvider>
                         </OrdersProvider>

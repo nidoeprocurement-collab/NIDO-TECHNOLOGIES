@@ -17,9 +17,14 @@ function addDays(dateStr: string, days: number): string {
 }
 
 // ── Line item helpers ─────────────────────────────────────────────────────────
+function taxableAmount(item: QuoteLineItem): number {
+  return Math.max(0, item.qty * item.rate - item.discount);
+}
+function gstAmount(item: QuoteLineItem): number {
+  return taxableAmount(item) * (item.taxPercent / 100);
+}
 function lineAmount(item: QuoteLineItem): number {
-  const base = item.qty * item.rate;
-  return base - base * (item.discount / 100);
+  return taxableAmount(item) + gstAmount(item);
 }
 
 function makeBlankItem(): QuoteLineItem {
@@ -91,6 +96,7 @@ export default function SalesQuoteFormPage() {
 
   // ── Notes & Summary ──────────────────────────────────────────────────────────
   const [adjustment, setAdjustment] = useState<number>(0);
+  const [shippingCharges, setShippingCharges] = useState<number>(0);
   const [termsConditions, setTermsConditions] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
 
@@ -116,6 +122,7 @@ export default function SalesQuoteFormPage() {
     q.lineItems.forEach(item => { ps[item.id] = item.name; });
     setProductSearch(ps);
     setAdjustment(q.adjustment);
+    setShippingCharges(q.shippingCharges ?? 0);
     setTermsConditions(q.termsConditions);
     setCustomerNotes(q.customerNotes);
     setSupportingDocs(q.supportingDocs || []);
@@ -201,23 +208,27 @@ export default function SalesQuoteFormPage() {
   const removeDoc = (idx: number) => setSupportingDocs(prev => prev.filter((_, i) => i !== idx));
 
   // ── Totals ────────────────────────────────────────────────────────────────────
-  const subtotal = lineItems.reduce((s, item) => s + lineAmount(item), 0);
+  const grossSubtotal = lineItems.reduce((s, item) => s + item.qty * item.rate, 0);
+  const totalDiscount = lineItems.reduce((s, item) => s + item.discount, 0);
+  const totalTaxableValue = lineItems.reduce((s, item) => s + taxableAmount(item), 0);
   const gstSlabs = useMemo(() => {
     const map: Record<number, { taxable: number; cgst: number; sgst: number }> = {};
     for (const item of lineItems) {
-      const amt = lineAmount(item);
+      const taxable = taxableAmount(item);
       const rate = item.taxPercent;
       if (!map[rate]) map[rate] = { taxable: 0, cgst: 0, sgst: 0 };
-      map[rate].taxable += amt;
-      map[rate].cgst += amt * (rate / 2) / 100;
-      map[rate].sgst += amt * (rate / 2) / 100;
+      map[rate].taxable += taxable;
+      map[rate].cgst += taxable * (rate / 2) / 100;
+      map[rate].sgst += taxable * (rate / 2) / 100;
     }
     return Object.entries(map).filter(([, v]) => v.taxable > 0)
       .map(([rate, v]) => ({ rate: Number(rate), ...v }))
-      .sort((a, b) => b.rate - a.rate);
+      .sort((a, b) => a.rate - b.rate);
   }, [lineItems]);
-  const totalTax = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
-  const grandTotal = subtotal + totalTax + adjustment;
+  const totalGst = gstSlabs.reduce((s, sl) => s + sl.cgst + sl.sgst, 0);
+  const roundOff = adjustment;
+  const grandTotal = totalTaxableValue + totalGst + shippingCharges + roundOff;
+  const subtotal = totalTaxableValue;
 
   // ── Build quote object ────────────────────────────────────────────────────────
   const buildQuote = (status: StoredQuote['status']): StoredQuote => {
@@ -238,8 +249,10 @@ export default function SalesQuoteFormPage() {
       lineItems,
       subtotal,
       gstSlabs,
-      totalTax,
+      totalTax: totalGst,
       adjustment,
+      shippingCharges,
+      shippingGstIncluded: false,
       grandTotal,
       termsConditions,
       customerNotes,
@@ -460,31 +473,37 @@ export default function SalesQuoteFormPage() {
           <div>
             <table className="w-full">
               <colgroup>
+                <col style={{ width: '3%' }} />
                 <col style={{ width: '22%' }} />
-                <col style={{ width: '22%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '5%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '7%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '6%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '8%' }} />
                 <col style={{ width: '10%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '8%' }} />
-                <col style={{ width: '11%' }} />
                 <col style={{ width: '4%' }} />
               </colgroup>
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                  {['ITEM NAME', 'DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISCOUNT', 'TAX %', 'AMOUNT', ''].map(h => (
+                  {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE (₹)', 'DISC (₹)', 'TAXABLE (₹)', 'GST RATE', 'GST (₹)', 'AMOUNT (₹)', ''].map(h => (
                     <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {lineItems.map(item => {
-                  const amt = lineAmount(item);
+                {lineItems.map((item, idx) => {
+                  const taxable = taxableAmount(item);
+                  const gst = gstAmount(item);
+                  const amt = taxable + gst;
                   const filteredProds = getFilteredProducts(item.id);
                   const displayName = productSearch[item.id] !== undefined ? productSearch[item.id] : item.name;
                   return (
                     <tr key={item.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50/50 dark:hover:bg-gray-700/30">
-                      {/* Item Name */}
+                      {/* Sl.No */}
+                      <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-center">{idx + 1}</td>
+                      {/* Item / Description — combined */}
                       <td className="px-3 py-2">
                         <div className="relative" ref={el => { productRefs.current[item.id] = el; }} onClick={e => e.stopPropagation()}>
                           <input
@@ -508,11 +527,9 @@ export default function SalesQuoteFormPage() {
                             </div>
                           )}
                         </div>
-                      </td>
-                      {/* Description — auto-filled from product */}
-                      <td className="px-3 py-2">
                         <input type="text" placeholder="Description" value={item.description}
-                          onChange={e => updateLineItem(item.id, 'description', e.target.value)} className={tdInputCls} />
+                          onChange={e => updateLineItem(item.id, 'description', e.target.value)}
+                          className={`${tdInputCls} mt-1`} />
                       </td>
                       {/* HSN/SAC */}
                       <td className="px-3 py-2">
@@ -523,27 +540,31 @@ export default function SalesQuoteFormPage() {
                       <td className="px-3 py-2">
                         <input type="number" value={item.qty} min={1}
                           onChange={e => updateLineItem(item.id, 'qty', Math.max(1, parseInt(e.target.value) || 1))}
-                          className={`${tdInputCls} w-16 text-center`} />
+                          className={`${tdInputCls} w-14 text-center`} />
                       </td>
-                      {/* Rate */}
+                      {/* Rate (₹) */}
                       <td className="px-3 py-2">
                         <input type="number" value={item.rate} min={0}
                           onChange={e => updateLineItem(item.id, 'rate', parseFloat(e.target.value) || 0)}
-                          className={`${tdInputCls} w-24 text-center`} />
+                          className={`${tdInputCls} w-20 text-center`} />
                       </td>
-                      {/* Discount */}
+                      {/* Disc (₹) */}
                       <td className="px-3 py-2">
-                        <input type="number" value={item.discount} min={0} max={100}
+                        <input type="number" value={item.discount} min={0}
                           onChange={e => updateLineItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
                           className={`${tdInputCls} w-16 text-center`} />
                       </td>
-                      {/* Tax % */}
+                      {/* Taxable (₹) — computed */}
+                      <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{fmt(taxable)}</td>
+                      {/* GST Rate */}
                       <td className="px-3 py-2">
                         <input type="number" value={item.taxPercent} min={0}
                           onChange={e => updateLineItem(item.id, 'taxPercent', parseFloat(e.target.value) || 0)}
-                          className={`${tdInputCls} w-16 text-center`} />
+                          className={`${tdInputCls} w-14 text-center`} />
                       </td>
-                      {/* Amount */}
+                      {/* GST (₹) — computed */}
+                      <td className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 text-right whitespace-nowrap">{fmt(gst)}</td>
+                      {/* Amount (₹) */}
                       <td className="px-3 py-2 text-sm font-medium text-gray-900 dark:text-white text-right whitespace-nowrap">{fmt(amt)}</td>
                       {/* Delete */}
                       <td className="px-3 py-2 text-center">
@@ -560,55 +581,68 @@ export default function SalesQuoteFormPage() {
           </div>
         </div>
 
-        {/* ── Notes + GST Summary ───────────────────────────────────────── */}
+        {/* ── Notes + Summary ───────────────────────────────────────────── */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 md:p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
             <textarea rows={4} placeholder="Additional notes..." className={`${inputCls} resize-none`} />
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <tbody>
+                  {/* Gross Subtotal */}
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Subtotal</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(subtotal)}</td>
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Gross Subtotal</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(grossSubtotal)}</td>
                   </tr>
-                  {gstSlabs.length > 0 ? gstSlabs.map(slab => (
-                    <Fragment key={slab.rate}>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">CGST ({slab.rate / 2}%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(slab.cgst)}</td>
-                      </tr>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">SGST ({slab.rate / 2}%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(slab.sgst)}</td>
-                      </tr>
-                    </Fragment>
-                  )) : (
-                    <>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">CGST (9%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">0.00</td>
-                      </tr>
-                      <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">SGST (9%)</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">0.00</td>
-                      </tr>
-                    </>
-                  )}
+                  {/* Item Level Discounts */}
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Adjustment</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-gray-900 dark:text-white">{fmt(adjustment)}</td>
+                    <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Item Level Discounts (-)</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹ - {fmt(totalDiscount)}</td>
                   </tr>
-                  <tr className="bg-gray-50 dark:bg-gray-700">
-                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-white uppercase tracking-wide">TOTAL</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{fmt(grandTotal)}</td>
+                  {/* Total Taxable Value */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 font-semibold text-gray-900 dark:text-white">Total Taxable Value</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">₹{fmt(totalTaxableValue)}</td>
+                  </tr>
+                  {/* Total GST */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
+                      Total GST{gstSlabs.length > 0 ? ` (${gstSlabs.map(s => `${s.rate}%`).join(', ')})` : ''}
+                    </td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(totalGst)}</td>
+                  </tr>
+                  {/* Shipping & Handling */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Shipping &amp; Handling Charges</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">₹{fmt(shippingCharges)}</td>
+                  </tr>
+                  {/* Round Off */}
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">Round Off Adjustment</td>
+                    <td className="px-4 py-2.5 text-right text-gray-900 dark:text-white">{roundOff >= 0 ? '' : '-'}₹{fmt(Math.abs(roundOff))}</td>
+                  </tr>
+                  {/* Total Payable */}
+                  <tr className="border-t-2 border-gray-300 dark:border-gray-500">
+                    <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">Total Payable</td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">₹{fmt(grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-          <div className="mt-5 max-w-xs">
-            <label className={labelCls}>Adjustment</label>
-            <input type="number" value={adjustment} onChange={e => setAdjustment(parseFloat(e.target.value) || 0)} className={inputCls} />
+          {/* Inputs below the grid */}
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+            <div>
+              <label className={labelCls}>Shipping &amp; Handling Charges (₹)</label>
+              <input type="number" min={0} value={shippingCharges}
+                onChange={e => setShippingCharges(parseFloat(e.target.value) || 0)}
+                className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Round Off Adjustment (₹)</label>
+              <input type="number" value={adjustment}
+                onChange={e => setAdjustment(parseFloat(e.target.value) || 0)}
+                className={inputCls} />
+            </div>
           </div>
         </div>
 

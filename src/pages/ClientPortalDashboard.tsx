@@ -13,6 +13,8 @@ import {
   Package,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getClientOrders, getClientServices } from '@/lib/clientDataStore';
+import { getInvoices } from '@/lib/invoiceStore';
 
 export default function ClientPortalDashboard() {
   const { user } = useAuth();
@@ -20,35 +22,48 @@ export default function ClientPortalDashboard() {
   const clientName = user?.clientName ?? 'Your Company';
 
   const portalUsers = getPortalUsersByClient(clientId);
+  const clientOrders = clientId ? getClientOrders(clientId, clientName) : [];
+  const clientServices = clientId ? getClientServices(clientId) : [];
+  const clientInvoices = getInvoices().filter((invoice) =>
+    invoice.clientName === clientName ||
+    (invoice as typeof invoice & { clientId?: string }).clientId === clientId
+  );
+  const pendingOrders = clientOrders.filter(order =>
+    !["Delivered", "Cancelled"].includes(order.status)
+  ).length;
+  const activeServices = clientServices.filter(service => service.status === "Active").length;
+  const outstandingInvoices = clientInvoices.filter(invoice =>
+    ["Pending", "Overdue", "Sent"].includes(invoice.status)
+  ).length;
 
   const stats = [
     {
       label: 'Total Orders',
-      value: 0,
+      value: clientOrders.length,
       icon: <ShoppingBag size={22} className="text-blue-600" />,
       bg: 'bg-blue-50',
     },
     {
       label: 'Pending Orders',
-      value: 0,
+      value: pendingOrders,
       icon: <Clock size={22} className="text-orange-600" />,
       bg: 'bg-orange-50',
     },
     {
       label: 'Completed Orders',
-      value: 0,
+      value: clientOrders.filter(order => order.status === "Delivered").length,
       icon: <CheckCircle2 size={22} className="text-green-600" />,
       bg: 'bg-green-50',
     },
     {
       label: 'Active Services',
-      value: 0,
+      value: activeServices,
       icon: <Wrench size={22} className="text-purple-600" />,
       bg: 'bg-purple-50',
     },
     {
       label: 'Outstanding Invoices',
-      value: 0,
+      value: outstandingInvoices,
       icon: <FileText size={22} className="text-red-600" />,
       bg: 'bg-red-50',
     },

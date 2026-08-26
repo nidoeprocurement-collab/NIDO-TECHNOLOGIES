@@ -19,6 +19,8 @@ import { NIDO_ROLES_EVENT, NIDO_USERS_EVENT } from '@/lib/nidoUsersStore';
 interface PermissionsContextType {
   /** Check if the current user has a specific permission. Always true for System Owner. */
   hasPermission: (moduleKey: string, action: ActionKey) => boolean;
+  /** Check a page-level module first, then fall back to its legacy group. */
+  hasRoutePermission: (moduleKey: string, legacyModuleKey: string, action: ActionKey) => boolean;
   /** Get all module permissions for the current user's role. */
   getModulePermissions: (moduleKey: string) => ModulePermissions;
   /** True if the current user is a Super Admin (System Owner). */
@@ -61,6 +63,19 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     [roleName, isNidoAdmin]
   );
 
+  const hrp = useCallback(
+    (moduleKey: string, legacyModuleKey: string, action: ActionKey): boolean => {
+      if (!isNidoAdmin) return false;
+      if (isSuperAdmin(roleName)) return true;
+      const rolePermissions = getRolePermissions(roleName);
+      if (Object.prototype.hasOwnProperty.call(rolePermissions, moduleKey)) {
+        return !!rolePermissions[moduleKey]?.[action];
+      }
+      return checkPermission(roleName, legacyModuleKey, action);
+    },
+    [roleName, isNidoAdmin]
+  );
+
   const gmp = useCallback(
     (moduleKey: string): ModulePermissions => {
       if (!isNidoAdmin) return {};
@@ -71,7 +86,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   return (
     <PermissionsContext.Provider
-      value={{ hasPermission: hp, getModulePermissions: gmp, isSuperAdmin: superAdmin, roleName }}
+      value={{ hasPermission: hp, hasRoutePermission: hrp, getModulePermissions: gmp, isSuperAdmin: superAdmin, roleName }}
     >
       {children}
     </PermissionsContext.Provider>

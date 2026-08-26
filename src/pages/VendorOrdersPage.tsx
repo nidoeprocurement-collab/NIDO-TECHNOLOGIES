@@ -6,8 +6,9 @@ import { getAllPOs, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchas
 import { getProcurementSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
+import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
-type OrderStatus = "Draft" | "Processing" | "Confirmed" | "Shipped" | "Delivered" | "Closed" | "Cancelled";
+type OrderStatus = string;
 
 interface Order {
   id: string;
@@ -51,11 +52,11 @@ const INITIAL_ORDERS: Order[] = [
   { id: "PO-10009", orderId: "ORD-8796", vendor: "Office Supplies Co.", date: "2026-03-28", dateStr: "Mar 28, 2026", status: "Processing", amount: 720.0, amountStr: "$720.00", delivery: "Apr 5, 2026", by: "Pavan (System Owner)" },
 ];
 
-const TABS: (OrderStatus | "All")[] = ["All", "Draft", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
+const LEGACY_PO_STATUSES: OrderStatus[] = ["Draft", "Processing", "Confirmed", "Shipped", "Delivered", "Closed", "Cancelled"];
 const VENDORS = ["All Vendors", "TechHub Solutions", "Office Supplies Co.", "Global Industrial", "Furniture Mart", "Printer World"];
 const PER_PAGE = 10;
 
-const badgeStyles: Record<OrderStatus, { bg: string; color: string; border: string }> = {
+const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
   Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
   Confirmed:  { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
   Shipped:    { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
@@ -66,7 +67,7 @@ const badgeStyles: Record<OrderStatus, { bg: string; color: string; border: stri
 };
 
 function Badge({ status }: { status: OrderStatus }) {
-  const s = badgeStyles[status];
+  const s = badgeStyles[status] || { bg: "#f3f4f6", color: "#4b5563", border: "#d1d5db" };
   return (
     <span style={{ display: "inline-block", padding: "3px 11px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
       {status}
@@ -319,7 +320,16 @@ function BulkNotesModal({ selectedCount, onApply, onClose }: {
 export default function VendorOrderList() {
   const navigate = useNavigate();
   const { config } = useConfig();
+  const orderStatusConfig = useOrderStatusConfig();
   const poPrefix = config.prefixes.find(p => p.key === "purchaseOrder")?.value || "PO-";
+  const poStatusOptions = Array.from(new Set([
+    ...orderStatusConfig.statuses
+      .filter(status => status.category === "Purchase Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => status.name),
+    ...LEGACY_PO_STATUSES,
+  ]));
+  const poTabs: (OrderStatus | "All")[] = ["All", ...poStatusOptions];
 
   // Build orders list: real POs from store (prepended) + static demo orders
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -430,6 +440,15 @@ export default function VendorOrderList() {
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return { ...r, status, ...extra };
     }));
+    // Persist cancellations to the store so purchaseOrderStore dispatches the
+    // poCancelled event and OrderDetailsPage resets its vendor-selection state.
+    if (status === "Cancelled") {
+      for (const id of eligible) {
+        const changes: any = { status: "Cancelled" };
+        if (cancelReason) changes.cancelReason = cancelReason;
+        updatePO(id, changes);
+      }
+    }
     const skipped = selected.size - eligible.length;
     toast.show(
       skipped > 0
@@ -558,7 +577,7 @@ export default function VendorOrderList() {
       <Modal open={statusModal} title="Bulk update status" onClose={() => setStatusModal(false)} onApply={applyBulkStatus}>
         <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as OrderStatus)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", background: card, color: fg }}>
           <option value="">Select a status...</option>
-          {(["Draft","Processing","Confirmed","Shipped","Delivered","Closed","Cancelled"] as OrderStatus[]).map(st => <option key={st}>{st}</option>)}
+          {poStatusOptions.map(st => <option key={st}>{st}</option>)}
         </select>
       </Modal>
       {notesModal && (
@@ -614,7 +633,7 @@ export default function VendorOrderList() {
             Status ▾
           </button>
           <Dropdown id="status">
-            {(["All", ...Object.keys(badgeStyles)] as (OrderStatus | "All")[]).map(st => (
+            {(["All", ...poStatusOptions] as (OrderStatus | "All")[]).map(st => (
               <button key={st} style={s.ddItem} onClick={() => { setStatusFilter(st); setCurrentPage(1); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
             ))}
           </Dropdown>
@@ -648,7 +667,7 @@ export default function VendorOrderList() {
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: `1.5px solid ${bdr}`, gap: 0, overflowX: "auto" }}>
-        {TABS.map(t => (
+        {poTabs.map(t => (
           <div key={t} onClick={() => { setActiveTab(t); setCurrentPage(1); }}
             style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : muted, cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
             {t === "All" ? "All Orders" : t} ({tabCount(t)})
