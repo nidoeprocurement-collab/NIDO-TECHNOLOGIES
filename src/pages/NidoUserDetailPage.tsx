@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Activity,
   ArrowLeft,
+  Activity,
   BriefcaseBusiness,
   Check,
-  ClipboardList,
   FileText,
   KeyRound,
   LockKeyhole,
@@ -21,14 +20,10 @@ import { Button } from "@/components/ui/button";
 import { getUsers, type NidoUser, NIDO_USERS_EVENT } from "@/lib/nidoUsersStore";
 import { getRolePermissions, MODULES } from "@/lib/permissionsStore";
 
-type DetailTab = "overview" | "access" | "permissions" | "activity" | "items" | "documents" | "notes";
+type DetailTab = "overview" | "documents" | "notes";
 
 const tabs: { id: DetailTab; label: string; icon: typeof UserRound }[] = [
   { id: "overview", label: "Overview", icon: UserRound },
-  { id: "access", label: "Access & Roles", icon: Users },
-  { id: "permissions", label: "Permissions", icon: Shield },
-  { id: "activity", label: "Activity Log", icon: Activity },
-  { id: "items", label: "Assigned Items", icon: ClipboardList },
   { id: "documents", label: "Documents", icon: FileText },
   { id: "notes", label: "Notes", icon: FileText },
 ];
@@ -252,35 +247,13 @@ export default function NidoUserDetailPage() {
                   </tbody>
                 </table>
               </div>
-              <button type="button" onClick={() => setActiveTab("activity")} className="flex w-full items-center justify-center gap-2 border-t border-border py-4 text-sm font-semibold text-primary hover:bg-muted/30">
+              <button type="button" className="flex w-full items-center justify-center gap-2 border-t border-border py-4 text-sm font-semibold text-primary hover:bg-muted/30">
                 View all activity logs <span>→</span>
               </button>
             </section>
           </>
         )}
 
-        {activeTab === "access" && (
-          <section className={`${cardClass} p-6`}>
-            <h2 className="text-h3">Access &amp; Roles</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg border border-border p-4"><div className={labelClass}>Assigned Role</div><div className="mt-2 text-body-lg font-semibold">{selectedUser.role || "—"}</div></div>
-              <div className="rounded-lg border border-border p-4"><div className={labelClass}>Account Status</div><div className="mt-2"><StatusBadge status={selectedUser.status} /></div></div>
-            </div>
-          </section>
-        )}
-        {activeTab === "permissions" && (
-          <section className={`${cardClass} overflow-hidden`}>
-            <div className="border-b border-border p-6"><h2 className="text-h3">Permissions</h2><p className="mt-1 text-body-sm text-muted-foreground">Permissions inherited from the {selectedUser.role || "assigned"} role.</p></div>
-            <div className="grid gap-3 p-6 sm:grid-cols-2 lg:grid-cols-3">
-              {MODULES.map((module) => {
-                const granted = selectedUser.role === "System Owner" || Object.values(permissions[module.key] || {}).some(Boolean);
-                return <div key={module.key} className="flex items-center justify-between rounded-lg border border-border p-3 text-sm"><span>{module.label}</span>{granted ? <Check className="h-4 w-4 text-green-600" /> : <span className="text-xs text-muted-foreground">No access</span>}</div>;
-              })}
-            </div>
-          </section>
-        )}
-        {activeTab === "activity" && <section className={`${cardClass} p-6`}><h2 className="text-h3 mb-5">Activity Log</h2><div className="space-y-4">{activity.map((entry) => <div key={entry.action} className="flex gap-3 border-b border-border pb-4 last:border-0"><Activity className="mt-0.5 h-4 w-4 text-primary" /><div><p className="text-sm font-semibold">{entry.action}</p><p className="text-sm text-muted-foreground">{entry.details} · {entry.date}</p></div></div>)}</div></section>}
-        {activeTab === "items" && <EmptyTab label="assigned items" />}
         {activeTab === "documents" && <EmptyTab label="documents" />}
         {activeTab === "notes" && <EmptyTab label="notes" />}
       </div>
