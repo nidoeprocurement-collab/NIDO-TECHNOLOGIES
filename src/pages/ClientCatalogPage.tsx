@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import { getAllVendorProducts } from "@/lib/vendorStore";
+import { getVendors } from "@/lib/vendorDataStore";
 import {
   getClientCatalog,
   saveClientCatalog,
@@ -736,8 +737,10 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
     // has been added by multiple vendors, it must still appear only once.
     const loadAssignable = () => {
       const vendorProductStore = getAllVendorProducts();
+      const activeVendorIds = new Set(getVendors().filter(v => v.status === "Active").map(v => v.id));
       const activeMasterCodes = new Set<string>();
-      for (const products of Object.values(vendorProductStore)) {
+      for (const [vendorId, products] of Object.entries(vendorProductStore)) {
+        if (!activeVendorIds.has(vendorId)) continue;
         for (const p of products) {
           if (p.status === "Active") activeMasterCodes.add(p.masterProductCode);
         }
@@ -865,6 +868,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
       tags: row.product.tags,
       productType: row.product.productType,
       physicalType: row.product.physicalType,
+      fulfillmentType: row.product.fulfillmentType,
       roles: row.roles,
       preference: row.preference,
       cpc: cpcs[i],

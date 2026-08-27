@@ -486,6 +486,7 @@ export function computeVendorComparisons(
     const match = products.find(p => p.masterProductCode === masterProductCode && p.status === 'Active');
     if (!match) return;
     const info = allVendors.find(v => v.id === vendorId);
+    if (!info || info.status !== 'Active') return;
     const rawTerms = info?.paymentTerms || '';
     const basePrice = parseFloat(match.price) || 0;
     const vendorSettings = getVendorCommonSettings(vendorId);

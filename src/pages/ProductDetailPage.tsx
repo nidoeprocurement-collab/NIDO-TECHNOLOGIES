@@ -36,6 +36,7 @@ type Product = {
   tags?: string[];
   productType?: string;
   physicalType?: string;
+  fulfillmentType?: "physical" | "digital";
   image: string;
   images?: string[];
   specs: string[];
@@ -667,7 +668,7 @@ export default function ProductDetailPage() {
                         onClick={e => { e.stopPropagation(); handleRelatedClick(rp); }}
                         className="mt-2 flex items-center justify-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 text-[11px] font-semibold transition-colors"
                       >
-                        <ShoppingCart size={12} /> View &amp; Select Vendor
+                        <ShoppingCart size={12} /> {isDigitalProduct(rp) ? "View Product" : "View & Select Vendor"}
                       </button>
                     </div>
                   );

@@ -41,6 +41,7 @@ type Product = {
   tags?: string[];
   productType?: string;
   physicalType?: string;
+  fulfillmentType?: "physical" | "digital";
   image: string;
   images?: string[];
   specs: string[];
@@ -62,7 +63,7 @@ type ProductGroup = "physical" | "digital";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function getProductGroup(product: Pick<Product, "productType" | "physicalType">): ProductGroup {
+function getProductGroup(product: Pick<Product, "productType" | "physicalType" | "fulfillmentType">): ProductGroup {
   return getFulfillmentType(product);
 }
 
@@ -183,7 +184,8 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
   const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
   const productType = master?.productType || e.productType;
   const physicalType = master?.physicalType || e.physicalType;
-  const digital = isDigitalProduct({ productType, physicalType });
+  const fulfillmentType = master?.fulfillmentType || e.fulfillmentType || getFulfillmentType({ productType, physicalType });
+  const digital = isDigitalProduct({ productType, physicalType, fulfillmentType });
   const masterSpecs = master?.specifications
     ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
     .filter(Boolean);
@@ -207,6 +209,7 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     tags: master?.tags || e.tags || [],
     productType,
     physicalType,
+    fulfillmentType,
     image: images[0] || "",
     images,
     specs: masterSpecs?.length ? masterSpecs : e.specs || [],

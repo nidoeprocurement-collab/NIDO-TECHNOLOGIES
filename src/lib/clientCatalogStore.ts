@@ -1,5 +1,6 @@
 // Client Catalog Store — persists each client's catalog products to localStorage
 // keyed by clientId so ShopPage can read them per-client.
+import type { FulfillmentType } from './productType';
 
 export interface ClientCatalogEntry {
   productCode: string;
@@ -11,6 +12,7 @@ export interface ClientCatalogEntry {
   tags?: string[];
   productType?: string;
   physicalType?: string;
+  fulfillmentType?: FulfillmentType;
   roles: string[];
   preference?: string;
   cpc?: string;
