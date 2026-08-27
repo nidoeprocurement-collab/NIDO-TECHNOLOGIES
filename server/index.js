@@ -7,6 +7,7 @@ import emailRouter from "./routes/email.js";
 import quotesRouter from "./routes/quotes.js";
 import exchangeRatesRouter from "./routes/exchangeRates.js";
 import approvalsRouter from "./routes/approvals.js";
+import digitalFulfillmentsRouter from "./routes/digitalFulfillments.js";
 import { migrate } from "./migrate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,7 @@ async function main() {
   app.use("/api/quotes", quotesRouter);
   app.use("/api/exchange-rates", exchangeRatesRouter);
   app.use("/api/approvals", approvalsRouter);
+  app.use("/api", digitalFulfillmentsRouter);
   app.get("/api/client-context", (req, res) => {
     const forwardedFor = req.headers["x-forwarded-for"];
     const forwardedIp = Array.isArray(forwardedFor)

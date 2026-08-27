@@ -11,6 +11,9 @@ import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 import { reserveVendorStock } from "@/lib/vendorStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { isDigitalProduct } from "@/lib/productType";
+import { useAuth } from "@/contexts/AuthContext";
+import { createDigitalFulfillments } from "@/lib/digitalFulfillmentApi";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -43,6 +46,7 @@ export default function ReviewPage() {
   useI18n();
   const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
+  const { effectiveUser } = useAuth();
 
   const clientId = localStorage.getItem("nido_shop_selected_client") || "";
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
@@ -52,6 +56,7 @@ export default function ReviewPage() {
   }, [clientId]);
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+  const hasPhysicalItems = cart.some((item) => !isDigitalProduct(item));
 
   // Read saved payment terms (selected on the checkout page)
   const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
@@ -135,7 +140,11 @@ export default function ReviewPage() {
     cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category }))
   );
   const subtotal = preTaxSubtotal;
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
+    if (hasPhysicalItems && !selectedAddr) {
+      navigate("/shop/checkout");
+      return;
+    }
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     const itemsSnapshot = cart.map((i) => ({ ...i }));
@@ -184,6 +193,9 @@ export default function ReviewPage() {
         moq: i.moq,
         clientId: i.clientId,
         productCode: i.productCode,
+         productType: i.productType,
+         physicalType: i.physicalType,
+         fulfillmentType: i.fulfillmentType,
         vendorAllocations: i.vendorAllocations,
         // Vendor snapshot locked at add-to-cart time — travels with the order
         selectedVendorId: i.selectedVendorId,
@@ -200,12 +212,29 @@ export default function ReviewPage() {
     // Reserve stock immediately so the shop shows reduced available qty.
     // physicalStock stays unchanged; only reservedStock increases.
     for (const item of itemsSnapshot) {
+      if (isDigitalProduct(item)) continue;
       if (!item.productCode) continue;
       for (const alloc of (item.vendorAllocations || [])) {
         if (alloc.vendorId && alloc.allocated > 0) {
           reserveVendorStock(alloc.vendorId, item.productCode, alloc.allocated);
         }
       }
+    }
+
+    try {
+      await createDigitalFulfillments(
+        orderNumber,
+        cart[0]?.clientId || clientId,
+        itemsSnapshot.map((item) => ({
+          ...item,
+          fulfillmentType: item.fulfillmentType || (isDigitalProduct(item) ? "digital" : "physical"),
+        })) as OrderCartItem[],
+        effectiveUser,
+      );
+    } catch (error) {
+      // Keep the existing order/cart flow intact, but do not hide a backend
+      // sync failure from the console. The endpoint is idempotent for retries.
+      console.error("[digital fulfillment] order sync failed", error);
     }
 
     consumeCart();
@@ -266,7 +295,17 @@ export default function ReviewPage() {
                   <Pencil size={11} /> Edit
                 </button>
               </div>
-              {selectedAddr ? (
+              {!hasPhysicalItems ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-violet-100 rounded-full flex items-center justify-center">
+                    <span className="text-violet-600 text-sm">↗</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm text-gray-900">Digital fulfillment</p>
+                    <p className="text-xs text-gray-500">No delivery address required</p>
+                  </div>
+                </div>
+              ) : selectedAddr ? (
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                     <MapPin size={18} className="text-blue-500" />

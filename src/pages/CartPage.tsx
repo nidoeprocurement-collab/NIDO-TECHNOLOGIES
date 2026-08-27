@@ -16,6 +16,7 @@ import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } 
 import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { getFulfillmentType, isDigitalProduct } from "@/lib/productType";
 
 function formatPrice(n: number) {
   return formatCurrency(n);
@@ -111,11 +112,11 @@ function SuggestedCard({
           {priceNum > 0 && <span className="text-[11px] font-normal text-gray-500"> / each</span>}
         </p>
         <button
-          onClick={() => navigate(`/shop/product/${product.productCode}`, { state: { product: { id: product.productCode, productCode: product.productCode, name: product.name, category: product.category, image: product.img || "", specs: product.specs || [], leadTime: product.leadTime || "", moq: product.moq ?? 1, priceNum, inStock: (product as any).totalStock !== 0 }, clientId } })}
+          onClick={() => navigate(`/shop/product/${product.productCode}`, { state: { product: { id: product.productCode, productCode: product.productCode, name: product.name, category: product.category, productType: product.productType, physicalType: product.physicalType, fulfillmentType: getFulfillmentType(product), image: product.img || "", specs: product.specs || [], leadTime: product.leadTime || "", moq: product.moq ?? 1, priceNum, inStock: (product as any).totalStock !== 0 }, clientId } })}
           className="mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
         >
           <ShoppingCart size={12} />
-          View &amp; Select Vendor →
+          {isDigitalProduct(product) ? "View Digital Product →" : "View & Select Vendor →"}
         </button>
       </div>
     </div>
