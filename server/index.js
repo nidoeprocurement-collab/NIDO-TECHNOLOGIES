@@ -20,13 +20,15 @@ async function main() {
     await migrate();
   } catch (err) {
     console.error(
-      "[server] email database is not reachable yet — the app will still run, but Email Configuration/Templates/Logs and email sending will return an error until SUPABASE_DB_URL is fixed:",
+      "[server] database is not reachable yet — the app will still run, but database-backed features will return an error until DATABASE_URL or SUPABASE_DB_URL is available:",
       err.message,
     );
   }
 
   const app = express();
-  app.use(express.json({ limit: "10mb" }));
+  // License uploads are sent as base64 JSON. A 50 MB file needs roughly
+  // 67 MB when encoded, plus request metadata.
+  app.use(express.json({ limit: "75mb" }));
 
   app.use("/api/email", emailRouter);
   app.use("/api/quotes", quotesRouter);
@@ -41,6 +43,16 @@ async function main() {
     res.json({
       ip: forwardedIp || req.socket.remoteAddress || "Not available",
     });
+  });
+
+  app.use((error, _req, res, next) => {
+    if (error?.type === "entity.too.large") {
+      return res.status(413).json({
+        success: false,
+        error: "The request is too large. License files must be 50 MB or smaller.",
+      });
+    }
+    return next(error);
   });
 
   const httpServer = http.createServer(app);

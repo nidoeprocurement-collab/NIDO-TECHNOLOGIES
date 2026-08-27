@@ -7,7 +7,7 @@ export async function migrate() {
   if (migrated) return;
   if (!pool) {
     throw new Error(
-      "SUPABASE_DB_URL is not set — email features are disabled.",
+      "DATABASE_URL or SUPABASE_DB_URL is not set — database features are disabled.",
     );
   }
 
@@ -237,6 +237,14 @@ export async function migrate() {
     -- Digital fulfillment foundation. Orders and catalogue items remain
     -- frontend-owned in this imported app, so relationships use stable IDs
     -- without duplicating the existing Order/Product/Vendor tables.
+    CREATE TABLE IF NOT EXISTS digital_fulfillment_orders (
+      order_id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS digital_fulfillment_orders_client_idx
+      ON digital_fulfillment_orders (client_id);
+
     CREATE TABLE IF NOT EXISTS digital_fulfillments (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
@@ -269,6 +277,14 @@ export async function migrate() {
       ON digital_fulfillments (client_id);
     CREATE INDEX IF NOT EXISTS digital_fulfillments_status_idx
       ON digital_fulfillments (status);
+
+    -- Backfill the ownership table when upgrading an installation that
+    -- already has fulfillment records.
+    INSERT INTO digital_fulfillment_orders (order_id, client_id)
+      SELECT order_id, MIN(client_id)
+      FROM digital_fulfillments
+      GROUP BY order_id
+      ON CONFLICT (order_id) DO NOTHING;
 
     CREATE TABLE IF NOT EXISTS digital_fulfillment_audit_log (
       id BIGSERIAL PRIMARY KEY,

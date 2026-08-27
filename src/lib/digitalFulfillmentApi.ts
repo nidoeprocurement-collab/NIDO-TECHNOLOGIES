@@ -5,14 +5,22 @@ import { isDigitalProduct } from "@/lib/productType";
 type DigitalFulfillmentActor = Pick<User, "id" | "name" | "role" | "userType" | "clientId">;
 
 function requestHeaders(actor: DigitalFulfillmentActor | null, clientId: string): HeadersInit {
-  return {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(actor?.id ? { "x-nido-user-id": actor.id } : {}),
-    ...(actor?.name ? { "x-nido-user-name": actor.name } : {}),
-    ...(actor?.role ? { "x-nido-role": actor.role } : {}),
-    ...(actor?.userType ? { "x-nido-user-type": actor.userType } : {}),
-    ...(clientId ? { "x-nido-client-id": clientId } : {}),
   };
+
+  // The localStorage auth model has no server-verifiable credential. These
+  // headers are only a development bridge; production relies on the
+  // server-authenticated session/cookie and never sends browser-controlled
+  // identity claims.
+  if (import.meta.env.DEV) {
+    if (actor?.id) headers["x-nido-user-id"] = actor.id;
+    if (actor?.name) headers["x-nido-user-name"] = actor.name;
+    if (actor?.role) headers["x-nido-role"] = actor.role;
+    if (actor?.userType) headers["x-nido-user-type"] = actor.userType;
+    if (clientId) headers["x-nido-client-id"] = clientId;
+  }
+  return headers;
 }
 
 /**

@@ -31,19 +31,49 @@ const ah = fn => (req, res) => Promise.resolve(fn(req, res)).catch(error => {
   });
 });
 
-function actorFromRequest(req) {
+function normalizeActor(principal) {
+  if (!principal?.id) return null;
   return {
-    id: String(req.get("x-nido-user-id") || "unknown"),
-    name: String(req.get("x-nido-user-name") || req.get("x-nido-user-id") || "Unknown user"),
-    role: String(req.get("x-nido-role") || ""),
-    clientId: String(req.get("x-nido-client-id") || ""),
-    userType: String(req.get("x-nido-user-type") || ""),
+    id: String(principal.id),
+    name: String(principal.name || principal.email || principal.id),
+    role: String(principal.role || ""),
+    clientId: String(principal.clientId || principal.client_id || ""),
+    userType: String(principal.userType || principal.user_type || ""),
   };
+}
+
+/**
+ * The imported frontend currently authenticates against localStorage, which
+ * cannot produce a trustworthy server identity. Production must therefore
+ * receive a principal from real server middleware (req.authenticatedUser,
+ * req.auth, or req.user). The header bridge is deliberately limited to local
+ * development and can be disabled with NIDO_ALLOW_LOCAL_AUTH_HEADERS=false.
+ */
+function actorFromRequest(req) {
+  const serverPrincipal = req.authenticatedUser || req.auth?.user || req.auth || req.user;
+  const trustedActor = normalizeActor(serverPrincipal);
+  if (trustedActor) return trustedActor;
+
+  if (process.env.NODE_ENV !== "production" && process.env.NIDO_ALLOW_LOCAL_AUTH_HEADERS !== "false") {
+    return normalizeActor({
+      id: req.get("x-nido-user-id"),
+      name: req.get("x-nido-user-name"),
+      role: req.get("x-nido-role"),
+      clientId: req.get("x-nido-client-id"),
+      userType: req.get("x-nido-user-type"),
+    });
+  }
+
+  return null;
 }
 
 function requireInternalRole(req, res, roles) {
   const actor = actorFromRequest(req);
-  if (!actor.id || actor.id === "unknown" || !roles.has(actor.role)) {
+  if (!actor) {
+    res.status(401).json({ success: false, error: "A server-authenticated user context is required." });
+    return false;
+  }
+  if (!roles.has(actor.role)) {
     res.status(403).json({ success: false, error: "You do not have permission to manage digital fulfillments." });
     return false;
   }
@@ -52,8 +82,8 @@ function requireInternalRole(req, res, roles) {
 
 function requireAuthenticatedClient(req, res) {
   const actor = actorFromRequest(req);
-  if (!actor.id || actor.id === "unknown" || !actor.clientId) {
-    res.status(401).json({ success: false, error: "Authenticated client context is required." });
+  if (!actor || !actor.clientId) {
+    res.status(401).json({ success: false, error: "A server-authenticated client context is required." });
     return null;
   }
   return actor;
@@ -106,6 +136,33 @@ async function getFulfillment(id) {
   return result.rows[0] || null;
 }
 
+function decodeLicenseFile(fileBase64) {
+  const encoded = String(fileBase64 || "")
+    .replace(/^data:[^;]+;base64,/, "")
+    .replace(/\s/g, "");
+  if (!encoded || encoded.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+    const error = new Error("License file encoding is invalid.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+  const estimatedBytes = (encoded.length * 3) / 4 - padding;
+  if (estimatedBytes > MAX_LICENSE_BYTES) {
+    const error = new Error("License file must be between 1 byte and 50 MB.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const contents = Buffer.from(encoded, "base64");
+  if (!contents.length || contents.length > MAX_LICENSE_BYTES) {
+    const error = new Error("License file must be between 1 byte and 50 MB.");
+    error.statusCode = 400;
+    throw error;
+  }
+  return contents;
+}
+
 async function audit(client, fulfillmentId, event, actor, metadata = {}) {
   await client.query(
     `INSERT INTO digital_fulfillment_audit_log
@@ -145,23 +202,43 @@ router.use(async (_req, res, next) => {
 // cannot create duplicate fulfillment records for the same digital item.
 router.post("/digital-fulfillments/order", ah(async (req, res) => {
   const actor = actorFromRequest(req);
-  if (!actor.id || actor.id === "unknown") {
-    return res.status(401).json({ success: false, error: "Authenticated user context is required." });
+  if (!actor) {
+    return res.status(401).json({ success: false, error: "A server-authenticated user context is required." });
   }
 
   const { orderId, clientId, cartItems } = req.body || {};
   if (!orderId || !clientId || !Array.isArray(cartItems)) {
     return res.status(400).json({ success: false, error: "orderId, clientId, and cartItems are required." });
   }
-  if (actor.clientId && actor.userType !== "nido_admin" && actor.clientId !== String(clientId)) {
+  if (actor.userType !== "nido_admin" && (!actor.clientId || actor.clientId !== String(clientId))) {
     return res.status(403).json({ success: false, error: "You cannot create fulfillment records for another client." });
   }
 
   const digitalItems = cartItems.filter(isDigitalItem);
+  if (digitalItems.length === 0) {
+    return res.status(201).json({ success: true, data: [], createdCount: 0 });
+  }
+
   const client = await pool.connect();
   const created = [];
   try {
     await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO digital_fulfillment_orders (order_id, client_id)
+       VALUES ($1, $2)
+       ON CONFLICT (order_id) DO NOTHING`,
+      [String(orderId), String(clientId)],
+    );
+    const ownerResult = await client.query(
+      "SELECT client_id FROM digital_fulfillment_orders WHERE order_id = $1 FOR UPDATE",
+      [String(orderId)],
+    );
+    if (!ownerResult.rows[0] || ownerResult.rows[0].client_id !== String(clientId)) {
+      const error = new Error("This order already belongs to another client.");
+      error.statusCode = 409;
+      throw error;
+    }
+
     for (const item of digitalItems) {
       const orderItemId = `${orderId}-${String(item.id)}`;
       const result = await client.query(
@@ -235,16 +312,7 @@ router.post("/internal/digital-fulfillments/:id/license", ah(async (req, res) =>
   }
   assertStatusTransition(fulfillment.status, requestedStatus);
 
-  const encoded = String(fileBase64).replace(/^data:[^;]+;base64,/, "");
-  let contents;
-  try {
-    contents = Buffer.from(encoded, "base64");
-  } catch {
-    return res.status(400).json({ success: false, error: "License file encoding is invalid." });
-  }
-  if (!contents.length || contents.length > MAX_LICENSE_BYTES) {
-    return res.status(400).json({ success: false, error: "License file must be between 1 byte and 50 MB." });
-  }
+  const contents = decodeLicenseFile(fileBase64);
 
   await fs.mkdir(storageRoot, { recursive: true });
   const storageKey = `${fulfillment.id}/${crypto.randomUUID()}-${safeFileName(originalFileName)}`;
@@ -339,12 +407,60 @@ router.post("/internal/digital-fulfillments/:id/cancel", ah(async (req, res) => 
   return res.json({ success: true, data: toPublicFulfillment(result.rows[0]) });
 }));
 
+router.post("/internal/digital-fulfillments/:id/complete", ah(async (req, res) => {
+  if (!requireInternalRole(req, res, ACTION_ROLES)) return;
+  const actor = actorFromRequest(req);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const locked = await client.query(
+      "SELECT * FROM digital_fulfillments WHERE id = $1 FOR UPDATE",
+      [req.params.id],
+    );
+    const fulfillment = locked.rows[0];
+    if (!fulfillment) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ success: false, error: "Digital fulfillment not found." });
+    }
+
+    assertStatusTransition(fulfillment.status, "COMPLETED");
+    const alreadyCompleted = fulfillment.status === "COMPLETED";
+    const result = await client.query(
+      `UPDATE digital_fulfillments
+       SET status = 'COMPLETED',
+           completed_at = COALESCE(completed_at, now()),
+           updated_at = now()
+       WHERE id = $1
+       RETURNING *`,
+      [fulfillment.id],
+    );
+    if (!alreadyCompleted) {
+      await audit(client, fulfillment.id, "fulfillment_completed", actor);
+    }
+    await client.query("COMMIT");
+    return res.json({ success: true, data: toPublicFulfillment(result.rows[0]) });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}));
+
 router.get("/client/digital-fulfillments/:id/download", ah(async (req, res) => {
   const actor = requireAuthenticatedClient(req, res);
   if (!actor) return;
-  const fulfillment = await getFulfillment(req.params.id);
+  const result = await pool.query(
+    `SELECT f.*, o.client_id AS order_owner_client_id
+     FROM digital_fulfillments f
+     INNER JOIN digital_fulfillment_orders o ON o.order_id = f.order_id
+     WHERE f.id = $1`,
+    [req.params.id],
+  );
+  const fulfillment = result.rows[0];
   if (!fulfillment) return res.status(404).json({ success: false, error: "Digital fulfillment not found." });
-  if (fulfillment.client_id !== actor.clientId) {
+  if (fulfillment.client_id !== fulfillment.order_owner_client_id
+      || fulfillment.order_owner_client_id !== actor.clientId) {
     return res.status(403).json({ success: false, error: "You cannot access another client's fulfillment." });
   }
   if (!CLIENT_DOWNLOAD_STATUSES.has(fulfillment.status)) {

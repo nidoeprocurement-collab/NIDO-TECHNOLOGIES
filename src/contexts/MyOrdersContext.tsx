@@ -136,7 +136,7 @@ function cascadeStatusToSubOrders(order: MyOrder, status: MyOrderStatus) {
 }
 
 // Serial, zero-padded order numbers: ORD-000001, ORD-000002, ...
-function nextOrderId(): string {
+export function nextOrderId(): string {
   let seq = 0;
   try {
     seq = parseInt(localStorage.getItem(SEQ_KEY) || "0", 10) || 0;
@@ -305,13 +305,16 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
-    const id = nextOrderId();
+    // Callers that need to complete a server-side prerequisite before the
+    // local order is committed can reserve the ID first and pass it back.
+    const id = order.id || nextOrderId();
+    const { id: _providedId, ...orderWithoutId } = order;
     const cartItems = order.cartItems?.map((item, index) => ({
       ...item,
       subOrderId: item.subOrderId
         || `${getPrefix("salesOrder") || "SO-"}${id}-${String(index + 1).padStart(3, "0")}`,
     }));
-    const normalizedOrder = { ...order, id, cartItems } as MyOrder;
+    const normalizedOrder = { ...orderWithoutId, id, cartItems } as MyOrder;
     setOrders((prev) => [normalizedOrder, ...prev]);
     // Auto-create Draft POs grouped by vendor immediately after the order is saved.
     if (cartItems?.length) {
