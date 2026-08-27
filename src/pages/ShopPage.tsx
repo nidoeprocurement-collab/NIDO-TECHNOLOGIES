@@ -25,6 +25,7 @@ import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { getFulfillmentType, isDigitalProduct } from "@/lib/productType";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,19 +63,7 @@ type ProductGroup = "physical" | "digital";
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getProductGroup(product: Pick<Product, "productType" | "physicalType">): ProductGroup {
-  const physicalType = (product.physicalType || "").trim().toLowerCase();
-  const productType = (product.productType || "").trim().toLowerCase();
-
-  // physicalType is the authoritative field when it is present. Services are
-  // treated as digital/non-physical products so they do not appear with stock
-  // based physical goods.
-  if (physicalType.includes("digital") || physicalType.includes("service")) return "digital";
-  if (physicalType.includes("physical")) return "physical";
-  if (productType.includes("digital") || productType.includes("service")) return "digital";
-
-  // Older catalog entries may not have either field populated. Keep those
-  // products discoverable in the physical section for backwards compatibility.
-  return "physical";
+  return getFulfillmentType(product);
 }
 
 function getCategoryColor(cat: string): string {
@@ -309,7 +298,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   const handleAdd = () => {
     if (isImpersonating) return;
     if (added) return;
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode, productType: product.productType, physicalType: product.physicalType, fulfillmentType: getFulfillmentType(product) }, Math.max(1, qty));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -684,6 +673,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         clientId,
         category: product.category,
         productCode: product.productCode,
+        productType: product.productType,
+        physicalType: product.physicalType,
+        fulfillmentType: "physical",
         leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
@@ -1094,7 +1086,7 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
   const [adding, setAdding] = useState(false);
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const recommendedVendor = getRecommendedVendor(vendorComps);
-  const canAdd = !isImpersonating && product.inStock && !!recommendedVendor && canVendorFulfillMoq(recommendedVendor);
+  const canAdd = !isImpersonating && product.inStock;
 
   useEffect(() => {
     if (!product.productCode) return;
@@ -1129,28 +1121,31 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
 
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (!canAdd || !recommendedVendor || adding) return;
+    if (!canAdd || adding) return;
     setAdding(true);
     addItem({
       id: Math.random() * 10000,
       name: product.name,
       image: product.image,
       specs: product.specs,
-      moq: Math.max(1, recommendedVendor.moq),
-      totalStock: recommendedVendor.stock,
+       moq: Math.max(1, product.moq),
+       totalStock: product.totalStock,
       priceNum: product.priceNum,
       clientId,
       category: product.category,
-      productCode: product.productCode,
-      leadTime: recommendedVendor.leadTime > 0 ? `${recommendedVendor.leadTime * 2} days` : product.leadTime,
-      selectedVendorId: recommendedVendor.vendorId,
-      selectedVendorName: recommendedVendor.vendorName,
-      vendorPrice: recommendedVendor.basePrice,
-      landedCost: recommendedVendor.landedCostPerUnit,
+       productCode: product.productCode,
+       productType: product.productType,
+       physicalType: product.physicalType,
+       fulfillmentType: "digital",
+       leadTime: recommendedVendor && recommendedVendor.leadTime > 0 ? `${recommendedVendor.leadTime * 2} days` : product.leadTime,
+       selectedVendorId: recommendedVendor?.vendorId,
+       selectedVendorName: recommendedVendor?.vendorName,
+       vendorPrice: recommendedVendor?.basePrice,
+       landedCost: recommendedVendor?.landedCostPerUnit,
       gstSnapshot: gstRate,
       hsnSnapshot: hsn,
-      vendorRating: recommendedVendor.rating,
-    }, Math.max(1, recommendedVendor.moq));
+       vendorRating: recommendedVendor?.rating,
+     }, Math.max(1, product.moq));
     setTimeout(() => setAdding(false), 1500);
   };
 

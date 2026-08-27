@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCart } from "@/contexts/CartContext";
+import { isDigitalProduct } from "@/lib/productType";
 import {
   ChevronRight, MapPin, Building2, Home, Pencil, Plus,
   ChevronDown, X, Check,
@@ -226,6 +228,8 @@ const PAYMENT_TERMS_KEY = "nido_payment_terms";
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const { items: cart } = useCart();
+  const requiresDelivery = cart.some((item) => !isDigitalProduct(item));
   const [notesOpen, setNotesOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
@@ -273,6 +277,7 @@ export default function CheckoutPage() {
   };
 
   const canAddMore = addresses.length < 2;
+  const hasSelectedAddress = addresses.some((address) => address.id === selectedAddressId);
 
   return (
     <div className="min-h-screen bg-white px-2 py-6">
@@ -296,8 +301,8 @@ export default function CheckoutPage() {
         <div className="flex gap-2 items-start">
           {/* Left */}
           <div className="flex-1 min-w-0 space-y-4">
-            {/* Delivery Details card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6">
+            {/* Delivery Details card — only required when the cart contains a Physical Product */}
+            {requiresDelivery ? <div className="bg-white border border-gray-200 rounded-xl p-6">
               <h2 className="font-semibold text-gray-900 text-base mb-4">Delivery Details</h2>
 
               {/* Delivery Address header */}
@@ -406,7 +411,12 @@ export default function CheckoutPage() {
                   <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>
                 </div>
               </div>
-            </div>
+            </div> : (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-6">
+                <h2 className="font-semibold text-violet-900 text-base mb-1">Digital Order</h2>
+                <p className="text-sm text-violet-700">No delivery address or shipping information is required for this digital-only order.</p>
+              </div>
+            )}
 
             {/* Order Notes */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -470,7 +480,8 @@ export default function CheckoutPage() {
             <div className="flex justify-center pt-2">
               <button
                 onClick={() => navigate("/shop/checkout/payment")}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
+                disabled={requiresDelivery && !hasSelectedAddress}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 Continue to Payment
                 <ChevronRight size={16} />

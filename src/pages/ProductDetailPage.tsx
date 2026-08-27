@@ -22,6 +22,7 @@ import {
 } from "@/lib/priceEngineStore";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
+import { getFulfillmentType, isDigitalProduct } from "@/lib/productType";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -252,6 +253,7 @@ export default function ProductDetailPage() {
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const effectivePrice = discountPct > 0 ? product.priceNum * (1 - discountPct / 100) : product.priceNum;
   const recommendedVendor = getRecommendedVendor(vendorComps);
+  const digital = isDigitalProduct(product);
 
   const specPairs = product.specs.map(s => {
     const idx = s.indexOf(': ');
@@ -261,7 +263,8 @@ export default function ProductDetailPage() {
   const gstRate = getEffectiveTaxPctForCategory(product?.category ?? "");
 
   const handleAdd = () => {
-    if (added || !selectedVendor) return;
+    if (added || (!digital && !selectedVendor) || !product.inStock) return;
+    const vendor = digital ? recommendedVendor : selectedVendor;
     addItem(
       {
         id: Math.random() * 10000,
@@ -269,16 +272,19 @@ export default function ProductDetailPage() {
         image: product.image,
         specs: product.specs,
         moq: product.moq,
-        totalStock: selectedVendor.stock,
+        totalStock: digital ? product.moq : selectedVendor!.stock,
         priceNum: product.priceNum,
         clientId,
         category: product.category,
         productCode: product.productCode,
-        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
-        selectedVendorId: selectedVendor.vendorId,
-        selectedVendorName: selectedVendor.vendorName,
-        vendorPrice: selectedVendor.basePrice,
-        landedCost: selectedVendor.landedCostPerUnit,
+        productType: product.productType,
+        physicalType: product.physicalType,
+        fulfillmentType: digital ? "digital" : "physical",
+        leadTime: vendor && vendor.leadTime > 0 ? `${vendor.leadTime * 2} days` : product.leadTime,
+        selectedVendorId: vendor?.vendorId,
+        selectedVendorName: vendor?.vendorName,
+        vendorPrice: vendor?.basePrice,
+        landedCost: vendor?.landedCostPerUnit,
         gstSnapshot: gstRate,
       },
       Math.max(1, qty)
@@ -440,21 +446,22 @@ export default function ProductDetailPage() {
                 </p>
               )}
 
-              {/* ── Vendor Selection ── */}
-              <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+               {/* ── Vendor Selection ── */}
+               {!digital ? (
+                <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
                 <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Select Vendor</span>
                   {vendorComps.length > 0 && <span className="text-[10px] text-gray-400">{vendorComps.length} available</span>}
-                </div>
+                 </div>
                 {vendorComps.length === 0 ? (
                   <div className="px-3 py-3 text-xs text-gray-400">No vendor pricing available for this product.</div>
-                ) : selectedVendor ? (
-                  <div className="px-3 py-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-                          <Check size={10} className="text-white" />
-                        </div>
+                 ) : selectedVendor ? (
+                   <div className="px-3 py-2.5">
+                     <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-2 min-w-0">
+                         <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                           <Check size={10} className="text-white" />
+                         </div>
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</p>
                           <p className="text-[10px] text-gray-500">
@@ -529,7 +536,13 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 )}
-              </div>
+                </div>
+               ) : (
+                 <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3">
+                   <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Digital Product</p>
+                   <p className="mt-1 text-xs text-violet-600">No vendor selection is required. Add directly to your cart.</p>
+                 </div>
+               )}
 
               {/* Qty stepper */}
               <div className="flex items-center gap-3 mt-4">
@@ -552,14 +565,14 @@ export default function ProductDetailPage() {
               {/* Add to Cart */}
               <button
                 onClick={handleAdd}
-                disabled={!selectedVendor}
+                disabled={!product.inStock || (!digital && !selectedVendor)}
                 className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-                  !selectedVendor ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" :
+                   !product.inStock || (!digital && !selectedVendor) ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" :
                   added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
                 }`}
               >
                 {added ? <Check size={16} /> : <ShoppingCart size={16} />}
-                {added ? "Added to Cart!" : !selectedVendor ? "Select a vendor first" : "Add to Cart"}
+                 {added ? "Added to Cart!" : !product.inStock ? "Unavailable" : !digital && !selectedVendor ? "Select a vendor first" : "Add to Cart"}
               </button>
 
               {/* MOQ / Lead time / Warranty */}
