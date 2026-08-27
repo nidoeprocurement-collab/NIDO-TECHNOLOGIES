@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronRight, ShoppingCart, Check, Package, Shield, Clock,
   Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2,
@@ -20,7 +20,7 @@ import {
   getVendorComparisonBadge,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
-import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getFulfillmentType, isDigitalProduct } from "@/lib/productType";
 
@@ -152,6 +152,9 @@ function getVendorMatchMap(): Map<string, { leadTime: string; moq: number }> {
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { leadTime: string; moq: number }>): Product {
   const match = vendorMatches.get(e.productCode);
   const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
+  const productType = master?.productType || e.productType;
+  const physicalType = master?.physicalType || e.physicalType;
+  const fulfillmentType = master?.fulfillmentType || e.fulfillmentType || getFulfillmentType({ productType, physicalType });
   const masterSpecs = master?.specifications
     ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
     .filter(Boolean);
@@ -166,8 +169,9 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { lead
     subcategory: master?.subcategory || e.subcategory,
     brand: master?.brand || e.brand,
     tags: master?.tags || e.tags || [],
-    productType: master?.productType || e.productType,
-    physicalType: master?.physicalType || e.physicalType,
+    productType,
+    physicalType,
+    fulfillmentType,
     image: master?.images?.[0] || e.img || "",
     images: master?.images?.length ? master.images : e.images,
     specs: masterSpecs?.length ? masterSpecs : e.specs || [],
@@ -188,11 +192,14 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { lead
 export default function ProductDetailPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { productId } = useParams<{ productId: string }>();
   const { addItem } = useCart();
 
   // Product + client come from router state (set by ShopPage on click)
   const stateProduct = location.state?.product as Product | undefined;
-  const clientId = location.state?.clientId as string | undefined;
+  const clientId = (location.state?.clientId as string | undefined)
+    || localStorage.getItem("nido_shop_selected_client")
+    || undefined;
 
   const [product, setProduct] = useState<Product | null>(stateProduct ?? null);
   const [activeImg, setActiveImg] = useState(0);
@@ -202,6 +209,17 @@ export default function ProductDetailPage() {
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+
+  // Shop navigation supplies router state, but direct URLs and browser
+  // refreshes must resolve the product from the selected client's catalogue.
+  useEffect(() => {
+    if (product || !productId || !clientId) return;
+    const vendorMatches = getVendorMatchMap();
+    const match = getClientCatalog(clientId)
+      .map(entry => entryToProduct(entry, vendorMatches))
+      .find(entry => entry.productCode === productId);
+    if (match) setProduct(match);
+  }, [product, productId, clientId]);
 
   // Keep qty >= moq
   useEffect(() => {
@@ -266,6 +284,16 @@ export default function ProductDetailPage() {
   }).filter(sp => sp.key || sp.val);
 
   const gstRate = getEffectiveTaxPctForCategory(product?.category ?? "");
+  const hsnSnapshot = (() => {
+    const map = new Map<string, string>();
+    getHsnCodes().forEach(h => {
+      if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code);
+    });
+    getProductCategoryTaxMap().forEach(m => {
+      if (m.defaultHsnCode && m.productCategory) map.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
+    });
+    return map.get((product?.category || "").toLowerCase()) || "";
+  })();
 
   const handleAdd = () => {
     if (added || (!digital && !selectedVendor) || !product.inStock) return;
@@ -291,6 +319,8 @@ export default function ProductDetailPage() {
         vendorPrice: vendor?.basePrice,
         landedCost: vendor?.landedCostPerUnit,
         gstSnapshot: gstRate,
+         hsnSnapshot,
+         vendorRating: vendor?.rating,
       },
       Math.max(1, qty)
     );
