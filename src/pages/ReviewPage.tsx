@@ -12,6 +12,8 @@ import { reserveVendorStock } from "@/lib/vendorStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { isDigitalProduct } from "@/lib/productType";
+import { useAuth } from "@/contexts/AuthContext";
+import { createDigitalFulfillments } from "@/lib/digitalFulfillmentApi";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -44,6 +46,7 @@ export default function ReviewPage() {
   useI18n();
   const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
+  const { effectiveUser } = useAuth();
 
   const clientId = localStorage.getItem("nido_shop_selected_client") || "";
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
@@ -137,7 +140,7 @@ export default function ReviewPage() {
     cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category }))
   );
   const subtotal = preTaxSubtotal;
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (hasPhysicalItems && !selectedAddr) {
       navigate("/shop/checkout");
       return;
@@ -216,6 +219,22 @@ export default function ReviewPage() {
           reserveVendorStock(alloc.vendorId, item.productCode, alloc.allocated);
         }
       }
+    }
+
+    try {
+      await createDigitalFulfillments(
+        orderNumber,
+        cart[0]?.clientId || clientId,
+        itemsSnapshot.map((item) => ({
+          ...item,
+          fulfillmentType: item.fulfillmentType || (isDigitalProduct(item) ? "digital" : "physical"),
+        })) as OrderCartItem[],
+        effectiveUser,
+      );
+    } catch (error) {
+      // Keep the existing order/cart flow intact, but do not hide a backend
+      // sync failure from the console. The endpoint is idempotent for retries.
+      console.error("[digital fulfillment] order sync failed", error);
     }
 
     consumeCart();
