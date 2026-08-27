@@ -274,6 +274,7 @@ export default function CartPage() {
 
                 {/* Rows */}
                 {cart.map((item, idx) => {
+                  const digital = isDigitalProduct(item);
                   const discountPct    = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
                   const effectivePrice = discountPct > 0 ? item.priceNum * (1 - discountPct / 100) : item.priceNum;
                   const inclusiveTotal = effectivePrice * item.quantity;
@@ -281,17 +282,17 @@ export default function CartPage() {
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
                   const originalUnit   = item.priceNum * 100 / (100 + gstRate);
                   const catalog        = catalogMap.get(item.productCode || "");
-                  const stockInfo      = vendorMatchMap.get(item.productCode || "");
+                  const stockInfo      = digital ? undefined : vendorMatchMap.get(item.productCode || "");
                   const liveRemaining  = stockInfo?.totalStock ?? 0;
                   const stockDataKnown = stockInfo !== undefined;
                   const maxQty         = stockDataKnown ? item.quantity + liveRemaining : undefined;
 
-                  const inStock = !stockDataKnown || liveRemaining > 0 || item.quantity > 0;
-                  const stockLabel = !stockDataKnown || liveRemaining > 0 ? "In Stock" : "Reserved";
+                  const inStock = digital || !stockDataKnown || liveRemaining > 0 || item.quantity > 0;
+                  const stockLabel = digital ? "Digital" : (!stockDataKnown || liveRemaining > 0 ? "In Stock" : "Reserved");
 
-                  const itemMoq = stockInfo?.moq && stockInfo.moq > 0 ? stockInfo.moq : (item.moq > 0 ? item.moq : 1);
-                  const itemLeadTime = item.leadTime || stockInfo?.leadTime || "";
-                  const itemStock = stockInfo?.totalStock ?? item.totalStock ?? 0;
+                  const itemMoq = digital ? (item.moq > 0 ? item.moq : 1) : (stockInfo?.moq && stockInfo.moq > 0 ? stockInfo.moq : (item.moq > 0 ? item.moq : 1));
+                  const itemLeadTime = digital ? "" : (item.leadTime || stockInfo?.leadTime || "");
+                  const itemStock = digital ? 0 : (stockInfo?.totalStock ?? item.totalStock ?? 0);
 
                   const specChips = item.specs.slice(0, 5).map(parseSpec);
 
@@ -322,7 +323,7 @@ export default function CartPage() {
                               <p className="font-bold text-gray-900 text-sm leading-snug">{item.name}</p>
                               <button
                                 onClick={() => {
-                                  if (item.selectedVendorId && item.productCode) {
+                                  if (!digital && item.selectedVendorId && item.productCode) {
                                     releaseVendorReservation(item.selectedVendorId, item.productCode, item.quantity);
                                   }
                                   onRemove(item.id);
@@ -334,7 +335,7 @@ export default function CartPage() {
                             </div>
 
                             {/* Vendor row */}
-                            {item.selectedVendorName && (
+                            {!digital && item.selectedVendorName && (
                               <div className="flex items-center gap-2 mb-1.5">
                                 <span className="text-xs text-gray-500">Vendor:</span>
                                 <span className="text-xs font-semibold text-gray-800">{item.selectedVendorName}</span>

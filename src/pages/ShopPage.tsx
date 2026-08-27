@@ -181,6 +181,9 @@ function prefOrder(pref?: string): number {
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
   const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
+  const productType = master?.productType || e.productType;
+  const physicalType = master?.physicalType || e.physicalType;
+  const digital = isDigitalProduct({ productType, physicalType });
   const masterSpecs = master?.specifications
     ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
     .filter(Boolean);
@@ -202,8 +205,8 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     subcategory: master?.subcategory || e.subcategory,
     brand: master?.brand || e.brand,
     tags: master?.tags || e.tags || [],
-    productType: master?.productType || e.productType,
-    physicalType: master?.physicalType || e.physicalType,
+    productType,
+    physicalType,
     image: images[0] || "",
     images,
     specs: masterSpecs?.length ? masterSpecs : e.specs || [],
@@ -212,7 +215,12 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     totalStock,
     priceNum: e.priceNum ?? 0,
     // A product is in stock only when at least one vendor can fulfill its MOQ.
-    inStock: e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
+    // Digital availability is controlled by catalogue eligibility, not
+    // physical stock or MOQ. The assigned active supplier may not carry
+    // physical inventory for a license or service.
+    inStock: digital
+      ? e.availability !== "Out of Stock" && match !== undefined
+      : e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
     description: master?.description || e.description,
     generalSpecs: masterGeneralSpecs?.length ? masterGeneralSpecs : e.generalSpecs,
     productNotes: master?.productNotes || e.productNotes,
@@ -1085,7 +1093,10 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
   const { isImpersonating } = useAuth();
   const [adding, setAdding] = useState(false);
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
-  const recommendedVendor = getRecommendedVendor(vendorComps);
+  // Digital products still retain an internal supplier snapshot, but the
+  // customer never selects or sees this supplier. Unlike physical products,
+  // the supplier does not need to satisfy a stock/MOQ check.
+  const internalSupplier = vendorComps[0] ?? null;
   const canAdd = !isImpersonating && product.inStock;
 
   useEffect(() => {
@@ -1097,14 +1108,14 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
   }, [product.productCode, product.category]);
 
   const gstRate = getEffectiveTaxPctForCategory(product.category);
-  const price = recommendedVendor && clientId
+   const price = internalSupplier && clientId
     ? computeClientFinalPrice(
-        recommendedVendor.landedCostPerUnit,
+         internalSupplier.landedCostPerUnit,
         getClientCommonSettings(clientId),
         resolveClientProfitPct(clientId, product.productCode, product.category),
         product.category,
       ).finalPrice
-    : recommendedVendor?.basePrice ?? product.priceNum;
+     : internalSupplier?.basePrice ?? product.priceNum;
   const priceSuffix = getDigitalSpec(product, ["billing", "term", "duration"], "").toLowerCase().includes("year")
     ? " / year"
     : getDigitalSpec(product, ["license", "billing", "term"], "").toLowerCase().includes("one")
@@ -1137,14 +1148,14 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
        productType: product.productType,
        physicalType: product.physicalType,
        fulfillmentType: "digital",
-       leadTime: recommendedVendor && recommendedVendor.leadTime > 0 ? `${recommendedVendor.leadTime * 2} days` : product.leadTime,
-       selectedVendorId: recommendedVendor?.vendorId,
-       selectedVendorName: recommendedVendor?.vendorName,
-       vendorPrice: recommendedVendor?.basePrice,
-       landedCost: recommendedVendor?.landedCostPerUnit,
+        leadTime: internalSupplier && internalSupplier.leadTime > 0 ? `${internalSupplier.leadTime * 2} days` : product.leadTime,
+        selectedVendorId: internalSupplier?.vendorId,
+        selectedVendorName: internalSupplier?.vendorName,
+        vendorPrice: internalSupplier?.basePrice,
+        landedCost: internalSupplier?.landedCostPerUnit,
       gstSnapshot: gstRate,
       hsnSnapshot: hsn,
-       vendorRating: recommendedVendor?.rating,
+        vendorRating: internalSupplier?.rating,
      }, Math.max(1, product.moq));
     setTimeout(() => setAdding(false), 1500);
   };

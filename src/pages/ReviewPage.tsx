@@ -232,7 +232,9 @@ export default function ReviewPage() {
         gstSnapshot: i.gstSnapshot,
         hsnSnapshot: i.hsnSnapshot,
         vendorRating: i.vendorRating,
-        stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
+        stockReservationId: isDigitalProduct(i)
+          ? undefined
+          : `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
       })) satisfies OrderCartItem[],
     });
 

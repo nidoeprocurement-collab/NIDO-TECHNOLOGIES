@@ -253,6 +253,10 @@ export default function ProductDetailPage() {
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const effectivePrice = discountPct > 0 ? product.priceNum * (1 - discountPct / 100) : product.priceNum;
   const recommendedVendor = getRecommendedVendor(vendorComps);
+  // Digital products use the first active supplier ranked by the existing
+  // price engine internally; customers never select this supplier and
+  // digital availability is not tied to physical stock/MOQ.
+  const internalDigitalSupplier = vendorComps[0] ?? null;
   const digital = isDigitalProduct(product);
 
   const specPairs = product.specs.map(s => {
@@ -264,7 +268,7 @@ export default function ProductDetailPage() {
 
   const handleAdd = () => {
     if (added || (!digital && !selectedVendor) || !product.inStock) return;
-    const vendor = digital ? recommendedVendor : selectedVendor;
+    const vendor = digital ? internalDigitalSupplier : selectedVendor;
     addItem(
       {
         id: Math.random() * 10000,
@@ -272,7 +276,7 @@ export default function ProductDetailPage() {
         image: product.image,
         specs: product.specs,
         moq: product.moq,
-        totalStock: digital ? product.moq : selectedVendor!.stock,
+        totalStock: digital ? 0 : selectedVendor!.stock,
         priceNum: product.priceNum,
         clientId,
         category: product.category,
