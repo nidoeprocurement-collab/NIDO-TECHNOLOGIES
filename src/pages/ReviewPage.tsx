@@ -162,9 +162,15 @@ export default function ReviewPage() {
     const orderNumber = nextOrderId();
 
     try {
+      const fulfillmentClientId = cart.find((item) => item.clientId)?.clientId
+        || effectiveUser?.clientId
+        || clientId;
+      if (!fulfillmentClientId) {
+        throw new Error("Select a client before placing a digital product order.");
+      }
       await createDigitalFulfillments(
         orderNumber,
-        cart[0]?.clientId || clientId,
+        fulfillmentClientId,
         itemsSnapshot.map((item) => ({
           ...item,
           fulfillmentType: item.fulfillmentType || (isDigitalProduct(item) ? "digital" : "physical"),

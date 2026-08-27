@@ -4,6 +4,24 @@ import { isDigitalProduct } from "@/lib/productType";
 
 type DigitalFulfillmentActor = Pick<User, "id" | "name" | "role" | "userType" | "clientId">;
 
+function getDevelopmentActor(): DigitalFulfillmentActor | null {
+  if (!import.meta.env.DEV || typeof window === "undefined") return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem("nido_user") || "null");
+    return stored?.id
+      ? {
+          id: String(stored.id),
+          name: String(stored.name || stored.email || stored.id),
+          role: stored.role ? String(stored.role) : undefined,
+          userType: stored.userType || "nido_admin",
+          clientId: stored.clientId ? String(stored.clientId) : undefined,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function requestHeaders(actor: DigitalFulfillmentActor | null, clientId: string): HeadersInit {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -14,10 +32,14 @@ function requestHeaders(actor: DigitalFulfillmentActor | null, clientId: string)
   // server-authenticated session/cookie and never sends browser-controlled
   // identity claims.
   if (import.meta.env.DEV) {
-    if (actor?.id) headers["x-nido-user-id"] = actor.id;
-    if (actor?.name) headers["x-nido-user-name"] = actor.name;
-    if (actor?.role) headers["x-nido-role"] = actor.role;
-    if (actor?.userType) headers["x-nido-user-type"] = actor.userType;
+    // AuthContext can briefly be empty while restoring a local session. Read
+    // the same development-only session as a fallback so checkout does not
+    // send an anonymous fulfillment request during that transition.
+    const developmentActor = actor || getDevelopmentActor();
+    if (developmentActor?.id) headers["x-nido-user-id"] = developmentActor.id;
+    if (developmentActor?.name) headers["x-nido-user-name"] = developmentActor.name;
+    if (developmentActor?.role) headers["x-nido-role"] = developmentActor.role;
+    if (developmentActor?.userType) headers["x-nido-user-type"] = developmentActor.userType;
     if (clientId) headers["x-nido-client-id"] = clientId;
   }
   return headers;
@@ -44,6 +66,9 @@ export async function createDigitalFulfillments(
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.success) {
-    throw new Error(payload.error || "Digital fulfillment records could not be created.");
+    throw new Error(
+      payload.error
+      || `Digital fulfillment records could not be created (HTTP ${response.status}).`,
+    );
   }
 }
