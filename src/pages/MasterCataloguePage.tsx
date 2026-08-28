@@ -37,6 +37,7 @@ interface CatalogItem {
   publishStatus?: 'draft' | 'published' | 'pending' | 'archived';
   category: string;
   subCategory: string;
+  physicalType?: string;
   brand: string;
   price: number;
   discountPrice?: number;
@@ -311,6 +312,7 @@ export default function CatalogUpdatesTab() {
       publishStatus: p.publishStatus,
       category: p.category,
       subCategory: p.subcategory,
+      physicalType: p.physicalType,
       brand: p.brand,
       price: p.price,
       status: 'In Stock' as const,
@@ -1035,6 +1037,7 @@ export default function CatalogUpdatesTab() {
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Master Product Code</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Physical Type</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
@@ -1044,7 +1047,7 @@ export default function CatalogUpdatesTab() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-2 text-gray-600">
+                    <TableCell colSpan={9} className="text-center py-2 text-gray-600">
                       No items match the selected filters. Adjust search, category, or status to view catalog entries.
                     </TableCell>
                   </TableRow>
@@ -1085,6 +1088,7 @@ export default function CatalogUpdatesTab() {
                       </TableCell>
                       <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
                       <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
+                      <TableCell className="text-sm text-gray-700">{item.physicalType || '—'}</TableCell>
                       <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
                       <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
                       <TableCell>
