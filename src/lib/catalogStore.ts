@@ -59,7 +59,11 @@ clearSeedData();
 
 export function getCatalogProducts(): CatalogProduct[] {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    const products = JSON.parse(localStorage.getItem(STORE_KEY) || '[]') as CatalogProduct[];
+    return products.map(product => ({
+      ...product,
+      physicalType: product.physicalType?.trim() || 'Physical Product',
+    }));
   } catch {
     return [];
   }

@@ -37,7 +37,7 @@ interface CatalogItem {
   publishStatus?: 'draft' | 'published' | 'pending' | 'archived';
   category: string;
   subCategory: string;
-  physicalType?: string;
+  physicalType: string;
   brand: string;
   price: number;
   discountPrice?: number;
@@ -293,7 +293,7 @@ const CATALOGUE_CSV_HEADERS: string[] = [
 ];
 
 const emptyItem: Omit<CatalogItem, 'id'> = {
-  name: '', sku: '', category: '', subCategory: '', brand: '', price: 0, status: 'In Stock',
+  name: '', sku: '', category: '', subCategory: '', physicalType: 'Physical Product', brand: '', price: 0, status: 'In Stock',
   tags: [], initialStock: 50, minStockThreshold: 5, description: '', specification: '', warranty: '',
   hsnCode: '', dimensionL: '', dimensionW: '', dimensionH: '', dimUnit: 'cm', weight: '', weightUnit: 'kg',
   customsDeclaration: 'Exempt', primaryVendor: '', vendorSku: '', leadTime: '10 Days',
@@ -312,7 +312,7 @@ export default function CatalogUpdatesTab() {
       publishStatus: p.publishStatus,
       category: p.category,
       subCategory: p.subcategory,
-      physicalType: p.physicalType,
+      physicalType: p.physicalType || 'Physical Product',
       brand: p.brand,
       price: p.price,
       status: 'In Stock' as const,
@@ -700,7 +700,7 @@ export default function CatalogUpdatesTab() {
             skuCode: col(row, 'sku code'),
             productName,
             productType: col(row, 'product type') || 'Product',
-            physicalType: col(row, 'physical type') || 'Physical',
+            physicalType: col(row, 'physical type') || 'Physical Product',
             category: col(row, 'category'),
             subcategory: col(row, 'subcategory'),
             brand: col(row, 'brand'),
@@ -1088,7 +1088,7 @@ export default function CatalogUpdatesTab() {
                       </TableCell>
                       <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
                       <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
-                      <TableCell className="text-sm text-gray-700">{item.physicalType || '—'}</TableCell>
+                      <TableCell className="text-sm text-gray-700">{item.physicalType}</TableCell>
                       <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
                       <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
                       <TableCell>
