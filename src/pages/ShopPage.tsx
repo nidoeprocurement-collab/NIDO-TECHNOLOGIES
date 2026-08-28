@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus } from "lucide-react";
+import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus, Cloud, KeyRound, Repeat2, Layers3, LayoutGrid, List, ArrowDownAZ } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
@@ -107,6 +107,47 @@ function formatLeadTime(t: string) { return t ? `${t} (Subject to Availability)`
 function formatMoq(n: number) { return n > 0 ? String(n) : "—"; }
 
 type VendorMatch = { leadTime: string; moq: number; totalStock: number; hasEligibleVendor: boolean };
+type ShopTab = "all" | "physical" | "digital" | "subscription" | "cloud" | "hybrid";
+type SortOption = "Popularity" | "Price: Low to High" | "Price: High to Low" | "Name";
+
+const SHOP_TABS: { id: ShopTab; label: string; icon: typeof Package }[] = [
+  { id: "all", label: "All Products", icon: Package },
+  { id: "physical", label: "Physical Products", icon: Package },
+  { id: "digital", label: "Digital Licenses", icon: KeyRound },
+  { id: "subscription", label: "Subscriptions (SaaS)", icon: Repeat2 },
+  { id: "cloud", label: "Cloud Services", icon: Cloud },
+  { id: "hybrid", label: "Hybrid Products", icon: Layers3 },
+];
+
+function getShopProductKind(product: Pick<Product, "productType" | "physicalType" | "category" | "name">): Exclude<ShopTab, "all"> {
+  const value = `${product.productType || ""} ${product.physicalType || ""} ${product.category || ""} ${product.name || ""}`.toLowerCase();
+  if (value.includes("hybrid")) return "hybrid";
+  if (value.includes("subscription") || value.includes("saas")) return "subscription";
+  if (value.includes("cloud")) return "cloud";
+  if (
+    value.includes("digital") ||
+    value.includes("license") ||
+    value.includes("software") ||
+    value.includes("service")
+  ) return "digital";
+  return "physical";
+}
+
+function getShopProductLabel(kind: Exclude<ShopTab, "all">): string {
+  const labels: Record<Exclude<ShopTab, "all">, string> = {
+    physical: "Physical Product",
+    digital: "Digital License",
+    subscription: "Subscription",
+    cloud: "Cloud Service",
+    hybrid: "Hybrid Product",
+  };
+  return labels[kind];
+}
+
+function getShopProductIcon(kind: Exclude<ShopTab, "all">) {
+  const Icon = SHOP_TABS.find(tab => tab.id === kind)?.icon || Package;
+  return <Icon size={12} />;
+}
 
 // getClientOrderedQtyMap and getPOdQtyMap removed — available stock is now
 // calculated directly from physicalStock − reservedStock in vendorStore, so
@@ -147,6 +188,14 @@ function prefOrder(pref?: string): number {
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
   const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
+  const productType = master?.productType || e.productType;
+  const physicalType = master?.physicalType || e.physicalType;
+  const kind = getShopProductKind({
+    productType,
+    physicalType,
+    category: master?.category || e.category,
+    name: master?.productName || e.name,
+  });
   const masterSpecs = master?.specifications
     ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
     .filter(Boolean);
@@ -168,8 +217,8 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     subcategory: master?.subcategory || e.subcategory,
     brand: master?.brand || e.brand,
     tags: master?.tags || e.tags || [],
-    productType: master?.productType || e.productType,
-    physicalType: master?.physicalType || e.physicalType,
+    productType,
+    physicalType,
     image: images[0] || "",
     images,
     specs: masterSpecs?.length ? masterSpecs : e.specs || [],
@@ -177,8 +226,11 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     moq: match?.moq ?? e.moq ?? 0,
     totalStock,
     priceNum: e.priceNum ?? 0,
-    // A product is in stock only when at least one vendor can fulfill its MOQ.
-    inStock: e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
+    // Digital products are not constrained by physical stock or vendor MOQ.
+    // They still require an active vendor relationship in the client catalog.
+    inStock: kind !== "physical" && kind !== "hybrid"
+      ? e.availability !== "Out of Stock" && match !== undefined
+      : e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
     description: master?.description || e.description,
     generalSpecs: masterGeneralSpecs?.length ? masterGeneralSpecs : e.generalSpecs,
     productNotes: master?.productNotes || e.productNotes,
@@ -699,19 +751,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       className={`group relative flex h-full flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
-      {/* Top row: In Stock badge + Heart */}
+      {/* Top row: product type badge + Heart */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
-        {product.inStock ? (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            In Stock
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
-            Out of Stock
-          </span>
-        )}
+        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+          {getShopProductIcon(getShopProductKind(product))}
+          {getShopProductLabel(getShopProductKind(product))}
+        </span>
         <button
           onClick={e => { e.stopPropagation(); setLiked(l => !l); }}
           className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
@@ -1040,6 +1085,128 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   );
 }
 
+function DigitalProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
+  const { addItem } = useCart();
+  const { isImpersonating } = useAuth();
+  const [adding, setAdding] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const kind = getShopProductKind(product);
+  const gstRate = getEffectiveTaxPctForCategory(product.category);
+  const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, Math.max(1, product.moq)) : 0;
+  const basePriceExcl = product.priceNum * 100 / (100 + gstRate);
+  const displayPrice = discountPct > 0 ? basePriceExcl * (1 - discountPct / 100) : basePriceExcl;
+  const specPairs = product.specs
+    .map(spec => {
+      const splitAt = spec.indexOf(": ");
+      return splitAt > -1
+        ? { label: spec.slice(0, splitAt), value: spec.slice(splitAt + 2) }
+        : { label: "", value: spec };
+    })
+    .filter(spec => spec.value)
+    .slice(0, 4);
+
+  const handleAdd = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (isImpersonating || !product.inStock || adding) return;
+    setAdding(true);
+    addItem({
+      id: Math.random() * 10000,
+      name: product.name,
+      image: product.image,
+      specs: product.specs,
+      moq: product.moq,
+      totalStock: 0,
+      priceNum: product.priceNum,
+      clientId,
+      category: product.category,
+      productCode: product.productCode,
+      leadTime: product.leadTime,
+      gstSnapshot: gstRate,
+    }, Math.max(1, product.moq));
+    window.setTimeout(() => setAdding(false), 1500);
+  };
+
+  return (
+    <div
+      className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+      onClick={() => onPreview(product)}
+    >
+      <div className="flex items-center justify-between px-3 pt-3">
+        <span className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">
+          {getShopProductIcon(kind)}
+          {getShopProductLabel(kind)}
+        </span>
+        <button
+          type="button"
+          aria-label={`Save ${product.name}`}
+          onClick={event => { event.stopPropagation(); setLiked(value => !value); }}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-gray-100"
+        >
+          <Heart size={15} className={liked ? "fill-red-500 text-red-500" : ""} />
+        </button>
+      </div>
+
+      <div className="flex h-[132px] items-center justify-center px-5 py-3">
+        {product.image ? (
+          <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
+        ) : (
+          <div className="h-full w-full overflow-hidden rounded-lg">{getProductIcon(product.name, product.category)}</div>
+        )}
+      </div>
+
+      <div className="border-b border-gray-100 px-3 pb-3 text-center">
+        <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-gray-900">{product.name}</h3>
+        <span className={`mt-0.5 block text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
+      </div>
+
+      <div className="flex-1 px-3 pt-3">
+        <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-gray-500">Key Details</p>
+        <div className="space-y-1.5">
+          {specPairs.length > 0 ? specPairs.map((spec, index) => (
+            <div key={index} className="flex items-start justify-between gap-3 text-[10px] leading-snug">
+              <span className="text-gray-500">{spec.label || "Details"}</span>
+              <span className="text-right font-semibold text-gray-700">{spec.value}</span>
+            </div>
+          )) : (
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-gray-500">Availability</span>
+              <span className="font-semibold text-emerald-600">Unlimited</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="px-3 pb-3 pt-4">
+        <div className="mb-3 flex items-end justify-between gap-2">
+          <div>
+            <p className="text-[10px] text-gray-500">Starting price</p>
+            <p className={`text-[17px] font-bold ${discountPct > 0 ? "text-emerald-600" : "text-gray-900"}`}>
+              {formatPrice(displayPrice)}
+              {product.priceNum > 0 && <span className="ml-1 text-[10px] font-normal text-gray-500">/ unit</span>}
+            </p>
+          </div>
+          <span className="text-[10px] font-medium text-emerald-600">{product.inStock ? "Available" : "Unavailable"}</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={isImpersonating || !product.inStock}
+          className={`flex w-full items-center justify-center gap-2 rounded-lg border py-2.5 text-[12px] font-semibold transition-colors ${
+            isImpersonating || !product.inStock
+              ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
+              : adding
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-blue-300 bg-white text-blue-600 hover:bg-blue-50"
+          }`}
+        >
+          {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
+          {adding ? "Added to Cart!" : product.inStock ? "Add to Cart" : "Unavailable"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ShopPage() {
@@ -1047,6 +1214,10 @@ export default function ShopPage() {
   const { user, isClientPortalUser } = useAuth();
   useI18n();
   const [search, setSearch] = useState("");
+  const [shopTab, setShopTab] = useState<ShopTab>("all");
+  const [brand, setBrand] = useState("All Brands");
+  const [sortBy, setSortBy] = useState<SortOption>("Popularity");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedClientId, setSelectedClientId] = useState<string>(
     () => (isClientPortalUser ? user?.clientId ?? "" : localStorage.getItem("nido_shop_selected_client") ?? "")
   );
@@ -1063,6 +1234,9 @@ export default function ShopPage() {
   const [catOpen, setCatOpen] = useState(false);
   const [availOpen, setAvailOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
+  const [brandOpen, setBrandOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
@@ -1101,16 +1275,33 @@ export default function ShopPage() {
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
   const allCats = ["All Categories", ...Array.from(new Set(catalogProducts.map(p => p.category)))];
+  const allBrands = ["All Brands", ...Array.from(new Set(catalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
+
+  const closeFilterMenus = () => {
+    setCatOpen(false);
+    setAvailOpen(false);
+    setClientOpen(false);
+    setBrandOpen(false);
+    setSortOpen(false);
+    setMoreFiltersOpen(false);
+  };
 
   const filtered = catalogProducts
     .filter(p => {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
+      if (shopTab !== "all" && getShopProductKind(p) !== shopTab) return false;
       if (category !== "All Categories" && p.category !== category) return false;
+      if (brand !== "All Brands" && p.brand !== brand) return false;
       if (availability === "In Stock" && !p.inStock) return false;
       if (availability === "Out of Stock" && p.inStock) return false;
       return true;
     })
-    .sort((a, b) => prefOrder(a.preference) - prefOrder(b.preference));
+    .sort((a, b) => {
+      if (sortBy === "Name") return a.name.localeCompare(b.name);
+      if (sortBy === "Price: Low to High") return a.priceNum - b.priceNum;
+      if (sortBy === "Price: High to Low") return b.priceNum - a.priceNum;
+      return prefOrder(a.preference) - prefOrder(b.preference);
+    });
 
   const totalProducts = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));
@@ -1120,10 +1311,17 @@ export default function ShopPage() {
     setSelectedClientId(id);
     localStorage.setItem("nido_shop_selected_client", id);
     setCategory("All Categories");
+    setBrand("All Brands");
+    setShopTab("all");
     setAvailability("All");
     setSearch("");
     setCurrentPage(1);
-    setClientOpen(false);
+    closeFilterMenus();
+  };
+
+  const handleShopTabChange = (tab: ShopTab) => {
+    setShopTab(tab);
+    setCurrentPage(1);
   };
 
   const pageNums = () => {
@@ -1140,27 +1338,27 @@ export default function ShopPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white px-2 py-2">
+    <div className="min-h-screen bg-[#fbfcfe] px-3 py-3 md:px-5">
       <FloatingCartButton />
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-5 gap-2">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Shop</h1>
+          <p className="mt-1 text-xs text-gray-500 md:text-sm">
             {selectedClient
-              ? `Showing catalog for ${selectedClient.name}`
-              : "Select a client to view their catalog"}
+              ? `Browse and order physical products, digital licenses, subscriptions, cloud services and more for ${selectedClient.name}.`
+              : "Browse and order physical products, digital licenses, subscriptions, cloud services and more."}
           </p>
         </div>
-        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2 py-2 w-72 bg-white shadow-sm">
+        <div className="flex w-full max-w-xs items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
           <Search size={15} className="text-gray-400 shrink-0" />
           <input
             type="text"
             placeholder="Search products by name or category..."
             value={search}
             onChange={e => { setSearch(e.target.value); resetPage(); }}
-            className="text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none w-full"
+            className="w-full bg-transparent text-xs text-gray-700 outline-none placeholder:text-gray-400 md:text-sm"
           />
           {search && (
             <button onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
@@ -1170,8 +1368,35 @@ export default function ShopPage() {
         </div>
       </div>
 
+      {/* Product type tabs */}
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+        {SHOP_TABS.map(tab => {
+          const Icon = tab.icon;
+          const active = shopTab === tab.id;
+          const count = tab.id === "all"
+            ? catalogProducts.length
+            : catalogProducts.filter(product => getShopProductKind(product) === tab.id).length;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleShopTabChange(tab.id)}
+              className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold transition-colors md:text-xs ${
+                active
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50/50"
+              }`}
+            >
+              <Icon size={14} className={active ? "text-blue-600" : "text-gray-400"} />
+              {tab.label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-white text-blue-600" : "bg-gray-100 text-gray-500"}`}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filters row */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
+      <div className="mb-5 flex items-center gap-2.5 flex-wrap">
 
         {/* ── Client dropdown — hidden in the client portal, where the
             catalog is always scoped to the logged-in client's own account ── */}
@@ -1206,7 +1431,7 @@ export default function ShopPage() {
         {selectedClientId && (
           <div className="relative">
             <button
-              onClick={() => { setCatOpen(o => !o); setAvailOpen(false); setClientOpen(false); }}
+              onClick={() => { setCatOpen(o => !o); setAvailOpen(false); setClientOpen(false); setBrandOpen(false); setSortOpen(false); setMoreFiltersOpen(false); }}
               className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors ${catOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
             >
               {category}
@@ -1225,11 +1450,39 @@ export default function ShopPage() {
           </div>
         )}
 
+        {/* Brand dropdown */}
+        {selectedClientId && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setBrandOpen(o => !o); setCatOpen(false); setAvailOpen(false); setClientOpen(false); setSortOpen(false); setMoreFiltersOpen(false); }}
+              className={`flex min-w-[112px] items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${brandOpen ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+            >
+              <span className="truncate">{brand}</span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform ${brandOpen ? "rotate-180" : ""}`} />
+            </button>
+            {brandOpen && (
+              <div className="absolute left-0 top-full z-30 mt-1 max-h-64 min-w-[180px] overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {allBrands.map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => { setBrand(option); setBrandOpen(false); resetPage(); }}
+                    className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50 ${brand === option ? "bg-blue-50 font-medium text-blue-600" : "text-gray-700"}`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Availability dropdown — only when client selected */}
         {selectedClientId && (
           <div className="relative">
             <button
-              onClick={() => { setAvailOpen(o => !o); setCatOpen(false); setClientOpen(false); }}
+              onClick={() => { setAvailOpen(o => !o); setCatOpen(false); setClientOpen(false); setBrandOpen(false); setSortOpen(false); setMoreFiltersOpen(false); }}
               className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors ${availOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
             >
               Availability: {availability}
@@ -1250,11 +1503,88 @@ export default function ShopPage() {
 
         {/* More Filters */}
         {selectedClientId && (
-          <button className="flex items-center gap-2 text-sm border border-gray-200 rounded-lg px-2 py-2 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-            <Filter size={14} />
-            More Filters
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setMoreFiltersOpen(o => !o); setCatOpen(false); setAvailOpen(false); setClientOpen(false); setBrandOpen(false); setSortOpen(false); }}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${moreFiltersOpen ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+            >
+              <Filter size={14} />
+              More Filters
+            </button>
+            {moreFiltersOpen && (
+              <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Quick filters</p>
+                <button
+                  type="button"
+                  onClick={() => { setAvailability(availability === "In Stock" ? "All" : "In Stock"); setMoreFiltersOpen(false); resetPage(); }}
+                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  In-stock products
+                  <span className={`h-4 w-4 rounded border ${availability === "In Stock" ? "border-blue-600 bg-blue-600" : "border-gray-300"}`}>
+                    {availability === "In Stock" && <Check size={12} className="text-white" />}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAvailability(availability === "Out of Stock" ? "All" : "Out of Stock"); setMoreFiltersOpen(false); resetPage(); }}
+                  className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  Out-of-stock products
+                  <span className={`h-4 w-4 rounded border ${availability === "Out of Stock" ? "border-blue-600 bg-blue-600" : "border-gray-300"}`}>
+                    {availability === "Out of Stock" && <Check size={12} className="text-white" />}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
         )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => { setSortOpen(o => !o); setCatOpen(false); setAvailOpen(false); setClientOpen(false); setBrandOpen(false); setMoreFiltersOpen(false); }}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${sortOpen ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+            >
+              <ArrowDownAZ size={14} />
+              <span>Sort By: <span className="font-semibold">{sortBy}</span></span>
+              <ChevronDown size={14} className={`transition-transform ${sortOpen ? "rotate-180" : ""}`} />
+            </button>
+            {sortOpen && (
+              <div className="absolute right-0 top-full z-30 mt-1 min-w-[190px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                {(["Popularity", "Price: Low to High", "Price: High to Low", "Name"] as SortOption[]).map(option => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => { setSortBy(option); setSortOpen(false); resetPage(); }}
+                    className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50 ${sortBy === option ? "bg-blue-50 font-medium text-blue-600" : "text-gray-700"}`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center rounded-lg border border-gray-200 bg-white p-0.5">
+            <button
+              type="button"
+              aria-label="Grid view"
+              onClick={() => setViewMode("grid")}
+              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === "grid" ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              type="button"
+              aria-label="List view"
+              onClick={() => setViewMode("list")}
+              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === "list" ? "bg-blue-50 text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+            >
+              <List size={15} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -1282,15 +1612,16 @@ export default function ShopPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {paginated.map(product => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onPreview={p => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } })}
-                clientId={selectedClientId}
-              />
-            ))}
+          <div className={viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" : "grid grid-cols-1 gap-3"}>
+            {paginated.map(product => {
+              const preview = (p: Product) => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } });
+              const kind = getShopProductKind(product);
+              return kind === "physical" || kind === "hybrid" ? (
+                <ProductCard key={product.id} product={product} onPreview={preview} clientId={selectedClientId} />
+              ) : (
+                <DigitalProductCard key={product.id} product={product} onPreview={preview} clientId={selectedClientId} />
+              );
+            })}
           </div>
 
           {/* Pagination */}
@@ -1334,8 +1665,8 @@ export default function ShopPage() {
       )}
 
       {/* Close dropdowns on outside click */}
-      {(catOpen || availOpen || clientOpen) && (
-        <div className="fixed inset-0 z-20" onClick={() => { setCatOpen(false); setAvailOpen(false); setClientOpen(false); }} />
+      {(catOpen || availOpen || clientOpen || brandOpen || sortOpen || moreFiltersOpen) && (
+        <div className="fixed inset-0 z-20" onClick={closeFilterMenus} />
       )}
     </div>
   );
