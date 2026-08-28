@@ -693,13 +693,6 @@ export default function VendorProductsPage() {
                        </td>
                        <td className="px-3 py-4 align-middle whitespace-nowrap">
                          <div className="flex items-center gap-2">
-                           <button
-                             onClick={() => setEditProduct(product)}
-                             aria-label={`Edit ${product.productName}`}
-                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                           >
-                             <Pencil className="w-4 h-4" />
-                           </button>
                            <div className="relative inline-block">
                              <button
                                onMouseDown={(e) => { e.stopPropagation(); }}
