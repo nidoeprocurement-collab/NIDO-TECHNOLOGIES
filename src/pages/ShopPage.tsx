@@ -691,6 +691,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         clientId,
         category: product.category,
         productCode: product.productCode,
+        fulfillmentType: product.fulfillmentType,
         leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
@@ -706,12 +707,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   };
 
   const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canVendorFulfillMoq(selectedVendor);
-
-  // Parse specs into key/value pairs
-  const specPairs = product.specs.map(s => {
-    const idx = s.indexOf(': ');
-    return idx > -1 ? { key: s.slice(0, idx), val: s.slice(idx + 2) } : { key: '', val: s };
-  });
 
   // Filtered vendors by search
   const filteredVendors = vendorSearch
@@ -766,7 +761,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Product image */}
-      <div className="flex items-center justify-center px-3 py-2 h-[150px]">
+      <div className="flex items-center justify-center px-3 py-2 h-[118px]">
         {product.image ? (
           <img
             src={product.image}
@@ -783,13 +778,13 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Name + Category */}
-      <div className="text-center px-3 pb-3 border-b border-gray-100">
+      <div className="text-center px-3 pb-2 border-b border-gray-100">
         <h3 className="text-[13px] font-bold text-gray-900 leading-snug line-clamp-2">{product.name}</h3>
         <span className={`block mt-0.5 text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
       </div>
 
       {/* Vendor selector */}
-      <div ref={vendorSelectionRef} className="relative px-3 pt-2.5" onClick={e => e.stopPropagation()}>
+      <div ref={vendorSelectionRef} className="relative px-3 pt-2" onClick={e => e.stopPropagation()}>
         <p className="text-[10px] text-gray-500 mb-1">Vendor</p>
         <button
           type="button"
@@ -924,39 +919,19 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         )}
       </div>
 
-      {/* Key Specifications */}
-      <div className="px-3 pt-3 pb-2 border-t border-gray-100 mt-2.5">
-        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1.5">Key Specifications</p>
-        {specPairs.length > 0 ? (
-          <ul className="space-y-[3px]">
-            {specPairs.slice(0, 5).map((sp, i) => (
-              <li key={i} className="flex items-start gap-1.5 text-[10px] leading-snug">
-                <span className="text-gray-400 shrink-0 mt-[2px]">•</span>
-                {sp.key ? (
-                  <>
-                    <span className="font-semibold text-gray-700 shrink-0">{sp.key}</span>
-                    <span className="text-gray-500 min-w-0 truncate">{sp.val}</span>
-                  </>
-                ) : (
-                  <span className="text-gray-600 min-w-0">{sp.val}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-[9px] text-gray-400">Specifications unavailable</p>
-        )}
-      </div>
-
-      {product.productNotes && (
-        <div className="mx-3 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-amber-700 mb-0.5">Product Notes</p>
-          <p className="text-[10px] leading-snug text-amber-900 whitespace-pre-line line-clamp-3">{product.productNotes}</p>
-        </div>
-      )}
+      {/* Details stay on the product page so cards remain compact. */}
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); onPreview(product); }}
+        className="mx-3 mt-2 flex items-center justify-between rounded-md px-1 py-1 text-left text-[10px] font-semibold text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+        aria-label={`View key specifications for ${product.name}`}
+      >
+        <span>View key specifications</span>
+        <ChevronRight size={12} />
+      </button>
 
       {/* Info grid */}
-      <div className="px-3 pt-2 border-t border-gray-100 space-y-2" onClick={e => e.stopPropagation()}>
+      <div className="px-3 pt-2 border-t border-gray-100 space-y-1.5" onClick={e => e.stopPropagation()}>
         {/* Row 1: MOQ + (Lead Time when vendor selected) + Stock Available */}
         <div className={`grid gap-3 ${selectedVendor ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <div>
@@ -1095,16 +1070,6 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, Math.max(1, product.moq)) : 0;
   const basePriceExcl = product.priceNum * 100 / (100 + gstRate);
   const displayPrice = discountPct > 0 ? basePriceExcl * (1 - discountPct / 100) : basePriceExcl;
-  const specPairs = product.specs
-    .map(spec => {
-      const splitAt = spec.indexOf(": ");
-      return splitAt > -1
-        ? { label: spec.slice(0, splitAt), value: spec.slice(splitAt + 2) }
-        : { label: "", value: spec };
-    })
-    .filter(spec => spec.value)
-    .slice(0, 4);
-
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (isImpersonating || !product.inStock || adding) return;
@@ -1146,7 +1111,7 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
         </button>
       </div>
 
-      <div className="flex h-[132px] items-center justify-center px-5 py-3">
+      <div className="flex h-[110px] items-center justify-center px-5 py-2">
         {product.image ? (
           <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
         ) : (
@@ -1154,29 +1119,22 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
         )}
       </div>
 
-      <div className="border-b border-gray-100 px-3 pb-3 text-center">
+      <div className="border-b border-gray-100 px-3 pb-2 text-center">
         <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-gray-900">{product.name}</h3>
         <span className={`mt-0.5 block text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
       </div>
 
-      <div className="flex-1 px-3 pt-3">
-        <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-gray-500">Key Details</p>
-        <div className="space-y-1.5">
-          {specPairs.length > 0 ? specPairs.map((spec, index) => (
-            <div key={index} className="flex items-start justify-between gap-3 text-[10px] leading-snug">
-              <span className="text-gray-500">{spec.label || "Details"}</span>
-              <span className="text-right font-semibold text-gray-700">{spec.value}</span>
-            </div>
-          )) : (
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-gray-500">Availability</span>
-              <span className="font-semibold text-emerald-600">Unlimited</span>
-            </div>
-          )}
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={event => { event.stopPropagation(); onPreview(product); }}
+        className="mx-3 mt-2 flex items-center justify-between rounded-md px-1 py-1 text-left text-[10px] font-semibold text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-700"
+        aria-label={`View key specifications for ${product.name}`}
+      >
+        <span>View key specifications</span>
+        <ChevronRight size={12} />
+      </button>
 
-      <div className="px-3 pb-3 pt-4">
+      <div className="px-3 pb-3 pt-2.5">
         <div className="mb-3 flex items-end justify-between gap-2">
           <div>
             <p className="text-[10px] text-gray-500">Starting price</p>
