@@ -91,6 +91,59 @@ function StockBadge({ status, count }: { status: StockStatus; count: number }) {
   );
 }
 
+function productType(product: VendorProduct): string {
+  return product.physicalType?.trim() || "Physical Product";
+}
+
+function isDigitalType(type: string): boolean {
+  const normalized = type.toLowerCase();
+  return normalized.includes("digital")
+    || normalized.includes("subscription")
+    || normalized.includes("saas")
+    || normalized.includes("cloud")
+    || normalized.includes("service");
+}
+
+function isHybridType(type: string): boolean {
+  return type.toLowerCase().includes("hybrid");
+}
+
+function typeBadgeClasses(type: string): string {
+  const normalized = type.toLowerCase();
+  if (normalized.includes("digital")) return "bg-violet-50 text-violet-700";
+  if (normalized.includes("subscription") || normalized.includes("saas")) return "bg-blue-50 text-blue-700";
+  if (normalized.includes("cloud") || normalized.includes("service")) return "bg-sky-50 text-sky-700";
+  if (normalized.includes("hybrid")) return "bg-amber-50 text-amber-700";
+  return "bg-emerald-50 text-emerald-700";
+}
+
+function pricingModel(type: string): string {
+  const normalized = type.toLowerCase();
+  if (normalized.includes("cloud")) return "Pay-As-You-Go (Consumption)";
+  if (normalized.includes("subscription") || normalized.includes("saas")) return "Per Account / Year";
+  if (normalized.includes("digital")) return "Per User / Year";
+  if (normalized.includes("hybrid")) return "Per Unit + Subscription";
+  return "Per Unit";
+}
+
+function quantityLabel(type: string): string {
+  const normalized = type.toLowerCase();
+  if (normalized.includes("cloud")) return "Min. Commitment";
+  if (normalized.includes("subscription") || normalized.includes("saas")) return "Account";
+  if (normalized.includes("digital")) return "User";
+  return "Units";
+}
+
+function formatLeadTime(product: VendorProduct, type: string): { primary: string; secondary?: string } {
+  if (isDigitalType(type) && !isHybridType(type)) {
+    return { primary: product.leadTime ? `${product.leadTime} Hours` : "Instant", secondary: "Provisioning" };
+  }
+  return {
+    primary: product.leadTime ? `${product.leadTime} Days` : "—",
+    secondary: isHybridType(type) ? "Instant" : undefined,
+  };
+}
+
 const MENU_ITEMS = [
   { icon: <Plus className="w-4 h-4" />, label: "Add Product" },
   { icon: <Tag className="w-4 h-4" />, label: "Bulk Price Update" },
@@ -499,7 +552,7 @@ export default function VendorProductsPage() {
           onConfirm={() => handleConfirmRemove(removeProduct.id)}
         />
       )}
-      <div className="max-w-[1200px]px-2 py-2 space-y-4">
+      <div className="max-w-[1200px] mx-auto px-4 py-4 space-y-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {STATS.map((stat) => (
@@ -554,121 +607,134 @@ export default function VendorProductsPage() {
               </button>
             </div>
           ) : (
-          <div className="overflow-x-visible">
-            <table className="w-full text-sm">
+           <div className="overflow-x-auto">
+             <table className="w-full min-w-[1080px] text-sm">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">VPC</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">MPI</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">Product Name</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">Category</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Purchase Price</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">MOQ</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">Lead Time</th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">
-                    <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Stock <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
-                  </th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide whitespace-nowrap">
-                    <span className="flex items-center gap-1 cursor-pointer hover:text-gray-900">Added On <span className="flex flex-col"><ChevronUp className="w-3 h-3 -mb-1" /><ChevronDown className="w-3 h-3" /></span></span>
-                  </th>
-                  <th className="text-left px-2 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">Actions</th>
+                 <tr className="border-b border-gray-200 bg-gray-50">
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">VPC / MPI</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Pricing Model</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Lead Time / SLA</th>
+                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
-                {vendorProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
-                  const initials = product.productName.slice(0, 2).toUpperCase();
-                  return (
-                    <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="text-gray-600 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{product.vendorProductCode || "—"}</span>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <span className="text-gray-600 text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">{product.masterProductCode}</span>
-                      </td>
-                      <td className="px-4 py-3.5 max-w-[220px]">
-                        <div className="flex items-center gap-2.5">
-                          {product.images && product.images.length > 0 ? (
-                            <img src={product.images[0]} alt={product.productName} className="w-8 h-8 rounded-md object-cover border border-gray-200 flex-shrink-0" />
-                          ) : (
-                            <div className="w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0 border border-blue-200">{initials}</div>
-                          )}
-                          <div>
-                            <div className="font-medium text-gray-800 text-sm leading-tight">{product.productName}</div>
-                            <div className="text-xs text-gray-400 mt-0.5 font-mono">{product.skuCode || "—"}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.category || "—"}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <div className="font-semibold text-gray-800 text-sm">
-                          {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">{product.moq || "—"}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-600 text-sm">
-                        {product.leadTime ? `${product.leadTime} day${product.leadTime !== "1" ? "s" : ""}` : "—"}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        {(() => {
-                          const current = parseInt(product.stock || "0") || 0;
-                          const reserved = parseInt(product.reservedStock || "0") || 0;
-                          const available = Math.max(0, current - reserved);
-                          const status: StockStatus = available > 10 ? "In Stock" : available > 0 ? "Low Stock" : "Out of Stock";
-                          return (
-                            <div className="flex flex-col gap-0.5">
-                              <StockBadge status={status} count={available} />
-                              <div className="text-[10px] text-gray-400 space-y-0.5 mt-1">
-                                <div className="flex justify-between gap-3">
-                                  <span>Current</span><span className="font-medium text-gray-600">{current}</span>
-                                </div>
-                                <div className="flex justify-between gap-3">
-                                  <span>Reserved</span><span className="font-medium text-amber-600">{reserved}</span>
-                                </div>
-                                {(parseInt(product.incomingStock || "0") || 0) > 0 && (
-                                  <div className="flex justify-between gap-3">
-                                    <span>Incoming</span><span className="font-medium text-blue-600">{product.incomingStock}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-gray-500 text-sm">{product.addedAt}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <div className="relative inline-block">
-                          <button
-                            onMouseDown={(e) => { e.stopPropagation(); }}
-                            onClick={(e) => { e.stopPropagation(); setOpenRowMenu(openRowMenu === product.id ? null : product.id); }}
-                            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                          {openRowMenu === product.id && (
-                            <div
-                              className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                                onClick={() => { setOpenRowMenu(null); setEditProduct(product); }}
-                              >
-                                <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
-                              </button>
-                              <button
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                onClick={() => { setOpenRowMenu(null); setRemoveProduct(product); }}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-400" /> Remove Product
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
+               <tbody className="divide-y divide-gray-100">
+                 {vendorProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
+                   const initials = product.productName.slice(0, 2).toUpperCase();
+                   const type = productType(product);
+                   const digital = isDigitalType(type) && !isHybridType(type);
+                   const hybrid = isHybridType(type);
+                   const current = parseInt(product.stock || "0") || 0;
+                   const reserved = parseInt(product.reservedStock || "0") || 0;
+                   const available = Math.max(0, current - reserved);
+                   const availabilityStatus: StockStatus = available > 10 ? "In Stock" : available > 0 ? "Low Stock" : "Out of Stock";
+                   const leadTime = formatLeadTime(product, type);
+                   return (
+                     <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
+                       <td className="px-3 py-4 min-w-[220px]">
+                         <div className="flex items-center gap-3">
+                           {product.images && product.images.length > 0 ? (
+                             <img src={product.images[0]} alt={product.productName} className="w-10 h-10 rounded-md object-cover border border-gray-200 flex-shrink-0" />
+                           ) : (
+                             <div className="w-10 h-10 bg-blue-100 rounded-md flex items-center justify-center text-blue-700 text-xs font-bold flex-shrink-0 border border-blue-200">{initials}</div>
+                           )}
+                           <div className="min-w-0">
+                             <div className="font-semibold text-gray-800 text-sm leading-snug">{product.productName}</div>
+                             <div className="text-xs text-gray-500 mt-1">{product.category || "—"}</div>
+                           </div>
+                         </div>
+                       </td>
+                       <td className="px-3 py-4 align-middle">
+                         <span className={`inline-flex max-w-[112px] rounded-md px-2 py-2 text-xs font-semibold leading-snug ${typeBadgeClasses(type)}`}>{type}</span>
+                       </td>
+                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                         <div className="space-y-1">
+                           <div className="font-mono text-xs text-gray-700">{product.vendorProductCode || "—"}</div>
+                           <div className="font-mono text-xs text-gray-500">{product.masterProductCode || "—"}</div>
+                         </div>
+                       </td>
+                       <td className="px-3 py-4 align-middle max-w-[170px] text-xs text-gray-700">{pricingModel(type)}</td>
+                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                         <div className="font-semibold text-gray-800 text-sm">
+                           {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
+                         </div>
+                       </td>
+                       <td className="px-3 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
+                         {product.moq || "—"} <span className="text-xs text-gray-500">{quantityLabel(type)}</span>
+                       </td>
+                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                         {digital ? (
+                           <div className="space-y-1">
+                             <div className="font-semibold text-sm text-gray-800">Unlimited</div>
+                             <div className="text-xs font-medium text-emerald-600">Instant</div>
+                           </div>
+                         ) : (
+                           <div className="space-y-1">
+                             <div className="font-semibold text-sm text-gray-800">{available} Units</div>
+                             <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
+                               availabilityStatus === "In Stock" ? "bg-emerald-50 text-emerald-700" :
+                               availabilityStatus === "Low Stock" ? "bg-amber-50 text-amber-700" :
+                               "bg-red-50 text-red-600"
+                             }`}>
+                               {availabilityStatus}
+                             </span>
+                           </div>
+                         )}
+                       </td>
+                       <td className="px-3 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
+                         <div className="space-y-1">
+                           <div>{leadTime.primary}{hybrid ? " *" : ""}</div>
+                           {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
+                         </div>
+                       </td>
+                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                         <div className="flex items-center gap-2">
+                           <button
+                             onClick={() => setEditProduct(product)}
+                             aria-label={`Edit ${product.productName}`}
+                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                           >
+                             <Pencil className="w-4 h-4" />
+                           </button>
+                           <div className="relative inline-block">
+                             <button
+                               onMouseDown={(e) => { e.stopPropagation(); }}
+                               onClick={(e) => { e.stopPropagation(); setOpenRowMenu(openRowMenu === product.id ? null : product.id); }}
+                               aria-label={`More actions for ${product.productName}`}
+                               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+                             >
+                               <MoreVertical className="w-4 h-4" />
+                             </button>
+                             {openRowMenu === product.id && (
+                               <div
+                                 className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
+                                 onMouseDown={(e) => e.stopPropagation()}
+                               >
+                                 <button
+                                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                                   onClick={() => { setOpenRowMenu(null); setEditProduct(product); }}
+                                 >
+                                   <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
+                                 </button>
+                                 <button
+                                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                                   onClick={() => { setOpenRowMenu(null); setRemoveProduct(product); }}
+                                 >
+                                   <Trash2 className="w-4 h-4 text-red-400" /> Remove Product
+                                 </button>
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                       </td>
+                     </tr>
+                   );
+                 })}
+               </tbody>
             </table>
           </div>
           )}
