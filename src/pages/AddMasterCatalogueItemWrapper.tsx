@@ -38,7 +38,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const [skuCode, setSkuCode] = useState(draft?.skuCode ?? '');
   const [productName, setProductName] = useState(draft?.productName ?? '');
   const [productType, setProductType] = useState(draft?.productType ?? 'Product');
-  const [physicalType, setPhysicalType] = useState(draft?.physicalType ?? 'Physical');
+  const [physicalType, setPhysicalType] = useState(draft?.physicalType ?? 'Physical Product');
   const [category, setCategory] = useState(draft?.category ?? '');
   const [subcategory, setSubcategory] = useState(draft?.subcategory ?? '');
   const [brand, setBrand] = useState(draft?.brand ?? '');
@@ -62,7 +62,7 @@ export default function AddMasterCatalogueItemWrapper() {
     setSkuCode(product.skuCode || '');
     setProductName(product.productName || '');
     setProductType(product.productType || 'Product');
-    setPhysicalType(product.physicalType || 'Physical');
+    setPhysicalType(product.physicalType || 'Physical Product');
     setCategory(product.category || '');
     setSubcategory(product.subcategory || '');
     setBrand(product.brand || '');
@@ -86,7 +86,13 @@ export default function AddMasterCatalogueItemWrapper() {
   const [newOptionValue, setNewOptionValue] = useState('');
 
   const [productTypesList, setProductTypesList] = useState(['Product', 'Service', 'Bundle']);
-  const [physicalTypesList, setPhysicalTypesList] = useState(['Physical', 'Digital', 'Service']);
+  const [physicalTypesList, setPhysicalTypesList] = useState([
+    'Physical Product',
+    'Digital Licence',
+    'Subscriptions',
+    'Hybrid Product',
+    'Cloud Service',
+  ]);
   const [categoriesList, setCategoriesList] = useState<string[]>(CATEGORY_LIST);
   const [subcategoriesList, setSubcategoriesList] = useState<string[]>(
     category ? (CATEGORY_SUBCATEGORIES[category] ?? []) : []
