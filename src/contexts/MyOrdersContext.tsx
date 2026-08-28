@@ -27,6 +27,7 @@ export interface OrderCartItem {
   moq: number;
   clientId: string;
   productCode?: string;
+  fulfillmentType?: "physical" | "digital";
   /** Vendor allocation snapshot — used to restore stock if the order is cancelled. */
   vendorAllocations?: StockAllocation[];
   // ── Vendor snapshot — locked at add-to-cart time ──────────────────────────

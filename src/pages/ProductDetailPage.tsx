@@ -274,6 +274,7 @@ export default function ProductDetailPage() {
         clientId,
         category: product.category,
         productCode: product.productCode,
+        fulfillmentType: product.fulfillmentType,
         leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,

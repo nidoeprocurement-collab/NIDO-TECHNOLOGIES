@@ -620,6 +620,8 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [vendorSearch, setVendorSearch] = useState("");
   const [liked, setLiked] = useState(false);
   const vendorSelectionRef = useRef<HTMLDivElement>(null);
+  const isDigital = isDigitalProduct(product);
+  const canUseVendor = (vendor: VendorComparisonRow) => isDigital || canVendorFulfillMoq(vendor);
 
   useEffect(() => {
     const refreshVendors = () => {
@@ -635,7 +637,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     setSelectedVendor(current => {
       if (!current) return current;
       const refreshed = vendorComps.find(comp => comp.vendorId === current.vendorId);
-      return refreshed && canVendorFulfillMoq(refreshed) ? refreshed : null;
+      return refreshed && canUseVendor(refreshed) ? refreshed : null;
     });
   }, [vendorComps]);
 
@@ -651,7 +653,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   }, []);
 
   const maxQty = selectedVendor
-    ? (selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
+    ? (isDigital ? undefined : selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
     : undefined;
 
   const recommendedVendor = getRecommendedVendor(vendorComps);
@@ -677,7 +679,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isImpersonating) return;
-    if (!product.inStock || adding || !selectedVendor) return;
+    if (!product.inStock || adding || !selectedVendor || !canUseVendor(selectedVendor)) return;
     setAdding(true);
     addItem(
       {
@@ -706,7 +708,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     setTimeout(() => setAdding(false), 1500);
   };
 
-  const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canVendorFulfillMoq(selectedVendor);
+  const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor);
 
   // Filtered vendors by search
   const filteredVendors = vendorSearch
@@ -719,9 +721,9 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     ? `${selectedVendor.leadTime * 2}-${selectedVendor.leadTime * 2 + 1} Days`
     : '--';
   const displayStock = selectedVendor
-    ? (selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString('en-IN')} Units` : 'Out of Stock')
+    ? (isDigital ? 'Digital delivery' : selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString('en-IN')} Units` : 'Out of Stock')
     : '--';
-  const displayPrice = selectedVendor && canVendorFulfillMoq(selectedVendor)
+  const displayPrice = selectedVendor && canUseVendor(selectedVendor)
     ? (clientId && selectedVendorSellingPrice
         ? formatCurrency(selectedVendorSellingPrice)
         : formatCurrency(selectedVendor.basePrice))
@@ -1573,11 +1575,8 @@ export default function ShopPage() {
           <div className={viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" : "grid grid-cols-1 gap-3"}>
             {paginated.map(product => {
               const preview = (p: Product) => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } });
-              const kind = getShopProductKind(product);
-              return kind === "physical" || kind === "hybrid" ? (
+              return (
                 <ProductCard key={product.id} product={product} onPreview={preview} clientId={selectedClientId} />
-              ) : (
-                <DigitalProductCard key={product.id} product={product} onPreview={preview} clientId={selectedClientId} />
               );
             })}
           </div>
