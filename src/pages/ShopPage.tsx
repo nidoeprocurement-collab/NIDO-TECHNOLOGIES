@@ -133,6 +133,11 @@ function getShopProductKind(product: Pick<Product, "productType" | "physicalType
   return "physical";
 }
 
+function isDigitalProduct(product: Pick<Product, "productType" | "physicalType" | "category" | "name">): boolean {
+  const kind = getShopProductKind(product);
+  return kind === "digital" || kind === "subscription" || kind === "cloud";
+}
+
 function getShopProductLabel(kind: Exclude<ShopTab, "all">): string {
   const labels: Record<Exclude<ShopTab, "all">, string> = {
     physical: "Physical Product",
