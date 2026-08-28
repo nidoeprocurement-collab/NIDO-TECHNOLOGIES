@@ -89,7 +89,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const [physicalTypesList, setPhysicalTypesList] = useState([
     'Physical Product',
     'Digital Licence',
-    'Subscriptions',
+    'Subscription',
     'Hybrid Product',
     'Cloud Service',
   ]);
