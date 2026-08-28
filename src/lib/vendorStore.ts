@@ -11,6 +11,8 @@ export interface VendorProduct {
   productName: string;
   category: string;
   brand: string;
+  /** Snapshot of the master catalog fulfillment type at assignment time. */
+  physicalType?: string;
   images: string[];
   price: string;
   moq: string;

@@ -113,6 +113,7 @@ export function saveCatalogProduct(product: CatalogProduct): void {
           productName:       product.productName,
           category:          product.category,
           brand:             product.brand,
+           physicalType:      product.physicalType,
           images:            product.images,
         };
       });
