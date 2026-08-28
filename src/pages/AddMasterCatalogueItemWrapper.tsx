@@ -17,7 +17,6 @@ import {
   generateMasterProductCode, saveCatalogProduct, getCatalogProducts,
   type CatalogSpec, type GeneralSpec
 } from '@/lib/catalogStore';
-import { getFulfillmentType } from '@/lib/productType';
 
 export default function AddMasterCatalogueItemWrapper() {
   const navigate = useNavigate();
@@ -220,7 +219,6 @@ export default function AddMasterCatalogueItemWrapper() {
     productName: productName || 'Untitled Product',
     productType,
     physicalType,
-    fulfillmentType: getFulfillmentType({ productType, physicalType }),
     category,
     subcategory,
     brand,
@@ -244,7 +242,7 @@ export default function AddMasterCatalogueItemWrapper() {
       masterProductCode: currentMasterProductCode,
       skuCode,
       productName: productName || 'Untitled Product',
-      productType, physicalType, fulfillmentType: getFulfillmentType({ productType, physicalType }), category, subcategory, brand, tags,
+      productType, physicalType, category, subcategory, brand, tags,
       description, specifications, generalSpecs, productNotes, videoUrl, images,
       createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
     };

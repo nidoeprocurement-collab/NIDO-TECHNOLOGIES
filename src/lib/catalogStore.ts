@@ -1,5 +1,4 @@
 import { getPrefix } from './configService';
-import type { FulfillmentType } from './productType';
 
 export interface CatalogSpec {
   id: string;
@@ -21,8 +20,6 @@ export interface CatalogProduct {
   productName: string;
   productType: string;
   physicalType: string;
-  /** Normalized fulfillment classification shared by downstream catalogue flows. */
-  fulfillmentType?: FulfillmentType;
   category: string;
   subcategory: string;
   brand: string;
@@ -152,7 +149,6 @@ export function saveCatalogProduct(product: CatalogProduct): void {
           tags:         product.tags ?? [],
           productType:  product.productType,
           physicalType: product.physicalType,
-           fulfillmentType: product.fulfillmentType,
           img:          product.images?.[0] ?? (e.img as string) ?? '',
           images:       product.images ?? [],
           description:  product.description,

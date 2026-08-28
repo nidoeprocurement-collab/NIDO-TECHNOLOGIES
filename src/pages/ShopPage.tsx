@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus, Users, KeyRound, Grid2X2, List, LockKeyhole } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
@@ -25,7 +25,6 @@ import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
-import { getFulfillmentType, isDigitalProduct } from "@/lib/productType";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +40,6 @@ type Product = {
   tags?: string[];
   productType?: string;
   physicalType?: string;
-  fulfillmentType?: "physical" | "digital";
   image: string;
   images?: string[];
   specs: string[];
@@ -59,13 +57,7 @@ type Product = {
   preference?: string;
 };
 
-type ProductGroup = "physical" | "digital";
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function getProductGroup(product: Pick<Product, "productType" | "physicalType" | "fulfillmentType">): ProductGroup {
-  return getFulfillmentType(product);
-}
 
 function getCategoryColor(cat: string): string {
   const c = cat.toLowerCase();
@@ -90,33 +82,6 @@ function getProductIcon(name: string, category: string) {
   if (n.includes("storage")) return <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-300 flex items-center justify-center"><HardDrive size={40} className="text-gray-500" /></div>;
   if (n.includes("notebook") || n.includes("station") || n.includes("book")) return <div className="w-full h-full bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center"><FileText size={40} className="text-zinc-400" /></div>;
   return <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center"><Package size={40} className="text-blue-400" /></div>;
-}
-
-function getDigitalSpec(product: Product, labels: string[], fallback: string): string {
-  const wanted = labels.map(label => label.toLowerCase());
-  const general = product.generalSpecs?.find(spec =>
-    wanted.some(label => spec.label.toLowerCase().includes(label))
-  );
-  if (general?.value) return general.value;
-
-  const detail = product.specs.find(spec =>
-    wanted.some(label => spec.toLowerCase().startsWith(`${label}:`) || spec.toLowerCase().includes(label))
-  );
-  if (detail) {
-    const separator = detail.indexOf(":");
-    return separator >= 0 ? detail.slice(separator + 1).trim() : detail;
-  }
-  return fallback;
-}
-
-function getDigitalBadge(product: Product): string {
-  const values = [product.productType, product.physicalType, ...(product.tags || [])]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  if (values.includes("subscription") || values.includes("service")) return "SUBSCRIPTION";
-  if (values.includes("license")) return "DIGITAL LICENSE";
-  return "DIGITAL PRODUCT";
 }
 
 function getSpecIcon(name: string) {
@@ -182,10 +147,6 @@ function prefOrder(pref?: string): number {
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, VendorMatch>): Product {
   const match = vendorMatches.get(e.productCode);
   const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
-  const productType = master?.productType || e.productType;
-  const physicalType = master?.physicalType || e.physicalType;
-  const fulfillmentType = master?.fulfillmentType || e.fulfillmentType || getFulfillmentType({ productType, physicalType });
-  const digital = isDigitalProduct({ productType, physicalType, fulfillmentType });
   const masterSpecs = master?.specifications
     ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
     .filter(Boolean);
@@ -207,9 +168,8 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     subcategory: master?.subcategory || e.subcategory,
     brand: master?.brand || e.brand,
     tags: master?.tags || e.tags || [],
-    productType,
-    physicalType,
-    fulfillmentType,
+    productType: master?.productType || e.productType,
+    physicalType: master?.physicalType || e.physicalType,
     image: images[0] || "",
     images,
     specs: masterSpecs?.length ? masterSpecs : e.specs || [],
@@ -218,12 +178,7 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     totalStock,
     priceNum: e.priceNum ?? 0,
     // A product is in stock only when at least one vendor can fulfill its MOQ.
-    // Digital availability is controlled by catalogue eligibility, not
-    // physical stock or MOQ. The assigned active supplier may not carry
-    // physical inventory for a license or service.
-    inStock: digital
-      ? e.availability !== "Out of Stock" && match !== undefined
-      : e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
+    inStock: e.availability !== "Out of Stock" && (match === undefined || match.hasEligibleVendor),
     description: master?.description || e.description,
     generalSpecs: masterGeneralSpecs?.length ? masterGeneralSpecs : e.generalSpecs,
     productNotes: master?.productNotes || e.productNotes,
@@ -309,7 +264,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   const handleAdd = () => {
     if (isImpersonating) return;
     if (added) return;
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode, productType: product.productType, physicalType: product.physicalType, fulfillmentType: getFulfillmentType(product) }, Math.max(1, qty));
+    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
   };
@@ -684,9 +639,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         clientId,
         category: product.category,
         productCode: product.productCode,
-        productType: product.productType,
-        physicalType: product.physicalType,
-        fulfillmentType: "physical",
         leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
@@ -1088,222 +1040,12 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   );
 }
 
-// ── Digital Product Card ─────────────────────────────────────────────────────
-// Digital products use a compact license/subscription presentation. Physical
-// products continue to use ProductCard above without sharing this layout.
-function DigitalProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
-  const { addItem } = useCart();
-  const { isImpersonating } = useAuth();
-  const [adding, setAdding] = useState(false);
-  const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
-  // Digital products still retain an internal supplier snapshot, but the
-  // customer never selects or sees this supplier. Unlike physical products,
-  // the supplier does not need to satisfy a stock/MOQ check.
-  const internalSupplier = vendorComps[0] ?? null;
-  const canAdd = !isImpersonating && product.inStock;
-
-  useEffect(() => {
-    if (!product.productCode) return;
-    const refreshVendors = () => setVendorComps(computeVendorComparisons(product.productCode, product.category));
-    refreshVendors();
-    window.addEventListener("vendorProductsUpdated", refreshVendors);
-    return () => window.removeEventListener("vendorProductsUpdated", refreshVendors);
-  }, [product.productCode, product.category]);
-
-  const gstRate = getEffectiveTaxPctForCategory(product.category);
-   const price = internalSupplier && clientId
-    ? computeClientFinalPrice(
-         internalSupplier.landedCostPerUnit,
-        getClientCommonSettings(clientId),
-        resolveClientProfitPct(clientId, product.productCode, product.category),
-        product.category,
-      ).finalPrice
-     : internalSupplier?.basePrice ?? product.priceNum;
-  const priceSuffix = getDigitalSpec(product, ["billing", "term", "duration"], "").toLowerCase().includes("year")
-    ? " / year"
-    : getDigitalSpec(product, ["license", "billing", "term"], "").toLowerCase().includes("one")
-      ? " / one-time"
-      : " / year";
-  const users = getDigitalSpec(product, ["user", "seat", "license quantity"], "1 – Unlimited");
-  const subscription = getDigitalSpec(product, ["subscription", "duration", "term"], "1 Year");
-  const hsn = (() => {
-    const map = new Map<string, string>();
-    getHsnCodes().forEach(h => { if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code); });
-    getProductCategoryTaxMap().forEach(m => { if (m.defaultHsnCode && m.productCategory) map.set(m.productCategory.toLowerCase(), m.defaultHsnCode); });
-    return map.get((product.category || "").toLowerCase()) || "";
-  })();
-
-  const handleAdd = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (!canAdd || adding) return;
-    setAdding(true);
-    addItem({
-      id: Math.random() * 10000,
-      name: product.name,
-      image: product.image,
-      specs: product.specs,
-       moq: Math.max(1, product.moq),
-       totalStock: product.totalStock,
-      priceNum: product.priceNum,
-      clientId,
-      category: product.category,
-       productCode: product.productCode,
-       productType: product.productType,
-       physicalType: product.physicalType,
-       fulfillmentType: "digital",
-        leadTime: internalSupplier && internalSupplier.leadTime > 0 ? `${internalSupplier.leadTime * 2} days` : product.leadTime,
-        selectedVendorId: internalSupplier?.vendorId,
-        selectedVendorName: internalSupplier?.vendorName,
-        vendorPrice: internalSupplier?.basePrice,
-        landedCost: internalSupplier?.landedCostPerUnit,
-      gstSnapshot: gstRate,
-      hsnSnapshot: hsn,
-        vendorRating: internalSupplier?.rating,
-     }, Math.max(1, product.moq));
-    setTimeout(() => setAdding(false), 1500);
-  };
-
-  return (
-    <div
-      className="group flex min-w-0 h-full flex-col rounded-lg border border-gray-200 bg-white px-2.5 pt-2.5 pb-2 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => onPreview(product)}
-    >
-      <div className="flex items-start justify-between gap-2 min-h-[56px]">
-        <div className="flex h-12 w-14 items-center justify-center overflow-hidden">
-          {product.image ? (
-            <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
-          ) : (
-            <Package size={30} className="text-blue-400" />
-          )}
-        </div>
-        <button
-          onClick={event => { event.stopPropagation(); }}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-gray-300 hover:bg-gray-50 hover:text-red-400 transition-colors"
-          aria-label={`Save ${product.name}`}
-        >
-          <Heart size={13} />
-        </button>
-      </div>
-
-      <h3 className="mt-1 min-h-[30px] text-[11px] font-bold leading-snug text-gray-900 line-clamp-2">{product.name}</h3>
-      <p className="mt-0.5 truncate text-[9px] text-gray-500">{product.brand || product.category}</p>
-      <span className="mt-1.5 w-fit rounded bg-violet-50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-violet-600">
-        {getDigitalBadge(product)}
-      </span>
-
-      <p className="mt-2 min-h-[38px] text-[9px] leading-relaxed text-gray-500 line-clamp-3">
-        {product.description || "Digital product for your business workflow and productivity needs."}
-      </p>
-
-      <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
-        <div className="flex items-center gap-1.5 text-[9px] text-gray-500">
-          <Users size={10} className="shrink-0 text-gray-400" />
-          <span>Users: <strong className="font-medium text-gray-600">{users}</strong></span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[9px] text-gray-500">
-          <KeyRound size={10} className="shrink-0 text-gray-400" />
-          <span>Subscription: <strong className="font-medium text-gray-600">{subscription}</strong></span>
-        </div>
-        <div className={`flex items-center gap-1.5 text-[9px] font-medium ${product.inStock ? "text-emerald-600" : "text-amber-600"}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${product.inStock ? "bg-emerald-500" : "bg-amber-400"}`} />
-          {product.inStock ? "In Stock" : "Low Stock"}
-        </div>
-      </div>
-
-      <div className="mt-auto pt-2">
-        <p className="text-[12px] font-bold text-gray-900">
-          {price > 0 ? formatCurrency(price, undefined, { decimals: 0 }) : "Price on request"}
-          {price > 0 && <span className="text-[9px] font-normal text-gray-500">{priceSuffix}</span>}
-        </p>
-        <button
-          onClick={handleAdd}
-          disabled={!canAdd}
-          className={`mt-2 flex w-full items-center justify-center gap-1 rounded-md border py-1.5 text-[10px] font-semibold transition-colors ${
-            !canAdd
-              ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
-              : adding
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-blue-200 bg-white text-blue-600 hover:bg-blue-50"
-          }`}
-        >
-          {adding ? <Check size={11} /> : <ShoppingCart size={11} />}
-          {adding ? "Added to Cart" : "Add to Cart"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function DigitalCartSidebar({ cartPath }: { cartPath: string }) {
-  const navigate = useNavigate();
-  const { items, removeItem } = useCart();
-  const subtotal = items.reduce((sum, item) => sum + (item.priceNum || 0) * item.quantity, 0);
-  const gst = items.reduce((sum, item) => {
-    const rate = getEffectiveTaxPctForCategory(item.category || "");
-    return sum + ((item.priceNum || 0) * item.quantity * rate) / 100;
-  }, 0);
-
-  return (
-    <aside className="h-fit rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-        <h2 className="text-[11px] font-bold text-gray-900">Your Cart ({items.length})</h2>
-        <button onClick={() => navigate(cartPath)} className="text-[9px] font-medium text-blue-600 hover:underline">View Cart</button>
-      </div>
-      {items.length === 0 ? (
-        <div className="py-8 text-center text-[10px] text-gray-400">
-          <ShoppingCart size={24} className="mx-auto mb-2 text-gray-300" />
-          Your cart is empty
-        </div>
-      ) : (
-        <>
-          <div className="divide-y divide-gray-100">
-            {items.map(item => (
-              <div key={item.id} className="flex gap-1.5 py-2">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded bg-gray-50">
-                  {item.image ? <img src={item.image} alt="" className="max-h-full max-w-full object-contain" /> : <Package size={16} className="text-gray-400" />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-1">
-                    <p className="line-clamp-2 text-[9px] font-semibold leading-snug text-gray-800">{item.name}</p>
-                    <button onClick={() => removeItem(item.id)} className="shrink-0 text-gray-300 hover:text-red-500" aria-label={`Remove ${item.name}`}>
-                      <X size={10} />
-                    </button>
-                  </div>
-                  <div className="mt-0.5 flex items-center justify-between gap-1 text-[8px] text-gray-400">
-                    <span>{item.quantity} {item.quantity === 1 ? "User" : "Users"}</span>
-                    <strong className="text-[9px] text-gray-700">{formatCurrency((item.priceNum || 0) * item.quantity, undefined, { decimals: 0 })}</strong>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-1 border-t border-gray-100 pt-2 text-[9px]">
-            <div className="flex justify-between text-gray-500"><span>Subtotal ({items.length} items)</span><strong className="text-gray-700">{formatCurrency(subtotal, undefined, { decimals: 0 })}</strong></div>
-            <div className="flex justify-between text-gray-500"><span>GST</span><strong className="text-gray-700">{formatCurrency(gst, undefined, { decimals: 0 })}</strong></div>
-            <div className="flex justify-between border-t border-gray-100 pt-2 text-[11px] font-bold text-gray-900"><span>Total</span><strong className="text-blue-600">{formatCurrency(subtotal + gst, undefined, { decimals: 0 })}</strong></div>
-          </div>
-          <button onClick={() => navigate(cartPath)} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md bg-blue-600 py-2 text-[10px] font-semibold text-white hover:bg-blue-700">
-            <LockKeyhole size={10} /> Proceed to Checkout
-          </button>
-        </>
-      )}
-    </aside>
-  );
-}
-
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ShopPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, isClientPortalUser } = useAuth();
   useI18n();
-  const activeProductGroup: ProductGroup | null = location.pathname.endsWith("/physical")
-    ? "physical"
-    : location.pathname.endsWith("/digital")
-      ? "digital"
-      : null;
-  const shopBasePath = location.pathname.startsWith("/portal/") ? "/portal/catalog" : "/shop";
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<string>(
     () => (isClientPortalUser ? user?.clientId ?? "" : localStorage.getItem("nido_shop_selected_client") ?? "")
@@ -1324,9 +1066,6 @@ export default function ShopPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
-  const [digitalVendorFilter, setDigitalVendorFilter] = useState("All Vendors");
-  const [digitalBrandFilter, setDigitalBrandFilter] = useState("All Brands");
-  const [digitalSort, setDigitalSort] = useState("Popularity");
 
   // Load clients on mount and re-load when the shared store updates
   useEffect(() => {
@@ -1360,45 +1099,18 @@ export default function ShopPage() {
   // Reset page on filter change
   const resetPage = () => setCurrentPage(1);
 
-  useEffect(() => {
-    setSearch("");
-    setCategory("All Categories");
-    setAvailability("All");
-    setCurrentPage(1);
-    setDigitalVendorFilter("All Vendors");
-    setDigitalBrandFilter("All Brands");
-    setDigitalSort("Popularity");
-  }, [activeProductGroup]);
-
   const selectedClient = clients.find(c => c.id === selectedClientId);
-  const groupedProducts = activeProductGroup
-    ? catalogProducts.filter(p => getProductGroup(p) === activeProductGroup)
-    : [];
-  const allCats = ["All Categories", ...Array.from(new Set(groupedProducts.map(p => p.category)))];
-  const digitalBrands = ["All Brands", ...Array.from(new Set(groupedProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
-  const digitalVendors = ["All Vendors", ...Array.from(new Set(
-    groupedProducts.flatMap(p => computeVendorComparisons(p.productCode, p.category).map(v => v.vendorName))
-  )).sort()];
+  const allCats = ["All Categories", ...Array.from(new Set(catalogProducts.map(p => p.category)))];
 
-  const filtered = groupedProducts
+  const filtered = catalogProducts
     .filter(p => {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (category !== "All Categories" && p.category !== category) return false;
       if (availability === "In Stock" && !p.inStock) return false;
       if (availability === "Out of Stock" && p.inStock) return false;
-      if (activeProductGroup === "digital" && digitalBrandFilter !== "All Brands" && p.brand !== digitalBrandFilter) return false;
-      if (activeProductGroup === "digital" && digitalVendorFilter !== "All Vendors" &&
-        !computeVendorComparisons(p.productCode, p.category).some(v => v.vendorName === digitalVendorFilter)) return false;
       return true;
     })
-    .sort((a, b) => {
-      if (activeProductGroup === "digital") {
-        if (digitalSort === "Price: Low to High") return a.priceNum - b.priceNum;
-        if (digitalSort === "Price: High to Low") return b.priceNum - a.priceNum;
-        if (digitalSort === "Name") return a.name.localeCompare(b.name);
-      }
-      return prefOrder(a.preference) - prefOrder(b.preference);
-    });
+    .sort((a, b) => prefOrder(a.preference) - prefOrder(b.preference));
 
   const totalProducts = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));
@@ -1412,10 +1124,6 @@ export default function ShopPage() {
     setSearch("");
     setCurrentPage(1);
     setClientOpen(false);
-  };
-
-  const openProductGroup = (group: ProductGroup) => {
-    navigate(`${shopBasePath}/${group}`);
   };
 
   const pageNums = () => {
@@ -1438,51 +1146,28 @@ export default function ShopPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-5 gap-2">
         <div>
-          <div className="flex items-center gap-2">
-            {activeProductGroup && (
-              <button
-                onClick={() => navigate(shopBasePath)}
-                className="flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors"
-                aria-label="Back to Shop"
-              >
-                <ChevronLeft size={16} />
-              </button>
-            )}
-            <h1 className="text-2xl font-bold text-gray-900">
-              {activeProductGroup === "digital"
-                ? "Shop – Digital Products"
-                : activeProductGroup === "physical"
-                ? "Physical Products"
-                : "Shop"}
-            </h1>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {activeProductGroup === "digital"
-              ? "Software, Cloud Subscriptions, Licenses & Digital Services"
-              : !activeProductGroup
-              ? "Choose a product type to browse the catalog"
-              : selectedClient
+            {selectedClient
               ? `Showing catalog for ${selectedClient.name}`
               : "Select a client to view their catalog"}
           </p>
         </div>
-        {activeProductGroup && (
-          <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2 py-2 w-72 bg-white shadow-sm">
-            <Search size={15} className="text-gray-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search products by name or category..."
-              value={search}
-              onChange={e => { setSearch(e.target.value); resetPage(); }}
-              className="text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none w-full"
-            />
-            {search && (
-              <button onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
-                <X size={13} />
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2 py-2 w-72 bg-white shadow-sm">
+          <Search size={15} className="text-gray-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search products by name or category..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); resetPage(); }}
+            className="text-sm text-gray-700 placeholder-gray-400 bg-transparent outline-none w-full"
+          />
+          {search && (
+            <button onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
+              <X size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters row */}
@@ -1517,48 +1202,8 @@ export default function ShopPage() {
           </div>
         )}
 
-        {activeProductGroup === "digital" && (
-          <>
-            <select
-              value={category}
-              onChange={e => { setCategory(e.target.value); resetPage(); }}
-              className="h-9 min-w-[118px] rounded-md border border-gray-200 bg-white px-2 text-[11px] text-gray-700 outline-none hover:border-blue-300 focus:border-blue-500"
-              aria-label="Filter digital products by category"
-            >
-              {allCats.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            <select
-              value="Digital Products"
-              disabled
-              className="h-9 min-w-[126px] rounded-md border border-blue-200 bg-blue-50 px-2 text-[11px] font-semibold text-blue-700 outline-none"
-              aria-label="Current product type"
-            >
-              <option>Digital Products</option>
-            </select>
-            <select
-              value={digitalVendorFilter}
-              onChange={e => { setDigitalVendorFilter(e.target.value); resetPage(); }}
-              className="h-9 min-w-[108px] rounded-md border border-gray-200 bg-white px-2 text-[11px] text-gray-700 outline-none hover:border-blue-300 focus:border-blue-500"
-              aria-label="Filter digital products by vendor"
-            >
-              {digitalVendors.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            <select
-              value={digitalBrandFilter}
-              onChange={e => { setDigitalBrandFilter(e.target.value); resetPage(); }}
-              className="h-9 min-w-[105px] rounded-md border border-gray-200 bg-white px-2 text-[11px] text-gray-700 outline-none hover:border-blue-300 focus:border-blue-500"
-              aria-label="Filter digital products by brand"
-            >
-              {digitalBrands.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            <button className="flex h-9 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 text-[11px] text-gray-700 hover:bg-gray-50 transition-colors">
-              <Filter size={12} /> More Filters
-            </button>
-          </>
-        )}
-
-        {/* Category and availability filters are only shown inside a product group. */}
-        {activeProductGroup && activeProductGroup !== "digital" && selectedClientId && (
+        {/* Category dropdown — only when client selected */}
+        {selectedClientId && (
           <div className="relative">
             <button
               onClick={() => { setCatOpen(o => !o); setAvailOpen(false); setClientOpen(false); }}
@@ -1581,7 +1226,7 @@ export default function ShopPage() {
         )}
 
         {/* Availability dropdown — only when client selected */}
-        {activeProductGroup && activeProductGroup !== "digital" && selectedClientId && (
+        {selectedClientId && (
           <div className="relative">
             <button
               onClick={() => { setAvailOpen(o => !o); setCatOpen(false); setClientOpen(false); }}
@@ -1604,7 +1249,7 @@ export default function ShopPage() {
         )}
 
         {/* More Filters */}
-        {activeProductGroup && activeProductGroup !== "digital" && selectedClientId && (
+        {selectedClientId && (
           <button className="flex items-center gap-2 text-sm border border-gray-200 rounded-lg px-2 py-2 text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             <Filter size={14} />
             More Filters
@@ -1612,72 +1257,8 @@ export default function ShopPage() {
         )}
       </div>
 
-      {activeProductGroup === "digital" && selectedClientId && (
-        <div className="mb-3 flex items-center justify-end gap-2">
-          <select
-            value={digitalSort}
-            onChange={e => { setDigitalSort(e.target.value); resetPage(); }}
-            className="h-8 rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-700 outline-none hover:border-blue-300 focus:border-blue-500"
-            aria-label="Sort digital products"
-          >
-            <option>Popularity</option>
-            <option>Price: Low to High</option>
-            <option>Price: High to Low</option>
-            <option>Name</option>
-          </select>
-          <button className="flex h-8 w-8 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-blue-600" aria-label="Grid view">
-            <Grid2X2 size={13} />
-          </button>
-          <button className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400 hover:bg-gray-50" aria-label="List view">
-            <List size={13} />
-          </button>
-        </div>
-      )}
-
       {/* Content */}
-      {!activeProductGroup ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 mt-8 max-w-5xl mx-auto">
-          <button
-            type="button"
-            onClick={() => openProductGroup("physical")}
-            className="rounded-2xl border border-blue-100 bg-[#f0f4ff] p-6 md:p-8 flex flex-col items-center text-center hover:shadow-md hover:border-blue-200 transition-all group"
-          >
-            <div className="w-16 h-16 rounded-full bg-[#dce6ff] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <Package size={29} className="text-[#3b5bdb]" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">Physical Products</h2>
-            <p className="text-sm text-gray-500 leading-relaxed mt-2 max-w-xs">
-              Browse hardware, office supplies, equipment, and other products that can be physically delivered.
-            </p>
-            {selectedClientId && (
-              <span className="text-xs font-semibold text-blue-600 mt-5">
-                {catalogProducts.filter(p => getProductGroup(p) === "physical").length} products available
-              </span>
-            )}
-            <span className="mt-4 text-sm font-semibold text-blue-600 group-hover:underline">View Physical Products <ChevronRight size={15} className="inline-block ml-1" /></span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => openProductGroup("digital")}
-            className="rounded-2xl border border-violet-100 bg-[#f5f0ff] p-6 md:p-8 flex flex-col items-center text-center hover:shadow-md hover:border-violet-200 transition-all group"
-          >
-            <div className="w-16 h-16 rounded-full bg-[#e3d9ff] flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-              <FileText size={29} className="text-[#7c3aed]" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">Digital Products</h2>
-            <p className="text-sm text-gray-500 leading-relaxed mt-2 max-w-xs">
-              Explore software, subscriptions, services, licenses, and other non-physical products.
-            </p>
-            {selectedClientId && (
-              <span className="text-xs font-semibold text-violet-600 mt-5">
-                {catalogProducts.filter(p => getProductGroup(p) === "digital").length} products available
-              </span>
-            )}
-            <span className="mt-4 text-sm font-semibold text-violet-600 group-hover:underline">View Digital Products <ChevronRight size={15} className="inline-block ml-1" /></span>
-          </button>
-        </div>
-      ) : !selectedClientId ? (
+      {!selectedClientId ? (
         /* No client selected — empty state */
         <div className="text-center py-32 text-gray-400">
           <Building2 size={56} className=" mb-4 opacity-20" />
@@ -1689,44 +1270,28 @@ export default function ShopPage() {
         <div className="text-center py-24 text-gray-400">
           <ShoppingCart size={48} className=" mb-3 opacity-30" />
           <p className="font-medium text-gray-500">
-            {groupedProducts.length === 0
+            {catalogProducts.length === 0
               ? `No products have been added to ${selectedClient?.name}'s catalog yet`
               : "No products match your filters"}
           </p>
           <p className="text-sm mt-1">
-            {groupedProducts.length === 0
+            {catalogProducts.length === 0
               ? "Go to the client's Catalog tab to add products from the master catalog."
               : "Try adjusting your search or filters."}
           </p>
         </div>
       ) : (
         <>
-          {activeProductGroup === "digital" ? (
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_190px]">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-                {paginated.map(product => (
-                  <DigitalProductCard
-                    key={product.id}
-                    product={product}
-                    onPreview={p => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } })}
-                    clientId={selectedClientId}
-                  />
-                ))}
-              </div>
-              <DigitalCartSidebar cartPath={location.pathname.startsWith("/portal/") ? "/portal/shop/cart" : "/shop/cart"} />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              {paginated.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onPreview={p => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } })}
-                  clientId={selectedClientId}
-                />
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {paginated.map(product => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onPreview={p => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } })}
+                clientId={selectedClientId}
+              />
+            ))}
+          </div>
 
           {/* Pagination */}
           {totalProducts > 0 && (

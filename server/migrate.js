@@ -7,7 +7,7 @@ export async function migrate() {
   if (migrated) return;
   if (!pool) {
     throw new Error(
-      "DATABASE_URL or SUPABASE_DB_URL is not set — database features are disabled.",
+      "SUPABASE_DB_URL is not set — email features are disabled.",
     );
   }
 
@@ -233,70 +233,6 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS approval_requests_status_idx ON approval_requests (status);
     CREATE INDEX IF NOT EXISTS approval_requests_workflow_idx ON approval_requests (workflow_id);
     CREATE INDEX IF NOT EXISTS approval_actions_request_idx ON approval_actions (request_id, created_at);
-
-    -- Digital fulfillment foundation. Orders and catalogue items remain
-    -- frontend-owned in this imported app, so relationships use stable IDs
-    -- without duplicating the existing Order/Product/Vendor tables.
-    CREATE TABLE IF NOT EXISTS digital_fulfillment_orders (
-      order_id TEXT PRIMARY KEY,
-      client_id TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS digital_fulfillment_orders_client_idx
-      ON digital_fulfillment_orders (client_id);
-
-    CREATE TABLE IF NOT EXISTS digital_fulfillments (
-      id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
-      order_item_id TEXT NOT NULL,
-      product_id TEXT NOT NULL,
-      client_id TEXT NOT NULL,
-      supplier_id TEXT,
-      supplier_name TEXT,
-      status TEXT NOT NULL DEFAULT 'PENDING'
-        CHECK (status IN ('PENDING','LICENSE_UPLOADED','PENDING_RELEASE','RELEASED','DOWNLOADED','COMPLETED','CANCELLED')),
-      license_original_name TEXT,
-      license_storage_key TEXT,
-      license_mime_type TEXT,
-      license_size BIGINT,
-      encrypted_password TEXT,
-      uploaded_by TEXT,
-      uploaded_at TIMESTAMPTZ,
-      released_by TEXT,
-      released_at TIMESTAMPTZ,
-      downloaded_at TIMESTAMPTZ,
-      completed_at TIMESTAMPTZ,
-      cancelled_at TIMESTAMPTZ,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      UNIQUE (order_id, order_item_id)
-    );
-    CREATE INDEX IF NOT EXISTS digital_fulfillments_order_idx
-      ON digital_fulfillments (order_id);
-    CREATE INDEX IF NOT EXISTS digital_fulfillments_client_idx
-      ON digital_fulfillments (client_id);
-    CREATE INDEX IF NOT EXISTS digital_fulfillments_status_idx
-      ON digital_fulfillments (status);
-
-    -- Backfill the ownership table when upgrading an installation that
-    -- already has fulfillment records.
-    INSERT INTO digital_fulfillment_orders (order_id, client_id)
-      SELECT order_id, MIN(client_id)
-      FROM digital_fulfillments
-      GROUP BY order_id
-      ON CONFLICT (order_id) DO NOTHING;
-
-    CREATE TABLE IF NOT EXISTS digital_fulfillment_audit_log (
-      id BIGSERIAL PRIMARY KEY,
-      fulfillment_id TEXT NOT NULL REFERENCES digital_fulfillments(id) ON DELETE CASCADE,
-      event TEXT NOT NULL,
-      actor_id TEXT NOT NULL DEFAULT 'system',
-      actor_name TEXT NOT NULL DEFAULT 'System',
-      metadata JSONB NOT NULL DEFAULT '{}',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    );
-    CREATE INDEX IF NOT EXISTS digital_fulfillment_audit_idx
-      ON digital_fulfillment_audit_log (fulfillment_id, created_at);
   `);
 
   await pool.query(

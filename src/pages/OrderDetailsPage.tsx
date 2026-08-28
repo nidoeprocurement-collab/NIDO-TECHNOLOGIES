@@ -15,7 +15,6 @@ import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { getPrefix } from "@/lib/configService";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 import { createApprovalRequest } from "@/lib/approvalEngine";
-import { isDigitalProduct } from "@/lib/productType";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -1634,9 +1633,6 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     category: item.category || "General",
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
     productCode: item.productCode || "",
-    productType: item.productType,
-    physicalType: item.physicalType,
-    fulfillmentType: item.fulfillmentType,
     referenceNumber: "",
     // Vendor snapshot — set at add-to-cart time by the client's vendor selection.
     selectedVendorId: item.selectedVendorId || null,
@@ -1928,9 +1924,6 @@ export default function MyOrderPage() {
 
     for (const sub of subOrders) {
       if (!selectedSet.has(sub.id) || createdPOs[sub.id]) continue;
-      // Digital items may carry an internal supplier snapshot for fulfillment,
-      // but they must never enter procurement PO grouping.
-      if (isDigitalProduct(sub)) continue;
 
       // Get allocations: multi-vendor array or single-vendor fallback
       const allocs: Array<{ vendorId: string; qty: number; meta: any }> =

@@ -5,7 +5,6 @@ import { releaseVendorReservation } from "../lib/vendorStore";
 import { savePO, generatePoNumber, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
 import { getVendorById } from "../lib/vendorDataStore";
 import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
-import { isDigitalProduct } from "../lib/productType";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -28,9 +27,6 @@ export interface OrderCartItem {
   moq: number;
   clientId: string;
   productCode?: string;
-  productType?: string;
-  physicalType?: string;
-  fulfillmentType?: "physical" | "digital";
   /** Vendor allocation snapshot — used to restore stock if the order is cancelled. */
   vendorAllocations?: StockAllocation[];
   // ── Vendor snapshot — locked at add-to-cart time ──────────────────────────
@@ -136,7 +132,7 @@ function cascadeStatusToSubOrders(order: MyOrder, status: MyOrderStatus) {
 }
 
 // Serial, zero-padded order numbers: ORD-000001, ORD-000002, ...
-export function nextOrderId(): string {
+function nextOrderId(): string {
   let seq = 0;
   try {
     seq = parseInt(localStorage.getItem(SEQ_KEY) || "0", 10) || 0;
@@ -167,7 +163,6 @@ function autoCreateDraftPOs(
   // Group items by selectedVendorId (skip items with no vendor selected)
   const vendorGroups = new Map<string, OrderCartItem[]>();
   for (const item of cartItems) {
-    if (isDigitalProduct(item)) continue;
     if (!item.selectedVendorId) continue;
     if (!vendorGroups.has(item.selectedVendorId)) vendorGroups.set(item.selectedVendorId, []);
     vendorGroups.get(item.selectedVendorId)!.push(item);
@@ -305,16 +300,13 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
-    // Callers that need to complete a server-side prerequisite before the
-    // local order is committed can reserve the ID first and pass it back.
-    const id = order.id || nextOrderId();
-    const { id: _providedId, ...orderWithoutId } = order;
+    const id = nextOrderId();
     const cartItems = order.cartItems?.map((item, index) => ({
       ...item,
       subOrderId: item.subOrderId
         || `${getPrefix("salesOrder") || "SO-"}${id}-${String(index + 1).padStart(3, "0")}`,
     }));
-    const normalizedOrder = { ...orderWithoutId, id, cartItems } as MyOrder;
+    const normalizedOrder = { ...order, id, cartItems } as MyOrder;
     setOrders((prev) => [normalizedOrder, ...prev]);
     // Auto-create Draft POs grouped by vendor immediately after the order is saved.
     if (cartItems?.length) {
@@ -342,7 +334,6 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       // releaseVendorReservation makes this safe to call unconditionally.
       if (status === "Cancelled") {
         for (const item of (target.cartItems || [])) {
-          if (isDigitalProduct(item)) continue;
           if (!item.productCode) continue;
           for (const alloc of (item.vendorAllocations || [])) {
             if (alloc.vendorId && alloc.allocated > 0) {

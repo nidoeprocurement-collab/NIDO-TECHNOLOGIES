@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ShoppingCart, Check, Package, Shield, Clock,
   Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2,
@@ -20,9 +20,8 @@ import {
   getVendorComparisonBadge,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
-import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
+import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
-import { getFulfillmentType, isDigitalProduct } from "@/lib/productType";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,7 +35,6 @@ type Product = {
   tags?: string[];
   productType?: string;
   physicalType?: string;
-  fulfillmentType?: "physical" | "digital";
   image: string;
   images?: string[];
   specs: string[];
@@ -152,9 +150,6 @@ function getVendorMatchMap(): Map<string, { leadTime: string; moq: number }> {
 function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { leadTime: string; moq: number }>): Product {
   const match = vendorMatches.get(e.productCode);
   const master = getCatalogProducts().find(p => p.masterProductCode === e.productCode);
-  const productType = master?.productType || e.productType;
-  const physicalType = master?.physicalType || e.physicalType;
-  const fulfillmentType = master?.fulfillmentType || e.fulfillmentType || getFulfillmentType({ productType, physicalType });
   const masterSpecs = master?.specifications
     ?.map(s => `${s.specification}: ${s.value}${s.unit && s.unit !== "-" ? ` ${s.unit}` : ""}`)
     .filter(Boolean);
@@ -169,9 +164,8 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { lead
     subcategory: master?.subcategory || e.subcategory,
     brand: master?.brand || e.brand,
     tags: master?.tags || e.tags || [],
-    productType,
-    physicalType,
-    fulfillmentType,
+    productType: master?.productType || e.productType,
+    physicalType: master?.physicalType || e.physicalType,
     image: master?.images?.[0] || e.img || "",
     images: master?.images?.length ? master.images : e.images,
     specs: masterSpecs?.length ? masterSpecs : e.specs || [],
@@ -192,14 +186,11 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, { lead
 export default function ProductDetailPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { productId } = useParams<{ productId: string }>();
   const { addItem } = useCart();
 
   // Product + client come from router state (set by ShopPage on click)
   const stateProduct = location.state?.product as Product | undefined;
-  const clientId = (location.state?.clientId as string | undefined)
-    || localStorage.getItem("nido_shop_selected_client")
-    || undefined;
+  const clientId = location.state?.clientId as string | undefined;
 
   const [product, setProduct] = useState<Product | null>(stateProduct ?? null);
   const [activeImg, setActiveImg] = useState(0);
@@ -209,17 +200,6 @@ export default function ProductDetailPage() {
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
-
-  // Shop navigation supplies router state, but direct URLs and browser
-  // refreshes must resolve the product from the selected client's catalogue.
-  useEffect(() => {
-    if (product || !productId || !clientId) return;
-    const vendorMatches = getVendorMatchMap();
-    const match = getClientCatalog(clientId)
-      .map(entry => entryToProduct(entry, vendorMatches))
-      .find(entry => entry.productCode === productId);
-    if (match) setProduct(match);
-  }, [product, productId, clientId]);
 
   // Keep qty >= moq
   useEffect(() => {
@@ -272,11 +252,6 @@ export default function ProductDetailPage() {
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const effectivePrice = discountPct > 0 ? product.priceNum * (1 - discountPct / 100) : product.priceNum;
   const recommendedVendor = getRecommendedVendor(vendorComps);
-  // Digital products use the first active supplier ranked by the existing
-  // price engine internally; customers never select this supplier and
-  // digital availability is not tied to physical stock/MOQ.
-  const internalDigitalSupplier = vendorComps[0] ?? null;
-  const digital = isDigitalProduct(product);
 
   const specPairs = product.specs.map(s => {
     const idx = s.indexOf(': ');
@@ -284,20 +259,9 @@ export default function ProductDetailPage() {
   }).filter(sp => sp.key || sp.val);
 
   const gstRate = getEffectiveTaxPctForCategory(product?.category ?? "");
-  const hsnSnapshot = (() => {
-    const map = new Map<string, string>();
-    getHsnCodes().forEach(h => {
-      if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code);
-    });
-    getProductCategoryTaxMap().forEach(m => {
-      if (m.defaultHsnCode && m.productCategory) map.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
-    });
-    return map.get((product?.category || "").toLowerCase()) || "";
-  })();
 
   const handleAdd = () => {
-    if (added || (!digital && !selectedVendor) || !product.inStock) return;
-    const vendor = digital ? internalDigitalSupplier : selectedVendor;
+    if (added || !selectedVendor) return;
     addItem(
       {
         id: Math.random() * 10000,
@@ -305,22 +269,17 @@ export default function ProductDetailPage() {
         image: product.image,
         specs: product.specs,
         moq: product.moq,
-        totalStock: digital ? 0 : selectedVendor!.stock,
+        totalStock: selectedVendor.stock,
         priceNum: product.priceNum,
         clientId,
         category: product.category,
         productCode: product.productCode,
-        productType: product.productType,
-        physicalType: product.physicalType,
-        fulfillmentType: digital ? "digital" : "physical",
-        leadTime: vendor && vendor.leadTime > 0 ? `${vendor.leadTime * 2} days` : product.leadTime,
-        selectedVendorId: vendor?.vendorId,
-        selectedVendorName: vendor?.vendorName,
-        vendorPrice: vendor?.basePrice,
-        landedCost: vendor?.landedCostPerUnit,
+        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
+        selectedVendorId: selectedVendor.vendorId,
+        selectedVendorName: selectedVendor.vendorName,
+        vendorPrice: selectedVendor.basePrice,
+        landedCost: selectedVendor.landedCostPerUnit,
         gstSnapshot: gstRate,
-         hsnSnapshot,
-         vendorRating: vendor?.rating,
       },
       Math.max(1, qty)
     );
@@ -481,22 +440,21 @@ export default function ProductDetailPage() {
                 </p>
               )}
 
-               {/* ── Vendor Selection ── */}
-               {!digital ? (
-                <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+              {/* ── Vendor Selection ── */}
+              <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
                 <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Select Vendor</span>
                   {vendorComps.length > 0 && <span className="text-[10px] text-gray-400">{vendorComps.length} available</span>}
-                 </div>
+                </div>
                 {vendorComps.length === 0 ? (
                   <div className="px-3 py-3 text-xs text-gray-400">No vendor pricing available for this product.</div>
-                 ) : selectedVendor ? (
-                   <div className="px-3 py-2.5">
-                     <div className="flex items-center justify-between">
-                       <div className="flex items-center gap-2 min-w-0">
-                         <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-                           <Check size={10} className="text-white" />
-                         </div>
+                ) : selectedVendor ? (
+                  <div className="px-3 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                          <Check size={10} className="text-white" />
+                        </div>
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</p>
                           <p className="text-[10px] text-gray-500">
@@ -571,13 +529,7 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 )}
-                </div>
-               ) : (
-                 <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3">
-                   <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Digital Product</p>
-                   <p className="mt-1 text-xs text-violet-600">No vendor selection is required. Add directly to your cart.</p>
-                 </div>
-               )}
+              </div>
 
               {/* Qty stepper */}
               <div className="flex items-center gap-3 mt-4">
@@ -600,14 +552,14 @@ export default function ProductDetailPage() {
               {/* Add to Cart */}
               <button
                 onClick={handleAdd}
-                disabled={!product.inStock || (!digital && !selectedVendor)}
+                disabled={!selectedVendor}
                 className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-                   !product.inStock || (!digital && !selectedVendor) ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" :
+                  !selectedVendor ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-dashed border-gray-300" :
                   added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"
                 }`}
               >
                 {added ? <Check size={16} /> : <ShoppingCart size={16} />}
-                 {added ? "Added to Cart!" : !product.inStock ? "Unavailable" : !digital && !selectedVendor ? "Select a vendor first" : "Add to Cart"}
+                {added ? "Added to Cart!" : !selectedVendor ? "Select a vendor first" : "Add to Cart"}
               </button>
 
               {/* MOQ / Lead time / Warranty */}
@@ -698,7 +650,7 @@ export default function ProductDetailPage() {
                         onClick={e => { e.stopPropagation(); handleRelatedClick(rp); }}
                         className="mt-2 flex items-center justify-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 text-[11px] font-semibold transition-colors"
                       >
-                        <ShoppingCart size={12} /> {isDigitalProduct(rp) ? "View Product" : "View & Select Vendor"}
+                        <ShoppingCart size={12} /> View &amp; Select Vendor
                       </button>
                     </div>
                   );

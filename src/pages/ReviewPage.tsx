@@ -7,13 +7,10 @@ import OrderSummaryPanel from "./OrderSummaryPanel";
 import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
-import { nextOrderId, useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
+import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 import { reserveVendorStock } from "@/lib/vendorStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
-import { isDigitalProduct } from "@/lib/productType";
-import { useAuth } from "@/contexts/AuthContext";
-import { createDigitalFulfillments } from "@/lib/digitalFulfillmentApi";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -46,7 +43,6 @@ export default function ReviewPage() {
   useI18n();
   const { items: cart, consumeCart } = useCart();
   const { addOrder } = useMyOrders();
-  const { effectiveUser } = useAuth();
 
   const clientId = localStorage.getItem("nido_shop_selected_client") || "";
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
@@ -56,9 +52,6 @@ export default function ReviewPage() {
   }, [clientId]);
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
-  const hasPhysicalItems = cart.some((item) => !isDigitalProduct(item));
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [placementError, setPlacementError] = useState("");
 
   // Read saved payment terms (selected on the checkout page)
   const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
@@ -142,15 +135,7 @@ export default function ReviewPage() {
     cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category }))
   );
   const subtotal = preTaxSubtotal;
-  const handlePlaceOrder = async () => {
-    if (isPlacingOrder || cart.length === 0) return;
-    if (hasPhysicalItems && !selectedAddr) {
-      navigate("/shop/checkout");
-      return;
-    }
-    setPlacementError("");
-    setIsPlacingOrder(true);
-
+  const handlePlaceOrder = () => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     const itemsSnapshot = cart.map((i) => ({ ...i }));
@@ -159,35 +144,8 @@ export default function ReviewPage() {
     const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
     const poRef = Date.now().toString().slice(-6);
-    const orderNumber = nextOrderId();
 
-    try {
-      const fulfillmentClientId = cart.find((item) => item.clientId)?.clientId
-        || effectiveUser?.clientId
-        || clientId;
-      if (!fulfillmentClientId) {
-        throw new Error("Select a client before placing a digital product order.");
-      }
-      await createDigitalFulfillments(
-        orderNumber,
-        fulfillmentClientId,
-        itemsSnapshot.map((item) => ({
-          ...item,
-          fulfillmentType: item.fulfillmentType || (isDigitalProduct(item) ? "digital" : "physical"),
-        })) as OrderCartItem[],
-        effectiveUser,
-      );
-    } catch (error) {
-      console.error("[digital fulfillment] order sync failed", error);
-      setPlacementError(error instanceof Error
-        ? error.message
-        : "Digital fulfillment could not be prepared. No order was placed.");
-      setIsPlacingOrder(false);
-      return;
-    }
-
-    const savedOrderNumber = addOrder({
-      id: orderNumber,
+    const orderNumber = addOrder({
       clientId: cart[0]?.clientId,
       client: "Nido Tech CorpEssentials",
       clientColor: "#2563eb",
@@ -226,9 +184,6 @@ export default function ReviewPage() {
         moq: i.moq,
         clientId: i.clientId,
         productCode: i.productCode,
-        productType: i.productType,
-        physicalType: i.physicalType,
-        fulfillmentType: i.fulfillmentType,
         vendorAllocations: i.vendorAllocations,
         // Vendor snapshot locked at add-to-cart time — travels with the order
         selectedVendorId: i.selectedVendorId,
@@ -238,16 +193,13 @@ export default function ReviewPage() {
         gstSnapshot: i.gstSnapshot,
         hsnSnapshot: i.hsnSnapshot,
         vendorRating: i.vendorRating,
-        stockReservationId: isDigitalProduct(i)
-          ? undefined
-          : `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
+        stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
       })) satisfies OrderCartItem[],
     });
 
     // Reserve stock immediately so the shop shows reduced available qty.
     // physicalStock stays unchanged; only reservedStock increases.
     for (const item of itemsSnapshot) {
-      if (isDigitalProduct(item)) continue;
       if (!item.productCode) continue;
       for (const alloc of (item.vendorAllocations || [])) {
         if (alloc.vendorId && alloc.allocated > 0) {
@@ -257,10 +209,9 @@ export default function ReviewPage() {
     }
 
     consumeCart();
-    setIsPlacingOrder(false);
-    navigate(`/shop/order-confirmation/${savedOrderNumber}`, {
+    navigate(`/shop/order-confirmation/${orderNumber}`, {
       state: {
-        orderNumber: savedOrderNumber,
+        orderNumber,
         orderDate: today,
         items: itemsSnapshot,
         subtotal,
@@ -315,17 +266,7 @@ export default function ReviewPage() {
                   <Pencil size={11} /> Edit
                 </button>
               </div>
-              {!hasPhysicalItems ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-violet-100 rounded-full flex items-center justify-center">
-                    <span className="text-violet-600 text-sm">↗</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm text-gray-900">Digital fulfillment</p>
-                    <p className="text-xs text-gray-500">No delivery address required</p>
-                  </div>
-                </div>
-              ) : selectedAddr ? (
+              {selectedAddr ? (
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                     <MapPin size={18} className="text-blue-500" />
@@ -424,18 +365,12 @@ export default function ReviewPage() {
               </button>
               <button
                 onClick={handlePlaceOrder}
-                disabled={isPlacingOrder || cart.length === 0}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
               >
                 <Lock size={15} />
-                {isPlacingOrder ? "Preparing fulfillment…" : "Place Order"}
+                Place Order
               </button>
             </div>
-            {placementError && (
-              <div role="alert" className="mx-auto max-w-xl rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {placementError}
-              </div>
-            )}
           </div>
 
           {/* Right */}

@@ -704,22 +704,6 @@ function AppRoutes() {
             }
           />
           <Route
-            path="shop/physical"
-            element={
-              <PageErrorBoundary title="Physical products failed to load" resetKey={location.pathname}>
-                <ShopPage />
-              </PageErrorBoundary>
-            }
-          />
-          <Route
-            path="shop/digital"
-            element={
-              <PageErrorBoundary title="Digital products failed to load" resetKey={location.pathname}>
-                <ShopPage />
-              </PageErrorBoundary>
-            }
-          />
-          <Route
             path="shop/cart"
             element={
               <PageErrorBoundary
@@ -1106,26 +1090,6 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Shop failed to load" resetKey={location.pathname}>
-                  <ShopPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/catalog/physical"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Physical products failed to load" resetKey={location.pathname}>
-                  <ShopPage />
-                </PageErrorBoundary>
-              </ClientPortalRoute>
-            }
-          />
-          <Route
-            path="portal/catalog/digital"
-            element={
-              <ClientPortalRoute>
-                <PageErrorBoundary title="Digital products failed to load" resetKey={location.pathname}>
                   <ShopPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>

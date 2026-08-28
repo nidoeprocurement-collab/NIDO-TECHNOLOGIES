@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { FulfillmentType } from '@/lib/productType';
 
 export interface StockAllocation {
   vendorId: string;
@@ -21,9 +20,6 @@ export type CartItem = {
   clientId?: string;
   category?: string;
   productCode?: string;
-  productType?: string;
-  physicalType?: string;
-  fulfillmentType?: FulfillmentType;
   leadTime?: string;
   // ── Vendor snapshot — locked at add-to-cart time by client selection ──────
   selectedVendorId?: string;

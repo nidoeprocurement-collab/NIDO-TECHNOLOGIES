@@ -164,7 +164,7 @@ export function getProductTotalAvailableStock(masterProductCode: string): number
   let totalReserved = 0;
   for (const products of Object.values(store)) {
     for (const p of products) {
-      if (p.masterProductCode === masterProductCode && p.status === 'Active' && getVendorById(p.vendorId)?.status === 'Active') {
+      if (p.masterProductCode === masterProductCode && p.status === 'Active') {
         totalPhysical += parseInt(p.physicalStock ?? p.stock ?? '0') || 0;
         totalReserved += parseInt(p.reservedStock ?? '0') || 0;
       }
