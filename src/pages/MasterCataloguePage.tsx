@@ -312,7 +312,7 @@ export default function CatalogUpdatesTab() {
       publishStatus: p.publishStatus,
       category: p.category,
       subCategory: p.subcategory,
-      physicalType: p.physicalType || 'Physical Product',
+      physicalType: p.physicalType?.trim() || 'Physical Product',
       brand: p.brand,
       price: p.price,
       status: 'In Stock' as const,
@@ -376,6 +376,7 @@ export default function CatalogUpdatesTab() {
       publishStatus: p.publishStatus,
       category: p.category,
       subCategory: p.subcategory,
+      physicalType: p.physicalType?.trim() || 'Physical Product',
       brand: p.brand,
       price: p.price,
       status: 'In Stock' as const,
@@ -1088,7 +1089,7 @@ export default function CatalogUpdatesTab() {
                       </TableCell>
                       <TableCell className="text-xs font-mono text-gray-600">{item.masterProductCode || '—'}</TableCell>
                       <TableCell className="text-xs text-gray-600">{item.sku}</TableCell>
-                      <TableCell className="text-sm text-gray-700">{item.physicalType}</TableCell>
+                      <TableCell className="text-sm text-gray-700">{item.physicalType || 'Physical Product'}</TableCell>
                       <TableCell className="text-sm text-gray-700">{item.category}</TableCell>
                       <TableCell className="text-sm text-gray-700">{item.brand}</TableCell>
                       <TableCell>
