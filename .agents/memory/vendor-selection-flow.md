@@ -47,3 +47,10 @@ Vendor selection is locked at add-to-cart time. The client must choose a vendor 
 - Never auto-assign a vendor after order placement — vendor must come from CartItem snapshot.
 - Confirm button in Draft POs tab calls `updatePO(po.poNumber, { status: "Confirmed" })` then navigates to the PO detail page for PDF/email.
 - The old `handleCreatePurchaseOrders` and `VendorSelectionModal`/`VendorSelectionTab`/`VendorSelectedSummaryTab` components remain in OrderDetailsPage but are unreachable UI (no tab or button references them) — safe to fully remove in a later cleanup.
+
+## Shared product-type presentation
+The vendor product table and Shop vendor selectors use one shared rule set for pricing model, quantity label, availability, and lead-time units. Digital-only products show unlimited/instant provisioning; hybrid products retain stock-based availability with day lead time and instant service.
+
+**Why:** These fields previously diverged between the admin catalog and client shopping flow, making the same product appear to have different commercial terms depending on the page.
+
+**How to apply:** Reuse the shared product-type rule helpers whenever adding another product comparison, catalog card, or vendor-selection surface.

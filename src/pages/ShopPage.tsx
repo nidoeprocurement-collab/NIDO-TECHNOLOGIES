@@ -25,6 +25,13 @@ import { getProductTotalAvailableStock } from "@/lib/vendorStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import {
+  formatLeadTimeByType,
+  getAvailabilityByType,
+  getPricingModel,
+  getProductType,
+  getQuantityLabel,
+} from "@/lib/productTypeRules";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -626,6 +633,11 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [liked, setLiked] = useState(false);
   const vendorSelectionRef = useRef<HTMLDivElement>(null);
   const isDigital = isDigitalProduct(product);
+  // Keep these labels in lockstep with Vendor Products so every product type
+  // presents its commercial terms in the same way across the app.
+  const productType = getProductType(product.physicalType);
+  const productPricingModel = getPricingModel(productType);
+  const productQuantityLabel = getQuantityLabel(productType);
   const canUseVendor = (vendor: VendorComparisonRow) => isDigital || canVendorFulfillMoq(vendor);
 
   useEffect(() => {
@@ -665,15 +677,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
 
-  const selectedVendorSellingPrice = selectedVendor && clientId
-    ? computeClientFinalPrice(
-        selectedVendor.landedCostPerUnit,
-        getClientCommonSettings(clientId),
-        resolveClientProfitPct(clientId, product.productCode, product.category),
-        product.category,
-      ).finalPrice
-    : null;
-
   const hsnForCategory = (() => {
     const map = new Map<string, string>();
     getHsnCodes().forEach(h => { if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code); });
@@ -699,7 +702,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         category: product.category,
         productCode: product.productCode,
         fulfillmentType: product.fulfillmentType,
-        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
+        leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
         vendorPrice: selectedVendor.basePrice,
@@ -721,17 +724,21 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
     : vendorComps;
 
   // Display values
-  const displayMoq = selectedVendor ? (selectedVendor.moq > 0 ? `${selectedVendor.moq} Units` : '--') : '--';
-  const displayLeadTime = selectedVendor && selectedVendor.leadTime > 0
-    ? `${selectedVendor.leadTime * 2}-${selectedVendor.leadTime * 2 + 1} Days`
+  const displayMoq = selectedVendor ? (selectedVendor.moq > 0 ? `${selectedVendor.moq} ${productQuantityLabel}` : '--') : '--';
+  const selectedLeadTime = selectedVendor
+    ? formatLeadTimeByType(selectedVendor.leadTime, productType)
+    : null;
+  const selectedAvailability = selectedVendor
+    ? getAvailabilityByType(selectedVendor.stock, productType)
+    : null;
+  const displayLeadTime = selectedLeadTime
+    ? `${selectedLeadTime.primary}${selectedLeadTime.secondary ? ` · ${selectedLeadTime.secondary}` : ''}`
     : '--';
-  const displayStock = selectedVendor
-    ? (isDigital ? 'Digital delivery' : selectedVendor.stock > 0 ? `${selectedVendor.stock.toLocaleString('en-IN')} Units` : 'Out of Stock')
+  const displayStock = selectedAvailability
+    ? `${selectedAvailability.primary}${selectedAvailability.secondary ? ` · ${selectedAvailability.secondary}` : ''}`
     : '--';
   const displayPrice = selectedVendor && canUseVendor(selectedVendor)
-    ? (clientId && selectedVendorSellingPrice
-        ? formatCurrency(selectedVendorSellingPrice)
-        : formatCurrency(selectedVendor.basePrice))
+    ? formatCurrency(selectedVendor.basePrice)
     : '--';
 
   // First active slab with a non-zero discount that applies to this product's
@@ -813,7 +820,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
         {/* Vendor dropdown panel */}
         {vendorPanelOpen && (
-          <div className="absolute left-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden" style={{ width: "480px" }}>
+          <div className="absolute left-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden" style={{ width: "min(700px, calc(100vw - 32px))" }}>
             {/* Header */}
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-[12px] font-bold text-gray-800">Select Vendor</p>
@@ -832,27 +839,23 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               </div>
             </div>
             {/* Table header */}
-            <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1.2fr" }}>
+            <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1.7fr 1fr 1.25fr 1.25fr 1fr" }}>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Stock</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Pricing Model</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Price / Unit</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Availability</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time / SLA</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ / Min Qty</span>
             </div>
             {/* Vendor rows */}
             <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
               {filteredVendors.map(comp => {
                 const isSelected = selectedVendor?.vendorId === comp.vendorId;
-                const isOOS = !canVendorFulfillMoq(comp);
+                const isOOS = !canUseVendor(comp);
                 const badge = getVendorComparisonBadge(comp, vendorComps);
-                const price = !isOOS && clientId
-                  ? computeClientFinalPrice(
-                      comp.landedCostPerUnit,
-                      getClientCommonSettings(clientId),
-                      resolveClientProfitPct(clientId, product.productCode, product.category),
-                      product.category,
-                    ).finalPrice
-                  : !isOOS ? comp.basePrice : 0;
+                const availability = getAvailabilityByType(comp.stock, productType);
+                const leadTime = formatLeadTimeByType(comp.leadTime, productType);
+                const price = !isOOS ? comp.basePrice : 0;
                 return (
                   <button
                     key={comp.vendorId}
@@ -872,7 +875,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                     className={`w-full grid items-center px-3 py-2 text-left transition-colors ${
                       isSelected ? 'bg-blue-50' : isOOS ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'hover:bg-gray-50'
                     }`}
-                    style={{ gridTemplateColumns: "2fr 1fr 1fr 1fr 1.2fr" }}
+                     style={{ gridTemplateColumns: "2fr 1.7fr 1fr 1.25fr 1.25fr 1fr" }}
                   >
                     {/* Vendor name */}
                     <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -893,18 +896,29 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
                         )}
                       </div>
                     </div>
-                    {/* MOQ */}
-                    <span className="text-[10px] text-gray-700">{comp.moq > 0 ? `${comp.moq} Units` : '--'}</span>
-                    {/* Lead Time */}
-                    <span className="text-[10px] text-gray-700">{comp.leadTime > 0 ? `${comp.leadTime * 2}-${comp.leadTime * 2 + 1} Days` : '--'}</span>
-                    {/* Stock */}
-                    <span className={`text-[10px] font-semibold ${comp.stock > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                      {isOOS ? 'Out of Stock' : `${comp.stock.toLocaleString('en-IN')} Units`}
-                    </span>
+                     {/* Pricing model */}
+                     <span className="text-[10px] leading-tight text-gray-700">{productPricingModel}</span>
                     {/* Price */}
                     <span className="text-[10px] font-semibold text-gray-800">
                       {!isOOS && price > 0 ? formatCurrency(price, undefined, { decimals: 0 }) : '--'}
                     </span>
+                     {/* Availability */}
+                     <span className={`text-[10px] leading-tight font-semibold ${
+                       availability.status === 'Out of Stock' ? 'text-red-500' :
+                       availability.status === 'Low Stock' ? 'text-amber-600' : 'text-emerald-600'
+                     }`}>
+                       {availability.primary}
+                       <span className="block text-[9px] font-medium text-gray-400">
+                         {availability.isUnlimited ? 'Instant' : availability.status}
+                       </span>
+                     </span>
+                     {/* Lead time / SLA */}
+                     <span className="text-[10px] leading-tight text-gray-700">
+                       {leadTime.primary}
+                       {leadTime.secondary && <span className="block text-[9px] text-gray-400">{leadTime.secondary}</span>}
+                     </span>
+                     {/* MOQ */}
+                     <span className="text-[10px] text-gray-700">{comp.moq > 0 ? `${comp.moq} ${productQuantityLabel}` : '--'}</span>
                   </button>
                 );
               })}
@@ -939,12 +953,21 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
       {/* Info grid */}
       <div className="px-3 pt-2 border-t border-gray-100 space-y-1.5" onClick={e => e.stopPropagation()}>
-        {/* Row 1: MOQ + (Lead Time when vendor selected) + Stock Available */}
-        <div className={`grid gap-3 ${selectedVendor ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {/* Type-specific commercial terms, matching the Vendor Products table. */}
+        <div className={`grid gap-3 ${selectedVendor ? 'grid-cols-4' : 'grid-cols-2'}`}>
+          {selectedVendor && (
+            <div>
+              <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                <Layers3 size={10} className="text-gray-400 shrink-0" />
+                <span className="font-medium">Pricing Model</span>
+              </div>
+              <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{productPricingModel}</p>
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-1 text-[9px] text-gray-500">
               <Package size={10} className="text-gray-400 shrink-0" />
-              <span className="font-medium">MOQ</span>
+              <span className="font-medium">MOQ / Min Qty</span>
             </div>
             <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayMoq}</p>
           </div>
@@ -952,15 +975,15 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             <div>
               <div className="flex items-center gap-1 text-[9px] text-gray-500">
                 <Clock size={10} className="text-gray-400 shrink-0" />
-                <span className="font-medium">Lead Time</span>
+                <span className="font-medium">Lead Time / SLA</span>
               </div>
-              <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayLeadTime}</p>
+              <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{displayLeadTime}</p>
             </div>
           )}
           <div>
             <div className="flex items-center gap-1 text-[9px] text-gray-500">
               <Package size={10} className="text-gray-400 shrink-0" />
-              <span className="font-medium">Stock Available</span>
+              <span className="font-medium">Availability</span>
             </div>
             <p className={`text-[11px] font-semibold mt-0.5 ${selectedVendor && selectedVendor.stock > 0 ? 'text-emerald-600' : 'text-gray-800'}`}>
               {displayStock}
@@ -975,7 +998,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         {!selectedVendor && (
           <div className="flex items-center gap-1.5">
             <Clock size={10} className="text-gray-400 shrink-0" />
-            <span className="text-[9px] text-gray-500 font-medium">Lead Time</span>
+            <span className="text-[9px] text-gray-500 font-medium">Lead Time / SLA</span>
             <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
           </div>
         )}
@@ -986,7 +1009,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
             <div>
               <div className="flex items-center gap-1 text-[9px] text-gray-500">
                 <Tag size={10} className="text-gray-400 shrink-0" />
-                <span className="font-medium">Price per Unit</span>
+                <span className="font-medium">Price / Unit</span>
               </div>
               <p className="text-[13px] font-bold text-gray-900 mt-0.5">{displayPrice}</p>
             </div>

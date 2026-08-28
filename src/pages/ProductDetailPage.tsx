@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ShoppingCart, Check, Package, Shield, Clock,
   Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2,
-  Timer, ZoomIn, ChevronDown, ChevronUp,
+  Timer, ZoomIn,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
@@ -12,16 +12,20 @@ import {
   getAllProductPricing,
   getSlabDiscountPct,
   computeVendorComparisons,
-  computeClientFinalPrice,
-  getClientCommonSettings,
-  resolveClientProfitPct,
   canVendorFulfillMoq,
-  getRecommendedVendor,
   getVendorComparisonBadge,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
+import {
+  formatLeadTimeByType,
+  getAvailabilityByType,
+  getPricingModel,
+  getProductType,
+  getQuantityLabel,
+  isDigitalOnlyType,
+} from "@/lib/productTypeRules";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -251,7 +255,11 @@ export default function ProductDetailPage() {
 
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
   const effectivePrice = discountPct > 0 ? product.priceNum * (1 - discountPct / 100) : product.priceNum;
-  const recommendedVendor = getRecommendedVendor(vendorComps);
+  const productType = getProductType(product.physicalType);
+  const productPricingModel = getPricingModel(productType);
+  const productQuantityLabel = getQuantityLabel(productType);
+  const canUseVendor = (vendor: VendorComparisonRow) =>
+    isDigitalOnlyType(productType) || canVendorFulfillMoq(vendor);
 
   const specPairs = product.specs.map(s => {
     const idx = s.indexOf(': ');
@@ -268,14 +276,14 @@ export default function ProductDetailPage() {
         name: product.name,
         image: product.image,
         specs: product.specs,
-        moq: product.moq,
+        moq: selectedVendor.moq,
         totalStock: selectedVendor.stock,
         priceNum: product.priceNum,
         clientId,
         category: product.category,
         productCode: product.productCode,
         fulfillmentType: product.fulfillmentType,
-        leadTime: selectedVendor.leadTime > 0 ? `${selectedVendor.leadTime * 2} days` : product.leadTime,
+        leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
         vendorPrice: selectedVendor.basePrice,
@@ -444,14 +452,17 @@ export default function ProductDetailPage() {
               {/* ── Vendor Selection ── */}
               <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
                 <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Select Vendor</span>
+                  <div>
+                    <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Select Vendor</span>
+                    <span className="block text-[9px] text-gray-400 mt-0.5">{productType} · {productPricingModel}</span>
+                  </div>
                   {vendorComps.length > 0 && <span className="text-[10px] text-gray-400">{vendorComps.length} available</span>}
                 </div>
                 {vendorComps.length === 0 ? (
                   <div className="px-3 py-3 text-xs text-gray-400">No vendor pricing available for this product.</div>
                 ) : selectedVendor ? (
-                  <div className="px-3 py-2.5">
-                    <div className="flex items-center justify-between">
+                  <div className="px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
                           <Check size={10} className="text-white" />
@@ -459,75 +470,69 @@ export default function ProductDetailPage() {
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-gray-900 truncate">{selectedVendor.vendorName}</p>
                           <p className="text-[10px] text-gray-500">
-                            ₹{selectedVendor.landedCostPerUnit.toLocaleString("en-IN")} landed
-                            {selectedVendor.stock > 0 && ` · ${selectedVendor.stock} in stock`}
-                            {selectedVendor.leadTime > 0 && ` · ${selectedVendor.leadTime * 2}d lead`}
+                            Selected vendor · {productPricingModel}
                           </p>
                         </div>
                       </div>
-                      <button onClick={() => { setSelectedVendor(null); setVendorPanelOpen(true); }} className="text-[10px] text-blue-600 font-semibold shrink-0 ml-2 hover:underline">Change</button>
+                      <button onClick={() => { setSelectedVendor(null); setVendorPanelOpen(true); }} className="text-[10px] text-blue-600 font-semibold shrink-0 hover:underline">Change</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 mt-3 pt-3 border-t border-gray-100">
+                      {(() => {
+                        const availability = getAvailabilityByType(selectedVendor.stock, productType);
+                        const leadTime = formatLeadTimeByType(selectedVendor.leadTime, productType);
+                        return (
+                          <>
+                            <div><p className="text-[9px] text-gray-400 uppercase">Price / Unit</p><p className="text-xs font-bold text-gray-900">₹{selectedVendor.basePrice.toLocaleString("en-IN")}</p></div>
+                            <div><p className="text-[9px] text-gray-400 uppercase">Availability</p><p className="text-xs font-semibold text-emerald-600">{availability.primary}</p><p className="text-[9px] text-gray-400">{availability.isUnlimited ? "Instant" : availability.status}</p></div>
+                            <div><p className="text-[9px] text-gray-400 uppercase">Lead Time / SLA</p><p className="text-xs font-semibold text-gray-800">{leadTime.primary}</p><p className="text-[9px] text-gray-400">{leadTime.secondary || "Subject to Availability"}</p></div>
+                            <div><p className="text-[9px] text-gray-400 uppercase">MOQ / Min Qty</p><p className="text-xs font-semibold text-gray-800">{selectedVendor.moq > 0 ? `${selectedVendor.moq} ${productQuantityLabel}` : "—"}</p></div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 ) : (
                   <div>
-                    {/* Price-engine recommendation — only an eligible vendor can be suggested. */}
-                    {recommendedVendor && (
-                      <button
-                        onClick={() => setSelectedVendor(recommendedVendor)}
-                        className="w-full flex items-start justify-between px-3 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span style={{ background: "#eff6ff", color: "#1d4ed8", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>★ Recommended by Price Engine</span>
-                          </div>
-                          <p className="text-xs font-semibold text-gray-900">{recommendedVendor.vendorName}</p>
-                          <p className="text-[10px] text-gray-500 mt-0.5">
-                            {recommendedVendor.stock} in stock
-                            {recommendedVendor.leadTime > 0 && ` · ${recommendedVendor.leadTime * 2}d lead`}
-                            {recommendedVendor.rating > 0 && ` · ★ ${recommendedVendor.rating}`}
-                          </p>
+                    {/* The comparison rows use the same type-specific presentation as Vendor Products. */}
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[600px]">
+                        <div className="grid grid-cols-[1.5fr_1.55fr_0.9fr_1.15fr_1.2fr_1fr] gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Vendor</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Pricing Model</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Price / Unit</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Availability</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Lead Time / SLA</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">MOQ / Min Qty</span>
                         </div>
-                        <div className="text-right ml-3 shrink-0">
-                          <p className="text-sm font-bold text-gray-900">₹{recommendedVendor.landedCostPerUnit.toLocaleString("en-IN")}</p>
-                          <p className="text-[10px] text-gray-400">landed cost</p>
-                        </div>
-                      </button>
-                    )}
-                    {/* Other vendors toggle */}
-                    {vendorComps.filter(v => v.vendorId !== recommendedVendor?.vendorId).length > 0 && (
-                      <button
-                        onClick={() => setVendorPanelOpen(v => !v)}
-                        className="w-full flex items-center justify-between px-3 py-2 text-xs text-blue-600 font-semibold hover:bg-gray-50 transition-colors"
-                      >
-                        <span>{vendorPanelOpen ? "Hide other vendors" : `${vendorComps.filter(v => v.vendorId !== recommendedVendor?.vendorId).length} more vendor${vendorComps.filter(v => v.vendorId !== recommendedVendor?.vendorId).length > 1 ? "s" : ""}`}</span>
-                        {vendorPanelOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </button>
-                    )}
-                    {vendorPanelOpen && (
-                      <div className="border-t border-gray-100">
-                        {vendorComps.filter(comp => comp.vendorId !== recommendedVendor?.vendorId).map((comp, i) => (
-                          <button
-                            key={comp.vendorId}
-                            disabled={!canVendorFulfillMoq(comp)}
-                            onClick={() => { setSelectedVendor(comp); setVendorPanelOpen(false); }}
-                            className={`w-full flex items-start justify-between px-3 py-2.5 transition-colors text-left ${i > 0 ? "border-t border-gray-50" : ""} ${canVendorFulfillMoq(comp) ? "hover:bg-blue-50" : "opacity-50 cursor-not-allowed"}`}
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold text-gray-900">{comp.vendorName}</p>
-                              <p className="text-[10px] text-gray-500 mt-0.5">
-                                {canVendorFulfillMoq(comp) ? `${comp.stock} in stock` : "Cannot fulfill MOQ"}
-                                {comp.leadTime > 0 && ` · ${comp.leadTime * 2}d lead`}
-                                {comp.rating > 0 && ` · ★ ${comp.rating}`}
-                              </p>
-                            </div>
-                            <div className="text-right ml-3 shrink-0">
-                              <p className="text-xs font-bold text-gray-900">₹{comp.landedCostPerUnit.toLocaleString("en-IN")}</p>
-                              <p className="text-[10px] text-gray-400">landed</p>
-                            </div>
-                          </button>
-                        ))}
+                        {vendorComps.map((comp) => {
+                          const eligible = canUseVendor(comp);
+                          const availability = getAvailabilityByType(comp.stock, productType);
+                          const leadTime = formatLeadTimeByType(comp.leadTime, productType);
+                          const badge = getVendorComparisonBadge(comp, vendorComps);
+                          return (
+                            <button
+                              key={comp.vendorId}
+                              type="button"
+                              disabled={!eligible}
+                              onClick={() => { if (eligible) { setSelectedVendor(comp); setQty(Math.max(1, comp.moq)); setVendorPanelOpen(false); } }}
+                              className={`w-full grid grid-cols-[1.5fr_1.55fr_0.9fr_1.15fr_1.2fr_1fr] gap-2 items-center px-3 py-2.5 text-left border-b border-gray-50 last:border-0 transition-colors ${eligible ? "hover:bg-blue-50" : "opacity-50 cursor-not-allowed"}`}
+                            >
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-semibold text-gray-800 truncate">{comp.vendorName}</p>
+                                {badge && <span className="text-[8px] text-blue-700 font-bold">{badge === "Recommended" ? "★ " : ""}{badge}</span>}
+                              </div>
+                              <span className="text-[9px] leading-tight text-gray-700">{productPricingModel}</span>
+                              <span className="text-[10px] font-semibold text-gray-800">{eligible ? `₹${comp.basePrice.toLocaleString("en-IN")}` : "—"}</span>
+                              <span className={`text-[9px] leading-tight font-semibold ${availability.status === "Out of Stock" ? "text-red-500" : availability.status === "Low Stock" ? "text-amber-600" : "text-emerald-600"}`}>
+                                {availability.primary}<span className="block text-[8px] text-gray-400 font-medium">{availability.isUnlimited ? "Instant" : availability.status}</span>
+                              </span>
+                              <span className="text-[9px] leading-tight text-gray-700">{leadTime.primary}<span className="block text-[8px] text-gray-400">{leadTime.secondary || "Subject to Availability"}</span></span>
+                              <span className="text-[9px] text-gray-700">{comp.moq > 0 ? `${comp.moq} ${productQuantityLabel}` : "—"}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>

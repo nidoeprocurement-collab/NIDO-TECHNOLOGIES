@@ -29,6 +29,14 @@ import {
   Warehouse,
 } from "lucide-react";
 import { getVendorProducts, removeVendorProduct, updateVendorProduct, VendorProduct } from "@/lib/vendorStore";
+import {
+  formatLeadTimeByType,
+  getAvailabilityByType,
+  getPricingModel,
+  getProductType,
+  getQuantityLabel,
+  isHybridType,
+} from "@/lib/productTypeRules";
 
 const STATS = [
   { icon: <Package className="w-5 h-5 text-blue-500" />, label: "Total Products", value: "128", sub: "All Products", bg: "bg-blue-50" },
@@ -91,23 +99,6 @@ function StockBadge({ status, count }: { status: StockStatus; count: number }) {
   );
 }
 
-function productType(product: VendorProduct): string {
-  return product.physicalType?.trim() || "Physical Product";
-}
-
-function isDigitalType(type: string): boolean {
-  const normalized = type.toLowerCase();
-  return normalized.includes("digital")
-    || normalized.includes("subscription")
-    || normalized.includes("saas")
-    || normalized.includes("cloud")
-    || normalized.includes("service");
-}
-
-function isHybridType(type: string): boolean {
-  return type.toLowerCase().includes("hybrid");
-}
-
 function typeBadgeClasses(type: string): string {
   const normalized = type.toLowerCase();
   if (normalized.includes("digital")) return "bg-violet-50 text-violet-700";
@@ -115,33 +106,6 @@ function typeBadgeClasses(type: string): string {
   if (normalized.includes("cloud") || normalized.includes("service")) return "bg-sky-50 text-sky-700";
   if (normalized.includes("hybrid")) return "bg-amber-50 text-amber-700";
   return "bg-emerald-50 text-emerald-700";
-}
-
-function pricingModel(type: string): string {
-  const normalized = type.toLowerCase();
-  if (normalized.includes("cloud")) return "Pay-As-You-Go (Consumption)";
-  if (normalized.includes("subscription") || normalized.includes("saas")) return "Per Account / Year";
-  if (normalized.includes("digital")) return "Per User / Year";
-  if (normalized.includes("hybrid")) return "Per Unit + Subscription";
-  return "Per Unit";
-}
-
-function quantityLabel(type: string): string {
-  const normalized = type.toLowerCase();
-  if (normalized.includes("cloud")) return "Min. Commitment";
-  if (normalized.includes("subscription") || normalized.includes("saas")) return "Account";
-  if (normalized.includes("digital")) return "User";
-  return "Units";
-}
-
-function formatLeadTime(product: VendorProduct, type: string): { primary: string; secondary?: string } {
-  if (isDigitalType(type) && !isHybridType(type)) {
-    return { primary: product.leadTime ? `${product.leadTime} Hours` : "Instant", secondary: "Provisioning" };
-  }
-  return {
-    primary: product.leadTime ? `${product.leadTime} Days` : "—",
-    secondary: isHybridType(type) ? "Instant" : undefined,
-  };
 }
 
 const MENU_ITEMS = [
@@ -625,14 +589,13 @@ export default function VendorProductsPage() {
                <tbody className="divide-y divide-gray-100">
                  {vendorProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
                    const initials = product.productName.slice(0, 2).toUpperCase();
-                   const type = productType(product);
-                   const digital = isDigitalType(type) && !isHybridType(type);
-                   const hybrid = isHybridType(type);
+                    const type = getProductType(product.physicalType);
+                    const hybrid = isHybridType(type);
                    const current = parseInt(product.stock || "0") || 0;
                    const reserved = parseInt(product.reservedStock || "0") || 0;
                    const available = Math.max(0, current - reserved);
-                   const availabilityStatus: StockStatus = available > 10 ? "In Stock" : available > 0 ? "Low Stock" : "Out of Stock";
-                   const leadTime = formatLeadTime(product, type);
+                    const availability = getAvailabilityByType(available, type);
+                    const leadTime = formatLeadTimeByType(product.leadTime, type);
                    return (
                      <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
                        <td className="px-3 py-4 min-w-[220px]">
@@ -657,30 +620,30 @@ export default function VendorProductsPage() {
                            <div className="font-mono text-xs text-gray-500">{product.masterProductCode || "—"}</div>
                          </div>
                        </td>
-                       <td className="px-3 py-4 align-middle max-w-[170px] text-xs text-gray-700">{pricingModel(type)}</td>
+                        <td className="px-3 py-4 align-middle max-w-[170px] text-xs text-gray-700">{getPricingModel(type)}</td>
                        <td className="px-3 py-4 align-middle whitespace-nowrap">
                          <div className="font-semibold text-gray-800 text-sm">
                            {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
                          </div>
                        </td>
                        <td className="px-3 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
-                         {product.moq || "—"} <span className="text-xs text-gray-500">{quantityLabel(type)}</span>
+                          {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
                        </td>
                        <td className="px-3 py-4 align-middle whitespace-nowrap">
-                         {digital ? (
+                          {availability.isUnlimited ? (
                            <div className="space-y-1">
-                             <div className="font-semibold text-sm text-gray-800">Unlimited</div>
+                              <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
                              <div className="text-xs font-medium text-emerald-600">Instant</div>
                            </div>
                          ) : (
                            <div className="space-y-1">
-                             <div className="font-semibold text-sm text-gray-800">{available} Units</div>
+                              <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
                              <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
-                               availabilityStatus === "In Stock" ? "bg-emerald-50 text-emerald-700" :
-                               availabilityStatus === "Low Stock" ? "bg-amber-50 text-amber-700" :
+                                availability.status === "In Stock" ? "bg-emerald-50 text-emerald-700" :
+                                availability.status === "Low Stock" ? "bg-amber-50 text-amber-700" :
                                "bg-red-50 text-red-600"
                              }`}>
-                               {availabilityStatus}
+                                {availability.status}
                              </span>
                            </div>
                          )}
