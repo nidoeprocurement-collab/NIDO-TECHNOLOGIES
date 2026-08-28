@@ -629,6 +629,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const [vendorPanelAlign, setVendorPanelAlign] = useState<"left" | "right">("left");
   const [vendorSearch, setVendorSearch] = useState("");
   const [liked, setLiked] = useState(false);
   const vendorSelectionRef = useRef<HTMLDivElement>(null);
@@ -802,7 +803,16 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
         <p className="text-[10px] text-gray-500 mb-1">Vendor</p>
         <button
           type="button"
-          onClick={() => setVendorPanelOpen(o => !o)}
+          onClick={() => {
+            if (!vendorPanelOpen) {
+              const rect = vendorSelectionRef.current?.getBoundingClientRect();
+              const panelWidth = Math.min(600, window.innerWidth - 24);
+              setVendorPanelAlign(
+                rect && rect.left + panelWidth > window.innerWidth - 16 ? "right" : "left",
+              );
+            }
+            setVendorPanelOpen(o => !o);
+          }}
           className="w-full flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-2 text-left hover:border-blue-300 transition-colors bg-white"
         >
           <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
@@ -820,7 +830,10 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
         {/* Vendor dropdown panel */}
         {vendorPanelOpen && (
-          <div className="absolute left-0 top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden" style={{ width: "min(700px, calc(100vw - 32px))" }}>
+          <div
+            className={`absolute ${vendorPanelAlign === "right" ? "right-0" : "left-0"} top-[calc(100%+4px)] z-30 bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-900/10 overflow-hidden`}
+            style={{ width: "min(600px, calc(100vw - 24px))" }}
+          >
             {/* Header */}
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-[12px] font-bold text-gray-800">Select Vendor</p>
@@ -925,16 +938,6 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
               {filteredVendors.length === 0 && (
                 <div className="px-3 py-4 text-center text-[11px] text-gray-400">No vendors found</div>
               )}
-            </div>
-            {/* Add New Vendor footer */}
-            <div className="border-t border-gray-100 px-3 py-2">
-              <button
-                onClick={e => e.stopPropagation()}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                <Plus size={12} />
-                Add New Vendor
-              </button>
             </div>
           </div>
         )}
