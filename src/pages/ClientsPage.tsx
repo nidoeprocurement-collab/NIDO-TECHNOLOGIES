@@ -55,6 +55,17 @@ function formatBalance(val: any): string {
   return lakh >= 100 ? `₹${(lakh / 100).toFixed(1)} Cr` : `₹${lakh.toFixed(1)} L`
 }
 
+function formatContractDate(value?: string): string {
+  if (!value) return "—"
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
 function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${className}`}>
@@ -678,7 +689,8 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
                 <col style={{ width: "8%" }} />
                 <col style={{ width: "9%" }} />
                 <col style={{ width: "10%" }} />
-                <col style={{ width: "7%" }} />
+                 <col style={{ width: "10%" }} />
+                 <col style={{ width: "7%" }} />
               </colgroup>
               <thead>
                 <tr className="bg-gray-50 border-b text-xs text-gray-600">
@@ -689,7 +701,8 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
                   <th className="px-3 py-3 text-left">Tier</th>
                   <th className="px-3 py-3 text-left">City</th>
                   <th className="px-3 py-3 text-left">Status</th>
-                  <th className="px-3 py-3 text-left">Balance</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Contract Start</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Contract End</th>
                   <th className="px-3 py-3 text-center">Actions</th>
                 </tr>
               </thead>
@@ -761,11 +774,12 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
                       </Badge>
                     </td>
 
-                    {/* Opening Balance */}
-                    <td className="px-3 py-3">
-                      <span className={`text-sm font-semibold ${c.openingBalance && parseFloat(c.openingBalance) > 0 ? "text-gray-800" : "text-gray-300"}`}>
-                        {formatBalance(c.openingBalance)}
-                      </span>
+                    {/* Contract dates */}
+                    <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {formatContractDate(c.contractStartDate)}
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-600 whitespace-nowrap">
+                      {formatContractDate(c.contractEndDate)}
                     </td>
 
                     {/* Actions */}
