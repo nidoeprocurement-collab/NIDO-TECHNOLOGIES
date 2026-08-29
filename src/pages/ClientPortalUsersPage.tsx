@@ -83,7 +83,7 @@ export default function ClientPortalUsersPage({ readOnly = false }: ClientPortal
   }, [clientId]);
 
   const openAdd = () => {
-    setForm(BLANK_FORM);
+    setForm({ ...BLANK_FORM, role: getPortalRoleNames(clientId)[0] || BLANK_FORM.role });
     setEditingId(null);
     setShowForm(true);
   };

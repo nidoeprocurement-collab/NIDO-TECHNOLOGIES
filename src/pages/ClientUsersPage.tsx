@@ -27,7 +27,6 @@ import {
 } from "recharts";
 import { servicesData } from "./ClientServicesPage";
 import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
-import { CircleCheck } from "./ClientRolesPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getPortalUsersByClient, getPortalRoles, PORTAL_MODULES, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
@@ -103,7 +102,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
     reportingManager: "",
     gender: "",
     joiningDate: "",
-    role:"",
+    role: getPortalRoles(clientId || "")[0]?.name || "",
     orgAccess: clientName || "",
     dataVisibility: "All Data",
     locationAccess: "All Locations",
@@ -149,18 +148,9 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
   // Client users only receive permissions for modules available in their
   // client portal, never the internal NIDO platform modules.
   const addUserModules = [...PORTAL_MODULES];
-  const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"];
-  const initPerms = () => {
-    const out: Record<string, Record<string, boolean>> = {};
-    addUserModules.forEach((m) => {
-      out[m] = {};
-      addUserPermCols.forEach((c) => { out[m][c] = false; });
-    });
-    return out;
-  };
-  const [perms, setPerms] = useState<Record<string, Record<string, boolean>>>(initPerms);
-  const togglePerm = (mod: string, col: string) =>
-    setPerms((prev) => ({ ...prev, [mod]: { ...prev[mod], [col]: !prev[mod][col] } }));
+  const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"] as const;
+  const inheritedPermissions = getPortalRoles(clientId || "")
+    .find(role => role.name === form.role)?.permissions ?? [];
 
   // Expenses
   const [expenseForm, setExpenseForm] = useState({
@@ -386,7 +376,6 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                       <label className={labelCls}>Status <span className="text-red-400">*</span></label>
                       <select value={form.status} onChange={set("status")} className={inputCls + " appearance-none text-gray-700"}>
                         <option>Active</option>
-                        <option>Pending</option>
                         <option>Inactive</option>
                       </select>
                     </div>
@@ -449,7 +438,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
               <div className="border border-gray-100 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                   <p className="text-xs font-semibold text-gray-700">Module Permissions</p>
-                  <p className="text-[10px] text-gray-400">Toggle access per module</p>
+                  <p className="text-[10px] text-gray-400">Inherited from the selected role</p>
                 </div>
                 <table className="w-full text-xs">
                   <thead>
@@ -466,10 +455,16 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                         <td className="px-4 py-2.5 text-gray-700 font-medium text-[11px]">{mod}</td>
                         {addUserPermCols.map((col) => (
                           <td key={col} className="px-3 py-2.5 text-center">
-                            <CircleCheck
-                              checked={!!perms[mod]?.[col]}
-                              onChange={() => togglePerm(mod, col)}
-                            />
+                            <span
+                              aria-label={`${col} ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] ? "enabled" : "disabled"}`}
+                              className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${
+                                inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
+                                  ? "border-blue-500 bg-blue-500"
+                                  : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </span>
                           </td>
                         ))}
                       </tr>
@@ -956,15 +951,9 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const addUserModules = [...PORTAL_MODULES];
-  const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"];
-  const initPerms = () => {
-    const out: Record<string, Record<string, boolean>> = {};
-    addUserModules.forEach((m) => { out[m] = {}; addUserPermCols.forEach((c) => { out[m][c] = true; }); });
-    return out;
-  };
-  const [perms, setPerms] = useState<Record<string, Record<string, boolean>>>(initPerms);
-  const togglePerm = (mod: string, col: string) =>
-    setPerms((prev) => ({ ...prev, [mod]: { ...prev[mod], [col]: !prev[mod][col] } }));
+  const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"] as const;
+  const inheritedPermissions = getPortalRoles(clientId || "")
+    .find(role => role.name === form.role)?.permissions ?? [];
 
   const [expenseForm, setExpenseForm] = useState({ monthlyLimit: "50000", annualLimit: "500000", currency: "INR", approvalRequired: true, approvalThreshold: "5000", categories: [] as string[] });
   const expenseCategories = ["Hardware", "Software", "Travel", "Furniture", "Accessories", "Training"];
@@ -1076,7 +1065,7 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                   <div>
                     <label className={labelCls}>Status <span className="text-red-400">*</span></label>
                     <select value={form.status} onChange={set("status")} className={inputCls + " appearance-none text-gray-700"}>
-                      <option>Active</option><option>Pending</option><option>Inactive</option>
+                       <option>Active</option><option>Inactive</option>
                     </select>
                   </div>
                 </div>
@@ -1122,7 +1111,7 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
           <div className="border border-gray-100 rounded-xl overflow-hidden">
             <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
               <p className="text-xs font-semibold text-gray-700">Module Permissions</p>
-              <p className="text-[10px] text-gray-400">Toggle access per module</p>
+              <p className="text-[10px] text-gray-400">Inherited from the selected role</p>
             </div>
             <table className="w-full text-xs">
               <thead>
@@ -1137,7 +1126,16 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                     <td className="px-4 py-2.5 text-gray-700 font-medium text-[11px]">{mod}</td>
                     {addUserPermCols.map((col) => (
                       <td key={col} className="px-3 py-2.5 text-center">
-                        <CircleCheck checked={!!perms[mod]?.[col]} onChange={() => togglePerm(mod, col)} />
+                        <span
+                          aria-label={`${col} ${inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] ? "enabled" : "disabled"}`}
+                          className={`inline-flex w-4 h-4 rounded-full border-2 items-center justify-center ${
+                            inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"]
+                              ? "border-blue-500 bg-blue-500"
+                              : "border-gray-300 bg-white"
+                          }`}
+                        >
+                          {inheritedPermissions.find(permission => permission.module === mod)?.[col.toLowerCase() as "view" | "create" | "edit" | "delete" | "approve"] && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </span>
                       </td>
                     ))}
                   </tr>
@@ -2653,7 +2651,17 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         email: user.email,
         name: user.name,
         role: user.role,
+        status: user.status === "Active" ? "active" : "inactive",
       });
+      // Use the canonical persisted record (and its ID) rather than the
+      // temporary table record. This keeps edit/deactivate actions live.
+      const persisted = getPortalUsersByClient(clientId).find(
+        candidate => candidate.email.toLowerCase() === user.email.toLowerCase(),
+      );
+      if (persisted) {
+        setUsers(prev => [portalUserToRecord(persisted), ...prev.filter(item => item.id !== persisted.id)]);
+        return;
+      }
     }
     setUsers((prev) => [user, ...prev]);
   };

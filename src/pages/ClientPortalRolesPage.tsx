@@ -9,6 +9,8 @@ import {
   getPortalUsersByClient,
   updatePortalUser,
   PORTAL_MODULES,
+  PORTAL_MODULE_CATALOG,
+  getPortalModuleDescription,
   createPortalRolePermission,
   type PortalRole,
   type PortalRolePermission,
@@ -27,6 +29,7 @@ export default function ClientPortalRolesPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
+  const [moduleToAdd, setModuleToAdd] = useState('');
 
   useEffect(() => {
     const refresh = () => {
@@ -83,14 +86,27 @@ export default function ClientPortalRolesPage() {
     const updated = roles.map(item => item.id === role.id
       ? { ...item, name: name.trim(), description: description?.trim() ?? item.description }
       : item);
+    savePortalRoles(clientId, updated);
+    setRoles(updated);
+    setSelected(updated.find(item => item.id === role.id) ?? null);
     if (name.trim() !== role.name) {
       getPortalUsersByClient(clientId)
         .filter(user => user.role === role.name)
         .forEach(user => updatePortalUser(user.id, { role: name.trim() }));
     }
+  };
+
+  const addModule = () => {
+    if (!isAdmin || !selected || !moduleToAdd) return;
+    const updated = roles.map(role => role.id !== selected.id
+      ? role
+      : role.permissions.some(permission => permission.module === moduleToAdd)
+        ? role
+        : { ...role, permissions: [...role.permissions, createPortalRolePermission(moduleToAdd)] });
     savePortalRoles(clientId, updated);
     setRoles(updated);
-    setSelected(updated.find(item => item.id === role.id) ?? null);
+    setSelected(updated.find(role => role.id === selected.id) ?? null);
+    setModuleToAdd('');
   };
 
   const deleteRole = (role: PortalRole) => {
@@ -174,10 +190,30 @@ export default function ClientPortalRolesPage() {
                     <p className="text-xs text-gray-500 mt-0.5">{selected.description}</p>
                   )}
                 </div>
+                <div className="px-6 py-2 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
+                  <select
+                    value={moduleToAdd}
+                    onChange={event => setModuleToAdd(event.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                    disabled={!isAdmin}
+                  >
+                    <option value="">Add module...</option>
+                    {PORTAL_MODULE_CATALOG
+                      .filter(module => !selected.permissions.some(permission => permission.module === module.name))
+                      .map(module => <option key={module.name} value={module.name}>{module.name}</option>)}
+                  </select>
+                  <Button variant="outline" size="sm" onClick={addModule} disabled={!isAdmin || !moduleToAdd}>
+                    Add Module
+                  </Button>
+                  <span className="text-[11px] text-gray-400 ml-auto">
+                    {selected.permissions.length} of {PORTAL_MODULES.length} modules
+                  </span>
+                </div>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b text-xs text-gray-500">
                       <th className="px-6 py-2 text-left">Module</th>
+                      <th className="px-6 py-2 text-left">Details</th>
                       <th className="px-6 py-2 text-center">View</th>
                       <th className="px-6 py-2 text-center">Create</th>
                       <th className="px-6 py-2 text-center">Edit</th>
@@ -188,6 +224,7 @@ export default function ClientPortalRolesPage() {
                     {selected.permissions.map(p => (
                       <tr key={p.module} className="border-b last:border-b-0 hover:bg-gray-50">
                         <td className="px-6 py-2 font-medium text-gray-800">{p.module}</td>
+                        <td className="px-6 py-2 text-xs text-gray-500">{getPortalModuleDescription(p.module)}</td>
                         {(['view', 'create', 'edit', 'delete'] as const).map(perm => (
                           <td
                             key={perm}

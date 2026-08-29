@@ -7,6 +7,8 @@ import {
   getPortalUsersByClient,
   updatePortalUser,
   PORTAL_MODULES,
+  PORTAL_MODULE_CATALOG,
+  getPortalModuleDescription,
   createPortalRolePermission,
   type PortalRole,
   type PortalRolePermission,
@@ -891,9 +893,12 @@ export default function ClientRolesPage() {
     const name = window.prompt("Role name", selected.name)?.trim();
     if (!name || name === selected.name) return;
     const description = window.prompt("Role description", selected.description) ?? selected.description;
+    const updatedRoles = roles.map(role => role.id === selected.id ? { ...role, name, description } : role);
+    // Persist the new role name before updating users. The user store rejects
+    // assignments to roles that are not yet present in the role catalog.
+    persist(updatedRoles);
     getPortalUsersByClient(clientId).filter(user => user.role === selected.name)
       .forEach(user => updatePortalUser(user.id, { role: name }));
-    persist(roles.map(role => role.id === selected.id ? { ...role, name, description } : role));
   };
 
   return (
@@ -932,26 +937,30 @@ export default function ClientRolesPage() {
               </div>
               <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit role</button>
             </div>
-            <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
+              <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
               <select value={moduleToAdd} onChange={event => setModuleToAdd(event.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
                 <option value="">Add module...</option>
-                {PORTAL_MODULES.filter(module => !selected.permissions.some(item => item.module === module))
-                  .map(module => <option key={module} value={module}>{module}</option>)}
+                  {PORTAL_MODULE_CATALOG.filter(module => !selected.permissions.some(item => item.module === module.name))
+                   .map(module => <option key={module.name} value={module.name}>{module.name}</option>)}
               </select>
               <button onClick={addModule} disabled={!moduleToAdd} className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40">Add Module</button>
-              <span className="text-[11px] text-gray-400 ml-auto">{selected.permissions.length} modules</span>
+               <span className="text-[11px] text-gray-400 ml-auto">
+                 {selected.permissions.length} of {PORTAL_MODULE_CATALOG.length} modules
+               </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead><tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-2.5 font-semibold text-gray-500">MODULE</th>
+                   <th className="text-left px-4 py-2.5 font-semibold text-gray-500">MODULE</th>
+                   <th className="text-left px-3 py-2.5 font-semibold text-gray-500">DETAILS</th>
                   {CLIENT_ACTIONS.map(action => <th key={action} className="text-center px-3 py-2.5 font-semibold text-gray-500 uppercase">{action}</th>)}
                 </tr></thead>
                 <tbody>
                   {selected.permissions.map((permission, index) => (
                     <tr key={permission.module} className={index % 2 ? "bg-gray-50/50" : "bg-white"}>
                       <td className="px-4 py-2.5 font-medium text-gray-700">{permission.module}</td>
+                       <td className="px-3 py-2.5 text-[11px] text-gray-400 min-w-[220px]">{getPortalModuleDescription(permission.module)}</td>
                       {CLIENT_ACTIONS.map(action => (
                         <td key={action} className="text-center px-3 py-2.5">
                           <button onClick={() => togglePermission(permission.module, action)} className={`w-4 h-4 rounded-full border-2 inline-flex items-center justify-center ${permission[action] ? "bg-blue-600 border-blue-600" : "border-gray-300 hover:border-blue-300"}`}>

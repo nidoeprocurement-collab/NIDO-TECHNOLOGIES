@@ -38,10 +38,25 @@ export interface PortalRole {
   permissions: PortalRolePermission[];
 }
 
-export const PORTAL_MODULES = [
-  'Dashboard', 'Catalog', 'Orders', 'Services', 'Invoices',
-  'Reports', 'Notifications', 'Addresses', 'Contracts',
+export const PORTAL_MODULE_CATALOG = [
+  { name: 'Dashboard', description: 'Client portal overview and account activity.' },
+  { name: 'Catalog', description: 'Browse and manage the products available to this client.' },
+  { name: 'Orders', description: 'Create, review, and track client orders.' },
+  { name: 'Services', description: 'View and manage active client services.' },
+  { name: 'Invoices', description: 'View invoices, balances, and payment status.' },
+  { name: 'Reports', description: 'View client purchasing and spend reports.' },
+  { name: 'Notifications', description: 'View important account and order notifications.' },
+  { name: 'Addresses', description: 'Manage delivery and billing addresses.' },
+  { name: 'Contracts', description: 'View current client contracts and terms.' },
+  { name: 'Support', description: 'Create and track client support requests.' },
 ] as const;
+
+export const PORTAL_MODULES = PORTAL_MODULE_CATALOG.map(module => module.name);
+
+export function getPortalModuleDescription(module: string): string {
+  return PORTAL_MODULE_CATALOG.find(item => item.name === module)?.description
+    || 'Client portal module.';
+}
 
 const ROLE_BLUEPRINTS: Array<Pick<PortalRole, 'id' | 'name' | 'description'> & { view: string[]; create?: string[]; edit?: string[] }> = [
   { id: 'r1', name: 'Client Admin', description: 'Full access to all portal modules', view: [...PORTAL_MODULES], create: [...PORTAL_MODULES], edit: [...PORTAL_MODULES] },
@@ -188,10 +203,17 @@ export function savePortalUsers(users: PortalUser[]): void {
 export function addPortalUser(user: PortalUser): void {
   const users = getPortalUsers();
   const idx = users.findIndex(u => u.id === user.id);
+  const availableRoles = getPortalRoles(user.clientId);
+  const role = availableRoles.some(item => item.name === user.role)
+    ? user.role
+    : availableRoles.find(item => item.name === 'Employee')?.name
+      || availableRoles[0]?.name
+      || 'Employee';
+  const normalizedUser = { ...user, role };
   if (idx > -1) {
-    users[idx] = user;
+    users[idx] = normalizedUser;
   } else {
-    users.push(user);
+    users.push(normalizedUser);
   }
   savePortalUsers(users);
 }
@@ -200,7 +222,12 @@ export function updatePortalUser(id: string, updates: Partial<PortalUser>): void
   const users = getPortalUsers();
   const idx = users.findIndex(u => u.id === id);
   if (idx > -1) {
-    users[idx] = { ...users[idx], ...updates };
+    const next = { ...users[idx], ...updates };
+    if (updates.role) {
+      const roleNames = new Set(getPortalRoleNames(next.clientId));
+      if (!roleNames.has(updates.role)) next.role = users[idx].role;
+    }
+    users[idx] = next;
     savePortalUsers(users);
   }
 }
@@ -309,25 +336,32 @@ export function provisionClientPortal(
 export function provisionPortalUser(
   clientId: string,
   clientName: string,
-  details: { email: string; name: string; role?: string },
+  details: { email: string; name: string; role?: string; status?: 'active' | 'inactive' },
 ): ProvisionResult {
   const email = details.email.trim().toLowerCase();
   const password = `User@${randomSuffix()}!`;
   const existing = getPortalUsers().find(
     user => user.clientId === clientId && user.email.trim().toLowerCase() === email,
   );
+  const userId = existing?.id || `portal-${clientId}-${Date.now()}`;
+  const availableRoles = getPortalRoles(clientId);
+  const role = availableRoles.some(item => item.name === details.role)
+    ? details.role!
+    : availableRoles.find(item => item.name === 'Employee')?.name
+      || availableRoles[0]?.name
+      || 'Employee';
   addPortalUser({
-    id: existing?.id || `portal-${clientId}-${Date.now()}`,
+    id: userId,
     email,
     password,
     name: details.name.trim(),
     userType: existing?.userType || 'client_user',
     clientId,
     clientName,
-    role: details.role || existing?.role || 'Employee',
-    status: 'active',
+    role: role || existing?.role || 'Employee',
+    status: details.status || 'active',
     createdAt: existing?.createdAt || new Date().toISOString(),
     provisionedAt: new Date().toISOString(),
   });
-  return { email, password, userId: existing?.id || `portal-${clientId}-${Date.now()}` };
+  return { email, password, userId };
 }

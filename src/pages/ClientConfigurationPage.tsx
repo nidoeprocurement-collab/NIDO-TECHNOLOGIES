@@ -1,8 +1,31 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
-import { StatusBadge, usersData } from "./ClientUsersPage";
+import { StatusBadge } from "./ClientUsersPage";
 import ClientPricingSettingsPanel from "./ClientPricingSettingsPanel";
 import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
+import { getPortalRoles, getPortalUsersByClient, updatePortalUser, type PortalUser } from "@/lib/portalUserStore";
+
+type InviteUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: "Active" | "Inactive";
+  initials: string;
+  color: string;
+};
+
+function toInviteUser(user: PortalUser): InviteUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status === "active" ? "Active" : "Inactive",
+    initials: user.name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "U",
+    color: "bg-blue-500",
+  };
+}
 
 export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { clientId?: string }) {
   const [configTab, setConfigTab] = useState("General");
@@ -23,10 +46,24 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
   const [selectedInvites, setSelectedInvites] = useState<Set<string>>(new Set());
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
   const [showInviteConfirm, setShowInviteConfirm] = useState(false);
+  const [portalUsers, setPortalUsers] = useState<InviteUser[]>(() =>
+    getPortalUsersByClient(clientId).map(toInviteUser),
+  );
 
-  const uniqueRoles = ["All Roles", ...Array.from(new Set(usersData.map((u) => u.role)))];
+  useEffect(() => {
+    const refresh = () => setPortalUsers(getPortalUsersByClient(clientId).map(toInviteUser));
+    refresh();
+    window.addEventListener("nidoPortalUsersUpdated", refresh);
+    window.addEventListener("nidoPortalRolesUpdated", refresh);
+    return () => {
+      window.removeEventListener("nidoPortalUsersUpdated", refresh);
+      window.removeEventListener("nidoPortalRolesUpdated", refresh);
+    };
+  }, [clientId]);
 
-  const inviteFiltered = usersData.filter((u) => {
+  const uniqueRoles = ["All Roles", ...getPortalRoles(clientId).map((role) => role.name)];
+
+  const inviteFiltered = portalUsers.filter((u) => {
     const matchSearch =
       u.name.toLowerCase().includes(inviteSearch.toLowerCase()) ||
       u.email.toLowerCase().includes(inviteSearch.toLowerCase()) ||
@@ -59,6 +96,9 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
   };
 
   const confirmAndSendInvites = () => {
+    // This is the local-mode equivalent of sending an invitation: selected
+    // portal accounts become active in the canonical store immediately.
+    selectedInvites.forEach(id => updatePortalUser(id, { status: "active" }));
     setInvitedIds((prev) => new Set([...prev, ...selectedInvites]));
     setSelectedInvites(new Set());
     setShowInviteConfirm(false);
@@ -155,7 +195,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
                     You are about to send invitations to <span className="font-semibold text-gray-800">{selectedInvites.size} user{selectedInvites.size > 1 ? "s" : ""}</span>. They will receive an email with access instructions.
                   </p>
                   <div className="border border-gray-100 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
-                    {usersData.filter((u) => selectedInvites.has(u.id)).map((user, i) => (
+                    {portalUsers.filter((u) => selectedInvites.has(u.id)).map((user, i) => (
                       <div key={user.id} className={`flex items-center gap-3 px-2 py-2.5 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/40"}`}>
                         <div className={`w-6 h-6 rounded-full ${user.color} flex items-center justify-center text-white text-[9px] font-bold shrink-0`}>{user.initials}</div>
                         <div className="flex-1 min-w-0">
