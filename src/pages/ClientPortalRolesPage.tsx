@@ -3,125 +3,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ShieldCheck, Plus, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { getPortalUsersByClient, updatePortalUser } from '@/lib/portalUserStore';
-
-interface RolePermission {
-  module: string;
-  view: boolean;
-  create: boolean;
-  edit: boolean;
-  delete: boolean;
-}
-
-interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: RolePermission[];
-}
-
-const MODULES = ['Dashboard', 'Catalog', 'Orders', 'Services', 'Invoices', 'Reports', 'Notifications', 'Addresses', 'Contracts'];
-
-const DEFAULT_ROLE_TEMPLATES: Role[] = [
-  {
-    id: 'r1',
-    name: 'Client Admin',
-    description: 'Full access to all portal modules',
-    permissions: MODULES.map(m => ({ module: m, view: true, create: true, edit: true, delete: true })),
-  },
-  {
-    id: 'r2',
-    name: 'Procurement Manager',
-    description: 'Can manage orders and catalog',
-    permissions: MODULES.map(m => ({
-      module: m,
-      view: true,
-      create: ['Catalog', 'Orders'].includes(m),
-      edit: ['Catalog', 'Orders'].includes(m),
-      delete: false,
-    })),
-  },
-  {
-    id: 'r3',
-    name: 'Purchase Executive',
-    description: 'Can place and track orders',
-    permissions: MODULES.map(m => ({
-      module: m,
-      view: true,
-      create: m === 'Orders',
-      edit: m === 'Orders',
-      delete: false,
-    })),
-  },
-  {
-    id: 'r4',
-    name: 'Finance',
-    description: 'Access to invoices and reports',
-    permissions: MODULES.map(m => ({
-      module: m,
-      view: ['Dashboard', 'Invoices', 'Reports'].includes(m),
-      create: false,
-      edit: false,
-      delete: false,
-    })),
-  },
-  {
-    id: 'r5',
-    name: 'Store Manager',
-    description: 'Manages catalog and services',
-    permissions: MODULES.map(m => ({
-      module: m,
-      view: true,
-      create: ['Catalog', 'Services'].includes(m),
-      edit: ['Catalog', 'Services'].includes(m),
-      delete: false,
-    })),
-  },
-  {
-    id: 'r6',
-    name: 'Approver',
-    description: 'Reviews and approves orders',
-    permissions: MODULES.map(m => ({
-      module: m,
-      view: ['Dashboard', 'Orders', 'Services'].includes(m),
-      create: false,
-      edit: m === 'Orders',
-      delete: false,
-    })),
-  },
-  {
-    id: 'r7',
-    name: 'Employee',
-    description: 'Browse catalog and submit requests',
-    permissions: MODULES.map(m => ({
-      module: m,
-      view: ['Dashboard', 'Catalog', 'Orders', 'Services', 'Notifications'].includes(m),
-      create: ['Orders'].includes(m),
-      edit: false,
-      delete: false,
-    })),
-  },
-  {
-    id: 'r8',
-    name: 'Viewer',
-    description: 'Read-only access across all modules',
-    permissions: MODULES.map(m => ({ module: m, view: true, create: false, edit: false, delete: false })),
-  },
-];
-
-const STORE_KEY_PREFIX = 'nido_portal_roles_';
-
-function getRoles(clientId: string): Role[] {
-  try {
-    const raw = localStorage.getItem(`${STORE_KEY_PREFIX}${clientId}`);
-    if (raw) return JSON.parse(raw);
-  } catch { /* */ }
-  return DEFAULT_ROLE_TEMPLATES;
-}
-
-function saveRoles(clientId: string, roles: Role[]): void {
-  localStorage.setItem(`${STORE_KEY_PREFIX}${clientId}`, JSON.stringify(roles));
-}
+import {
+  getPortalRoles,
+  savePortalRoles,
+  getPortalUsersByClient,
+  updatePortalUser,
+  PORTAL_MODULES,
+  createPortalRolePermission,
+  type PortalRole,
+  type PortalRolePermission,
+} from '@/lib/portalUserStore';
 
 const Tick = ({ v }: { v: boolean }) =>
   v ? <Check size={14} className="text-green-600" /> : <X size={14} className="text-gray-300" />;
@@ -131,15 +22,15 @@ export default function ClientPortalRolesPage() {
   const clientId = user?.clientId ?? '';
   const isAdmin = user?.userType === 'client_admin' || user?.userType === 'nido_admin';
 
-  const [roles, setRoles] = useState<Role[]>(() => getRoles(clientId));
-  const [selected, setSelected] = useState<Role | null>(roles[0] ?? null);
+  const [roles, setRoles] = useState<PortalRole[]>(() => getPortalRoles(clientId));
+  const [selected, setSelected] = useState<PortalRole | null>(roles[0] ?? null);
   const [showAdd, setShowAdd] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleDesc, setNewRoleDesc] = useState('');
 
   useEffect(() => {
     const refresh = () => {
-      const next = getRoles(clientId);
+      const next = getPortalRoles(clientId);
       setRoles(next);
       setSelected(current => current ? next.find(r => r.id === current.id) ?? next[0] ?? null : next[0] ?? null);
     };
@@ -153,38 +44,38 @@ export default function ClientPortalRolesPage() {
 
   const handleAddRole = () => {
     if (!newRoleName.trim()) return;
-    const r: Role = {
+    const r: PortalRole = {
       id: `r-${Date.now()}`,
       name: newRoleName.trim(),
       description: newRoleDesc.trim(),
-      permissions: MODULES.map(m => ({ module: m, view: false, create: false, edit: false, delete: false })),
+      permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module)),
     };
     const updated = [...roles, r];
     setRoles(updated);
-    saveRoles(clientId, updated);
+    savePortalRoles(clientId, updated);
     setSelected(r);
     setShowAdd(false);
     setNewRoleName('');
     setNewRoleDesc('');
   };
 
-  const togglePerm = (roleId: string, module: string, perm: keyof RolePermission) => {
+  const togglePerm = (roleId: string, module: string, perm: keyof Omit<PortalRolePermission, 'module'>) => {
     if (!isAdmin || perm === 'module') return;
     const updated = roles.map(r => {
       if (r.id !== roleId) return r;
       return {
         ...r,
         permissions: r.permissions.map(p =>
-          p.module === module ? { ...p, [perm]: !p[perm as keyof RolePermission] } : p
+          p.module === module ? { ...p, [perm]: !p[perm as keyof PortalRolePermission] } : p
         ),
       };
     });
     setRoles(updated);
-    saveRoles(clientId, updated);
+    savePortalRoles(clientId, updated);
     setSelected(updated.find(r => r.id === roleId) ?? null);
   };
 
-  const editRole = (role: Role) => {
+  const editRole = (role: PortalRole) => {
     if (!isAdmin) return;
     const name = window.prompt('Role name', role.name);
     if (!name?.trim()) return;
@@ -197,12 +88,12 @@ export default function ClientPortalRolesPage() {
         .filter(user => user.role === role.name)
         .forEach(user => updatePortalUser(user.id, { role: name.trim() }));
     }
-    saveRoles(clientId, updated);
+    savePortalRoles(clientId, updated);
     setRoles(updated);
     setSelected(updated.find(item => item.id === role.id) ?? null);
   };
 
-  const deleteRole = (role: Role) => {
+  const deleteRole = (role: PortalRole) => {
     if (!isAdmin) return;
     const assigned = getPortalUsersByClient(clientId).filter(user => user.role === role.name).length;
     if (assigned > 0) {
@@ -211,7 +102,7 @@ export default function ClientPortalRolesPage() {
     }
     if (!window.confirm(`Delete the role "${role.name}"? This cannot be undone.`)) return;
     const updated = roles.filter(item => item.id !== role.id);
-    saveRoles(clientId, updated);
+    savePortalRoles(clientId, updated);
     setRoles(updated);
     setSelected(updated[0] ?? null);
   };

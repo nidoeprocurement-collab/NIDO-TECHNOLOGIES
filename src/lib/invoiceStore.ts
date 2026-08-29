@@ -258,7 +258,9 @@ export function getInvoiceById(id: string): StoredInvoice | undefined {
 }
 
 export function saveInvoice(invoice: StoredInvoice): void {
-  const invoices = getInvoices();
+  // Save against the full collection so updating an active invoice never
+  // drops invoices that were intentionally archived.
+  const invoices = seedInvoices();
   const index = invoices.findIndex((item) => item.id === invoice.id);
   if (index >= 0) invoices[index] = invoice;
   else invoices.unshift(invoice);

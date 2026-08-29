@@ -5,7 +5,9 @@ import {
   getPortalRoles,
   savePortalRoles,
   getPortalUsersByClient,
+  updatePortalUser,
   PORTAL_MODULES,
+  createPortalRolePermission,
   type PortalRole,
   type PortalRolePermission,
 } from "@/lib/portalUserStore";
@@ -817,22 +819,6 @@ function LegacyClientRolesPage() {
   );
 }
 
-// Live client-scoped roles view. This is intentionally backed by the same
-// portal role store used by ClientPortalRolesPage, so users and permissions
-// never drift between the Clients area and the portal.
-const CLIENT_MODULES = [
-  ...PORTAL_MODULES,
-  "Purchase Orders",
-  "Vendors",
-  "Clients",
-  "Inventory",
-  "Transactions",
-  "User Management",
-  "Configuration",
-  "Approvals",
-  "Audit Trail",
-].filter((module, index, all) => all.indexOf(module) === index);
-
 const CLIENT_ACTIONS: Array<keyof Omit<PortalRolePermission, "module">> = [
   "view", "create", "edit", "delete", "approve", "export", "import", "manage", "configure",
 ];
@@ -876,7 +862,7 @@ export default function ClientRolesPage() {
 
   const addModule = () => {
     if (!selected || !moduleToAdd) return;
-    const permission: PortalRolePermission = { module: moduleToAdd, view: false, create: false, edit: false, delete: false };
+    const permission = createPortalRolePermission(moduleToAdd);
     persist(roles.map(role => role.id !== selected.id ? role : (
       role.permissions.some(item => item.module === moduleToAdd)
         ? role
@@ -891,7 +877,7 @@ export default function ClientRolesPage() {
       id: `client-role-${Date.now()}`,
       name: newRoleName.trim(),
       description: newRoleDescription.trim(),
-      permissions: CLIENT_MODULES.map(module => ({ module, view: false, create: false, edit: false, delete: false })),
+      permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module)),
     };
     persist([...roles, role]);
     setSelectedId(role.id);
@@ -906,15 +892,8 @@ export default function ClientRolesPage() {
     if (!name || name === selected.name) return;
     const description = window.prompt("Role description", selected.description) ?? selected.description;
     getPortalUsersByClient(clientId).filter(user => user.role === selected.name)
-      .forEach(user => {
-        // Keep every assigned user aligned with the role being renamed.
-        const allUsers = JSON.parse(localStorage.getItem("nido_portal_users") || "[]");
-        const index = allUsers.findIndex((item: { id: string }) => item.id === user.id);
-        if (index >= 0) allUsers[index] = { ...allUsers[index], role: name };
-        localStorage.setItem("nido_portal_users", JSON.stringify(allUsers));
-      });
+      .forEach(user => updatePortalUser(user.id, { role: name }));
     persist(roles.map(role => role.id === selected.id ? { ...role, name, description } : role));
-    window.dispatchEvent(new Event("nidoPortalUsersUpdated"));
   };
 
   return (
@@ -957,7 +936,7 @@ export default function ClientRolesPage() {
               <select value={moduleToAdd} onChange={event => setModuleToAdd(event.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
                 <option value="">Add module...</option>
-                {CLIENT_MODULES.filter(module => !selected.permissions.some(item => item.module === module))
+                {PORTAL_MODULES.filter(module => !selected.permissions.some(item => item.module === module))
                   .map(module => <option key={module} value={module}>{module}</option>)}
               </select>
               <button onClick={addModule} disabled={!moduleToAdd} className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40">Add Module</button>

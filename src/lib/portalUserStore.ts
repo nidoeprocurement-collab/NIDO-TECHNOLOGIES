@@ -59,8 +59,7 @@ function defaultPortalRoles(): PortalRole[] {
     id: r.id,
     name: r.name,
     description: r.description,
-    permissions: PORTAL_MODULES.map(module => ({
-      module,
+    permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module, {
       view: r.view.includes(module),
       create: r.create?.includes(module) ?? false,
       edit: r.edit?.includes(module) ?? false,
@@ -69,17 +68,75 @@ function defaultPortalRoles(): PortalRole[] {
   }));
 }
 
+export function createPortalRolePermission(
+  module: string,
+  permission?: Partial<PortalRolePermission>,
+): PortalRolePermission {
+  return {
+    module,
+    view: Boolean(permission?.view),
+    create: Boolean(permission?.create),
+    edit: Boolean(permission?.edit),
+    delete: Boolean(permission?.delete),
+    approve: Boolean(permission?.approve),
+    export: Boolean(permission?.export),
+    import: Boolean(permission?.import),
+    manage: Boolean(permission?.manage),
+    configure: Boolean(permission?.configure),
+  };
+}
+
+function normalizePortalRoles(value: unknown): PortalRole[] {
+  if (!Array.isArray(value)) return defaultPortalRoles();
+
+  return value.map((candidate, index) => {
+    const role = candidate && typeof candidate === 'object'
+      ? candidate as Partial<PortalRole>
+      : {};
+    const storedPermissions = Array.isArray(role.permissions) ? role.permissions : [];
+    const permissionByModule = new Map(
+      storedPermissions
+        .filter((permission): permission is PortalRolePermission => (
+          Boolean(permission) &&
+          typeof permission === 'object' &&
+          typeof permission.module === 'string'
+        ))
+        .map(permission => [permission.module, permission]),
+    );
+
+    return {
+      id: String(role.id || `portal-role-${index + 1}`),
+      name: String(role.name || `Role ${index + 1}`),
+      description: String(role.description || ''),
+      permissions: PORTAL_MODULES.map(module => createPortalRolePermission(
+        module,
+        permissionByModule.get(module),
+      )),
+    };
+  });
+}
+
 export function getPortalRoles(clientId: string): PortalRole[] {
   try {
     const raw = localStorage.getItem(`${ROLE_STORE_PREFIX}${clientId}`);
-    return raw ? JSON.parse(raw) : defaultPortalRoles();
+    if (!raw) {
+      const defaults = defaultPortalRoles();
+      localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(defaults));
+      return defaults;
+    }
+    const normalized = normalizePortalRoles(JSON.parse(raw));
+    // Keep legacy saved roles compatible with the canonical portal module
+    // catalog and complete permission shape.
+    localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(normalized));
+    return normalized;
   } catch {
     return defaultPortalRoles();
   }
 }
 
 export function savePortalRoles(clientId: string, roles: PortalRole[]): void {
-  localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(roles));
+  const normalized = normalizePortalRoles(roles);
+  localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(normalized));
   window.dispatchEvent(new Event('nidoPortalRolesUpdated'));
 }
 
