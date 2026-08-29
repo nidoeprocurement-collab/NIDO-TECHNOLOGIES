@@ -37,6 +37,19 @@ export interface CatalogProduct {
   warranty: string;
 }
 
+/** Product names are unique in the master catalog, regardless of case or extra spacing. */
+export function normalizeCatalogProductName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+export function findCatalogProductByName(productName: string, excludeId?: string): CatalogProduct | undefined {
+  const normalizedName = normalizeCatalogProductName(productName);
+  if (!normalizedName) return undefined;
+  return getCatalogProducts().find(product =>
+    product.id !== excludeId && normalizeCatalogProductName(product.productName) === normalizedName
+  );
+}
+
 const STORE_KEY = 'nido_catalog_products';
 const COUNTER_KEY = 'nido_mpc_counter';
 const SEED_KEY = 'nido_catalog_seeded';
@@ -79,9 +92,15 @@ export function getMasterCatalogCategories(): string[] {
   return Array.from(seen).sort();
 }
 
-export function saveCatalogProduct(product: CatalogProduct): void {
+export function saveCatalogProduct(product: CatalogProduct): boolean {
   const products = getCatalogProducts();
   const idx = products.findIndex(p => p.id === product.id);
+  const duplicate = products.find(p =>
+    p.id !== product.id &&
+    normalizeCatalogProductName(p.productName) === normalizeCatalogProductName(product.productName)
+  );
+  if (duplicate) return false;
+
   if (idx >= 0) {
     products[idx] = product;
   } else {
@@ -217,6 +236,8 @@ export function removeArchivedProductFromDownstream(id: string, masterProductCod
       window.dispatchEvent(new Event('clientCatalogUpdated'));
     }
   } catch { /* never block */ }
+
+  return true;
 }
 
 export function generateMasterProductCode(): string {

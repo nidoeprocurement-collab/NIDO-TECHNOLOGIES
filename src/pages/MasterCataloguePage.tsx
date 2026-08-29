@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CATEGORY_SUBCATEGORIES } from '@/lib/categories';
-import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode, removeArchivedProductFromDownstream } from '@/lib/catalogStore';
+import { getCatalogProducts, deleteCatalogProduct, saveCatalogProduct, generateMasterProductCode, removeArchivedProductFromDownstream, findCatalogProductByName, normalizeCatalogProductName } from '@/lib/catalogStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -506,6 +506,15 @@ export default function CatalogUpdatesTab() {
 
   const handleAddItem = () => {
     if (!form.name.trim()) { toast.error('Item Name is required'); return; }
+    const duplicate = findCatalogProductByName(form.name, editingItem?.id)
+      || items.find(item =>
+        item.id !== editingItem?.id &&
+        normalizeCatalogProductName(item.name) === normalizeCatalogProductName(form.name)
+      );
+    if (duplicate) {
+      toast.error(`A product named "${'productName' in duplicate ? duplicate.productName : duplicate.name}" already exists in the master catalog.`);
+      return;
+    }
     const sku = autoSku ? generateSku() : form.sku;
     if (!sku.trim()) { toast.error('SKU is required'); return; }
 
@@ -657,7 +666,8 @@ export default function CatalogUpdatesTab() {
           return idx >= 0 ? row[idx] || '' : '';
         };
 
-        let added = 0;
+         let added = 0;
+         let skippedDuplicates = 0;
         for (let i = 1; i < nonEmpty.length; i++) {
           const row = parseCSVRow(nonEmpty[i]);
           const productName = col(row, 'product name');
@@ -719,14 +729,20 @@ export default function CatalogUpdatesTab() {
             warranty: col(row, 'warranty'),
           };
 
-          saveCatalogProduct(product);
-          added++;
+           if (saveCatalogProduct(product)) {
+             added++;
+           } else {
+             skippedDuplicates++;
+           }
         }
 
         if (added > 0) {
           loadFromStore();
-          toast.success(`${added} product(s) imported as Draft. Review and publish when ready.`);
+           toast.success(`${added} product(s) imported as Draft${skippedDuplicates ? ` · ${skippedDuplicates} duplicate${skippedDuplicates === 1 ? '' : 's'} skipped` : ''}. Review and publish when ready.`);
           setBulkImportOpen(false);
+         } else if (skippedDuplicates > 0) {
+           loadFromStore();
+           toast.error('All imported products already exist in the master catalog.');
         } else {
           toast.error('No valid rows found. Ensure "Product Name" column has values.');
         }

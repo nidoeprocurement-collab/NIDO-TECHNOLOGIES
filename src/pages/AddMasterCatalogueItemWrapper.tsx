@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  generateMasterProductCode, saveCatalogProduct, getCatalogProducts,
+  generateMasterProductCode, saveCatalogProduct, getCatalogProducts, findCatalogProductByName,
   type CatalogSpec, type GeneralSpec
 } from '@/lib/catalogStore';
 
@@ -258,9 +258,22 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const clearDraft = () => sessionStorage.removeItem('nido_preview_draft');
 
+  const saveProduct = (status: 'draft' | 'published') => {
+    const duplicate = findCatalogProductByName(productName, isEditMode ? editProductId : undefined);
+    if (duplicate) {
+      toast.error(`A product named "${duplicate.productName}" already exists in the master catalog.`);
+      return false;
+    }
+    if (!saveCatalogProduct(buildProduct(status))) {
+      toast.error('A product with this name already exists in the master catalog.');
+      return false;
+    }
+    return true;
+  };
+
   const handleSaveDraft = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
-    saveCatalogProduct(buildProduct('draft'));
+    if (!saveProduct('draft')) return;
     clearDraft();
     toast.success('Saved as draft');
     navigate('/configuration/master-catalogue');
@@ -268,7 +281,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const handlePublish = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
-    saveCatalogProduct(buildProduct('published'));
+    if (!saveProduct('published')) return;
     clearDraft();
     toast.success('Product published successfully!');
     navigate('/configuration/master-catalogue');
@@ -277,7 +290,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const handleSaveChanges = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
     const existing = getCatalogProducts().find(p => p.id === editProductId);
-    saveCatalogProduct(buildProduct(existing?.publishStatus || 'draft'));
+    if (!saveProduct(existing?.publishStatus || 'draft')) return;
     clearDraft();
     toast.success('Changes saved successfully');
     navigate('/configuration/master-catalogue');
