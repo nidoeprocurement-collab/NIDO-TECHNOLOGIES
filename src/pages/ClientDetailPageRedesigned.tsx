@@ -39,6 +39,7 @@ import {
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import { getSupportTickets, type SupportTicket } from "@/lib/supportTicketStore";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
 import OrdersPage from "./ClientOrdersPage";
@@ -268,6 +269,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const [contract, setContract] = useState(() => getClientContract(clientId));
   const [invoices, setInvoices] = useState<StoredInvoice[]>(() => getInvoices());
   const [tickets, setTickets] = useState<SupportTicket[]>(() => getSupportTickets());
+  const [portalUsers, setPortalUsers] = useState(() => getPortalUsersByClient(clientId));
 
   useEffect(() => {
     const reload = () => {
@@ -279,6 +281,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       setContract(getClientContract(clientId));
       setInvoices(getInvoices());
       setTickets(getSupportTickets());
+      setPortalUsers(getPortalUsersByClient(clientId));
       setRefreshKey((value) => value + 1);
     };
     reload();
@@ -288,6 +291,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       "catalogUpdated",
       "nidoInvoicesUpdated",
       "supportTicketsUpdated",
+      "nidoPortalUsersUpdated",
     ] as const;
     events.forEach((event) => window.addEventListener(event, reload));
     return () => events.forEach((event) => window.removeEventListener(event, reload));
@@ -482,12 +486,13 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             Data shown below: <span className="font-semibold">{formatDateRange(selectedDateRange)}</span>
           </p>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<Users size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => goTo("Orders")} />
+           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+             <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => goTo("Orders")} />
             <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => goTo("Orders")} />
             <MetricCard label="Products" value={catalog.length} change={`${catalog.length ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={catalog.map((_, i) => i + 1)} onClick={() => goTo("Catalog")} />
             <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => goTo("Documents")} />
             <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate("/support")} />
+             <MetricCard label="Total Users" value={portalUsers.length} change={`${portalUsers.length ? 100 : 0}%`} icon={<Users size={18} className="text-indigo-600" />} color="bg-indigo-50" values={portalUsers.map((_, i) => i + 1)} onClick={() => goTo("Users")} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
