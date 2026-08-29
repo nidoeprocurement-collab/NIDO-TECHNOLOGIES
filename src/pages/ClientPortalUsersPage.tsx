@@ -45,11 +45,16 @@ const BLANK_FORM: UserFormState = {
   userType: 'client_user',
 };
 
-export default function ClientPortalUsersPage() {
+interface ClientPortalUsersPageProps {
+  readOnly?: boolean;
+}
+
+export default function ClientPortalUsersPage({ readOnly = false }: ClientPortalUsersPageProps) {
   const { user } = useAuth();
   const clientId = user?.clientId ?? '';
   const clientName = user?.clientName ?? '';
   const isAdmin = user?.userType === 'client_admin' || user?.userType === 'nido_admin';
+  const canManageUsers = isAdmin && !readOnly;
 
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
@@ -151,7 +156,7 @@ export default function ClientPortalUsersPage() {
             <h1 className="text-2xl font-bold">Users</h1>
             <p className="text-sm text-gray-500">{clientName}</p>
           </div>
-          {isAdmin && (
+          {canManageUsers && (
             <Button onClick={openAdd} className="flex items-center gap-2">
               <Plus size={16} /> Add User
             </Button>
@@ -214,14 +219,14 @@ export default function ClientPortalUsersPage() {
                   <th className="px-6 py-2 text-left">Type</th>
                   <th className="px-6 py-2 text-left">Status</th>
                   <th className="px-6 py-2 text-left">Created</th>
-                  {isAdmin && <th className="px-6 py-2 text-center">Actions</th>}
+                  {canManageUsers && <th className="px-6 py-2 text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 6} className="px-6 py-12 text-center text-gray-400 text-sm">
-                      No users yet. {isAdmin && 'Click "Add User" to create one.'}
+                    <td colSpan={canManageUsers ? 7 : 6} className="px-6 py-12 text-center text-gray-400 text-sm">
+                      No users yet. {canManageUsers && 'Click "Add User" to create one.'}
                     </td>
                   </tr>
                 ) : (
@@ -251,7 +256,7 @@ export default function ClientPortalUsersPage() {
                       <td className="px-6 py-2 text-xs text-gray-400">
                         {new Date(u.createdAt).toLocaleDateString()}
                       </td>
-                      {isAdmin && (
+                      {canManageUsers && (
                         <td className="px-6 py-2 text-center">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>

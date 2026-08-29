@@ -351,6 +351,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const goTo = (tab: string) => {
     if (visibleAdminTabs.includes(tab) || tab === "Overview") setActiveTab(tab);
   };
+  const openOverviewLink = (path: string, tab: string) => {
+    if (portalMode) navigate(path);
+    else goTo(tab);
+  };
 
   const renderTab = () => {
     if (activeTab === "Roles") return <RolesPage key={`${clientId}-${refreshKey}-roles`} />;
@@ -487,12 +491,12 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </p>
 
            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
-             <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => goTo("Orders")} />
-            <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => goTo("Orders")} />
-            <MetricCard label="Products" value={catalog.length} change={`${catalog.length ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={catalog.map((_, i) => i + 1)} onClick={() => goTo("Catalog")} />
-            <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => goTo("Documents")} />
-            <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => navigate("/support")} />
-             <MetricCard label="Total Users" value={portalUsers.length} change={`${portalUsers.length ? 100 : 0}%`} icon={<Users size={18} className="text-indigo-600" />} color="bg-indigo-50" values={portalUsers.map((_, i) => i + 1)} onClick={() => goTo("Users")} />
+             <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
+             <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
+             <MetricCard label="Products" value={catalog.length} change={`${catalog.length ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
+             <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
+             <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/support", "Overview")} />
+             <MetricCard label="Total Users" value={portalUsers.length} change={`${portalUsers.length ? 100 : 0}%`} icon={<Users size={18} className="text-indigo-600" />} color="bg-indigo-50" values={portalUsers.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/users", "Users")} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -515,7 +519,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               </button>
             </Panel>
 
-            <Panel title="Orders Overview" action={<button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
+             <Panel title="Orders Overview" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>}>
               <div className="flex min-h-[138px] items-center gap-4">
                 <div className="relative flex h-32 w-32 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#10b981 0 ${((statusCounts[0].count / totalStatusCount) * 100)}%, #2563eb ${((statusCounts[0].count / totalStatusCount) * 100)}% ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}%, #f59e0b ${((statusCounts[0].count + statusCounts[1].count) / totalStatusCount) * 100}% ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}%, #7c3aed ${((statusCounts[0].count + statusCounts[1].count + statusCounts[2].count) / totalStatusCount) * 100}% 100%)` }}>
                   <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white"><span className="text-xl font-bold">{periodOrders.length}</span><span className="text-[9px] text-gray-500">Total Orders</span></div>
@@ -529,7 +533,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               </div>
             </Panel>
 
-            <Panel title="Account Summary" action={<button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
+             <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
               <div className="space-y-2.5 text-[10px]">
                 <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Active Contracts</span><strong>{contract ? 1 : 0}</strong></button>
                 <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
@@ -540,7 +544,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <Panel title="Top Products" action={<button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
+             <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
               {topProducts.length === 0 ? <EmptyState message="No products have been assigned to this client yet." /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[460px] text-left text-[10px]">
@@ -551,7 +555,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
               )}
             </Panel>
 
-            <Panel title="Recent Orders" action={<button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
+             <Panel title="Recent Orders" action={!portalMode && <button type="button" onClick={() => goTo("Orders")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Orders</button>} className="overflow-hidden">
               {recentOrders.length === 0 ? <EmptyState message="No orders found for this client in the selected period." /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[470px] text-left text-[10px]">
@@ -566,10 +570,10 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           <div className="mt-3">
             <h2 className="mb-2 text-xs font-bold text-gray-900">Quick Links</h2>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <button type="button" onClick={() => goTo("Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-              <button type="button" onClick={() => goTo("Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-              <button type="button" onClick={() => navigate("/support")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
-              <button type="button" onClick={() => goTo("Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+               <button type="button" onClick={() => openOverviewLink("/portal/catalog", "Catalog")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><ShoppingCart size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Shop Products</strong><small className="block text-[9px] text-gray-500">Browse and purchase products easily.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+               <button type="button" onClick={() => openOverviewLink("/portal/services", "Services")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600"><Package size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Quick Services</strong><small className="block text-[9px] text-gray-500">Explore and order services.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+               <button type="button" onClick={() => openOverviewLink("/portal/support", "Overview")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600"><TicketCheck size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Request Support</strong><small className="block text-[9px] text-gray-500">Raise a ticket and get assistance.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
+               <button type="button" onClick={() => openOverviewLink("/portal/reports", "Documents")} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-blue-200 hover:shadow-sm"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><FileText size={17} /></span><span className="flex-1"><strong className="block text-[11px]">Download Report</strong><small className="block text-[9px] text-gray-500">Review documents and invoices.</small></span><ChevronRight size={14} className="text-gray-400" /></button>
             </div>
           </div>
         </main>

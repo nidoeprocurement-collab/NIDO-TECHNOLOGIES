@@ -1199,7 +1199,7 @@ function AppRoutes() {
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Portal users failed to load" resetKey={location.pathname}>
-                  <ClientPortalUsersPage />
+                  <ClientPortalUsersPage readOnly />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
