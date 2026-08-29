@@ -512,7 +512,7 @@ export default function CatalogUpdatesTab() {
         normalizeCatalogProductName(item.name) === normalizeCatalogProductName(form.name)
       );
     if (duplicate) {
-      toast.error(`A product named "${'productName' in duplicate ? duplicate.productName : duplicate.name}" already exists in the master catalog.`);
+      toast.error(`Product duplication found: "${'productName' in duplicate ? duplicate.productName : duplicate.name}" already exists in the master catalog.`);
       return;
     }
     const sku = autoSku ? generateSku() : form.sku;
@@ -738,11 +738,14 @@ export default function CatalogUpdatesTab() {
 
         if (added > 0) {
           loadFromStore();
-           toast.success(`${added} product(s) imported as Draft${skippedDuplicates ? ` · ${skippedDuplicates} duplicate${skippedDuplicates === 1 ? '' : 's'} skipped` : ''}. Review and publish when ready.`);
+           toast.success(`${added} product(s) imported as Draft. Review and publish when ready.`);
+           if (skippedDuplicates > 0) {
+             toast.error(`Product duplication found during import: ${skippedDuplicates} duplicate product${skippedDuplicates === 1 ? '' : 's'} skipped.`);
+           }
           setBulkImportOpen(false);
          } else if (skippedDuplicates > 0) {
            loadFromStore();
-           toast.error('All imported products already exist in the master catalog.');
+           toast.error(`Product duplication found during import: all ${skippedDuplicates} imported product${skippedDuplicates === 1 ? '' : 's'} already exist in the master catalog.`);
         } else {
           toast.error('No valid rows found. Ensure "Product Name" column has values.');
         }

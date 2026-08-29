@@ -261,11 +261,11 @@ export default function AddMasterCatalogueItemWrapper() {
   const saveProduct = (status: 'draft' | 'published') => {
     const duplicate = findCatalogProductByName(productName, isEditMode ? editProductId : undefined);
     if (duplicate) {
-      toast.error(`A product named "${duplicate.productName}" already exists in the master catalog.`);
+      toast.error(`Product duplication found: "${duplicate.productName}" already exists in the master catalog.`);
       return false;
     }
     if (!saveCatalogProduct(buildProduct(status))) {
-      toast.error('A product with this name already exists in the master catalog.');
+      toast.error('Product duplication found: a product with this name already exists in the master catalog.');
       return false;
     }
     return true;
