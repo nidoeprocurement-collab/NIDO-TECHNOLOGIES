@@ -962,7 +962,8 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
         <ChevronRight size={12} />
       </button>
 
-      {/* Info grid */}
+      {/* Commercial details are revealed only after a vendor is selected. */}
+      {selectedVendor && (
       <div className="px-3 pt-2 border-t border-gray-100 space-y-1.5" onClick={e => e.stopPropagation()}>
         {/* Type-specific commercial terms, matching the Vendor Products table. */}
          <div className="grid grid-cols-2 gap-3">
@@ -1069,6 +1070,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
           </>
         )}
       </div>
+      )}
 
       {/* Add to Cart button */}
        <div className="mt-auto px-3 pb-3" onClick={e => e.stopPropagation()}>
@@ -1634,23 +1636,13 @@ export default function ShopPage() {
             {paginated.map(product => {
               const preview = (p: Product) => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } });
               return (
-                 isDigitalProduct(product) ? (
-                   <DigitalProductCard
-                     key={product.id}
-                     product={product}
-                     onPreview={preview}
-                     clientId={selectedClientId}
-                     isGrid={viewMode === "grid"}
-                   />
-                 ) : (
-                   <ProductCard
-                     key={product.id}
-                     product={product}
-                     onPreview={preview}
-                     clientId={selectedClientId}
-                     isGrid={viewMode === "grid"}
-                   />
-                 )
+                 <ProductCard
+                   key={product.id}
+                   product={product}
+                   onPreview={preview}
+                   clientId={selectedClientId}
+                   isGrid={viewMode === "grid"}
+                 />
               );
             })}
           </div>
