@@ -461,7 +461,6 @@ export default function VendorProductsPage() {
   const { id: vendorId = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
   const [editProduct, setEditProduct] = useState<VendorProduct | null>(null);
@@ -483,7 +482,6 @@ export default function VendorProductsPage() {
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-      setOpenRowMenu(null);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -654,38 +652,25 @@ export default function VendorProductsPage() {
                            {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
                          </div>
                        </td>
-                       <td className="px-3 py-4 align-middle whitespace-nowrap">
-                         <div className="flex items-center gap-2">
-                           <div className="relative inline-block">
-                             <button
-                               onMouseDown={(e) => { e.stopPropagation(); }}
-                               onClick={(e) => { e.stopPropagation(); setOpenRowMenu(openRowMenu === product.id ? null : product.id); }}
-                               aria-label={`More actions for ${product.productName}`}
-                               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-                             >
-                               <MoreVertical className="w-4 h-4" />
-                             </button>
-                             {openRowMenu === product.id && (
-                               <div
-                                 className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1"
-                                 onMouseDown={(e) => e.stopPropagation()}
-                               >
-                                 <button
-                                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                                   onClick={() => { setOpenRowMenu(null); setEditProduct(product); }}
-                                 >
-                                   <Pencil className="w-4 h-4 text-gray-400" /> Edit Product
-                                 </button>
-                                 <button
-                                   className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                                   onClick={() => { setOpenRowMenu(null); setRemoveProduct(product); }}
-                                 >
-                                   <Trash2 className="w-4 h-4 text-red-400" /> Remove Product
-                                 </button>
-                               </div>
-                             )}
-                           </div>
-                         </div>
+                        <td className="px-3 py-4 align-middle whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditProduct(product)}
+                              aria-label={`Edit ${product.productName}`}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                            >
+                              <Pencil className="w-3.5 h-3.5" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRemoveProduct(product)}
+                              aria-label={`Remove ${product.productName}`}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Remove
+                            </button>
+                          </div>
                        </td>
                      </tr>
                    );
