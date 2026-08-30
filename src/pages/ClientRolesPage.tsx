@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Download, Upload, X } from "lucide-react";
+import { Download, MoreVertical, Upload, X } from "lucide-react";
 import {
   getPortalRoles,
   savePortalRoles,
@@ -887,6 +887,7 @@ export default function ClientRolesPage() {
   const [newRoleName, setNewRoleName] = useState("");
   const [newRoleDescription, setNewRoleDescription] = useState("");
   const [moduleToAdd, setModuleToAdd] = useState("");
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
 
   useEffect(() => {
     const refresh = () => {
@@ -962,6 +963,7 @@ export default function ClientRolesPage() {
   };
 
   const downloadCsvTemplate = () => {
+    setShowActionsMenu(false);
     const header = CLIENT_PERMISSION_CSV_COLUMNS.map(column => csvEscape(column)).join(",");
     const rows = PORTAL_MODULE_CATALOG.map(module => [
       "New Client Role",
@@ -981,6 +983,7 @@ export default function ClientRolesPage() {
   };
 
   const exportRolesCsv = () => {
+    setShowActionsMenu(false);
     const header = CLIENT_PERMISSION_CSV_COLUMNS.map(column => csvEscape(column)).join(",");
     const rows = roles.flatMap(role => PORTAL_MODULES.map(module => {
       const permission = role.permissions.find(item => item.module === module)
@@ -1004,6 +1007,7 @@ export default function ClientRolesPage() {
   };
 
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setShowActionsMenu(false);
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -1096,18 +1100,45 @@ export default function ClientRolesPage() {
           <h2 className="text-base font-semibold text-gray-900">Roles & Permissions</h2>
           <p className="text-xs text-gray-500 mt-1">Live roles assigned to users in this client account.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowAddRole(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Role</button>
-          <button onClick={downloadCsvTemplate} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1 hover:bg-gray-50">
-            <Download size={11} /> Download Template
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowActionsMenu(open => !open)}
+            aria-label="Role and permission actions"
+            aria-expanded={showActionsMenu}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            <MoreVertical size={17} />
           </button>
-          <button onClick={exportRolesCsv} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1 hover:bg-gray-50">
-            <Download size={11} /> Export CSV
-          </button>
-          <label className="px-3 py-1.5 text-xs border border-blue-200 rounded-lg text-blue-600 flex items-center gap-1 hover:bg-blue-50 cursor-pointer">
-            <Upload size={11} /> Bulk Upload CSV
-            <input type="file" accept=".csv,text/csv" onChange={handleBulkUpload} className="sr-only" />
-          </label>
+          {showActionsMenu && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl">
+              <button
+                type="button"
+                onClick={() => { setShowActionsMenu(false); setShowAddRole(true); }}
+                className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Add Role
+              </button>
+              <button
+                type="button"
+                onClick={downloadCsvTemplate}
+                className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Download Template
+              </button>
+              <button
+                type="button"
+                onClick={exportRolesCsv}
+                className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Export CSV
+              </button>
+              <label className="block w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                Bulk Upload CSV
+                <input type="file" accept=".csv,text/csv" onChange={handleBulkUpload} className="sr-only" />
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
