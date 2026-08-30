@@ -1126,7 +1126,14 @@ function UploadDocModal({ onSave, onClose }) {
             onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
             onClick={() => fileRef.current.click()}
             style={{ border: `2px dashed ${dragging ? "#2563eb" : "#d1d5db"}`, borderRadius: 10, padding: "28px 20px", textAlign: "center", cursor: "pointer", background: dragging ? "#eff6ff" : "#f9fafb", marginBottom: 18, transition: "all 0.15s" }}>
-            <input ref={fileRef} type="file" style={{ display: "none" }} onChange={e => handleFile((e.target.files as any)[0])} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.xlsx,.docx,.png,.jpg,.jpeg"
+              style={{ display: "none" }}
+              onClick={e => e.stopPropagation()}
+              onChange={e => handleFile((e.target.files as any)[0])}
+            />
             {file ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
                 <DocTypeIcon ext={ext} size={36} />
@@ -1146,7 +1153,7 @@ function UploadDocModal({ onSave, onClose }) {
           </div>
           <div style={{ marginBottom: 14 }}>
             <label style={lbSt}>Document Type</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} style={{ ...inSt, appearance: "none" }}>
+            <select value={form.type} onChange={e => { setError(""); setForm({ ...form, type: e.target.value }); }} style={{ ...inSt, appearance: "none" }}>
               <option value="">Select type</option>
               {["Purchase Order", "Quotation", "Invoice", "Contract", "Shipping Document", "Other"].map(t => <option key={t}>{t}</option>)}
             </select>
@@ -1163,7 +1170,7 @@ function UploadDocModal({ onSave, onClose }) {
         </div>
         <div style={{ display: "flex", gap: 10, padding: "0 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
-          <button onClick={handleSave} disabled={!file} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: file ? "hsl(var(--primary))" : "hsl(var(--primary)/0.5)", color: "hsl(var(--primary-foreground))", cursor: file ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
+          <button onClick={handleSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
         </div>
       </div>
     </div>
