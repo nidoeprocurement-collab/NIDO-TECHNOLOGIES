@@ -12,3 +12,4 @@
 - [Approval engine adapter](approval-engine-local-mode.md) — approval UI/service contracts support local persistence now and a future backend switch via one environment flag.
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
+- [Catalog bulk-import classification](catalog-bulk-import.md) — classify duplicates against both stored products and earlier rows before reporting mixed import results.

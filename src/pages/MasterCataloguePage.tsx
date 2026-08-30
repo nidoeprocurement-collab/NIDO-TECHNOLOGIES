@@ -660,18 +660,42 @@ export default function CatalogUpdatesTab() {
         const nonEmpty = lines.filter(l => l.trim());
         if (nonEmpty.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
 
-        const headers = parseCSVRow(nonEmpty[0]).map(h => h.toLowerCase().replace(/\s+/g, ' '));
+        const headers = parseCSVRow(nonEmpty[0]).map(h => h.replace(/^\uFEFF/, '').toLowerCase().replace(/\s+/g, ' ').trim());
         const col = (row: string[], key: string) => {
           const idx = headers.indexOf(key);
           return idx >= 0 ? row[idx] || '' : '';
         };
+        const colAny = (row: string[], keys: string[]) => {
+          for (const key of keys) {
+            const value = col(row, key);
+            if (value.trim()) return value;
+          }
+          return '';
+        };
 
-         let added = 0;
-         let skippedDuplicates = 0;
+        let added = 0;
+        let skippedDuplicates = 0;
+        let skippedInvalid = 0;
+        const existingNames = new Set(
+          getCatalogProducts().map(product => normalizeCatalogProductName(product.productName))
+        );
+
         for (let i = 1; i < nonEmpty.length; i++) {
           const row = parseCSVRow(nonEmpty[i]);
-          const productName = col(row, 'product name');
-          if (!productName.trim()) continue;
+          const productName = colAny(row, ['product name', 'item name', 'name']).trim();
+          if (!productName) {
+            skippedInvalid++;
+            continue;
+          }
+
+          // Check against both the existing catalog and earlier rows in this
+          // same file. This keeps a mixed import from being misclassified and
+          // prevents duplicate rows inside the upload from being added.
+          const normalizedName = normalizeCatalogProductName(productName);
+          if (existingNames.has(normalizedName)) {
+            skippedDuplicates++;
+            continue;
+          }
 
           // Key Specifications — up to 8 sets
           const specifications = [];
@@ -708,7 +732,7 @@ export default function CatalogUpdatesTab() {
           const product = {
             id: `csv-${Date.now()}-${i}`,
             masterProductCode: generateMasterProductCode(),
-            skuCode: col(row, 'sku code'),
+            skuCode: colAny(row, ['sku code', 'sku']),
             productName,
             productType: col(row, 'product type') || 'Product',
             physicalType: col(row, 'physical type') || 'Physical Product',
@@ -729,25 +753,36 @@ export default function CatalogUpdatesTab() {
             warranty: col(row, 'warranty'),
           };
 
-           if (saveCatalogProduct(product)) {
+          if (saveCatalogProduct(product)) {
              added++;
+            existingNames.add(normalizedName);
            } else {
+            // A concurrent update or a legacy record can still be caught by
+            // the store-level guard; report it as a duplicate without
+            // affecting the classification of other rows.
              skippedDuplicates++;
            }
         }
 
         if (added > 0) {
           loadFromStore();
-           toast.success(`${added} product(s) imported as Draft. Review and publish when ready.`);
-           if (skippedDuplicates > 0) {
-             toast.error(`Product duplication found during import: ${skippedDuplicates} duplicate product${skippedDuplicates === 1 ? '' : 's'} skipped.`);
-           }
+          toast.success(`${added} product(s) imported as Draft. Review and publish when ready.`);
+          if (skippedDuplicates > 0) {
+            toast.warning(`${skippedDuplicates} duplicate product${skippedDuplicates === 1 ? '' : 's'} skipped.`);
+          }
+          if (skippedInvalid > 0) {
+            toast.warning(`${skippedInvalid} row${skippedInvalid === 1 ? '' : 's'} skipped because Product Name is missing.`);
+          }
           setBulkImportOpen(false);
-         } else if (skippedDuplicates > 0) {
+        } else if (skippedDuplicates > 0) {
            loadFromStore();
-           toast.error(`Product duplication found during import: all ${skippedDuplicates} imported product${skippedDuplicates === 1 ? '' : 's'} already exist in the master catalog.`);
+          if (skippedInvalid > 0) {
+            toast.warning(`No products imported: ${skippedDuplicates} duplicate${skippedDuplicates === 1 ? '' : 's'} skipped and ${skippedInvalid} row${skippedInvalid === 1 ? '' : 's'} missing Product Name.`);
+          } else {
+            toast.error(`No products imported: ${skippedDuplicates} duplicate product${skippedDuplicates === 1 ? '' : 's'} skipped.`);
+          }
         } else {
-          toast.error('No valid rows found. Ensure "Product Name" column has values.');
+          toast.error('No valid rows found. Ensure "Product Name" or "Item Name" column has values.');
         }
         // reset file input
         if (bulkFileRef.current) bulkFileRef.current.value = '';
