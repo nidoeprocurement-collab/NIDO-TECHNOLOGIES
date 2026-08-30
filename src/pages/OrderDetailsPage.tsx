@@ -1077,16 +1077,38 @@ function UploadDocModal({ onSave, onClose }) {
   const [file, setFile] = useState(null);
   const [form, setForm] = useState({ type: "", description: "" });
   const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState("");
   const fileRef = useRef<any>();
 
-  const handleFile = f => { if (f) setFile(f); };
+  const handleFile = f => {
+    if (f) {
+      setError("");
+      setFile(f);
+    }
+  };
   const ext = file ? (file as any).name.split(".").pop() : "";
 
   const handleSave = () => {
-    if (!file) return;
+    if (!file) {
+      setError("Please attach a document before saving.");
+      return;
+    }
+    if (!form.type) {
+      setError("Please select a document type.");
+      return;
+    }
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + "\n" + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    onSave({ id: "d" + Date.now(), name: (file as any).name, ext, size: ((file as any).size / 1024).toFixed(0) + " KB", type: form.type || "Other", uploadedBy: "System Owner", uploadedOn: dateStr, description: form.description });
+    try {
+      const saved = onSave({ id: "d" + Date.now(), name: (file as any).name, ext, size: ((file as any).size / 1024).toFixed(0) + " KB", type: form.type, uploadedBy: "System Owner", uploadedOn: dateStr, description: form.description });
+      if (saved === false) {
+        setError("The document could not be saved. Please try again.");
+        return;
+      }
+    } catch {
+      setError("The document could not be saved. Please try again.");
+      return;
+    }
     onClose();
   };
 
@@ -1133,6 +1155,11 @@ function UploadDocModal({ onSave, onClose }) {
             <label style={lbSt}>Description</label>
             <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Add a description..." style={{ ...inSt, resize: "vertical" }} />
           </div>
+          {error && (
+            <div role="alert" style={{ marginTop: 12, padding: "9px 11px", borderRadius: 7, background: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", fontSize: 12.5, lineHeight: 1.4 }}>
+              {error}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", gap: 10, padding: "0 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
@@ -1193,6 +1220,7 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
   const [visibility, setVisibility] = useState("Internal Note");
   const [showUpload, setShowUpload] = useState(false);
   const [docSearch, setDocSearch] = useState("");
+  const [docFeedback, setDocFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Reload docs/notes when the order changes, and persist on every change so
   // both stay in sync between the owner platform and the client portal.
@@ -1207,7 +1235,11 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
   }, [notes, notesKey]);
 
   useEffect(() => {
-    localStorage.setItem(docsKey, JSON.stringify(docs));
+    try {
+      localStorage.setItem(docsKey, JSON.stringify(docs));
+    } catch {
+      setDocFeedback({ type: "error", message: "Documents could not be saved because browser storage is unavailable or full." });
+    }
   }, [docs, docsKey]);
 
   // Cross-tab sync: pick up notes/documents added from another open tab
@@ -1243,6 +1275,32 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
     setNoteText("");
   };
 
+  const handleSaveDocument = (doc: any): boolean => {
+    const nextDocs = [...docs, doc];
+    try {
+      // Persist before closing the modal so a successful confirmation always
+      // means the document is actually stored for this order.
+      localStorage.setItem(docsKey, JSON.stringify(nextDocs));
+      setDocs(nextDocs);
+      setDocFeedback({ type: "success", message: `${doc.name} was saved successfully.` });
+      return true;
+    } catch {
+      setDocFeedback({ type: "error", message: "The document could not be saved because browser storage is unavailable or full." });
+      return false;
+    }
+  };
+
+  const handleRemoveDocument = (docId: string) => {
+    const nextDocs = docs.filter(d => d.id !== docId);
+    try {
+      localStorage.setItem(docsKey, JSON.stringify(nextDocs));
+      setDocs(nextDocs);
+      setDocFeedback({ type: "success", message: "Document removed successfully." });
+    } catch {
+      setDocFeedback({ type: "error", message: "The document could not be removed. Please try again." });
+    }
+  };
+
   return (
     <div style={{ padding: "20px 24px 28px" }}>
       <div style={{ marginBottom: 28 }}>
@@ -1258,13 +1316,19 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
                 style={{ padding: "7px 12px 7px 28px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
             {!isClientPortalUser && (
-              <button onClick={() => setShowUpload(true)}
+              <button onClick={() => { setDocFeedback(null); setShowUpload(true); }}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
                 ⬆ Upload Document
               </button>
             )}
           </div>
         </div>
+          {docFeedback && (
+            <div role="alert" style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: docFeedback.type === "success" ? "#f0fdf4" : "#fef2f2", border: `1px solid ${docFeedback.type === "success" ? "#bbf7d0" : "#fecaca"}`, color: docFeedback.type === "success" ? "#166534" : "#b91c1c", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <span>{docFeedback.message}</span>
+              <button onClick={() => setDocFeedback(null)} aria-label="Dismiss message" style={{ border: "none", background: "none", color: "inherit", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+            </div>
+          )}
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 40px", gap: "2px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
             {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "DESCRIPTION", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
@@ -1290,7 +1354,7 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
               {isClientPortalUser ? (
                 <button onClick={() => alert(`Downloading ${doc.name}...`)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
               ) : (
-                <DocRowMenu onDownload={() => alert(`Downloading ${doc.name}...`)} onRemove={() => setDocs(prev => prev.filter(d => d.id !== doc.id))} />
+                <DocRowMenu onDownload={() => alert(`Downloading ${doc.name}...`)} onRemove={() => handleRemoveDocument(doc.id)} />
               )}
             </div>
           ))}
@@ -1362,7 +1426,7 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
           </div>
         </div>
       </div>
-      {showUpload && <UploadDocModal onSave={doc => setDocs(prev => [...prev, doc])} onClose={() => setShowUpload(false)} />}
+      {showUpload && <UploadDocModal onSave={handleSaveDocument} onClose={() => setShowUpload(false)} />}
     </div>
   );
 }
