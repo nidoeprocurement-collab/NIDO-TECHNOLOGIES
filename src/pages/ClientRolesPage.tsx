@@ -826,7 +826,7 @@ const CLIENT_ACTIONS: Array<keyof Omit<PortalRolePermission, "module">> = [
 ];
 
 const CLIENT_PERMISSION_CSV_COLUMNS = [
-  "role_name", "description", "status", "module",
+  "role_name", "description", "status", "module", "module_description",
   ...CLIENT_ACTIONS,
 ] as const;
 
@@ -968,6 +968,7 @@ export default function ClientRolesPage() {
       "Replace with your role description",
       "active",
       module.name,
+      module.description,
       ...CLIENT_ACTIONS.map(() => false),
     ].map(value => csvEscape(value)).join(","));
     const blob = new Blob([[header, ...rows].join("\r\n")], { type: "text/csv;charset=utf-8;" });
@@ -989,6 +990,7 @@ export default function ClientRolesPage() {
         role.description,
         role.status,
         module,
+        getPortalModuleDescription(module),
         ...CLIENT_ACTIONS.map(action => Boolean(permission[action])),
       ].map(value => csvEscape(value)).join(",");
     }));
