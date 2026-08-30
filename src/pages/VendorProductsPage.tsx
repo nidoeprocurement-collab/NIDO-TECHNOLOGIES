@@ -399,7 +399,7 @@ function ConfirmRemoveDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div data-confirmation-skip className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
@@ -666,6 +666,7 @@ export default function VendorProductsPage() {
                               type="button"
                               onClick={() => setRemoveProduct(product)}
                               aria-label={`Remove ${product.productName}`}
+                              data-confirmation-skip
                               className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Remove

@@ -392,7 +392,7 @@ function ConfirmationDialog({
 }: ConfirmState & { onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent data-confirmation-skip className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -838,6 +838,7 @@ export default function RecurringInvoicesPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
+                    data-confirmation-skip
                     onSelect={(event) => {
                       event.preventDefault();
                       setConfirmState({

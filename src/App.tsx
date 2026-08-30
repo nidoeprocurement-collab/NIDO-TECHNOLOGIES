@@ -94,6 +94,7 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PageMetaProvider } from "@/contexts/PageMetaContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
+import ActionConfirmationGuard from "@/components/shared/ActionConfirmationGuard";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
@@ -1267,6 +1268,7 @@ const App = () => (
                           <MyOrdersProvider>
                             <OrganizationProvider>
                               <PageMetaProvider>
+                                <ActionConfirmationGuard />
                                 <AppRoutes />
                               </PageMetaProvider>
                             </OrganizationProvider>

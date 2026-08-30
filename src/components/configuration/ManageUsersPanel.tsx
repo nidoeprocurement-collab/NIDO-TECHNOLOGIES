@@ -284,7 +284,7 @@ export function ActionsMenu({
               <MailPlus size={14} className="text-muted-foreground" /> Send Invitation
             </button>
             <div className="my-1 border-t border-border" />
-            <button className={`${itemCls} text-red-600`} onClick={() => act(handleDelete)}>
+            <button data-confirmation-skip className={`${itemCls} text-red-600`} onClick={() => act(handleDelete)}>
               <Trash2 size={14} /> Delete User
             </button>
           </div>,
@@ -311,7 +311,7 @@ export function ActionsMenu({
         </DialogContent>
       </Dialog>
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent data-confirmation-skip className="max-w-md">
           <DialogHeader>
             <DialogTitle>Delete User</DialogTitle>
             <DialogDescription>
