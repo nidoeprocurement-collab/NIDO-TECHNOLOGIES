@@ -879,6 +879,7 @@ export default function ClientRolesPage() {
       id: `client-role-${Date.now()}`,
       name: newRoleName.trim(),
       description: newRoleDescription.trim(),
+      status: "active",
       permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module)),
     };
     persist([...roles, role]);
@@ -899,6 +900,12 @@ export default function ClientRolesPage() {
     persist(updatedRoles);
     getPortalUsersByClient(clientId).filter(user => user.role === selected.name)
       .forEach(user => updatePortalUser(user.id, { role: name }));
+  };
+
+  const toggleRoleStatus = () => {
+    if (!selected) return;
+    const nextStatus = selected.status === "active" ? "inactive" : "active";
+    persist(roles.map(role => role.id === selected.id ? { ...role, status: nextStatus } : role));
   };
 
   return (
@@ -932,10 +939,20 @@ export default function ClientRolesPage() {
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 flex items-start justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">{selected.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-gray-900">{selected.name}</h3>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${selected.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                    {selected.status === "active" ? "Active" : "Inactive"}
+                  </span>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">{selected.description || "No description"}</p>
               </div>
-              <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit role</button>
+               <div className="flex items-center gap-3">
+                 <button onClick={toggleRoleStatus} className="text-xs text-gray-600 hover:underline">
+                   {selected.status === "active" ? "Deactivate" : "Activate"}
+                 </button>
+                 <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit role</button>
+               </div>
             </div>
               <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
               <select value={moduleToAdd} onChange={event => setModuleToAdd(event.target.value)}

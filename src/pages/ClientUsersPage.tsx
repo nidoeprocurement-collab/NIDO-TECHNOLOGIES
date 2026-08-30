@@ -102,7 +102,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
     reportingManager: "",
     gender: "",
     joiningDate: "",
-    role: getPortalRoles(clientId || "")[0]?.name || "",
+    role: getPortalRoles(clientId || "").find(item => item.status === "active")?.name || "",
     orgAccess: clientName || "",
     dataVisibility: "All Data",
     locationAccess: "All Locations",
@@ -394,7 +394,9 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                       <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                       <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-600"}>
                         <option value="">Select role</option>
-                        {getPortalRoles(clientId || "").map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
+                        {getPortalRoles(clientId || "")
+                          .filter(role => role.status === "active" || role.name === form.role)
+                          .map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                       </select>
                       <button className="text-[11px] text-blue-500 hover:underline mt-1">+ Add New Role</button>
                     </div>
@@ -1078,7 +1080,9 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                   <div>
                     <label className={labelCls}>Role <span className="text-red-400">*</span></label>
                     <select value={form.role} onChange={set("role")} className={inputCls + " appearance-none text-gray-700"}>
-                      {getPortalRoles(clientId || "").map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
+                      {getPortalRoles(clientId || "")
+                        .filter(role => role.status === "active" || role.name === form.role)
+                        .map(role => <option key={role.id} value={role.name}>{role.name}</option>)}
                     </select>
                   </div>
                   <div>

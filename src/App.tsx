@@ -94,7 +94,7 @@ import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { PageMetaProvider } from "@/contexts/PageMetaContext";
 import AppLayout from "@/components/layout/AppLayout";
 import PageErrorBoundary from "@/components/shared/PageErrorBoundary";
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
 import { I18nProvider } from "./i18n/I18nProvider";
@@ -142,6 +142,16 @@ function AdminOnlyRoute({ children }: { children: React.ReactNode }) {
 function ClientPortalRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isClientPortalUser, isImpersonating, user } = useAuth();
   const location = useLocation();
+  const [, refreshPermissions] = useState(0);
+  useEffect(() => {
+    const refresh = () => refreshPermissions(value => value + 1);
+    window.addEventListener("nidoPortalRolesUpdated", refresh);
+    window.addEventListener("nidoPortalUsersUpdated", refresh);
+    return () => {
+      window.removeEventListener("nidoPortalRolesUpdated", refresh);
+      window.removeEventListener("nidoPortalUsersUpdated", refresh);
+    };
+  }, []);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
   const adminOnly = /\/(users|roles|addresses)(\/|$)/.test(location.pathname);

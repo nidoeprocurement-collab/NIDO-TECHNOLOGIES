@@ -14,6 +14,8 @@ export const ROUTE_MODULE_MAP: Array<{ prefix: string; moduleKey: string }> = [
   { prefix: '/services', moduleKey: 'services' },
   { prefix: '/my-services', moduleKey: 'services' },
   { prefix: '/support', moduleKey: 'support' },
+  { prefix: '/clients/roles', moduleKey: 'roles' },
+  { prefix: '/clients/users', moduleKey: 'users' },
   { prefix: '/clients', moduleKey: 'clients' },
   { prefix: '/vendors', moduleKey: 'vendors' },
   { prefix: '/orders', moduleKey: 'orders' },

@@ -189,7 +189,13 @@ export function getRoles(): NidoRole[] {
       localStorage.setItem(ROLES_KEY, JSON.stringify(DEFAULT_ROLES));
       return DEFAULT_ROLES;
     }
-    const roles = removeLegacyDemoRoles(JSON.parse(raw));
+    const storedRoles = removeLegacyDemoRoles(JSON.parse(raw)).map((role: NidoRole) => ({
+      ...role,
+      status: role.status === "Inactive" ? "Inactive" as const : "Active" as const,
+    }));
+    const roles = storedRoles.some(role => role.name === SYSTEM_OWNER_ROLE)
+      ? storedRoles
+      : [DEFAULT_ROLES[0], ...storedRoles];
     const normalized = JSON.stringify(roles);
     if (normalized !== raw) localStorage.setItem(ROLES_KEY, normalized);
     return roles;
@@ -199,7 +205,10 @@ export function getRoles(): NidoRole[] {
 }
 
 export function saveRoles(roles: NidoRole[]): void {
-  localStorage.setItem(ROLES_KEY, JSON.stringify(roles));
+  const normalized = roles.some(role => role.name === SYSTEM_OWNER_ROLE)
+    ? roles
+    : [DEFAULT_ROLES[0], ...roles];
+  localStorage.setItem(ROLES_KEY, JSON.stringify(normalized));
   window.dispatchEvent(new Event(NIDO_ROLES_EVENT));
 }
 
@@ -359,6 +368,12 @@ export function authenticateNidoUser(
   if (user.status === "Suspended") {
     logAttempt("suspended");
     return { error: "suspended" };
+  }
+
+  const assignedRole = getRoles().find(role => role.name === user.role);
+  if (!assignedRole || assignedRole.status !== "Active") {
+    logAttempt("inactive");
+    return { error: "inactive" };
   }
 
   if (user.password !== password) {

@@ -86,6 +86,9 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       // Existing roles keep their current module list and defaults.
       const hasConfiguredModules =
         Object.keys(perms).length > 0 || selectedPlatformModules.length > 0;
+      const allPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
+        !builtInsAndCustom.some(existing => existing.key === module.key),
+      );
       const allRoleModules = hasConfiguredModules
         ? [
             ...builtInsAndCustom.filter(module =>
@@ -96,7 +99,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               !Object.prototype.hasOwnProperty.call(perms, module.key),
             ),
           ]
-        : [];
+         : [...builtInsAndCustom, ...allPlatformModules];
       setModules(allRoleModules);
       const full: PermMatrix = {};
       for (const m of allRoleModules) {
@@ -234,6 +237,9 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                 <th className="py-3 px-3 text-left font-semibold text-foreground border-b border-border w-52">
                   Module
                 </th>
+                <th className="py-3 px-3 text-left font-semibold text-foreground border-b border-border min-w-[280px]">
+                  Details
+                </th>
                 {ACTIONS.map(a => (
                   <th key={a.key} className="py-3 px-2 text-center font-semibold text-foreground border-b border-border">
                     <button
@@ -284,6 +290,9 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                         </button>
                       </div>
                     </td>
+                    <td className="py-2.5 px-3 border-b border-border text-xs text-muted-foreground">
+                      {'description' in m ? m.description : 'Custom permission module.'}
+                    </td>
                     {ACTIONS.map(a => {
                       const enabled = superAdmin || !!modPerms[a.key];
                       return (
@@ -322,7 +331,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               {/* Add Module inline input row */}
               {showAddModule && !superAdmin && (
                 <tr className="bg-blue-50/60 dark:bg-blue-950/20">
-                  <td colSpan={ACTIONS.length + 2} className="px-3 py-3 border-b border-border">
+                  <td colSpan={ACTIONS.length + 3} className="px-3 py-3 border-b border-border">
                     <div className="flex items-center gap-2 max-w-2xl">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -333,7 +342,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-[360px] max-h-80 overflow-y-auto">
-                          {availablePlatformModules.length > 0 ? (
+                           {availablePlatformModules.length > 0 ? (
                             availablePlatformModules.map(module => (
                               <DropdownMenuCheckboxItem
                                 key={module.key}
@@ -348,7 +357,10 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
                                 }}
                                 onSelect={event => event.preventDefault()}
                               >
-                                {module.label}
+                                <span className="flex flex-col">
+                                  <span>{module.label}</span>
+                                  <span className="text-xs text-muted-foreground">{module.description}</span>
+                                </span>
                               </DropdownMenuCheckboxItem>
                             ))
                           ) : (

@@ -35,6 +35,7 @@ export interface PortalRole {
   id: string;
   name: string;
   description: string;
+  status: 'active' | 'inactive';
   permissions: PortalRolePermission[];
 }
 
@@ -74,6 +75,7 @@ function defaultPortalRoles(): PortalRole[] {
     id: r.id,
     name: r.name,
     description: r.description,
+    status: 'active',
     permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module, {
       view: r.view.includes(module),
       create: r.create?.includes(module) ?? false,
@@ -123,6 +125,7 @@ function normalizePortalRoles(value: unknown): PortalRole[] {
       id: String(role.id || `portal-role-${index + 1}`),
       name: String(role.name || `Role ${index + 1}`),
       description: String(role.description || ''),
+      status: String(role.status || 'active').toLowerCase() === 'active' ? 'active' : 'inactive',
       permissions: PORTAL_MODULES.map(module => createPortalRolePermission(
         module,
         permissionByModule.get(module),
@@ -156,7 +159,11 @@ export function savePortalRoles(clientId: string, roles: PortalRole[]): void {
 }
 
 export function getPortalRoleNames(clientId: string): string[] {
-  return getPortalRoles(clientId).map(role => role.name);
+  return getPortalRoles(clientId).filter(role => role.status === 'active').map(role => role.name);
+}
+
+export function isPortalRoleActive(clientId: string, roleName: string): boolean {
+  return getPortalRoles(clientId).some(role => role.name === roleName && role.status === 'active');
 }
 
 export function getUsersWithInvalidPortalRoles(clientId: string): PortalUser[] {
@@ -170,8 +177,9 @@ export function hasPortalPermission(
   module: string,
   action: keyof Omit<PortalRolePermission, 'module'> = 'view',
 ): boolean {
-  if (roleName === 'Client Admin') return true;
   const role = getPortalRoles(clientId).find(item => item.name === roleName);
+  if (!role || role.status !== 'active') return false;
+  if (roleName === 'Client Admin') return true;
   return !!role?.permissions.find(permission => permission.module === module)?.[action];
 }
 
@@ -184,12 +192,19 @@ export function getPortalUsers(): PortalUser[] {
     // Normalize records created by older versions of the portal user screen.
     // In particular, login must not fail because an email was saved with
     // accidental whitespace or status used a different casing.
-    return parsed.map((user: Partial<PortalUser>) => ({
+    const normalizedUsers = parsed.map((user: Partial<PortalUser>) => ({
       ...user,
       email: String(user.email ?? '').trim(),
       name: String(user.name ?? '').trim(),
       status: String(user.status ?? 'active').toLowerCase() === 'active' ? 'active' : 'inactive',
     })) as PortalUser[];
+    return normalizedUsers.map(user => {
+      const activeRoles = getPortalRoles(user.clientId).filter(role => role.status === 'active');
+      const hasActiveRole = activeRoles.some(role => role.name === user.role);
+      return hasActiveRole || activeRoles.length === 0
+        ? user
+        : { ...user, role: activeRoles[0].name };
+    });
   } catch {
     return [];
   }
@@ -245,7 +260,8 @@ export function findPortalUser(email: string, password: string): PortalUser | nu
       u =>
         u.email.trim().toLowerCase() === normalizedEmail &&
         u.password === password &&
-        String(u.status).toLowerCase() === 'active'
+        String(u.status).toLowerCase() === 'active' &&
+        isPortalRoleActive(u.clientId, u.role)
     ) ?? null
   );
 }

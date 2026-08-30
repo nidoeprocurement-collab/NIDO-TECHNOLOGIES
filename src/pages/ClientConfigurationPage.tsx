@@ -61,7 +61,7 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
     };
   }, [clientId]);
 
-  const uniqueRoles = ["All Roles", ...getPortalRoles(clientId).map((role) => role.name)];
+  const uniqueRoles = ["All Roles", ...getPortalRoles(clientId).filter((role) => role.status === "active").map((role) => role.name)];
 
   const inviteFiltered = portalUsers.filter((u) => {
     const matchSearch =

@@ -8,6 +8,8 @@ import {
   IMPERSONATION_EVENT,
   type ImpersonationSession,
 } from '@/lib/impersonationStore';
+import { getRoles, getUsers, NIDO_ROLES_EVENT, NIDO_USERS_EVENT } from '@/lib/nidoUsersStore';
+import { getPortalUsersByClient, isPortalRoleActive } from '@/lib/portalUserStore';
 
 export type UserType = 'nido_admin' | 'client_admin' | 'client_user';
 
@@ -65,6 +67,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    const validateSession = () => {
+      setUser(current => {
+        if (!current || impersonationSession) return current;
+        if (current.userType !== 'nido_admin') {
+          const portalUser = current.clientId
+            ? getPortalUsersByClient(current.clientId).find(candidate => candidate.id === current.id)
+            : null;
+          if (!portalUser || portalUser.status !== 'active' || !isPortalRoleActive(portalUser.clientId, portalUser.role)) {
+            setIsAuthenticated(false);
+            localStorage.removeItem('nido_user');
+            return null;
+          }
+          return current;
+        }
+        const stored = getUsers().find(candidate => candidate.id === current.id);
+        const role = stored ? getRoles().find(candidate => candidate.name === stored.role) : null;
+        if (!stored || stored.status !== 'Active' || !role || role.status !== 'Active') {
+          setIsAuthenticated(false);
+          localStorage.removeItem('nido_user');
+          return null;
+        }
+        return {
+          ...current,
+          name: stored.name,
+          email: stored.email,
+          role: stored.role,
+        };
+      });
+    };
+    window.addEventListener(NIDO_ROLES_EVENT, validateSession);
+    window.addEventListener(NIDO_USERS_EVENT, validateSession);
+    return () => {
+      window.removeEventListener(NIDO_ROLES_EVENT, validateSession);
+      window.removeEventListener(NIDO_USERS_EVENT, validateSession);
+    };
+  }, [impersonationSession]);
 
   useEffect(() => {
     const refresh = () => {

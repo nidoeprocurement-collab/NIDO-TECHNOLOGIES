@@ -51,6 +51,7 @@ export default function ClientPortalRolesPage() {
       id: `r-${Date.now()}`,
       name: newRoleName.trim(),
       description: newRoleDesc.trim(),
+      status: 'active',
       permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module)),
     };
     const updated = [...roles, r];
@@ -109,6 +110,16 @@ export default function ClientPortalRolesPage() {
     setModuleToAdd('');
   };
 
+  const toggleRoleStatus = (roleId: string) => {
+    if (!isAdmin) return;
+    const updated = roles.map(role => role.id === roleId
+      ? { ...role, status: role.status === 'active' ? 'inactive' as const : 'active' as const }
+      : role);
+    savePortalRoles(clientId, updated);
+    setRoles(updated);
+    setSelected(updated.find(role => role.id === roleId) ?? null);
+  };
+
   const deleteRole = (role: PortalRole) => {
     if (!isAdmin) return;
     const assigned = getPortalUsersByClient(clientId).filter(user => user.role === role.name).length;
@@ -157,17 +168,24 @@ export default function ClientPortalRolesPage() {
               >
                 <div className="flex items-center gap-2">
                   <ShieldCheck size={15} className={selected?.id === r.id ? 'text-blue-600' : 'text-gray-400'} />
-                  {r.name}
+                   {r.name}
+                   <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[10px] ${r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                     {r.status === 'active' ? 'Active' : 'Inactive'}
+                   </span>
                 </div>
                 {r.description && (
                   <p className="text-xs text-gray-400 mt-0.5 pl-[23px] truncate">{r.description}</p>
                 )}
                 {isAdmin && (
                   <span className="flex gap-2 pl-[23px] mt-1 text-[11px]">
-                    <span
+                     <span
                       className="text-blue-600 hover:underline"
                       onClick={(event) => { event.stopPropagation(); editRole(r); }}
                     >Edit</span>
+                    <span
+                      className="text-gray-600 hover:underline"
+                      onClick={(event) => { event.stopPropagation(); toggleRoleStatus(r.id); }}
+                    >{r.status === 'active' ? 'Deactivate' : 'Activate'}</span>
                     <span
                       className="text-red-600 hover:underline"
                       onClick={(event) => { event.stopPropagation(); deleteRole(r); }}

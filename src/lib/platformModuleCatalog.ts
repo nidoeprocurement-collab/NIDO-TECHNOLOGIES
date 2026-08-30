@@ -12,12 +12,23 @@ export interface PlatformModuleOption {
   label: string;
   path: string;
   legacyKey: string;
+  description: string;
 }
 
 interface ModuleDefinition {
   label: string;
   path: string;
   legacyKey: string;
+}
+
+function describeModule(label: string): string {
+  const parts = label.split(" › ");
+  if (parts.length > 1) {
+    const moduleName = parts[parts.length - 1];
+    const parentName = parts[parts.length - 2];
+    return `Manage ${moduleName.toLowerCase()} access and workflows within ${parentName.toLowerCase()}.`;
+  }
+  return `View and manage ${label.toLowerCase()} across the NIDO platform.`;
 }
 
 const definitions: ModuleDefinition[] = [
@@ -28,8 +39,8 @@ const definitions: ModuleDefinition[] = [
   { label: 'Clients', path: '/clients', legacyKey: 'clients' },
   { label: 'Clients › Add Client', path: '/clients/add', legacyKey: 'clients' },
   { label: 'Clients › Contracts', path: '/contracts', legacyKey: 'contracts' },
-  { label: 'Clients › Roles', path: '/clients/roles', legacyKey: 'clients' },
-  { label: 'Clients › Users', path: '/clients/users', legacyKey: 'clients' },
+  { label: 'Clients › Roles', path: '/clients/roles', legacyKey: 'roles' },
+  { label: 'Clients › Users', path: '/clients/users', legacyKey: 'users' },
   { label: 'Clients › Orders', path: '/clients/orders', legacyKey: 'clients' },
   { label: 'Clients › Services', path: '/clients/services', legacyKey: 'clients' },
   { label: 'Clients › Catalog', path: '/clients/catalog', legacyKey: 'clients' },
@@ -112,12 +123,13 @@ export function getPlatformModuleKey(path: string): string {
 export const PLATFORM_MODULE_OPTIONS: PlatformModuleOption[] = definitions.map(definition => ({
   ...definition,
   key: getPlatformModuleKey(definition.path),
+  description: describeModule(definition.label),
 }));
 
 /** Modules available for manual role assignment from the Add Module picker. */
-export const ROLE_PERMISSION_MODULE_OPTIONS = PLATFORM_MODULE_OPTIONS.filter(
-  module => !module.label.startsWith('User Management ›'),
-);
+// Keep this list identical to the platform catalog. User-management pages are
+// real protected modules and must not disappear from the role editor.
+export const ROLE_PERMISSION_MODULE_OPTIONS = PLATFORM_MODULE_OPTIONS;
 
 /**
  * Finds the most specific platform page for a pathname. This makes nested
