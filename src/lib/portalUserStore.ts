@@ -198,13 +198,10 @@ export function getPortalUsers(): PortalUser[] {
       name: String(user.name ?? '').trim(),
       status: String(user.status ?? 'active').toLowerCase() === 'active' ? 'active' : 'inactive',
     })) as PortalUser[];
-    return normalizedUsers.map(user => {
-      const activeRoles = getPortalRoles(user.clientId).filter(role => role.status === 'active');
-      const hasActiveRole = activeRoles.some(role => role.name === user.role);
-      return hasActiveRole || activeRoles.length === 0
-        ? user
-        : { ...user, role: activeRoles[0].name };
-    });
+    // Do not silently move a user away from an inactive or missing role here.
+    // Keeping the original assignment makes the access problem visible to an
+    // administrator and lets authentication fail closed.
+    return normalizedUsers;
   } catch {
     return [];
   }
@@ -218,7 +215,7 @@ export function savePortalUsers(users: PortalUser[]): void {
 export function addPortalUser(user: PortalUser): void {
   const users = getPortalUsers();
   const idx = users.findIndex(u => u.id === user.id);
-  const availableRoles = getPortalRoles(user.clientId);
+  const availableRoles = getPortalRoles(user.clientId).filter(item => item.status === 'active');
   const role = availableRoles.some(item => item.name === user.role)
     ? user.role
     : availableRoles.find(item => item.name === 'Employee')?.name
@@ -360,7 +357,7 @@ export function provisionPortalUser(
     user => user.clientId === clientId && user.email.trim().toLowerCase() === email,
   );
   const userId = existing?.id || `portal-${clientId}-${Date.now()}`;
-  const availableRoles = getPortalRoles(clientId);
+  const availableRoles = getPortalRoles(clientId).filter(item => item.status === 'active');
   const role = availableRoles.some(item => item.name === details.role)
     ? details.role!
     : availableRoles.find(item => item.name === 'Employee')?.name

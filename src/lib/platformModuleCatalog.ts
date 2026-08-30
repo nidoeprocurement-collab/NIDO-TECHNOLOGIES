@@ -39,6 +39,7 @@ const definitions: ModuleDefinition[] = [
   { label: 'Clients', path: '/clients', legacyKey: 'clients' },
   { label: 'Clients › Add Client', path: '/clients/add', legacyKey: 'clients' },
   { label: 'Clients › Contracts', path: '/contracts', legacyKey: 'contracts' },
+  { label: 'Clients › Contracts', path: '/clients/:id/contracts', legacyKey: 'contracts' },
   { label: 'Clients › Roles', path: '/clients/roles', legacyKey: 'roles' },
   { label: 'Clients › Users', path: '/clients/users', legacyKey: 'users' },
   { label: 'Clients › Orders', path: '/clients/orders', legacyKey: 'clients' },
@@ -141,7 +142,11 @@ export function getPlatformModuleForPath(pathname: string): PlatformModuleOption
   let best: PlatformModuleOption | null = null;
   for (const module of PLATFORM_MODULE_OPTIONS) {
     const modulePath = normalizePath(module.path);
-    if (current === modulePath || current.startsWith(`${modulePath}/`)) {
+    const currentParts = current.split('/');
+    const moduleParts = modulePath.split('/');
+    const matchesTemplate = currentParts.length >= moduleParts.length &&
+      moduleParts.every((part, index) => part.startsWith(':') || part === currentParts[index]);
+    if (matchesTemplate) {
       if (!best || modulePath.length > normalizePath(best.path).length) best = module;
     }
   }

@@ -89,7 +89,14 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       const allPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
         !builtInsAndCustom.some(existing => existing.key === module.key),
       );
-      const allRoleModules = hasConfiguredModules
+       const allRoleModules = superAdmin
+         ? [
+             ...builtInsAndCustom,
+             ...allPlatformModules.filter(module =>
+               !builtInsAndCustom.some(existing => existing.key === module.key),
+             ),
+           ]
+         : hasConfiguredModules
         ? [
             ...builtInsAndCustom.filter(module =>
               Object.prototype.hasOwnProperty.call(perms, module.key),
@@ -98,8 +105,8 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               !builtInsAndCustom.some(existing => existing.key === module.key) &&
               !Object.prototype.hasOwnProperty.call(perms, module.key),
             ),
-          ]
-         : [...builtInsAndCustom, ...allPlatformModules];
+           ]
+          : [...builtInsAndCustom, ...allPlatformModules];
       setModules(allRoleModules);
       const full: PermMatrix = {};
       for (const m of allRoleModules) {

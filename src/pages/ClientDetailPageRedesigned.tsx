@@ -50,7 +50,7 @@ import ConfigurationPage from "./ClientConfigurationPage";
 import ContractsPage from "./ClientContractsPage";
 import DocumentsPage from "./ClientDocumentsPage";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { getPlatformModuleKey } from "@/lib/platformModuleCatalog";
+import { getPlatformModuleForPath } from "@/lib/platformModuleCatalog";
 
 const ADMIN_TABS = [
   "Overview",
@@ -344,10 +344,15 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const address = [client.billingAddress || client.billing_address, client.billingCity || client.billing_city, client.billingState || client.billing_state, client.billingPincode || client.billing_pincode].filter(Boolean).join(", ");
   const initials = initialsFor(client);
   const formatDate = (value: string) => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
-  const visibleAdminTabs = ADMIN_TABS.filter(tab =>
-    tab === "Overview" ||
-    hasRoutePermission(getPlatformModuleKey(`/clients/${tab.toLowerCase()}`), "clients", "view"),
-  );
+  const visibleAdminTabs = ADMIN_TABS.filter(tab => {
+    if (tab === "Overview") return true;
+    const module = getPlatformModuleForPath(
+      tab === "Contracts" ? `/clients/${clientId}/contracts` : `/clients/${tab.toLowerCase()}`,
+    );
+    return module
+      ? hasRoutePermission(module.key, module.legacyKey, "view")
+      : hasRoutePermission("clients", "clients", "view");
+  });
   const goTo = (tab: string) => {
     if (visibleAdminTabs.includes(tab) || tab === "Overview") setActiveTab(tab);
   };
