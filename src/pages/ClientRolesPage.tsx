@@ -979,6 +979,28 @@ export default function ClientRolesPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportRolesCsv = () => {
+    const header = CLIENT_PERMISSION_CSV_COLUMNS.map(column => csvEscape(column)).join(",");
+    const rows = roles.flatMap(role => PORTAL_MODULES.map(module => {
+      const permission = role.permissions.find(item => item.module === module)
+        || createPortalRolePermission(module);
+      return [
+        role.name,
+        role.description,
+        role.status,
+        module,
+        ...CLIENT_ACTIONS.map(action => Boolean(permission[action])),
+      ].map(value => csvEscape(value)).join(",");
+    }));
+    const blob = new Blob([[header, ...rows].join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "client-role-permissions.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1076,6 +1098,9 @@ export default function ClientRolesPage() {
           <button onClick={() => setShowAddRole(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Role</button>
           <button onClick={downloadCsvTemplate} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1 hover:bg-gray-50">
             <Download size={11} /> Download Template
+          </button>
+          <button onClick={exportRolesCsv} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1 hover:bg-gray-50">
+            <Download size={11} /> Export CSV
           </button>
           <label className="px-3 py-1.5 text-xs border border-blue-200 rounded-lg text-blue-600 flex items-center gap-1 hover:bg-blue-50 cursor-pointer">
             <Upload size={11} /> Bulk Upload CSV
