@@ -1302,7 +1302,36 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
   };
 
   return (
-    <div style={{ padding: "20px 24px 28px" }}>
+    <>
+      {docFeedback && createPortal(
+        <div
+          role="alert"
+          style={{
+            position: "fixed",
+            top: 24,
+            right: 24,
+            zIndex: 1200,
+            minWidth: 300,
+            maxWidth: 440,
+            padding: "12px 14px",
+            borderRadius: 9,
+            background: docFeedback.type === "success" ? "#f0fdf4" : "#fef2f2",
+            border: `1px solid ${docFeedback.type === "success" ? "#86efac" : "#fca5a5"}`,
+            color: docFeedback.type === "success" ? "#166534" : "#b91c1c",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span>{docFeedback.message}</span>
+          <button onClick={() => setDocFeedback(null)} aria-label="Dismiss message" style={{ border: "none", background: "none", color: "inherit", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>
+        </div>,
+        document.body,
+      )}
+      <div style={{ padding: "20px 24px 28px" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <div>
@@ -1323,12 +1352,6 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
             )}
           </div>
         </div>
-          {docFeedback && (
-            <div role="alert" style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: docFeedback.type === "success" ? "#f0fdf4" : "#fef2f2", border: `1px solid ${docFeedback.type === "success" ? "#bbf7d0" : "#fecaca"}`, color: docFeedback.type === "success" ? "#166534" : "#b91c1c", fontSize: 12.5, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-              <span>{docFeedback.message}</span>
-              <button onClick={() => setDocFeedback(null)} aria-label="Dismiss message" style={{ border: "none", background: "none", color: "inherit", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
-            </div>
-          )}
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 40px", gap: "2px", padding: "10px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
             {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "DESCRIPTION", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
@@ -1427,7 +1450,8 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
         </div>
       </div>
       {showUpload && <UploadDocModal onSave={handleSaveDocument} onClose={() => setShowUpload(false)} />}
-    </div>
+      </div>
+    </>
   );
 }
 
