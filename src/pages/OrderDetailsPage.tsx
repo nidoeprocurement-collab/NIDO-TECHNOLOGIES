@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getVendorById } from "@/lib/vendorDataStore";
@@ -1572,12 +1573,34 @@ const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "
 function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, referenceLocked, onCancel, onRaiseReturn, returnAllowed }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const ref = useRef<any>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const statusConfig = useOrderStatusConfig();
   useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setStatusSub(false); } };
+    const h = e => {
+      const target = e.target as Node;
+      if (!ref.current?.contains(target) && !menuRef.current?.contains(target)) {
+        setOpen(false);
+        setStatusSub(false);
+      }
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+  useEffect(() => {
+    if (!open) return;
+    const closeMenu = () => {
+      setOpen(false);
+      setStatusSub(false);
+    };
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("resize", closeMenu);
+    return () => {
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("resize", closeMenu);
+    };
+  }, [open]);
   const statuses = Array.from(new Set([
     ...statusConfig.statuses
       .filter(status => status.category === "Orders" && status.visible)
@@ -1585,19 +1608,37 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, refe
       .map(status => status.name),
     "Pending", "Confirmed", "Processing", "Shipped", "Delivered",
   ]));
+  const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (open) {
+      setOpen(false);
+      setStatusSub(false);
+      return;
+    }
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const menuWidth = 220;
+    const estimatedMenuHeight = 285;
+    let top = rect.bottom + 4;
+    if (top + estimatedMenuHeight > window.innerHeight - 8) {
+      top = Math.max(8, rect.top - estimatedMenuHeight - 4);
+    }
+    const left = Math.min(
+      Math.max(8, rect.right - menuWidth),
+      Math.max(8, window.innerWidth - menuWidth - 8),
+    );
+    setMenuPosition({ top, left });
+    setOpen(true);
+  };
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={e => { e.stopPropagation(); setOpen(v => !v); setStatusSub(false); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
-      {open && (
-        <div style={{ position: "absolute", top: 30, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", zIndex: 200, minWidth: 200 }}>
+      <button ref={buttonRef} onClick={toggleMenu} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
+      {open && menuPosition && createPortal(
+        <div ref={menuRef} style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", zIndex: 1000, minWidth: 220, maxHeight: "calc(100vh - 16px)", overflow: "visible" }}>
           <div style={{ position: "relative" }} onMouseEnter={() => setStatusSub(true)} onMouseLeave={() => setStatusSub(false)}>
             <button style={{ ...menuItemSt, background: statusSub ? "#f9fafb" : "none" }}><span>🔄</span> Update Status <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span></button>
             {statusSub && (
-              // Opens to the LEFT of the parent menu (not right) so it stays
-              // within the table/container bounds — the 3-dot menu sits at
-              // the far-right column, so a right-opening flyout would run
-              // past the row's edge and get clipped.
-              <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", minWidth: 160, overflow: "hidden", zIndex: 201 }}>
+              <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", minWidth: 180, overflow: "hidden", zIndex: 1001 }}>
                 {statuses.map(s => (
                   <button key={s} onClick={() => { onUpdateStatus(s); setOpen(false); setStatusSub(false); }}
                     style={{ ...menuItemSt, background: sub.itemStatus === s ? "#f0f7ff" : "none", color: sub.itemStatus === s ? "#2563eb" : "#374151", fontWeight: sub.itemStatus === s ? 600 : 400 }}>
@@ -1623,7 +1664,8 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, refe
             <span>↩</span> Raise Return Request
             {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>Expired</span>}
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
