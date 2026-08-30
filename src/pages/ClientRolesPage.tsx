@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Download, X } from "lucide-react";
+import { Download, Upload, X } from "lucide-react";
 import {
   getPortalRoles,
   savePortalRoles,
@@ -825,6 +825,59 @@ const CLIENT_ACTIONS: Array<keyof Omit<PortalRolePermission, "module">> = [
   "view", "create", "edit", "delete", "approve", "export", "import", "manage", "configure",
 ];
 
+const CLIENT_PERMISSION_CSV_COLUMNS = [
+  "role_name", "description", "status", "module",
+  ...CLIENT_ACTIONS,
+] as const;
+
+function csvEscape(value: string | boolean): string {
+  const text = String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const next = text[index + 1];
+    if (character === '"' && quoted && next === '"') {
+      value += '"';
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      row.push(value.trim());
+      value = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && next === "\n") index += 1;
+      row.push(value.trim());
+      if (row.some(cell => cell.length > 0)) rows.push(row);
+      row = [];
+      value = "";
+    } else {
+      value += character;
+    }
+  }
+
+  if (quoted) throw new Error("The CSV contains an unclosed quote.");
+  if (value.length > 0 || row.length > 0) {
+    row.push(value.trim());
+    if (row.some(cell => cell.length > 0)) rows.push(row);
+  }
+  return rows;
+}
+
+function parseCsvBoolean(value: string, rowNumber: number, column: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (["true", "yes", "1"].includes(normalized)) return true;
+  if (["false", "no", "0", ""].includes(normalized)) return false;
+  throw new Error(`Row ${rowNumber}: ${column} must be true or false.`);
+}
+
 export default function ClientRolesPage() {
   const { id: routeClientId } = useParams<{ id: string }>();
   const clientId = routeClientId || localStorage.getItem("nido_shop_selected_client") || "";
@@ -908,6 +961,110 @@ export default function ClientRolesPage() {
     persist(roles.map(role => role.id === selected.id ? { ...role, status: nextStatus } : role));
   };
 
+  const downloadCsvTemplate = () => {
+    const header = CLIENT_PERMISSION_CSV_COLUMNS.map(column => csvEscape(column)).join(",");
+    const rows = PORTAL_MODULE_CATALOG.map(module => [
+      "New Client Role",
+      "Replace with your role description",
+      "active",
+      module.name,
+      ...CLIENT_ACTIONS.map(() => false),
+    ].map(value => csvEscape(value)).join(","));
+    const blob = new Blob([[header, ...rows].join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "client-role-permissions-template.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const rows = parseCsv(await file.text());
+      if (rows.length < 2) throw new Error("The CSV must contain a header and at least one permission row.");
+
+      const header = rows[0].map(cell => cell.toLowerCase());
+      const missingColumns = CLIENT_PERMISSION_CSV_COLUMNS.filter(column => !header.includes(column));
+      if (missingColumns.length > 0) {
+        throw new Error(`Missing CSV columns: ${missingColumns.join(", ")}.`);
+      }
+
+      const columnIndex = Object.fromEntries(header.map((column, index) => [column, index]));
+      const moduleByName = new Map(PORTAL_MODULES.map(module => [module.toLowerCase(), module]));
+      const imported = new Map<string, {
+        name: string;
+        description: string;
+        status: "active" | "inactive";
+        permissions: Map<string, PortalRolePermission>;
+      }>();
+
+      rows.slice(1).forEach((cells, index) => {
+        const rowNumber = index + 2;
+        const roleName = cells[columnIndex.role_name]?.trim();
+        const moduleName = moduleByName.get((cells[columnIndex.module] || "").trim().toLowerCase());
+        if (!roleName) throw new Error(`Row ${rowNumber}: role_name is required.`);
+        if (!moduleName) throw new Error(`Row ${rowNumber}: module must be one of ${PORTAL_MODULES.join(", ")}.`);
+
+        const rawStatus = (cells[columnIndex.status] || "active").trim().toLowerCase();
+        if (rawStatus !== "active" && rawStatus !== "inactive") {
+          throw new Error(`Row ${rowNumber}: status must be active or inactive.`);
+        }
+
+        const permission = createPortalRolePermission(moduleName, Object.fromEntries(
+          CLIENT_ACTIONS.map(action => [
+            action,
+            parseCsvBoolean(cells[columnIndex[action]] || "", rowNumber, action),
+          ]),
+        ) as Partial<PortalRolePermission>);
+        const roleKey = roleName.toLowerCase();
+        const current = imported.get(roleKey) || {
+          name: roleName,
+          description: cells[columnIndex.description]?.trim() || "",
+          status: rawStatus as "active" | "inactive",
+          permissions: new Map<string, PortalRolePermission>(),
+        };
+        current.description = cells[columnIndex.description]?.trim() || current.description;
+        current.status = rawStatus as "active" | "inactive";
+        current.permissions.set(moduleName, permission);
+        imported.set(roleKey, current);
+      });
+
+      const existingByName = new Map(roles.map(role => [role.name.toLowerCase(), role]));
+      const importedRoles = Array.from(imported.values()).map((incoming, index) => {
+        const existing = existingByName.get(incoming.name.toLowerCase());
+        return {
+          id: existing?.id || `client-role-${Date.now()}-${index}`,
+          name: incoming.name,
+          description: incoming.description,
+          status: incoming.status,
+          permissions: PORTAL_MODULES.map(module =>
+            incoming.permissions.get(module) || createPortalRolePermission(module),
+          ),
+        };
+      });
+
+      const updateCount = importedRoles.filter(role => existingByName.has(role.name.toLowerCase())).length;
+      const createCount = importedRoles.length - updateCount;
+      if (!window.confirm(
+        `Import ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} (${createCount} new, ${updateCount} updated)? Existing role permissions will be replaced by the CSV values.`,
+      )) return;
+
+      const importedByName = new Map(importedRoles.map(role => [role.name.toLowerCase(), role]));
+      const untouchedRoles = roles.filter(role => !importedByName.has(role.name.toLowerCase()));
+      const nextRoles = [...untouchedRoles, ...importedRoles];
+      persist(nextRoles);
+      setSelectedId(importedRoles[0]?.id || selectedId);
+      window.alert(`Imported ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} successfully.`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not import the CSV file.");
+    }
+  };
+
   return (
     <div className="p-5 flex flex-col gap-5">
       <div className="flex items-start justify-between border-b border-gray-200 pb-4">
@@ -917,7 +1074,13 @@ export default function ClientRolesPage() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowAddRole(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Role</button>
-          <button className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1"><Download size={11} /> Export CSV</button>
+          <button onClick={downloadCsvTemplate} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 flex items-center gap-1 hover:bg-gray-50">
+            <Download size={11} /> Download Template
+          </button>
+          <label className="px-3 py-1.5 text-xs border border-blue-200 rounded-lg text-blue-600 flex items-center gap-1 hover:bg-blue-50 cursor-pointer">
+            <Upload size={11} /> Bulk Upload CSV
+            <input type="file" accept=".csv,text/csv" onChange={handleBulkUpload} className="sr-only" />
+          </label>
         </div>
       </div>
 
