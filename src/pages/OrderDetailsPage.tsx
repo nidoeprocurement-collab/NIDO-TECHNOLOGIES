@@ -1282,7 +1282,6 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
       // means the document is actually stored for this order.
       localStorage.setItem(docsKey, JSON.stringify(nextDocs));
       setDocs(nextDocs);
-      setDocFeedback({ type: "success", message: `${doc.name} was saved successfully.` });
       return true;
     } catch {
       setDocFeedback({ type: "error", message: "The document could not be saved because browser storage is unavailable or full." });
