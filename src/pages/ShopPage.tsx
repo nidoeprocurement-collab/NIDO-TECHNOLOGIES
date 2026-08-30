@@ -620,7 +620,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
 // ── Product Card ─────────────────────────────────────────────────────────────
 
-function ProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
+function ProductCard({ product, onPreview, clientId, isGrid }: { product: Product; onPreview: (p: Product) => void; clientId?: string; isGrid: boolean }) {
   const { addItem } = useCart();
   const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(1);
@@ -758,7 +758,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
 
   return (
     <div
-      className={`group relative flex h-full flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${vendorPanelOpen ? "z-20" : ""}`}
+      className={`group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${isGrid ? "h-[520px]" : "h-full"} ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
       {/* Top row: product type badge + Heart */}
@@ -793,7 +793,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Name + Category */}
-      <div className="text-center px-3 pb-2 border-b border-gray-100">
+      <div className="text-center px-3 pb-2 border-b border-gray-100 min-h-[52px]">
         <h3 className="text-[13px] font-bold text-gray-900 leading-snug line-clamp-2">{product.name}</h3>
         <span className={`block mt-0.5 text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
       </div>
@@ -1073,7 +1073,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
       </div>
 
       {/* Add to Cart button */}
-      <div className="px-3 pb-3" onClick={e => e.stopPropagation()}>
+      <div className="mt-auto px-3 pb-3" onClick={e => e.stopPropagation()}>
         <button
           onClick={handleAdd}
           disabled={!canAdd}
@@ -1093,7 +1093,7 @@ function ProductCard({ product, onPreview, clientId }: { product: Product; onPre
   );
 }
 
-function DigitalProductCard({ product, onPreview, clientId }: { product: Product; onPreview: (p: Product) => void; clientId?: string }) {
+function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product: Product; onPreview: (p: Product) => void; clientId?: string; isGrid: boolean }) {
   const { addItem } = useCart();
   const { isImpersonating } = useAuth();
   const [adding, setAdding] = useState(false);
@@ -1126,7 +1126,7 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
 
   return (
     <div
-      className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "h-[520px]" : "h-full"}`}
       onClick={() => onPreview(product)}
     >
       <div className="flex items-center justify-between px-3 pt-3">
@@ -1152,7 +1152,7 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
         )}
       </div>
 
-      <div className="border-b border-gray-100 px-3 pb-2 text-center">
+      <div className="min-h-[52px] border-b border-gray-100 px-3 pb-2 text-center">
         <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-gray-900">{product.name}</h3>
         <span className={`mt-0.5 block text-[11px] font-medium ${getCategoryColor(product.category)}`}>{product.category}</span>
       </div>
@@ -1167,7 +1167,7 @@ function DigitalProductCard({ product, onPreview, clientId }: { product: Product
         <ChevronRight size={12} />
       </button>
 
-      <div className="px-3 pb-3 pt-2.5">
+      <div className="mt-auto px-3 pb-3 pt-2.5">
         <div className="mb-3 flex items-end justify-between gap-2">
           <div>
             <p className="text-[10px] text-gray-500">Starting price</p>
@@ -1607,7 +1607,13 @@ export default function ShopPage() {
             {paginated.map(product => {
               const preview = (p: Product) => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } });
               return (
-                <ProductCard key={product.id} product={product} onPreview={preview} clientId={selectedClientId} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onPreview={preview}
+                  clientId={selectedClientId}
+                  isGrid={viewMode === "grid"}
+                />
               );
             })}
           </div>
