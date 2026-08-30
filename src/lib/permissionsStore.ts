@@ -67,10 +67,19 @@ export function deleteCustomModule(key: string): void {
 
 /** All modules — built-in + custom — as a flat array for use in the matrix. */
 export function getAllModules(): { key: string; label: string; custom?: boolean }[] {
+  const seenKeys = new Set<string>();
+  const seenLabels = new Set<string>();
   return [
     ...MODULES.map(m => ({ ...m })),
     ...getCustomModules().map(m => ({ ...m, custom: true })),
-  ];
+  ].filter(module => {
+    const key = module.key.trim().toLowerCase();
+    const label = module.label.trim().toLowerCase();
+    if (seenKeys.has(key) || seenLabels.has(label)) return false;
+    seenKeys.add(key);
+    seenLabels.add(label);
+    return true;
+  });
 }
 
 export const ACTIONS = [

@@ -130,7 +130,16 @@ export const PLATFORM_MODULE_OPTIONS: PlatformModuleOption[] = definitions.map(d
 /** Modules available for manual role assignment from the Add Module picker. */
 // Keep this list identical to the platform catalog. User-management pages are
 // real protected modules and must not disappear from the role editor.
-export const ROLE_PERMISSION_MODULE_OPTIONS = PLATFORM_MODULE_OPTIONS;
+const seenRoleModuleKeys = new Set<string>();
+const seenRoleModuleLabels = new Set<string>();
+export const ROLE_PERMISSION_MODULE_OPTIONS = PLATFORM_MODULE_OPTIONS.filter(module => {
+  const key = module.key.toLowerCase();
+  const label = module.label.trim().toLowerCase();
+  if (seenRoleModuleKeys.has(key) || seenRoleModuleLabels.has(label)) return false;
+  seenRoleModuleKeys.add(key);
+  seenRoleModuleLabels.add(label);
+  return true;
+});
 
 /**
  * Finds the most specific platform page for a pathname. This makes nested

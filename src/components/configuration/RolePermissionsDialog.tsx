@@ -32,7 +32,6 @@ import {
   type ModulePermissions,
 } from '@/lib/permissionsStore';
 import {
-  PLATFORM_MODULE_OPTIONS,
   ROLE_PERMISSION_MODULE_OPTIONS,
 } from '@/lib/platformModuleCatalog';
 import type { NidoRole } from '@/lib/nidoUsersStore';
@@ -44,6 +43,19 @@ interface RolePermissionsDialogProps {
 }
 
 type PermMatrix = Record<string, ModulePermissions>;
+
+function uniqueModules<T extends { key: string; label: string }>(modules: T[]): T[] {
+  const seenKeys = new Set<string>();
+  const seenLabels = new Set<string>();
+  return modules.filter(module => {
+    const key = module.key.trim().toLowerCase();
+    const label = module.label.trim().toLowerCase();
+    if (seenKeys.has(key) || seenLabels.has(label)) return false;
+    seenKeys.add(key);
+    seenLabels.add(label);
+    return true;
+  });
+}
 
 export default function RolePermissionsDialog({ open, onOpenChange, role }: RolePermissionsDialogProps) {
   const [matrix, setMatrix] = useState<PermMatrix>({});
@@ -67,7 +79,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
           module.key.startsWith('platform_') &&
           !builtInsAndCustom.some(existing => existing.key === module.key),
         );
-        return [...builtInsAndCustom, ...currentPlatformModules];
+        return uniqueModules([...builtInsAndCustom, ...currentPlatformModules]);
       });
     };
     window.addEventListener(CUSTOM_MODULES_EVENT, handler);
@@ -78,7 +90,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
     if (open && role) {
       const perms = getRolePermissions(role.name);
       const builtInsAndCustom = getAllModules();
-      const selectedPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
+      const selectedPlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(module =>
         Object.prototype.hasOwnProperty.call(perms, module.key),
       );
       // A role without a saved permission map is newly created. Start with an
@@ -86,26 +98,21 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
       // Existing roles keep their current module list and defaults.
       const hasConfiguredModules =
         Object.keys(perms).length > 0 || selectedPlatformModules.length > 0;
-      const allPlatformModules = PLATFORM_MODULE_OPTIONS.filter(module =>
+      const allPlatformModules = ROLE_PERMISSION_MODULE_OPTIONS.filter(module =>
         !builtInsAndCustom.some(existing => existing.key === module.key),
       );
-       const allRoleModules = superAdmin
-         ? [
-             ...builtInsAndCustom,
-             ...allPlatformModules.filter(module =>
-               !builtInsAndCustom.some(existing => existing.key === module.key),
-             ),
-           ]
-         : hasConfiguredModules
-        ? [
-            ...builtInsAndCustom.filter(module =>
-              Object.prototype.hasOwnProperty.call(perms, module.key),
-            ),
-            ...selectedPlatformModules.filter(module =>
-                !builtInsAndCustom.some(existing => existing.key === module.key),
-            ),
-           ]
-          : [...builtInsAndCustom, ...allPlatformModules];
+      const selectedPlatformLabels = new Set(
+        selectedPlatformModules.map(module => module.label.trim().toLowerCase()),
+      );
+      const configuredLegacyModules = builtInsAndCustom.filter(module =>
+        Object.prototype.hasOwnProperty.call(perms, module.key) &&
+        !selectedPlatformLabels.has(module.label.trim().toLowerCase()),
+      );
+      const allRoleModules = superAdmin
+        ? uniqueModules([...allPlatformModules, ...builtInsAndCustom])
+        : hasConfiguredModules
+        ? uniqueModules([...selectedPlatformModules, ...configuredLegacyModules])
+        : uniqueModules([...allPlatformModules, ...builtInsAndCustom]);
       setModules(allRoleModules);
       const full: PermMatrix = {};
       for (const m of allRoleModules) {
