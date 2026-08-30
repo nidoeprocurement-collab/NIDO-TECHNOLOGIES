@@ -849,7 +849,7 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
   const pendingItems: PendingItem[] = [];
   for (const sub of subOrders) {
     const vid = selectedVendors[sub.id];
-    if (!vid || createdPOs[sub.id]) continue;
+    if (!vid || Object.values(createdPOs).some((po: any) => poCoversSubOrder(po, sub.id))) continue;
     const allocs = vendorAllocations?.[sub.id];
     if (allocs && allocs.length > 0) {
       pendingItems.push({
@@ -1726,6 +1726,20 @@ function isReturnAllowed(sub: any): boolean {
   return Date.now() - deliveredMs <= sevenDaysMs;
 }
 
+// A grouped PO keeps its first sub-order in `subOrderId`, while all covered
+// sub-orders are also stored in `subOrderIds` and on each line item. Check all
+// three shapes so every item in the group shows the same PO.
+function poCoversSubOrder(po: any, subOrderId: string): boolean {
+  if (po?.subOrderId === subOrderId) return true;
+  if (Array.isArray(po?.subOrderIds) && po.subOrderIds.includes(subOrderId)) return true;
+  return Array.isArray(po?.items) && po.items.some((item: any) => item?.subOrderId === subOrderId);
+}
+
+function isConfirmedPO(po: any): boolean {
+  const status = String(po?.status || "").toLowerCase();
+  return status !== "draft" && status !== "cancelled" && status !== "rejected";
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
@@ -1869,7 +1883,7 @@ export default function MyOrderPage() {
   // Derived maps used in the sub-orders table — built from the sub-orders list
   // so they stay in sync with any status/tracking changes without extra state.
   const createdPOs: Record<string, any> = useMemo(
-    () => Object.fromEntries((poRefreshKey >= 0 ? getAllPOs() : []).filter(p => p.orderId === orderId).map(p => [p.id, p])),
+    () => Object.fromEntries((poRefreshKey >= 0 ? getAllPOs() : []).filter(p => p.orderId === orderId).map(p => [p.poNumber, p])),
     [poRefreshKey, orderId]
   );
   const selectedVendors: Record<string, string> = useMemo(
@@ -1987,7 +2001,7 @@ export default function MyOrderPage() {
     const vendorLines = new Map<string, { meta: any; lines: LineEntry[] }>();
 
     for (const sub of subOrders) {
-      if (!selectedSet.has(sub.id) || createdPOs[sub.id]) continue;
+      if (!selectedSet.has(sub.id) || Object.values(createdPOs).some((po: any) => poCoversSubOrder(po, sub.id))) continue;
 
       // Get allocations: multi-vendor array or single-vendor fallback
       const allocs: Array<{ vendorId: string; qty: number; meta: any }> =
@@ -2390,8 +2404,9 @@ export default function MyOrderPage() {
                 </div>
                 {filtered.map((sub, idx) => {
                   const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub);
-                  const subPOs = Object.values(createdPOs).filter((p: any) => p.subOrderId === sub.id) as any[];
+                  const subPOs = Object.values(createdPOs).filter((p: any) => poCoversSubOrder(p, sub.id)) as any[];
                   const hasPO = subPOs.length > 0;
+                  const hasConfirmedPO = subPOs.some(isConfirmedPO);
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
@@ -2403,7 +2418,7 @@ export default function MyOrderPage() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                        {!isClientPortalUser && hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
+                        {!isClientPortalUser && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
                         {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
                       </div>
                       <div style={{ minWidth: 0 }}>
@@ -2454,17 +2469,20 @@ export default function MyOrderPage() {
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
                           {hasPO ? (
-                            // PO already confirmed — show the vendor from the PO
+                            // Show every vendor covered by this PO and keep its
+                            // state pending until the PO is confirmed.
                             <div>
                               {subPOs.map((po: any, pi: number) => (
                                 <div key={po.poNumber} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: pi === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                                     {(po.vendorName?.[0] || "V").toUpperCase()}
                                   </div>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName}</span>
+                                  <div>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName}</div>
+                                    <div style={{ fontSize: 10, color: "#9ca3af" }}>{isConfirmedPO(po) ? "PO Issued" : "PO Pending"}</div>
+                                  </div>
                                 </div>
                               ))}
-                              <span style={{ fontSize: 10, color: "#9ca3af" }}>PO Issued</span>
                             </div>
                           ) : sub.selectedVendorName ? (
                             // Vendor was locked at cart add-to-cart time — display only

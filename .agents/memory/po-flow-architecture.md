@@ -20,6 +20,21 @@ description: How the full PO creation flow works across the app — vendor selec
 
 **How to apply:** When adding new vendor selection columns or PO fields, update StoredPO type, the builder in handleCreatePurchaseOrders, and storedPOToDetail in VendorOrderDetailPage.
 
+## Grouped PO association
+
+When rendering an order’s sub-orders, a PO must be considered related when the
+sub-order appears in any of `subOrderId`, `subOrderIds`, or an item line’s
+`subOrderId`; the first field is only the primary-item shortcut for grouped
+POs. A Draft PO should display as pending, while PO Created/PO Issued indicate
+that confirmation has occurred.
+
+**Why:** Automatically created POs are grouped by vendor, so relying only on
+the primary sub-order makes later items lose their PO number and vendor state.
+
+**How to apply:** Reuse the three-shape association check whenever a page
+projects PO data into per-item or per-sub-order UI, and derive its label from
+the persisted PO status.
+
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)
 - `₹` symbol rendered as `Rs.` in totals (standard jsPDF fonts lack the Rupee glyph U+20B9)
