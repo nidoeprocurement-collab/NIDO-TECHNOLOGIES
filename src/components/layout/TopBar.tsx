@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Search, ArrowLeft, ChevronRight, Home, FileText, LayoutGrid, X } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, ArrowLeft, ChevronRight, Home, FileText, LayoutGrid, X, Command } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -89,10 +89,23 @@ export default function TopBar() {
   const [now, setNow] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        setSearchFocused(true);
+      }
+    };
+    window.addEventListener('keydown', focusSearch);
+    return () => window.removeEventListener('keydown', focusSearch);
   }, []);
 
   // Read localization settings from ConfigContext so the clock reacts to a
@@ -139,7 +152,7 @@ export default function TopBar() {
   }, [isClientPortalUser, searchQuery, isSuperAdmin, hasRoutePermission]);
 
   const openSearchResult = (result: GlobalSearchResult) => {
-    setSearchQuery(result.title);
+    setSearchQuery('');
     setSearchFocused(false);
     navigate(result.path);
   };
@@ -167,19 +180,26 @@ export default function TopBar() {
           >
             <ArrowLeft size={20} />
           </button>
-          {!isClientPortalUser && <div className="relative flex-1 max-w-md hidden md:flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2.5">
+          {!isClientPortalUser && <div className="relative flex-1 min-w-0 max-w-2xl flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2.5">
             <Search size={18} className="text-muted-foreground" />
             <input
               type="text"
+              ref={searchInputRef}
               value={searchQuery}
               onChange={event => setSearchQuery(event.target.value)}
               onFocus={() => setSearchFocused(true)}
               onKeyDown={handleSearchKeyDown}
               onBlur={() => window.setTimeout(() => setSearchFocused(false), 150)}
-              placeholder="Search anything in NIDO..."
-              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+              placeholder="Search pages, clients, vendors, orders..."
+              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1 min-w-0"
               aria-label="Search anything in NIDO"
+              aria-expanded={searchFocused && Boolean(searchQuery.trim())}
             />
+            {!searchQuery && (
+              <span className="hidden sm:flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground" title="Focus search">
+                <Command size={10} />K
+              </span>
+            )}
             {searchQuery && (
               <button
                 type="button"
@@ -214,8 +234,8 @@ export default function TopBar() {
                     ))}
                   </div>
                 ) : (
-                  <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-                    No matching pages or records found.
+                    <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    No matches found. Try a name, ID, SKU, email, status, or keyword.
                   </p>
                 )}
               </div>

@@ -1,4 +1,18 @@
 import { ROLE_PERMISSION_MODULE_OPTIONS } from "@/lib/platformModuleCatalog";
+import { getClients, getArchivedClients } from "@/lib/clientStore";
+import { getVendors } from "@/lib/vendorDataStore";
+import { getCatalogProducts } from "@/lib/catalogStore";
+import { getAllVendorProducts } from "@/lib/vendorStore";
+import { getAllPOs } from "@/lib/purchaseOrderStore";
+import { getQuotes } from "@/lib/quoteStore";
+import { getOrders as getSalesOrders } from "@/lib/salesOrderStore";
+import { getInvoices, getArchivedInvoices } from "@/lib/invoiceStore";
+import { getReceipts } from "@/lib/paymentReceiptStore";
+import { getChallans } from "@/lib/dcStore";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import { getSupportTickets } from "@/lib/supportTicketStore";
+import { getAllRecurring } from "@/lib/recurringInvoiceStore";
+import { getCustomReports } from "@/lib/reportStore";
 
 export type GlobalSearchResult = {
   id: string;
@@ -38,8 +52,16 @@ const routeHints: Array<[RegExp, string]> = [
 const titleKeys = [
   "name",
   "title",
+  "profileName",
+  "productName",
+  "masterProductCode",
+  "vendorProductCode",
   "subject",
   "number",
+  "challanNo",
+  "customerName",
+  "clientName",
+  "vendorName",
   "invoiceNumber",
   "quoteNumber",
   "orderNumber",
@@ -103,6 +125,91 @@ function getSubtitle(record: Record<string, unknown>, storageKey: string): strin
   return parts.length > 0 ? parts.join(" · ") : storageKey.replace(/[_-]+/g, " ");
 }
 
+type SearchRecordSource = {
+  key: string;
+  label: string;
+  path: string;
+  getRecords: () => unknown[];
+};
+
+const RECORD_SOURCES: SearchRecordSource[] = [
+  { key: "clients", label: "Clients", path: "/clients", getRecords: () => [...getClients(), ...getArchivedClients()] },
+  { key: "vendors", label: "Vendors", path: "/vendors", getRecords: getVendors },
+  { key: "catalog", label: "Master catalogue", path: "/configuration/master-catalogue", getRecords: getCatalogProducts },
+  {
+    key: "vendor-products",
+    label: "Vendor products",
+    path: "/vendors",
+    getRecords: () => Object.entries(getAllVendorProducts()).flatMap(([vendorId, products]) =>
+      products.map(product => ({ ...product, vendorId })),
+    ),
+  },
+  { key: "orders", label: "Orders", path: "/orders", getRecords: () => readJsonList("nido_my_orders") },
+  { key: "quotes", label: "Quotes", path: "/sales/quotes", getRecords: getQuotes },
+  { key: "sales-orders", label: "Sales orders", path: "/sales/orders", getRecords: getSalesOrders },
+  { key: "invoices", label: "Invoices", path: "/invoices", getRecords: () => [...getInvoices(), ...getArchivedInvoices()] },
+  { key: "purchase-orders", label: "Purchase orders", path: "/purchase-orders", getRecords: getAllPOs },
+  { key: "payment-receipts", label: "Payment receipts", path: "/payment-receipts", getRecords: getReceipts },
+  { key: "delivery-challans", label: "Delivery challans", path: "/delivery-challans", getRecords: getChallans },
+  { key: "services", label: "Service requests", path: "/my-services", getRecords: getServiceRequests },
+  { key: "support", label: "Support tickets", path: "/support/tickets", getRecords: getSupportTickets },
+  { key: "recurring-invoices", label: "Recurring invoices", path: "/recurring-invoices", getRecords: getAllRecurring },
+  { key: "custom-reports", label: "Custom reports", path: "/reports", getRecords: getCustomReports },
+];
+
+const COVERED_STORAGE_KEYS = new Set([
+  "nido_clients_v2",
+  "nido_clients_archived_v1",
+  "nido_catalog_products",
+  "nido_vendor_products",
+  "nido_my_orders",
+  "nido_sales_quotes",
+  "nido_sales_orders",
+  "nido_sales_invoices",
+  "nido_all_purchase_orders",
+  "nido_payment_receipts_v3",
+  "nido_service_requests",
+  "nido_support_tickets",
+  "nido_recurring_invoices",
+  "nido_custom_reports_v1",
+]);
+
+function readJsonList(key: string): unknown[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function resolveRecordPath(source: SearchRecordSource, record: Record<string, unknown>): string {
+  const id = typeof record.id === "string" || typeof record.id === "number" ? String(record.id) : "";
+  if (!id) return source.path;
+
+  switch (source.key) {
+    case "clients":
+      return `/clients/${encodeURIComponent(id)}`;
+    case "vendors":
+      return `/vendors/${encodeURIComponent(id)}`;
+    case "catalog":
+      return `/configuration/master-catalogue/edit/${encodeURIComponent(id)}`;
+    case "orders":
+      return `/orders/${encodeURIComponent(id)}`;
+    case "quotes":
+      return `/sales/quotes/${encodeURIComponent(id)}`;
+    case "sales-orders":
+      return `/sales/orders/${encodeURIComponent(id)}`;
+    case "invoices":
+      return `/sales/invoices/${encodeURIComponent(id)}`;
+    case "support":
+      return `/support/ticket/${encodeURIComponent(id)}`;
+    default:
+      return source.path;
+  }
+}
+
 function getStorageRoute(storageKey: string): string {
   const normalized = storageKey.toLowerCase();
   const hint = routeHints.find(([pattern]) => pattern.test(normalized));
@@ -155,8 +262,33 @@ function getRecordResults(): GlobalSearchResult[] {
   if (typeof window === "undefined") return [];
 
   const results: GlobalSearchResult[] = [];
+  RECORD_SOURCES.forEach(source => {
+    let records: unknown[] = [];
+    try {
+      records = source.getRecords();
+    } catch {
+      records = [];
+    }
+
+    records.forEach((value, index) => {
+      if (!isObject(value)) return;
+      const sanitized = safeValue(value);
+      const title = getTitle(value, source.label);
+      const subtitle = getSubtitle(value, source.label);
+      results.push({
+        id: `record:${source.key}:${index}:${String(value.id ?? title)}`,
+        title,
+        subtitle: `${source.label} · ${subtitle}`,
+        type: "record",
+        path: resolveRecordPath(source, value),
+        searchText: `${title} ${subtitle} ${source.label} ${textFromValue(sanitized)}`.toLowerCase(),
+      });
+    });
+  });
+
   Object.keys(window.localStorage).forEach(storageKey => {
     if (IGNORED_STORAGE_KEY.test(storageKey)) return;
+    if (COVERED_STORAGE_KEYS.has(storageKey)) return;
 
     let parsed: unknown;
     try {
@@ -191,14 +323,24 @@ export function searchGlobalPlatform(query: string): GlobalSearchResult[] {
   if (!normalizedQuery) return [];
 
   const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const seen = new Set<string>();
   return [...getPageResults(), ...getRecordResults()]
     .filter(result => terms.every(term => result.searchText.includes(term)))
+    .filter(result => {
+      const key = `${result.path}|${result.title.toLowerCase()}|${result.subtitle.toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .sort((first, second) => {
       const firstTitle = first.title.toLowerCase();
       const secondTitle = second.title.toLowerCase();
       const firstScore = firstTitle === normalizedQuery ? 3 : firstTitle.startsWith(normalizedQuery) ? 2 : 1;
       const secondScore = secondTitle === normalizedQuery ? 3 : secondTitle.startsWith(normalizedQuery) ? 2 : 1;
-      return secondScore - firstScore || first.title.localeCompare(second.title);
+      const typeScore = (result: GlobalSearchResult) => result.type === "record" ? 1 : 0;
+      return secondScore - firstScore
+        || typeScore(second) - typeScore(first)
+        || first.title.localeCompare(second.title);
     })
     .slice(0, 40);
 }
