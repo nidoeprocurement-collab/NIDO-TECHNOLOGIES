@@ -102,8 +102,7 @@ export default function RolePermissionsDialog({ open, onOpenChange, role }: Role
               Object.prototype.hasOwnProperty.call(perms, module.key),
             ),
             ...selectedPlatformModules.filter(module =>
-              !builtInsAndCustom.some(existing => existing.key === module.key) &&
-              !Object.prototype.hasOwnProperty.call(perms, module.key),
+                !builtInsAndCustom.some(existing => existing.key === module.key),
             ),
            ]
           : [...builtInsAndCustom, ...allPlatformModules];
