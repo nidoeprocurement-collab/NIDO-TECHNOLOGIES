@@ -9,6 +9,7 @@ import {
   saveOrder, getOrderById, generateOrderNumber,
   type StoredSalesOrder, type OrderLineItem, type OrderGstSlab,
 } from '@/lib/salesOrderStore';
+import { getProductCommercialTerms, getAvailabilityLabel } from '@/lib/productCommercialTerms';
 
 function todayISO(): string { return new Date().toISOString().split('T')[0]; }
 function addDays(dateStr: string, days: number): string {
@@ -192,7 +193,20 @@ export default function SalesOrderFormPage() {
     const hsnSac = taxEntry?.defaultHsnCode ?? '';
     setLineItems(prev => prev.map(item =>
       item.id === itemId
-        ? { ...item, productId: product.id, name: product.productName, description: product.description || '', hsnSac, rate: product.price || 0, taxPercent }
+         ? {
+             ...item,
+             productId: product.id,
+             name: product.productName,
+             description: product.description || '',
+             hsnSac,
+             rate: product.price || 0,
+             taxPercent,
+             productType: product.physicalType || product.productType,
+             commercialTerms: getProductCommercialTerms(product.physicalType || product.productType, {
+               moq: product.moq,
+               leadTime: product.leadTime,
+             }),
+           }
         : item
     ));
     setProductSearch(prev => ({ ...prev, [itemId]: product.productName }));

@@ -15,6 +15,7 @@ import { useMyOrders } from '@/contexts/MyOrdersContext';
 import { getEffectiveTaxPctForCategory } from '@/lib/taxEngine';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
+import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -109,7 +110,7 @@ export default function InvoiceFormPage() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applyLineItems(
-    items: Array<{ name: string; description?: string; hsnSac?: string; qty: number; rate: number; discount?: number; taxPercent?: number }>
+    items: Array<{ name: string; description?: string; hsnSac?: string; qty: number; rate: number; discount?: number; taxPercent?: number; productType?: string; commercialTerms?: InvoiceLineItem['commercialTerms'] }>
   ) {
     if (!items || items.length === 0) return;
     setLineItems(
@@ -123,6 +124,8 @@ export default function InvoiceFormPage() {
         discount:    li.discount     || 0,
         taxPercent:  li.taxPercent   ?? 18,
         taxType:     'IGST' as const,
+        productType: li.productType,
+        commercialTerms: li.commercialTerms,
       }))
     );
   }
@@ -170,6 +173,8 @@ export default function InvoiceFormPage() {
             discount:    0,
             taxPercent:  gstRate,
             taxType:     'IGST' as const,
+            productType: ci.productType || ci.physicalType,
+            commercialTerms: ci.commercialTerms,
           };
         })
       );
@@ -204,6 +209,8 @@ export default function InvoiceFormPage() {
         rate:        li.rate,
         discount:    li.discount,
         taxPercent:  li.taxPercent,
+        productType: li.productType,
+        commercialTerms: li.commercialTerms,
       }))
     );
 
@@ -236,6 +243,8 @@ export default function InvoiceFormPage() {
         rate:        li.rate,
         discount:    li.discount,
         taxPercent:  li.taxPercent,
+        productType: li.productType,
+        commercialTerms: li.commercialTerms,
       }))
     );
 
@@ -647,6 +656,14 @@ export default function InvoiceFormPage() {
                           placeholder="Description (optional)"
                           className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-500"
                         />
+                        {item.commercialTerms && (
+                          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-gray-500 leading-tight">
+                            <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
+                            <span>MOQ / Min Qty: <strong className="text-gray-700">{item.commercialTerms.moqLabel}</strong></span>
+                            <span>Lead Time / SLA: <strong className="text-gray-700">{item.commercialTerms.leadTimePrimary}{item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                            <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
+                          </div>
+                        )}
                       </td>
                       {/* HSN/SAC */}
                       <td className="px-3 py-2">

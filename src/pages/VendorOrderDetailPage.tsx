@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
+import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
@@ -634,6 +635,7 @@ function storedPOToDetail(po: StoredPO) {
             image: "📦",
             referenceNumber: li.referenceNumber || "",
             specs: li.specs || [],
+             commercialTerms: li.commercialTerms,
             qty: li.qty,
             unitPrice: fmtINR(li.unitPrice),
             total: fmtINR(li.lineSubtotal),
@@ -649,6 +651,7 @@ function storedPOToDetail(po: StoredPO) {
               image: "📦",
               referenceNumber: po.referenceNumber || "",
               specs: po.specs || [],
+              commercialTerms: undefined,
               qty: po.qty,
               unitPrice: fmtINR(po.unitPrice),
               total: fmtINR(po.subtotal),
@@ -1081,6 +1084,14 @@ export default function VendorOrderDetailPage() {
                   <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{item.image}</div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.name}</div>
+                     {item.commercialTerms && (
+                       <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 14px", fontSize: 10.5, color: "#6b7280", lineHeight: 1.4 }}>
+                         <span>Pricing Model: <strong style={{ color: "#374151" }}>{item.commercialTerms.pricingModel}</strong></span>
+                         <span>MOQ / Min Qty: <strong style={{ color: "#374151" }}>{item.commercialTerms.moqLabel}</strong></span>
+                         <span>Lead Time / SLA: <strong style={{ color: "#374151" }}>{item.commercialTerms.leadTimePrimary}{item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                         <span>Availability: <strong style={{ color: item.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
+                       </div>
+                     )}
                     <div style={{ marginTop: 4 }}>
                       <input
                         value={item.referenceNumber || ""}

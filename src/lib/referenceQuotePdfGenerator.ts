@@ -4,6 +4,7 @@ import { loadConfig } from './configService';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredQuote } from './quoteStore';
+import { getCommercialTermsLines } from './productCommercialTerms';
 
 export interface ReferenceDocumentOptions {
   title?: string;
@@ -259,7 +260,8 @@ export async function generateReferenceQuotePdfBase64(
     return [
       String(index + 1),
       item.name,
-      item.description || '',
+      (item.description || '') +
+        (item.commercialTerms ? `\n${getCommercialTermsLines(item.commercialTerms).join('\n')}` : ''),
       item.hsnSac || '',
       String(item.qty),
       fmt2(item.rate),

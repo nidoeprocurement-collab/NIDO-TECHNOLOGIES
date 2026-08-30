@@ -5,6 +5,7 @@ import { releaseVendorReservation } from "../lib/vendorStore";
 import { savePO, generatePoNumber, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
 import { getVendorById } from "../lib/vendorDataStore";
 import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
+import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -27,6 +28,9 @@ export interface OrderCartItem {
   moq: number;
   clientId: string;
   productCode?: string;
+  productType?: string;
+  physicalType?: string;
+  commercialTerms?: ProductCommercialTerms;
   fulfillmentType?: "physical" | "digital";
   /** Vendor allocation snapshot — used to restore stock if the order is cancelled. */
   vendorAllocations?: StockAllocation[];
@@ -199,6 +203,9 @@ function autoCreateDraftPOs(
         unitPrice,
         lineSubtotal: unitPrice * qty,
         gstPct,
+        productType: item.productType,
+        physicalType: item.physicalType,
+        commercialTerms: item.commercialTerms,
       };
     });
 

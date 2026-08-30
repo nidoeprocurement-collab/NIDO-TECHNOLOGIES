@@ -8,6 +8,7 @@ import { loadConfig } from './configService';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredPO } from './purchaseOrderStore';
+import { getCommercialTermsLines } from './productCommercialTerms';
 
 // ── Colour palette (identical to invoicePdf) ─────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -315,6 +316,7 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
     let itemCell = li.item;
     if (specLine) itemCell += `\n${specLine}`;
     if (li.referenceNumber) itemCell += `\nRef/Model No: ${li.referenceNumber}`;
+    if (li.commercialTerms) itemCell += `\n${getCommercialTermsLines(li.commercialTerms).join('\n')}`;
     return [
       String(index + 1),
       itemCell,

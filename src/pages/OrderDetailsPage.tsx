@@ -15,6 +15,10 @@ import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { getPrefix } from "@/lib/configService";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 import { createApprovalRequest } from "@/lib/approvalEngine";
+import {
+  getAvailabilityLabel,
+  getProductCommercialTerms,
+} from "@/lib/productCommercialTerms";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -270,6 +274,12 @@ function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
       city: v?.city || "",
       state: v?.state || "",
       pincode: v?.zipCode || "",
+      commercialTerms: c
+        ? getProductCommercialTerms(
+            sub.commercialTerms?.productType,
+            { moq: c.moq, leadTime: c.leadTime, stock: c.stock },
+          )
+        : sub.commercialTerms,
     };
   };
 
@@ -800,6 +810,14 @@ function ViewItemsModal({ group, onClose }) {
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
                   {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Ref/Model No: {sub.referenceNumber}</div>}
                   {sub.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
+                  {sub.commercialTerms && (
+                    <div style={{ marginTop: 7, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 12px", fontSize: 10.5, color: "#6b7280" }}>
+                      <span>Pricing Model: <strong style={{ color: "#374151" }}>{sub.commercialTerms.pricingModel}</strong></span>
+                      <span>MOQ / Min Qty: <strong style={{ color: "#374151" }}>{sub.commercialTerms.moqLabel}</strong></span>
+                      <span>Lead Time / SLA: <strong style={{ color: "#374151" }}>{sub.commercialTerms.leadTimePrimary}{sub.commercialTerms.leadTimeSecondary ? ` · ${sub.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                      <span>Availability: <strong style={{ color: sub.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(sub.commercialTerms)}</strong></span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{sub.qty}</div>
@@ -1650,6 +1668,10 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     deliveredAt: null,
     tracking: null,
     stockAllocations: item.vendorAllocations || [],
+     commercialTerms: item.commercialTerms || getProductCommercialTerms(
+       item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : "Physical Product"),
+       { moq: item.moq, leadTime: item.leadTime, stock: item.totalStock },
+     ),
   }));
 }
 
@@ -1958,6 +1980,8 @@ export default function MyOrderPage() {
           category: sub.category,
           hsnCode: "",
           specs: sub.specs,
+          productType: sub.commercialTerms?.productType,
+          commercialTerms: lm.commercialTerms || sub.commercialTerms,
           referenceNumber: sub.referenceNumber || "",
           qty,
           unitPrice,
@@ -2534,6 +2558,14 @@ export default function MyOrderPage() {
                                   <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{li.item}</div>
                                   {li.sku && <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 1 }}>SKU: {li.sku}</div>}
                                   {li.hsnCode && <div style={{ fontSize: 10.5, color: "#9ca3af" }}>HSN: {li.hsnCode} · GST {li.gstPct ?? 18}%</div>}
+                                  {li.commercialTerms && (
+                                    <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 12px", fontSize: 10.5, color: "#6b7280" }}>
+                                      <span>Pricing Model: <strong style={{ color: "#374151" }}>{li.commercialTerms.pricingModel}</strong></span>
+                                      <span>MOQ / Min Qty: <strong style={{ color: "#374151" }}>{li.commercialTerms.moqLabel}</strong></span>
+                                      <span>Lead Time / SLA: <strong style={{ color: "#374151" }}>{li.commercialTerms.leadTimePrimary}{li.commercialTerms.leadTimeSecondary ? ` · ${li.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                                      <span>Availability: <strong style={{ color: li.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(li.commercialTerms)}</strong></span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                                   <div style={{ fontSize: 11.5, color: "#6b7280" }}>{li.qty} × ₹{li.unitPrice.toLocaleString("en-IN")}</div>

@@ -32,6 +32,10 @@ import {
   getProductType,
   getQuantityLabel,
 } from "@/lib/productTypeRules";
+import {
+  getAvailabilityLabel,
+  getProductCommercialTerms,
+} from "@/lib/productCommercialTerms";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -674,7 +678,15 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
     ? (isDigital ? undefined : selectedVendor.stock > 0 ? selectedVendor.stock : undefined)
     : undefined;
 
-  const recommendedVendor = getRecommendedVendor(vendorComps);
+  const recommendedVendor = isDigital
+    ? (vendorComps[0] || null)
+    : getRecommendedVendor(vendorComps);
+  const termsVendor = selectedVendor ?? recommendedVendor;
+  const commercialTerms = getProductCommercialTerms(productType, {
+    moq: termsVendor?.moq ?? product.moq,
+    leadTime: termsVendor?.leadTime ?? product.leadTime,
+    stock: termsVendor?.stock ?? product.totalStock,
+  });
 
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
 
@@ -702,6 +714,13 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
         clientId,
         category: product.category,
         productCode: product.productCode,
+        productType: product.productType,
+        physicalType: product.physicalType,
+        commercialTerms: getProductCommercialTerms(productType, {
+          moq: selectedVendor.moq,
+          leadTime: selectedVendor.leadTime,
+          stock: selectedVendor.stock,
+        }),
         fulfillmentType: product.fulfillmentType,
         leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,
@@ -725,19 +744,8 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
     : vendorComps;
 
   // Display values
-  const displayMoq = selectedVendor ? (selectedVendor.moq > 0 ? `${selectedVendor.moq} ${productQuantityLabel}` : '--') : '--';
-  const selectedLeadTime = selectedVendor
-    ? formatLeadTimeByType(selectedVendor.leadTime, productType)
-    : null;
-  const selectedAvailability = selectedVendor
-    ? getAvailabilityByType(selectedVendor.stock, productType)
-    : null;
-  const displayLeadTime = selectedLeadTime
-    ? `${selectedLeadTime.primary}${selectedLeadTime.secondary ? ` · ${selectedLeadTime.secondary}` : ''}`
-    : '--';
-  const displayStock = selectedAvailability
-    ? `${selectedAvailability.primary}${selectedAvailability.secondary ? ` · ${selectedAvailability.secondary}` : ''}`
-    : '--';
+  const displayMoq = commercialTerms.moqLabel;
+  const displayLeadTime = `${commercialTerms.leadTimePrimary}${commercialTerms.leadTimeSecondary ? ` · ${commercialTerms.leadTimeSecondary}` : ''}`;
   const displayPrice = selectedVendor && canUseVendor(selectedVendor)
     ? formatCurrency(selectedVendor.basePrice)
     : '--';
@@ -957,54 +965,44 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
       {/* Info grid */}
       <div className="px-3 pt-2 border-t border-gray-100 space-y-1.5" onClick={e => e.stopPropagation()}>
         {/* Type-specific commercial terms, matching the Vendor Products table. */}
-        <div className={`grid gap-3 ${selectedVendor ? 'grid-cols-4' : 'grid-cols-2'}`}>
-          {selectedVendor && (
-            <div>
-              <div className="flex items-center gap-1 text-[9px] text-gray-500">
-                <Layers3 size={10} className="text-gray-400 shrink-0" />
-                <span className="font-medium">Pricing Model</span>
-              </div>
-              <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{productPricingModel}</p>
-            </div>
-          )}
+         <div className="grid grid-cols-2 gap-3">
+           <div>
+             <div className="flex items-center gap-1 text-[9px] text-gray-500">
+               <Layers3 size={10} className="text-gray-400 shrink-0" />
+               <span className="font-medium">Pricing Model</span>
+             </div>
+             <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{commercialTerms.pricingModel}</p>
+           </div>
           <div>
             <div className="flex items-center gap-1 text-[9px] text-gray-500">
               <Package size={10} className="text-gray-400 shrink-0" />
               <span className="font-medium">MOQ / Min Qty</span>
             </div>
-            <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayMoq}</p>
+             <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayMoq}</p>
           </div>
-          {selectedVendor && (
-            <div>
-              <div className="flex items-center gap-1 text-[9px] text-gray-500">
-                <Clock size={10} className="text-gray-400 shrink-0" />
-                <span className="font-medium">Lead Time / SLA</span>
-              </div>
-              <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{displayLeadTime}</p>
-            </div>
-          )}
+           <div>
+             <div className="flex items-center gap-1 text-[9px] text-gray-500">
+               <Clock size={10} className="text-gray-400 shrink-0" />
+               <span className="font-medium">Lead Time / SLA</span>
+             </div>
+             <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{displayLeadTime}</p>
+           </div>
           <div>
             <div className="flex items-center gap-1 text-[9px] text-gray-500">
               <Package size={10} className="text-gray-400 shrink-0" />
               <span className="font-medium">Availability</span>
             </div>
-            <p className={`text-[11px] font-semibold mt-0.5 ${selectedVendor && selectedVendor.stock > 0 ? 'text-emerald-600' : 'text-gray-800'}`}>
-              {displayStock}
+             <p className={`text-[11px] font-semibold mt-0.5 ${commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}`}>
+               {commercialTerms.availabilityPrimary}
             </p>
-            {selectedVendor && selectedVendor.stock > 0 && firstSlabHint && (
+             <p className="text-[9px] font-medium leading-tight text-gray-400">
+               {commercialTerms.availabilityIsUnlimited ? "Instant" : commercialTerms.availabilityStatus}
+             </p>
+             {termsVendor && termsVendor.stock > 0 && firstSlabHint && (
               <p className="text-[9px] text-emerald-600 font-medium leading-tight">{firstSlabHint.discountPct}% off on {firstSlabHint.minQty}+ Units</p>
             )}
           </div>
         </div>
-
-        {/* Lead Time row — only when no vendor selected */}
-        {!selectedVendor && (
-          <div className="flex items-center gap-1.5">
-            <Clock size={10} className="text-gray-400 shrink-0" />
-            <span className="text-[9px] text-gray-500 font-medium">Lead Time / SLA</span>
-            <span className="text-[10px] font-semibold text-gray-800 ml-auto">--</span>
-          </div>
-        )}
 
         {/* Price per Unit row */}
         {selectedVendor ? (
@@ -1073,7 +1071,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
       </div>
 
       {/* Add to Cart button */}
-      <div className="mt-auto px-3 pb-3" onClick={e => e.stopPropagation()}>
+       <div className="mt-auto px-3 pb-3" onClick={e => e.stopPropagation()}>
         <button
           onClick={handleAdd}
           disabled={!canAdd}
@@ -1099,6 +1097,12 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
   const [adding, setAdding] = useState(false);
   const [liked, setLiked] = useState(false);
   const kind = getShopProductKind(product);
+  const productType = getProductType(product.physicalType);
+  const commercialTerms = getProductCommercialTerms(productType, {
+    moq: product.moq,
+    leadTime: product.leadTime,
+    stock: product.totalStock,
+  });
   const gstRate = getEffectiveTaxPctForCategory(product.category);
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, Math.max(1, product.moq)) : 0;
   const basePriceExcl = product.priceNum * 100 / (100 + gstRate);
@@ -1118,6 +1122,10 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
       clientId,
       category: product.category,
       productCode: product.productCode,
+       productType: product.productType,
+       physicalType: product.physicalType,
+       commercialTerms,
+       fulfillmentType: "digital",
       leadTime: product.leadTime,
       gstSnapshot: gstRate,
     }, Math.max(1, product.moq));
@@ -1166,6 +1174,25 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
         <span>View key specifications</span>
         <ChevronRight size={12} />
       </button>
+
+      <div className="grid grid-cols-2 gap-3 border-t border-gray-100 px-3 pt-2.5 text-[10px] text-gray-500">
+        <div>
+          <span className="block">Pricing Model</span>
+          <strong className="text-gray-700">{commercialTerms.pricingModel}</strong>
+        </div>
+        <div>
+          <span className="block">MOQ / Min Qty</span>
+          <strong className="text-gray-700">{commercialTerms.moqLabel}</strong>
+        </div>
+        <div>
+          <span className="block">Lead Time / SLA</span>
+          <strong className="text-gray-700">{commercialTerms.leadTimePrimary}{commercialTerms.leadTimeSecondary ? ` · ${commercialTerms.leadTimeSecondary}` : ""}</strong>
+        </div>
+        <div>
+          <span className="block">Availability</span>
+          <strong className="text-emerald-600">{getAvailabilityLabel(commercialTerms)}</strong>
+        </div>
+      </div>
 
       <div className="mt-auto px-3 pb-3 pt-2.5">
         <div className="mb-3 flex items-end justify-between gap-2">
@@ -1607,13 +1634,23 @@ export default function ShopPage() {
             {paginated.map(product => {
               const preview = (p: Product) => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } });
               return (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onPreview={preview}
-                  clientId={selectedClientId}
-                  isGrid={viewMode === "grid"}
-                />
+                 isDigitalProduct(product) ? (
+                   <DigitalProductCard
+                     key={product.id}
+                     product={product}
+                     onPreview={preview}
+                     clientId={selectedClientId}
+                     isGrid={viewMode === "grid"}
+                   />
+                 ) : (
+                   <ProductCard
+                     key={product.id}
+                     product={product}
+                     onPreview={preview}
+                     clientId={selectedClientId}
+                     isGrid={viewMode === "grid"}
+                   />
+                 )
               );
             })}
           </div>

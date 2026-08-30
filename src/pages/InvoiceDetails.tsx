@@ -5,6 +5,7 @@ import { getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceSt
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
+import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 
 function fmt(value: number) {
   return formatCurrency(value);
@@ -248,6 +249,14 @@ export default function InvoiceDetails() {
                         <td className="px-3 py-3">
                           <p className="font-semibold text-gray-900">{item.description}</p>
                           {item.itemDetails && <p className="text-xs text-gray-500 mt-0.5">{item.itemDetails}</p>}
+                          {item.commercialTerms && (
+                            <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 leading-tight">
+                              <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
+                              <span>MOQ / Min Qty: <strong className="text-gray-700">{item.commercialTerms.moqLabel}</strong></span>
+                              <span>Lead Time / SLA: <strong className="text-gray-700">{item.commercialTerms.leadTimePrimary}{item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                              <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
                         <td className="px-3 py-3 text-center">{item.quantity}</td>

@@ -4,6 +4,7 @@ import { loadConfig } from './configService';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredInvoice } from './invoiceStore';
+import { getCommercialTermsLines } from './productCommercialTerms';
 
 // ── Colour palette (identical to referenceQuotePdfGenerator) ─────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -280,7 +281,8 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
     const taxRateLabel = item.taxType ? `${item.taxPercent}%\n${item.taxType}` : `${item.taxPercent}%`;
     return [
       String(index + 1),
-      item.description + (item.itemDetails ? `\n${item.itemDetails}` : ''),
+       item.description + (item.itemDetails ? `\n${item.itemDetails}` : '') +
+         (item.commercialTerms ? `\n${getCommercialTermsLines(item.commercialTerms).join('\n')}` : ''),
       item.hsnSac || '',
       String(item.quantity),
       fmt2(item.rate),

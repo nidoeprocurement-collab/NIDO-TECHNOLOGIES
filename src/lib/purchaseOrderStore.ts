@@ -3,6 +3,7 @@
 // VendorOrdersPage and VendorOrderDetailPage can read real data.
 
 import { getPrefix } from "./configService";
+import type { ProductCommercialTerms } from "./productCommercialTerms";
 
 export interface PODocument {
   id: string;
@@ -50,6 +51,8 @@ export interface POLineItem {
   lineSubtotal: number;
   /** Full GST rate for this line item (e.g. 18 for 18%). Stored so the PDF can show per-item rates. */
   gstPct?: number;
+  productType?: string;
+  commercialTerms?: ProductCommercialTerms;
 }
 
 export interface StoredPO {

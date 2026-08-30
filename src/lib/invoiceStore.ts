@@ -1,4 +1,5 @@
 import { getPrefix } from './configService';
+import type { ProductCommercialTerms } from './productCommercialTerms';
 
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
 
@@ -12,6 +13,8 @@ export interface InvoiceLineItem {
   discount?: number;        // item-level discount amount
   taxPercent: number;
   taxType?: string;         // e.g. 'IGST' or 'CGST+SGST'
+  productType?: string;
+  commercialTerms?: ProductCommercialTerms;
 }
 
 export interface InvoicePayment {

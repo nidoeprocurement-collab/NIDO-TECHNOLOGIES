@@ -4,6 +4,7 @@
 const STORE_KEY = 'nido_sales_orders';
 const COUNTER_KEY = 'nido_sales_order_counter';
 import { getPrefix } from './configService';
+import type { ProductCommercialTerms } from './productCommercialTerms';
 
 export interface OrderLineItem {
   id: string;
@@ -15,6 +16,8 @@ export interface OrderLineItem {
   rate: number;
   discount: number;
   taxPercent: number;
+  productType?: string;
+  commercialTerms?: ProductCommercialTerms;
 }
 
 export interface OrderGstSlab {

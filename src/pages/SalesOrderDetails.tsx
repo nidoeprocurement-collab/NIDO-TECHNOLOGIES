@@ -5,6 +5,7 @@ import { getOrderById, type StoredSalesOrder } from '@/lib/salesOrderStore';
 import { downloadSalesOrderPdf } from '@/lib/salesOrderPdfGenerator';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
+import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 
 function statusBadge(status: StoredSalesOrder['status']) {
   const map: Record<string, string> = {
@@ -179,6 +180,14 @@ export default function SalesOrderDetails() {
                           <td className="px-3 py-2.5">
                             <p className="font-medium text-gray-900 dark:text-white">{item.name}</p>
                             {item.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{item.description}</p>}
+                            {item.commercialTerms && (
+                              <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                                <span>Pricing Model: <strong className="text-gray-700 dark:text-gray-300">{item.commercialTerms.pricingModel}</strong></span>
+                                <span>MOQ / Min Qty: <strong className="text-gray-700 dark:text-gray-300">{item.commercialTerms.moqLabel}</strong></span>
+                                <span>Lead Time / SLA: <strong className="text-gray-700 dark:text-gray-300">{item.commercialTerms.leadTimePrimary}{item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                                <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-gray-600 dark:text-gray-400">{item.hsnSac}</td>
                           <td className="px-3 py-2.5 text-gray-900 dark:text-white text-center">{item.qty}</td>

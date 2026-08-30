@@ -16,6 +16,10 @@ import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } 
 import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import {
+  getAvailabilityLabel,
+  getProductCommercialTerms,
+} from "@/lib/productCommercialTerms";
 
 function formatPrice(n: number) {
   return formatCurrency(n);
@@ -81,8 +85,6 @@ function QtyInput({
     </div>
   );
 }
-
-function formatLeadTime(t?: string) { return t || "—"; }
 
 function SuggestedCard({
   product, clientId,
@@ -285,12 +287,13 @@ export default function CartPage() {
                   const stockDataKnown = stockInfo !== undefined;
                   const maxQty         = stockDataKnown ? item.quantity + liveRemaining : undefined;
 
-                  const inStock = !stockDataKnown || liveRemaining > 0 || item.quantity > 0;
-                  const stockLabel = !stockDataKnown || liveRemaining > 0 ? "In Stock" : "Reserved";
-
                   const itemMoq = stockInfo?.moq && stockInfo.moq > 0 ? stockInfo.moq : (item.moq > 0 ? item.moq : 1);
                   const itemLeadTime = item.leadTime || stockInfo?.leadTime || "";
                   const itemStock = stockInfo?.totalStock ?? item.totalStock ?? 0;
+                   const itemTerms = item.commercialTerms || getProductCommercialTerms(
+                     item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : "Physical Product"),
+                     { moq: itemMoq, leadTime: itemLeadTime, stock: itemStock },
+                   );
 
                   const specChips = item.specs.slice(0, 5).map(parseSpec);
 
@@ -367,29 +370,22 @@ export default function CartPage() {
                               </div>
                             )}
 
-                            {/* Stock / Lead / MOQ row */}
-                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                              <span className={`font-semibold px-2 py-0.5 rounded-full border text-[10px] ${inStock ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
-                                {stockLabel}
+                            {/* Commercial terms — the same type-aware format used by
+                                Vendor Products and Shop. Values are snapshots for
+                                the selected vendor when available. */}
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] text-gray-500">
+                              <span>
+                                Pricing Model: <strong className="font-semibold text-gray-700">{itemTerms.pricingModel}</strong>
                               </span>
-                              {itemLeadTime && (
-                                <>
-                                  <span className="text-gray-300">|</span>
-                                  <span>Lead Time: <span className="font-semibold text-gray-700">{formatLeadTime(itemLeadTime)}</span></span>
-                                </>
-                              )}
-                              {itemMoq > 0 && (
-                                <>
-                                  <span className="text-gray-300">|</span>
-                                  <span>MOQ: <span className="font-semibold text-gray-700">{itemMoq} Units</span></span>
-                                </>
-                              )}
-                              {itemStock > 0 && (
-                                <>
-                                  <span className="text-gray-300">|</span>
-                                  <span>Stock: <span className="font-semibold text-gray-700">{itemStock.toLocaleString("en-IN")} Units</span></span>
-                                </>
-                              )}
+                              <span>
+                                MOQ / Min Qty: <strong className="font-semibold text-gray-700">{itemTerms.moqLabel}</strong>
+                              </span>
+                              <span>
+                                Lead Time / SLA: <strong className="font-semibold text-gray-700">{itemTerms.leadTimePrimary}{itemTerms.leadTimeSecondary ? ` · ${itemTerms.leadTimeSecondary}` : ""}</strong>
+                              </span>
+                              <span>
+                                Availability: <strong className={`font-semibold ${itemTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}`}>{getAvailabilityLabel(itemTerms)}</strong>
+                              </span>
                             </div>
 
                             {/* Slab discount badge */}
