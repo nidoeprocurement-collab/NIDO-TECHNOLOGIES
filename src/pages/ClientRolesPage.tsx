@@ -958,8 +958,14 @@ export default function ClientRolesPage() {
               <select value={moduleToAdd} onChange={event => setModuleToAdd(event.target.value)}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
                 <option value="">Add module...</option>
-                  {PORTAL_MODULE_CATALOG.filter(module => !selected.permissions.some(item => item.module === module.name))
-                   .map(module => <option key={module.name} value={module.name}>{module.name}</option>)}
+                  {PORTAL_MODULE_CATALOG.map(module => {
+                    const alreadyAdded = selected.permissions.some(item => item.module === module.name);
+                    return (
+                      <option key={module.name} value={module.name} disabled={alreadyAdded}>
+                        {module.name} — {module.description}{alreadyAdded ? " (already added)" : ""}
+                      </option>
+                    );
+                  })}
               </select>
               <button onClick={addModule} disabled={!moduleToAdd} className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40">Add Module</button>
                <span className="text-[11px] text-gray-400 ml-auto">

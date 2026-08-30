@@ -216,9 +216,14 @@ export default function ClientPortalRolesPage() {
                     disabled={!isAdmin}
                   >
                     <option value="">Add module...</option>
-                    {PORTAL_MODULE_CATALOG
-                      .filter(module => !selected.permissions.some(permission => permission.module === module.name))
-                      .map(module => <option key={module.name} value={module.name}>{module.name}</option>)}
+                    {PORTAL_MODULE_CATALOG.map(module => {
+                      const alreadyAdded = selected.permissions.some(permission => permission.module === module.name);
+                      return (
+                        <option key={module.name} value={module.name} disabled={alreadyAdded}>
+                          {module.name} — {module.description}{alreadyAdded ? " (already added)" : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                   <Button variant="outline" size="sm" onClick={addModule} disabled={!isAdmin || !moduleToAdd}>
                     Add Module
