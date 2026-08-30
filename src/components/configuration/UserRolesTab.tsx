@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ChangeEvent } from "react"
 import { useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
 import {
-  Search, Plus, Download, Pencil, Trash2, FileText, Shield,
+  Search, Plus, Download, Upload, MoreVertical, Pencil, Trash2, FileText, Shield,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -18,10 +18,70 @@ import RolePermissionsDialog from "./RolePermissionsDialog"
 import {
   type NidoRole,
   getRoles, addRole, updateRole, deleteRole,
-  getRoleUserCount, exportRolesCsv, exportRolesPdf,
+  getRoleUserCount, exportRolesPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
 } from "@/lib/nidoUsersStore"
-import { isSuperAdmin } from "@/lib/permissionsStore"
+import {
+  ACTIONS,
+  getRolePermissions,
+  isSuperAdmin,
+  saveRolePermissions,
+  type ModulePermissions,
+} from "@/lib/permissionsStore"
+import { ROLE_PERMISSION_MODULE_OPTIONS } from "@/lib/platformModuleCatalog"
+
+const NIDO_PERMISSION_CSV_COLUMNS = [
+  "role_name", "description", "status", "module_key", "module", "module_description",
+  ...ACTIONS.map(action => action.key),
+] as const
+
+function csvEscape(value: string | boolean): string {
+  const text = String(value)
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let value = ""
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    const next = text[index + 1]
+    if (character === '"' && quoted && next === '"') {
+      value += '"'
+      index += 1
+    } else if (character === '"') {
+      quoted = !quoted
+    } else if (character === "," && !quoted) {
+      row.push(value.trim())
+      value = ""
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && next === "\n") index += 1
+      row.push(value.trim())
+      if (row.some(cell => cell.length > 0)) rows.push(row)
+      row = []
+      value = ""
+    } else {
+      value += character
+    }
+  }
+
+  if (quoted) throw new Error("The CSV contains an unclosed quote.")
+  if (value.length > 0 || row.length > 0) {
+    row.push(value.trim())
+    if (row.some(cell => cell.length > 0)) rows.push(row)
+  }
+  return rows
+}
+
+function parseCsvBoolean(value: string, rowNumber: number, column: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  if (["true", "yes", "1"].includes(normalized)) return true
+  if (["false", "no", "0", ""].includes(normalized)) return false
+  throw new Error(`Row ${rowNumber}: ${column} must be true or false.`)
+}
 
 export default function NidoUsersPage() {
   const [searchParams, setSearchParams]         = useSearchParams()
@@ -41,6 +101,7 @@ export default function NidoUsersPage() {
   const [editingRole, setEditingRole]           = useState<NidoRole | null>(null)
   const [permDialogOpen, setPermDialogOpen]     = useState(false)
   const [permRole, setPermRole]                 = useState<NidoRole | null>(null)
+  const [showRoleActionsMenu, setShowRoleActionsMenu] = useState(false)
   const [, forceRefresh]                        = useState(0)
 
   const refreshRoles = () => { setRoles(getRoles()); forceRefresh(n => n + 1); }
@@ -96,6 +157,156 @@ export default function NidoUsersPage() {
     setPermDialogOpen(true)
   }
 
+  const downloadNidoPermissionsTemplate = () => {
+    setShowRoleActionsMenu(false)
+    const header = NIDO_PERMISSION_CSV_COLUMNS.map(csvEscape).join(",")
+    const rows = ROLE_PERMISSION_MODULE_OPTIONS.map(module => [
+      "New NIDO Role",
+      "Replace with your role description",
+      "Active",
+      module.key,
+      module.label,
+      module.description,
+      ...ACTIONS.map(() => false),
+    ].map(csvEscape).join(","))
+    const blob = new Blob([[header, ...rows].join("\r\n")], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "nido-role-permissions-template.csv"
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportNidoPermissionsCsv = () => {
+    setShowRoleActionsMenu(false)
+    if (!filteredRoles.length) {
+      toast.info("Nothing to export")
+      return
+    }
+    const header = NIDO_PERMISSION_CSV_COLUMNS.map(csvEscape).join(",")
+    const rows = filteredRoles.flatMap(role => {
+      const storedPermissions = getRolePermissions(role.name)
+      return ROLE_PERMISSION_MODULE_OPTIONS.map(module => [
+        role.name,
+        role.description,
+        role.status,
+        module.key,
+        module.label,
+        module.description,
+        ...ACTIONS.map(action => Boolean(isSuperAdmin(role.name) || storedPermissions[module.key]?.[action.key])),
+      ].map(csvEscape).join(","))
+    })
+    const blob = new Blob([[header, ...rows].join("\r\n")], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "nido-role-permissions.csv"
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.success("Role permissions exported")
+  }
+
+  const handleNidoBulkUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    setShowRoleActionsMenu(false)
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    try {
+      const rows = parseCsv(await file.text())
+      if (rows.length < 2) throw new Error("The CSV must contain a header and at least one permission row.")
+
+      const header = rows[0].map(cell => cell.replace(/^\uFEFF/, "").toLowerCase())
+      const missingColumns = NIDO_PERMISSION_CSV_COLUMNS.filter(column => !header.includes(column))
+      if (missingColumns.length > 0) throw new Error(`Missing CSV columns: ${missingColumns.join(", ")}.`)
+      const columnIndex = Object.fromEntries(header.map((column, index) => [column, index])) as Record<string, number>
+      const moduleByKey = new Map(ROLE_PERMISSION_MODULE_OPTIONS.map(module => [module.key.toLowerCase(), module]))
+      const moduleByLabel = new Map(ROLE_PERMISSION_MODULE_OPTIONS.map(module => [module.label.toLowerCase(), module]))
+      const imported = new Map<string, {
+        name: string
+        description: string
+        status: "Active" | "Inactive"
+        permissions: Record<string, ModulePermissions>
+      }>()
+
+      rows.slice(1).forEach((cells, index) => {
+        const rowNumber = index + 2
+        const roleName = cells[columnIndex.role_name]?.trim()
+        const moduleValue = (cells[columnIndex.module_key] || cells[columnIndex.module] || "").trim().toLowerCase()
+        const module = moduleByKey.get(moduleValue) || moduleByLabel.get(moduleValue)
+        if (!roleName) throw new Error(`Row ${rowNumber}: role_name is required.`)
+        if (!module) throw new Error(`Row ${rowNumber}: module_key or module is not a valid platform module.`)
+        if (roleName.toLowerCase() === "system owner") {
+          throw new Error("System Owner cannot be changed through bulk upload.")
+        }
+
+        const rawStatus = (cells[columnIndex.status] || "Active").trim().toLowerCase()
+        if (rawStatus !== "active" && rawStatus !== "inactive") {
+          throw new Error(`Row ${rowNumber}: status must be Active or Inactive.`)
+        }
+        const roleKey = roleName.toLowerCase()
+        const current = imported.get(roleKey) || {
+          name: roleName,
+          description: cells[columnIndex.description]?.trim() || "",
+          status: rawStatus === "active" ? "Active" : "Inactive",
+          permissions: {},
+        }
+        if (current.permissions[module.key]) {
+          throw new Error(`Row ${rowNumber}: duplicate permission row for ${roleName} and ${module.label}.`)
+        }
+        const permissions: ModulePermissions = {}
+        ACTIONS.forEach(action => {
+          permissions[action.key] = parseCsvBoolean(
+            cells[columnIndex[action.key]] || "",
+            rowNumber,
+            action.key,
+          )
+        })
+        current.description = cells[columnIndex.description]?.trim() || current.description
+        current.status = rawStatus === "active" ? "Active" : "Inactive"
+        current.permissions[module.key] = permissions
+        imported.set(roleKey, current)
+      })
+
+      const existingByName = new Map(roles.map(role => [role.name.toLowerCase(), role]))
+      const importedRoles = Array.from(imported.values())
+      const updateCount = importedRoles.filter(role => existingByName.has(role.name.toLowerCase())).length
+      const createCount = importedRoles.length - updateCount
+      if (!window.confirm(
+        `Import ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} (${createCount} new, ${updateCount} updated)? Existing role permissions will be replaced by the CSV values.`,
+      )) return
+
+      importedRoles.forEach(incoming => {
+        const existing = existingByName.get(incoming.name.toLowerCase())
+        if (existing) {
+          updateRole(existing.id, {
+            name: incoming.name,
+            description: incoming.description,
+            status: incoming.status,
+          })
+        } else {
+          addRole({
+            name: incoming.name,
+            description: incoming.description,
+            status: incoming.status,
+          })
+        }
+        saveRolePermissions(incoming.name, incoming.permissions)
+      })
+      refreshRoles()
+      toast.success(`Imported ${importedRoles.length} role${importedRoles.length === 1 ? "" : "s"} successfully`)
+    } catch (error) {
+      toast.error("Could not import CSV", {
+        description: error instanceof Error ? error.message : "Please check the file format.",
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="w-full px-3 sm:px-4 md:px-6 py-2 md:py-6 space-y-4">
@@ -132,16 +343,65 @@ export default function NidoUsersPage() {
                       onChange={e => setSearchRole(e.target.value)}
                     />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={() => { if (!filteredRoles.length) { toast.info("Nothing to export"); return; } exportRolesCsv(filteredRoles); toast.success("CSV exported"); }}>
-                      <Download className="mr-2 h-4 w-4" /> Export CSV
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setShowRoleActionsMenu(open => !open)}
+                      aria-label="Role and permission actions"
+                      aria-expanded={showRoleActionsMenu}
+                    >
+                      <MoreVertical className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" onClick={() => { if (!filteredRoles.length) { toast.info("Nothing to export"); return; } exportRolesPdf(filteredRoles); toast.success("PDF exported"); }}>
-                      <FileText className="mr-2 h-4 w-4" /> Export PDF
-                    </Button>
-                    <Button onClick={handleAddRole}>
-                      <Plus className="mr-2 h-4 w-4" /> Add Role
-                    </Button>
+                    {showRoleActionsMenu && (
+                      <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-lg border border-border bg-background p-1.5 shadow-xl">
+                        <button
+                          type="button"
+                          onClick={() => { setShowRoleActionsMenu(false); handleAddRole(); }}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          <Plus className="mr-2 inline h-4 w-4" /> Add Role
+                        </button>
+                        <button
+                          type="button"
+                          onClick={downloadNidoPermissionsTemplate}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          <Download className="mr-2 inline h-4 w-4" /> Download Template
+                        </button>
+                        <button
+                          type="button"
+                          onClick={exportNidoPermissionsCsv}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          <Download className="mr-2 inline h-4 w-4" /> Export CSV
+                        </button>
+                        <label className="block w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm hover:bg-muted">
+                          <Upload className="mr-2 inline h-4 w-4" /> Bulk Upload CSV
+                          <input
+                            type="file"
+                            accept=".csv,text/csv"
+                            onChange={handleNidoBulkUpload}
+                            className="sr-only"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRoleActionsMenu(false)
+                            if (!filteredRoles.length) {
+                              toast.info("Nothing to export")
+                              return
+                            }
+                            exportRolesPdf(filteredRoles)
+                            toast.success("PDF exported")
+                          }}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          <FileText className="mr-2 inline h-4 w-4" /> Export PDF
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
