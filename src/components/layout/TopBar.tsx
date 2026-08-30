@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Search, ArrowLeft, ChevronRight, Home } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search, ArrowLeft, ChevronRight, Home, FileText, LayoutGrid, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
+import { usePermissions } from '@/contexts/PermissionsContext';
+import { getPlatformModuleForPath } from '@/lib/platformModuleCatalog';
+import { searchGlobalPlatform, type GlobalSearchResult } from '@/lib/globalSearch';
 import SLANotificationPopup from '@/components/shared/SLANotificationPopup';
 
 // Route to label mapping for breadcrumbs
@@ -81,8 +84,11 @@ export default function TopBar() {
   const location = useLocation();
   const { user, logout, isClientPortalUser } = useAuth();
   const { config } = useConfig();
+  const { hasRoutePermission, isSuperAdmin } = usePermissions();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [now, setNow] = useState(new Date());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -121,6 +127,34 @@ export default function TopBar() {
     navigate('/login', { replace: true });
   };
 
+  const canViewPath = (path: string) => {
+    if (isSuperAdmin) return true;
+    const module = getPlatformModuleForPath(path);
+    return !module || hasRoutePermission(module.key, module.legacyKey, 'view');
+  };
+
+  const searchResults = useMemo<GlobalSearchResult[]>(() => {
+    if (isClientPortalUser) return [];
+    return searchGlobalPlatform(searchQuery).filter(result => canViewPath(result.path));
+  }, [isClientPortalUser, searchQuery, isSuperAdmin, hasRoutePermission]);
+
+  const openSearchResult = (result: GlobalSearchResult) => {
+    setSearchQuery(result.title);
+    setSearchFocused(false);
+    navigate(result.path);
+  };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setSearchFocused(false);
+      return;
+    }
+    if (event.key === 'Enter' && searchResults[0]) {
+      event.preventDefault();
+      openSearchResult(searchResults[0]);
+    }
+  };
+
   return (
     <div className="relative z-20 bg-transparent">
       {/* Top section - Search bar and actions */}
@@ -133,13 +167,59 @@ export default function TopBar() {
           >
             <ArrowLeft size={20} />
           </button>
-          {!isClientPortalUser && <div className="flex-1 max-w-md hidden md:flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2.5">
+          {!isClientPortalUser && <div className="relative flex-1 max-w-md hidden md:flex items-center gap-2 bg-background border border-border rounded-lg px-3 py-2.5">
             <Search size={18} className="text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search users, orders, vendors, clients, invoices..."
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onKeyDown={handleSearchKeyDown}
+              onBlur={() => window.setTimeout(() => setSearchFocused(false), 150)}
+              placeholder="Search anything in NIDO..."
               className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+              aria-label="Search anything in NIDO"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => setSearchQuery('')}
+                className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X size={15} />
+              </button>
+            )}
+            {searchFocused && searchQuery.trim() && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(70vh,32rem)] overflow-y-auto rounded-xl border border-border bg-background p-2 shadow-xl">
+                {searchResults.length > 0 ? (
+                  <div className="space-y-1">
+                    {searchResults.map(result => (
+                      <button
+                        type="button"
+                        key={result.id}
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => openSearchResult(result)}
+                        className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left hover:bg-muted"
+                      >
+                        <span className="mt-0.5 rounded-md bg-primary/10 p-1.5 text-primary">
+                          {result.type === 'page' ? <LayoutGrid size={14} /> : <FileText size={14} />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-foreground">{result.title}</span>
+                          <span className="block truncate text-xs capitalize text-muted-foreground">{result.subtitle}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+                    No matching pages or records found.
+                  </p>
+                )}
+              </div>
+            )}
           </div>}
         </div>
 
