@@ -339,6 +339,7 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
       </button>
 
       <aside
+        data-navigation
         className={`fixed left-0 top-0 h-full bg-sidebar flex flex-col transition-all duration-300 z-30 w-64 lg:translate-x-0 shadow-[2px_0_6px_-2px_rgba(15,23,42,0.10)] ${
           effectiveCollapsed ? 'lg:w-16' : 'lg:w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}

@@ -9,16 +9,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-type ActionKind = "delete" | "save" | "resubmit" | "submit";
+type ActionKind = "delete" | "save" | "resubmit";
 
 type PendingAction = {
   kind: ActionKind;
   label: string;
   resume: () => void;
 };
-
-const ACTION_PATTERN =
-  /\b(delete|remove|save|resubmit|re-submit|resubmission|submit)\b/i;
 
 function getActionableElement(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Element)) return null;
@@ -43,14 +40,13 @@ function getActionLabel(element: HTMLElement): string {
     .trim();
 }
 
-function getActionKind(label: string, isSubmitButton = false): ActionKind | null {
+function getActionKind(label: string): ActionKind | null {
   const normalized = label.toLowerCase();
   if (/\b(resubmit|re-submit|resubmission)\b/.test(normalized)) {
     return "resubmit";
   }
   if (/\b(delete|remove)\b/.test(normalized)) return "delete";
   if (/\bsave\b/.test(normalized)) return "save";
-  if (/\bsubmit\b/.test(normalized) || isSubmitButton) return "submit";
   return null;
 }
 
@@ -80,9 +76,9 @@ function getConfirmationCopy(kind: ActionKind, label: string) {
     };
   }
   return {
-    title: "Confirm submission",
-    description: "Are you sure you want to submit this request?",
-    confirmLabel: "Submit",
+    title: "Confirm save",
+    description: "Are you sure you want to save these changes?",
+    confirmLabel: "Save",
   };
 }
 
@@ -104,7 +100,7 @@ export default function ActionConfirmationGuard() {
     window.confirm = guardedConfirm;
 
     const shouldSkip = (element: HTMLElement) =>
-      Boolean(element.closest("[data-confirmation-skip]"));
+      Boolean(element.closest("[data-confirmation-skip], [data-navigation]"));
 
     const requestConfirmation = (
       event: Event,
@@ -128,10 +124,7 @@ export default function ActionConfirmationGuard() {
       if (!element || element.hasAttribute("disabled") || element.getAttribute("aria-disabled") === "true") {
         return;
       }
-      const isSubmitButton =
-        element instanceof HTMLButtonElement &&
-        element.type === "submit";
-      const kind = getActionKind(getActionLabel(element), isSubmitButton);
+      const kind = getActionKind(getActionLabel(element));
       if (!kind) return;
       requestConfirmation(event, element, kind, () => element.click());
     };
@@ -149,8 +142,7 @@ export default function ActionConfirmationGuard() {
       const label = fallbackSubmitter
         ? getActionLabel(fallbackSubmitter)
         : "Submit";
-      const kind = getActionKind(label) ??
-        (fallbackSubmitter ? null : "submit");
+      const kind = getActionKind(label);
       if (!kind) return;
       requestConfirmation(event, fallbackSubmitter ?? form, kind, () => {
         if (submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement) {
