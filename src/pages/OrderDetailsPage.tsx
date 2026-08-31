@@ -31,7 +31,18 @@ const VENDOR_POOL = [
 
 
 // Documents and notes start empty; users add them interactively
-const INITIAL_DOCS: { id: string; name: string; ext: string; size: string; type: string; uploadedBy: string; uploadedOn: string; description: string }[] = [];
+const INITIAL_DOCS: {
+  id: string;
+  name: string;
+  ext: string;
+  size: string;
+  type: string;
+  uploadedBy: string;
+  uploadedOn: string;
+  description: string;
+  dataUrl?: string;
+  passwordHash?: string;
+}[] = [];
 const INITIAL_NOTES: { id: string; author: string; date: string; text: string; visibility: string }[] = [];
 
 const ALL_STATUS_MAP = {
@@ -1072,12 +1083,117 @@ function VendorSelectedSummaryTab({ subOrders, selectedVendors, selectedVendorMe
   );
 }
 
+const PASSWORD_PROTECTED_DOCUMENT_TYPES = new Set(["License", "Password Protected"]);
+
+async function hashDocumentPassword(password: string): Promise<string> {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+  return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function readDocumentAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("The document could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function PasswordDialog({
+  title,
+  description,
+  confirmPassword = false,
+  failureMessage = "The document could not be saved. Please try again.",
+  onSubmit,
+  onClose,
+}: {
+  title: string;
+  description: string;
+  confirmPassword?: boolean;
+  failureMessage?: string;
+  onSubmit: (password: string) => boolean | void | Promise<boolean | void>;
+  onClose: () => void;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!password) {
+      setError("Please enter a password.");
+      return;
+    }
+    if (confirmPassword && password !== confirmation) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setError("");
+    setSubmitting(true);
+    try {
+      const result = await onSubmit(password);
+      if (result !== false) onClose();
+      else setError(failureMessage);
+    } catch {
+      setError("The password could not be applied. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="document-password-title"
+      style={{ position: "fixed", inset: 0, zIndex: 1400, background: "rgba(17, 24, 39, 0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+      onMouseDown={event => { if (event.target === event.currentTarget && !submitting) onClose(); }}
+    >
+      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 420, background: "#fff", borderRadius: 12, boxShadow: "0 16px 40px rgba(0,0,0,0.22)", padding: 24 }}>
+        <div id="document-password-title" style={{ fontSize: 16, fontWeight: 700, color: "#111827", marginBottom: 6 }}>{title}</div>
+        <div style={{ fontSize: 13, lineHeight: 1.5, color: "#6b7280", marginBottom: 18 }}>{description}</div>
+        <label style={lbSt}>Password</label>
+        <input
+          autoFocus
+          type="password"
+          value={password}
+          onChange={event => { setError(""); setPassword(event.target.value); }}
+          placeholder="Enter password"
+          autoComplete={confirmPassword ? "new-password" : "current-password"}
+          style={inSt}
+        />
+        {confirmPassword && (
+          <>
+            <label style={{ ...lbSt, marginTop: 12 }}>Confirm Password</label>
+            <input
+              type="password"
+              value={confirmation}
+              onChange={event => { setError(""); setConfirmation(event.target.value); }}
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+              style={inSt}
+            />
+          </>
+        )}
+        {error && <div role="alert" style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5 }}>{error}</div>}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
+          <button type="button" onClick={onClose} disabled={submitting} style={{ padding: "9px 18px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: submitting ? "not-allowed" : "pointer", fontWeight: 600, fontFamily: "inherit" }}>Cancel</button>
+          <button type="submit" data-confirmation-skip disabled={submitting} style={{ padding: "9px 18px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: submitting ? "wait" : "pointer", fontWeight: 600, fontFamily: "inherit" }}>{submitting ? "Please wait..." : confirmPassword ? "Protect & Save" : "Unlock & Download"}</button>
+        </div>
+      </form>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Upload Document Modal ─────────────────────────────────────────────────────
 function UploadDocModal({ onSave, onClose }) {
   const [file, setFile] = useState(null);
   const [form, setForm] = useState({ type: "", description: "" });
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const fileRef = useRef<any>();
 
   const handleFile = f => {
@@ -1088,6 +1204,28 @@ function UploadDocModal({ onSave, onClose }) {
   };
   const ext = file ? (file as any).name.split(".").pop() : "";
 
+  const saveDocument = async (password?: string) => {
+    if (!file) return false;
+    const documentFile = file as File;
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + "\n" + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const dataUrl = await readDocumentAsDataUrl(documentFile);
+    const passwordHash = password ? await hashDocumentPassword(password) : undefined;
+    const saved = onSave({
+      id: "d" + Date.now(),
+      name: documentFile.name,
+      ext,
+      size: (documentFile.size / 1024).toFixed(0) + " KB",
+      type: form.type,
+      uploadedBy: "System Owner",
+      uploadedOn: dateStr,
+      description: form.description,
+      dataUrl,
+      passwordHash,
+    });
+    return saved !== false;
+  };
+
   const handleSave = () => {
     if (!file) {
       setError("Please attach a document before saving.");
@@ -1097,19 +1235,14 @@ function UploadDocModal({ onSave, onClose }) {
       setError("Please select a document type.");
       return;
     }
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + "\n" + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    try {
-      const saved = onSave({ id: "d" + Date.now(), name: (file as any).name, ext, size: ((file as any).size / 1024).toFixed(0) + " KB", type: form.type, uploadedBy: "System Owner", uploadedOn: dateStr, description: form.description });
-      if (saved === false) {
-        setError("The document could not be saved. Please try again.");
-        return;
-      }
-    } catch {
-      setError("The document could not be saved. Please try again.");
+    if (PASSWORD_PROTECTED_DOCUMENT_TYPES.has(form.type)) {
+      setShowPasswordDialog(true);
       return;
     }
-    onClose();
+    void saveDocument().then(saved => {
+      if (saved) onClose();
+      else setError("The document could not be saved. Please try again.");
+    }).catch(() => setError("The document could not be saved. Please try again."));
   };
 
   return (
@@ -1155,7 +1288,7 @@ function UploadDocModal({ onSave, onClose }) {
             <label style={lbSt}>Document Type</label>
             <select value={form.type} onChange={e => { setError(""); setForm({ ...form, type: e.target.value }); }} style={{ ...inSt, appearance: "none" }}>
               <option value="">Select type</option>
-              {["Purchase Order", "Quotation", "Invoice", "Contract", "Shipping Document", "Other"].map(t => <option key={t}>{t}</option>)}
+              {["Purchase Order", "Quotation", "Invoice", "Contract", "Shipping Document", "License", "Password Protected", "Other"].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: 6 }}>
@@ -1175,13 +1308,35 @@ function UploadDocModal({ onSave, onClose }) {
           </div>
         </div>
       </div>
+      {showPasswordDialog && (
+        <PasswordDialog
+          title="Protect this document"
+          description="Create a password for this document. Anyone who downloads it, including NIDO users and clients, must enter this password first."
+          confirmPassword
+          onSubmit={password => saveDocument(password).then(saved => {
+            if (!saved) return false;
+            onClose();
+            return true;
+          })}
+          onClose={() => setShowPasswordDialog(false)}
+        />
+      )}
     </div>
   );
 }
 
 // ── Documents & Notes Tab ─────────────────────────────────────────────────────
 function DocTypeTag({ type }) {
-  const map: any = { "Purchase Order": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" }, "Quotation": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" }, "Invoice": { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" }, "Contract": { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" }, "Shipping Document": { bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" }, "Other": { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" } };
+  const map: any = {
+    "Purchase Order": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+    "Quotation": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+    "Invoice": { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
+    "Contract": { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" },
+    "Shipping Document": { bg: "#f0f9ff", color: "#0369a1", border: "#bae6fd" },
+    License: { bg: "#fefce8", color: "#854d0e", border: "#fde68a" },
+    "Password Protected": { bg: "#fdf2f8", color: "#9d174d", border: "#f9a8d4" },
+    "Other": { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
+  };
   const s = map[type] || map["Other"];
   return <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>{type}</span>;
 }
@@ -1292,6 +1447,7 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
   const [noteText, setNoteText] = useState("");
   const [visibility, setVisibility] = useState("Internal Note");
   const [showUpload, setShowUpload] = useState(false);
+  const [protectedDocument, setProtectedDocument] = useState<any | null>(null);
   const [docSearch, setDocSearch] = useState("");
   const [docFeedback, setDocFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -1360,6 +1516,35 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
       setDocFeedback({ type: "error", message: "The document could not be saved because browser storage is unavailable or full." });
       return false;
     }
+  };
+
+  const downloadDocument = (doc: any): boolean => {
+    if (!doc?.dataUrl) {
+      setDocFeedback({ type: "error", message: "This document is not available for download." });
+      return false;
+    }
+    const link = document.createElement("a");
+    link.href = doc.dataUrl;
+    link.download = doc.name || "document";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return true;
+  };
+
+  const handleDownloadDocument = (doc: any) => {
+    if (doc.passwordHash) {
+      setProtectedDocument(doc);
+      return;
+    }
+    downloadDocument(doc);
+  };
+
+  const unlockAndDownload = async (password: string): Promise<boolean> => {
+    if (!protectedDocument?.passwordHash) return false;
+    const passwordHash = await hashDocumentPassword(password);
+    if (passwordHash !== protectedDocument.passwordHash) return false;
+    return downloadDocument(protectedDocument);
   };
 
   const handleRemoveDocument = (docId: string) => {
@@ -1447,9 +1632,9 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
               <div style={{ fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5 }}>{doc.uploadedOn}</div>
               <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.45 }}>{doc.description}</div>
               {isClientPortalUser ? (
-                <button onClick={() => alert(`Downloading ${doc.name}...`)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
+                <button onClick={() => handleDownloadDocument(doc)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
               ) : (
-                <DocRowMenu onDownload={() => alert(`Downloading ${doc.name}...`)} onRemove={() => handleRemoveDocument(doc.id)} />
+                <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={() => handleRemoveDocument(doc.id)} />
               )}
             </div>
           ))}
@@ -1522,6 +1707,15 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
         </div>
       </div>
       {showUpload && <UploadDocModal onSave={handleSaveDocument} onClose={() => setShowUpload(false)} />}
+      {protectedDocument && (
+        <PasswordDialog
+          title="Password required"
+          description={`Enter the password to download ${protectedDocument.name || "this document"}.`}
+          failureMessage="Incorrect password. Please try again."
+          onSubmit={unlockAndDownload}
+          onClose={() => setProtectedDocument(null)}
+        />
+      )}
       </div>
     </>
   );
