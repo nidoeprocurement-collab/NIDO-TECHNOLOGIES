@@ -1171,7 +1171,7 @@ function UploadDocModal({ onSave, onClose }) {
         <div style={{ borderTop: "1px solid #e5e7eb", padding: "16px 32px 24px", background: "#fff" }}>
           <div style={{ width: "100%", maxWidth: 960, margin: "0 auto", display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button type="button" onClick={onClose} style={{ width: 160, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
-            <button type="button" onClick={handleSave} style={{ width: 180, padding: "10px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
+            <button type="button" data-confirmation-skip onClick={handleSave} style={{ width: 180, padding: "10px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
           </div>
         </div>
       </div>
