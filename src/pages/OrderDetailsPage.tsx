@@ -1189,16 +1189,79 @@ function DocTypeTag({ type }) {
 function DocRowMenu({ onDownload, onRemove }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<any>(null);
+  const triggerRef = useRef<any>(null);
+  const menuRef = useRef<any>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
+  const updateMenuPosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const menuWidth = 170;
+    const menuHeight = 88;
+    const gap = 6;
+    const top = rect.bottom + gap + menuHeight <= window.innerHeight - 8
+      ? rect.bottom + gap
+      : Math.max(8, rect.top - menuHeight - gap);
+    const left = Math.min(
+      Math.max(8, rect.right - menuWidth),
+      Math.max(8, window.innerWidth - menuWidth - 8),
+    );
+    setMenuPosition({ top, left });
+  };
+
   useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const h = e => {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target) &&
+        !menuRef.current?.contains(e.target)
+      ) setOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    const closeOnScroll = () => setOpen(false);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", closeOnScroll, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", closeOnScroll, true);
+    };
+  }, [open]);
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
-      {open && (
-        <div style={{ position: "absolute", top: 28, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 20px rgba(0,0,0,0.13)", zIndex: 300, minWidth: 170, overflow: "hidden" }}>
+      <button
+        ref={triggerRef}
+        aria-label="Document actions"
+        aria-expanded={open}
+        onClick={() => {
+          if (!open) updateMenuPosition();
+          setOpen(v => !v);
+        }}
+        style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}
+      >⋮</button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: menuPosition.top,
+            left: menuPosition.left,
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 9,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.16)",
+            zIndex: 1200,
+            width: 170,
+            overflow: "hidden",
+          }}
+        >
           <button onClick={() => { onDownload(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" }}
             onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
             <span>⬇</span> Download Document
@@ -1208,7 +1271,8 @@ function DocRowMenu({ onDownload, onRemove }) {
             onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
             <span>🗑</span> Remove
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
