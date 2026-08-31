@@ -1113,13 +1113,13 @@ function UploadDocModal({ onSave, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 500, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #f3f4f6" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 600, overflowY: "auto" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", minHeight: "100%", width: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "sticky", top: 0, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 32px", background: "#fff", borderBottom: "1px solid #e5e7eb" }}>
           <span style={{ fontSize: 15, fontWeight: 700 }}>Upload Document</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
+          <button type="button" onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af" }}>×</button>
         </div>
-        <div style={{ padding: "20px 22px" }}>
+        <div style={{ width: "100%", maxWidth: 960, boxSizing: "border-box", margin: "0 auto", padding: "32px", flex: 1 }}>
           <div
             onDragOver={e => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
@@ -1168,9 +1168,11 @@ function UploadDocModal({ onSave, onClose }) {
             </div>
           )}
         </div>
-        <div style={{ display: "flex", gap: 10, padding: "0 22px 20px" }}>
-          <button type="button" onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
-          <button type="button" onClick={handleSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
+        <div style={{ borderTop: "1px solid #e5e7eb", padding: "16px 32px 24px", background: "#fff" }}>
+          <div style={{ width: "100%", maxWidth: 960, margin: "0 auto", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button type="button" onClick={onClose} style={{ width: 160, padding: "10px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
+            <button type="button" onClick={handleSave} style={{ width: 180, padding: "10px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Save Document</button>
+          </div>
         </div>
       </div>
     </div>
