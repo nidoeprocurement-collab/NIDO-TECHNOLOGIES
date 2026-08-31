@@ -1,6 +1,7 @@
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import {
   CalendarDays,
+  ArrowLeft,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -20,7 +21,13 @@ import {
   Check,
   Trash2,
   List,
+  FileText,
+  Activity,
+  StickyNote,
+  Receipt,
+  ShieldCheck,
 } from "lucide-react";
+import jsPDF from "jspdf";
 
 type RenewalStatus = "Overdue" | "Upcoming" | "Due Soon";
 type AutoRenew = "Enabled" | "Disabled";
@@ -384,6 +391,290 @@ function RenewalFormModal({
   );
 }
 
+type DetailTab = "Order Items" | "License Details" | "Renewals" | "Downloads" | "Invoices" | "Activity Log" | "Notes";
+
+const DETAIL_TABS: DetailTab[] = [
+  "Order Items",
+  "License Details",
+  "Renewals",
+  "Downloads",
+  "Invoices",
+  "Activity Log",
+  "Notes",
+];
+
+function formatCurrencyAmount(value: string): string {
+  const amount = Number(value.replace(/[^\d.-]/g, "").replace(/,/g, ""));
+  if (!Number.isFinite(amount)) return value;
+  return `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function downloadRenewalInvoice(row: Renewal) {
+  const amount = Number(row.amount.replace(/[^\d.-]/g, "").replace(/,/g, "")) || 0;
+  const gst = amount * 0.18;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("Nido Tech", 42, 54);
+  doc.setFontSize(13);
+  doc.text("Renewal Invoice", 42, 82);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Renewal ID: ${row.id}`, 42, 108);
+  doc.text(`Client: ${row.client}`, 42, 124);
+  doc.text(`Due date: ${row.dueDate}`, 42, 140);
+  doc.line(42, 158, 553, 158);
+  doc.setFont("helvetica", "bold");
+  doc.text("Description", 42, 180);
+  doc.text("Amount", 470, 180);
+  doc.setFont("helvetica", "normal");
+  doc.text(row.product, 42, 202);
+  doc.text(formatCurrencyAmount(row.amount), 470, 202, { align: "right" });
+  doc.line(42, 220, 553, 220);
+  doc.text(`Subtotal: ${formatCurrencyAmount(row.amount)}`, 553, 244, { align: "right" });
+  doc.text(`GST (18%): ${formatCurrencyAmount(String(gst))}`, 553, 262, { align: "right" });
+  doc.setFont("helvetica", "bold");
+  doc.text(`Total: ${formatCurrencyAmount(String(amount + gst))}`, 553, 288, { align: "right" });
+  doc.save(`${row.id}-invoice.pdf`);
+}
+
+function downloadRenewalFile(row: Renewal, type: "license" | "renewal") {
+  const contents = type === "license"
+    ? `Nido Tech License Details\n\nRenewal ID: ${row.id}\nProduct: ${row.product}\nClient: ${row.client}\nLicense type: ${row.licenseType}\nQuantity: ${row.seats}\nActivation domain: nido-tech.onmicrosoft.com\nLicense key: abcd1234-ef56-7890-abcd-1234567890ef\n`
+    : `Nido Tech Renewal Summary\n\nRenewal ID: ${row.id}\nProduct: ${row.product}\nClient: ${row.client}\nNext renewal: ${row.dueDate}\nRenewal amount: ${row.amount}\nAuto renewal: ${row.autoRenew}\n`;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([contents], { type: "text/plain;charset=utf-8" }));
+  link.download = `${row.id}-${type}-details.txt`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function DetailCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-[10px] border border-gray-200 bg-white p-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <h2 className="mb-3 text-[10px] font-bold text-gray-800">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[8px] text-gray-400">{label}</p>
+      <p className="mt-0.5 text-[9px] font-medium leading-3.5 text-gray-700">{value}</p>
+    </div>
+  );
+}
+
+function RenewalDetailsPage({
+  row,
+  onBack,
+  onEdit,
+  onRenew,
+  onRemove,
+  onManageRenewal,
+}: {
+  row: Renewal;
+  onBack: () => void;
+  onEdit: () => void;
+  onRenew: () => void;
+  onRemove: () => void;
+  onManageRenewal: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("Order Items");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [notes, setNotes] = useState<string[]>([]);
+  const amount = Number(row.amount.replace(/[^\d.-]/g, "").replace(/,/g, "")) || 0;
+  const gst = amount * 0.18;
+  const total = amount + gst;
+  const scrollToTab = (tab: DetailTab) => {
+    setActiveTab(tab);
+    document.getElementById(`renewal-detail-${tab.toLowerCase().replaceAll(" ", "-")}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#fbfcfe] px-2 pb-8 text-gray-900 sm:px-3">
+      <header className="px-1.5 pb-3 pt-2 sm:px-2">
+        <button type="button" onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-[9px] text-gray-500 hover:text-blue-600">
+          <ArrowLeft className="h-3 w-3" /> Back to Renewals
+        </button>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[17px] font-bold leading-6 tracking-[-0.25px] text-gray-900">Order Details / #ORD-000014</h1>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[8px] font-semibold text-emerald-700">Delivered</span>
+            </div>
+            <p className="mt-0.5 text-[9px] text-gray-500">Master Order · Created on Aug 24, 2026 04:21 PM · Requested by Rahul Sharma (Client Operations)</p>
+          </div>
+          <div className="relative flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={() => downloadRenewalInvoice(row)} className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-[9px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+              <Download className="h-3 w-3" /> Download Invoice
+            </button>
+            <button type="button" aria-label="Order actions" onClick={() => setMenuOpen(open => !open)} className="flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50">
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-8 z-30 w-36 rounded-lg border border-gray-200 bg-white p-1 shadow-xl">
+                <button type="button" onClick={() => { window.print(); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-gray-700 hover:bg-gray-50">Print details</button>
+                <button type="button" onClick={() => { navigator.clipboard?.writeText("ORD-000014"); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-gray-700 hover:bg-gray-50">Copy order ID</button>
+                <button type="button" onClick={() => { onRemove(); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-rose-600 hover:bg-rose-50">Remove renewal</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="mb-3 grid gap-px overflow-hidden rounded-[10px] border border-emerald-100 bg-emerald-100 md:grid-cols-3">
+        <div className="bg-emerald-50/70 px-3 py-2.5">
+          <p className="text-[8px] font-semibold uppercase text-emerald-700">Order Processing SLA</p>
+          <p className="mt-1 text-[9px] text-gray-600">Target: 24h <span className="ml-2 font-bold text-emerald-700">SLA Met in 6h 45m</span></p>
+        </div>
+        <div className="bg-emerald-50/70 px-3 py-2.5">
+          <p className="text-[8px] font-semibold uppercase text-gray-500">SLA Deadline: Aug 24, 2026 04:21 PM</p>
+          <p className="mt-1 text-[9px] text-gray-600">Completed On: Aug 24, 2026 11:06 PM</p>
+        </div>
+        <div className="bg-emerald-50/70 px-3 py-2.5">
+          <p className="text-[8px] font-semibold uppercase text-gray-500">Renewal ID</p>
+          <p className="mt-1 text-[9px] font-bold text-gray-700">{row.id}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <DetailCard title="Billing Information">
+          <div className="space-y-2.5">
+            <DetailField label="Client" value={row.client} />
+            <DetailField label="Payment Method" value="Company Account" />
+            <DetailField label="Payment Term" value="Net 30 (Payment due in 30 days)" />
+            <DetailField label="Billing Address" value="41/10, C Cross, Wilson garden, Bangalore – 560027" />
+          </div>
+        </DetailCard>
+        <DetailCard title="Delivery Information">
+          <div className="space-y-2.5">
+            <DetailField label="Ship To" value="41/10, C Cross, Wilson garden, Bangalore – 560027" />
+            <DetailField label="Delivery Type" value="Digital Delivery" />
+            <DetailField label="Delivery Status" value={<span className="text-emerald-600">Delivered</span>} />
+            <DetailField label="Delivered On" value="Aug 24, 2026 11:06 PM" />
+          </div>
+        </DetailCard>
+        <DetailCard title="Requester / Client Information">
+          <div className="space-y-2.5">
+            <DetailField label="Name" value="Rahul Sharma" />
+            <DetailField label="Role" value="Client Operations Analyst" />
+            <DetailField label="Organization" value={row.client} />
+            <DetailField label="Client Operations" value="Procurement" />
+          </div>
+        </DetailCard>
+        <DetailCard title="Order Summary">
+          <div className="space-y-2.5">
+            <DetailField label="Master Order ID" value="ORD-000014" />
+            <DetailField label="Sub Orders" value="1" />
+            <DetailField label="Total Items" value="1" />
+            <DetailField label="Total Amount" value={<span className="font-bold">{formatCurrencyAmount(String(total))}</span>} />
+            <DetailField label="Created On" value="Aug 24, 2026 04:21 PM" />
+          </div>
+        </DetailCard>
+      </div>
+
+      <nav className="mt-4 flex min-w-max items-end gap-1 overflow-x-auto border-b border-gray-200">
+        {DETAIL_TABS.map(tab => (
+          <button
+            type="button"
+            key={tab}
+            onClick={() => scrollToTab(tab)}
+            className={`relative inline-flex h-9 items-center gap-1.5 px-2.5 text-[9px] font-medium ${activeTab === tab ? "text-blue-700" : "text-gray-500 hover:text-gray-800"}`}
+          >
+            {tab === "Order Items" && <FileText className="h-3 w-3" />}
+            {tab === "License Details" && <ShieldCheck className="h-3 w-3" />}
+            {tab === "Renewals" && <RefreshCw className="h-3 w-3" />}
+            {tab === "Downloads" && <Download className="h-3 w-3" />}
+            {tab === "Invoices" && <Receipt className="h-3 w-3" />}
+            {tab === "Activity Log" && <Activity className="h-3 w-3" />}
+            {tab === "Notes" && <StickyNote className="h-3 w-3" />}
+            {tab}
+            {tab === "Order Items" && <span className="rounded-full bg-blue-100 px-1 text-[7px] text-blue-700">1</span>}
+            {tab === "Renewals" && <span className="rounded-full bg-blue-100 px-1 text-[7px] text-blue-700">1</span>}
+            {activeTab === tab && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-blue-600" />}
+          </button>
+        ))}
+      </nav>
+
+      <main className="mt-3 space-y-3">
+        <DetailCard title={`Order Items (1)`}>
+          <div id="renewal-detail-order-items" className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-[9px]">
+              <thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">#</th><th className="pb-2">Item Details</th><th className="pb-2">Type</th><th className="pb-2">Qty</th><th className="pb-2">Unit Price</th><th className="pb-2">Total</th><th className="pb-2">Status</th><th className="pb-2">Vendor</th></tr></thead>
+              <tbody><tr className="border-b border-gray-100"><td className="py-3">1</td><td className="py-3"><div className="flex items-center gap-2"><BrandMark brand={row.brand} /><span className="font-semibold text-gray-700">{row.product}<span className="mt-1 block w-fit rounded bg-purple-50 px-1 text-[7px] font-semibold uppercase text-purple-700">Digital License</span></span></div></td><td>Subscription<br />(License)</td><td>{row.seats.replace(/[^\d]/g, "") || "1"}</td><td>{formatCurrencyAmount(row.amount)}</td><td>{formatCurrencyAmount(row.amount)}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Delivered</span><span className="mt-1 block text-[7px] text-gray-400">Delivered on<br />Aug 24, 2026</span></td><td className="text-blue-600">TechCloud Solutions Pvt. Ltd.</td></tr></tbody>
+            </table>
+          </div>
+          <div className="mt-3 ml-auto w-56 space-y-1.5 text-right text-[9px]"><p>Sub-total (incl. GST) <span className="float-right font-semibold">{formatCurrencyAmount(String(amount))}</span></p><p>GST (18%) <span className="float-right font-semibold">{formatCurrencyAmount(String(gst))}</span></p><p className="border-t border-gray-200 pt-1.5 font-bold">Total Order Amount <span className="float-right">{formatCurrencyAmount(String(total))}</span></p></div>
+        </DetailCard>
+
+        <section id="renewal-detail-license-details">
+          <DetailCard title="License Details">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="flex items-start gap-3"><div className="flex h-10 w-10 items-center justify-center rounded bg-purple-50 text-purple-500"><ShieldCheck className="h-5 w-5" /></div><div className="space-y-2"><DetailField label="License Type" value={row.product} /><DetailField label="License Model" value="Subscription" /><DetailField label="Quantity Licensed" value={row.seats} /><DetailField label="Vendor" value={<span className="text-blue-600">TechCloud Solutions Pvt. Ltd.</span>} /></div></div>
+              <div className="space-y-2"><DetailField label="Activation / Tenant Domain" value="nido-tech.onmicrosoft.com" /><DetailField label="Assigned To" value={row.client} /><DetailField label="Assigned Users (10)" value={<button type="button" onClick={() => alert(`Showing assigned users for ${row.id}`)} className="text-blue-600 hover:underline">View Assigned Users →</button>} /><DetailField label="License Key / Notes" value="abcd1234-ef56-7890-abcd-1234567890ef" /></div>
+              <div className="space-y-2"><DetailField label="Start Date" value="Aug 24, 2026" /><DetailField label="End / Expiry Date" value="Aug 24, 2027" /><DetailField label="Status" value={<span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Active</span>} /><DetailField label="Auto Renewal" value={<span className="text-emerald-600">● Enabled</span>} /></div>
+            </div>
+            <div className="mt-3 flex justify-end"><button type="button" onClick={() => downloadRenewalFile(row, "license")} className="inline-flex items-center gap-1 text-[9px] font-medium text-blue-600 hover:underline"><Download className="h-3 w-3" /> Download license details</button></div>
+          </DetailCard>
+        </section>
+
+        <section id="renewal-detail-renewals">
+          <DetailCard title="Renewal Summary">
+            <div className="mb-3 flex justify-end"><button type="button" onClick={onManageRenewal} className="rounded border border-blue-200 px-2 py-1 text-[8px] font-semibold text-blue-600 hover:bg-blue-50">Manage Renewal</button></div>
+            <div className="grid gap-2 sm:grid-cols-4">
+              <div className="rounded border border-gray-100 p-2"><DetailField label="Next Renewal" value={<span className="font-bold">{row.dueDate}</span>} /><p className="mt-1 text-[8px] text-gray-400">{row.dueIn}</p></div>
+              <div className="rounded border border-gray-100 p-2"><DetailField label="Renewal Amount (Est.)" value={<span className="font-bold">{formatCurrencyAmount(row.amount)}</span>} /><p className="mt-1 text-[8px] text-gray-400">Excl. GST</p></div>
+              <div className="rounded border border-gray-100 p-2"><DetailField label="Renewal Status" value={<span className="rounded-full bg-blue-50 px-1.5 py-1 text-[8px] font-semibold text-blue-600">Upcoming</span>} /></div>
+              <div className="rounded border border-gray-100 p-2"><DetailField label="Auto Renewal" value={<span className="text-emerald-600">● Enabled</span>} /></div>
+            </div>
+          </DetailCard>
+          <DetailCard title="Renewal History">
+            <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-[9px]"><thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">Renewal ID</th><th className="pb-2">Period</th><th className="pb-2">Amount</th><th className="pb-2">Status</th><th className="pb-2">Renewed On</th><th className="pb-2">Invoice</th></tr></thead><tbody><tr><td className="py-2 text-blue-600">REN-000001</td><td>Aug 24, 2025 – Aug 24, 2026</td><td>{formatCurrencyAmount(row.amount)}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Completed</span></td><td>Aug 22, 2025</td><td><button type="button" onClick={() => downloadRenewalInvoice(row)} className="text-blue-600 hover:underline">INV-000039 ↓</button></td></tr></tbody></table></div>
+            <button type="button" onClick={() => setActiveTab("Renewals")} className="mt-3 block w-full text-center text-[9px] font-medium text-blue-600 hover:underline">View all renewal history →</button>
+          </DetailCard>
+        </section>
+
+        <section id="renewal-detail-downloads">
+          <DetailCard title="Downloads">
+            <div className="flex items-center justify-between gap-3 rounded border border-gray-100 p-2"><div className="flex items-center gap-2"><BrandMark brand={row.brand} /><div><p className="text-[9px] font-semibold text-gray-700">{row.product}</p><p className="text-[8px] text-gray-400">Setup & Authentication Guide</p></div></div><button type="button" onClick={() => downloadRenewalFile(row, "license")} className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-[8px] text-gray-600 hover:bg-gray-50"><Download className="h-3 w-3" /> Download</button></div>
+            <button type="button" onClick={() => scrollToTab("Downloads")} className="mt-3 block w-full text-center text-[9px] font-medium text-blue-600 hover:underline">View all downloads →</button>
+          </DetailCard>
+        </section>
+
+        <section id="renewal-detail-invoices">
+          <DetailCard title="Invoices">
+            <div className="overflow-x-auto"><table className="w-full min-w-[550px] text-[9px]"><thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">Invoice ID</th><th className="pb-2">Invoice Date</th><th className="pb-2">Amount</th><th className="pb-2">Status</th><th className="pb-2">Due Date</th><th className="pb-2">Actions</th></tr></thead><tbody><tr><td className="py-2 text-blue-600">INV-000123</td><td>Aug 24, 2026</td><td>{formatCurrencyAmount(String(total))}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Paid</span></td><td>Sep 23, 2026</td><td><button type="button" onClick={() => downloadRenewalInvoice(row)} className="text-blue-600 hover:underline">View</button><button type="button" onClick={() => downloadRenewalInvoice(row)} className="ml-2 rounded border border-gray-200 p-1 text-gray-500 hover:bg-gray-50" aria-label="Download invoice"><Download className="h-3 w-3" /></button></td></tr></tbody></table></div>
+            <button type="button" onClick={() => scrollToTab("Invoices")} className="mt-3 block w-full text-center text-[9px] font-medium text-blue-600 hover:underline">View all invoices →</button>
+          </DetailCard>
+        </section>
+
+        <section id="renewal-detail-activity-log">
+          <DetailCard title="Activity Log">
+            <div className="space-y-3 text-[9px]"><div className="flex gap-2"><Activity className="mt-0.5 h-3 w-3 text-blue-500" /><p><span className="font-semibold text-gray-700">Order delivered</span><span className="ml-2 text-gray-400">Aug 24, 2026 11:06 PM</span><br /><span className="text-gray-500">Digital license was delivered to the client.</span></p></div><div className="flex gap-2"><Activity className="mt-0.5 h-3 w-3 text-gray-400" /><p><span className="font-semibold text-gray-700">Renewal created</span><span className="ml-2 text-gray-400">Aug 24, 2026 04:21 PM</span><br /><span className="text-gray-500">Renewal request was submitted by Rahul Sharma.</span></p></div></div>
+          </DetailCard>
+        </section>
+
+        <section id="renewal-detail-notes">
+          <DetailCard title="Notes">
+            <div className="flex gap-2"><input value={note} onChange={event => setNote(event.target.value)} placeholder="Add a note about this renewal..." className="h-8 min-w-0 flex-1 rounded border border-gray-200 px-2 text-[9px] outline-none focus:border-blue-400" /><button type="button" onClick={() => { if (note.trim()) { setNotes(current => [note.trim(), ...current]); setNote(""); } }} className="h-8 rounded bg-blue-600 px-3 text-[9px] font-semibold text-white hover:bg-blue-700">Add Note</button></div>
+            {notes.length > 0 && <div className="mt-3 space-y-2">{notes.map((item, index) => <p key={`${item}-${index}`} className="rounded bg-gray-50 p-2 text-[9px] text-gray-600">{item}</p>)}</div>}
+          </DetailCard>
+        </section>
+
+        <div className="flex items-center gap-2 rounded bg-blue-50 px-3 py-2 text-[8px] text-blue-700"><ShieldCheck className="h-3 w-3" /> License keys are encrypted and visible only to authorized users. For security, sharing license keys externally is restricted.</div>
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onEdit} className="inline-flex items-center gap-1 rounded border border-gray-200 px-3 py-1.5 text-[9px] font-medium text-gray-700 hover:bg-gray-50"><Pencil className="h-3 w-3" /> Edit Renewal</button>
+          <button type="button" onClick={onRenew} className="inline-flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-[9px] font-semibold text-white hover:bg-emerald-700"><Check className="h-3 w-3" /> Mark as Renewed</button>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function RenewalActionMenu({
   row,
   open,
@@ -618,6 +909,25 @@ export default function MyRenewalsPage() {
     setPage(1);
     setActionMenuId(null);
   };
+
+  if (selectedRenewal) {
+    return (
+      <RenewalDetailsPage
+        row={selectedRenewal}
+        onBack={() => setSelectedRenewal(undefined)}
+        onEdit={() => {
+          setSelectedRenewal(undefined);
+          editRenewal(selectedRenewal);
+        }}
+        onRenew={() => markRenewed(selectedRenewal)}
+        onRemove={() => removeRenewal(selectedRenewal)}
+        onManageRenewal={() => {
+          setSelectedRenewal(undefined);
+          editRenewal(selectedRenewal);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white px-1.5 pb-4 text-gray-900 sm:px-2">
@@ -1126,49 +1436,6 @@ export default function MyRenewalsPage() {
           }}
           onSave={saveRenewal}
         />
-      )}
-      {selectedRenewal && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <BrandMark brand={selectedRenewal.brand} />
-                <div>
-                  <p className="text-[10px] font-semibold text-blue-600">{selectedRenewal.id}</p>
-                  <h2 className="mt-0.5 text-base font-semibold text-gray-900">{selectedRenewal.product}</h2>
-                  <p className="mt-0.5 text-xs text-gray-500">{selectedRenewal.client}</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => setSelectedRenewal(undefined)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close renewal details">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-xs">
-              <div><span className="block text-[10px] text-gray-400">Due date</span><span className="font-medium text-gray-800">{selectedRenewal.dueDate}</span></div>
-              <div><span className="block text-[10px] text-gray-400">Amount</span><span className="font-semibold text-gray-800">{selectedRenewal.amount}</span></div>
-              <div><span className="block text-[10px] text-gray-400">License</span><span className="font-medium text-gray-800">{selectedRenewal.licenseType}</span></div>
-              <div><span className="block text-[10px] text-gray-400">Seats</span><span className="font-medium text-gray-800">{selectedRenewal.seats}</span></div>
-              <div><span className="block text-[10px] text-gray-400">Renewal status</span><span className={`font-semibold ${selectedRenewal.renewalStatus === "Overdue" ? "text-rose-600" : "text-amber-600"}`}>{selectedRenewal.renewalStatus}</span></div>
-              <div><span className="block text-[10px] text-gray-400">Auto renew</span><span className="font-medium text-gray-800">{selectedRenewal.autoRenew}</span></div>
-            </div>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => setSelectedRenewal(undefined)} className="h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">Close</button>
-              {renewals.some(row => row.id === selectedRenewal.id) && (
-                <>
-                  <button type="button" onClick={() => { editRenewal(selectedRenewal); setSelectedRenewal(undefined); }} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50">
-                    <Pencil className="h-3 w-3" /> Edit
-                  </button>
-                  <button type="button" onClick={() => markRenewed(selectedRenewal)} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700">
-                    <Check className="h-3 w-3" /> Mark as renewed
-                  </button>
-                </>
-              )}
-              <button type="button" onClick={() => removeRenewal(selectedRenewal)} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50">
-                <Trash2 className="h-3 w-3" /> Remove renewal
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
