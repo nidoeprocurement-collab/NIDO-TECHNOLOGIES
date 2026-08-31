@@ -55,7 +55,7 @@ const definitions: ModuleDefinition[] = [
   { label: 'Vendors › Onboarding', path: '/vendors/onboarding', legacyKey: 'vendors' },
   { label: 'My Requests › Orders', path: '/orders', legacyKey: 'orders' },
   { label: 'My Requests › Services', path: '/my-services', legacyKey: 'services' },
-  { label: 'My Requests › SLA Overview', path: '/sla-overview', legacyKey: 'orders' },
+  { label: 'My Requests › My Renewals', path: '/my-renewals', legacyKey: 'orders' },
   { label: 'Reports', path: '/reports', legacyKey: 'reports' },
   { label: 'Reports › Executive', path: '/reports/executive', legacyKey: 'reports' },
   { label: 'Reports › Sales', path: '/reports/sales', legacyKey: 'reports' },

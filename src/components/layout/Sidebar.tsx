@@ -50,7 +50,7 @@ const adminNavigationItems: NavItem[] = [
     children: [
       { label: 'My Orders',   icon: <ShoppingBag size={16} />, path: '/orders',      moduleKey: 'orders' },
       { label: 'My Services', icon: <Wrench size={16} />,      path: '/my-services', moduleKey: 'services' },
-      { label: 'SLA Overview',icon: <Gauge size={16} />,       path: '/sla-overview',moduleKey: 'orders' },
+      { label: 'My Renewals',  icon: <Repeat size={16} />,      path: '/my-renewals', moduleKey: 'orders' },
     ],
   },
   { label: 'Reports', icon: <TrendingUp size={20} />, path: '/reports', moduleKey: 'reports' },

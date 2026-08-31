@@ -216,6 +216,7 @@ const ClientPortalAddressesPage = lazy(() => import("@/pages/ClientPortalAddress
 const MainDashboard = lazy(() => import("@/pages/MainDashboard"));
 const VendorDashboard = lazy(() => import("@/pages/VendorDashboard"));
 const SLAOverview = lazy(() => import("@/pages/SLAOverview"));
+const MyRenewalsPage = lazy(() => import("@/pages/MyRenewalsPage"));
 const MyOrderPage = lazy(() => import("@/pages/MyOrderPage"));
 const OrderDetailsPage = lazy(() => import("@/pages/OrderDetailsPage"));
 const VendorOrderDetailPage = lazy(() => import("@/pages/VendorOrderDetailPage"));
@@ -1049,7 +1050,7 @@ function AppRoutes() {
           <Route path="archive" element={<ArchivePage />} />
           
           {/* Simplified sidebar routes */}
-          <Route path="sla-overview" element={<SLAOverview />} />
+           <Route path="my-renewals" element={<MyRenewalsPage />} />
           <Route path="vendors/dashboard" element={<VendorDashboard />} />
           <Route path="roles" element={<Navigate to="/configuration/nido-users?tab=roles" replace />} />
           <Route path="departments" element={<DepartmentsPage />} />

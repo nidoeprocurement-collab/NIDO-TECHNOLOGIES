@@ -21,7 +21,7 @@ export const ROUTE_MODULE_MAP: Array<{ prefix: string; moduleKey: string }> = [
   { prefix: '/orders', moduleKey: 'orders' },
   { prefix: '/vendor-orders', moduleKey: 'orders' },
   { prefix: '/procure', moduleKey: 'orders' },
-  { prefix: '/sla-overview', moduleKey: 'orders' },
+  { prefix: '/my-renewals', moduleKey: 'orders' },
   { prefix: '/reports', moduleKey: 'reports' },
 
   { prefix: '/sales/quotes', moduleKey: 'sales' },

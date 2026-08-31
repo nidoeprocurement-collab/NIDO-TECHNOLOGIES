@@ -34,7 +34,7 @@ const routeLabels: Record<string, string> = {
   'roles': 'Roles',
   'user-invitations': 'Invitations',
   'audit-logs': 'Audit Logs',
-  'sla-overview': 'SLA Overview',
+  'my-renewals': 'My Renewals',
   'configuration': 'Configuration',
   'categories': 'Categories',
   'onboarding': 'Onboarding',
