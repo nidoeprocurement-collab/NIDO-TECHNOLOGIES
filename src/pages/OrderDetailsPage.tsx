@@ -1246,7 +1246,10 @@ function UploadDocModal({ onSave, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 600, overflowY: "auto" }} onClick={onClose}>
+    <div
+      style={{ position: "fixed", inset: 0, background: "#fff", zIndex: 600, overflowY: "auto" }}
+      onClick={event => { if (event.target === event.currentTarget) onClose(); }}
+    >
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", minHeight: "100%", width: "100%", display: "flex", flexDirection: "column" }}>
         <div style={{ position: "sticky", top: 0, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 32px", background: "#fff", borderBottom: "1px solid #e5e7eb" }}>
           <span style={{ fontSize: 15, fontWeight: 700 }}>Upload Document</span>
