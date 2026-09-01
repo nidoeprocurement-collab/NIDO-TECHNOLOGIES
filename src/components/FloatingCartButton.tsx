@@ -12,8 +12,6 @@ export default function FloatingCartButton() {
   const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
   const totalPrice = items.reduce((sum, item) => sum + (item.priceNum || 0) * item.quantity, 0);
 
-  if (totalQty === 0) return null;
-
   return (
     <button
       onClick={() => navigate('/shop/cart')}

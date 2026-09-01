@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Minus, Plus, ChevronLeft, ChevronRight,
-  ShoppingCart, Lock, X, FileText, Phone, Mail, MessageCircle,
+  ShoppingCart, Lock, X, Phone, Mail, MessageCircle,
   CheckCircle2, RotateCcw, Headphones, BadgeCheck,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
@@ -520,15 +520,6 @@ export default function CartPage() {
           >
             <Lock size={14} />
             Proceed to Checkout
-          </button>
-
-          {/* Save as Quote */}
-          <button
-            onClick={() => navigate("/transactions/sales/quotes")}
-            className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl py-3 text-sm transition-colors border border-gray-300"
-          >
-            <FileText size={14} />
-            Save as Quote
           </button>
 
           {/* We Accept */}
