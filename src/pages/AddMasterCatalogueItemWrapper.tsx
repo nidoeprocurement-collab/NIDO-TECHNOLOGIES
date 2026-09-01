@@ -74,6 +74,7 @@ export default function AddMasterCatalogueItemWrapper() {
   }, [itemId]);
 
   const currentMasterProductCode = isEditMode ? editMasterCode : masterProductCode;
+  const currentEditProductId = itemId || editProductId;
 
   const [newSpecName, setNewSpecName] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
@@ -215,7 +216,7 @@ export default function AddMasterCatalogueItemWrapper() {
   };
 
   const buildProduct = (status: 'draft' | 'published') => ({
-    id: isEditMode ? editProductId : Date.now().toString(),
+    id: isEditMode ? currentEditProductId : Date.now().toString(),
     masterProductCode: currentMasterProductCode,
     skuCode,
     productName: productName || 'Untitled Product',
@@ -256,7 +257,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const clearDraft = () => sessionStorage.removeItem('nido_preview_draft');
 
   const saveProduct = (status: 'draft' | 'published') => {
-    const duplicate = findCatalogProductByName(productName, isEditMode ? editProductId : undefined);
+    const duplicate = findCatalogProductByName(productName, isEditMode ? currentEditProductId : undefined);
     if (duplicate) {
       toast.error(`Product duplication found: "${duplicate.productName}" already exists in the master catalog.`);
       return false;
@@ -286,7 +287,11 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const handleSaveChanges = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
-    const existing = getCatalogProducts().find(p => p.id === editProductId);
+    const existing = getCatalogProducts().find(p => String(p.id) === String(currentEditProductId));
+    if (!existing) {
+      toast.error('Product could not be found. Please return to the master catalogue and try again.');
+      return;
+    }
     if (!saveProduct(existing?.publishStatus || 'draft')) return;
     clearDraft();
     toast.success('Changes saved successfully');
