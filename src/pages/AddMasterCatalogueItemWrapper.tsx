@@ -215,11 +215,16 @@ export default function AddMasterCatalogueItemWrapper() {
     }
   };
 
-  const buildProduct = (status: 'draft' | 'published') => ({
-    ...(isEditMode
+  const buildProduct = (
+    status: 'draft' | 'published',
+    existingProduct = isEditMode
       ? getCatalogProducts().find(p => String(p.id) === String(currentEditProductId))
-      : undefined),
-    id: isEditMode ? currentEditProductId : Date.now().toString(),
+      : undefined,
+  ) => ({
+    ...(isEditMode ? existingProduct : undefined),
+    // In edit mode, preserve the exact ID from storage. The route ID is only
+    // used to locate the record and must never turn an update into an insert.
+    id: isEditMode ? (existingProduct?.id ?? currentEditProductId) : Date.now().toString(),
     masterProductCode: currentMasterProductCode,
     skuCode,
     productName: productName || 'Untitled Product',
@@ -260,6 +265,15 @@ export default function AddMasterCatalogueItemWrapper() {
   const clearDraft = () => sessionStorage.removeItem('nido_preview_draft');
 
   const saveProduct = (status: 'draft' | 'published') => {
+    const existingProduct = isEditMode
+      ? getCatalogProducts().find(p => String(p.id) === String(currentEditProductId))
+      : undefined;
+
+    if (isEditMode && !existingProduct) {
+      toast.error('Product could not be found. Please return to the master catalogue and try again.');
+      return false;
+    }
+
     if (!isEditMode) {
       const duplicate = findCatalogProductByName(productName);
       if (duplicate) {
@@ -267,7 +281,7 @@ export default function AddMasterCatalogueItemWrapper() {
         return false;
       }
     }
-    const saved = saveCatalogProduct(buildProduct(status), {
+    const saved = saveCatalogProduct(buildProduct(status, existingProduct), {
       skipDuplicateCheck: isEditMode,
     });
     if (!saved) {
