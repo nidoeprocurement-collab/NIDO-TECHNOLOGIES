@@ -2984,7 +2984,12 @@ export default function MyOrderPage() {
                 </div>
                 {filtered.map((sub, idx) => {
                   const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub);
-                  const subPOs = Object.values(createdPOs).filter((p: any) => poCoversSubOrder(p, sub.id)) as any[];
+                  const isSubOrderCancelled = sub.itemStatus === "Cancelled";
+                  // A cancelled sub-order is fully inactive in this view. Do
+                  // not expose stale PO/vendor projections or action handlers.
+                  const subPOs = isSubOrderCancelled
+                    ? []
+                    : Object.values(createdPOs).filter((p: any) => poCoversSubOrder(p, sub.id)) as any[];
                   const hasPO = subPOs.length > 0;
                   const hasConfirmedPO = subPOs.some(isConfirmedPO);
                   const selVendorId = selectedVendors[sub.id];
@@ -2998,8 +3003,8 @@ export default function MyOrderPage() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                        {!isClientPortalUser && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
-                        {!isClientPortalUser && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
+                        {!isClientPortalUser && !isSubOrderCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
+                        {!isClientPortalUser && !isSubOrderCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -3016,7 +3021,9 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {hasPO ? (
+                          {isSubOrderCancelled ? (
+                            <span style={{ fontSize: 12, color: "#9ca3af" }}>---</span>
+                          ) : hasPO ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                               {subPOs.map((po: any) => (
                                 <button
@@ -3048,7 +3055,9 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {hasPO ? (
+                          {isSubOrderCancelled ? (
+                            <span style={{ fontSize: 12, color: "#9ca3af" }}>---</span>
+                          ) : hasPO ? (
                             // Show every vendor covered by this PO and keep its
                             // state pending until the PO is confirmed.
                             <div>
@@ -3080,7 +3089,7 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       )}
-                      {isOrderInactive ? (
+                      {isOrderInactive || isSubOrderCancelled ? (
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                       ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
