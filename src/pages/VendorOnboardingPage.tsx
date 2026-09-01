@@ -698,15 +698,10 @@ export default function AddVendorPage() {
             } />
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <FormField label="Payment Mode" input={
-              <AddableSelect name="paymentMode" value={formData.paymentMode} onChange={handleChange}
-                baseOptions={paymentModesBase} addLabel="+ Add New Payment Mode" placeholder="Select payment mode" className={selectClass} />
-            } />
-            <FormField label="Branch" input={
-              <input type="text" placeholder="Enter branch name" name="bankBranch" value={formData.bankBranch} onChange={handleChange} className={inputClass} />
-            } />
-          </div>
+          <FormField label="Payment Mode" input={
+            <AddableSelect name="paymentMode" value={formData.paymentMode} onChange={handleChange}
+              baseOptions={paymentModesBase} addLabel="+ Add New Payment Mode" placeholder="Select payment mode" className={selectClass} />
+          } />
 
           <FormField label="Credit Limit (INR)" input={
             <input type="text" placeholder="Enter amount" name="creditLimit" value={formData.creditLimit} onChange={handleChange} className={inputClass} />
@@ -730,6 +725,10 @@ export default function AddVendorPage() {
                 baseOptions={accountTypesBase} addLabel="+ Add New Account Type" placeholder="Select account type" className={selectClass} />
             } />
           </div>
+
+          <FormField label="Branch" input={
+            <input type="text" placeholder="Enter branch name" name="bankBranch" value={formData.bankBranch} onChange={handleChange} className={inputClass} />
+          } />
         </FormSection>
 
         {/* ── Section 5: Vendor Classification ────────────────────────────── */}
