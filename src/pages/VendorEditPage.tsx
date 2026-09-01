@@ -161,9 +161,6 @@ export default function VendorEditPage() {
   const designations = ['CEO / Director', 'Managing Director', 'Vice President', 'General Manager', 'Manager', 'Assistant Manager', 'Executive', 'Specialist', 'Others'];
   const vendorTypes = ['Supplier', 'Manufacturer', 'Distributor', 'Reseller', 'Service Provider', 'Consultant', 'Contractor', 'OEM', 'Others'];
 
-  // Years from 2024 down to 1999
-  const years = Array.from({ length: 26 }, (_, i) => String(2024 - i));
-
   const phoneCodes = ['+91 (India)', '+1 (USA)', '+44 (UK)', '+971 (UAE)', '+65 (Singapore)', '+61 (Australia)', '+86 (China)', '+81 (Japan)', '+49 (Germany)', '+33 (France)'];
   const countries = ['India', 'United States', 'United Kingdom', 'United Arab Emirates', 'Singapore', 'Australia', 'China', 'Japan', 'Germany', 'France', 'Others'];
 
@@ -426,11 +423,16 @@ export default function VendorEditPage() {
                 className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             } />
             <FormField label="Year of Establishment" input={
-              <select name="yearOfEstablishment" value={formData.yearOfEstablishment} onChange={handleChange}
-                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">Select year</option>
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
+              <input
+                type="text"
+                placeholder="e.g. 2010"
+                name="yearOfEstablishment"
+                value={formData.yearOfEstablishment}
+                onChange={handleChange}
+                maxLength={4}
+                pattern="\d{4}"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             } />
           </div>
 
