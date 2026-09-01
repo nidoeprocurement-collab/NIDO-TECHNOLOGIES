@@ -2252,7 +2252,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     unitPrice: `₹${Number(item.landedCost || item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     total: `₹${((item.landedCost || item.priceNum) * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
-    itemStatus: "Processing",
+    itemStatus: "Pending",
     updatedOn: orderDate,
     deliveredAt: null,
     tracking: null,
@@ -2285,6 +2285,34 @@ function poCoversSubOrder(po: any, subOrderId: string): boolean {
 function isConfirmedPO(po: any): boolean {
   const status = String(po?.status || "").toLowerCase();
   return status !== "draft" && status !== "cancelled" && status !== "rejected";
+}
+
+// Client-created sub-orders wait in Pending until their vendor PO is confirmed.
+// Keep this reconciliation tolerant of older saved orders that were initialized
+// as Processing before the PO confirmation gate was added.
+function reconcileSubOrderStatuses(subOrders: any[], orderId: string): any[] {
+  let orderPOs: any[] = [];
+  try {
+    orderPOs = getAllPOs().filter(po => po.orderId === orderId);
+  } catch {
+    orderPOs = [];
+  }
+  const confirmedPOs = orderPOs.filter(isConfirmedPO);
+  const updatedOn = new Date().toLocaleDateString("en-IN");
+
+  return subOrders.map(sub => {
+    if (sub.itemStatus === "Cancelled" || sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered") {
+      return sub;
+    }
+    const hasConfirmedPO = confirmedPOs.some(po => poCoversSubOrder(po, sub.id));
+    if (hasConfirmedPO && (sub.itemStatus === "Pending" || sub.itemStatus === "Confirmed")) {
+      return { ...sub, itemStatus: "Processing", updatedOn };
+    }
+    if (!hasConfirmedPO && sub.itemStatus === "Processing") {
+      return { ...sub, itemStatus: "Pending", updatedOn };
+    }
+    return sub;
+  });
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -2419,7 +2447,7 @@ export default function MyOrderPage() {
 
   const [subOrders, setSubOrders] = useState(() =>
     order?.cartItems?.length
-      ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
+      ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
       : []
   );
   const [subSearch, setSubSearch] = useState("");
@@ -2508,7 +2536,7 @@ export default function MyOrderPage() {
     if (!order) return;
     setSubOrders(
       order.cartItems?.length
-        ? applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState())
+        ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
         : []
     );
     setAssignment({
@@ -2564,7 +2592,10 @@ export default function MyOrderPage() {
   // so the Draft Purchase Orders tab badge and content stay in sync without
   // a page reload.
   useEffect(() => {
-    const refresh = () => setPoRefreshKey(k => k + 1);
+    const refresh = () => {
+      setPoRefreshKey(k => k + 1);
+      setSubOrders(prev => reconcileSubOrderStatuses(prev, orderId));
+    };
     const onStorage = (e: StorageEvent) => {
       if (e.key === "nido_all_purchase_orders") refresh();
     };
@@ -3307,7 +3338,28 @@ export default function MyOrderPage() {
                                       setPoRefreshKey(k => k + 1);
                                       return;
                                     }
-                                    updatePO(po.poNumber, { status: "Confirmed" });
+                                     updatePO(po.poNumber, { status: "Confirmed" });
+                                     const updatedOn = new Date().toLocaleDateString("en-IN");
+                                     const updatedSubOrders = subOrders.map(sub =>
+                                       poCoversSubOrder(po, sub.id) &&
+                                       (sub.itemStatus === "Pending" || sub.itemStatus === "Confirmed")
+                                         ? { ...sub, itemStatus: "Processing", updatedOn }
+                                         : sub
+                                     );
+                                     setSubOrders(updatedSubOrders);
+                                     // Persist immediately because navigation to the
+                                     // vendor-order page follows this action.
+                                     const persistedState: Record<string, any> = {};
+                                     updatedSubOrders.forEach(sub => {
+                                       persistedState[sub.id] = {
+                                         itemStatus: sub.itemStatus,
+                                         tracking: sub.tracking,
+                                         updatedOn: sub.updatedOn,
+                                         deliveredAt: sub.deliveredAt ? sub.deliveredAt.toISOString() : null,
+                                         referenceNumber: sub.referenceNumber,
+                                       };
+                                     });
+                                     localStorage.setItem(itemStateKey, JSON.stringify(persistedState));
                                     // Confirming a PO starts fulfillment; it
                                     // must not jump the master order to a
                                     // terminal Delivered state.
