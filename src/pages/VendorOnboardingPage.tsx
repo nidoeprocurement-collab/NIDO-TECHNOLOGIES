@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
@@ -355,11 +356,11 @@ export default function AddVendorPage() {
       return;
     }
     if (!isValidPhoneNumber(formData.phoneNumber)) {
-      alert('Phone number must contain exactly 10 digits.');
+      toast.error('Phone number must contain exactly 10 digits.');
       return;
     }
     if (formData.mobileNumber && !isValidPhoneNumber(formData.mobileNumber)) {
-      alert('Mobile number must contain exactly 10 digits.');
+      toast.error('Mobile number must contain exactly 10 digits.');
       return;
     }
     if (formData.pan && formData.pan.length !== 10) {

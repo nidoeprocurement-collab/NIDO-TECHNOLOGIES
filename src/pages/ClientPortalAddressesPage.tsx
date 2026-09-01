@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MapPin, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 
 interface Address {
@@ -52,7 +53,7 @@ export default function ClientPortalAddressesPage() {
   const handleSave = () => {
     if (!form.label.trim() || !form.line1.trim()) return;
     if (form.phone && !isValidPhoneNumber(form.phone)) {
-      window.alert('Phone number must contain exactly 10 digits.');
+      toast.error('Phone number must contain exactly 10 digits.');
       return;
     }
     if (editingAddr) {

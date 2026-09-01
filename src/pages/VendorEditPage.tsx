@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Cloud, Star, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 import { getVendorById, updateVendor } from '@/lib/vendorDataStore';
 import type { VendorStatus } from '@/lib/vendorDataStore';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
@@ -185,11 +186,11 @@ export default function VendorEditPage() {
   const handleSave = () => {
     if (!vendor) return;
     if (!isValidPhoneNumber(formData.phoneNumber)) {
-      alert('Phone number must contain exactly 10 digits.');
+      toast.error('Phone number must contain exactly 10 digits.');
       return;
     }
     if (formData.mobileNumber && !isValidPhoneNumber(formData.mobileNumber)) {
-      alert('Mobile number must contain exactly 10 digits.');
+      toast.error('Mobile number must contain exactly 10 digits.');
       return;
     }
     updateVendor(vendor.id, {

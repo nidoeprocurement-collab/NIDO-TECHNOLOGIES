@@ -4,6 +4,7 @@ import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
   Banknote, Building2, Info, Smartphone, QrCode, AlertCircle
 } from "lucide-react";
+import { toast } from "sonner";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
 import { isValidPhoneNumber } from "@/lib/phoneValidation";
@@ -358,7 +359,7 @@ export default function PaymentPage() {
               </button>
               <button onClick={() => {
                   if (state.paymentMethod === "wallets" && !isValidPhoneNumber(state.walletMobile)) {
-                    window.alert("Registered mobile number must contain exactly 10 digits.");
+                    toast.error("Registered mobile number must contain exactly 10 digits.");
                     return;
                   }
                   localStorage.setItem("nido_payment_selection", JSON.stringify(state));
