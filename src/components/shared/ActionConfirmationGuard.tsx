@@ -192,6 +192,7 @@ export default function ActionConfirmationGuard() {
             </Button>
             <Button
               variant={pending?.kind === "delete" ? "destructive" : "default"}
+              data-confirmation-skip
               onClick={handleConfirm}
             >
               {confirmCopy.confirmLabel}

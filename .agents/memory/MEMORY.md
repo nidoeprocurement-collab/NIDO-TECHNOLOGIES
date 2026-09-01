@@ -13,3 +13,4 @@
 - [Dialog select positioning](select-portal.md) — custom Select menus inside centered dialogs must portal to document.body.
 - [Digital fulfillment security boundary](digital-fulfillment-security.md) — production authorization must come from server auth; localStorage identity is development-only and checkout must fail closed.
 - [Catalog bulk-import classification](catalog-bulk-import.md) — classify duplicates against both stored products and earlier rows before reporting mixed import results.
+- [Confirmation guard dialogs](confirmation-guard.md) — confirmation dialog action buttons must bypass the global guard or confirmed mutations can be intercepted again.
