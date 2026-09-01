@@ -203,7 +203,7 @@ function WalletsPanel({ state, onChange }: { state: PaymentState; onChange: (d: 
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-medium">+91</span>
             <input type="tel" placeholder="9876543210" maxLength={10} value={state.walletMobile}
-              onChange={(e) => onChange({ walletMobile: e.target.value.replace(/\D/g, "") })}
+              onChange={(e) => onChange({ walletMobile: e.target.value.replace(/\D/g, "").slice(0, 10) })}
               className="w-full border border-gray-200 rounded-lg pl-12 pr-10 py-2.5 text-sm outline-none focus:border-blue-400" />
             <Smartphone size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
           </div>

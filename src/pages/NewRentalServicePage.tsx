@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getHsnCodes, getSacCodes } from "@/lib/taxEngine";
+import { sanitizePhoneNumber } from "@/lib/phoneValidation";
 
 // ─── Static options ────────────────────────────────────────────────────────────
 const PURPOSES  = ["Office Use", "Event / Conference", "Project Based", "Training", "Backup / Temporary", "Other"];
@@ -352,7 +353,7 @@ export default function NewRentalServicePage() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-gray-700">Contact Number <span className="text-red-500">*</span></label>
-              <input type="tel" value={contactNumber} onChange={e => setContactNumber(e.target.value)} placeholder="Enter Contact Number"
+              <input type="tel" inputMode="numeric" maxLength={10} value={contactNumber} onChange={e => setContactNumber(sanitizePhoneNumber(e.target.value))} placeholder="10-digit contact number"
                 className="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors hover:border-gray-400" />
             </div>
           </div>

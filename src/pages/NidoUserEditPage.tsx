@@ -15,6 +15,7 @@ import {
   type NidoUser,
   updateUser,
 } from "@/lib/nidoUsersStore";
+import { sanitizePhoneNumber } from "@/lib/phoneValidation";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const cardClass = "rounded-xl border border-border bg-card shadow-sm";
@@ -177,7 +178,7 @@ export default function NidoUserEditPage() {
             </div>
             <div>
               <Label>Phone</Label>
-              <Input className={inputClass} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+91-44-1234-5678" />
+              <Input className={inputClass} type="tel" inputMode="numeric" maxLength={10} value={phone} onChange={(event) => setPhone(sanitizePhoneNumber(event.target.value))} placeholder="10-digit phone number" />
             </div>
             <div>
               <Label>Employee ID</Label>

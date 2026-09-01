@@ -16,6 +16,7 @@ import { getClients } from "@/lib/clientStore";
 import type { StoredClient } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import type { StoredInvoice } from "@/lib/invoiceStore";
+import { sanitizePhoneNumber } from "@/lib/phoneValidation";
 import { safeReadJson } from "@/lib/utils";
 import { getPrefix } from "@/lib/configService";
 
@@ -636,10 +637,13 @@ export default function CreditNoteFormPage() {
                 <div>
                   <FieldLabel>Phone</FieldLabel>
                   <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     className={inp}
-                    placeholder="+91 98765 43210"
+                    placeholder="10-digit phone number"
                     value={form.customerPhone}
-                    onChange={(e) => setField("customerPhone", e.target.value)}
+                    onChange={(e) => setField("customerPhone", sanitizePhoneNumber(e.target.value))}
                   />
                 </div>
               </div>

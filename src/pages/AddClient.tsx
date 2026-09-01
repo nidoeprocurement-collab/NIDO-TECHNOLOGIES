@@ -8,6 +8,7 @@ import {
 } from "@/lib/clientStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
+import { sanitizePhoneNumber } from "@/lib/phoneValidation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -922,10 +923,13 @@ export default function AddClient() {
                       Phone
                     </label>
                     <Input
-                      placeholder="+91 XXXXX XXXXX"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      placeholder="10-digit phone number"
                       value={formData.phone}
                       onChange={(e) =>
-                        handleInputChange("phone", e.target.value)
+                        handleInputChange("phone", sanitizePhoneNumber(e.target.value))
                       }
                     />
                   </div>
@@ -934,10 +938,13 @@ export default function AddClient() {
                       Mobile
                     </label>
                     <Input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
                       placeholder="Alternate mobile number"
                       value={formData.mobile}
                       onChange={(e) =>
-                        handleInputChange("mobile", e.target.value)
+                        handleInputChange("mobile", sanitizePhoneNumber(e.target.value))
                       }
                     />
                   </div>

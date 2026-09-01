@@ -17,6 +17,7 @@ import {
   FileText,
   Clock,
 } from "lucide-react";
+import { sanitizePhoneNumber } from "@/lib/phoneValidation";
 import {
   BarChart,
   Bar,
@@ -338,7 +339,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
                     </div>
                     <div>
                       <label className={labelCls}>Phone Number <span className="text-red-400">*</span></label>
-                      <input type="text" value={form.phone} onChange={set("phone")} placeholder="+91 XXXXX XXXXX" className={inputCls} />
+                      <input type="tel" inputMode="numeric" maxLength={10} value={form.phone} onChange={e => set("phone")({ ...e, target: { ...e.target, value: sanitizePhoneNumber(e.target.value) } } as React.ChangeEvent<HTMLInputElement>)} placeholder="10-digit phone number" className={inputCls} />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -1043,7 +1044,7 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                   </div>
                   <div>
                     <label className={labelCls}>Phone Number <span className="text-red-400">*</span></label>
-                    <input type="text" value={form.phone} onChange={set("phone")} placeholder="+91 XXXXX XXXXX" className={inputCls} />
+                    <input type="tel" inputMode="numeric" maxLength={10} value={form.phone} onChange={e => set("phone")({ ...e, target: { ...e.target, value: sanitizePhoneNumber(e.target.value) } } as React.ChangeEvent<HTMLInputElement>)} placeholder="10-digit phone number" className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">

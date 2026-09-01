@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+import { sanitizePhoneNumber } from '@/lib/phoneValidation';
 import {
   Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Trash2,
   Settings, ShoppingCart, X, Star, Image as ImageIcon, Download
@@ -831,11 +832,11 @@ export default function CatalogUpdatesTab() {
                   </div>
                   <div>
                     <Label>Vendor Phone</Label>
-                    <Input placeholder="+91 98765 43210" value={form.vendorPhone || ''} onChange={e => updateForm({ vendorPhone: e.target.value })} />
+                    <Input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit phone number" value={form.vendorPhone || ''} onChange={e => updateForm({ vendorPhone: sanitizePhoneNumber(e.target.value) })} />
                   </div>
                   <div>
                     <Label>Vendor Phone</Label>
-                    <Input placeholder="+91 98765 43210" value={form.vendorPhone2 || ''} onChange={e => updateForm({ vendorPhone2: e.target.value })} />
+                    <Input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit phone number" value={form.vendorPhone2 || ''} onChange={e => updateForm({ vendorPhone2: sanitizePhoneNumber(e.target.value) })} />
                   </div>
                 </div>
               </div>

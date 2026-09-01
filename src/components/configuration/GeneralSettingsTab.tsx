@@ -12,6 +12,7 @@ import { useConfig } from "@/contexts/ConfigContext"
 import type { GeneralSettings, PrefixEntry } from "@/lib/configService"
 import AddressPairFields from "@/components/shared/AddressPairFields"
 import { formatAddressDetails, isValidGst, isValidPan, normalizeGstInput, normalizePanInput } from "@/lib/addressTypes"
+import { sanitizePhoneNumber } from "@/lib/phoneValidation"
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -277,11 +278,11 @@ export default function GeneralSettingsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label className="mb-2 block text-sm font-medium">Phone</Label>
-                <Input value={org.phone} onChange={e => update("organization", { phone: e.target.value })} />
+                <Input type="tel" inputMode="numeric" maxLength={10} value={org.phone} onChange={e => update("organization", { phone: sanitizePhoneNumber(e.target.value) })} placeholder="10-digit phone number" />
               </div>
               <div>
                 <Label className="mb-2 block text-sm font-medium">Support Phone</Label>
-                <Input value={org.supportPhone} onChange={e => update("organization", { supportPhone: e.target.value })} />
+                <Input type="tel" inputMode="numeric" maxLength={10} value={org.supportPhone} onChange={e => update("organization", { supportPhone: sanitizePhoneNumber(e.target.value) })} placeholder="10-digit phone number" />
               </div>
               <div>
                 <Label className="mb-2 block text-sm font-medium">Email</Label>

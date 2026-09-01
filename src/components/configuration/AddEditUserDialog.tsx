@@ -9,6 +9,7 @@ import {
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { SYSTEM_OWNER_ROLE, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore"
+import { sanitizePhoneNumber } from "@/lib/phoneValidation"
 
 interface AddEditUserDialogProps {
   open: boolean
@@ -123,7 +124,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </div>
           <div>
             <Label className="mb-2 block text-sm font-medium">Phone</Label>
-            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91-44-1234-5678" />
+            <Input type="tel" inputMode="numeric" maxLength={10} value={phone} onChange={e => setPhone(sanitizePhoneNumber(e.target.value))} placeholder="10-digit phone number" />
           </div>
 
           {/* Row 3 */}

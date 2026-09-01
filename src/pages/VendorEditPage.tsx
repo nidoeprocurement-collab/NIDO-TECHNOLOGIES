@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Cloud, Star, ArrowLeft } from 'lucide-react';
 import { getVendorById, updateVendor } from '@/lib/vendorDataStore';
 import type { VendorStatus } from '@/lib/vendorDataStore';
+import { sanitizePhoneNumber } from '@/lib/phoneValidation';
 
 // Helper: ensure a current value (from stored data) appears in the options list.
 // If it's already there, return the list unchanged. Otherwise prepend it.
@@ -158,7 +159,9 @@ export default function VendorEditPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    const newValue = type === 'checkbox' ? checked : value;
+    const newValue = type === 'checkbox'
+      ? checked
+      : (name === 'phoneNumber' || name === 'mobileNumber' ? sanitizePhoneNumber(value) : value);
 
     setFormData(prev => {
       const updated = { ...prev, [name]: newValue };
@@ -383,7 +386,7 @@ export default function VendorEditPage() {
                   className="px-3 py-2 border border-gray-300 rounded-lg">
                   {phoneCodes.map(code => <option key={code} value={code}>{code}</option>)}
                 </select>
-                <input type="text" placeholder="Enter phone number" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange}
+                <input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit phone number" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange}
                   className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             } />
@@ -393,7 +396,7 @@ export default function VendorEditPage() {
                   className="px-3 py-2 border border-gray-300 rounded-lg">
                   {phoneCodes.map(code => <option key={code} value={code}>{code}</option>)}
                 </select>
-                <input type="text" placeholder="Enter mobile number" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange}
+                <input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange}
                   className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             } />

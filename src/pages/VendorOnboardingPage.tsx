@@ -6,6 +6,7 @@ import { Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
 import { getPrefix } from '@/lib/configService';
+import { sanitizePhoneNumber } from '@/lib/phoneValidation';
 import AddressPairFields from '@/components/shared/AddressPairFields';
 import {
   createEmptyAddress,
@@ -289,7 +290,9 @@ export default function AddVendorPage() {
     const target = e.target as { name: string; value: string; type?: string; checked?: boolean };
     const { name, value } = target;
     const isCheckbox = (target as HTMLInputElement).type === 'checkbox';
-    const finalValue = isCheckbox ? (target as HTMLInputElement).checked : value;
+    const finalValue = isCheckbox
+      ? (target as HTMLInputElement).checked
+      : (name === 'phoneNumber' || name === 'mobileNumber' ? sanitizePhoneNumber(value) : value);
 
     setFormData(prev => {
       const updated = { ...prev, [name]: finalValue };
@@ -634,7 +637,7 @@ export default function AddVendorPage() {
                 <AddableSelect name="phone" value={formData.phone} onChange={handleChange}
                   baseOptions={phoneCodesBase} addLabel="+ Add New Code" placeholder="+code"
                   className="px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input type="text" placeholder="Phone number" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange}
+                <input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit phone number" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange}
                   className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             } />
@@ -643,7 +646,7 @@ export default function AddVendorPage() {
                 <AddableSelect name="mobile" value={formData.mobile} onChange={handleChange}
                   baseOptions={phoneCodesBase} addLabel="+ Add New Code" placeholder="+code"
                   className="px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input type="text" placeholder="Mobile number" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange}
+                <input type="tel" inputMode="numeric" maxLength={10} placeholder="10-digit mobile number" name="mobileNumber" value={formData.mobileNumber} onChange={handleChange}
                   className="flex-1 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             } />

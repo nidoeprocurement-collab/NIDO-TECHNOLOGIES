@@ -1,4 +1,5 @@
 import type { AddressDetails } from "@/lib/addressTypes";
+import { sanitizePhoneNumber } from "@/lib/phoneValidation";
 
 const DEFAULT_COUNTRIES = [
   "India",
@@ -165,8 +166,11 @@ function AddressColumn({
           </select>
           <input
             id={`${stateListId}-phone`}
+            type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={address.phone}
-            onChange={(event) => set("phone", event.target.value)}
+            onChange={(event) => set("phone", sanitizePhoneNumber(event.target.value))}
             className={`${controlClass} min-w-0 rounded-l-none border-l-0`}
           />
         </div>
