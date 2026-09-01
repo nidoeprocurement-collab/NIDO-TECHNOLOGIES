@@ -93,19 +93,26 @@ export function getMasterCatalogCategories(): string[] {
   return Array.from(seen).sort();
 }
 
-export function saveCatalogProduct(product: CatalogProduct): boolean {
+export function saveCatalogProduct(
+  product: CatalogProduct,
+  options: { skipDuplicateCheck?: boolean } = {},
+): boolean {
   const products = getCatalogProducts();
   const idx = products.findIndex(p => String(p.id) === String(product.id));
-  const duplicate = products.find(p =>
-    String(p.id) !== String(product.id) &&
-    normalizeCatalogProductName(p.productName) === normalizeCatalogProductName(product.productName)
-  );
-  if (duplicate) return false;
+  if (!options.skipDuplicateCheck) {
+    const duplicate = products.find(p =>
+      String(p.id) !== String(product.id) &&
+      normalizeCatalogProductName(p.productName) === normalizeCatalogProductName(product.productName)
+    );
+    if (duplicate) return false;
+  }
 
   if (idx >= 0) {
     products[idx] = product;
-  } else {
+  } else if (!options.skipDuplicateCheck) {
     products.push(product);
+  } else {
+    return false;
   }
   localStorage.setItem(STORE_KEY, JSON.stringify(products));
   window.dispatchEvent(new Event('catalogUpdated'));

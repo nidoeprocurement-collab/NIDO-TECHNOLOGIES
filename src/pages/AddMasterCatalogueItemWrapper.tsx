@@ -260,13 +260,22 @@ export default function AddMasterCatalogueItemWrapper() {
   const clearDraft = () => sessionStorage.removeItem('nido_preview_draft');
 
   const saveProduct = (status: 'draft' | 'published') => {
-    const duplicate = findCatalogProductByName(productName, isEditMode ? currentEditProductId : undefined);
-    if (duplicate) {
-      toast.error(`Product duplication found: "${duplicate.productName}" already exists in the master catalog.`);
-      return false;
+    if (!isEditMode) {
+      const duplicate = findCatalogProductByName(productName);
+      if (duplicate) {
+        toast.error(`Product duplication found: "${duplicate.productName}" already exists in the master catalog.`);
+        return false;
+      }
     }
-    if (!saveCatalogProduct(buildProduct(status))) {
-      toast.error('Product duplication found: a product with this name already exists in the master catalog.');
+    const saved = saveCatalogProduct(buildProduct(status), {
+      skipDuplicateCheck: isEditMode,
+    });
+    if (!saved) {
+      toast.error(
+        isEditMode
+          ? 'Unable to save changes because the product could not be found.'
+          : 'Product duplication found: a product with this name already exists in the master catalog.',
+      );
       return false;
     }
     return true;
