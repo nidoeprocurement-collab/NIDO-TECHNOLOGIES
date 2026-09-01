@@ -129,11 +129,11 @@ function ModalBox({ title, onClose, children, width = 440 }) {
     </div>
   );
 }
-function ModalFooter({ onCancel, onSave, saveLabel = "Save" }) {
+function ModalFooter({ onCancel, onSave, saveLabel = "Save", skipConfirmation = false }) {
   return (
     <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
       <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
-      <button onClick={onSave} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>{saveLabel}</button>
+      <button onClick={onSave} data-confirmation-skip={skipConfirmation ? "" : undefined} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>{saveLabel}</button>
     </div>
   );
 }
@@ -1913,7 +1913,7 @@ function AddTrackingModal({ current, onSave, onClose }) {
             </select>
           </div>
         </div>
-        <ModalFooter onCancel={onClose} onSave={() => { if (form.trackingNumber && form.carrier) { onSave(form); onClose(); } }} saveLabel="Save Tracking" />
+        <ModalFooter onCancel={onClose} onSave={() => { if (form.trackingNumber && form.carrier) { onSave(form); onClose(); } }} saveLabel="Save Tracking" skipConfirmation />
       </ModalBox>
     </Overlay>
   );
