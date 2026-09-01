@@ -2455,6 +2455,23 @@ export default function MyOrderPage() {
     setSubOrders(prev => prev.map(s => s.id === subId ? { ...s, itemStatus: status, updatedOn: new Date().toLocaleDateString("en-IN") } : s));
   };
 
+  const saveTrackingForSubOrder = (tracking: any) => {
+    if (!trackingTarget) return;
+    const updatedOn = new Date().toLocaleDateString("en-IN");
+    setSubOrders(prev => prev.map(s => s.id === trackingTarget
+      ? {
+          ...s,
+          tracking,
+          // The tracking dialog is opened from the Shipped status action.
+          // Preserve that state explicitly so saving tracking details cannot
+          // rehydrate the item's default Processing/Pending status.
+          itemStatus: "Shipped",
+          updatedOn,
+        }
+      : s
+    ));
+  };
+
   const handleCancelItem = (subId: string, reason: string) => {
     if (isOrderInactive) return;
     const target = subOrders.find(s => s.id === subId);
@@ -3333,7 +3350,7 @@ export default function MyOrderPage() {
 
 
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
-      {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}
+      {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={saveTrackingForSubOrder} onClose={() => setTrackingTarget(null)} />}
       {referenceTarget && <ReferenceNumberModal itemName={subOrders.find(s => s.id === referenceTarget)?.itemName || ""} current={subOrders.find(s => s.id === referenceTarget)?.referenceNumber || ""} onSave={v => setSubOrders(prev => prev.map(s => s.id === referenceTarget ? { ...s, referenceNumber: v } : s))} onClose={() => setReferenceTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={(reason) => handleCancelItem(cancelTarget, reason)} onClose={() => setCancelTarget(null)} />}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
