@@ -17,6 +17,7 @@ import VendorNewsActivityPage from "./VendorNewsActivityPage";
 import VendorPerformancePage from "./VendorPerformancePage";
 import VendorConfigurationTab from "./VendorConfigurationTab";
 import { getVendorById, type StoredVendor } from "@/lib/vendorDataStore";
+import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -33,38 +34,153 @@ function ProgressBar({ value, color = "bg-blue-500" }: { value: number; color?: 
   );
 }
 
-function generateSpendData(seed: number) {
-  const base = [32, 45, 28, 58, 41, 67, 52, 73, 61, 48, 55, 70];
-  return base.map((v, i) => ({
-    month: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i],
-    spend: Math.max(10, Math.round(v * (0.7 + ((seed * (i + 1)) % 50) / 100))),
-  }));
+function normalize(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
 }
 
-const defaultActivities = [
-  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Invoice approved successfully", time: "2 hours ago", color: "bg-emerald-50" },
-  { icon: <ShoppingCart className="w-4 h-4 text-blue-500" />, text: "New Purchase Order raised", time: "Yesterday", color: "bg-blue-50" },
-  { icon: <AlertCircle className="w-4 h-4 text-amber-500" />, text: "Compliance document renewal due in 15 days", time: "2 days ago", color: "bg-amber-50" },
-  { icon: <Clock className="w-4 h-4 text-purple-500" />, text: "Contract extended for 6 months", time: "1 week ago", color: "bg-purple-50" },
-  { icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />, text: "Annual vendor review completed", time: "2 weeks ago", color: "bg-emerald-50" },
-];
+function parseDate(value: unknown): Date | null {
+  if (!value) return null;
+  const raw = String(value);
+  const isoDate = new Date(raw);
+  if (!Number.isNaN(isoDate.getTime())) return isoDate;
+  const match = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (!match) return null;
+  const year = Number(match[3].length === 2 ? `20${match[3]}` : match[3]);
+  const parsed = new Date(year, Number(match[2]) - 1, Number(match[1]));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
-const defaultContracts = [
-  { name: "Master Supply Agreement", value: "₹1,80,00,000", progress: 20, status: "Active", end: "Mar 2026" },
-  { name: "Enterprise Support Contract", value: "₹95,00,000", progress: 45, status: "Active", end: "Dec 2025" },
-  { name: "Service Level Agreement", value: "₹1,20,00,000", progress: 74, status: "Active", end: "Aug 2025" },
-];
+function poBelongsToVendor(po: StoredPO, vendor: StoredVendor) {
+  return normalize(po.vendorId) === normalize(vendor.id)
+    || normalize(po.vendorName) === normalize(vendor.name);
+}
+
+function getVendorPurchaseOrders(vendor: StoredVendor) {
+  return getAllPOs().filter(po => poBelongsToVendor(po, vendor));
+}
+
+function getPOAmount(po: StoredPO) {
+  return Number(po.grandTotal ?? po.subtotal ?? 0) || 0;
+}
+
+function formatRelativeTime(value: unknown) {
+  const date = parseDate(value);
+  if (!date) return "Date unavailable";
+  const diff = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatDate(value: unknown) {
+  const date = parseDate(value);
+  return date
+    ? date.toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    : "—";
+}
+
+function getVendorContracts(vendor: StoredVendor): any[] {
+  const directContracts = [
+    (vendor as any).contracts,
+    (vendor as any).activeContracts,
+  ].find(value => Array.isArray(value));
+  if (directContracts) return directContracts;
+
+  // Support contract records saved by contract-management flows without
+  // treating an unrelated global contract list as belonging to this vendor.
+  try {
+    const raw = localStorage.getItem(`nido_vendor_contracts_${vendor.id}`);
+    const records = raw ? JSON.parse(raw) : [];
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+}
+
+function getContractProgress(contract: any) {
+  const start = parseDate(contract.startDate || contract.start_date);
+  const end = parseDate(contract.endDate || contract.end_date);
+  if (!start || !end || end <= start) return 0;
+  return Math.max(0, Math.min(100, Math.round(((Date.now() - start.getTime()) / (end.getTime() - start.getTime())) * 100)));
+}
+
+function formatContractValue(value: unknown) {
+  if (typeof value === "number") return fmt(value);
+  return value ? String(value) : "Value not recorded";
+}
+
+function buildSpendData(purchaseOrders: StoredPO[]) {
+  const now = new Date();
+  const totals = new Map<string, number>();
+  for (const po of purchaseOrders) {
+    const date = parseDate(po.createdOn || po.createdOnDisplay);
+    if (!date || po.status === "Draft" || po.status === "Cancelled") continue;
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    totals.set(key, (totals.get(key) || 0) + getPOAmount(po));
+  }
+
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - 11 + index, 1);
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    return {
+      month: date.toLocaleDateString("en-IN", { month: "short" }),
+      spend: Math.round((totals.get(key) || 0) / 100000),
+    };
+  });
+}
+
+function getRecentActivities(vendor: StoredVendor, purchaseOrders: StoredPO[], contracts: any[]) {
+  const poActivities = purchaseOrders.map(po => ({
+    icon: po.status === "Delivered"
+      ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+      : <ShoppingCart className="w-4 h-4 text-blue-500" />,
+    text: `Purchase order ${po.poNumber} is ${String(po.status).toLowerCase()}`,
+    time: formatRelativeTime(po.createdOn || po.createdOnDisplay),
+    color: po.status === "Delivered" ? "bg-emerald-50" : "bg-blue-50",
+    sortDate: parseDate(po.createdOn || po.createdOnDisplay)?.getTime() || 0,
+  }));
+  const contractActivities = contracts
+    .filter(contract => contract.updatedOn || contract.updatedAt || contract.createdOn || contract.createdAt)
+    .map(contract => ({
+      icon: <FileText className="w-4 h-4 text-purple-500" />,
+      text: `Contract ${contract.name || contract.id || "record"} updated`,
+      time: formatRelativeTime(contract.updatedOn || contract.updatedAt || contract.createdOn || contract.createdAt),
+      color: "bg-purple-50",
+      sortDate: parseDate(contract.updatedOn || contract.updatedAt || contract.createdOn || contract.createdAt)?.getTime() || 0,
+    }));
+  const activities = [...poActivities, ...contractActivities]
+    .sort((a, b) => b.sortDate - a.sortDate)
+    .slice(0, 5);
+  if (activities.length) return activities;
+  return vendor.onboardedDate
+    ? [{
+        icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
+        text: "Vendor onboarded",
+        time: formatRelativeTime(vendor.onboardedDate),
+        color: "bg-emerald-50",
+        sortDate: parseDate(vendor.onboardedDate)?.getTime() || 0,
+      }]
+    : [];
+}
 
 function OverviewTab({ vendor }: { vendor: StoredVendor }) {
-  const seed = parseInt(vendor.id.replace(/\D/g, "").slice(-3) || "1", 10);
-  const spendData = generateSpendData(seed);
-
-  const totalSpend = vendor.totalSpend
-    ? fmt(vendor.totalSpend)
-    : "₹0";
-  const avgOrderValue = vendor.totalSpend
-    ? fmt(Math.round(vendor.totalSpend / 156))
-    : "₹0";
+  const purchaseOrders = getVendorPurchaseOrders(vendor);
+  const activeContracts = getVendorContracts(vendor).filter(contract =>
+    ["active", "expiring soon"].includes(normalize(contract.status || "Active"))
+  );
+  const spendOrders = purchaseOrders.filter(po => po.status !== "Draft" && po.status !== "Cancelled");
+  const poSpend = spendOrders.reduce((sum, po) => sum + getPOAmount(po), 0);
+  const totalSpend = fmt(poSpend || vendor.totalSpend || 0);
+  const avgOrderValue = spendOrders.length
+    ? fmt(Math.round(poSpend / spendOrders.length))
+    : "—";
+  const spendData = buildSpendData(purchaseOrders);
+  const recentActivities = getRecentActivities(vendor, purchaseOrders, activeContracts);
 
   const qualityScore = vendor.performanceQuality ?? 82;
   const deliveryScore = vendor.performanceDelivery ?? 88;
@@ -216,7 +332,7 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
         </div>
       </div>
 
-      {/* Active Contracts + Report Activity */}
+      {/* Active Contracts + Recent Activity */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
@@ -224,38 +340,53 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
               <ClipboardList className="w-4 h-4 text-blue-500" />
               <h3 className="text-sm font-semibold text-gray-800">Active Contracts</h3>
             </div>
-            <span className="text-xs bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full">3 Active</span>
+            <span className="text-xs bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full">{activeContracts.length} Active</span>
           </div>
           <div className="flex flex-col gap-4">
-            {defaultContracts.map((c, i) => (
-              <div key={i} className="flex flex-col gap-1.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-800">{c.name}</p>
-                    <p className="text-xs text-gray-400">{c.value} · Ends {c.end}</p>
-                  </div>
-                  <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{c.status}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${c.progress}%` }} />
-                  </div>
-                  <span className="text-xs text-gray-400 w-8 text-right">{c.progress}%</span>
-                </div>
+            {activeContracts.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
+                <p className="text-xs font-medium text-gray-500">No active contracts recorded</p>
+                <p className="text-xs text-gray-400 mt-1">Contract records will appear here when linked to this vendor.</p>
               </div>
-            ))}
+            ) : activeContracts.map((c, i) => {
+              const status = c.status || "Active";
+              const endDate = c.endDate || c.end_date;
+              const progress = getContractProgress(c);
+              return (
+                <div key={c.id || i} className="flex flex-col gap-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-800">{c.name || c.title || c.id || "Untitled contract"}</p>
+                      <p className="text-xs text-gray-400">{formatContractValue(c.value || c.contractValue)} · Ends {formatDate(endDate)}</p>
+                    </div>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{status}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                      <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${progress}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-400 w-8 text-right">{progress}%</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-2 mb-4">
             <Newspaper className="w-4 h-4 text-blue-500" />
-            <h3 className="text-sm font-semibold text-gray-800">Report Activity</h3>
+            <h3 className="text-sm font-semibold text-gray-800">Recent Activity</h3>
           </div>
           <div className="flex flex-col gap-0">
-            {defaultActivities.map((a, i) => (
+            {recentActivities.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center">
+                <p className="text-xs font-medium text-gray-500">No recent activity</p>
+                <p className="text-xs text-gray-400 mt-1">New vendor and purchase-order activity will appear here.</p>
+              </div>
+            ) : recentActivities.map((a, i) => (
               <div key={i} className="flex gap-3 relative pb-4 last:pb-0">
-                {i < defaultActivities.length - 1 && (
+                {i < recentActivities.length - 1 && (
                   <div className="absolute left-4 top-7 bottom-0 w-px bg-gray-100" />
                 )}
                 <div className={`w-8 h-8 rounded-full ${a.color} flex items-center justify-center flex-shrink-0 z-10`}>
@@ -293,6 +424,9 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
               <Bar dataKey="spend" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          {spendOrders.length === 0 && (
+            <p className="text-center text-xs text-gray-400 -mt-2">No completed or confirmed purchase-order spend in this period.</p>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -305,6 +439,7 @@ function OverviewTab({ vendor }: { vendor: StoredVendor }) {
               { label: "Total Spend", value: totalSpend, highlight: true },
               { label: "Category", value: vendor.category, highlight: false },
               { label: "Avg Order Value", value: avgOrderValue, highlight: false },
+              { label: "Purchase Orders", value: String(spendOrders.length), highlight: false },
               { label: "Onboarded", value: vendor.onboardedDate, highlight: false },
               { label: "Region", value: vendor.region, highlight: false },
             ].map(m => (
@@ -338,8 +473,30 @@ export default function VendorDetailPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
+  const [dataVersion, setDataVersion] = useState(0);
 
   const vendor = vendorId ? getVendorById(vendorId) : undefined;
+
+  useEffect(() => {
+    const refresh = () => setDataVersion(version => version + 1);
+    const onStorage = (event: StorageEvent) => {
+      if (
+        event.key === "nido_vendors_v2"
+        || event.key === "nido_all_purchase_orders"
+        || event.key === `nido_vendor_contracts_${vendorId}`
+      ) {
+        refresh();
+      }
+    };
+    window.addEventListener("nidoVendorsUpdated", refresh);
+    window.addEventListener("poCreated", refresh);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("nidoVendorsUpdated", refresh);
+      window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [vendorId]);
 
   useEffect(() => {
     const state = location.state as { tab?: string } | null;
@@ -490,7 +647,7 @@ export default function VendorDetailPage() {
 
       {/* Page body */}
       <div className="flex-1 overflow-auto">
-        {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab vendor={vendor} /></div>}
+        {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab key={dataVersion} vendor={vendor} /></div>}
         {activeTab === "products" && <VendorProductsPage />}
         {activeTab === "orders" && <VendorOrdersPage />}
         {activeTab === "services" && <VendorServicesPage />}
