@@ -46,7 +46,8 @@ export function findCatalogProductByName(productName: string, excludeId?: string
   const normalizedName = normalizeCatalogProductName(productName);
   if (!normalizedName) return undefined;
   return getCatalogProducts().find(product =>
-    String(product.id) !== String(excludeId) && normalizeCatalogProductName(product.productName) === normalizedName
+    (excludeId === undefined || String(product.id) !== String(excludeId)) &&
+    normalizeCatalogProductName(product.productName) === normalizedName
   );
 }
 

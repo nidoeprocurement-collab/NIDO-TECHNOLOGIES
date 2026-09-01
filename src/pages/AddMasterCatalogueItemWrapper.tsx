@@ -54,7 +54,7 @@ export default function AddMasterCatalogueItemWrapper() {
   // Load product data when in edit mode
   useEffect(() => {
     if (!isEditMode || !itemId) return;
-    const product = getCatalogProducts().find(p => p.id === itemId);
+    const product = getCatalogProducts().find(p => String(p.id) === String(itemId));
     if (!product) { toast.error('Product not found'); navigate('/configuration/master-catalogue'); return; }
     setEditProductId(product.id);
     setEditMasterCode(product.masterProductCode);
@@ -216,6 +216,9 @@ export default function AddMasterCatalogueItemWrapper() {
   };
 
   const buildProduct = (status: 'draft' | 'published') => ({
+    ...(isEditMode
+      ? getCatalogProducts().find(p => String(p.id) === String(currentEditProductId))
+      : undefined),
     id: isEditMode ? currentEditProductId : Date.now().toString(),
     masterProductCode: currentMasterProductCode,
     skuCode,
@@ -358,7 +361,7 @@ export default function AddMasterCatalogueItemWrapper() {
                 <Input placeholder="e.g., Apple MacBook Air M3" value={productName} onChange={e => setProductName(e.target.value)} className="mt-1 text-sm" />
               </div>
               <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">Product</Label>
+                <Label className="text-xs sm:text-sm font-medium text-gray-700">Product Type</Label>
                 <SelectWithAdd value={physicalType} onValueChange={setPhysicalType} options={physicalTypesList} placeholder="Select type..." dialogType="physicalType" />
               </div>
             </div>

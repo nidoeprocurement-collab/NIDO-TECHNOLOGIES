@@ -1092,7 +1092,7 @@ export default function CatalogUpdatesTab() {
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Item Name</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Master Product Code</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">SKU</TableHead>
-                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Physical Type</TableHead>
+                  <TableHead className="text-gray-700 font-semibold uppercase text-xs">Product Type</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Category</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Brand</TableHead>
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Status</TableHead>
