@@ -9,7 +9,7 @@ import {
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { SYSTEM_OWNER_ROLE, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore"
-import { sanitizePhoneNumber } from "@/lib/phoneValidation"
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation"
 
 interface AddEditUserDialogProps {
   open: boolean
@@ -63,6 +63,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
     if (!role)                         { setError("Select a role for this user.");  return; }
     if (!isEdit && !password.trim())   { setError("Password is required for new users."); return; }
     if (role === SYSTEM_OWNER_ROLE)    { setError("The System Owner role is reserved."); return; }
+    if (phone && !isValidPhoneNumber(phone)) { setError("Phone number must contain exactly 10 digits."); return; }
 
     const now = new Date().toISOString().split("T")[0]
 

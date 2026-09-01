@@ -12,7 +12,7 @@ import { useConfig } from "@/contexts/ConfigContext"
 import type { GeneralSettings, PrefixEntry } from "@/lib/configService"
 import AddressPairFields from "@/components/shared/AddressPairFields"
 import { formatAddressDetails, isValidGst, isValidPan, normalizeGstInput, normalizePanInput } from "@/lib/addressTypes"
-import { sanitizePhoneNumber } from "@/lib/phoneValidation"
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation"
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
@@ -68,6 +68,11 @@ export default function GeneralSettingsPage() {
   const isDirty = JSON.stringify(draft) !== JSON.stringify(config)
 
   const handleSave = () => {
+    if ((org.phone && !isValidPhoneNumber(org.phone)) ||
+        (org.supportPhone && !isValidPhoneNumber(org.supportPhone))) {
+      toast.error("Phone numbers must contain exactly 10 digits.")
+      return
+    }
     if (org.gstNumber && !isValidGst(org.gstNumber)) {
       toast.error("GST Number must be exactly 15 alphanumeric characters.")
       return

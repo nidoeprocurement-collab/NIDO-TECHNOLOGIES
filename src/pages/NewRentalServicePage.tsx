@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getHsnCodes, getSacCodes } from "@/lib/taxEngine";
-import { sanitizePhoneNumber } from "@/lib/phoneValidation";
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 
 // ─── Static options ────────────────────────────────────────────────────────────
 const PURPOSES  = ["Office Use", "Event / Conference", "Project Based", "Training", "Backup / Temporary", "Other"];
@@ -154,6 +154,7 @@ export default function NewRentalServicePage() {
     if (!startDate || !endDate || !deliveryDate) { toast.error("Please fill in rental start date, end date, and preferred delivery date."); return; }
     if (new Date(endDate) < new Date(startDate)) { toast.error("Rental End Date must be after Start Date."); return; }
     if (!purpose || !contactPerson || !contactNumber) { toast.error("Please fill in all required Additional Details."); return; }
+    if (!isValidPhoneNumber(contactNumber)) { toast.error("Contact number must contain exactly 10 digits."); return; }
 
     setSubmitting(true);
     try {

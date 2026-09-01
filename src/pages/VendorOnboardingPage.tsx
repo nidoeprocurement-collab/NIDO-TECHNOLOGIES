@@ -6,7 +6,7 @@ import { Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
 import { getPrefix } from '@/lib/configService';
-import { sanitizePhoneNumber } from '@/lib/phoneValidation';
+import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 import AddressPairFields from '@/components/shared/AddressPairFields';
 import {
   createEmptyAddress,
@@ -352,6 +352,14 @@ export default function AddVendorPage() {
   const handleSave = () => {
     if (!formData.vendorName.trim()) {
       alert('Vendor Name is required.');
+      return;
+    }
+    if (!isValidPhoneNumber(formData.phoneNumber)) {
+      alert('Phone number must contain exactly 10 digits.');
+      return;
+    }
+    if (formData.mobileNumber && !isValidPhoneNumber(formData.mobileNumber)) {
+      alert('Mobile number must contain exactly 10 digits.');
       return;
     }
     if (formData.pan && formData.pan.length !== 10) {

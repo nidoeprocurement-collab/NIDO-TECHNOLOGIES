@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getHsnCodes, getSacCodes } from "@/lib/taxEngine";
-import { sanitizePhoneNumber } from "@/lib/phoneValidation";
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 
 // ─── Static options ────────────────────────────────────────────────────────────
 const CONDITIONS   = ["Working", "Not Working", "Partially Working", "Damaged / Broken", "Unknown"];
@@ -147,6 +147,7 @@ export default function NewRecycleDisposalPage() {
     if (!collectionDate || !timeSlot || !contactPerson || !contactNumber) {
       toast.error("Please fill in all Collection Details."); return;
     }
+    if (!isValidPhoneNumber(contactNumber)) { toast.error("Contact number must contain exactly 10 digits."); return; }
 
     setSubmitting(true);
     try {

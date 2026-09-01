@@ -15,7 +15,7 @@ import {
   type NidoUser,
   updateUser,
 } from "@/lib/nidoUsersStore";
-import { sanitizePhoneNumber } from "@/lib/phoneValidation";
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const cardClass = "rounded-xl border border-border bg-card shadow-sm";
@@ -98,6 +98,10 @@ export default function NidoUserEditPage() {
     }
     if (role === SYSTEM_OWNER_ROLE) {
       setError("The System Owner role is reserved.");
+      return;
+    }
+    if (phone && !isValidPhoneNumber(phone)) {
+      setError("Phone number must contain exactly 10 digits.");
       return;
     }
     const duplicate = users.some(

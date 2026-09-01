@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Cloud, Star, ArrowLeft } from 'lucide-react';
 import { getVendorById, updateVendor } from '@/lib/vendorDataStore';
 import type { VendorStatus } from '@/lib/vendorDataStore';
-import { sanitizePhoneNumber } from '@/lib/phoneValidation';
+import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 
 // Helper: ensure a current value (from stored data) appears in the options list.
 // If it's already there, return the list unchanged. Otherwise prepend it.
@@ -184,6 +184,14 @@ export default function VendorEditPage() {
 
   const handleSave = () => {
     if (!vendor) return;
+    if (!isValidPhoneNumber(formData.phoneNumber)) {
+      alert('Phone number must contain exactly 10 digits.');
+      return;
+    }
+    if (formData.mobileNumber && !isValidPhoneNumber(formData.mobileNumber)) {
+      alert('Mobile number must contain exactly 10 digits.');
+      return;
+    }
     updateVendor(vendor.id, {
       name: formData.vendorName,
       category: formData.category,

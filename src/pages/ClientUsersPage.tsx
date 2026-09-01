@@ -17,7 +17,7 @@ import {
   FileText,
   Clock,
 } from "lucide-react";
-import { sanitizePhoneNumber } from "@/lib/phoneValidation";
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 import {
   BarChart,
   Bar,
@@ -208,6 +208,10 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
 
     if (missing.length > 0) {
       setNotification(`Please fill in the required fields: ${missing.join(", ")}.`);
+      return;
+    }
+    if (!isValidPhoneNumber(form.phone)) {
+      setNotification("Phone number must contain exactly 10 digits.");
       return;
     }
 
@@ -971,6 +975,10 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
   );
 
   const handleSave = () => {
+    if (!isValidPhoneNumber(form.phone)) {
+      setNotification("Phone number must contain exactly 10 digits.");
+      return;
+    }
     const nameParts = form.fullName.trim().split(" ");
     const initials = nameParts.length >= 2
       ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()

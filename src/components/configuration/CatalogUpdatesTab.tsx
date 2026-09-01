@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { sanitizePhoneNumber } from '@/lib/phoneValidation';
+import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 import {
   Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Trash2,
   Settings, ShoppingCart, X, Star, Image as ImageIcon, Download
@@ -181,6 +181,10 @@ export default function CatalogUpdatesTab() {
 
   const handleAddItem = () => {
     if (!form.name.trim()) { toast.error('Item Name is required'); return; }
+    if ((form.vendorPhone && !isValidPhoneNumber(form.vendorPhone)) ||
+        (form.vendorPhone2 && !isValidPhoneNumber(form.vendorPhone2))) {
+      toast.error('Vendor phone numbers must contain exactly 10 digits'); return;
+    }
     const sku = autoSku ? generateSku() : form.sku;
     if (!sku.trim()) { toast.error('SKU is required'); return; }
 

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import CheckoutStepper from "./CheckoutStepper";
 import OrderSummaryPanel from "./OrderSummaryPanel";
+import { isValidPhoneNumber } from "@/lib/phoneValidation";
 import { useCart } from "@/contexts/CartContext";
 
 const PAYMENT_METHODS = [
@@ -356,6 +357,10 @@ export default function PaymentPage() {
                 Back to Delivery
               </button>
               <button onClick={() => {
+                  if (state.paymentMethod === "wallets" && !isValidPhoneNumber(state.walletMobile)) {
+                    window.alert("Registered mobile number must contain exactly 10 digits.");
+                    return;
+                  }
                   localStorage.setItem("nido_payment_selection", JSON.stringify(state));
                   navigate("/shop/checkout/review");
                 }}

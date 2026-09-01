@@ -16,7 +16,7 @@ import { getClients } from "@/lib/clientStore";
 import type { StoredClient } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import type { StoredInvoice } from "@/lib/invoiceStore";
-import { sanitizePhoneNumber } from "@/lib/phoneValidation";
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 import { safeReadJson } from "@/lib/utils";
 import { getPrefix } from "@/lib/configService";
 
@@ -337,6 +337,9 @@ export default function CreditNoteFormPage() {
     if (!form) return;
     if (!form.customerName.trim()) { toast.error("Customer name is required"); return; }
     if (!form.creditNoteNumber.trim()) { toast.error("Credit Note # is required"); return; }
+    if (form.customerPhone && !isValidPhoneNumber(form.customerPhone)) {
+      toast.error("Customer phone number must contain exactly 10 digits"); return;
+    }
     setSaving(true);
     const payload: CreditNoteEntry = {
       ...form, status,

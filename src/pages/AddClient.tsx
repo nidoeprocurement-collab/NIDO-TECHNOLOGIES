@@ -8,7 +8,7 @@ import {
 } from "@/lib/clientStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
-import { sanitizePhoneNumber } from "@/lib/phoneValidation";
+import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -473,6 +473,11 @@ export default function AddClient() {
       !formData.contact_person.trim()
     ) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+    if ((formData.phone && !isValidPhoneNumber(formData.phone)) ||
+        (formData.mobile && !isValidPhoneNumber(formData.mobile))) {
+      toast.error("Phone and mobile numbers must contain exactly 10 digits");
       return;
     }
       if (formData.gstin && !isValidGst(formData.gstin)) {
