@@ -698,14 +698,15 @@ export default function AddVendorPage() {
             } />
           </div>
 
-          <FormField label="Payment Mode" input={
-            <AddableSelect name="paymentMode" value={formData.paymentMode} onChange={handleChange}
-              baseOptions={paymentModesBase} addLabel="+ Add New Payment Mode" placeholder="Select payment mode" className={selectClass} />
-          } />
-
-          <FormField label="Credit Limit (INR)" input={
-            <input type="text" placeholder="Enter amount" name="creditLimit" value={formData.creditLimit} onChange={handleChange} className={inputClass} />
-          } />
+          <div className="grid grid-cols-2 gap-6">
+            <FormField label="Payment Mode" input={
+              <AddableSelect name="paymentMode" value={formData.paymentMode} onChange={handleChange}
+                baseOptions={paymentModesBase} addLabel="+ Add New Payment Mode" placeholder="Select payment mode" className={selectClass} />
+            } />
+            <FormField label="Credit Limit (INR)" input={
+              <input type="text" placeholder="Enter amount" name="creditLimit" value={formData.creditLimit} onChange={handleChange} className={inputClass} />
+            } />
+          </div>
 
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Bank Name" input={
