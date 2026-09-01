@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Minus, Plus, ChevronLeft, ChevronRight,
   ShoppingCart, Lock, X, FileText, Phone, Mail, MessageCircle,
-  Gift, CheckCircle2, RotateCcw, Headphones, BadgeCheck,
+  CheckCircle2, RotateCcw, Headphones, BadgeCheck,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
@@ -124,8 +124,6 @@ function SuggestedCard({
   );
 }
 
-const FREE_DELIVERY_THRESHOLD = 200000; // ₹2,00,000
-
 export default function CartPage() {
   useI18n();
   const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
@@ -226,10 +224,6 @@ export default function CartPage() {
   const subtotal = preTaxSubtotal;
   const grandTotal = preTaxSubtotal + totalGst;
 
-  // Free delivery progress
-  const deliveryProgress = Math.min(100, (grandTotal / FREE_DELIVERY_THRESHOLD) * 100);
-  const amountToFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - grandTotal);
-
   const visibleCount = 4;
   const maxScroll = Math.max(0, suggested.length - visibleCount);
 
@@ -249,7 +243,7 @@ export default function CartPage() {
 
       <div className="flex gap-0 min-h-[calc(100vh-49px)]">
 
-        {/* ── Left: Products + Free Delivery + Trust badges + Suggestions ─ */}
+        {/* ── Left: Products + Trust badges + Suggestions ─ */}
         <div className="flex-1 min-w-0 p-5 space-y-4">
 
           {/* ── Table ─────────────────────────────────────────────────── */}
@@ -434,41 +428,6 @@ export default function CartPage() {
               </>
             )}
           </div>
-
-          {/* ── Free Delivery Bar ──────────────────────────────────────── */}
-          {cart.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-blue-600" stroke="currentColor" strokeWidth={2}>
-                      <path d="M1 3h15v13H1zM16 8h4l3 3v5h-7V8z" /><circle cx="5.5" cy="18.5" r="1.5" /><circle cx="18.5" cy="18.5" r="1.5" />
-                    </svg>
-                  </div>
-                  <span className="text-sm text-gray-700">
-                    {amountToFreeDelivery > 0 ? (
-                      <>Add more items worth <span className="font-bold text-gray-900">{formatPrice(amountToFreeDelivery)}</span> to get free delivery</>
-                    ) : (
-                      <span className="font-semibold text-green-700">🎉 You've unlocked free delivery!</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-gray-400">{formatPrice(FREE_DELIVERY_THRESHOLD - amountToFreeDelivery)} more</span>
-                  <div className="flex items-center gap-1 text-sm font-semibold text-blue-600">
-                    <Gift size={16} />
-                    Free Delivery
-                  </div>
-                </div>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${deliveryProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
 
           {/* ── Trust Badges ───────────────────────────────────────────── */}
           <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
