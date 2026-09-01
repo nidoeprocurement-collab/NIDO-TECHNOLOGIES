@@ -177,6 +177,91 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
   }
 }
 
+/**
+ * Remove one cancelled sub-order from any Draft PO for its master order.
+ * If it was the only line, the Draft PO is removed. Multi-line POs keep their
+ * remaining products and have their totals/primary line metadata recalculated.
+ */
+export function removeSubOrderFromDraftPOs(orderId: string, subOrderId: string): void {
+  const all = getAllPOs();
+  const removedPoNumbers = new Set<string>();
+  let changed = false;
+
+  const next = all.flatMap((po) => {
+    if (po.orderId !== orderId || po.status !== "Draft") return [po];
+
+    const items = Array.isArray(po.items) ? po.items : [];
+    const remainingItems = items.filter((item) => item.subOrderId !== subOrderId);
+    const covered = remainingItems.length !== items.length
+      || po.subOrderId === subOrderId
+      || po.subOrderIds?.includes(subOrderId);
+
+    if (!covered) return [po];
+    changed = true;
+
+    if (remainingItems.length === 0) {
+      removedPoNumbers.add(po.poNumber);
+      return [];
+    }
+
+    const subtotal = remainingItems.reduce((sum, item) => sum + item.lineSubtotal, 0);
+    const sgstAmt = Math.round(
+      remainingItems.reduce((sum, item) => sum + item.lineSubtotal * ((item.gstPct ?? 18) / 2) / 100, 0) * 100,
+    ) / 100;
+    const cgstAmt = sgstAmt;
+    const primary = remainingItems[0];
+
+    return [{
+      ...po,
+      items: remainingItems,
+      subOrderId: primary.subOrderId,
+      subOrderIds: remainingItems.map((item) => item.subOrderId),
+      item: primary.item,
+      sku: primary.sku,
+      category: primary.category,
+      hsnCode: primary.hsnCode,
+      specs: primary.specs,
+      referenceNumber: primary.referenceNumber,
+      qty: primary.qty,
+      unitPrice: primary.unitPrice,
+      subtotal,
+      sgstPct: (primary.gstPct ?? 18) / 2,
+      cgstPct: (primary.gstPct ?? 18) / 2,
+      sgstAmt,
+      cgstAmt,
+      grandTotal: subtotal + sgstAmt + cgstAmt,
+    }];
+  });
+
+  if (!changed) return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+
+  // Keep the legacy per-order PO projection in sync where older flows created it.
+  try {
+    const posKey = `nido_pos_${orderId}`;
+    const legacyPOs: Record<string, any> = JSON.parse(localStorage.getItem(posKey) || "{}");
+    let legacyChanged = false;
+    for (const key of Object.keys(legacyPOs)) {
+      const entry = legacyPOs[key];
+      if (entry?.subOrderId === subOrderId || removedPoNumbers.has(entry?.poNumber)) {
+        delete legacyPOs[key];
+        legacyChanged = true;
+      }
+    }
+    if (legacyChanged) localStorage.setItem(posKey, JSON.stringify(legacyPOs));
+  } catch {
+    /* storage unavailable */
+  }
+
+  try {
+    window.dispatchEvent(new CustomEvent("poCreated", {
+      detail: { orderId, subOrderId, action: "lineRemoved" },
+    }));
+  } catch {
+    /* SSR safe */
+  }
+}
+
 // Dedicated monotonic counter — avoids rescanning all POs each time.
 const COUNTER_KEY = "nido_po_counter";
 

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, updatePO, getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -1927,7 +1927,18 @@ function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDat
 const menuItemSt: any = { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" };
 const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "#92400e" }, Processing: { color: "#6b21a8" }, Shipped: { color: "#1e40af" }, Delivered: { color: "#166534" } };
 
-function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, referenceLocked, onCancel, onRaiseReturn, returnAllowed }) {
+function ThreeDotMenu({
+  sub,
+  onUpdateStatus,
+  onAddTracking,
+  onSetReference,
+  referenceLocked,
+  onCancel,
+  cancelEnabled,
+  onRaiseReturn,
+  returnAllowed,
+  statusUpdatesEnabled,
+}) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
   const ref = useRef<any>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -1992,9 +2003,27 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, refe
       <button ref={buttonRef} onClick={toggleMenu} style={{ background: "none", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}>⋮</button>
       {open && menuPosition && createPortal(
         <div ref={menuRef} style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", zIndex: 1000, minWidth: 220, maxHeight: "calc(100vh - 16px)", overflow: "visible" }}>
-          <div style={{ position: "relative" }} onMouseEnter={() => setStatusSub(true)} onMouseLeave={() => setStatusSub(false)}>
-            <button style={{ ...menuItemSt, background: statusSub ? "#f9fafb" : "none" }}><span>🔄</span> Update Status <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span></button>
-            {statusSub && (
+          <div
+            style={{ position: "relative" }}
+            onMouseEnter={() => { if (statusUpdatesEnabled) setStatusSub(true); }}
+            onMouseLeave={() => setStatusSub(false)}
+          >
+            <button
+              disabled={!statusUpdatesEnabled}
+              title={!statusUpdatesEnabled ? "Confirm a purchase order before updating item status." : undefined}
+              style={{
+                ...menuItemSt,
+                background: statusSub ? "#f9fafb" : "none",
+                color: statusUpdatesEnabled ? "#374151" : "#d1d5db",
+                cursor: statusUpdatesEnabled ? "pointer" : "not-allowed",
+              }}
+            >
+              <span>🔄</span> Update Status
+              {!statusUpdatesEnabled
+                ? <span style={{ marginLeft: "auto", fontSize: 10 }}>PO pending</span>
+                : <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span>}
+            </button>
+            {statusSub && statusUpdatesEnabled && (
               <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", minWidth: 180, overflow: "hidden", zIndex: 1001 }}>
                 {statuses.map(s => (
                   <button key={s} onClick={() => { onUpdateStatus(s); setOpen(false); setStatusSub(false); }}
@@ -2015,7 +2044,19 @@ function ThreeDotMenu({ sub, onUpdateStatus, onAddTracking, onSetReference, refe
             {referenceLocked && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>Locked</span>}
           </button>
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
-          <button style={{ ...menuItemSt, color: "#dc2626" }} onClick={() => { onCancel(); setOpen(false); }}><span>✕</span> Cancel Item</button>
+          <button
+            disabled={!cancelEnabled}
+            title={!cancelEnabled ? "Cancellation is unavailable after the purchase order is confirmed." : undefined}
+            style={{
+              ...menuItemSt,
+              color: cancelEnabled ? "#dc2626" : "#d1d5db",
+              cursor: cancelEnabled ? "pointer" : "not-allowed",
+            }}
+            onClick={() => { if (cancelEnabled) { onCancel(); setOpen(false); } }}
+          >
+            <span>✕</span> Cancel Item
+            {!cancelEnabled && <span style={{ marginLeft: "auto", fontSize: 10 }}>Locked</span>}
+          </button>
           <button style={{ ...menuItemSt, color: returnAllowed ? "#7c3aed" : "#d1d5db", cursor: returnAllowed ? "pointer" : "not-allowed" }}
             onClick={() => { if (returnAllowed) { onRaiseReturn(); setOpen(false); } }}>
             <span>↩</span> Raise Return Request
@@ -2181,9 +2222,18 @@ export default function MyOrderPage() {
   // Once an order is Cancelled it is a terminal state — no further status
   // changes or processing are allowed on it.
   const isOrderCancelled = masterStatus === "Cancelled";
+  // Incremented whenever a PO is created, updated, or has a line removed so
+  // derived PO status/lock state refreshes immediately in this page.
+  const [poRefreshKey, setPoRefreshKey] = useState(0);
+  const orderPOs = useMemo(
+    () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
+    [poRefreshKey, orderId],
+  );
+  const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
     if (isOrderCancelled) return; // cancelled orders can no longer be updated
+    if (!hasConfirmedOrderPO) return; // master status stays locked until a PO is confirmed
     // Centralized in MyOrdersContext so a Cancelled/Draft transition always
     // cascades to sub-orders and clears vendor selection, whether triggered
     // here or from the order list's bulk status update.
@@ -2232,10 +2282,6 @@ export default function MyOrderPage() {
       )
     : subOrders;
   const [expandedItems, setExpandedItems] = useState(new Set<string>());
-  // Incremented whenever a PO is created or updated so getAllPOs() inline calls
-  // re-run and the Draft Purchase Orders tab / badge reflects the latest data
-  // without needing a page reload.
-  const [poRefreshKey, setPoRefreshKey] = useState(0);
 
   // Derived maps used in the sub-orders table — built from the sub-orders list
   // so they stay in sync with any status/tracking changes without extra state.
@@ -2255,8 +2301,29 @@ export default function MyOrderPage() {
     () => Object.fromEntries(subOrders.filter(s => s.stockAllocations?.length).map(s => [s.id, s.stockAllocations])),
     [subOrders]
   );
-  const updateStatus = (subId: string, status: string) =>
+  const updateStatus = (subId: string, status: string) => {
+    if (!hasConfirmedOrderPO || isOrderInactive) return;
     setSubOrders(prev => prev.map(s => s.id === subId ? { ...s, itemStatus: status, updatedOn: new Date().toLocaleDateString("en-IN") } : s));
+  };
+
+  const handleCancelItem = (subId: string, reason: string) => {
+    if (isOrderInactive) return;
+    const target = subOrders.find(s => s.id === subId);
+    if (!target || target.itemStatus === "Cancelled" || target.itemStatus === "Delivered") return;
+
+    const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
+    if (targetPOs.some(isConfirmedPO)) return;
+
+    // Return the pre-PO reservation to vendor availability.
+    if (target.stockAllocations?.length) releaseStock(target.stockAllocations);
+    removeSubOrderFromDraftPOs(orderId, subId);
+    setSubOrders(prev => prev.map(s => s.id === subId
+      ? { ...s, itemStatus: "Cancelled", cancelReason: reason, updatedOn: new Date().toLocaleDateString("en-IN") }
+      : s
+    ));
+    setCancelTarget(null);
+    setPoRefreshKey(k => k + 1);
+  };
 
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
@@ -2589,14 +2656,23 @@ export default function MyOrderPage() {
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => setPendingCancelStatus(true)}
-                  style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
-                >
-                  ✕ Cancel Order
-                </button>
+                hasConfirmedOrderPO ? (
+                  <button
+                    onClick={() => setPendingCancelStatus(true)}
+                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                  >
+                    ✕ Cancel Order
+                  </button>
+                ) : (
+                  <span
+                    title="Confirm at least one purchase order before changing the master order."
+                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    🔒 Confirm PO to update order
+                  </span>
+                )
               )
             )}
           </div>
@@ -2677,6 +2753,8 @@ export default function MyOrderPage() {
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
                 {isOrderCancelled ? (
                   <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This order is cancelled and can no longer be updated.</span>
+                ) : !hasConfirmedOrderPO ? (
+                  <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>Confirm a purchase order before updating the master order status.</span>
                 ) : (
                   <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid hsl(var(--primary))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--primary))", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
@@ -2861,12 +2939,14 @@ export default function MyOrderPage() {
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                       ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
-                          {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
+                           {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
                             <button
+                               disabled={hasConfirmedPO}
+                               title={hasConfirmedPO ? "Cancellation is unavailable after the purchase order is confirmed." : undefined}
                               onClick={() => setCancelTarget(sub.id)}
-                              style={{ padding: "5px 10px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                               style={{ padding: "5px 10px", border: `1px solid ${hasConfirmedPO ? "#e5e7eb" : "#fca5a5"}`, borderRadius: 6, background: hasConfirmedPO ? "#f9fafb" : "#fff", color: hasConfirmedPO ? "#9ca3af" : "#dc2626", cursor: hasConfirmedPO ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
                             >
-                              Cancel Item
+                               {hasConfirmedPO ? "Cancel Item (Locked)" : "Cancel Item"}
                             </button>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
@@ -2874,7 +2954,18 @@ export default function MyOrderPage() {
                         </div>
                       ) : (
                         <div style={{ minWidth: 0 }}>
-                          <ThreeDotMenu sub={sub} onUpdateStatus={s => updateStatus(sub.id, s)} onAddTracking={() => setTrackingTarget(sub.id)} onSetReference={() => setReferenceTarget(sub.id)} referenceLocked={hasPO} onCancel={() => setCancelTarget(sub.id)} onRaiseReturn={() => setReturnTarget(sub.id)} returnAllowed={returnOk} />
+                          <ThreeDotMenu
+                            sub={sub}
+                            onUpdateStatus={s => updateStatus(sub.id, s)}
+                            onAddTracking={() => setTrackingTarget(sub.id)}
+                            onSetReference={() => setReferenceTarget(sub.id)}
+                            referenceLocked={hasPO}
+                            onCancel={() => setCancelTarget(sub.id)}
+                            cancelEnabled={!hasConfirmedPO && sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered"}
+                            onRaiseReturn={() => setReturnTarget(sub.id)}
+                            returnAllowed={returnOk}
+                            statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}
+                          />
                         </div>
                       )}
                     </div>
@@ -3082,7 +3173,7 @@ export default function MyOrderPage() {
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={t => setSubOrders(prev => prev.map(s => s.id === trackingTarget ? { ...s, tracking: t } : s))} onClose={() => setTrackingTarget(null)} />}
       {referenceTarget && <ReferenceNumberModal itemName={subOrders.find(s => s.id === referenceTarget)?.itemName || ""} current={subOrders.find(s => s.id === referenceTarget)?.referenceNumber || ""} onSave={v => setSubOrders(prev => prev.map(s => s.id === referenceTarget ? { ...s, referenceNumber: v } : s))} onClose={() => setReferenceTarget(null)} />}
-      {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={(reason) => { setSubOrders(prev => prev.map(s => s.id === cancelTarget ? { ...s, itemStatus: "Pending", cancelReason: reason } : s)); setCancelTarget(null); }} onClose={() => setCancelTarget(null)} />}
+      {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={(reason) => handleCancelItem(cancelTarget, reason)} onClose={() => setCancelTarget(null)} />}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
     </div>
