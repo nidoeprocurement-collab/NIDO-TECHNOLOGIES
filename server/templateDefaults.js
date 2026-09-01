@@ -243,4 +243,16 @@ export const DEFAULT_TEMPLATES = [
     html_body: wrap("Notification", `<p>Hi {{user_name}}, {{message}}</p>`),
     text_body: "Hi {{user_name}}, {{message}}",
   },
+  {
+    key: "protected_document_password",
+    name: "Protected Document Password",
+    category: "Orders",
+    subject: "Password for {{document_name}} from {{company_name}}",
+    html_body: wrap(
+      "Protected document",
+      `<p>Dear {{client_name}},</p><p>The protected document <strong>{{document_name}}</strong> ({{document_type}}) for order <strong>{{order_number}}</strong> is attached to this email.</p><p>Use the password below to open it:</p><p style="padding:12px 16px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;font-family:monospace;font-size:18px;font-weight:700;letter-spacing:1px;color:#111827;">{{document_password}}</p><p style="font-size:13px;color:#6b7280;">Please keep this password confidential.</p>`,
+    ),
+    text_body:
+      "Dear {{client_name}}, the protected document {{document_name}} ({{document_type}}) for order {{order_number}} is attached. Password: {{document_password}}. Please keep this password confidential.",
+  },
 ];

@@ -3,6 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { getClients } from "@/lib/clientStore";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
 import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
@@ -1104,6 +1107,7 @@ function PasswordDialog({
   description,
   confirmPassword = false,
   failureMessage = "The document could not be saved. Please try again.",
+  recipientOptions = [],
   onSubmit,
   onClose,
 }: {
@@ -1111,11 +1115,15 @@ function PasswordDialog({
   description: string;
   confirmPassword?: boolean;
   failureMessage?: string;
-  onSubmit: (password: string) => boolean | void | Promise<boolean | void>;
+  recipientOptions?: Array<{ value: string; label: string }>;
+  onSubmit: (password: string, recipientEmail?: string) => boolean | void | Promise<boolean | void>;
   onClose: () => void;
 }) {
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [recipients, setRecipients] = useState(recipientOptions);
+  const [recipient, setRecipient] = useState(recipientOptions[0]?.value || "");
+  const [newRecipient, setNewRecipient] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -1129,10 +1137,14 @@ function PasswordDialog({
       setError("Passwords do not match.");
       return;
     }
+    if (confirmPassword && (!recipient || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.trim()))) {
+      setError("Select a valid recipient email address.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
-      const result = await onSubmit(password);
+      const result = await onSubmit(password, confirmPassword ? recipient.trim() : undefined);
       if (result !== false) onClose();
       else setError(failureMessage);
     } catch {
@@ -1176,6 +1188,61 @@ function PasswordDialog({
             />
           </>
         )}
+         {confirmPassword && (
+           <div style={{ marginTop: 14 }}>
+             <label style={lbSt}>Send password and document to</label>
+             <select
+               value={recipient}
+               onChange={event => {
+                 const value = event.target.value;
+                 if (value === "__add_new__") {
+                   setNewRecipient("");
+                   setRecipient("");
+                 } else {
+                   setRecipient(value);
+                   setNewRecipient("");
+                 }
+                 setError("");
+               }}
+               style={{ ...inSt, appearance: "none" }}
+             >
+               <option value="">Select an email address</option>
+               {recipients.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+               <option value="__add_new__">＋ Add new email address</option>
+             </select>
+             {!recipient && (
+               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                 <input
+                   type="email"
+                   value={newRecipient}
+                   onChange={event => { setNewRecipient(event.target.value); setError(""); }}
+                   placeholder="Enter new email address"
+                   autoComplete="email"
+                   style={{ ...inSt, marginBottom: 0, flex: 1 }}
+                 />
+                 <button
+                   type="button"
+                   disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newRecipient.trim())}
+                   onClick={() => {
+                     const email = newRecipient.trim().toLowerCase();
+                     const existing = recipients.find(option => option.value.toLowerCase() === email);
+                     if (existing) {
+                       setRecipient(existing.value);
+                     } else {
+                       setRecipients(previous => [...previous, { value: email, label: `New recipient — ${email}` }]);
+                       setRecipient(email);
+                     }
+                     setNewRecipient("");
+                     setError("");
+                   }}
+                   style={{ padding: "0 12px", border: "1px solid #2563eb", borderRadius: 7, background: "#eff6ff", color: "#1d4ed8", cursor: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newRecipient.trim()) ? "pointer" : "not-allowed", fontWeight: 600, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                 >
+                   Add
+                 </button>
+               </div>
+             )}
+           </div>
+         )}
         {error && <div role="alert" style={{ marginTop: 12, color: "#b91c1c", fontSize: 12.5 }}>{error}</div>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22 }}>
           <button type="button" onClick={onClose} disabled={submitting} style={{ padding: "9px 18px", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", color: "#374151", cursor: submitting ? "not-allowed" : "pointer", fontWeight: 600, fontFamily: "inherit" }}>Cancel</button>
@@ -1188,7 +1255,18 @@ function PasswordDialog({
 }
 
 // ── Upload Document Modal ─────────────────────────────────────────────────────
-function UploadDocModal({ onSave, onClose }) {
+function UploadDocModal({
+  onSave,
+  recipientOptions = [],
+  onClose,
+}: {
+  onSave: (
+    doc: any,
+    protectedDetails?: { password: string; recipientEmail: string },
+  ) => boolean | Promise<boolean>;
+  recipientOptions?: Array<{ value: string; label: string }>;
+  onClose: () => void;
+}) {
   const [file, setFile] = useState(null);
   const [form, setForm] = useState({ type: "", description: "" });
   const [dragging, setDragging] = useState(false);
@@ -1204,14 +1282,14 @@ function UploadDocModal({ onSave, onClose }) {
   };
   const ext = file ? (file as any).name.split(".").pop() : "";
 
-  const saveDocument = async (password?: string) => {
+  const saveDocument = async (password?: string, recipientEmail?: string) => {
     if (!file) return false;
     const documentFile = file as File;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + "\n" + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const dataUrl = await readDocumentAsDataUrl(documentFile);
     const passwordHash = password ? await hashDocumentPassword(password) : undefined;
-    const saved = onSave({
+    const saved = await onSave({
       id: "d" + Date.now(),
       name: documentFile.name,
       ext,
@@ -1222,7 +1300,7 @@ function UploadDocModal({ onSave, onClose }) {
       description: form.description,
       dataUrl,
       passwordHash,
-    });
+    }, password && recipientEmail ? { password, recipientEmail } : undefined);
     return saved !== false;
   };
 
@@ -1316,7 +1394,8 @@ function UploadDocModal({ onSave, onClose }) {
           title="Protect this document"
           description="Create a password for this document. Anyone who downloads it, including NIDO users and clients, must enter this password first."
           confirmPassword
-          onSubmit={password => saveDocument(password).then(saved => {
+          recipientOptions={recipientOptions}
+          onSubmit={(password, recipientEmail) => saveDocument(password, recipientEmail).then(saved => {
             if (!saved) return false;
             onClose();
             return true;
@@ -1438,8 +1517,34 @@ function DocRowMenu({ onDownload, onRemove }) {
 
 function DocumentsNotesTab({ orderId }: { orderId: string }) {
   const { user, isClientPortalUser } = useAuth();
+  const { orders } = useMyOrders();
   const notesKey = `nido_notes_${orderId}`;
   const docsKey = `nido_docs_${orderId}`;
+  const currentOrder = orders.find(order => order.id === orderId);
+  const recipientOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    const seen = new Set<string>();
+    const addRecipient = (email: string | undefined, label: string) => {
+      const normalized = email?.trim().toLowerCase();
+      if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || seen.has(normalized)) return;
+      seen.add(normalized);
+      options.push({ value: normalized, label: `${label} — ${normalized}` });
+    };
+
+    const client = getClients().find(candidate =>
+      (currentOrder?.clientId && candidate.id === currentOrder.clientId)
+      || candidate.name === currentOrder?.client,
+    );
+    addRecipient(client?.email, "Client");
+
+    const portalClientId = currentOrder?.clientId || client?.id;
+    if (portalClientId) {
+      getPortalUsersByClient(portalClientId).forEach(portalUser => {
+        addRecipient(portalUser.email, `Portal user: ${portalUser.name || "User"}`);
+      });
+    }
+    return options;
+  }, [currentOrder]);
 
   const [docs, setDocs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(docsKey) || "null") || INITIAL_DOCS; } catch { return INITIAL_DOCS; }
@@ -1507,18 +1612,58 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
     setNoteText("");
   };
 
-  const handleSaveDocument = (doc: any): boolean => {
+  const handleSaveDocument = async (
+    doc: any,
+    protectedDetails?: { password: string; recipientEmail: string },
+  ): Promise<boolean> => {
     const nextDocs = [...docs, doc];
     try {
       // Persist before closing the modal so a successful confirmation always
       // means the document is actually stored for this order.
       localStorage.setItem(docsKey, JSON.stringify(nextDocs));
       setDocs(nextDocs);
-      return true;
     } catch {
       setDocFeedback({ type: "error", message: "The document could not be saved because browser storage is unavailable or full." });
       return false;
     }
+
+    if (protectedDetails) {
+      try {
+        const base64Content = typeof doc.dataUrl === "string" && doc.dataUrl.includes(",")
+          ? doc.dataUrl.slice(doc.dataUrl.indexOf(",") + 1)
+          : "";
+        const result = await sendEmail({
+          templateKey: "protected_document_password",
+          to: protectedDetails.recipientEmail,
+          variables: {
+            client_name: currentOrder?.client || "Client",
+            document_name: doc.name || "protected document",
+            document_type: doc.type || "Document",
+            document_password: protectedDetails.password,
+            order_number: orderId,
+          },
+          attachments: base64Content
+            ? [{ filename: doc.name || "protected-document", content: base64Content }]
+            : [],
+          triggerModule: "order_details_document_protection",
+          sentBy: user?.email || user?.name || "System Owner",
+        });
+        if (!result.success || !result.data?.success) {
+          setDocFeedback({
+            type: "error",
+            message: `Document saved, but the password email could not be sent: ${result.error || result.data?.error || "Email service unavailable."}`,
+          });
+        } else {
+          setDocFeedback({ type: "success", message: `Protected document saved and emailed to ${protectedDetails.recipientEmail}.` });
+        }
+      } catch (error) {
+        setDocFeedback({
+          type: "error",
+          message: `Document saved, but the password email could not be sent: ${error instanceof Error ? error.message : "Email service unavailable."}`,
+        });
+      }
+    }
+    return true;
   };
 
   const downloadDocument = (doc: any): boolean => {
@@ -1709,7 +1854,7 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
           </div>
         </div>
       </div>
-      {showUpload && <UploadDocModal onSave={handleSaveDocument} onClose={() => setShowUpload(false)} />}
+       {showUpload && <UploadDocModal onSave={handleSaveDocument} recipientOptions={recipientOptions} onClose={() => setShowUpload(false)} />}
       {protectedDocument && (
         <PasswordDialog
           title="Password required"
