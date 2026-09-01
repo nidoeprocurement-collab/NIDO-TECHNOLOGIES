@@ -514,7 +514,7 @@ export default function VendorProductsPage() {
           onConfirm={() => handleConfirmRemove(removeProduct.id)}
         />
       )}
-      <div className="w-full max-w-[1200px] mx-auto px-2 py-4 space-y-4">
+      <div className="w-full px-2 py-4 space-y-4">
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           {STATS.map((stat) => (
@@ -568,19 +568,30 @@ export default function VendorProductsPage() {
                 Add products from master catalog
               </button>
             </div>
-          ) : (
-           <div className="overflow-x-auto">
-              <table className="w-full min-w-0 table-fixed text-sm">
+           ) : (
+            <div className="w-full overflow-hidden">
+               <table className="w-full table-fixed text-sm">
+               <colgroup>
+                 <col style={{ width: "21%" }} />
+                 <col style={{ width: "9%" }} />
+                 <col style={{ width: "12%" }} />
+                 <col style={{ width: "11%" }} />
+                 <col style={{ width: "9%" }} />
+                 <col style={{ width: "8%" }} />
+                 <col style={{ width: "10%" }} />
+                 <col style={{ width: "8%" }} />
+                 <col style={{ width: "12%" }} />
+               </colgroup>
               <thead>
                  <tr className="border-b border-gray-200 bg-gray-50">
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">VPC / MPI</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Pricing Model</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">VPC / MPI</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Price / Unit</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">MOQ / Min Qty</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Lead Time / SLA</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Lead Time / SLA</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -612,22 +623,22 @@ export default function VendorProductsPage() {
                        <td className="px-2 py-4 align-middle">
                          <span className={`inline-flex max-w-[112px] rounded-md px-2 py-2 text-xs font-semibold leading-snug ${typeBadgeClasses(type)}`}>{type}</span>
                        </td>
-                       <td className="px-2 py-4 align-middle whitespace-nowrap">
+                        <td className="px-2 py-4 align-middle break-words">
                          <div className="space-y-1">
-                           <div className="font-mono text-xs text-gray-700">{product.vendorProductCode || "—"}</div>
-                           <div className="font-mono text-xs text-gray-500">{product.masterProductCode || "—"}</div>
+                            <div className="font-mono text-[10px] text-gray-700 break-all">{product.vendorProductCode || "—"}</div>
+                            <div className="font-mono text-[10px] text-gray-500 break-all">{product.masterProductCode || "—"}</div>
                          </div>
                        </td>
-                        <td className="px-2 py-4 align-middle max-w-[170px] text-xs text-gray-700">{getPricingModel(type)}</td>
-                       <td className="px-2 py-4 align-middle whitespace-nowrap">
+                         <td className="px-2 py-4 align-middle break-words text-xs text-gray-700">{getPricingModel(type)}</td>
+                        <td className="px-2 py-4 align-middle break-words">
                          <div className="font-semibold text-gray-800 text-sm">
                            {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
                          </div>
                        </td>
-                       <td className="px-2 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
+                        <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
                           {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
                        </td>
-                       <td className="px-2 py-4 align-middle whitespace-nowrap">
+                        <td className="px-2 py-4 align-middle break-words">
                           {availability.isUnlimited ? (
                            <div className="space-y-1">
                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
@@ -646,30 +657,30 @@ export default function VendorProductsPage() {
                            </div>
                          )}
                        </td>
-                       <td className="px-2 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
+                        <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
                          <div className="space-y-1">
                            <div>{leadTime.primary}{hybrid ? " *" : ""}</div>
                            {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
                          </div>
                        </td>
-                        <td className="px-2 py-4 align-middle whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                         <td className="px-2 py-4 align-middle">
+                           <div className="flex flex-wrap items-center gap-1">
                             <button
                               type="button"
                               onClick={() => setEditProduct(product)}
                               aria-label={`Edit ${product.productName}`}
-                              className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                               className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
                             >
-                              <Pencil className="w-3.5 h-3.5" /> Edit
+                               <Pencil className="w-3 h-3" /><span className="hidden sm:inline">Edit</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setRemoveProduct(product)}
                               aria-label={`Remove ${product.productName}`}
                               data-confirmation-skip
-                              className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                               className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-1.5 text-[11px] font-medium text-red-700 hover:bg-red-100 transition-colors"
                             >
-                              <Trash2 className="w-3.5 h-3.5" /> Remove
+                               <Trash2 className="w-3 h-3" /><span className="hidden sm:inline">Remove</span>
                             </button>
                           </div>
                        </td>
