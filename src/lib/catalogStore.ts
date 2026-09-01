@@ -197,6 +197,8 @@ export function saveCatalogProduct(
       window.dispatchEvent(new Event('clientCatalogUpdated'));
     }
   } catch { /* never block the save */ }
+
+  return true;
 }
 
 export function deleteCatalogProduct(id: string): void {

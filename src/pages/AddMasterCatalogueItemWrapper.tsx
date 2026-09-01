@@ -677,7 +677,11 @@ export default function AddMasterCatalogueItemWrapper() {
             Preview Product
           </Button>
           {isEditMode ? (
-            <Button className="flex-1 text-sm h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={handleSaveChanges}>
+            <Button
+              data-confirmation-skip
+              className="flex-1 text-sm h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              onClick={handleSaveChanges}
+            >
               Save Changes
             </Button>
           ) : (
