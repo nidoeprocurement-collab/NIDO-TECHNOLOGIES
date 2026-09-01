@@ -514,9 +514,9 @@ export default function VendorProductsPage() {
           onConfirm={() => handleConfirmRemove(removeProduct.id)}
         />
       )}
-      <div className="max-w-[1200px] mx-auto px-4 py-4 space-y-4">
+      <div className="w-full max-w-[1200px] mx-auto px-2 py-4 space-y-4">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           {STATS.map((stat) => (
             <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-2 shadow-sm hover:shadow-md transition-shadow">
               <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center mb-2`}>{stat.icon}</div>
@@ -570,18 +570,18 @@ export default function VendorProductsPage() {
             </div>
           ) : (
            <div className="overflow-x-auto">
-             <table className="w-full min-w-[1080px] text-sm">
+              <table className="w-full min-w-0 table-fixed text-sm">
               <thead>
                  <tr className="border-b border-gray-200 bg-gray-50">
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">VPC / MPI</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Pricing Model</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Lead Time / SLA</th>
-                   <th className="text-left px-3 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">VPC / MPI</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Pricing Model</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Price / Unit</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">MOQ / Min Qty</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">Lead Time / SLA</th>
+                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
                <tbody className="divide-y divide-gray-100">
@@ -596,8 +596,8 @@ export default function VendorProductsPage() {
                     const leadTime = formatLeadTimeByType(product.leadTime, type);
                    return (
                      <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
-                       <td className="px-3 py-4 min-w-[220px]">
-                         <div className="flex items-center gap-3">
+                       <td className="px-2 py-4">
+                         <div className="flex items-center gap-2">
                            {product.images && product.images.length > 0 ? (
                              <img src={product.images[0]} alt={product.productName} className="w-10 h-10 rounded-md object-cover border border-gray-200 flex-shrink-0" />
                            ) : (
@@ -609,25 +609,25 @@ export default function VendorProductsPage() {
                            </div>
                          </div>
                        </td>
-                       <td className="px-3 py-4 align-middle">
+                       <td className="px-2 py-4 align-middle">
                          <span className={`inline-flex max-w-[112px] rounded-md px-2 py-2 text-xs font-semibold leading-snug ${typeBadgeClasses(type)}`}>{type}</span>
                        </td>
-                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                       <td className="px-2 py-4 align-middle whitespace-nowrap">
                          <div className="space-y-1">
                            <div className="font-mono text-xs text-gray-700">{product.vendorProductCode || "—"}</div>
                            <div className="font-mono text-xs text-gray-500">{product.masterProductCode || "—"}</div>
                          </div>
                        </td>
-                        <td className="px-3 py-4 align-middle max-w-[170px] text-xs text-gray-700">{getPricingModel(type)}</td>
-                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                        <td className="px-2 py-4 align-middle max-w-[170px] text-xs text-gray-700">{getPricingModel(type)}</td>
+                       <td className="px-2 py-4 align-middle whitespace-nowrap">
                          <div className="font-semibold text-gray-800 text-sm">
                            {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
                          </div>
                        </td>
-                       <td className="px-3 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
+                       <td className="px-2 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
                           {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
                        </td>
-                       <td className="px-3 py-4 align-middle whitespace-nowrap">
+                       <td className="px-2 py-4 align-middle whitespace-nowrap">
                           {availability.isUnlimited ? (
                            <div className="space-y-1">
                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
@@ -646,13 +646,13 @@ export default function VendorProductsPage() {
                            </div>
                          )}
                        </td>
-                       <td className="px-3 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
+                       <td className="px-2 py-4 align-middle whitespace-nowrap text-gray-700 text-sm">
                          <div className="space-y-1">
                            <div>{leadTime.primary}{hybrid ? " *" : ""}</div>
                            {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
                          </div>
                        </td>
-                        <td className="px-3 py-4 align-middle whitespace-nowrap">
+                        <td className="px-2 py-4 align-middle whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
