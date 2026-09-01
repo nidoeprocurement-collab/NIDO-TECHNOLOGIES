@@ -2119,8 +2119,8 @@ function ThreeDotMenu({
       .filter(status => status.category === "Orders" && status.visible)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(status => status.name),
-    "Pending", "Confirmed", "Processing", "Shipped", "Delivered",
-  ]));
+    "Pending", "Processing", "Shipped", "Delivered",
+  ])).filter(status => status !== "Approved" && status !== "Confirmed");
   const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (open) {
@@ -2171,7 +2171,12 @@ function ThreeDotMenu({
             {statusSub && statusUpdatesEnabled && (
               <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", minWidth: 180, overflow: "hidden", zIndex: 1001 }}>
                 {statuses.map(s => (
-                  <button key={s} onClick={() => { onUpdateStatus(s); setOpen(false); setStatusSub(false); }}
+                  <button key={s} onClick={() => {
+                    onUpdateStatus(s);
+                    if (s === "Shipped") onAddTracking();
+                    setOpen(false);
+                    setStatusSub(false);
+                  }}
                     style={{ ...menuItemSt, background: sub.itemStatus === s ? "#f0f7ff" : "none", color: sub.itemStatus === s ? "#2563eb" : "#374151", fontWeight: sub.itemStatus === s ? 600 : 400 }}>
                     <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: STATUS_STYLE[s]?.color || "#6b7280", marginRight: 8, flexShrink: 0 }} />
                     {s} {sub.itemStatus === s && "✓"}
@@ -2180,7 +2185,6 @@ function ThreeDotMenu({
               </div>
             )}
           </div>
-          <button style={menuItemSt} onClick={() => { onAddTracking(); setOpen(false); }}><span>📦</span> {sub.tracking ? "Update Tracking Info" : "Add Tracking Info"}</button>
           <button
             style={{ ...menuItemSt, color: referenceLocked ? "#d1d5db" : "#374151", cursor: referenceLocked ? "not-allowed" : "pointer" }}
             onClick={() => { if (!referenceLocked) { onSetReference(); setOpen(false); } }}
@@ -3287,6 +3291,10 @@ export default function MyOrderPage() {
                                       return;
                                     }
                                     updatePO(po.poNumber, { status: "Confirmed" });
+                                    // Confirming a PO starts fulfillment; it
+                                    // must not jump the master order to a
+                                    // terminal Delivered state.
+                                    updateOrderStatus(po.orderId, "Processing");
                                     navigate(`/vendor-orders/${po.poNumber}`);
                                   } catch (error: any) {
                                     setApprovalError(error?.message || "Approval service is unavailable. The PO was not confirmed.");
