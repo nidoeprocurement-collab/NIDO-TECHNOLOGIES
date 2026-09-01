@@ -10,7 +10,9 @@ import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
   | "Processing"
+  | "Pending Shipping"
   | "Partially Shipped"
+  | "Shipped"
   | "Partially Delivered"
   | "Delivered"
   | "Cancelled"

@@ -52,6 +52,7 @@ const ALL_STATUS_MAP = {
   Pending: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
   Confirmed: { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Processing: { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
+  "Pending Shipping": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Shipped: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   Delivered: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   "Partially Shipped": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
@@ -2038,7 +2039,9 @@ function CancelItemModal({ itemName, onConfirm, onClose }: { itemName: string; o
 function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDate?: string }) {
   const steps = [
     { label: "Processing", note: orderDate || "—" },
+    { label: "Pending Shipping", note: "Pending" },
     { label: "Partially Shipped", note: "In Progress" },
+    { label: "Shipped", note: "Pending" },
     { label: "Partially Delivered", note: "Pending" },
     { label: "Delivered", note: "Pending" },
   ];
@@ -2321,7 +2324,6 @@ export default function MyOrderPage() {
   const navigate = useNavigate();
   const { orders, updateOrderStatus } = useMyOrders();
   const { user, isClientPortalUser } = useAuth();
-  const statusConfig = useOrderStatusConfig();
   const orderId = id || "";
 
   // Find the real order from context
@@ -2419,13 +2421,14 @@ export default function MyOrderPage() {
   const [showStatusDd, setShowStatusDd] = useState(false);
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
-  const masterStatusOptions = Array.from(new Set([
-    ...statusConfig.statuses
-      .filter(status => status.category === "Orders" && status.visible)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(status => status.name),
-    "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
-  ]));
+  const masterStatusOptions = [
+    "Processing",
+    "Pending Shipping",
+    "Partially Shipped",
+    "Shipped",
+    "Partially Delivered",
+    "Delivered",
+  ];
 
   // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
   // Stock is no longer reserved at cart time, so no stock release is needed here.
