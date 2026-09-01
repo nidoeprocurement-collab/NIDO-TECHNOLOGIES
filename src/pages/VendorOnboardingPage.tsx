@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cloud, Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react';
+import { Plus, Trash2, Star, Upload, X, FileText, Paperclip } from 'lucide-react';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
 import { getPrefix } from '@/lib/configService';
@@ -273,13 +273,6 @@ export default function AddVendorPage() {
     tags: [] as string[],
     internalNotes: '',
     visibility: '',
-    // Document checklist
-    gstCertificate: false,
-    panCard: false,
-    businessRegistration: false,
-    bankDetails: false,
-    isoCertificate: false,
-    otherDocuments: false,
   });
 
   const [addressDetails, setAddressDetails] = useState<{
@@ -441,14 +434,6 @@ export default function AddVendorPage() {
       tags: formData.tags,
       internalNotes: formData.internalNotes,
       visibility: formData.visibility,
-      documentChecklist: {
-        gstCertificate: formData.gstCertificate,
-        panCard: formData.panCard,
-        businessRegistration: formData.businessRegistration,
-        bankDetails: formData.bankDetails,
-        isoCertificate: formData.isoCertificate,
-        otherDocuments: formData.otherDocuments,
-      },
       // Registered address
        city: addressDetails.billing.city || formData.city,
        state: addressDetails.billing.state || formData.state,
@@ -791,40 +776,8 @@ export default function AddVendorPage() {
           } />
         </FormSection>
 
-        {/* ── Section 7: Documents ─────────────────────────────────────────── */}
-        <FormSection number={7} title="Documents">
-          <div className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center mb-6">
-            <Cloud className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-            <p className="text-gray-700 font-medium mb-2">Drag and drop files here</p>
-            <p className="text-gray-500 text-sm mb-4">or click to upload</p>
-            <p className="text-gray-500 text-xs mb-2">Supported files: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG</p>
-            <p className="text-gray-500 text-xs">Max file size: 10MB</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-4">Document Checklist</label>
-            <div className="grid grid-cols-2 gap-4">
-              {(
-                [
-                  { name: 'gstCertificate', label: 'GST Certificate' },
-                  { name: 'bankDetails', label: 'Bank Details' },
-                  { name: 'panCard', label: 'PAN Card' },
-                  { name: 'isoCertificate', label: 'ISO Certificate' },
-                  { name: 'businessRegistration', label: 'Business Registration' },
-                  { name: 'otherDocuments', label: 'Other Documents' },
-                ] as { name: 'gstCertificate' | 'bankDetails' | 'panCard' | 'isoCertificate' | 'businessRegistration' | 'otherDocuments'; label: string }[]
-              ).map(({ name, label }) => (
-                <div key={name} className="flex items-center gap-2">
-                  <input type="checkbox" name={name} checked={formData[name]} onChange={handleChange} className="w-4 h-4 rounded border-gray-300" />
-                  <label className="text-sm text-gray-700">{label}</label>
-                </div>
-              ))}
-            </div>
-          </div>
-        </FormSection>
-
-        {/* ── Section 8: Additional Information ───────────────────────────── */}
-        <FormSection number={8} title="Additional Information">
+        {/* ── Section 7: Additional Information ───────────────────────────── */}
+        <FormSection number={7} title="Additional Information">
 
           {/* Tags */}
           <div>

@@ -734,7 +734,7 @@ export default function CatalogUpdatesTab() {
             masterProductCode: generateMasterProductCode(),
             skuCode: colAny(row, ['sku code', 'sku']),
             productName,
-            productType: col(row, 'product type') || 'Product',
+            productType: col(row, 'product type') || 'Product ',
             physicalType: col(row, 'physical type') || 'Physical Product',
             category: col(row, 'category'),
             subcategory: col(row, 'subcategory'),
