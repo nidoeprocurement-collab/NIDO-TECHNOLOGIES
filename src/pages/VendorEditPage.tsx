@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Cloud, Star, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { getVendorById, updateVendor } from '@/lib/vendorDataStore';
-import type { VendorStatus } from '@/lib/vendorDataStore';
+import type { StoredVendor, VendorStatus } from '@/lib/vendorDataStore';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 
 // Helper: ensure a current value (from stored data) appears in the options list.
@@ -25,6 +25,108 @@ function scoreToStars(score: number | undefined): number {
 // Convert 1-5 stars back to 0-100 performance score
 function starsToScore(stars: number): number {
   return stars * 20;
+}
+
+const PHONE_CODE_OPTIONS = [
+  { prefix: '+91', value: '+91 (India)' },
+  { prefix: '+1', value: '+1 (USA)' },
+  { prefix: '+44', value: '+44 (UK)' },
+  { prefix: '+971', value: '+971 (UAE)' },
+  { prefix: '+65', value: '+65 (Singapore)' },
+  { prefix: '+61', value: '+61 (Australia)' },
+  { prefix: '+86', value: '+86 (China)' },
+  { prefix: '+81', value: '+81 (Japan)' },
+  { prefix: '+49', value: '+49 (Germany)' },
+  { prefix: '+33', value: '+33 (France)' },
+];
+
+function getPhoneParts(value: string | undefined) {
+  const raw = value?.trim() ?? '';
+  const option = PHONE_CODE_OPTIONS.find(({ prefix }) => raw.startsWith(prefix));
+  return {
+    countryCode: option?.value ?? '+91 (India)',
+    number: sanitizePhoneNumber(raw),
+  };
+}
+
+function toDateInputValue(value: string | undefined): string {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+}
+
+function toDisplayDate(value: string): string {
+  if (!value) return '';
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function createEditFormData(vendor?: StoredVendor) {
+  const phone = getPhoneParts(vendor?.phone);
+  const mobile = getPhoneParts(vendor?.mobile);
+  const registeredAddress = vendor?.addressLine1
+    ? [vendor.addressLine1, vendor.addressLine2].filter(Boolean).join(', ')
+    : vendor?.address ?? '';
+  const billingAddress = vendor?.billingAddressLine1
+    ? [vendor.billingAddressLine1, vendor.billingAddressLine2].filter(Boolean).join(', ')
+    : '';
+
+  return {
+    vendorName: vendor?.name ?? '',
+    vendorCode: vendor?.vendorCode ?? vendor?.id ?? 'Auto-generated',
+    category: vendor?.category ?? '',
+    subCategory: vendor?.subCategory ?? '',
+    vendorType: vendor?.vendorType ?? '',
+    pan: vendor?.pan ?? '',
+    legalEntityName: vendor?.legalEntityName ?? '',
+    yearOfEstablishment: vendor?.founded ?? '',
+    website: vendor?.website ?? '',
+    contactPerson: vendor?.primaryContact ?? '',
+    designation: vendor?.designation ?? '',
+    email: vendor?.email ?? '',
+    phone: phone.countryCode,
+    phoneNumber: phone.number,
+    mobile: mobile.countryCode,
+    mobileNumber: mobile.number,
+    alternateEmail: vendor?.alternateEmail ?? '',
+    registeredAddress,
+    billingAddress,
+    country: vendor?.country ?? '',
+    state: vendor?.state ?? '',
+    city: vendor?.city ?? '',
+    pincode: vendor?.zipCode ?? '',
+    sameAsRegistered: false,
+    paymentTerms: vendor?.paymentTerms ?? '',
+    currency: vendor?.currency ?? 'INR - Indian Rupee',
+    creditLimit: vendor?.creditLimit ?? '',
+    bankName: vendor?.bankName ?? '',
+    accountNumber: vendor?.bankAccount ?? '',
+    ifscCode: vendor?.ifscCode ?? '',
+    accountType: vendor?.accountType ?? '',
+    msmeStatus: vendor?.msmeStatus ?? '',
+    isoStatus: vendor?.isoStatus ?? '',
+    qualityCertification: vendor?.qualityCertification ?? '',
+    environmentalCertification: vendor?.environmentalCertification ?? '',
+    qualityRating: scoreToStars(vendor?.performanceQuality),
+    deliveryRating: scoreToStars(vendor?.performanceDelivery),
+    serviceRating: scoreToStars(vendor?.performanceResponsiveness),
+    blacklisted: vendor?.blacklisted ?? '',
+    contractStatus: (vendor?.contractStatus ?? vendor?.status ?? '') as string,
+    onboardingDate: toDateInputValue(vendor?.onboardingDate ?? vendor?.onboardedDate),
+    preferredVendor: vendor?.preferredVendor ?? '',
+    tags: Array.isArray(vendor?.tags) ? [...vendor.tags] : [],
+    internalNotes: vendor?.internalNotes ?? '',
+    visibility: vendor?.visibility ?? '',
+    gstCertificate: Boolean(vendor?.gstCertificate),
+    panCard: Boolean(vendor?.panCard),
+    businessRegistration: Boolean(vendor?.businessRegistration),
+    bankDetails: Boolean(vendor?.bankDetails),
+    isoCertificate: Boolean(vendor?.isoCertificate),
+    otherDocuments: Boolean(vendor?.otherDocuments),
+  };
 }
 
 export default function VendorEditPage() {
@@ -88,74 +190,24 @@ export default function VendorEditPage() {
   const visibilityOptions = ['Internal Only', 'Procurement Team', 'Finance Team', 'Management', 'All Users'];
 
   // ── Form state (pre-populated from StoredVendor) ───────────────────────────
-  const [formData, setFormData] = useState({
-    vendorName: vendor?.name ?? '',
-    vendorCode: vendor?.id ?? 'Auto-generated',
-    category: vendor?.category ?? '',
-    subCategory: '',
-    vendorType: '',
-    pan: vendor?.pan ?? '',
-    legalEntityName: '',
-    yearOfEstablishment: vendor?.founded ?? '',
-    website: vendor?.website ?? '',
-    // Primary contact
-    contactPerson: vendor?.primaryContact ?? '',
-    designation: '',
-    email: vendor?.email ?? '',
-    phone: '+91 (India)',
-    phoneNumber: vendor?.phone ?? '',
-    mobile: '+91 (India)',
-    mobileNumber: '',
-    alternateEmail: '',
-    // Address
-    registeredAddress: vendor?.addressLine1
-      ? [vendor.addressLine1, vendor.addressLine2].filter(Boolean).join(', ')
-      : vendor?.address ?? '',
-    billingAddress: vendor?.billingAddressLine1
-      ? [vendor.billingAddressLine1, vendor.billingAddressLine2].filter(Boolean).join(', ')
-      : '',
-    country: vendor?.country ?? '',
-    state: vendor?.state ?? '',
-    city: vendor?.city ?? '',
-    pincode: vendor?.zipCode ?? '',
-    sameAsRegistered: false,
-    // Financial
-    paymentTerms: vendor?.paymentTerms ?? '',
-    currency: 'INR - Indian Rupee',
-    creditLimit: '',
-    bankName: vendor?.bankName ?? '',
-    accountNumber: vendor?.bankAccount ?? '',
-    ifscCode: vendor?.ifscCode ?? '',
-    accountType: '',
-    // Classification
-    msmeStatus: '',
-    isoStatus: '',
-    qualityCertification: '',
-    environmentalCertification: '',
-    // Performance (convert 0-100 to 1-5 stars)
-    qualityRating: scoreToStars(vendor?.performanceQuality),
-    deliveryRating: scoreToStars(vendor?.performanceDelivery),
-    serviceRating: scoreToStars(vendor?.performanceResponsiveness),
-    blacklisted: '',
-    contractStatus: (vendor?.status ?? '') as string,
-    onboardingDate: vendor?.onboardedDate ?? '',
-    preferredVendor: '',
-    // Additional
-    tags: [] as string[],
-    internalNotes: '',
-    visibility: '',
-    // Documents
-    gstCertificate: false,
-    panCard: false,
-    businessRegistration: false,
-    bankDetails: false,
-    isoCertificate: false,
-    otherDocuments: false,
-  });
+  const [formData, setFormData] = useState(() => createEditFormData(vendor));
 
   const [subCategoryOptions, setSubCategoryOptions] = useState<string[]>(
-    formData.category ? (subCategoriesMap[formData.category] ?? []) : []
+    formData.category
+      ? withCurrentValue(subCategoriesMap[formData.category] ?? [], formData.subCategory)
+      : []
   );
+
+  useEffect(() => {
+    const currentVendor = getVendorById(id!);
+    const nextFormData = createEditFormData(currentVendor);
+    setFormData(nextFormData);
+    setSubCategoryOptions(
+      nextFormData.category
+        ? withCurrentValue(subCategoriesMap[nextFormData.category] ?? [], nextFormData.subCategory)
+        : []
+    );
+  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -193,31 +245,61 @@ export default function VendorEditPage() {
       toast.error('Mobile number must contain exactly 10 digits.');
       return;
     }
+    const phone = formData.phoneNumber ? `${formData.phone} ${formData.phoneNumber}` : '';
+    const mobile = formData.mobileNumber ? `${formData.mobile} ${formData.mobileNumber}` : '';
     updateVendor(vendor.id, {
+      vendorCode: formData.vendorCode,
       name: formData.vendorName,
       category: formData.category,
+      subCategory: formData.subCategory,
+      vendorType: formData.vendorType,
+      legalEntityName: formData.legalEntityName,
       primaryContact: formData.contactPerson,
+      designation: formData.designation,
       email: formData.email,
-      phone: formData.phoneNumber,
+      phone,
+      mobile,
+      alternateEmail: formData.alternateEmail,
       pan: formData.pan,
       website: formData.website,
       address: formData.registeredAddress,
       addressLine1: formData.registeredAddress,
+      addressLine2: '',
       country: formData.country,
       state: formData.state,
       city: formData.city,
       zipCode: formData.pincode,
       billingAddressLine1: formData.billingAddress,
+      billingAddressLine2: '',
       paymentTerms: formData.paymentTerms,
+      currency: formData.currency,
+      creditLimit: formData.creditLimit,
       bankName: formData.bankName,
       bankAccount: formData.accountNumber,
       ifscCode: formData.ifscCode,
+      accountType: formData.accountType,
+      msmeStatus: formData.msmeStatus,
+      isoStatus: formData.isoStatus,
+      qualityCertification: formData.qualityCertification,
+      environmentalCertification: formData.environmentalCertification,
       // Convert 1-5 stars back to 0-100 scale
       performanceQuality: starsToScore(formData.qualityRating),
       performanceDelivery: starsToScore(formData.deliveryRating),
       performanceResponsiveness: starsToScore(formData.serviceRating),
       onboardedDate: formData.onboardingDate,
+      onboardingDate: formData.onboardingDate,
       founded: formData.yearOfEstablishment,
+      blacklisted: formData.blacklisted,
+      preferredVendor: formData.preferredVendor,
+      tags: formData.tags,
+      internalNotes: formData.internalNotes,
+      visibility: formData.visibility,
+      gstCertificate: formData.gstCertificate,
+      panCard: formData.panCard,
+      businessRegistration: formData.businessRegistration,
+      bankDetails: formData.bankDetails,
+      isoCertificate: formData.isoCertificate,
+      otherDocuments: formData.otherDocuments,
       // Map contract status → vendor status
       ...(formData.contractStatus && {
         status: formData.contractStatus as VendorStatus,
