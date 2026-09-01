@@ -37,7 +37,6 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const [skuCode, setSkuCode] = useState(draft?.skuCode ?? '');
   const [productName, setProductName] = useState(draft?.productName ?? '');
-  const [productType, setProductType] = useState(draft?.productType ?? 'Product');
   const [physicalType, setPhysicalType] = useState(draft?.physicalType ?? 'Physical Product');
   const [category, setCategory] = useState(draft?.category ?? '');
   const [subcategory, setSubcategory] = useState(draft?.subcategory ?? '');
@@ -61,7 +60,6 @@ export default function AddMasterCatalogueItemWrapper() {
     setEditMasterCode(product.masterProductCode);
     setSkuCode(product.skuCode || '');
     setProductName(product.productName || '');
-    setProductType(product.productType || 'Product');
     setPhysicalType(product.physicalType || 'Physical Product');
     setCategory(product.category || '');
     setSubcategory(product.subcategory || '');
@@ -85,7 +83,6 @@ export default function AddMasterCatalogueItemWrapper() {
   const [addDialogType, setAddDialogType] = useState('');
   const [newOptionValue, setNewOptionValue] = useState('');
 
-  const [productTypesList, setProductTypesList] = useState(['Product', 'Service', 'Bundle']);
   const [physicalTypesList, setPhysicalTypesList] = useState([
     'Physical Product',
     'Digital Licence',
@@ -110,7 +107,6 @@ export default function AddMasterCatalogueItemWrapper() {
     const val = newOptionValue.trim();
     if (!val) { toast.error('Please enter a value'); return; }
     const map: Record<string, () => void> = {
-      productType: () => { if (!productTypesList.includes(val)) { setProductTypesList(p => [...p, val]); setProductType(val); toast.success('Added'); } else toast.error('Already exists'); },
       physicalType: () => { if (!physicalTypesList.includes(val)) { setPhysicalTypesList(p => [...p, val]); setPhysicalType(val); toast.success('Added'); } else toast.error('Already exists'); },
       category: () => { if (!categoriesList.includes(val)) { setCategoriesList(p => [...p, val]); setCategory(val); toast.success('Added'); } else toast.error('Already exists'); },
       subcategory: () => { if (!subcategoriesList.includes(val)) { setSubcategoriesList(p => [...p, val]); setSubcategory(val); toast.success('Added'); } else toast.error('Already exists'); },
@@ -223,7 +219,8 @@ export default function AddMasterCatalogueItemWrapper() {
     masterProductCode: currentMasterProductCode,
     skuCode,
     productName: productName || 'Untitled Product',
-    productType,
+    // Retained for compatibility with existing catalog records and downstream consumers.
+    productType: 'Product',
     physicalType,
     category,
     subcategory,
@@ -248,7 +245,7 @@ export default function AddMasterCatalogueItemWrapper() {
       masterProductCode: currentMasterProductCode,
       skuCode,
       productName: productName || 'Untitled Product',
-      productType, physicalType, category, subcategory, brand, tags,
+      physicalType, category, subcategory, brand, tags,
       description, specifications, generalSpecs, productNotes, videoUrl, images,
       createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
     };
@@ -349,18 +346,14 @@ export default function AddMasterCatalogueItemWrapper() {
               </div>
             </div>
 
-            {/* Row 1: Product Name, Type, Physical Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {/* Row 1: Product Name, Product */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <Label className="text-xs sm:text-sm font-medium text-gray-700">Product Name</Label>
                 <Input placeholder="e.g., Apple MacBook Air M3" value={productName} onChange={e => setProductName(e.target.value)} className="mt-1 text-sm" />
               </div>
               <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">Product Type</Label>
-                <SelectWithAdd value={productType} onValueChange={setProductType} options={productTypesList} placeholder="Select type..." dialogType="productType" />
-              </div>
-              <div>
-                <Label className="text-xs sm:text-sm font-medium text-gray-700">Physical Type</Label>
+                <Label className="text-xs sm:text-sm font-medium text-gray-700">Product</Label>
                 <SelectWithAdd value={physicalType} onValueChange={setPhysicalType} options={physicalTypesList} placeholder="Select type..." dialogType="physicalType" />
               </div>
             </div>
@@ -674,8 +667,7 @@ export default function AddMasterCatalogueItemWrapper() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add New {
-              addDialogType === 'productType' ? 'Product Type' :
-              addDialogType === 'physicalType' ? 'Physical Type' :
+              addDialogType === 'physicalType' ? 'Product' :
               addDialogType === 'category' ? 'Category' :
               addDialogType === 'subcategory' ? 'Subcategory' :
               addDialogType === 'brand' ? 'Brand' :
@@ -686,7 +678,6 @@ export default function AddMasterCatalogueItemWrapper() {
             <Label className="text-sm font-medium">Enter new value</Label>
             <Input
               placeholder={
-                addDialogType === 'productType' ? 'e.g., Hybrid' :
                 addDialogType === 'physicalType' ? 'e.g., Rental' :
                 addDialogType === 'category' ? 'e.g., Software' :
                 addDialogType === 'subcategory' ? 'e.g., Tablets' :
