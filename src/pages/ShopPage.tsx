@@ -295,11 +295,10 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 }
 
 function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, allProducts, onSelectProduct }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string; allProducts: Product[]; onSelectProduct: (p: Product) => void }) {
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [qtyDraft, setQtyDraft] = useState(String(product?.moq ?? 1));
-  const [added, setAdded] = useState(false);
   const [editingMoq, setEditingMoq] = useState(false);
   const [moqDraft, setMoqDraft] = useState(String(product?.moq ?? 0));
   const [selectedImage, setSelectedImage] = useState<string>(product?.image ?? "");
@@ -309,6 +308,9 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   useEffect(() => { if (product) setSelectedImage(product.image ?? ""); }, [product?.id]);
 
   const dialogMaxQty = product ? (product.totalStock > 0 ? product.totalStock : undefined) : undefined;
+  const isInCart = product
+    ? items.some(item => item.productCode === product.productCode && item.clientId === clientId)
+    : false;
 
   const commitDialogQty = () => {
     const min = Math.max(1, product?.moq ?? 1);
@@ -331,10 +333,8 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
   const handleAdd = () => {
     if (isImpersonating) return;
-    if (added) return;
+    if (isInCart) return;
     addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
   };
 
   const specPairs = product.specs.map(s => {
@@ -504,11 +504,11 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
                 <button
                   onClick={handleAdd}
-                  disabled={!product.inStock}
-                  className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : added ? "bg-green-600 text-white" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
+                    disabled={!product.inStock || isInCart}
+                    className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : isInCart ? "bg-green-600 text-white cursor-default" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                 >
-                  {added ? <Check size={16} /> : <ShoppingCart size={16} />}
-                  {!product.inStock ? "Out of Stock" : added ? "Added to Cart!" : "Add to Cart"}
+                  {isInCart ? <Check size={16} /> : <ShoppingCart size={16} />}
+                  {!product.inStock ? "Out of Stock" : isInCart ? "Added to Cart" : "Add to Cart"}
                 </button>
 
                 <div className="mt-5 space-y-2.5 border-t border-gray-100 pt-4">
@@ -579,6 +579,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                     const rpGstRate = getEffectiveTaxPctForCategory(rp.category);
                     const rpBasePriceExcl = rp.priceNum * 100 / (100 + rpGstRate);
                     const rpPrice = rpDiscountPct > 0 ? rpBasePriceExcl * (1 - rpDiscountPct / 100) : rpBasePriceExcl;
+                    const rpInCart = items.some(item => item.productCode === rp.productCode && item.clientId === clientId);
                     return (
                       <div
                         key={rp.id}
@@ -602,11 +603,18 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (rpInCart) return;
                             addItem({ id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category, productCode: rp.productCode }, Math.max(1, rp.moq));
                           }}
-                          className="mt-2 flex items-center justify-center gap-1.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-lg py-1.5 text-[11px] font-semibold transition-colors"
+                          disabled={rpInCart}
+                          className={`mt-2 flex items-center justify-center gap-1.5 rounded-lg border py-1.5 text-[11px] font-semibold transition-colors ${
+                            rpInCart
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 cursor-default"
+                              : "border-blue-200 text-blue-600 hover:bg-blue-50"
+                          }`}
                         >
-                          <ShoppingCart size={12} /> Cart
+                          {rpInCart ? <Check size={12} /> : <ShoppingCart size={12} />}
+                          {rpInCart ? "Added to Cart" : "Add to Cart"}
                         </button>
                       </div>
                     );
@@ -625,11 +633,10 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 // ── Product Card ─────────────────────────────────────────────────────────────
 
 function ProductCard({ product, onPreview, clientId, isGrid }: { product: Product; onPreview: (p: Product) => void; clientId?: string; isGrid: boolean }) {
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(1);
   const [qtyDraft, setQtyDraft] = useState("1");
-  const [adding, setAdding] = useState(false);
   const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
@@ -644,6 +651,11 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   const productPricingModel = getPricingModel(productType);
   const productQuantityLabel = getQuantityLabel(productType);
   const canUseVendor = (vendor: VendorComparisonRow) => isDigital || canVendorFulfillMoq(vendor);
+  const isInCart = !!selectedVendor && items.some(item =>
+    item.productCode === product.productCode &&
+    item.clientId === clientId &&
+    item.selectedVendorId === selectedVendor.vendorId
+  );
 
   useEffect(() => {
     const refreshVendors = () => {
@@ -700,8 +712,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isImpersonating) return;
-    if (!product.inStock || adding || !selectedVendor || !canUseVendor(selectedVendor)) return;
-    setAdding(true);
+    if (!product.inStock || isInCart || !selectedVendor || !canUseVendor(selectedVendor)) return;
     addItem(
       {
         id: Math.random() * 10000,
@@ -733,7 +744,6 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
       },
       Math.max(1, Math.max(selectedVendor.moq, qty))
     );
-    setTimeout(() => setAdding(false), 1500);
   };
 
   const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor);
@@ -1080,13 +1090,13 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
           className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${
             !canAdd
               ? 'bg-gray-50 text-gray-400 border border-gray-200 cursor-not-allowed'
-              : adding
+             : isInCart
                 ? 'bg-emerald-600 text-white'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
-          {adding ? 'Added to Cart!' : 'Add to Cart'}
+           {isInCart ? <Check size={13} /> : <ShoppingCart size={13} />}
+           {isInCart ? 'Added to Cart' : 'Add to Cart'}
         </button>
       </div>
     </div>
@@ -1094,9 +1104,8 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
 }
 
 function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product: Product; onPreview: (p: Product) => void; clientId?: string; isGrid: boolean }) {
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const { isImpersonating } = useAuth();
-  const [adding, setAdding] = useState(false);
   const [liked, setLiked] = useState(false);
   const kind = getShopProductKind(product);
   const productType = getProductType(product.physicalType);
@@ -1109,10 +1118,10 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, Math.max(1, product.moq)) : 0;
   const basePriceExcl = product.priceNum * 100 / (100 + gstRate);
   const displayPrice = discountPct > 0 ? basePriceExcl * (1 - discountPct / 100) : basePriceExcl;
+  const isInCart = items.some(item => item.productCode === product.productCode && item.clientId === clientId);
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
-    if (isImpersonating || !product.inStock || adding) return;
-    setAdding(true);
+    if (isImpersonating || !product.inStock || isInCart) return;
     addItem({
       id: Math.random() * 10000,
       name: product.name,
@@ -1131,7 +1140,6 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
       leadTime: product.leadTime,
       gstSnapshot: gstRate,
     }, Math.max(1, product.moq));
-    window.setTimeout(() => setAdding(false), 1500);
   };
 
   return (
@@ -1210,17 +1218,17 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
         <button
           type="button"
           onClick={handleAdd}
-          disabled={isImpersonating || !product.inStock}
+          disabled={isImpersonating || !product.inStock || isInCart}
           className={`flex w-full items-center justify-center gap-2 rounded-lg border py-2.5 text-[12px] font-semibold transition-colors ${
             isImpersonating || !product.inStock
               ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
-              : adding
+              : isInCart
                 ? "border-emerald-600 bg-emerald-600 text-white"
                 : "border-blue-300 bg-white text-blue-600 hover:bg-blue-50"
           }`}
         >
-          {adding ? <Check size={13} /> : <ShoppingCart size={13} />}
-          {adding ? "Added to Cart!" : product.inStock ? "Add to Cart" : "Unavailable"}
+          {isInCart ? <Check size={13} /> : <ShoppingCart size={13} />}
+          {isInCart ? "Added to Cart" : product.inStock ? "Add to Cart" : "Unavailable"}
         </button>
       </div>
     </div>
