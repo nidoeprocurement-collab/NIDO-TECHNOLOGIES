@@ -16,6 +16,7 @@ import SLABadge from "@/components/shared/SLABadge";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
+import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
 import { createApprovalRequest } from "@/lib/approvalEngine";
 import {
@@ -172,7 +173,7 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
 function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], onSelect, onClose }) {
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
-    return computeVendorComparisons(sub.productCode)
+    return computeVendorComparisons(sub.productCode, undefined, true)
       .filter(vendor => !excludedVendorIds.includes(vendor.vendorId))
       .slice(0, 4);
   }, [sub.productCode, excludedVendorIds]);
