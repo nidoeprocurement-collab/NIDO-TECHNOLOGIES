@@ -7,7 +7,7 @@ import { getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, updatePO, getAllPOs, isPOConfirmed, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -2228,7 +2228,7 @@ function ThreeDotMenu({
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button
             disabled={!cancelEnabled}
-            title={!cancelEnabled ? "Cancellation is unavailable after a purchase order has been confirmed or issued, or the item is locked." : undefined}
+            title={!cancelEnabled ? "Cancellation is unavailable after a purchase order has been generated or the item is locked." : undefined}
             style={{
               ...menuItemSt,
               color: cancelEnabled ? "#dc2626" : "#d1d5db",
@@ -2342,7 +2342,8 @@ function isPOItemShipped(po: any, subOrderId: string): boolean {
 }
 
 function isConfirmedPO(po: any): boolean {
-  return isPOConfirmed(po);
+  const status = String(po?.status || "").toLowerCase();
+  return status !== "draft" && status !== "cancelled" && status !== "rejected";
 }
 
 // Client-created sub-orders wait in Pending until their vendor PO is confirmed.
@@ -2431,22 +2432,54 @@ export default function MyOrderPage() {
     } catch { return null; }
   }, [order?.paymentMethod]);
 
-  const deliveryAddressFallback = useMemo(() => {
-    if (order?.deliveryAddress) return null; // field already stored on order
+  const deliveryInfo = useMemo(() => {
+    const stored = order?.deliveryDetails;
+    let savedAddress: any = null;
     try {
-      const clientId = localStorage.getItem("nido_shop_selected_client") || "";
+      const clientId = order?.clientId || localStorage.getItem("nido_shop_selected_client") || "";
       const addrs: any[] = JSON.parse(
         localStorage.getItem(`nido_delivery_addresses_${clientId}`) || "[]"
       );
-      const addr = addrs.find(a => a.isDefault) ?? addrs[0] ?? null;
-      if (!addr) return null;
-      return [addr.line1, addr.line2, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
-    } catch { return null; }
-  }, [order?.deliveryAddress]);
+      // Prefer an address whose formatted value matches the stored order,
+      // then use the default/first address for legacy orders.
+      savedAddress = addrs.find((a) =>
+        order?.deliveryAddress &&
+        [a.line1, a.line2, a.city, a.state, a.zip].filter(Boolean).join(", ") === order.deliveryAddress
+      ) ?? addrs.find(a => a.isDefault) ?? addrs[0] ?? null;
+    } catch {
+      savedAddress = null;
+    }
+
+    const client = getClients().find((entry: any) =>
+      entry.id === order?.clientId || entry.name === order?.client
+    ) as any;
+    const source = stored || savedAddress || {};
+    const address = order?.deliveryAddress || [
+      source.line1, source.line2, source.city, source.state, source.country, source.zip,
+    ].filter(Boolean).join(", ");
+
+    return {
+      label: source.label || "",
+      attentionName: source.attentionName || source.attention ||
+        (order as any)?.deliveryAttention || (order as any)?.deliveryAttn ||
+        client?.shipping_attention || client?.shippingAttention || "",
+      address,
+      line1: source.line1 || "",
+      line2: source.line2 || "",
+      city: source.city || "",
+      state: source.state || "",
+      country: source.country || "",
+      zip: source.zip || "",
+      phone: source.phone || "",
+      instructions: source.instructions || (order as any)?.deliveryInstructions || "",
+    };
+  }, [order]);
 
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
-  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Draft Purchase Orders"];
+  const TABS = isClientPortalUser
+    ? ["Sub Orders / Items"]
+    : ["Sub Orders / Items", "Draft Purchase Orders"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   // Master status lives on the shared order record itself (single source of
   // truth) so a change made on the owner platform is visible immediately on
@@ -2464,8 +2497,11 @@ export default function MyOrderPage() {
     () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
     [poRefreshKey, orderId],
   );
+  const hasGeneratedOrderPO = orderPOs.length > 0;
+  const allOrderPOsCancelled = hasGeneratedOrderPO
+    && orderPOs.every(po => String(po.status || "").toLowerCase() === "cancelled");
+  const canCancelOrder = !hasGeneratedOrderPO || allOrderPOsCancelled;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
-  const canCancelOrder = !hasConfirmedOrderPO;
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
     if (isOrderCancelled || isOrderDelivered) return; // terminal orders can no longer be updated
@@ -3163,10 +3199,10 @@ export default function MyOrderPage() {
               ) : (
                 !canCancelOrder ? (
                   <span
-                    title="This order cannot be cancelled because a purchase order has already been confirmed or issued."
+                    title="This order cannot be cancelled because a purchase order has already been generated."
                     style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
                   >
-                    🔒 PO confirmed — order locked
+                    🔒 PO generated — order locked
                   </span>
                 ) : (
                   <button
@@ -3215,9 +3251,10 @@ export default function MyOrderPage() {
           );
         })()}
 
-        {/* Info Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
+        {/* Top billing and delivery information */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 20 }}>
+          <div style={card}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
             <Field label="Client" value={order?.client || "—"} />
             <Field label="Payment Method" value={order?.paymentMethod || paymentFallback?.label || "—"} />
             {(order?.paymentDetail || paymentFallback?.detail) && (
@@ -3225,10 +3262,25 @@ export default function MyOrderPage() {
             )}
             <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
           </div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
-            <Field label="Delivery Address" value={order?.deliveryAddress || deliveryAddressFallback || "As per checkout"} />
-             <Field label="Delivery Instructions" value={order?.deliveryInstructions || "No delivery instructions provided"} />
-            <Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} />
+          <div style={card}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16 }}>
+              <Field label="Address Label" value={deliveryInfo.label || "—"} />
+              <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
+              <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
+              <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
+              <Field label="City" value={deliveryInfo.city || "—"} />
+              <Field label="State" value={deliveryInfo.state || "—"} />
+              <Field label="Country" value={deliveryInfo.country || "—"} />
+              <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
+              <Field label="Phone" value={deliveryInfo.phone || "—"} />
+            </div>
+            <div style={{ marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Delivery Instructions</div>
+              <div style={{ fontSize: 13.5, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+                {deliveryInfo.instructions || "No delivery instructions provided"}
+              </div>
+            </div>
           </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
             <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
@@ -3241,7 +3293,6 @@ export default function MyOrderPage() {
             ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
             ["Total Amount", order?.totalAmount || "—"],
             ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
-             ["Order Note", order?.orderNotes || "—"],
           ].map(([l, v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
         </div>
 
@@ -3537,9 +3588,9 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onSetReference={() => setReferenceTarget(sub.id)}
-                            referenceLocked={hasConfirmedPO && sub.itemStatus !== "Shipped"}
+                            referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
                             onCancel={() => setCancelTarget(sub.id)}
-                            cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Delivered" && !hasConfirmedPO}
+                            cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}
@@ -3555,11 +3606,7 @@ export default function MyOrderPage() {
                 // priceNum is tax-inclusive so we back-calculate per-category rates, not a flat 18%.
                 const cartItems = order.cartItems || [];
                 const { slabs, totalGst, preTaxSubtotal } = computeCartGST(
-                  cartItems.map(i => ({
-                    inclusiveAmount: i.priceNum * i.quantity,
-                    category: i.category,
-                    taxRate: i.gstSnapshot,
-                  }))
+                  cartItems.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
                 );
                 const grandTotal = preTaxSubtotal + totalGst;
                 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
