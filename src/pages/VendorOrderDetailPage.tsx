@@ -826,7 +826,7 @@ export default function VendorOrderDetailPage() {
     if (po && itemIndex >= 0) {
       updatePO(poKey, {
         items: po.items.map((line, index) => index === itemIndex
-          ? { ...line, status: "Cancelled", cancelReason }
+          ? { ...line, status: "Cancelled", cancelReason: reason }
           : line),
       });
       const subOrderId = po.items[itemIndex]?.subOrderId;
@@ -834,7 +834,7 @@ export default function VendorOrderDetailPage() {
         try {
           const key = `nido_subitems_${po.orderId}`;
           const saved = JSON.parse(localStorage.getItem(key) || "{}");
-          saved[subOrderId] = { ...(saved[subOrderId] || {}), itemStatus: "Cancelled", cancelReason, updatedOn: new Date().toLocaleDateString("en-IN") };
+          saved[subOrderId] = { ...(saved[subOrderId] || {}), itemStatus: "Cancelled", cancelReason: reason, updatedOn: new Date().toLocaleDateString("en-IN") };
           localStorage.setItem(key, JSON.stringify(saved));
           window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
         } catch { /* storage unavailable */ }
