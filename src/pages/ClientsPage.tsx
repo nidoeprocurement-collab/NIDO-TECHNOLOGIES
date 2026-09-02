@@ -568,58 +568,9 @@ export default function ClientsPageUI() {
   }
 
   const handleDownloadTemplate = () => {
-    const sample = clientToImportValues({
-      id: "CL-00001",
-      name: "Company Name",
-      category: "IT Hardware",
-      tier: "Premium",
-      rep: "John Doe",
-      email: "john@company.com",
-      phone: "+91 98765 43210",
-      mobile: "+91 99876 54321",
-      website: "www.company.com",
-      contractStartDate: "2024-01-01",
-      contractEndDate: "2025-01-01",
-      client_logo_url: "",
-      gst_treatment: "Registered Business",
-      gstin: "27AABCT1234A1Z5",
-      id_reference_number: "REF-0001",
-      source_of_supply: "Maharashtra",
-      pan_number: "AAAAA0000A",
-      currency: "INR",
-      opening_balance: 50000,
-      payment_terms: "Net 30",
-      tds_rate: 1,
-      bank_name: "ICICI Bank",
-      account_number: "9876543210",
-      ifsc_code: "ICIC0001234",
-      branch: "Mumbai",
-      billing_address: "123 Business Street",
-      billing_attention: "Accounts Team",
-      billing_country: "India",
-      billing_address_line2: "Business Park",
-      billing_city: "Mumbai",
-      billing_state: "Maharashtra",
-      billing_pincode: "400001",
-      billing_phone_country_code: "+91",
-      billing_phone: "+91 98765 43210",
-      billing_fax_number: "",
-      shipping_address: "123 Business Street",
-      shipping_attention: "Receiving Team",
-      shipping_country: "India",
-      shipping_address_line2: "Business Park",
-      shipping_city: "Mumbai",
-      shipping_state: "Maharashtra",
-      shipping_pincode: "400001",
-      shipping_phone_country_code: "+91",
-      shipping_phone: "+91 98765 43210",
-      shipping_fax_number: "",
-      same_address: true,
-      status: "active",
-    })
     const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
     const header = CLIENT_IMPORT_HEADERS.map(escapeCsv).join(",")
-    const template = [header, sample.map(escapeCsv).join(",")].join("\r\n")
+    const template = `${header}\r\n`
     const blob = new Blob([`\uFEFF${template}`], { type: "text/csv;charset=utf-8;" })
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "client-template.csv"
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
