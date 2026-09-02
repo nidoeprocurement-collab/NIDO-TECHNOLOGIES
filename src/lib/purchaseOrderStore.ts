@@ -28,6 +28,7 @@ export interface PONote {
 export type POStatus =
   | "Draft"
   | "Confirmed"
+  | "Partially Shipped"
   | "Vendor Notified"
   | "Accepted"
   | "Dispatched"
@@ -53,6 +54,15 @@ export interface POLineItem {
   gstPct?: number;
   productType?: string;
   commercialTerms?: ProductCommercialTerms;
+  /** Fulfilment state and shipment details for this specific PO line. */
+  status?: string;
+  cancelReason?: string;
+  tracking?: {
+    number: string;
+    carrier: string;
+    note: string;
+    link: string;
+  } | null;
 }
 
 export interface StoredPO {

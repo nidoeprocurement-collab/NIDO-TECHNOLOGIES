@@ -2301,6 +2301,7 @@ function isReturnAllowed(sub: any): boolean {
 // sub-orders are also stored in `subOrderIds` and on each line item. Check all
 // three shapes so every item in the group shows the same PO.
 function poCoversSubOrder(po: any, subOrderId: string): boolean {
+  if (String(po?.status || "").toLowerCase() === "cancelled") return false;
   if (po?.subOrderId === subOrderId) return true;
   if (Array.isArray(po?.subOrderIds) && po.subOrderIds.includes(subOrderId)) return true;
   return Array.isArray(po?.items) && po.items.some((item: any) => item?.subOrderId === subOrderId);
@@ -2343,7 +2344,7 @@ function reconcileSubOrderStatuses(subOrders: any[], orderId: string): any[] {
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { orders, updateOrderStatus } = useMyOrders();
+  const { orders, updateOrderStatus, setOrders } = useMyOrders();
   const { user, isClientPortalUser } = useAuth();
   const orderId = id || "";
 
@@ -2496,7 +2497,10 @@ export default function MyOrderPage() {
     [subOrders]
   );
   const selectedVendorMeta: Record<string, any> = useMemo(
-    () => Object.fromEntries(subOrders.filter(s => s.selectedVendorId).map(s => [s.id, { vendorId: s.selectedVendorId, vendorName: s.selectedVendorName || s.vendorName, location: "" }])),
+    () => Object.fromEntries(subOrders.filter(s => s.selectedVendorId).map(s => [
+      s.id,
+      s.vendorSelectionMeta || { vendorId: s.selectedVendorId, vendorName: s.selectedVendorName || s.vendorName, location: "" },
+    ])),
     [subOrders]
   );
   const vendorAllocations: Record<string, any[]> = useMemo(
@@ -2526,16 +2530,25 @@ export default function MyOrderPage() {
   };
 
   const handleCancelItem = (subId: string, reason: string) => {
-    if (isOrderInactive || hasGeneratedOrderPO) return;
+    if (isOrderInactive) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target || target.itemStatus === "Cancelled" || target.itemStatus === "Delivered") return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
-    if (targetPOs.length > 0) return;
 
     // Return the pre-PO reservation to vendor availability.
-    if (target.stockAllocations?.length) releaseStock(target.stockAllocations);
-    removeSubOrderFromDraftPOs(orderId, subId);
+    if (target.stockAllocations?.length && targetPOs.length === 0) releaseStock(target.stockAllocations);
+
+    // Keep the line in the PO so the vendor-order detail page shows the
+    // cancelled item and its reason instead of removing the audit trail.
+    targetPOs.forEach((po: any) => {
+      updatePO(po.poNumber, {
+        items: (po.items || []).map((line: any) =>
+          line.subOrderId === subId ? { ...line, status: "Cancelled", cancelReason: reason } : line
+        ),
+      });
+    });
+
     setSubOrders(prev => prev.map(s => s.id === subId
       ? { ...s, itemStatus: "Cancelled", cancelReason: reason, updatedOn: new Date().toLocaleDateString("en-IN") }
       : s
@@ -2544,10 +2557,156 @@ export default function MyOrderPage() {
     setPoRefreshKey(k => k + 1);
   };
 
+  const handleVendorSelection = (subId: string, allocations: any[]) => {
+    if (!allocations.length) return;
+    const primary = allocations[0];
+    const meta = primary.meta || {};
+    const vendorName = meta.vendorName || primary.vendorId;
+    setSubOrders(prev => prev.map(sub => sub.id === subId
+      ? {
+          ...sub,
+          selectedVendorId: primary.vendorId,
+          selectedVendorName: vendorName,
+          vendorName,
+          vendorInitial: vendorName[0]?.toUpperCase() || "V",
+          vendorSelectionMeta: meta,
+          stockAllocations: allocations,
+        }
+      : sub
+    ));
+
+    // Keep the vendor choice on the order snapshot as well as this page's
+    // derived sub-order state, so a refresh does not revert the selection.
+    setOrders(prev => prev.map(existingOrder => existingOrder.id !== orderId
+      ? existingOrder
+      : {
+          ...existingOrder,
+          cartItems: existingOrder.cartItems?.map(item => item.subOrderId !== subId
+            ? item
+            : {
+                ...item,
+                selectedVendorId: primary.vendorId,
+                selectedVendorName: vendorName,
+                vendorPrice: meta.unitPrice,
+                landedCost: meta.unitPrice,
+                vendorAllocations: allocations,
+              }
+          ),
+        }
+    ));
+
+    // A draft PO may already have been created automatically. A single-line
+    // draft can be re-pointed in place. For a grouped draft, split only this
+    // line into a new PO so the other lines keep their original vendor.
+    const draftPO = getAllPOs().find(po =>
+      po.orderId === orderId &&
+      po.status === "Draft" &&
+      po.items?.some(line => line.subOrderId === subId)
+    );
+    if (draftPO) {
+      const line = draftPO.items.find(item => item.subOrderId === subId)!;
+      const updatedUnitPrice = Number(meta.unitPrice || line.unitPrice || 0);
+      const vendorFields = {
+        vendorId: primary.vendorId,
+        vendorName,
+        vendorContact: meta.contact || "",
+        vendorEmail: meta.email || "",
+        vendorPhone: meta.phone || "",
+        vendorGstin: meta.gstin || "",
+        vendorAddress: [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
+        vendorAddressLine1: meta.addressLine1 || "",
+        vendorAddressLine2: meta.addressLine2 || "",
+        vendorCity: meta.city || "",
+        vendorState: meta.state || "",
+        vendorPincode: meta.pincode || "",
+      };
+      const movedLine = { ...line, unitPrice: updatedUnitPrice, lineSubtotal: updatedUnitPrice * line.qty };
+
+      if (draftPO.items.length === 1) {
+        updatePO(draftPO.poNumber, {
+          ...vendorFields,
+          item: movedLine.item,
+          sku: movedLine.sku,
+          category: movedLine.category,
+          hsnCode: movedLine.hsnCode,
+          specs: movedLine.specs,
+          qty: movedLine.qty,
+          unitPrice: movedLine.unitPrice,
+          subtotal: movedLine.lineSubtotal,
+          grandTotal: movedLine.lineSubtotal + draftPO.sgstAmt + draftPO.cgstAmt,
+          items: [movedLine],
+        });
+      } else {
+        const remainingLines = draftPO.items.filter(item => item.subOrderId !== subId);
+        const remainingSubtotal = remainingLines.reduce((sum, item) => sum + item.lineSubtotal, 0);
+        const remainingSgst = Math.round(
+          remainingLines.reduce((sum, item) => sum + item.lineSubtotal * ((item.gstPct ?? 18) / 2) / 100, 0) * 100,
+        ) / 100;
+        const remainingPrimary = remainingLines[0];
+        updatePO(draftPO.poNumber, {
+          items: remainingLines,
+          subOrderId: remainingPrimary.subOrderId,
+          subOrderIds: remainingLines.map(item => item.subOrderId),
+          item: remainingPrimary.item,
+          sku: remainingPrimary.sku,
+          category: remainingPrimary.category,
+          hsnCode: remainingPrimary.hsnCode,
+          specs: remainingPrimary.specs,
+          qty: remainingPrimary.qty,
+          unitPrice: remainingPrimary.unitPrice,
+          subtotal: remainingSubtotal,
+          sgstAmt: remainingSgst,
+          cgstAmt: remainingSgst,
+          grandTotal: remainingSubtotal + remainingSgst + remainingSgst,
+        });
+
+        const movedSubtotal = movedLine.lineSubtotal;
+        const movedGst = Math.round(movedSubtotal * ((movedLine.gstPct ?? 18) / 2) / 100 * 100) / 100;
+        const now = new Date();
+        const displayDate = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+        savePO({
+          ...draftPO,
+          ...vendorFields,
+          poNumber: generatePoNumber(),
+          subOrderId: movedLine.subOrderId,
+          subOrderIds: [movedLine.subOrderId],
+          items: [movedLine],
+          item: movedLine.item,
+          sku: movedLine.sku,
+          category: movedLine.category,
+          hsnCode: movedLine.hsnCode,
+          specs: movedLine.specs,
+          qty: movedLine.qty,
+          unitPrice: movedLine.unitPrice,
+          subtotal: movedSubtotal,
+          sgstPct: (movedLine.gstPct ?? 18) / 2,
+          cgstPct: (movedLine.gstPct ?? 18) / 2,
+          sgstAmt: movedGst,
+          cgstAmt: movedGst,
+          grandTotal: movedSubtotal + movedGst + movedGst,
+          status: "Draft",
+          createdOn: now.toISOString(),
+          createdOnDisplay: displayDate,
+          notes: [...(draftPO.notes || []), {
+            id: `vendor_change_${Date.now()}`,
+            author: "System",
+            initials: "SY",
+            color: "#6b7280",
+            date: displayDate,
+            text: `Draft PO recreated after vendor change for ${movedLine.item}.`,
+            visibility: "Internal Note",
+          }],
+        });
+      }
+    }
+    setVendorTarget(null);
+  };
+
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [referenceTarget, setReferenceTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [vendorTarget, setVendorTarget] = useState<any>(null);
   const [returnTarget, setReturnTarget] = useState(null);
   const [assignment, setAssignment] = useState({
     assignedTo: order?.assigned || "Admin",
@@ -2671,7 +2830,7 @@ export default function MyOrderPage() {
     for (const [vendorId, { meta, lines }] of vendorLines.entries()) {
       const poNumber = generatePoNumber();
 
-      const lineItems = lines.map(({ sub, qty, meta: lm }) => {
+    const lineItems = lines.map(({ sub, qty, meta: lm }) => {
         const unitPrice = lm.unitPrice || 0;
         const lineSubtotal = unitPrice * qty;
         const taxRate = getEffectiveTaxPctForCategory(sub.category);
@@ -2689,6 +2848,8 @@ export default function MyOrderPage() {
           unitPrice,
           lineSubtotal,
           _taxRate: taxRate,
+          status: "Pending",
+          tracking: null,
         };
       });
 
@@ -2779,10 +2940,10 @@ export default function MyOrderPage() {
   };
 
   const handleCancelPO = (subId: string) => {
-    setCreatedPOs(prev => { const n = { ...prev }; delete n[subId]; return n; });
-    setSelectedVendors(prev => { const n = { ...prev }; delete n[subId]; return n; });
-    setSelectedVendorMeta(prev => { const n = { ...prev }; delete n[subId]; return n; });
-    setVendorAllocations(prev => { const n = { ...prev }; delete n[subId]; return n; });
+    // PO state is read from the shared store; cancelling a PO is handled from
+    // its detail page. Refresh this view after that action instead of trying
+    // to mutate derived vendor maps that no longer have their own state.
+    setPoRefreshKey(k => k + 1);
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
@@ -3128,15 +3289,23 @@ export default function MyOrderPage() {
                         )}
                       </div>
                       <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
-                        {sub.tracking ? (<><div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber}</div><div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div><div style={{ color: "#6b7280" }}>{sub.tracking.note}</div><a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel}</a></>) : <span style={{ color: "#d1d5db" }}>-</span>}
+                        {sub.tracking ? (
+                          <>
+                            <div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber || sub.tracking.number}</div>
+                            <div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div>
+                            <div style={{ color: "#6b7280" }}>{sub.tracking.note}</div>
+                            <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel || sub.tracking.link || "Track Package"}</a>
+                          </>
+                        ) : <span style={{ color: "#d1d5db" }}>-</span>}
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
                           {isSubOrderCancelled ? (
                             <span style={{ fontSize: 12, color: "#9ca3af" }}>---</span>
                           ) : hasPO ? (
-                            // Show every vendor covered by this PO and keep its
-                            // state pending until the PO is confirmed.
+                            // Show every vendor covered by this PO. Draft POs
+                            // can still be redirected before procurement
+                            // confirmation; confirmed POs remain locked.
                             <div>
                               {subPOs.map((po: any, pi: number) => (
                                 <div key={po.poNumber} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
@@ -3149,20 +3318,43 @@ export default function MyOrderPage() {
                                   </div>
                                 </div>
                               ))}
+                              {!hasConfirmedPO && (
+                                <button
+                                  onClick={() => setVendorTarget(sub)}
+                                  style={{ marginTop: 4, padding: "4px 8px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                                >
+                                  Change Vendor
+                                </button>
+                              )}
                             </div>
                           ) : sub.selectedVendorName ? (
                             // Vendor was locked at cart add-to-cart time — display only
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                {(sub.selectedVendorName[0] || "V").toUpperCase()}
+                            <div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                  {(sub.selectedVendorName[0] || "V").toUpperCase()}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{sub.selectedVendorName}</div>
+                                  <div style={{ fontSize: 10, color: "#9ca3af" }}>Selected at order</div>
+                                </div>
                               </div>
-                              <div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{sub.selectedVendorName}</div>
-                                <div style={{ fontSize: 10, color: "#9ca3af" }}>Selected at order</div>
-                              </div>
+                              {!hasConfirmedPO && (
+                                <button
+                                  onClick={() => setVendorTarget(sub)}
+                                  style={{ marginTop: 6, padding: "4px 8px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                                >
+                                  Change Vendor
+                                </button>
+                              )}
                             </div>
                           ) : (
-                            <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                            <button
+                              onClick={() => setVendorTarget(sub)}
+                              style={{ padding: "5px 9px", border: "1px solid #d1d5db", borderRadius: 6, background: "#fff", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                            >
+                              Select Vendor
+                            </button>
                           )}
                         </div>
                       )}
@@ -3172,12 +3364,12 @@ export default function MyOrderPage() {
                         <div style={{ minWidth: 0 }}>
                            {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
                             <button
-                                disabled={hasGeneratedOrderPO}
-                                title={hasGeneratedOrderPO ? "Cancellation is unavailable after a purchase order has been generated." : undefined}
+                                disabled={isOrderInactive}
+                                title={isOrderInactive ? "This order is inactive." : undefined}
                               onClick={() => setCancelTarget(sub.id)}
-                                style={{ padding: "5px 10px", border: `1px solid ${hasGeneratedOrderPO ? "#e5e7eb" : "#fca5a5"}`, borderRadius: 6, background: hasGeneratedOrderPO ? "#f9fafb" : "#fff", color: hasGeneratedOrderPO ? "#9ca3af" : "#dc2626", cursor: hasGeneratedOrderPO ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                                style={{ padding: "5px 10px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: isOrderInactive ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
                             >
-                               {hasGeneratedOrderPO ? "Cancel Item (Locked)" : "Cancel Item"}
+                                Cancel Item
                             </button>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
@@ -3192,7 +3384,7 @@ export default function MyOrderPage() {
                             onSetReference={() => setReferenceTarget(sub.id)}
                             referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
                             onCancel={() => setCancelTarget(sub.id)}
-                            cancelEnabled={!hasGeneratedOrderPO && !hasConfirmedPO && sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered"}
+                            cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}
@@ -3430,6 +3622,14 @@ export default function MyOrderPage() {
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={saveTrackingForSubOrder} onClose={() => setTrackingTarget(null)} />}
       {referenceTarget && <ReferenceNumberModal itemName={subOrders.find(s => s.id === referenceTarget)?.itemName || ""} current={subOrders.find(s => s.id === referenceTarget)?.referenceNumber || ""} onSave={v => setSubOrders(prev => prev.map(s => s.id === referenceTarget ? { ...s, referenceNumber: v } : s))} onClose={() => setReferenceTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={(reason) => handleCancelItem(cancelTarget, reason)} onClose={() => setCancelTarget(null)} />}
+      {vendorTarget && (
+        <VendorSelectionModal
+          sub={vendorTarget}
+          selectedVendorId={vendorTarget.selectedVendorId}
+          onSelect={handleVendorSelection}
+          onClose={() => setVendorTarget(null)}
+        />
+      )}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
     </div>

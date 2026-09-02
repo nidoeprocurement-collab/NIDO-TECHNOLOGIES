@@ -208,6 +208,8 @@ function autoCreateDraftPOs(
         productType: item.productType,
         physicalType: item.physicalType,
         commercialTerms: item.commercialTerms,
+        status: "Pending",
+        tracking: null,
       };
     });
 

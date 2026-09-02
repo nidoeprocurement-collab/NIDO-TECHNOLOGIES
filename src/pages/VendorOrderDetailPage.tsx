@@ -5,7 +5,6 @@ import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
-import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -68,18 +67,28 @@ const PO_DATA: Record<string, any> = {
   },
 };
 
-const ITEM_STATUSES = ["Pending", "Confirmed", "Processing", "Shipped", "Delivered", "Cancelled"];
+const ORDER_FULFILLMENT_STATUSES = [
+  "Processing",
+  "Pending Shipping",
+  "Partially Shipped",
+  "Shipped",
+  "Partially Delivered",
+  "Delivered",
+];
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
   Pending:    { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
   Confirmed:  { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Processing: { bg: "#faf5ff", color: "#6b21a8", border: "#d8b4fe" },
+  "Pending Shipping": { bg: "#fff7ed", color: "#c2410c", border: "#fed7aa" },
+  "Partially Shipped": { bg: "#eff6ff", color: "#1d4ed8", border: "#93c5fd" },
   Shipped:    { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  "Partially Delivered": { bg: "#f0fdfa", color: "#0f766e", border: "#99f6e4" },
   Delivered:  { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Cancelled:  { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
 };
 
-const STEPPER_STEPS = ["Confirmed", "Processing", "Shipped", "Delivered"];
+const STEPPER_STEPS = ORDER_FULFILLMENT_STATUSES;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function StatusPill({ status }: { status: string }) {
@@ -324,18 +333,15 @@ function UploadDocumentModal({ onSave, onClose }: { onSave: (doc: any) => void; 
 }
 
 // ── Status Dropdown ───────────────────────────────────────────────────────────
-function StatusDropdown({ status, onChange, disabled }: { status: string; onChange: (s: string) => void; disabled?: boolean }) {
+function StatusDropdown({ status, onChange, disabled, allowCancel = true }: { status: string; onChange: (s: string) => void; disabled?: boolean; allowCancel?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const statusConfig = useOrderStatusConfig();
   const s = STATUS_STYLE[status] || STATUS_STYLE["Pending"];
   const itemStatuses = Array.from(new Set([
-    ...statusConfig.statuses
-      .filter(item => item.category === "Purchase Orders" && item.visible)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(item => item.name),
-    ...ITEM_STATUSES,
-  ]));
+    ...ORDER_FULFILLMENT_STATUSES,
+    status,
+    ...(allowCancel ? ["Cancelled"] : []),
+  ])).filter(option => option !== "Cancelled" || allowCancel);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -513,7 +519,7 @@ function AddNoteModal({ onSave, onClose }: { onSave: (text: string, vis: string)
 // ── Stepper ───────────────────────────────────────────────────────────────────
 function Stepper({ currentStatus }: { currentStatus: string }) {
   const steps = STEPPER_STEPS;
-  const currentIdx = steps.indexOf(currentStatus);
+  const currentIdx = Math.max(0, steps.indexOf(currentStatus));
   const dates: Record<string, string> = {
     Confirmed: "Apr 16, 2026",
     Processing: "Apr 16, 2026",
@@ -552,13 +558,9 @@ function Stepper({ currentStatus }: { currentStatus: string }) {
 function UpdateStatusDropdown({ current, onChange }: { current: string; onChange: (s: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const statusConfig = useOrderStatusConfig();
   const opts = Array.from(new Set([
-    ...statusConfig.statuses
-      .filter(status => status.category === "Purchase Orders" && status.visible)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(status => status.name),
-    "Confirmed", "Processing", "Shipped", "Delivered",
+    ...ORDER_FULFILLMENT_STATUSES,
+    current,
   ]));
 
   useEffect(() => {
@@ -639,9 +641,10 @@ function storedPOToDetail(po: StoredPO) {
             qty: li.qty,
             unitPrice: fmtINR(li.unitPrice),
             total: fmtINR(li.lineSubtotal),
-            status: po.status === "Cancelled" ? "Cancelled" : "Processing",
+            status: po.status === "Cancelled" ? "Cancelled" : (li.status || (po.status === "Draft" ? "Pending" : "Processing")),
             expectedDelivery: po.requestedDelivery || "Within 30 days",
-            tracking: null,
+            tracking: li.tracking || null,
+            cancelReason: li.cancelReason,
           }))
         : [
             {
@@ -723,6 +726,29 @@ export default function VendorOrderDetailPage() {
     setPoCancelReason(po?.cancelReason || "");
   }, [poKey]);
 
+  // Keep an already-open PO detail page in sync when the master-order page
+  // updates a line's tracking or cancellation reason in the shared store.
+  useEffect(() => {
+    const refreshFromStore = () => {
+      const latest = getPOByNumber(poKey);
+      if (!latest) return;
+      const data = storedPOToDetail(latest);
+      setOrderStatus(data.status);
+      setItems(data.items);
+      setNotes(data.notes);
+      setPoCancelReason(latest.cancelReason || "");
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "nido_all_purchase_orders") refreshFromStore();
+    };
+    window.addEventListener("poCreated", refreshFromStore);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("poCreated", refreshFromStore);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [poKey]);
+
   // Sync status changes back to the shared PO store (only for real POs)
   useEffect(() => {
     const currentRealPO = getPOByNumber(poKey);
@@ -738,14 +764,41 @@ export default function VendorOrderDetailPage() {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
     if (status === "Cancelled") {
       const it = items.find(i => i.id === id);
+      if (it?.status === "Shipped" || it?.status === "Delivered") return;
       setPendingItemCancel({ id, name: it?.name || "this item" });
       return;
     }
     setItems(prev => prev.map(it => it.id === id ? { ...it, status } : it));
+    const po = getPOByNumber(poKey);
+    const itemIndex = items.findIndex(it => it.id === id);
+    if (po && itemIndex >= 0) {
+      updatePO(poKey, {
+        items: po.items.map((line, index) => index === itemIndex ? { ...line, status } : line),
+      });
+    }
   };
   const confirmItemCancel = (reason: string) => {
     if (!pendingItemCancel) return;
+    const itemIndex = items.findIndex(it => it.id === pendingItemCancel.id);
     setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled", cancelReason: reason } : it));
+    const po = getPOByNumber(poKey);
+    if (po && itemIndex >= 0) {
+      updatePO(poKey, {
+        items: po.items.map((line, index) => index === itemIndex
+          ? { ...line, status: "Cancelled", cancelReason }
+          : line),
+      });
+      const subOrderId = po.items[itemIndex]?.subOrderId;
+      if (subOrderId) {
+        try {
+          const key = `nido_subitems_${po.orderId}`;
+          const saved = JSON.parse(localStorage.getItem(key) || "{}");
+          saved[subOrderId] = { ...(saved[subOrderId] || {}), itemStatus: "Cancelled", cancelReason, updatedOn: new Date().toLocaleDateString("en-IN") };
+          localStorage.setItem(key, JSON.stringify(saved));
+          window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
+        } catch { /* storage unavailable */ }
+      }
+    }
   };
   const handleReferenceNumberChange = (id: string, referenceNumber: string) => {
     if (isCancelled) return;
@@ -771,7 +824,36 @@ export default function VendorOrderDetailPage() {
   };
   const handleUpdateTracking = (id: string, tracking: any) => {
     if (isCancelled) return;
-    setItems(prev => prev.map(it => it.id === id ? { ...it, tracking } : it));
+    const normalizedTracking = tracking?.number?.trim() || tracking?.carrier?.trim() ? tracking : null;
+    const itemIndex = items.findIndex(it => it.id === id);
+    const updatedItems = items.map(it => it.id === id
+      ? { ...it, tracking: normalizedTracking, status: normalizedTracking ? "Shipped" : it.status }
+      : it);
+    setItems(updatedItems);
+
+    const po = getPOByNumber(poKey);
+    if (!po || itemIndex < 0) return;
+    const updatedLines = po.items.map((line, index) => index === itemIndex
+      ? { ...line, tracking: normalizedTracking, status: normalizedTracking ? "Shipped" : line.status }
+      : line);
+    const activeLines = updatedLines.filter(line => line.status !== "Cancelled");
+    const trackedCount = activeLines.filter(line => Boolean(line.tracking?.number?.trim() || line.tracking?.carrier?.trim())).length;
+    const shipmentStatus = trackedCount === 0
+      ? (po.status === "Draft" ? "Draft" : "Processing")
+      : trackedCount === activeLines.length ? "Shipped" : "Partially Shipped";
+    updatePO(poKey, { items: updatedLines, status: shipmentStatus as StoredPO["status"] });
+    setOrderStatus(shipmentStatus);
+
+    const subOrderId = po.items[itemIndex]?.subOrderId;
+    if (subOrderId) {
+      try {
+        const key = `nido_subitems_${po.orderId}`;
+        const saved = JSON.parse(localStorage.getItem(key) || "{}");
+        saved[subOrderId] = { ...(saved[subOrderId] || {}), tracking: normalizedTracking, itemStatus: normalizedTracking ? "Shipped" : "Processing", updatedOn: new Date().toLocaleDateString("en-IN") };
+        localStorage.setItem(key, JSON.stringify(saved));
+        window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
+      } catch { /* storage unavailable */ }
+    }
   };
   const handleDeleteDoc = (id: string) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
@@ -1112,7 +1194,12 @@ export default function VendorOrderDetailPage() {
               <div style={{ fontSize: 13 }}>{item.unitPrice}</div>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
               <div>
-                <StatusDropdown status={item.status} onChange={s => handleItemStatusChange(item.id, s)} disabled={isCancelled || item.status === "Cancelled"} />
+                <StatusDropdown
+                  status={item.status}
+                  onChange={s => handleItemStatusChange(item.id, s)}
+                  disabled={isCancelled || item.status === "Cancelled"}
+                  allowCancel={item.status !== "Shipped" && item.status !== "Delivered"}
+                />
                 {item.status === "Cancelled" && (item as any).cancelReason && (
                   <div style={{ fontSize: 11, color: "#991b1b", marginTop: 5, lineHeight: 1.4, fontStyle: "italic" }}>
                     Reason: {(item as any).cancelReason}

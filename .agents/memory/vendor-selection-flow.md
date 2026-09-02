@@ -4,9 +4,9 @@ description: Architecture of the refactored procurement workflow — client sele
 ---
 
 ## Rule
-Vendor selection is locked at add-to-cart time. The client must choose a vendor on the Shop page (ProductCard or ProductDetailPage) before the Add to Cart button is enabled. The chosen vendor is snapshotted onto the CartItem and propagated all the way through to Draft PO creation.
+Vendor selection is required before add-to-cart and is snapshotted onto the CartItem. The master order may still change that selection while its PO is Draft; once a PO is confirmed, the vendor is locked and must be changed through procurement cancellation/recreation.
 
-**Why:** Spec (attached_assets/Pasted--Modify-Procurement-Workflow…txt) requires vendor choice to happen pre-cart so pricing, stock, and lead time are deterministic at order time — no post-order sourcing negotiation.
+**Why:** The pre-cart snapshot keeps pricing, stock, and lead time deterministic, while the Draft window supports correction before procurement commits the vendor.
 
 ## Key Data Flow
 
@@ -39,12 +39,12 @@ Vendor selection is locked at add-to-cart time. The client must choose a vendor 
 7. **OrderDetailsPage**:
    - "Vendor Selected Summary" tab renamed to "Draft Purchase Orders".
    - `cartItemsToSubOrders()` now passes `selectedVendorId` / `selectedVendorName` from cart items.
-   - Vendor column in Sub Orders table shows vendor name locked at cart time (read-only).
+    - Vendor column in Sub Orders table shows the selected vendor and offers Change Vendor while the related PO is still Draft.
    - "Draft Purchase Orders" tab: lists auto-created Draft POs per vendor with Confirm → `/vendor-orders/:po` and Reject buttons.
    - VendorSelectionModal JSX removed from this page.
 
 ## How to Apply
-- Never auto-assign a vendor after order placement — vendor must come from CartItem snapshot.
+- Never auto-assign a vendor after order placement — vendor must come from the CartItem snapshot or an explicit Draft-PO change in the master order.
 - Confirm button in Draft POs tab calls `updatePO(po.poNumber, { status: "Confirmed" })` then navigates to the PO detail page for PDF/email.
 - The old `handleCreatePurchaseOrders` and `VendorSelectionModal`/`VendorSelectionTab`/`VendorSelectedSummaryTab` components remain in OrderDetailsPage but are unreachable UI (no tab or button references them) — safe to fully remove in a later cleanup.
 
