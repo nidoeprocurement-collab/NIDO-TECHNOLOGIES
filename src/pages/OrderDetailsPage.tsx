@@ -287,12 +287,15 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
   const detailVendorInfo = detailVendorId ? getVendorById(detailVendorId) : undefined;
   const canConfirm = selectedComps.length > 0 && totalAllocated === sub.qty;
 
-  // 15-column grid: cb | # | Vendor | Price | Current | Reserved | Available | LeadTime | Rating | OnTime | PayTerms | MOQ | Score | AllocQty | Total
-  const GRID = "36px 32px 1fr 100px 72px 72px 72px 110px 62px 72px 106px 56px 60px 106px 90px";
+  // 15-column grid: cb | # | Vendor | Price | Current | Reserved | Available | LeadTime | Rating | OnTime | PayTerms | MOQ | Score | AllocQty | Total.
+  // Every table row uses this exact template so grouped headers, subheaders, and cells
+  // remain vertically aligned even when the full table needs horizontal scrolling.
+  const TABLE_MIN_WIDTH = 1180;
+  const GRID = "36px 32px minmax(150px, 1fr) 100px 72px 72px 72px 110px 62px 72px 106px 56px 60px 106px 90px";
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.48)", zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: 1080, boxShadow: "0 20px 60px rgba(0,0,0,0.28)", overflow: "hidden", maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.48)", zIndex: 600, display: "flex", alignItems: "stretch", justifyContent: "stretch" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 0, width: "100vw", height: "100vh", maxWidth: "none", maxHeight: "none", boxShadow: "none", overflow: "hidden", display: "flex", flexDirection: "column" }}>
 
         {/* ── Header ── */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "18px 24px 14px", borderBottom: "1px solid #e5e7eb" }}>
@@ -352,7 +355,7 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
               <div style={{ fontSize: 13, marginTop: 4 }}>Add this product to a vendor's catalog, then configure the Price Engine.</div>
             </div>
           ) : (
-            <div style={{ minWidth: 960 }}>
+            <div style={{ minWidth: TABLE_MIN_WIDTH }}>
               {/* Group-header row */}
               <div style={{ display: "grid", gridTemplateColumns: GRID, background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#374151", textAlign: "center" }}>
                 <div style={{ padding: "9px 0", borderRight: "1px solid #e5e7eb" }} />
