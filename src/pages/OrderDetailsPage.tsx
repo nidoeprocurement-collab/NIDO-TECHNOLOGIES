@@ -2074,6 +2074,7 @@ function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDat
 
 const menuItemSt: any = { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" };
 const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "#92400e" }, Processing: { color: "#6b21a8" }, Shipped: { color: "#1e40af" }, Delivered: { color: "#166534" } };
+const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered"];
 
 function ThreeDotMenu({
   sub,
@@ -2123,7 +2124,17 @@ function ThreeDotMenu({
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(status => status.name),
     "Pending", "Processing", "Shipped", "Delivered",
-  ])).filter(status => status !== "Approved" && status !== "Confirmed");
+  ]))
+    .filter(status => status !== "Approved" && status !== "Confirmed")
+    .filter(status => {
+      const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
+      const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
+      if (status === sub.itemStatus) return false;
+      // Custom statuses remain available, but built-in statuses can only move
+      // forward through the fulfillment lifecycle.
+      return currentIndex < 0 || nextIndex < 0 || nextIndex > currentIndex;
+    });
+  const canAdvanceStatus = statusUpdatesEnabled && statuses.length > 0;
   const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (open) {
@@ -2157,26 +2168,36 @@ function ThreeDotMenu({
             onMouseLeave={() => setStatusSub(false)}
           >
             <button
-              disabled={!statusUpdatesEnabled}
-              title={!statusUpdatesEnabled ? "Confirm a purchase order before updating item status." : undefined}
+              disabled={!canAdvanceStatus}
+              title={!statusUpdatesEnabled
+                ? "Confirm a purchase order before updating item status."
+                : statuses.length === 0
+                  ? "This item is already at its final status."
+                  : undefined}
               style={{
                 ...menuItemSt,
                 background: statusSub ? "#f9fafb" : "none",
-                color: statusUpdatesEnabled ? "#374151" : "#d1d5db",
-                cursor: statusUpdatesEnabled ? "pointer" : "not-allowed",
+                color: canAdvanceStatus ? "#374151" : "#d1d5db",
+                cursor: canAdvanceStatus ? "pointer" : "not-allowed",
               }}
             >
               <span>🔄</span> Update Status
               {!statusUpdatesEnabled
                 ? <span style={{ marginLeft: "auto", fontSize: 10 }}>PO pending</span>
-                : <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span>}
+                : statuses.length === 0
+                  ? <span style={{ marginLeft: "auto", fontSize: 10 }}>Complete</span>
+                  : <span style={{ marginLeft: "auto", color: "#9ca3af" }}>‹</span>}
             </button>
-            {statusSub && statusUpdatesEnabled && (
+            {statusSub && canAdvanceStatus && (
               <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", minWidth: 180, overflow: "hidden", zIndex: 1001 }}>
                 {statuses.map(s => (
                   <button key={s} onClick={() => {
-                    onUpdateStatus(s);
-                    if (s === "Shipped") onAddTracking();
+                    if (s === "Shipped") {
+                      // Tracking is required before an item can become Shipped.
+                      onAddTracking();
+                    } else {
+                      onUpdateStatus(s);
+                    }
                     setOpen(false);
                     setStatusSub(false);
                   }}
