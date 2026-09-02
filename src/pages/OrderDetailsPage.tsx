@@ -213,33 +213,6 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
     selectedVendorId || comparisons[0]?.vendorId || ""
   );
 
-  // ── Auto Allocate ─────────────────────────────────────────────────────────
-  const handleAutoAllocate = () => {
-    // Sort vendors by score descending (highest score fills first)
-    const sorted = [...comparisons].sort((a, b) => b.score - a.score);
-    const newQtys: Record<string, number> = {};
-    const newChecked = new Set<string>();
-    let remaining = sub.qty;
-
-    for (const c of sorted) {
-      if (remaining <= 0) break;
-      const avail = c.stock; // c.stock = availableStock
-      if (avail <= 0) continue;
-      const take = Math.min(remaining, avail);
-      newQtys[c.vendorId] = take;
-      newChecked.add(c.vendorId);
-      remaining -= take;
-    }
-
-    // Zero out vendors not allocated
-    for (const c of comparisons) {
-      if (!newQtys[c.vendorId]) newQtys[c.vendorId] = 0;
-    }
-
-    setRowQtys(newQtys);
-    setCheckedSet(newChecked);
-  };
-
   const handleToggleCheck = (vendorId: string) => {
     setCheckedSet(prev => {
       const next = new Set(prev);
@@ -623,15 +596,6 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
             style={{ padding: "9px 26px", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
           >
             Cancel
-          </button>
-
-          {/* Auto Allocate button */}
-          <button
-            onClick={handleAutoAllocate}
-            title="Fills quantities automatically: highest-scored vendor fills first, then next, until the required qty is met."
-            style={{ padding: "9px 20px", border: "1px solid #7c3aed", borderRadius: 8, background: "#f5f3ff", color: "#7c3aed", cursor: "pointer", fontWeight: 700, fontSize: 13, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}
-          >
-            ⚡ Auto Allocate
           </button>
 
           {/* Allocation progress */}
