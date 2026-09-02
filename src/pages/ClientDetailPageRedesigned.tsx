@@ -393,7 +393,11 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     // an update loop that prevents the row action menu from responding.
     if (activeTab === "Catalog") return <CatalogPage key={`${clientId}-catalog`} clientId={clientId} />;
     if (activeTab === "Activity") return <ActivityPage key={`${clientId}-${refreshKey}-activity`} clientId={clientId} />;
-    if (activeTab === "Configuration") return <ConfigurationPage key={`${clientId}-${refreshKey}-configuration`} clientId={clientId} />;
+    // Configuration owns nested tabs and editable form state. Do not key it by
+    // refreshKey: saving a pricing field can refresh the client catalog, which
+    // updates refreshKey and would otherwise remount Configuration back on
+    // its default General tab.
+    if (activeTab === "Configuration") return <ConfigurationPage clientId={clientId} />;
     if (activeTab === "Documents") return <DocumentsPage key={`${clientId}-${refreshKey}-documents`} clientId={clientId} />;
     return null;
   };
