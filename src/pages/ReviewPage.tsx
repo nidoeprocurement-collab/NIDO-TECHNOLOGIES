@@ -12,9 +12,11 @@ import { reserveVendorStock } from "@/lib/vendorStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
-
-const DELIVERY_INSTRUCTIONS_KEY = "nido_delivery_instructions";
-const ORDER_NOTES_KEY = "nido_order_notes";
+import {
+  DELIVERY_INSTRUCTIONS_KEY,
+  ORDER_NOTES_KEY,
+  sanitizeCheckoutNote,
+} from "@/lib/checkoutNotes";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -59,8 +61,8 @@ export default function ReviewPage() {
 
   // Read saved payment terms (selected on the checkout page)
   const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
-  const deliveryInstructions = localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "";
-  const orderNotes = localStorage.getItem(ORDER_NOTES_KEY) || "";
+  const deliveryInstructions = sanitizeCheckoutNote(localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "");
+  const orderNotes = sanitizeCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "");
   const paymentTermsLabel = (() => {
     const map: Record<string, string> = {
       "Net 30": "Net 30 (Payment due in 30 days)",
