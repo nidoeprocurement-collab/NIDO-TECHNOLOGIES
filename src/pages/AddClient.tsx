@@ -31,12 +31,7 @@ import {
   normalizePanInput,
   type AddressDetails,
 } from "@/lib/addressTypes";
-
-// Mock toast notification system
-const toast = {
-  success: (msg: string) => console.log("[v0] Success:", msg),
-  error: (msg: string) => console.error("[v0] Error:", msg),
-};
+import { toast } from "sonner";
 
 const STEPS = [
   { label: "Basic Info", icon: "A" },
@@ -419,6 +414,67 @@ export default function AddClient() {
     return true;
   };
 
+  const getValidationIssues = () => {
+    const issues: { step: number; label: string; fields: string[] }[] = [];
+    const addIssue = (stepIndex: number, label: string, fields: string[]) => {
+      if (fields.length) issues.push({ step: stepIndex, label, fields });
+    };
+
+    const basicFields: string[] = [];
+    if (!formData.client_id.trim()) basicFields.push("Client ID");
+    if (!formData.company_name.trim()) basicFields.push("Company Name");
+    if (!formData.category) basicFields.push("Category");
+    if (!formData.client_tier) basicFields.push("Client Tier");
+    if (!formData.contact_person.trim()) basicFields.push("Contact Person");
+    if (!formData.email.trim()) basicFields.push("Email");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      basicFields.push("valid Email");
+    }
+    if (!formData.contract_start_date) basicFields.push("Contract Start Date");
+    if (!formData.contract_end_date) basicFields.push("Contract End Date");
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      basicFields.push("valid Phone");
+    }
+    if (formData.mobile && !isValidPhoneNumber(formData.mobile)) {
+      basicFields.push("valid Mobile");
+    }
+    addIssue(0, "Basic Info", basicFields);
+
+    const businessFields: string[] = [];
+    if (!formData.gst_treatment) businessFields.push("GST Treatment");
+    if (formData.gstin && !isValidGst(formData.gstin)) {
+      businessFields.push("valid GSTIN");
+    } else if (formData.gst_treatment === "Registered Business" && !formData.gstin) {
+      businessFields.push("GSTIN");
+    }
+    if (!formData.pan_number) businessFields.push("PAN Number");
+    else if (!isValidPan(formData.pan_number)) businessFields.push("valid PAN Number");
+    addIssue(1, "Business", businessFields);
+
+    const financialFields: string[] = [];
+    if (!formData.payment_terms) financialFields.push("Payment Terms");
+    if (!formData.bank_name.trim()) financialFields.push("Bank Name");
+    if (!formData.account_number.trim()) financialFields.push("Account Number");
+    if (!formData.ifsc_code.trim()) financialFields.push("IFSC Code");
+    if (!formData.branch.trim()) financialFields.push("Branch");
+    addIssue(2, "Financial", financialFields);
+
+    const addressFields: string[] = [];
+    if (!formData.billing_address.trim()) addressFields.push("Billing Address");
+    if (!formData.billing_city.trim()) addressFields.push("Billing City");
+    if (!formData.billing_state) addressFields.push("Billing State");
+    if (!formData.billing_pincode.trim()) addressFields.push("Billing Pincode");
+    if (!formData.same_address) {
+      if (!formData.shipping_address.trim()) addressFields.push("Shipping Address");
+      if (!formData.shipping_city.trim()) addressFields.push("Shipping City");
+      if (!formData.shipping_state) addressFields.push("Shipping State");
+      if (!formData.shipping_pincode.trim()) addressFields.push("Shipping Pincode");
+    }
+    addIssue(3, "Address", addressFields);
+
+    return issues;
+  };
+
   const downloadTemplate = () => {
     const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
     const csv = CLIENT_IMPORT_HEADERS.map(escapeCsv).join(",");
@@ -555,26 +611,14 @@ export default function AddClient() {
   };
 
   const handleSave = async () => {
-    // Validate required fields
-    if (
-      !formData.company_name.trim() ||
-      !formData.email.trim() ||
-      !formData.contact_person.trim()
-    ) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-    if ((formData.phone && !isValidPhoneNumber(formData.phone)) ||
-        (formData.mobile && !isValidPhoneNumber(formData.mobile))) {
-      toast.error("Phone and mobile numbers must contain exactly 10 digits");
-      return;
-    }
-      if (formData.gstin && !isValidGst(formData.gstin)) {
-      toast.error("GSTIN must be exactly 15 alphanumeric characters");
-      return;
-    }
-    if (!isValidPan(formData.pan_number)) {
-      toast.error("PAN must follow the format AAAAA9999A");
+    const validationIssues = getValidationIssues();
+    if (validationIssues.length) {
+      const firstIssue = validationIssues[0];
+      setStep(firstIssue.step);
+      const message = validationIssues
+        .map((issue) => `${issue.label}: ${issue.fields.join(", ")}`)
+        .join(" • ");
+      toast.error(`Please complete the client form: ${message}`);
       return;
     }
 
@@ -670,6 +714,10 @@ export default function AddClient() {
         name: clientData.company_name || formData.client_id,
         ...clientData,
       });
+      const savedClient = getClients().find((client) => client.id === formData.client_id);
+      if (!savedClient || savedClient.company_name !== clientData.company_name) {
+        throw new Error("The client could not be confirmed in local storage.");
+      }
       if (clientIdToEdit) {
         console.log("[v0] Client updated successfully");
         toast.success("Client updated successfully");
@@ -684,7 +732,8 @@ export default function AddClient() {
       }, 1000);
     } catch (err) {
       console.error("[v0] Error:", err);
-      toast.error("An error occurred while saving");
+      const reason = err instanceof Error ? err.message : "Unknown storage error";
+      toast.error(`Could not save client: ${reason}`);
     }
   };
 
