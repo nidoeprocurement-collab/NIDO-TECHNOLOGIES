@@ -8,7 +8,7 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import { releaseVendorReservation } from "@/lib/vendorStore";
-import { getSlabDiscountPct, getAllProductPricing, type VendorStockAllocation } from "@/lib/priceEngineStore";
+import { getSlabDiscountPct, getAllProductPricing, getRecommendedVendor, type VendorStockAllocation } from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
@@ -132,7 +132,13 @@ export default function CartPage() {
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
 
-  type VendorInfo = { leadTime: string; moq: number; totalStock: number; allocations: VendorStockAllocation[] };
+  type VendorInfo = {
+    leadTime: string;
+    moq: number;
+    totalStock: number;
+    allocations: VendorStockAllocation[];
+    recommendedVendorId?: string;
+  };
   const buildVendorMatchMap = (): Map<string, VendorInfo> => {
     const map = new Map<string, VendorInfo>();
     getAllProductPricing().forEach(p => {
@@ -155,6 +161,7 @@ export default function CartPage() {
         moq: p.winningVendor?.moq ?? 0,
         totalStock,
         allocations,
+        recommendedVendorId: getRecommendedVendor(p.vendorComparisons)?.vendorId,
       });
     });
     return map;
@@ -344,7 +351,13 @@ export default function CartPage() {
                               <div className="flex items-center gap-2 mb-1.5">
                                 <span className="text-xs text-gray-500">Vendor:</span>
                                 <span className="text-xs font-semibold text-gray-800">{item.selectedVendorName}</span>
-                                <span className="text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 px-1.5 py-0.5 rounded-full">Recommended</span>
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                  item.selectedVendorId && item.selectedVendorId === stockInfo?.recommendedVendorId
+                                    ? "text-green-700 bg-green-100 border border-green-200"
+                                    : "text-blue-700 bg-blue-100 border border-blue-200"
+                                }`}>
+                                  {item.selectedVendorId && item.selectedVendorId === stockInfo?.recommendedVendorId ? "Recommended" : "Selected"}
+                                </span>
                               </div>
                             )}
 
