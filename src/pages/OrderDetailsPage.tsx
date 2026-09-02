@@ -2079,6 +2079,7 @@ const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shi
 function ThreeDotMenu({
   sub,
   onUpdateStatus,
+  canMarkShipped,
   onAddTracking,
   onSetReference,
   referenceLocked,
@@ -2126,6 +2127,7 @@ function ThreeDotMenu({
     "Pending", "Processing", "Shipped", "Delivered",
   ]))
     .filter(status => status !== "Approved" && status !== "Confirmed")
+    .filter(status => status !== "Shipped" || canMarkShipped)
     .filter(status => {
       const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
       const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
@@ -2305,6 +2307,15 @@ function poCoversSubOrder(po: any, subOrderId: string): boolean {
   if (po?.subOrderId === subOrderId) return true;
   if (Array.isArray(po?.subOrderIds) && po.subOrderIds.includes(subOrderId)) return true;
   return Array.isArray(po?.items) && po.items.some((item: any) => item?.subOrderId === subOrderId);
+}
+
+function isPOItemShipped(po: any, subOrderId: string): boolean {
+  if (!poCoversSubOrder(po, subOrderId)) return false;
+  if (po.status === "Shipped") return true;
+  return (po.items || []).some((line: any) =>
+    line.subOrderId === subOrderId &&
+    (line.status === "Shipped" || Boolean(line.tracking?.number || line.tracking?.trackingNumber))
+  );
 }
 
 function isConfirmedPO(po: any): boolean {
@@ -2509,6 +2520,7 @@ export default function MyOrderPage() {
   );
   const updateStatus = (subId: string, status: string) => {
     if (!hasConfirmedOrderPO || isOrderInactive) return;
+    if (status === "Shipped" && !getAllPOs().some(po => po.orderId === orderId && isPOItemShipped(po, subId))) return;
     setSubOrders(prev => prev.map(s => s.id === subId ? { ...s, itemStatus: status, updatedOn: new Date().toLocaleDateString("en-IN") } : s));
   };
 
@@ -3230,6 +3242,7 @@ export default function MyOrderPage() {
                     : Object.values(createdPOs).filter((p: any) => poCoversSubOrder(p, sub.id)) as any[];
                   const hasPO = subPOs.length > 0;
                   const hasConfirmedPO = subPOs.some(isConfirmedPO);
+                   const canMarkShipped = subPOs.some((po: any) => isPOItemShipped(po, sub.id));
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
@@ -3380,6 +3393,7 @@ export default function MyOrderPage() {
                           <ThreeDotMenu
                             sub={sub}
                             onUpdateStatus={s => updateStatus(sub.id, s)}
+                            canMarkShipped={canMarkShipped}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onSetReference={() => setReferenceTarget(sub.id)}
                             referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
