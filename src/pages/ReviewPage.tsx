@@ -13,6 +13,9 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 
+const DELIVERY_INSTRUCTIONS_KEY = "nido_delivery_instructions";
+const ORDER_NOTES_KEY = "nido_order_notes";
+
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
 interface DeliveryAddress {
@@ -56,6 +59,8 @@ export default function ReviewPage() {
 
   // Read saved payment terms (selected on the checkout page)
   const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
+  const deliveryInstructions = localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "";
+  const orderNotes = localStorage.getItem(ORDER_NOTES_KEY) || "";
   const paymentTermsLabel = (() => {
     const map: Record<string, string> = {
       "Net 30": "Net 30 (Payment due in 30 days)",
@@ -177,6 +182,8 @@ export default function ReviewPage() {
       paymentMethod: paymentSummary.label,
       paymentDetail: paymentSummary.detail,
       paymentTerms: paymentTermsLabel,
+      deliveryInstructions,
+      orderNotes,
       deliveryAddress: selectedAddr
         ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
             .filter(Boolean).join(", ")
@@ -218,6 +225,8 @@ export default function ReviewPage() {
     }
 
     consumeCart();
+    localStorage.removeItem(DELIVERY_INSTRUCTIONS_KEY);
+    localStorage.removeItem(ORDER_NOTES_KEY);
     navigate(`/shop/order-confirmation/${orderNumber}`, {
       state: {
         orderNumber,

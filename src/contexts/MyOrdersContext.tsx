@@ -82,6 +82,8 @@ export interface MyOrder {
   paymentDetail?: string;
   paymentTerms?: string;
   deliveryAddress?: string;
+  deliveryInstructions?: string;
+  orderNotes?: string;
   cancelReason?: string;
 }
 

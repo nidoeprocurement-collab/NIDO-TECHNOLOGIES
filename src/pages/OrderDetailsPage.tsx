@@ -3227,7 +3227,7 @@ export default function MyOrderPage() {
           </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
             <Field label="Delivery Address" value={order?.deliveryAddress || deliveryAddressFallback || "As per checkout"} />
-            <Field label="Requested Delivery" value="Within 30 days" />
+             <Field label="Delivery Instructions" value={order?.deliveryInstructions || "No delivery instructions provided"} />
             <Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} />
           </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
@@ -3241,6 +3241,7 @@ export default function MyOrderPage() {
             ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
             ["Total Amount", order?.totalAmount || "—"],
             ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
+             ["Order Note", order?.orderNotes || "—"],
           ].map(([l, v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
         </div>
 

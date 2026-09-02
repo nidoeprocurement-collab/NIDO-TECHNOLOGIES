@@ -222,13 +222,15 @@ const PAYMENT_TERMS_OPTIONS = [
 ];
 
 const PAYMENT_TERMS_KEY = "nido_payment_terms";
+const DELIVERY_INSTRUCTIONS_KEY = "nido_delivery_instructions";
+const ORDER_NOTES_KEY = "nido_order_notes";
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const [notesOpen, setNotesOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
-  const [deliveryInstructions, setDeliveryInstructions] = useState("");
-  const [orderNotes, setOrderNotes] = useState("");
+  const [deliveryInstructions, setDeliveryInstructions] = useState(() => localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "");
+  const [orderNotes, setOrderNotes] = useState(() => localStorage.getItem(ORDER_NOTES_KEY) || "");
   const [paymentTerms, setPaymentTerms] = useState<string>(() => {
     return localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
   });
@@ -399,7 +401,10 @@ export default function CheckoutPage() {
                     maxLength={250}
                     placeholder="Add delivery instructions, gate entry details, timing preferences, etc."
                     value={deliveryInstructions}
-                    onChange={(e) => setDeliveryInstructions(e.target.value)}
+                    onChange={(e) => {
+                      setDeliveryInstructions(e.target.value);
+                      localStorage.setItem(DELIVERY_INSTRUCTIONS_KEY, e.target.value);
+                    }}
                     className="w-full px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
                   <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>
@@ -425,7 +430,10 @@ export default function CheckoutPage() {
                     rows={3}
                     placeholder="Add any special notes for this order..."
                     value={orderNotes}
-                    onChange={(e) => setOrderNotes(e.target.value)}
+                    onChange={(e) => {
+                      setOrderNotes(e.target.value);
+                      localStorage.setItem(ORDER_NOTES_KEY, e.target.value);
+                    }}
                     className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
                 </div>
