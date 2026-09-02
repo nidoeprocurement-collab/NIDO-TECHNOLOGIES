@@ -2466,6 +2466,9 @@ export default function MyOrderPage() {
     [poRefreshKey, orderId],
   );
   const hasGeneratedOrderPO = orderPOs.length > 0;
+  const allOrderPOsCancelled = hasGeneratedOrderPO
+    && orderPOs.every(po => String(po.status || "").toLowerCase() === "cancelled");
+  const canCancelOrder = !hasGeneratedOrderPO || allOrderPOsCancelled;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
@@ -2499,7 +2502,7 @@ export default function MyOrderPage() {
   // Stock restoration (if any POs were already raised) is handled when the PO itself
   // is cancelled from the Vendor Orders page.
   const handleCancelOrder = (reason: string) => {
-    if (isOrderCancelled || hasGeneratedOrderPO) return;
+    if (isOrderCancelled || !canCancelOrder) return;
     updateOrderStatus(orderId, "Cancelled" as any, reason);
   };
   // Per-item overrides (status, tracking) are persisted separately from the
@@ -3162,7 +3165,7 @@ export default function MyOrderPage() {
                   )}
                 </div>
               ) : (
-                hasGeneratedOrderPO ? (
+                !canCancelOrder ? (
                   <span
                     title="This order cannot be cancelled because a purchase order has already been generated."
                     style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
