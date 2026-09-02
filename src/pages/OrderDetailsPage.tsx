@@ -2478,8 +2478,9 @@ export default function MyOrderPage() {
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
   const TABS = isClientPortalUser
-    ? ["Delivery Information", "Sub Orders / Items"]
-    : ["Delivery Information", "Sub Orders / Items", "Draft Purchase Orders"];
+    ? ["Sub Orders / Items"]
+    : ["Sub Orders / Items", "Draft Purchase Orders"];
+  const [activeInfoTab, setActiveInfoTab] = useState<"Billing Information" | "Delivery Information">("Billing Information");
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   // Master status lives on the shared order record itself (single source of
   // truth) so a change made on the owner platform is visible immediately on
@@ -3251,15 +3252,60 @@ export default function MyOrderPage() {
           );
         })()}
 
-        {/* Info Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 20 }}>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
-            <Field label="Client" value={order?.client || "—"} />
-            <Field label="Payment Method" value={order?.paymentMethod || paymentFallback?.label || "—"} />
-            {(order?.paymentDetail || paymentFallback?.detail) && (
-              <Field label="Payment Detail" value={order?.paymentDetail || paymentFallback?.detail || ""} />
+        {/* Top billing and delivery information */}
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)", gap: 16, marginBottom: 20 }}>
+          <div style={{ ...card, minWidth: 0 }}>
+            <div style={{ display: "flex", gap: 24, borderBottom: "1px solid #f3f4f6", marginBottom: 14 }}>
+              {(["Billing Information", "Delivery Information"] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveInfoTab(tab)}
+                  style={{
+                    padding: "0 0 10px",
+                    border: "none",
+                    borderBottom: activeInfoTab === tab ? "2px solid hsl(var(--primary))" : "2px solid transparent",
+                    background: "none",
+                    color: activeInfoTab === tab ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                    cursor: "pointer",
+                    fontSize: 13.5,
+                    fontWeight: activeInfoTab === tab ? 700 : 500,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            {activeInfoTab === "Billing Information" ? (
+              <>
+                <Field label="Client" value={order?.client || "—"} />
+                <Field label="Payment Method" value={order?.paymentMethod || paymentFallback?.label || "—"} />
+                {(order?.paymentDetail || paymentFallback?.detail) && (
+                  <Field label="Payment Detail" value={order?.paymentDetail || paymentFallback?.detail || ""} />
+                )}
+                <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
+              </>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0 22px" }}>
+                <Field label="Address Label" value={deliveryInfo.label || "—"} />
+                <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
+                <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
+                <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
+                <Field label="City" value={deliveryInfo.city || "—"} />
+                <Field label="State" value={deliveryInfo.state || "—"} />
+                <Field label="Country" value={deliveryInfo.country || "—"} />
+                <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
+                <Field label="Phone" value={deliveryInfo.phone || "—"} />
+                <Field label="Requested Delivery" value="Within 30 days" />
+                <Field label="Order Date" value={order ? `${order.orderDate} ${order.orderTime}` : "—"} />
+                <div style={{ gridColumn: "1 / -1", marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Delivery Instructions</div>
+                  <div style={{ fontSize: 13.5, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+                    {deliveryInfo.instructions || "No delivery instructions provided"}
+                  </div>
+                </div>
+              </div>
             )}
-            <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
           </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
             <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
@@ -3362,47 +3408,6 @@ export default function MyOrderPage() {
               </div>
             )}
           </div>
-
-          {/* Delivery Information tab */}
-          {activeTab === "Delivery Information" && (
-            <div style={{ padding: 20 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Address</div>
-                  <Field label="Address Label" value={deliveryInfo.label || "—"} />
-                  <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
-                  <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
-                  <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
-                </div>
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Location & Contact</div>
-                  <Field label="City" value={deliveryInfo.city || "—"} />
-                  <Field label="State" value={deliveryInfo.state || "—"} />
-                  <Field label="Country" value={deliveryInfo.country || "—"} />
-                  <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
-                  <Field label="Phone" value={deliveryInfo.phone || "—"} />
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16, marginTop: 16 }}>
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Schedule</div>
-                  <Field label="Requested Delivery" value="Within 30 days" />
-                  <Field label="Order Date" value={order ? `${order.orderDate} ${order.orderTime}` : "—"} />
-                </div>
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Instructions</div>
-                  <div style={{ fontSize: 13.5, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
-                    {deliveryInfo.instructions || "No delivery instructions provided"}
-                  </div>
-                </div>
-              </div>
-              {!deliveryInfo.line1 && deliveryInfo.address && (
-                <div style={{ marginTop: 16, border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
-                  <Field label="Full Delivery Address" value={deliveryInfo.address} />
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
