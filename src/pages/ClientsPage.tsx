@@ -9,6 +9,10 @@ import {
   getArchivedClients,
   saveArchivedClients,
   isSharedClient,
+  CLIENT_IMPORT_HEADERS,
+  clientFromImportRow,
+  clientToImportValues,
+  parseClientCsv,
   type StoredClient,
   type ArchivedClient,
 } from "@/lib/clientStore"
@@ -554,22 +558,67 @@ export default function ClientsPageUI() {
   }
 
   const handleExport = () => {
-    const headers = "Client ID,Company Name,Category,Tier,Representative,Email,Phone,Status,Opening Balance,Contract Start,Contract End,Billing City,Billing State\n"
-    const rows = clients.map(c => [
-      c.id, c.name, c.category || "", c.tier || "", c.rep || "",
-      c.email || "", c.phone || "", c.status || "",
-      c.openingBalance || "0", c.contractStartDate || "",
-      c.contractEndDate || "", c.billingCity || "", c.billingState || "",
-    ].join(",")).join("\n")
-    const blob = new Blob([headers + rows], { type: "text/csv" })
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+    const rows = clients.map(c => clientToImportValues(c).map(escapeCsv).join(","))
+    const csv = [CLIENT_IMPORT_HEADERS.join(","), ...rows].join("\n")
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" })
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "clients-export.csv"
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
 
   const handleDownloadTemplate = () => {
-    const template = `Client ID,Company Name,Category,Client Tier,Contact Person,Email,Phone,Mobile,Website,Contract Start Date,Contract End Date,GST Treatment,GSTIN,Source of Supply,PAN Number,Currency,Opening Balance,Payment Terms,TDS Rate,Bank Name,Account Number,IFSC Code,Branch,Billing Address,Billing City,Billing State,Billing Pincode,Shipping Address,Shipping City,Shipping State,Shipping Pincode
-CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43210,+91 99876 54321,www.company.com,2024-01-01,2025-01-01,Registered Business,27AABCT1234A1Z5,Maharashtra,AAAAA0000A,INR,50000,Net 30,1.0,ICICI Bank,9876543210,ICIC0001234,Mumbai,123 Business Street,Mumbai,Maharashtra,400001,123 Business Street,Mumbai,Maharashtra,400001`
-    const blob = new Blob([template], { type: "text/csv;charset=utf-8;" })
+    const sample = clientToImportValues({
+      id: "CL-00001",
+      name: "Company Name",
+      category: "IT Hardware",
+      tier: "Premium",
+      rep: "John Doe",
+      email: "john@company.com",
+      phone: "+91 98765 43210",
+      mobile: "+91 99876 54321",
+      website: "www.company.com",
+      contractStartDate: "2024-01-01",
+      contractEndDate: "2025-01-01",
+      client_logo_url: "",
+      gst_treatment: "Registered Business",
+      gstin: "27AABCT1234A1Z5",
+      id_reference_number: "REF-0001",
+      source_of_supply: "Maharashtra",
+      pan_number: "AAAAA0000A",
+      currency: "INR",
+      opening_balance: 50000,
+      payment_terms: "Net 30",
+      tds_rate: 1,
+      bank_name: "ICICI Bank",
+      account_number: "9876543210",
+      ifsc_code: "ICIC0001234",
+      branch: "Mumbai",
+      billing_address: "123 Business Street",
+      billing_attention: "Accounts Team",
+      billing_country: "India",
+      billing_address_line2: "Business Park",
+      billing_city: "Mumbai",
+      billing_state: "Maharashtra",
+      billing_pincode: "400001",
+      billing_phone_country_code: "+91",
+      billing_phone: "+91 98765 43210",
+      billing_fax_number: "",
+      shipping_address: "123 Business Street",
+      shipping_attention: "Receiving Team",
+      shipping_country: "India",
+      shipping_address_line2: "Business Park",
+      shipping_city: "Mumbai",
+      shipping_state: "Maharashtra",
+      shipping_pincode: "400001",
+      shipping_phone_country_code: "+91",
+      shipping_phone: "+91 98765 43210",
+      shipping_fax_number: "",
+      same_address: true,
+      status: "active",
+    })
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+    const template = [CLIENT_IMPORT_HEADERS.join(","), sample.map(escapeCsv).join(",")].join("\n")
+    const blob = new Blob([`\uFEFF${template}`], { type: "text/csv;charset=utf-8;" })
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "client-template.csv"
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
   }
@@ -579,30 +628,25 @@ CL-00001,Company Name,IT Hardware,Premium,John Doe,john@company.com,+91 98765 43
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
-        const csv = e.target?.result as string
-        const lines = csv.split("\n")
-        const headers = lines[0].split(",").map(h => h.trim())
+         const csv = e.target?.result as string
+         const rows = parseClientCsv(csv)
         const maxId = clients.length > 0 ? Math.max(...clients.map(c => parseInt(c.id.replace("CI-", "")) || 0)) : 0
-        const newClients: StoredClient[] = lines.slice(1).filter(l => l.trim()).map((line, index) => {
-          const values = line.split(",").map(v => v.trim())
-          const d: Record<string, string> = {}
-          headers.forEach((h, i) => { d[h] = values[i] || "" })
-          return {
-            id: d["Client ID"] || `CI-${String(maxId + index + 1).padStart(5, "0")}`,
-            name: d["Company Name"] || "", category: d["Category"] || "", tier: d["Client Tier"] || "",
-            rep: d["Contact Person"] || "", email: d["Email"] || "", phone: d["Phone"] || "",
-            mobile: d["Mobile"] || "", website: d["Website"] || "",
-            contractStartDate: d["Contract Start Date"] || "", contractEndDate: d["Contract End Date"] || "",
-            billingAddress: d["Billing Address"] || "", billingCity: d["Billing City"] || "",
-            billingState: d["Billing State"] || "", billingPincode: d["Billing Pincode"] || "",
-            openingBalance: d["Opening Balance"] || "", paymentTerms: d["Payment Terms"] || "",
-            status: "active",
-          }
-        })
-        const existingIds = new Set(clients.map(c => c.id))
-        persistClients([...clients, ...newClients.filter(c => !existingIds.has(c.id))])
+         const newClients: StoredClient[] = rows.map((row, index) =>
+           clientFromImportRow(
+             row,
+             `CI-${String(maxId + index + 1).padStart(5, "0")}`,
+           ),
+         )
+         const existingIds = new Set(clients.map(c => c.id))
+         const uniqueClients = newClients.filter(c => {
+           if (existingIds.has(c.id)) return false
+           existingIds.add(c.id)
+           return true
+         })
+         persistClients([...clients, ...uniqueClients])
         setShowBulkImport(false)
-      } catch { alert("Error parsing CSV file. Please check the format.") }
+         alert(`${uniqueClients.length} client(s) imported successfully.`)
+       } catch { alert("Error parsing CSV file. Please check the format.") }
     }
     reader.readAsText(file)
   }

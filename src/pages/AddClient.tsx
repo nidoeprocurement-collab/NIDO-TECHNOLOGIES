@@ -5,6 +5,9 @@ import {
   addClient as addStoredClient,
   getClients,
   isSharedClient,
+  CLIENT_IMPORT_HEADERS,
+  clientFromImportRow,
+  parseClientCsv,
 } from "@/lib/clientStore";
 import { getPrefix } from "@/lib/configService";
 import { Button } from "@/components/ui/button";
@@ -417,42 +420,7 @@ export default function AddClient() {
   };
 
   const downloadTemplate = () => {
-    const headers = [
-      "Client ID",
-      "Company Name",
-      "Category",
-      "Client Tier",
-      "Contact Person",
-      "Email",
-      "Phone",
-      "Mobile",
-      "Website",
-      "Contract Start Date",
-      "Contract End Date",
-      "Client Logo URL",
-      "GST Treatment",
-      "GSTIN",
-      "Source of Supply",
-      "PAN Number",
-      "Currency",
-      "Opening Balance",
-      "Payment Terms",
-      "TDS Rate",
-      "Bank Name",
-      "Account Number",
-      "IFSC Code",
-      "Branch",
-      "Billing Address",
-      "Billing City",
-      "Billing State",
-      "Billing Pincode",
-      "Shipping Address",
-      "Shipping City",
-      "Shipping State",
-      "Shipping Pincode",
-    ];
-
-    const csv = headers.join(",");
+    const csv = CLIENT_IMPORT_HEADERS.join(",");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -463,6 +431,126 @@ export default function AddClient() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     toast.success("Template downloaded successfully");
+  };
+
+  const handleMagicUpload = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const rows = parseClientCsv(String(event.target?.result || ""));
+        if (!rows.length) {
+          toast.error("The CSV has no client data row");
+          return;
+        }
+
+        const imported = clientFromImportRow(
+          rows[0],
+          formData.client_id || "CL-00001",
+        );
+        setFormData((previous) => ({
+          ...previous,
+          client_id: imported.id,
+          company_name: imported.company_name || imported.name || "",
+          category: imported.category || "",
+          client_tier: imported.client_tier || imported.tier || "",
+          contact_person: imported.contact_person || imported.rep || "",
+          email: imported.email || "",
+          phone: imported.phone || "",
+          mobile: imported.mobile || "",
+          website: imported.website || "",
+          contract_start_date:
+            imported.contract_start_date || imported.contractStartDate || "",
+          contract_end_date:
+            imported.contract_end_date || imported.contractEndDate || "",
+          client_logo_url: imported.client_logo_url || "",
+          gst_treatment: imported.gst_treatment || "",
+          gstin: imported.gstin || "",
+          id_reference_number: imported.id_reference_number || "",
+          source_of_supply: imported.source_of_supply || "",
+          pan_number: imported.pan_number || "",
+          currency: imported.currency || "INR",
+          opening_balance:
+            imported.opening_balance != null
+              ? String(imported.opening_balance)
+              : "",
+          payment_terms: imported.payment_terms || "",
+          tds_rate:
+            imported.tds_rate != null ? String(imported.tds_rate) : "",
+          bank_name: imported.bank_name || "",
+          account_number: imported.account_number || "",
+          ifsc_code: imported.ifsc_code || "",
+          branch: imported.branch || "",
+          billing_address:
+            imported.billing_address || imported.billingAddress || "",
+          billing_attention:
+            imported.billing_attention || imported.billingAttention || "",
+          billing_country:
+            imported.billing_country || imported.billingCountry || "",
+          billing_address_line2:
+            imported.billing_address_line2 ||
+            imported.billingAddressLine2 ||
+            "",
+          billing_city: imported.billing_city || imported.billingCity || "",
+          billing_state: imported.billing_state || imported.billingState || "",
+          billing_pincode:
+            imported.billing_pincode || imported.billingPincode || "",
+          billing_phone_country_code:
+            imported.billing_phone_country_code ||
+            imported.billingPhoneCountryCode ||
+            "+91",
+          billing_phone: imported.billing_phone || imported.billingPhone || "",
+          billing_fax_number:
+            imported.billing_fax_number || imported.billingFaxNumber || "",
+          shipping_address:
+            imported.shipping_address || imported.shippingAddress || "",
+          shipping_attention:
+            imported.shipping_attention || imported.shippingAttention || "",
+          shipping_country:
+            imported.shipping_country || imported.shippingCountry || "",
+          shipping_address_line2:
+            imported.shipping_address_line2 ||
+            imported.shippingAddressLine2 ||
+            "",
+          shipping_city:
+            imported.shipping_city || imported.shippingCity || "",
+          shipping_state:
+            imported.shipping_state || imported.shippingState || "",
+          shipping_pincode:
+            imported.shipping_pincode || imported.shippingPincode || "",
+          shipping_phone_country_code:
+            imported.shipping_phone_country_code ||
+            imported.shippingPhoneCountryCode ||
+            "+91",
+          shipping_phone:
+            imported.shipping_phone || imported.shippingPhone || "",
+          shipping_fax_number:
+            imported.shipping_fax_number || imported.shippingFaxNumber || "",
+          same_address: !!imported.same_address,
+        }));
+
+        setCategoriesList((current) =>
+          imported.category && !current.includes(imported.category)
+            ? [...current, imported.category]
+            : current,
+        );
+        setClientTiers((current) =>
+          imported.client_tier && !current.includes(imported.client_tier)
+            ? [...current, imported.client_tier]
+            : current,
+        );
+        setCurrenciesList((current) =>
+          imported.currency && !current.includes(imported.currency)
+            ? [...current, imported.currency]
+            : current,
+        );
+        setShowMagicUpload(false);
+        toast.success("Client details imported into the form");
+      } catch {
+        toast.error("Could not read the CSV. Please use the downloaded template.");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSave = async () => {
@@ -1451,6 +1539,9 @@ export default function AddClient() {
                 type="file"
                 accept=".csv"
                 className="block w-full border border-gray-300 rounded-lg p-3"
+                onChange={(event) =>
+                  handleMagicUpload(event.target.files?.[0])
+                }
               />
               <div className="flex gap-3 justify-end">
                 <Button
@@ -1461,10 +1552,11 @@ export default function AddClient() {
                 </Button>
                 <Button
                   className="bg-[#4A6CF7] hover:bg-[#3B5DE8] text-white"
-                  onClick={() => {
-                    setShowMagicUpload(false);
-                    toast.success("File uploaded successfully");
-                  }}
+                  onClick={() =>
+                    toast.success(
+                      "Choose a CSV file above to fill all client fields",
+                    )
+                  }
                 >
                   Upload
                 </Button>
