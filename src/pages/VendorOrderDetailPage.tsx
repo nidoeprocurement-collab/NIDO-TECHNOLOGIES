@@ -1195,14 +1195,14 @@ export default function VendorOrderDetailPage() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
-            {["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO"].map(h => <div key={h}>{h}</div>)}
+          <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+            {["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
           </div>
           {filteredItems.length === 0 && (
             <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
           )}
           {filteredItems.map((item, idx) => (
-            <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1241,7 +1241,7 @@ export default function VendorOrderDetailPage() {
                   status={item.status}
                   onChange={s => handleItemStatusChange(item.id, s)}
                   disabled={isCancelled || item.status === "Cancelled"}
-                  allowCancel={item.status !== "Shipped" && item.status !== "Delivered"}
+                  allowCancel={false}
                 />
                 {item.status === "Cancelled" && (item as any).cancelReason && (
                   <div style={{ fontSize: 11, color: "#991b1b", marginTop: 5, lineHeight: 1.4, fontStyle: "italic" }}>
@@ -1268,6 +1268,22 @@ export default function VendorOrderDetailPage() {
                       Update
                     </button>
                   </div>
+                )}
+              </div>
+              <div style={{ minWidth: 0 }}>
+                {item.status === "Cancelled" ? (
+                  <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>Cancelled</span>
+                ) : item.status === "Shipped" || item.status === "Delivered" ? (
+                  <span style={{ fontSize: 12, color: "#9ca3af" }} title="Shipped and delivered items cannot be cancelled here">—</span>
+                ) : isCancelled ? (
+                  <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
+                ) : (
+                  <button
+                    onClick={() => setPendingItemCancel({ id: item.id, name: item.name })}
+                    style={{ padding: "5px 12px", border: "1px solid #fca5a5", borderRadius: 6, background: "#fff", color: "#dc2626", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                  >
+                    Cancel
+                  </button>
                 )}
               </div>
             </div>

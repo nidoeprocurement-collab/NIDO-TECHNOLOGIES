@@ -7,7 +7,7 @@ import { getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -162,6 +162,7 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
           }
         }
       }
+      }
     }
     return liveStock + totalReserved;
   } catch {
@@ -169,11 +170,13 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
   }
 }
 
-function VendorSelectionModal({ sub, selectedVendorId, onSelect, onClose }) {
+function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], onSelect, onClose }) {
   const comparisons: VendorComparisonRow[] = useMemo(() => {
     if (!sub.productCode) return [];
-    return computeVendorComparisons(sub.productCode).slice(0, 4);
-  }, [sub.productCode]);
+    return computeVendorComparisons(sub.productCode)
+      .filter(vendor => !excludedVendorIds.includes(vendor.vendorId))
+      .slice(0, 4);
+  }, [sub.productCode, excludedVendorIds]);
 
   // Use the stock value exactly as entered in vendor product assignment.
   const getVendorStock = (c: VendorComparisonRow): number => c.stock;
@@ -2634,6 +2637,8 @@ export default function MyOrderPage() {
     const primary = allocations[0];
     const meta = primary.meta || {};
     const vendorName = meta.vendorName || primary.vendorId;
+    const previousSubOrder = subOrders.find(sub => sub.id === subId);
+    const wasCancelled = previousSubOrder?.itemStatus === "Cancelled";
     setSubOrders(prev => prev.map(sub => sub.id === subId
       ? {
           ...sub,
@@ -2643,6 +2648,10 @@ export default function MyOrderPage() {
           vendorInitial: vendorName[0]?.toUpperCase() || "V",
           vendorSelectionMeta: meta,
           stockAllocations: allocations,
+          itemStatus: wasCancelled ? "Pending" : sub.itemStatus,
+          cancelReason: wasCancelled ? undefined : sub.cancelReason,
+          tracking: wasCancelled ? null : sub.tracking,
+          updatedOn: wasCancelled ? new Date().toLocaleDateString("en-IN") : sub.updatedOn,
         }
       : sub
     ));
@@ -2675,24 +2684,31 @@ export default function MyOrderPage() {
       po.status === "Draft" &&
       po.items?.some(line => line.subOrderId === subId)
     );
+    const vendorFields = {
+      vendorId: primary.vendorId,
+      vendorName,
+      vendorContact: meta.contact || "",
+      vendorEmail: meta.email || "",
+      vendorPhone: meta.phone || "",
+      vendorGstin: meta.gstin || "",
+      vendorAddress: [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
+      vendorAddressLine1: meta.addressLine1 || "",
+      vendorAddressLine2: meta.addressLine2 || "",
+      vendorCity: meta.city || "",
+      vendorState: meta.state || "",
+      vendorPincode: meta.pincode || "",
+    };
     if (draftPO) {
       const line = draftPO.items.find(item => item.subOrderId === subId)!;
       const updatedUnitPrice = Number(meta.unitPrice || line.unitPrice || 0);
-      const vendorFields = {
-        vendorId: primary.vendorId,
-        vendorName,
-        vendorContact: meta.contact || "",
-        vendorEmail: meta.email || "",
-        vendorPhone: meta.phone || "",
-        vendorGstin: meta.gstin || "",
-        vendorAddress: [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
-        vendorAddressLine1: meta.addressLine1 || "",
-        vendorAddressLine2: meta.addressLine2 || "",
-        vendorCity: meta.city || "",
-        vendorState: meta.state || "",
-        vendorPincode: meta.pincode || "",
+      const movedLine = {
+        ...line,
+        unitPrice: updatedUnitPrice,
+        lineSubtotal: updatedUnitPrice * line.qty,
+        status: wasCancelled ? "Pending" : line.status,
+        cancelReason: wasCancelled ? undefined : line.cancelReason,
+        tracking: wasCancelled ? null : line.tracking,
       };
-      const movedLine = { ...line, unitPrice: updatedUnitPrice, lineSubtotal: updatedUnitPrice * line.qty };
 
       if (draftPO.items.length === 1) {
         updatePO(draftPO.poNumber, {
@@ -2770,6 +2786,74 @@ export default function MyOrderPage() {
           }],
         });
       }
+    } else if (wasCancelled && previousSubOrder) {
+      // A cancelled line may belong to a confirmed PO, so it cannot be
+      // redirected in place. Keep the old cancelled line for its audit trail
+      // and create a fresh Draft PO for the replacement vendor.
+      const unitPrice = Number(meta.unitPrice || String(previousSubOrder.unitPrice || "").replace(/[^\d.-]/g, "") || 0);
+      const qty = Number(previousSubOrder.qty || 0);
+      const gstPct = getEffectiveTaxPctForCategory(previousSubOrder.category);
+      const lineSubtotal = unitPrice * qty;
+      const replacementLine: POLineItem = {
+        subOrderId: subId,
+        item: previousSubOrder.itemName,
+        sku: previousSubOrder.sku || `${getPrefix("sku") || "SKU-"}${subId}`,
+        productCode: previousSubOrder.productCode || "",
+        category: previousSubOrder.category || "General",
+        hsnCode: "",
+        specs: Array.isArray(previousSubOrder.specs) ? previousSubOrder.specs : [],
+        referenceNumber: previousSubOrder.referenceNumber || "",
+        qty,
+        unitPrice,
+        lineSubtotal,
+        gstPct,
+        productType: previousSubOrder.commercialTerms?.productType,
+        commercialTerms: previousSubOrder.commercialTerms,
+        status: "Pending",
+        tracking: null,
+      };
+      const now = new Date();
+      const displayDate = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+      const halfGst = gstPct / 2;
+      const gstAmount = Math.round(lineSubtotal * halfGst / 100 * 100) / 100;
+      const replacementPO: StoredPO = {
+        poNumber: generatePoNumber(),
+        orderId,
+        subOrderId: subId,
+        subOrderIds: [subId],
+        items: [replacementLine],
+        ...vendorFields,
+        item: replacementLine.item,
+        sku: replacementLine.sku,
+        category: replacementLine.category,
+        hsnCode: replacementLine.hsnCode,
+        specs: replacementLine.specs,
+        referenceNumber: replacementLine.referenceNumber,
+        qty,
+        unitPrice,
+        subtotal: lineSubtotal,
+        sgstPct: halfGst,
+        cgstPct: halfGst,
+        sgstAmt: gstAmount,
+        cgstAmt: gstAmount,
+        grandTotal: lineSubtotal + gstAmount + gstAmount,
+        paymentTerms: order?.paymentTerms || "Net 30",
+        status: "Draft",
+        createdOn: now.toISOString(),
+        createdOnDisplay: displayDate,
+        requestedDelivery: previousSubOrder.requiredDate || "",
+        documents: [],
+        notes: [{
+          id: `audit_replacement_${Date.now()}`,
+          author: "System",
+          initials: "SY",
+          color: "#6b7280",
+          date: displayDate,
+          text: `Draft PO created after ${previousSubOrder.itemName} was cancelled with the previous vendor. Replacement vendor: ${vendorName}.`,
+          visibility: "Internal Note",
+        }],
+      };
+      savePO(replacementPO);
     }
     setVendorTarget(null);
   };
@@ -3300,9 +3384,12 @@ export default function MyOrderPage() {
                   const isSubOrderCancelled = sub.itemStatus === "Cancelled";
                   // A cancelled sub-order is fully inactive in this view. Do
                   // not expose stale PO/vendor projections or action handlers.
-                  const subPOs = isSubOrderCancelled
-                    ? []
-                    : Object.values(createdPOs).filter((p: any) => poCoversSubOrder(p, sub.id)) as any[];
+                   const subPOs = Object.values(createdPOs)
+                     .filter((p: any) => poCoversSubOrder(p, sub.id))
+                     .filter((p: any) => {
+                       const line = (p.items || []).find((item: any) => item.subOrderId === sub.id);
+                       return isSubOrderCancelled || !line || line.status !== "Cancelled";
+                     }) as any[];
                   const hasPO = subPOs.length > 0;
                   const hasConfirmedPO = subPOs.some(isConfirmedPO);
                    const canMarkShipped = subPOs.some((po: any) => isPOItemShipped(po, sub.id));
@@ -3335,8 +3422,31 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                          {isSubOrderCancelled ? (
-                            <span style={{ fontSize: 12, color: "#9ca3af" }}>---</span>
+                           {isSubOrderCancelled ? (
+                             <div>
+                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                 <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                                   {(subPOs[0]?.vendorName || sub.selectedVendorName || "V")[0].toUpperCase()}
+                                 </div>
+                                 <div>
+                                   <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>
+                                     {subPOs[0]?.vendorName || sub.selectedVendorName || "Previous vendor"}
+                                   </div>
+                                   <div style={{ fontSize: 10, color: "#991b1b" }}>Cancelled</div>
+                                 </div>
+                               </div>
+                               <button
+                                 onClick={() => setVendorTarget({
+                                   ...sub,
+                                   selectedVendorId: "",
+                                   selectedVendorName: null,
+                                   previousVendorId: subPOs[0]?.vendorId || sub.selectedVendorId || "",
+                                 })}
+                                 style={{ marginTop: 6, padding: "4px 8px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
+                               >
+                                 Select Different Vendor
+                               </button>
+                               </div>
                           ) : hasPO ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                               {subPOs.map((po: any) => (
@@ -3704,6 +3814,7 @@ export default function MyOrderPage() {
         <VendorSelectionModal
           sub={vendorTarget}
           selectedVendorId={vendorTarget.selectedVendorId}
+           excludedVendorIds={vendorTarget.previousVendorId ? [vendorTarget.previousVendorId] : []}
           onSelect={handleVendorSelection}
           onClose={() => setVendorTarget(null)}
         />
