@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
-import { savePO, generatePoNumber, getAllPOs, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
+import { savePO, generatePoNumber, getAllPOs, updatePO, isPOConfirmed, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
 import { getVendorById } from "../lib/vendorDataStore";
 import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
@@ -347,9 +347,15 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
         target.status !== "Shipped" &&
         target.status !== "Partially Delivered"
       ) return prev;
-      // Once any PO has been generated for an order (including a draft PO),
-      // the master order must not be cancelled.
-      if (status === "Cancelled" && getAllPOs().some((po) => po.orderId === orderId)) return prev;
+      // Draft POs are created automatically and remain editable. The master
+      // order becomes non-cancellable only after a PO is confirmed/issued.
+      if (status === "Cancelled" && getAllPOs().some((po) => po.orderId === orderId && isPOConfirmed(po))) return prev;
+      if (status === "Cancelled") {
+        // Keep cancelled orders from retaining actionable draft POs.
+        getAllPOs()
+          .filter((po) => po.orderId === orderId && !isPOConfirmed(po) && String(po.status).toLowerCase() !== "cancelled")
+          .forEach((po) => updatePO(po.poNumber, { status: "Cancelled", cancelReason: cancelReason || "Order cancelled" }));
+      }
       // Release reserved stock when an order is cancelled before a PO is raised.
       // If a PO was already raised for some qty, that qty's reservedStock was
       // already cleared at PO-creation time, so the Math.max(0, ...) floor in
@@ -377,14 +383,14 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
         if (
           idSet.has(o.id) &&
           o.status !== "Cancelled" &&
-          !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id))
+          !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
         ) cascadeStatusToSubOrders(o, status);
       });
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return prev.map((o) => (
         idSet.has(o.id) &&
         o.status !== "Cancelled" &&
-        !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id))
+        !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
           ? { ...o, status, ...extra }
           : o
       ));

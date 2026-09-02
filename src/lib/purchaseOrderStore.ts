@@ -107,6 +107,12 @@ export interface StoredPO {
   cancelReason?: string;
 }
 
+/** A PO locks its order only after it has left the editable Draft state. */
+export function isPOConfirmed(po: Pick<StoredPO, "status"> | null | undefined): boolean {
+  const status = String(po?.status || "").toLowerCase();
+  return status !== "draft" && status !== "cancelled" && status !== "rejected";
+}
+
 const STORAGE_KEY = "nido_all_purchase_orders";
 
 export function getAllPOs(): StoredPO[] {

@@ -7,7 +7,7 @@ import { getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, isPOConfirmed, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -2228,7 +2228,7 @@ function ThreeDotMenu({
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button
             disabled={!cancelEnabled}
-            title={!cancelEnabled ? "Cancellation is unavailable after a purchase order has been generated or the item is locked." : undefined}
+            title={!cancelEnabled ? "Cancellation is unavailable after a purchase order has been confirmed or issued, or the item is locked." : undefined}
             style={{
               ...menuItemSt,
               color: cancelEnabled ? "#dc2626" : "#d1d5db",
@@ -2342,8 +2342,7 @@ function isPOItemShipped(po: any, subOrderId: string): boolean {
 }
 
 function isConfirmedPO(po: any): boolean {
-  const status = String(po?.status || "").toLowerCase();
-  return status !== "draft" && status !== "cancelled" && status !== "rejected";
+  return isPOConfirmed(po);
 }
 
 // Client-created sub-orders wait in Pending until their vendor PO is confirmed.
@@ -2465,11 +2464,8 @@ export default function MyOrderPage() {
     () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
     [poRefreshKey, orderId],
   );
-  const hasGeneratedOrderPO = orderPOs.length > 0;
-  const allOrderPOsCancelled = hasGeneratedOrderPO
-    && orderPOs.every(po => String(po.status || "").toLowerCase() === "cancelled");
-  const canCancelOrder = !hasGeneratedOrderPO || allOrderPOsCancelled;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
+  const canCancelOrder = !hasConfirmedOrderPO;
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
     if (isOrderCancelled || isOrderDelivered) return; // terminal orders can no longer be updated
@@ -3167,10 +3163,10 @@ export default function MyOrderPage() {
               ) : (
                 !canCancelOrder ? (
                   <span
-                    title="This order cannot be cancelled because a purchase order has already been generated."
+                    title="This order cannot be cancelled because a purchase order has already been confirmed or issued."
                     style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
                   >
-                    🔒 PO generated — order locked
+                    🔒 PO confirmed — order locked
                   </span>
                 ) : (
                   <button
@@ -3540,9 +3536,9 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onSetReference={() => setReferenceTarget(sub.id)}
-                            referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
+                            referenceLocked={hasConfirmedPO && sub.itemStatus !== "Shipped"}
                             onCancel={() => setCancelTarget(sub.id)}
-                            cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Delivered"}
+                            cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Delivered" && !hasConfirmedPO}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}
