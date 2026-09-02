@@ -81,6 +81,19 @@ export interface MyOrder {
   paymentDetail?: string;
   paymentTerms?: string;
   deliveryAddress?: string;
+  /** Snapshot of the selected checkout delivery address for the order detail view. */
+  deliveryDetails?: {
+    label?: string;
+    attentionName?: string;
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    zip?: string;
+    phone?: string;
+    instructions?: string;
+  };
   cancelReason?: string;
 }
 

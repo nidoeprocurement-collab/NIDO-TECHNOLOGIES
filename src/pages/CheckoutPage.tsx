@@ -14,6 +14,7 @@ import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 interface DeliveryAddress {
   id: number;
   label: string;
+  attentionName?: string;
   line1: string;
   line2: string;
   city: string;
@@ -24,7 +25,7 @@ interface DeliveryAddress {
 }
 
 type AddressForm = Omit<DeliveryAddress, "id" | "isDefault">;
-const EMPTY_FORM: AddressForm = { label: "", line1: "", line2: "", city: "", state: "", zip: "", phone: "" };
+const EMPTY_FORM: AddressForm = { label: "", attentionName: "", line1: "", line2: "", city: "", state: "", zip: "", phone: "" };
 
 function isValidPhone(raw: string): boolean {
   return isValidPhoneNumber(raw);
@@ -55,6 +56,7 @@ function buildDefaultAddress(clientId: string): DeliveryAddress | null {
   return {
     id: 1,
     label: "Office",
+    attentionName: (client as any).shippingAttention || (client as any).shipping_attention || "",
     line1: client.billingAddress || "",
     line2: "",
     city: client.billingCity || "",
@@ -137,7 +139,18 @@ function AddressFormBlock({
         </div>
       </div>
 
-      {/* Row 2: Address Line 1 */}
+      {/* Row 2: Attention name */}
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1">Attention Name <span className="text-gray-400 font-normal">(optional)</span></label>
+        <input
+          value={form.attentionName}
+          onChange={set("attentionName")}
+          placeholder="Person receiving the delivery"
+          className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-400 bg-white"
+        />
+      </div>
+
+      {/* Row 3: Address Line 1 */}
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 1 <span className="text-red-500">*</span></label>
         <input
@@ -322,7 +335,7 @@ export default function CheckoutPage() {
                   editingId === addr.id ? (
                     <AddressFormBlock
                       key={addr.id}
-                      initial={{ label: addr.label, line1: addr.line1, line2: addr.line2 ?? "", city: addr.city ?? "", state: addr.state ?? "", zip: addr.zip ?? "", phone: addr.phone }}
+                      initial={{ label: addr.label, attentionName: addr.attentionName ?? "", line1: addr.line1, line2: addr.line2 ?? "", city: addr.city ?? "", state: addr.state ?? "", zip: addr.zip ?? "", phone: addr.phone }}
                       onSave={(f) => saveEdit(addr.id, f)}
                       onCancel={() => setEditingId(null)}
                     />
@@ -399,7 +412,10 @@ export default function CheckoutPage() {
                     maxLength={250}
                     placeholder="Add delivery instructions, gate entry details, timing preferences, etc."
                     value={deliveryInstructions}
-                    onChange={(e) => setDeliveryInstructions(e.target.value)}
+                    onChange={(e) => {
+                      setDeliveryInstructions(e.target.value);
+                      localStorage.setItem("nido_delivery_instructions", e.target.value);
+                    }}
                     className="w-full px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                   />
                   <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>

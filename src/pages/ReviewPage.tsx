@@ -21,8 +21,11 @@ interface DeliveryAddress {
   line2: string;
   city?: string;
   state?: string;
+  country?: string;
   zip?: string;
   phone: string;
+  attention?: string;
+  attentionName?: string;
   isDefault: boolean;
 }
 
@@ -46,9 +49,11 @@ export default function ReviewPage() {
 
   const clientId = localStorage.getItem("nido_shop_selected_client") || "";
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
 
   useEffect(() => {
     setAddresses(loadAddresses(clientId));
+    setDeliveryInstructions(localStorage.getItem("nido_delivery_instructions") || "");
   }, [clientId]);
 
   const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
@@ -173,6 +178,20 @@ export default function ReviewPage() {
         ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
             .filter(Boolean).join(", ")
         : "",
+      deliveryDetails: selectedAddr
+        ? {
+            label: selectedAddr.label,
+            attentionName: selectedAddr.attentionName || selectedAddr.attention || "",
+            line1: selectedAddr.line1,
+            line2: selectedAddr.line2,
+            city: selectedAddr.city,
+            state: selectedAddr.state,
+            country: selectedAddr.country,
+            zip: selectedAddr.zip,
+            phone: selectedAddr.phone,
+            instructions: deliveryInstructions,
+          }
+        : undefined,
       cartItems: itemsSnapshot.map((i) => ({
         id: i.id,
         name: i.name,
@@ -209,6 +228,7 @@ export default function ReviewPage() {
     }
 
     consumeCart();
+    localStorage.removeItem("nido_delivery_instructions");
     navigate(`/shop/order-confirmation/${orderNumber}`, {
       state: {
         orderNumber,

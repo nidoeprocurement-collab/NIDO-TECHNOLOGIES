@@ -2432,22 +2432,54 @@ export default function MyOrderPage() {
     } catch { return null; }
   }, [order?.paymentMethod]);
 
-  const deliveryAddressFallback = useMemo(() => {
-    if (order?.deliveryAddress) return null; // field already stored on order
+  const deliveryInfo = useMemo(() => {
+    const stored = order?.deliveryDetails;
+    let savedAddress: any = null;
     try {
-      const clientId = localStorage.getItem("nido_shop_selected_client") || "";
+      const clientId = order?.clientId || localStorage.getItem("nido_shop_selected_client") || "";
       const addrs: any[] = JSON.parse(
         localStorage.getItem(`nido_delivery_addresses_${clientId}`) || "[]"
       );
-      const addr = addrs.find(a => a.isDefault) ?? addrs[0] ?? null;
-      if (!addr) return null;
-      return [addr.line1, addr.line2, addr.city, addr.state, addr.zip].filter(Boolean).join(", ");
-    } catch { return null; }
-  }, [order?.deliveryAddress]);
+      // Prefer an address whose formatted value matches the stored order,
+      // then use the default/first address for legacy orders.
+      savedAddress = addrs.find((a) =>
+        order?.deliveryAddress &&
+        [a.line1, a.line2, a.city, a.state, a.zip].filter(Boolean).join(", ") === order.deliveryAddress
+      ) ?? addrs.find(a => a.isDefault) ?? addrs[0] ?? null;
+    } catch {
+      savedAddress = null;
+    }
+
+    const client = getClients().find((entry: any) =>
+      entry.id === order?.clientId || entry.name === order?.client
+    ) as any;
+    const source = stored || savedAddress || {};
+    const address = order?.deliveryAddress || [
+      source.line1, source.line2, source.city, source.state, source.country, source.zip,
+    ].filter(Boolean).join(", ");
+
+    return {
+      label: source.label || "",
+      attentionName: source.attentionName || source.attention ||
+        (order as any)?.deliveryAttention || (order as any)?.deliveryAttn ||
+        client?.shipping_attention || client?.shippingAttention || "",
+      address,
+      line1: source.line1 || "",
+      line2: source.line2 || "",
+      city: source.city || "",
+      state: source.state || "",
+      country: source.country || "",
+      zip: source.zip || "",
+      phone: source.phone || "",
+      instructions: source.instructions || (order as any)?.deliveryInstructions || "",
+    };
+  }, [order]);
 
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
-  const TABS = isClientPortalUser ? ["Sub Orders / Items"] : ["Sub Orders / Items", "Draft Purchase Orders"];
+  const TABS = isClientPortalUser
+    ? ["Delivery Information", "Sub Orders / Items"]
+    : ["Delivery Information", "Sub Orders / Items", "Draft Purchase Orders"];
   const [activeTab, setActiveTab] = useState("Sub Orders / Items");
   // Master status lives on the shared order record itself (single source of
   // truth) so a change made on the owner platform is visible immediately on
@@ -3229,11 +3261,6 @@ export default function MyOrderPage() {
             )}
             <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
           </div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
-            <Field label="Delivery Address" value={order?.deliveryAddress || deliveryAddressFallback || "As per checkout"} />
-            <Field label="Requested Delivery" value="Within 30 days" />
-            <Field label="Items" value={`${subOrders.length} sub-order${subOrders.length !== 1 ? "s" : ""} · ${subOrders.reduce((s, o) => s + o.qty, 0)} unit${subOrders.reduce((s, o) => s + o.qty, 0) !== 1 ? "s" : ""}`} />
-          </div>
           <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
             <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
           ) : (
@@ -3335,6 +3362,47 @@ export default function MyOrderPage() {
               </div>
             )}
           </div>
+
+          {/* Delivery Information tab */}
+          {activeTab === "Delivery Information" && (
+            <div style={{ padding: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Address</div>
+                  <Field label="Address Label" value={deliveryInfo.label || "—"} />
+                  <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
+                  <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
+                  <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
+                </div>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Location & Contact</div>
+                  <Field label="City" value={deliveryInfo.city || "—"} />
+                  <Field label="State" value={deliveryInfo.state || "—"} />
+                  <Field label="Country" value={deliveryInfo.country || "—"} />
+                  <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
+                  <Field label="Phone" value={deliveryInfo.phone || "—"} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16, marginTop: 16 }}>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Schedule</div>
+                  <Field label="Requested Delivery" value="Within 30 days" />
+                  <Field label="Order Date" value={order ? `${order.orderDate} ${order.orderTime}` : "—"} />
+                </div>
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Instructions</div>
+                  <div style={{ fontSize: 13.5, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+                    {deliveryInfo.instructions || "No delivery instructions provided"}
+                  </div>
+                </div>
+              </div>
+              {!deliveryInfo.line1 && deliveryInfo.address && (
+                <div style={{ marginTop: 16, border: "1px solid #e5e7eb", borderRadius: 10, padding: 18 }}>
+                  <Field label="Full Delivery Address" value={deliveryInfo.address} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
