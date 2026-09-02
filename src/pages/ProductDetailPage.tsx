@@ -16,7 +16,7 @@ import {
   getVendorComparisonBadge,
   type VendorComparisonRow,
 } from "@/lib/priceEngineStore";
-import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
+import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import {
   formatLeadTimeByType,
@@ -254,12 +254,15 @@ export default function ProductDetailPage() {
     : product.image ? [product.image] : [];
 
   const discountPct = clientId ? getSlabDiscountPct(clientId, product.category, qty) : 0;
-  const effectivePrice = discountPct > 0 ? product.priceNum * (1 - discountPct / 100) : product.priceNum;
   const productType = getProductType(product.physicalType);
   const productPricingModel = getPricingModel(productType);
   const productQuantityLabel = getQuantityLabel(productType);
   const canUseVendor = (vendor: VendorComparisonRow) =>
     isDigitalOnlyType(productType) || canVendorFulfillMoq(vendor);
+  const vendorMoq = selectedVendor?.moq ?? product.moq;
+  const vendorMaxQty = selectedVendor && !isDigitalOnlyType(productType) && selectedVendor.stock > 0
+    ? selectedVendor.stock
+    : undefined;
 
   const specPairs = product.specs.map(s => {
     const idx = s.indexOf(': ');
@@ -267,9 +270,23 @@ export default function ProductDetailPage() {
   }).filter(sp => sp.key || sp.val);
 
   const gstRate = getEffectiveTaxPctForCategory(product?.category ?? "");
+  const selectedVendorPrice = selectedVendor?.basePrice;
+  const displayPriceExcl = selectedVendorPrice ?? product.priceNum * 100 / (100 + gstRate);
+  const effectivePrice = discountPct > 0 ? displayPriceExcl * (1 - discountPct / 100) : displayPriceExcl;
+  const hsnSnapshot = (() => {
+    const byCategory = new Map<string, string>();
+    getHsnCodes().forEach(h => {
+      if (h.status === "Active" && h.productCategory) byCategory.set(h.productCategory.toLowerCase(), h.code);
+    });
+    getProductCategoryTaxMap().forEach(m => {
+      if (m.defaultHsnCode && m.productCategory) byCategory.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
+    });
+    return byCategory.get((product.category || "").toLowerCase()) || "";
+  })();
 
   const handleAdd = () => {
-    if (added || !selectedVendor) return;
+    if (added || !selectedVendor || !canUseVendor(selectedVendor)) return;
+    const orderQty = vendorMaxQty !== undefined ? Math.min(vendorMaxQty, qty) : qty;
     addItem(
       {
         id: Math.random() * 10000,
@@ -286,11 +303,13 @@ export default function ProductDetailPage() {
         leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
+         vendorProductCode: selectedVendor.vendorProductCode,
         vendorPrice: selectedVendor.basePrice,
         landedCost: selectedVendor.landedCostPerUnit,
         gstSnapshot: gstRate,
+         hsnSnapshot,
       },
-      Math.max(1, qty)
+       Math.max(1, orderQty)
     );
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -435,7 +454,7 @@ export default function ProductDetailPage() {
 
               {discountPct > 0 ? (
                 <>
-                  <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(product.priceNum)}</p>
+                   <p className="text-sm text-gray-400 line-through mt-1">{formatPrice(displayPriceExcl)}</p>
                   <p className="text-3xl font-bold text-green-600 mt-0.5">
                     {formatPrice(effectivePrice)}
                     {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
@@ -444,8 +463,8 @@ export default function ProductDetailPage() {
                 </>
               ) : (
                 <p className="text-3xl font-bold text-gray-900 mt-1">
-                  {formatPrice(product.priceNum)}
-                  {product.priceNum > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
+                   {formatPrice(displayPriceExcl)}
+                   {displayPriceExcl > 0 && <span className="text-sm font-normal text-gray-500"> / each</span>}
                 </p>
               )}
 
@@ -540,19 +559,20 @@ export default function ProductDetailPage() {
               {/* Qty stepper */}
               <div className="flex items-center gap-3 mt-4">
                 <button
-                  onClick={() => setQty(q => Math.max(Math.max(1, product.moq), q - 1))}
+                   onClick={() => setQty(q => Math.max(Math.max(1, vendorMoq), q - 1))}
                   className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
                 >
                   −
                 </button>
-                <span className="flex-1 text-center font-bold text-base">{qty}</span>
+                   <span className="flex-1 text-center font-bold text-base">{qty}</span>
                 <button
-                  onClick={() => setQty(q => q + 1)}
+                   onClick={() => setQty(q => vendorMaxQty === undefined ? q + 1 : Math.min(vendorMaxQty, q + 1))}
+                   disabled={vendorMaxQty !== undefined && qty >= vendorMaxQty}
                   className="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 text-lg leading-none shrink-0"
                 >
                   +
                 </button>
-                <span className="text-xs text-gray-400 whitespace-nowrap">(Min: {product.moq > 0 ? product.moq : 1})</span>
+                 <span className="text-xs text-gray-400 whitespace-nowrap">(Min: {vendorMoq > 0 ? vendorMoq : 1})</span>
               </div>
 
               {/* Add to Cart */}

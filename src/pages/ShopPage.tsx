@@ -295,7 +295,7 @@ function ZoomableImage({ src, alt }: { src: string; alt: string }) {
 }
 
 function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, allProducts, onSelectProduct }: { product: Product | null; open: boolean; onClose: () => void; onMoqChange: (product: Product, newMoq: number) => void; clientId?: string; allProducts: Product[]; onSelectProduct: (p: Product) => void }) {
-  const { addItem, items } = useCart();
+  const { items } = useCart();
   const { isImpersonating } = useAuth();
   const [qty, setQty] = useState(product?.moq ?? 1);
   const [qtyDraft, setQtyDraft] = useState(String(product?.moq ?? 1));
@@ -332,9 +332,11 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
     : dialogBasePriceExcl;
 
   const handleAdd = () => {
-    if (isImpersonating) return;
-    if (isInCart) return;
-    addItem({ id: Math.random() * 10000, name: product.name, image: product.image, specs: product.specs, moq: product.moq, totalStock: product.totalStock, priceNum: product.priceNum, clientId, category: product.category, productCode: product.productCode }, Math.max(1, qty));
+    // This legacy dialog must not bypass the vendor-selection requirement.
+    // The live Shop flow opens ProductDetailPage, where the user selects one.
+    if (isImpersonating || isInCart) return;
+    onSelectProduct(product);
+    onClose();
   };
 
   const specPairs = product.specs.map(s => {
@@ -508,7 +510,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                     className={`w-full mt-4 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold transition-all ${!product.inStock ? "bg-gray-200 text-gray-400 cursor-not-allowed" : isInCart ? "bg-green-600 text-white cursor-default" : "bg-blue-600 hover:bg-blue-700 text-white"}`}
                 >
                   {isInCart ? <Check size={16} /> : <ShoppingCart size={16} />}
-                  {!product.inStock ? "Out of Stock" : isInCart ? "Added to Cart" : "Add to Cart"}
+                   {!product.inStock ? "Out of Stock" : isInCart ? "Added to Cart" : "Select a vendor first"}
                 </button>
 
                 <div className="mt-5 space-y-2.5 border-t border-gray-100 pt-4">
@@ -604,7 +606,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                           onClick={(e) => {
                             e.stopPropagation();
                             if (rpInCart) return;
-                            addItem({ id: Math.random() * 10000, name: rp.name, image: rp.image, specs: rp.specs, moq: rp.moq, priceNum: rp.priceNum, clientId, category: rp.category, productCode: rp.productCode }, Math.max(1, rp.moq));
+                            onSelectProduct(rp);
                           }}
                           disabled={rpInCart}
                           className={`mt-2 flex items-center justify-center gap-1.5 rounded-lg border py-1.5 text-[11px] font-semibold transition-colors ${
@@ -614,7 +616,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
                           }`}
                         >
                           {rpInCart ? <Check size={12} /> : <ShoppingCart size={12} />}
-                          {rpInCart ? "Added to Cart" : "Add to Cart"}
+                          {rpInCart ? "Added to Cart" : "View & Select Vendor"}
                         </button>
                       </div>
                     );
@@ -736,6 +738,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
         leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
+        vendorProductCode: selectedVendor.vendorProductCode,
         vendorPrice: selectedVendor.basePrice,
         landedCost: selectedVendor.landedCostPerUnit,
         gstSnapshot: cardGstRate,
@@ -1104,7 +1107,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
 }
 
 function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product: Product; onPreview: (p: Product) => void; clientId?: string; isGrid: boolean }) {
-  const { addItem, items } = useCart();
+  const { items } = useCart();
   const { isImpersonating } = useAuth();
   const [liked, setLiked] = useState(false);
   const kind = getShopProductKind(product);
@@ -1121,25 +1124,10 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
   const isInCart = items.some(item => item.productCode === product.productCode && item.clientId === clientId);
   const handleAdd = (event: React.MouseEvent) => {
     event.stopPropagation();
+    // Digital products still have a vendor relationship. Never add one with
+    // the catalog price; open the same vendor-selection flow as other items.
     if (isImpersonating || !product.inStock || isInCart) return;
-    addItem({
-      id: Math.random() * 10000,
-      name: product.name,
-      image: product.image,
-      specs: product.specs,
-      moq: product.moq,
-      totalStock: 0,
-      priceNum: product.priceNum,
-      clientId,
-      category: product.category,
-      productCode: product.productCode,
-       productType: product.productType,
-       physicalType: product.physicalType,
-       commercialTerms,
-       fulfillmentType: "digital",
-      leadTime: product.leadTime,
-      gstSnapshot: gstRate,
-    }, Math.max(1, product.moq));
+    onPreview(product);
   };
 
   return (
@@ -1227,8 +1215,8 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
                 : "border-blue-300 bg-white text-blue-600 hover:bg-blue-50"
           }`}
         >
-          {isInCart ? <Check size={13} /> : <ShoppingCart size={13} />}
-          {isInCart ? "Added to Cart" : product.inStock ? "Add to Cart" : "Unavailable"}
+           {isInCart ? <Check size={13} /> : <ShoppingCart size={13} />}
+           {isInCart ? "Added to Cart" : product.inStock ? "Select Vendor" : "Unavailable"}
         </button>
       </div>
     </div>

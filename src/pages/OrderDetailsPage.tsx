@@ -3558,7 +3558,11 @@ export default function MyOrderPage() {
                 // priceNum is tax-inclusive so we back-calculate per-category rates, not a flat 18%.
                 const cartItems = order.cartItems || [];
                 const { slabs, totalGst, preTaxSubtotal } = computeCartGST(
-                  cartItems.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
+                  cartItems.map(i => ({
+                    inclusiveAmount: i.priceNum * i.quantity,
+                    category: i.category,
+                    taxRate: i.gstSnapshot,
+                  }))
                 );
                 const grandTotal = preTaxSubtotal + totalGst;
                 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });

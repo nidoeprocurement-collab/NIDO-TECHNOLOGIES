@@ -31,6 +31,8 @@ export type CartItem = {
   selectedVendorName?: string;
   /** Vendor's raw base price per unit (excl. logistics/tax). */
   vendorPrice?: number;
+  /** Exact vendor-side product code for the selected vendor. */
+  vendorProductCode?: string;
   /** Fully-loaded landed cost per unit (incl. logistics, handling, tax). */
   landedCost?: number;
   /** GST rate % captured at time of add. */

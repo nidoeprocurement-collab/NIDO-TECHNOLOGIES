@@ -11,6 +11,7 @@ import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 import { reserveVendorStock } from "@/lib/vendorStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 
 // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -127,18 +128,25 @@ export default function ReviewPage() {
 
   // priceNum is tax-inclusive — extract embedded GST, don't add on top.
   // Apply slab discount (same logic as CartPage) before computing GST.
-  const getEffectivePrice = (i: { clientId?: string; category?: string; priceNum: number; quantity: number }) => {
+  const getEffectivePrice = (i: { clientId?: string; category?: string; priceNum: number; quantity: number; selectedVendorId?: string; vendorPrice?: number; gstSnapshot?: number }) => {
     const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-    return discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
+    const taxRate = getCartTaxRate(i) ?? 0;
+    const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate);
+    return discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
   };
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
-    cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category }))
+    cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category, taxRate: getCartTaxRate(i) }))
   );
   const subtotal = preTaxSubtotal;
   const handlePlaceOrder = () => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
-    const itemsSnapshot = cart.map((i) => ({ ...i }));
+    // Persist the selected vendor's tax-inclusive customer price as priceNum
+    // so order, invoice, and confirmation views cannot fall back to catalog pricing.
+    const itemsSnapshot = cart.map((i) => ({
+      ...i,
+      priceNum: getCartUnitPriceInclusive(i, getCartTaxRate(i) ?? 0),
+    }));
     const totalAmount = subtotal + totalGst;
     const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -188,6 +196,7 @@ export default function ReviewPage() {
         // Vendor snapshot locked at add-to-cart time — travels with the order
         selectedVendorId: i.selectedVendorId,
         selectedVendorName: i.selectedVendorName,
+         vendorProductCode: i.vendorProductCode,
         vendorPrice: i.vendorPrice,
         landedCost: i.landedCost,
         gstSnapshot: i.gstSnapshot,

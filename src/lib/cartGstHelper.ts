@@ -28,12 +28,14 @@ export interface CartGstResult {
  *   gst     = inclusiveAmount − preTax
  */
 export function computeCartGST(
-  items: { inclusiveAmount: number; category?: string }[],
+  items: { inclusiveAmount: number; category?: string; taxRate?: number }[],
 ): CartGstResult {
   const rateMap = new Map<number, { preTax: number; gst: number }>();
 
   for (const item of items) {
-    const rate = getEffectiveTaxPctForCategory(item.category || '');
+    const rate = typeof item.taxRate === 'number' && Number.isFinite(item.taxRate)
+      ? item.taxRate
+      : getEffectiveTaxPctForCategory(item.category || '');
     const preTax = item.inclusiveAmount * 100 / (100 + rate);
     const gst   = item.inclusiveAmount - preTax;
     const prev  = rateMap.get(rate) ?? { preTax: 0, gst: 0 };

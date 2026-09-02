@@ -40,6 +40,7 @@ export interface OrderCartItem {
   selectedVendorId?: string;
   selectedVendorName?: string;
   vendorPrice?: number;
+  vendorProductCode?: string;
   landedCost?: number;
   gstSnapshot?: number;
   hsnSnapshot?: string;
@@ -195,7 +196,7 @@ function autoCreateDraftPOs(
       return {
         subOrderId,
         item: item.name,
-        sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
+       sku: item.vendorProductCode || item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
         productCode: item.productCode || "",
         category: item.category || "General",
         hsnCode: item.hsnSnapshot || "",

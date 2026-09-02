@@ -6,6 +6,7 @@ import { useOrgConfig } from "@/contexts/ConfigContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,11 @@ type ConfirmationState = {
     category?: string;
     specs?: string[];
     clientId?: string;
+    selectedVendorId?: string;
+    selectedVendorName?: string;
+    vendorPrice?: number;
+    vendorProductCode?: string;
+    gstSnapshot?: number;
   }[];
   subtotal: number;
   gst: number;
@@ -254,7 +260,8 @@ export default function OrderConfirmationPage() {
                     <span className="text-gray-800 font-medium shrink-0">
                       {(() => {
                         const discountPct = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
-                        const effectivePrice = discountPct > 0 ? item.priceNum * (1 - discountPct / 100) : item.priceNum;
+                        const vendorInclusivePrice = getCartUnitPriceInclusive(item, getCartTaxRate(item) ?? 0);
+                        const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
                         return formatPrice(effectivePrice * item.quantity);
                       })()}
                     </span>

@@ -6,6 +6,7 @@ import { useOrgConfig } from "@/contexts/ConfigContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 
 function formatPrice(n: number) {
   return formatCurrency(n, undefined, { decimals: 0 });
@@ -28,8 +29,10 @@ export default function OrderSummaryPanel({
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
     cart.map(i => {
       const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-      const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
-      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category };
+      const taxRate = getCartTaxRate(i);
+      const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate ?? 0);
+      const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
+      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
     })
   );
   const subtotal = preTaxSubtotal;
@@ -67,7 +70,7 @@ export default function OrderSummaryPanel({
                     <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity}</p>
                   </div>
                   <p className="text-xs font-semibold text-gray-900 shrink-0">
-                    {formatPrice(item.priceNum * item.quantity)}
+                     {formatPrice(getCartUnitPriceInclusive(item, getCartTaxRate(item) ?? 0) * item.quantity)}
                   </p>
                 </div>
               ))}

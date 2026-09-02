@@ -157,9 +157,11 @@ export default function InvoiceFormPage() {
     if (order.cartItems && order.cartItems.length > 0) {
       setLineItems(
         order.cartItems.map((ci) => {
-          // priceNum is tax-inclusive; derive the correct GST rate from the
-          // item category, then back-calculate the pre-tax unit rate.
-          const gstRate    = getEffectiveTaxPctForCategory(ci.category || '');
+          // Selected vendor tax is snapshotted on the order. Legacy orders
+          // continue to resolve their rate from the current tax settings.
+          const gstRate    = typeof ci.gstSnapshot === 'number'
+            ? ci.gstSnapshot
+            : getEffectiveTaxPctForCategory(ci.category || '');
           const preTaxRate = gstRate > 0
             ? Math.round((ci.priceNum * 100 / (100 + gstRate)) * 100) / 100
             : (ci.priceNum || 0);

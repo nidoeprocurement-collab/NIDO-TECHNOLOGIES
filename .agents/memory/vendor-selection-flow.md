@@ -48,6 +48,13 @@ Vendor selection is required before add-to-cart and is snapshotted onto the Cart
 - Confirm button in Draft POs tab calls `updatePO(po.poNumber, { status: "Confirmed" })` then navigates to the PO detail page for PDF/email.
 - The old `handleCreatePurchaseOrders` and `VendorSelectionModal`/`VendorSelectionTab`/`VendorSelectedSummaryTab` components remain in OrderDetailsPage but are unreachable UI (no tab or button references them) — safe to fully remove in a later cleanup.
 
+## Pricing boundary
+Customer-facing cart and order totals use the selected vendor's snapshotted base price plus its GST snapshot. Supplier POs use that same vendor's landed cost; the catalog's generic client price is only a legacy fallback.
+
+**Why:** The vendor selector is the user's commercial choice. Re-reading the generic catalog price downstream can charge one vendor's price while sourcing another vendor.
+
+**How to apply:** Any new cart, checkout, confirmation, invoice, or order-summary surface must resolve its unit price and tax rate from the vendor snapshot before reading `priceNum`.
+
 ## Shared product-type presentation
 The vendor product table and Shop vendor selectors use one shared rule set for pricing model, quantity label, availability, and lead-time units. Digital-only products show unlimited/instant provisioning; hybrid products retain stock-based availability with day lead time and instant service.
 

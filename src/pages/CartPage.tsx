@@ -13,6 +13,7 @@ import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } from "@/lib/taxEngine";
+import { getCartTaxRate, getCartUnitPriceExclGst, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
@@ -126,7 +127,7 @@ function SuggestedCard({
 
 export default function CartPage() {
   useI18n();
-  const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear, addItem } = useCart();
+  const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear } = useCart();
   const navigate = useNavigate();
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
@@ -138,7 +139,8 @@ export default function CartPage() {
       const days = p.winningVendor?.leadTime ?? 0;
       const displayDays = days > 0 ? days * 2 : 0;
       const allocations: VendorStockAllocation[] = p.vendorComparisons
-        .filter(r => r.stock > 0)
+        // Keep zero-stock vendors in the map so a selected vendor reaching
+        // zero cannot fall back to its stale add-to-cart stock snapshot.
         .map(r => ({
           vendorId: r.vendorId,
           vendorName: r.vendorName,
@@ -195,12 +197,6 @@ export default function CartPage() {
     return () => window.removeEventListener("clientCatalogUpdated", handler);
   }, [cart, vendorMatchMap]);
 
-  const onAddToCart = (p: Omit<CartItem, "quantity" | "vendorAllocations">) => {
-    const correctMoq = Math.max(1, p.moq);
-    const qty = p.totalStock > 0 ? Math.min(p.totalStock, correctMoq) : correctMoq;
-    addItem({ ...p, moq: correctMoq }, qty);
-  };
-
   const hsnByCategory = useMemo(() => {
     const map = new Map<string, string>();
     getHsnCodes().forEach(h => {
@@ -217,8 +213,10 @@ export default function CartPage() {
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
     cart.map(i => {
       const discountPct    = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-      const effectivePrice = discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
-      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category };
+      const taxRate = getCartTaxRate(i) ?? getEffectiveTaxPctForCategory(i.category || "");
+      const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate);
+      const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
+      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
     })
   );
   const subtotal = preTaxSubtotal;
@@ -270,20 +268,32 @@ export default function CartPage() {
                 {/* Rows */}
                 {cart.map((item, idx) => {
                   const discountPct    = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
-                  const effectivePrice = discountPct > 0 ? item.priceNum * (1 - discountPct / 100) : item.priceNum;
+                  const taxRate        = getCartTaxRate(item) ?? getEffectiveTaxPctForCategory(item.category || "");
+                  const unitPriceExcl   = getCartUnitPriceExclGst(item, taxRate);
+                  const vendorInclusivePrice = getCartUnitPriceInclusive(item, taxRate);
+                  const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
                   const inclusiveTotal = effectivePrice * item.quantity;
-                  const gstRate        = getEffectiveTaxPctForCategory(item.category || "");
+                  const gstRate        = taxRate;
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
-                  const originalUnit   = item.priceNum * 100 / (100 + gstRate);
+                  const originalUnit   = discountPct > 0 ? unitPriceExcl : preTaxUnit;
                   const catalog        = catalogMap.get(item.productCode || "");
-                  const stockInfo      = vendorMatchMap.get(item.productCode || "");
-                  const liveRemaining  = stockInfo?.totalStock ?? 0;
-                  const stockDataKnown = stockInfo !== undefined;
+                   const stockInfo      = vendorMatchMap.get(item.productCode || "");
+                   const selectedAllocation = item.selectedVendorId
+                     ? stockInfo?.allocations.find(a => a.vendorId === item.selectedVendorId)
+                     : undefined;
+                   const liveRemaining  = item.selectedVendorId
+                     ? (selectedAllocation?.stock ?? item.totalStock ?? 0)
+                     : (stockInfo?.totalStock ?? item.totalStock ?? 0);
+                   const stockDataKnown = item.selectedVendorId
+                     ? selectedAllocation !== undefined || item.totalStock !== undefined
+                     : stockInfo !== undefined;
                   const maxQty         = stockDataKnown ? item.quantity + liveRemaining : undefined;
 
-                  const itemMoq = stockInfo?.moq && stockInfo.moq > 0 ? stockInfo.moq : (item.moq > 0 ? item.moq : 1);
-                  const itemLeadTime = item.leadTime || stockInfo?.leadTime || "";
-                  const itemStock = stockInfo?.totalStock ?? item.totalStock ?? 0;
+                   const itemMoq = selectedAllocation?.moq && selectedAllocation.moq > 0
+                     ? selectedAllocation.moq
+                     : (item.moq > 0 ? item.moq : 1);
+                   const itemLeadTime = item.leadTime || (item.selectedVendorId ? "" : stockInfo?.leadTime || "");
+                   const itemStock = item.selectedVendorId ? (item.totalStock ?? selectedAllocation?.stock ?? 0) : (stockInfo?.totalStock ?? item.totalStock ?? 0);
                    const itemTerms = item.commercialTerms || getProductCommercialTerms(
                      item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : "Physical Product"),
                      { moq: itemMoq, leadTime: itemLeadTime, stock: itemStock },
