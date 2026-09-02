@@ -1932,7 +1932,7 @@ function ReferenceNumberModal({ itemName, current, onSave, onClose }) {
             <input value={value} onChange={e => setValue(e.target.value)} placeholder="Enter reference/model number" style={inSt} autoFocus />
           </div>
         </div>
-        <ModalFooter onCancel={onClose} onSave={() => { onSave(value.trim()); onClose(); }} saveLabel="Save" />
+        <ModalFooter onCancel={onClose} onSave={() => { onSave(value.trim()); onClose(); }} saveLabel="Save" skipConfirmation />
       </ModalBox>
     </Overlay>
   );
