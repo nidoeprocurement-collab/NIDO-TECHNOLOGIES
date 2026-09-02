@@ -3264,17 +3264,17 @@ export default function MyOrderPage() {
           </div>
           <div style={card}>
             <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
-            <Field label="Address Label" value={deliveryInfo.label || "—"} />
-            <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
-            <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
-            <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
-            <Field label="City" value={deliveryInfo.city || "—"} />
-            <Field label="State" value={deliveryInfo.state || "—"} />
-            <Field label="Country" value={deliveryInfo.country || "—"} />
-            <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
-            <Field label="Phone" value={deliveryInfo.phone || "—"} />
-            <Field label="Requested Delivery" value="Within 30 days" />
-            <Field label="Order Date" value={order ? `${order.orderDate} ${order.orderTime}` : "—"} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16 }}>
+              <Field label="Address Label" value={deliveryInfo.label || "—"} />
+              <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
+              <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
+              <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
+              <Field label="City" value={deliveryInfo.city || "—"} />
+              <Field label="State" value={deliveryInfo.state || "—"} />
+              <Field label="Country" value={deliveryInfo.country || "—"} />
+              <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
+              <Field label="Phone" value={deliveryInfo.phone || "—"} />
+            </div>
             <div style={{ marginTop: 2 }}>
               <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Delivery Instructions</div>
               <div style={{ fontSize: 13.5, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
