@@ -340,6 +340,12 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
+      if (target.status === "Delivered") return prev;
+      if (
+        status === "Delivered" &&
+        target.status !== "Shipped" &&
+        target.status !== "Partially Delivered"
+      ) return prev;
       // Once any PO has been generated for an order (including a draft PO),
       // the master order must not be cancelled.
       if (status === "Cancelled" && getAllPOs().some((po) => po.orderId === orderId)) return prev;

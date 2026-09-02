@@ -1516,7 +1516,7 @@ function DocRowMenu({ onDownload, onRemove }) {
   );
 }
 
-function DocumentsNotesTab({ orderId }: { orderId: string }) {
+function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locked?: boolean }) {
   const { user, isClientPortalUser } = useAuth();
   const { orders } = useMyOrders();
   const notesKey = `nido_notes_${orderId}`;
@@ -1600,6 +1600,16 @@ function DocumentsNotesTab({ orderId }: { orderId: string }) {
   // Client portal users are on the "external" side of the conversation —
   // Internal Notes are staff-only and never leave the owner platform.
   const visibleNotes = isClientPortalUser ? notes.filter(n => n.visibility !== "Internal Note") : notes;
+
+  if (locked) {
+    return (
+      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280" }}>
+        <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>Documents & Notes are locked</div>
+        <div style={{ fontSize: 12.5, marginTop: 4 }}>This order is Delivered and can no longer be edited.</div>
+      </div>
+    );
+  }
 
   const handleAddNote = () => {
     if (!noteText.trim()) return;
@@ -2036,6 +2046,27 @@ function CancelItemModal({ itemName, onConfirm, onClose }: { itemName: string; o
   );
 }
 
+function DeliveredConfirmationModal({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title={`Mark ${subject} as Delivered?`} onClose={onClose}>
+        <div style={{ padding: "20px 22px 8px" }}>
+          <div style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
+            Are you sure you want to mark this {subject} as <b>Delivered</b>?
+          </div>
+          <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#9a3412" }}>
+            Delivered is a final status. It cannot be replaced or edited afterward, and Documents & Notes will be locked.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Open</button>
+          <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#16a34a", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Confirm Delivered</button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  );
+}
+
 function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDate?: string }) {
   const steps = [
     { label: "Processing", note: orderDate || "—" },
@@ -2080,6 +2111,7 @@ function ThreeDotMenu({
   sub,
   onUpdateStatus,
   canMarkShipped,
+  onRequestDelivered,
   onAddTracking,
   onSetReference,
   referenceLocked,
@@ -2090,6 +2122,7 @@ function ThreeDotMenu({
   statusUpdatesEnabled,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
+  const [statusWarning, setStatusWarning] = useState<{ status: string; reason: string } | null>(null);
   const ref = useRef<any>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -2124,19 +2157,23 @@ function ThreeDotMenu({
       .filter(status => status.category === "Orders" && status.visible)
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map(status => status.name),
-    "Pending", "Processing", "Shipped", "Delivered",
+    "Pending", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered",
   ]))
-    .filter(status => status !== "Approved" && status !== "Confirmed")
-    .filter(status => status !== "Shipped" || canMarkShipped)
-    .filter(status => {
-      const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
-      const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
-      if (status === sub.itemStatus) return false;
-      // Custom statuses remain available, but built-in statuses can only move
-      // forward through the fulfillment lifecycle.
-      return currentIndex < 0 || nextIndex < 0 || nextIndex > currentIndex;
-    });
-  const canAdvanceStatus = statusUpdatesEnabled && statuses.length > 0;
+    .filter(status => status !== "Approved" && status !== "Confirmed");
+  const getStatusLockReason = (status: string): string | null => {
+    if (status === sub.itemStatus) return "This item is already at this status.";
+    if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
+    const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
+    const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
+    if (currentIndex >= 0 && nextIndex >= 0 && nextIndex <= currentIndex) {
+      return "Item statuses can only move forward. Complete the previous status first.";
+    }
+    if ((status === "Shipped" || status === "Delivered") && !canMarkShipped) {
+      return "Update this item to Shipped in its PO first by adding tracking in Vendor Order Detail.";
+    }
+    return null;
+  };
+  const canAdvanceStatus = statuses.length > 0;
   const toggleMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (open) {
@@ -2166,13 +2203,13 @@ function ThreeDotMenu({
         <div ref={menuRef} style={{ position: "fixed", top: menuPosition.top, left: menuPosition.left, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", zIndex: 1000, minWidth: 220, maxHeight: "calc(100vh - 16px)", overflow: "visible" }}>
           <div
             style={{ position: "relative" }}
-            onMouseEnter={() => { if (statusUpdatesEnabled) setStatusSub(true); }}
+            onMouseEnter={() => setStatusSub(true)}
             onMouseLeave={() => setStatusSub(false)}
           >
             <button
-              disabled={!canAdvanceStatus}
+              aria-disabled={!canAdvanceStatus}
               title={!statusUpdatesEnabled
-                ? "Confirm a purchase order before updating item status."
+                ? "Confirm a purchase order first to enable item status updates."
                 : statuses.length === 0
                   ? "This item is already at its final status."
                   : undefined}
@@ -2192,22 +2229,31 @@ function ThreeDotMenu({
             </button>
             {statusSub && canAdvanceStatus && (
               <div style={{ position: "absolute", top: 0, right: "100%", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 8px 28px rgba(0,0,0,0.18)", minWidth: 180, overflow: "hidden", zIndex: 1001 }}>
-                {statuses.map(s => (
-                  <button key={s} onClick={() => {
-                    if (s === "Shipped") {
-                      // Tracking is required before an item can become Shipped.
-                      onAddTracking();
+                {statuses.map(s => {
+                  const lockReason = getStatusLockReason(s);
+                  const isLocked = Boolean(lockReason);
+                  return (
+                  <button key={s} aria-disabled={isLocked} title={lockReason || undefined} onClick={() => {
+                    if (isLocked) {
+                      setStatusWarning({ status: s, reason: lockReason! });
+                      setOpen(false);
+                      setStatusSub(false);
+                      return;
+                    }
+                    if (s === "Delivered" && onRequestDelivered) {
+                      onRequestDelivered();
                     } else {
                       onUpdateStatus(s);
                     }
                     setOpen(false);
                     setStatusSub(false);
                   }}
-                    style={{ ...menuItemSt, background: sub.itemStatus === s ? "#f0f7ff" : "none", color: sub.itemStatus === s ? "#2563eb" : "#374151", fontWeight: sub.itemStatus === s ? 600 : 400 }}>
+                    style={{ ...menuItemSt, background: sub.itemStatus === s ? "#f0f7ff" : "none", color: isLocked ? "#9ca3af" : sub.itemStatus === s ? "#2563eb" : "#374151", fontWeight: sub.itemStatus === s ? 600 : 400, cursor: isLocked ? "not-allowed" : "pointer", opacity: isLocked ? 0.72 : 1 }}>
                     <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: STATUS_STYLE[s]?.color || "#6b7280", marginRight: 8, flexShrink: 0 }} />
-                    {s} {sub.itemStatus === s && "✓"}
+                    {s} {sub.itemStatus === s && "✓"} {isLocked && <span style={{ marginLeft: "auto", fontSize: 10 }}>Locked</span>}
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2237,6 +2283,22 @@ function ThreeDotMenu({
             <span>↩</span> Raise Return Request
             {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>Expired</span>}
           </button>
+        </div>,
+        document.body,
+      )}
+      {statusWarning && createPortal(
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setStatusWarning(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: 420, background: "#fff", borderRadius: 12, boxShadow: "0 12px 44px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+            <div style={{ padding: "17px 20px", borderBottom: "1px solid #f3f4f6", fontWeight: 700, fontSize: 15, color: "#111827" }}>
+              {statusWarning.status} is not available yet
+            </div>
+            <div style={{ padding: "20px", color: "#374151", fontSize: 13.5, lineHeight: 1.55 }}>
+              {statusWarning.reason}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "0 20px 18px" }}>
+              <button onClick={() => setStatusWarning(null)} style={{ padding: "8px 20px", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Got it</button>
+            </div>
+          </div>
         </div>,
         document.body,
       )}
@@ -2434,6 +2496,7 @@ export default function MyOrderPage() {
   // Once an order is Cancelled it is a terminal state — no further status
   // changes or processing are allowed on it.
   const isOrderCancelled = masterStatus === "Cancelled";
+  const isOrderDelivered = masterStatus === "Delivered";
   // Incremented whenever a PO is created, updated, or has a line removed so
   // derived PO status/lock state refreshes immediately in this page.
   const [poRefreshKey, setPoRefreshKey] = useState(0);
@@ -2445,8 +2508,9 @@ export default function MyOrderPage() {
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
-    if (isOrderCancelled) return; // cancelled orders can no longer be updated
+    if (isOrderCancelled || isOrderDelivered) return; // terminal orders can no longer be updated
     if (!hasConfirmedOrderPO) return; // master status stays locked until a PO is confirmed
+    if (status === "Delivered" && masterStatus !== "Shipped" && masterStatus !== "Partially Delivered") return;
     // Centralized in MyOrdersContext so a Cancelled/Draft transition always
     // cascades to sub-orders and clears vendor selection, whether triggered
     // here or from the order list's bulk status update.
@@ -2455,6 +2519,8 @@ export default function MyOrderPage() {
   const [showStatusDd, setShowStatusDd] = useState(false);
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
+  const [pendingDeliveredStatus, setPendingDeliveredStatus] = useState(false);
+  const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
   const masterStatusOptions = [
     "Processing",
     "Pending Shipping",
@@ -2463,6 +2529,9 @@ export default function MyOrderPage() {
     "Partially Delivered",
     "Delivered",
   ];
+  const selectableMasterStatusOptions = masterStatusOptions.filter(opt =>
+    opt !== "Delivered" || masterStatus === "Shipped" || masterStatus === "Partially Delivered"
+  );
 
   // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
   // Stock is no longer reserved at cart time, so no stock release is needed here.
@@ -3148,6 +3217,8 @@ export default function MyOrderPage() {
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
                 {isOrderCancelled ? (
                   <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This order is cancelled and can no longer be updated.</span>
+                ) : isOrderDelivered ? (
+                  <span style={{ fontSize: 12.5, color: "#166534", fontStyle: "italic" }}>This order is Delivered and can no longer be updated.</span>
                 ) : !hasConfirmedOrderPO ? (
                   <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>Confirm a purchase order before updating the master order status.</span>
                 ) : (
@@ -3155,10 +3226,11 @@ export default function MyOrderPage() {
                     <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid hsl(var(--primary))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--primary))", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
                     {showStatusDd && (
                       <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                        {masterStatusOptions.map(opt => (
+                        {selectableMasterStatusOptions.map(opt => (
                           <button key={opt} onClick={() => {
                             setShowStatusDd(false);
                             if (opt === "Cancelled") { setPendingCancelStatus(true); return; }
+                            if (opt === "Delivered") { setPendingDeliveredStatus(true); return; }
                             setMasterStatus(opt);
                           }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
                             {opt} {opt === masterStatus && <span>✓</span>}
@@ -3394,6 +3466,7 @@ export default function MyOrderPage() {
                             sub={sub}
                             onUpdateStatus={s => updateStatus(sub.id, s)}
                             canMarkShipped={canMarkShipped}
+                            onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onSetReference={() => setReferenceTarget(sub.id)}
                             referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
@@ -3627,7 +3700,7 @@ export default function MyOrderPage() {
             are visible to the client but only the owner platform can upload
             or remove them. */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
-          <DocumentsNotesTab orderId={orderId} />
+          <DocumentsNotesTab orderId={orderId} locked={isOrderDelivered} />
         </div>
       </div>
 
@@ -3645,6 +3718,23 @@ export default function MyOrderPage() {
         />
       )}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
+      {pendingDeliveredStatus && (
+        <DeliveredConfirmationModal
+          subject="master order"
+          onConfirm={() => setMasterStatus("Delivered")}
+          onClose={() => setPendingDeliveredStatus(false)}
+        />
+      )}
+      {pendingItemDelivered && (
+        <DeliveredConfirmationModal
+          subject={`item ${subOrders.find(sub => sub.id === pendingItemDelivered)?.itemName || ""}`}
+          onConfirm={() => {
+            updateStatus(pendingItemDelivered, "Delivered");
+            setPendingItemDelivered(null);
+          }}
+          onClose={() => setPendingItemDelivered(null)}
+        />
+      )}
       {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
     </div>
   );

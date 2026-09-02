@@ -192,6 +192,30 @@ function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName
   );
 }
 
+function DeliveredConfirmationModal({ subject, onConfirm, onClose }: { subject: string; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 700, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 12, width: 420, boxShadow: "0 12px 44px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid #f3f4f6", fontSize: 15, fontWeight: 700 }}>
+          Mark {subject} as Delivered?
+        </div>
+        <div style={{ padding: "20px 22px 8px" }}>
+          <div style={{ fontSize: 14, color: "#374151", marginBottom: 10 }}>
+            Are you sure you want to mark this {subject} as <b>Delivered</b>?
+          </div>
+          <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#9a3412" }}>
+            Delivered is a final status and cannot be replaced. Documents and Notes will be locked afterward.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "20px 22px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Keep Open</button>
+          <button onClick={() => { onConfirm(); onClose(); }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#16a34a", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Confirm Delivered</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Doc Actions Menu ──────────────────────────────────────────────────────────
 function DocActionsMenu({ onDownload, onDelete }: { onDownload: () => void; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
@@ -562,7 +586,12 @@ function UpdateStatusDropdown({ current, onChange }: { current: string; onChange
   const opts = Array.from(new Set([
     ...ORDER_FULFILLMENT_STATUSES,
     current,
-  ]));
+  ])).filter(status =>
+    status !== "Delivered" ||
+    current === "Shipped" ||
+    current === "Partially Delivered" ||
+    current === "Delivered"
+  );
 
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
@@ -704,6 +733,7 @@ export default function VendorOrderDetailPage() {
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
   const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
+  const [pendingDeliveredStatus, setPendingDeliveredStatus] = useState(false);
 
   // A cancelled PO is a terminal state: no further status changes, item
   // edits, vendor/reference updates, or tracking changes are allowed. Derive
@@ -711,6 +741,7 @@ export default function VendorOrderDetailPage() {
   // `cancelled` flag, so a PO cancelled elsewhere (e.g. bulk status update
   // on the orders list) is also locked here.
   const isCancelled = orderStatus === "Cancelled" || cancelled;
+  const isDelivered = orderStatus === "Delivered";
 
   // Reset all state when navigating between different PO detail pages
   useEffect(() => {
@@ -760,6 +791,15 @@ export default function VendorOrderDetailPage() {
     it.name.toLowerCase().includes(search.toLowerCase()) ||
     (it.referenceNumber || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleOrderStatusChange = (status: string) => {
+    if (isCancelled || isDelivered) return;
+    if (status === "Delivered") {
+      setPendingDeliveredStatus(true);
+      return;
+    }
+    setOrderStatus(status);
+  };
 
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
@@ -1116,8 +1156,10 @@ export default function VendorOrderDetailPage() {
                     ✓ Confirm Purchase Order
                   </button>
                 </>
+              ) : isDelivered ? (
+                <span style={{ fontSize: 12.5, color: "#166534", fontStyle: "italic" }}>This PO is Delivered and can no longer be updated.</span>
               ) : (
-                <UpdateStatusDropdown current={orderStatus} onChange={setOrderStatus} />
+                <UpdateStatusDropdown current={orderStatus} onChange={handleOrderStatusChange} />
               )}
             </div>
           </div>
@@ -1265,6 +1307,14 @@ export default function VendorOrderDetailPage() {
           </div>
         </div>
 
+        {isDelivered ? (
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280", marginBottom: 16 }}>
+            <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>Documents & Notes are locked</div>
+            <div style={{ fontSize: 12.5, marginTop: 4 }}>This PO is Delivered and can no longer be edited.</div>
+          </div>
+        ) : (
+          <>
         {/* Documents Section */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "14px 20px" }}>
@@ -1383,6 +1433,9 @@ export default function VendorOrderDetailPage() {
           </div>
         </div>
 
+          </>
+        )}
+
       </div>
 
       {/* Modals */}
@@ -1434,6 +1487,13 @@ export default function VendorOrderDetailPage() {
           tracking={updateTrackingItem.tracking}
           onSave={t => handleUpdateTracking(updateTrackingItem.id, t)}
           onClose={() => setUpdateTrackingItem(null)}
+        />
+      )}
+      {pendingDeliveredStatus && (
+        <DeliveredConfirmationModal
+          subject="purchase order"
+          onConfirm={() => setOrderStatus("Delivered")}
+          onClose={() => setPendingDeliveredStatus(false)}
         />
       )}
       {showUploadDocument && (

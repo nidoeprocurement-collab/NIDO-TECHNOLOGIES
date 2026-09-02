@@ -138,6 +138,14 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
   const all = getAllPOs();
   const idx = all.findIndex((p) => p.poNumber === poNumber);
   if (idx >= 0) {
+    const existing = all[idx];
+    if (existing.status === "Delivered" && changes.status && changes.status !== "Delivered") return;
+    if (
+      changes.status === "Delivered" &&
+      existing.status !== "Shipped" &&
+      existing.status !== "Partially Delivered" &&
+      existing.status !== "Delivered"
+    ) return;
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 
