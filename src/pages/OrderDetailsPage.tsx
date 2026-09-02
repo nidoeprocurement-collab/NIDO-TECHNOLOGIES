@@ -17,7 +17,6 @@ import { computeCartGST } from "@/lib/cartGstHelper";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { getPrefix } from "@/lib/configService";
-import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 import { createApprovalRequest } from "@/lib/approvalEngine";
 import {
   getAvailabilityLabel,
@@ -2127,7 +2126,6 @@ function ThreeDotMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const statusConfig = useOrderStatusConfig();
   useEffect(() => {
     const h = e => {
       const target = e.target as Node;
@@ -2152,14 +2150,7 @@ function ThreeDotMenu({
       window.removeEventListener("resize", closeMenu);
     };
   }, [open]);
-  const statuses = Array.from(new Set([
-    ...statusConfig.statuses
-      .filter(status => status.category === "Orders" && status.visible)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(status => status.name),
-    "Pending", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered",
-  ]))
-    .filter(status => status !== "Approved" && status !== "Confirmed");
+  const statuses = ["Pending", "Processing", "Pending Shipping", "Shipped", "Delivered"];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
     if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
