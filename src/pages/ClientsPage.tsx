@@ -559,8 +559,9 @@ export default function ClientsPageUI() {
 
   const handleExport = () => {
     const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
+    const header = CLIENT_IMPORT_HEADERS.map(escapeCsv).join(",")
     const rows = clients.map(c => clientToImportValues(c).map(escapeCsv).join(","))
-    const csv = [CLIENT_IMPORT_HEADERS.join(","), ...rows].join("\n")
+    const csv = [header, ...rows].join("\r\n")
     const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" })
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "clients-export.csv"
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
@@ -617,7 +618,8 @@ export default function ClientsPageUI() {
       status: "active",
     })
     const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`
-    const template = [CLIENT_IMPORT_HEADERS.join(","), sample.map(escapeCsv).join(",")].join("\n")
+    const header = CLIENT_IMPORT_HEADERS.map(escapeCsv).join(",")
+    const template = [header, sample.map(escapeCsv).join(",")].join("\r\n")
     const blob = new Blob([`\uFEFF${template}`], { type: "text/csv;charset=utf-8;" })
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "client-template.csv"
     document.body.appendChild(a); a.click(); document.body.removeChild(a)

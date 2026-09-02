@@ -420,8 +420,9 @@ export default function AddClient() {
   };
 
   const downloadTemplate = () => {
-    const csv = CLIENT_IMPORT_HEADERS.join(",");
-    const blob = new Blob([csv], { type: "text/csv" });
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const csv = CLIENT_IMPORT_HEADERS.map(escapeCsv).join(",");
+    const blob = new Blob([`\uFEFF${csv}\r\n`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
