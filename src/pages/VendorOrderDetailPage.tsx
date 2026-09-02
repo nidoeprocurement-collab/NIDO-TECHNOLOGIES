@@ -181,6 +181,7 @@ function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
           <button
             onClick={() => { onSave({ ...form, link: form.link || "Track Package" }); onClose(); }}
+            data-confirmation-skip=""
             style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
           >
             Save Tracking
