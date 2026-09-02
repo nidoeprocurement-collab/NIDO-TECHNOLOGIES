@@ -8,7 +8,9 @@ import SLABadge from "@/components/shared/SLABadge";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  "Pending Shipping":    { bg: "#fff7ed", color: "#9a3412", border: "#fed7aa" },
   "Partially Shipped":   { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
+  Shipped:               { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   "Partially Delivered": { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Delivered:             { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Cancelled:             { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" },
@@ -16,7 +18,7 @@ const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: str
 };
 
 const ALL_STATUSES: OrderStatus[] = [
-  "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
+  "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft",
 ];
 
 // ALL_TABS is now derived inside the component from live orders
@@ -35,7 +37,9 @@ function Avatar({ initial, color, size = 28 }: { initial: string; color: string;
 }
 
 function StatusBadge({ status }: { status: OrderStatus }) {
-  const s = STATUS_STYLE[status];
+  // Persisted legacy/custom orders can contain a status added outside the
+  // current type map, so never let a missing style crash the orders page.
+  const s = STATUS_STYLE[status] ?? { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" };
   return (
     <span style={{
       padding: "4px 10px", borderRadius: 14, fontSize: 12, fontWeight: 500,
@@ -134,7 +138,7 @@ function FilterPanel({ filters, setFilters, onClose, onApply, onClear }: {
         <Sel label="Client" fkey="client" placeholder="Select Client"
           options={["TechHub Solutions", "OfficeMart Supplies", "PaperWorld Distributors", "Global Industrial"]} {...p} />
         <Sel label="Order Status" fkey="orderStatus" placeholder="Select status"
-          options={["Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled", "Draft"]} {...p} />
+          options={ALL_STATUSES} {...p} />
         <Sel label="Assigned To" fkey="assignedTo" placeholder="Select users"
           options={["Sneha Iyer", "Priya Nair", "Arjun Mehta", "Rahul Verma", "Sanjay Patel", "Anita Desai"]} {...p} />
         <Sel label="SLA Status" fkey="slaStatus" placeholder="Select SLA status"
@@ -424,7 +428,7 @@ export default function MyOrderPage() {
 
   // Derive tab counts from live orders
   const ALL_TABS = useMemo(() => {
-    const statuses: OrderStatus[] = ["Draft", "Processing", "Partially Shipped", "Partially Delivered", "Delivered", "Cancelled"];
+    const statuses: OrderStatus[] = ["Draft", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Cancelled"];
     return [
        { key: "All Orders", label: "All Orders", count: visibleOrders.length },
        ...statuses.map(s => ({ key: s, label: s, count: visibleOrders.filter(o => o.status === s).length })),
