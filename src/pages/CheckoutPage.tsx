@@ -388,6 +388,9 @@ export default function CheckoutPage() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 leading-relaxed">
+                          {addr.attentionName && (
+                            <><span className="font-medium text-gray-700">Attention:</span> {addr.attentionName}<br /></>
+                          )}
                           {addr.line1}
                           {addr.line2 && <><br />{addr.line2}</>}
                           {(addr.city || addr.state || addr.zip) && (
