@@ -115,7 +115,7 @@ function AddressFormBlock({
       {/* Row 1: Label + Phone */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Label <span className="text-red-500">*</span></label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Attention <span className="text-red-500">*</span></label>
           <input
             value={form.label}
             onChange={set("label")}
