@@ -37,6 +37,10 @@ function storageKey(clientId: string) {
   return `nido_delivery_addresses_${clientId}`;
 }
 
+function selectedAddressKey(clientId: string) {
+  return `nido_selected_delivery_address_${clientId}`;
+}
+
 function loadAddresses(clientId: string): DeliveryAddress[] {
   try {
     const raw = localStorage.getItem(storageKey(clientId));
@@ -239,7 +243,7 @@ const PAYMENT_TERMS_KEY = "nido_payment_terms";
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const [notesOpen, setNotesOpen] = useState(false);
-  const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [paymentTerms, setPaymentTerms] = useState<string>(() => {
@@ -261,7 +265,16 @@ export default function CheckoutPage() {
       if (stored.length) persistAddresses(clientId, stored);
     }
     setAddresses(stored);
-    if (stored.length) setSelectedAddressId(stored.find((a) => a.isDefault)?.id ?? stored[0].id);
+    if (stored.length) {
+      const savedId = Number(localStorage.getItem(selectedAddressKey(clientId)));
+      const savedAddress = Number.isFinite(savedId) ? stored.find((a) => a.id === savedId) : undefined;
+      const nextAddressId = savedAddress?.id ?? stored.find((a) => a.isDefault)?.id ?? stored[0].id;
+      setSelectedAddressId(nextAddressId);
+      localStorage.setItem(selectedAddressKey(clientId), String(nextAddressId));
+    } else {
+      setSelectedAddressId(null);
+      localStorage.removeItem(selectedAddressKey(clientId));
+    }
   }, [clientId]);
 
   // ── Handlers ──
@@ -281,6 +294,10 @@ export default function CheckoutPage() {
     const updated = [...addresses, newAddr];
     setAddresses(updated);
     persistAddresses(clientId, updated);
+    if (selectedAddressId === null) {
+      setSelectedAddressId(newId);
+      localStorage.setItem(selectedAddressKey(clientId), String(newId));
+    }
     setAddingNew(false);
   };
 
@@ -353,7 +370,10 @@ export default function CheckoutPage() {
                         name="address"
                         className="mt-1 accent-blue-600"
                         checked={selectedAddressId === addr.id}
-                        onChange={() => setSelectedAddressId(addr.id)}
+                        onChange={() => {
+                          setSelectedAddressId(addr.id);
+                          localStorage.setItem(selectedAddressKey(clientId), String(addr.id));
+                        }}
                       />
                       <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                         <AddressIcon label={addr.label} />

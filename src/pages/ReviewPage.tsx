@@ -37,6 +37,10 @@ function loadAddresses(clientId: string): DeliveryAddress[] {
   return [];
 }
 
+function selectedAddressKey(clientId: string) {
+  return `nido_selected_delivery_address_${clientId}`;
+}
+
 function formatPrice(n: number) {
   return formatCurrency(n, undefined, { decimals: 0 });
 }
@@ -49,14 +53,25 @@ export default function ReviewPage() {
 
   const clientId = localStorage.getItem("nido_shop_selected_client") || "";
   const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
 
   useEffect(() => {
-    setAddresses(loadAddresses(clientId));
+    const loadedAddresses = loadAddresses(clientId);
+    setAddresses(loadedAddresses);
+    const savedId = Number(localStorage.getItem(selectedAddressKey(clientId)));
+    const savedAddress = Number.isFinite(savedId)
+      ? loadedAddresses.find((address) => address.id === savedId)
+      : undefined;
+    const nextAddressId = savedAddress?.id
+      ?? loadedAddresses.find((address) => address.isDefault)?.id
+      ?? loadedAddresses[0]?.id
+      ?? null;
+    setSelectedAddressId(nextAddressId);
     setDeliveryInstructions(localStorage.getItem("nido_delivery_instructions") || "");
   }, [clientId]);
 
-  const selectedAddr = addresses.find((a) => a.isDefault) ?? addresses[0] ?? null;
+  const selectedAddr = addresses.find((a) => a.id === selectedAddressId) ?? null;
 
   // Read saved payment terms (selected on the checkout page)
   const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
@@ -229,6 +244,7 @@ export default function ReviewPage() {
 
     consumeCart();
     localStorage.removeItem("nido_delivery_instructions");
+    localStorage.removeItem(selectedAddressKey(clientId));
     navigate(`/shop/order-confirmation/${orderNumber}`, {
       state: {
         orderNumber,
