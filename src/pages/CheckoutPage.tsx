@@ -12,7 +12,7 @@ import {
   CHECKOUT_NOTE_MAX_LENGTH,
   DELIVERY_INSTRUCTIONS_KEY,
   ORDER_NOTES_KEY,
-  sanitizeCheckoutNote,
+  limitCheckoutNote,
 } from "@/lib/checkoutNotes";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -234,10 +234,10 @@ export default function CheckoutPage() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [selectedAddressId, setSelectedAddressId] = useState<number>(1);
   const [deliveryInstructions, setDeliveryInstructions] = useState(() =>
-    sanitizeCheckoutNote(localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "")
+    limitCheckoutNote(localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "")
   );
   const [orderNotes, setOrderNotes] = useState(() =>
-    sanitizeCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "")
+    limitCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "")
   );
   const [paymentTerms, setPaymentTerms] = useState<string>(() => {
     return localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
@@ -410,7 +410,7 @@ export default function CheckoutPage() {
                     placeholder="Letters and numbers only"
                     value={deliveryInstructions}
                     onChange={(e) => {
-                      const value = sanitizeCheckoutNote(e.target.value);
+                      const value = limitCheckoutNote(e.target.value);
                       setDeliveryInstructions(value);
                       localStorage.setItem(DELIVERY_INSTRUCTIONS_KEY, value);
                     }}
@@ -443,7 +443,7 @@ export default function CheckoutPage() {
                     placeholder="Letters and numbers only"
                     value={orderNotes}
                     onChange={(e) => {
-                      const value = sanitizeCheckoutNote(e.target.value);
+                      const value = limitCheckoutNote(e.target.value);
                       setOrderNotes(value);
                       localStorage.setItem(ORDER_NOTES_KEY, value);
                     }}
