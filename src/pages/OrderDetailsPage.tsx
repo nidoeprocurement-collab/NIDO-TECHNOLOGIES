@@ -3189,7 +3189,7 @@ export default function MyOrderPage() {
                             onUpdateStatus={s => updateStatus(sub.id, s)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onSetReference={() => setReferenceTarget(sub.id)}
-                            referenceLocked={hasPO}
+                            referenceLocked={hasPO || ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus) >= ITEM_STATUS_SEQUENCE.indexOf("Shipped")}
                             onCancel={() => setCancelTarget(sub.id)}
                             cancelEnabled={!hasConfirmedPO && sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
