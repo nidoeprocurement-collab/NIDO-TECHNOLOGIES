@@ -163,7 +163,6 @@ function getFullVendorStock(vendorId: string, masterProductCode: string, liveSto
         }
       }
       }
-    }
     return liveStock + totalReserved;
   } catch {
     return liveStock;
