@@ -11,6 +11,7 @@
   import { reserveVendorStock } from "@/lib/vendorStore";
   import { useI18n } from "@/i18n/I18nProvider";
   import { formatCurrency } from "@/lib/formatters";
+import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -147,12 +148,14 @@
 
     // priceNum is tax-inclusive — extract embedded GST, don't add on top.
     // Apply slab discount (same logic as CartPage) before computing GST.
-    const getEffectivePrice = (i: { clientId?: string; category?: string; priceNum: number; quantity: number }) => {
+    const getEffectivePrice = (i: Parameters<typeof getCartUnitPriceInclusive>[0] & { quantity: number }) => {
       const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-      return discountPct > 0 ? i.priceNum * (1 - discountPct / 100) : i.priceNum;
+      const taxRate = getCartTaxRate(i) ?? 0;
+      const inclusivePrice = getCartUnitPriceInclusive(i, taxRate);
+      return discountPct > 0 ? inclusivePrice * (1 - discountPct / 100) : inclusivePrice;
     };
     const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
-      cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category }))
+      cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category, taxRate: getCartTaxRate(i) }))
     );
     const subtotal = preTaxSubtotal;
     const handlePlaceOrder = () => {
@@ -223,6 +226,7 @@
           selectedVendorId: i.selectedVendorId,
           selectedVendorName: i.selectedVendorName,
           vendorPrice: i.vendorPrice,
+           clientSellingPriceExclGst: i.clientSellingPriceExclGst,
           landedCost: i.landedCost,
           gstSnapshot: i.gstSnapshot,
           hsnSnapshot: i.hsnSnapshot,

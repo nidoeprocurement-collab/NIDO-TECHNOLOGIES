@@ -636,6 +636,8 @@ export interface ClientPriceCalc {
   subtotal: number;
   profit: number;
   discount: number;
+  /** Final client selling price before GST. */
+  preTaxFinalPrice: number;
   tax: number;
   finalPrice: number;
 }
@@ -654,15 +656,32 @@ export function computeClientFinalPrice(
   const subtotal = landedCostPerUnit + perUnitTotal;
   const profit = (subtotal * effectiveProfitPct) / 100;
   const discount = ((subtotal + profit) * s.discountPct) / 100;
-  const taxBase = subtotal + profit - discount;
+  const preTaxFinalPrice = subtotal + profit - discount;
+  const taxBase = preTaxFinalPrice;
   // Tax always comes from the Tax Settings engine — never a local override.
   const effectiveTaxPct = getEffectiveTaxPctForCategory(productCategory || '');
   const tax = (taxBase * effectiveTaxPct) / 100;
-  let finalPrice = subtotal + profit - discount + tax;
+  let finalPrice = preTaxFinalPrice + tax;
   if (s.roundOff === 'nearest') finalPrice = Math.round(finalPrice);
   else if (s.roundOff === 'up') finalPrice = Math.ceil(finalPrice);
   else if (s.roundOff === 'down') finalPrice = Math.floor(finalPrice);
-  return { perUnitTotal, subtotal, profit, discount, tax, finalPrice };
+  return { perUnitTotal, subtotal, profit, discount, preTaxFinalPrice, tax, finalPrice };
+}
+
+/** Compute the client-facing selling price before GST for a selected vendor. */
+export function computeClientSellingPriceExclGst(
+  clientId: string,
+  masterProductCode: string,
+  productCategory: string,
+  landedCostPerUnit: number,
+): number {
+  const calc = computeClientFinalPrice(
+    landedCostPerUnit,
+    getClientCommonSettings(clientId),
+    resolveClientProfitPct(clientId, masterProductCode, productCategory),
+    productCategory,
+  );
+  return Math.max(0, calc.preTaxFinalPrice);
 }
 
 // Since pricing settings are now configured per-client, each row represents

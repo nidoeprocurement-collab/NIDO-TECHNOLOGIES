@@ -12,6 +12,7 @@ import {
   getAllProductPricing,
   getSlabDiscountPct,
   computeVendorComparisons,
+  computeClientSellingPriceExclGst,
   canVendorFulfillMoq,
   getVendorComparisonBadge,
   type VendorComparisonRow,
@@ -270,8 +271,15 @@ export default function ProductDetailPage() {
   }).filter(sp => sp.key || sp.val);
 
   const gstRate = getEffectiveTaxPctForCategory(product?.category ?? "");
-  const selectedVendorPrice = selectedVendor?.basePrice;
-  const displayPriceExcl = selectedVendorPrice ?? product.priceNum * 100 / (100 + gstRate);
+  const selectedClientPriceExcl = selectedVendor && clientId
+    ? computeClientSellingPriceExclGst(
+        clientId,
+        product.productCode,
+        product.category,
+        selectedVendor.landedCostPerUnit,
+      )
+    : undefined;
+  const displayPriceExcl = selectedClientPriceExcl ?? product.priceNum * 100 / (100 + gstRate);
   const effectivePrice = discountPct > 0 ? displayPriceExcl * (1 - discountPct / 100) : displayPriceExcl;
   const hsnSnapshot = (() => {
     const byCategory = new Map<string, string>();
@@ -303,8 +311,16 @@ export default function ProductDetailPage() {
         leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
-         vendorProductCode: selectedVendor.vendorProductCode,
+        vendorProductCode: selectedVendor.vendorProductCode,
         vendorPrice: selectedVendor.basePrice,
+        clientSellingPriceExclGst: clientId
+          ? computeClientSellingPriceExclGst(
+              clientId,
+              product.productCode,
+              product.category,
+              selectedVendor.landedCostPerUnit,
+            )
+          : selectedVendor.basePrice,
         landedCost: selectedVendor.landedCostPerUnit,
         gstSnapshot: gstRate,
          hsnSnapshot,

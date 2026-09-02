@@ -282,6 +282,7 @@ export default function CartPage() {
                   const inclusiveTotal = effectivePrice * item.quantity;
                   const gstRate        = taxRate;
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
+                   const gstAmount      = inclusiveTotal - preTaxUnit * item.quantity;
                   const originalUnit   = discountPct > 0 ? unitPriceExcl : preTaxUnit;
                   const catalog        = catalogMap.get(item.productCode || "");
                    const stockInfo      = vendorMatchMap.get(item.productCode || "");
@@ -437,7 +438,10 @@ export default function CartPage() {
 
                         {/* ── GST % ───────────────────────────────────── */}
                         <div className="flex items-start justify-center pt-2">
-                          <span className="text-sm font-semibold text-gray-700">{gstRate}%</span>
+                          <div className="text-center">
+                            <span className="text-sm font-semibold text-gray-700">{gstRate}%</span>
+                            <span className="block text-[10px] text-gray-400">{formatPrice(gstAmount)}</span>
+                          </div>
                         </div>
 
                         {/* ── Total ───────────────────────────────────── */}

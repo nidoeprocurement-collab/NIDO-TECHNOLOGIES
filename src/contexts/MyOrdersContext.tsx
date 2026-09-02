@@ -40,6 +40,8 @@ export interface OrderCartItem {
   selectedVendorId?: string;
   selectedVendorName?: string;
   vendorPrice?: number;
+  /** Final client selling price per unit before GST, snapshotted at checkout. */
+  clientSellingPriceExclGst?: number;
   landedCost?: number;
   gstSnapshot?: number;
   hsnSnapshot?: string;

@@ -13,9 +13,7 @@ import {
   getSlabDiscountPct,
   getClientPriceSlabs,
   computeVendorComparisons,
-  computeClientFinalPrice,
-  getClientCommonSettings,
-  resolveClientProfitPct,
+  computeClientSellingPriceExclGst,
   canVendorFulfillMoq,
   getRecommendedVendor,
   getVendorComparisonBadge,
@@ -703,6 +701,14 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   });
 
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
+  const clientSellingPriceExclGst = termsVendor && clientId
+    ? computeClientSellingPriceExclGst(
+        clientId,
+        product.productCode,
+        product.category,
+        termsVendor.landedCostPerUnit,
+      )
+    : product.priceNum * 100 / (100 + cardGstRate);
 
   const hsnForCategory = (() => {
     const map = new Map<string, string>();
@@ -740,6 +746,14 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
         selectedVendorName: selectedVendor.vendorName,
         vendorProductCode: selectedVendor.vendorProductCode,
         vendorPrice: selectedVendor.basePrice,
+        clientSellingPriceExclGst: clientId
+          ? computeClientSellingPriceExclGst(
+              clientId,
+              product.productCode,
+              product.category,
+              selectedVendor.landedCostPerUnit,
+            )
+          : selectedVendor.basePrice,
         landedCost: selectedVendor.landedCostPerUnit,
         gstSnapshot: cardGstRate,
         hsnSnapshot: hsnForCategory,
@@ -759,8 +773,8 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   // Display values
   const displayMoq = commercialTerms.moqLabel;
   const displayLeadTime = `${commercialTerms.leadTimePrimary}${commercialTerms.leadTimeSecondary ? ` · ${commercialTerms.leadTimeSecondary}` : ''}`;
-  const displayPrice = selectedVendor && canUseVendor(selectedVendor)
-    ? formatCurrency(selectedVendor.basePrice)
+  const displayPrice = clientSellingPriceExclGst > 0
+    ? formatCurrency(clientSellingPriceExclGst)
     : '--';
 
   // First active slab with a non-zero discount that applies to this product's
@@ -876,7 +890,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
             <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1.7fr 1fr 1.25fr 1.25fr 1fr" }}>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Pricing Model</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Price / Unit</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor Cost / Unit</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Availability</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time / SLA</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ / Min Qty</span>
@@ -975,6 +989,20 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
         <ChevronRight size={12} />
       </button>
 
+      {/* Client price is shown before tax; GST is calculated in the cart. */}
+      <div className="px-3 pt-2" onClick={e => e.stopPropagation()}>
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-1 text-[9px] text-gray-500">
+              <Tag size={10} className="text-gray-400 shrink-0" />
+              <span className="font-medium">Client Selling Price (Excl. GST)</span>
+            </div>
+            <p className="text-[15px] font-bold text-gray-900 mt-0.5">{displayPrice}</p>
+          </div>
+          <span className="text-[9px] text-gray-400 text-right">GST {cardGstRate}%<br />added in cart</span>
+        </div>
+      </div>
+
       {/* Commercial details are revealed only after a vendor is selected. */}
       {selectedVendor && (
       <div className="px-3 pt-2 border-t border-gray-100 space-y-1.5" onClick={e => e.stopPropagation()}>
@@ -1018,16 +1046,9 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
           </div>
         </div>
 
-        {/* Price per Unit row */}
+        {/* Quantity row */}
         {selectedVendor ? (
-          <div className="flex items-end justify-between gap-2 pb-2">
-            <div>
-              <div className="flex items-center gap-1 text-[9px] text-gray-500">
-                <Tag size={10} className="text-gray-400 shrink-0" />
-                <span className="font-medium">Price / Unit</span>
-              </div>
-              <p className="text-[13px] font-bold text-gray-900 mt-0.5">{displayPrice}</p>
-            </div>
+          <div className="flex items-end justify-end gap-2 pb-2">
             <div>
               <p className="text-[9px] text-gray-500 font-medium mb-1">Quantity</p>
               <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
@@ -1195,11 +1216,12 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
       <div className="mt-auto px-3 pb-3 pt-2.5">
         <div className="mb-3 flex items-end justify-between gap-2">
           <div>
-            <p className="text-[10px] text-gray-500">Starting price</p>
+            <p className="text-[10px] text-gray-500">Client Selling Price (Excl. GST)</p>
             <p className={`text-[17px] font-bold ${discountPct > 0 ? "text-emerald-600" : "text-gray-900"}`}>
               {formatPrice(displayPrice)}
               {product.priceNum > 0 && <span className="ml-1 text-[10px] font-normal text-gray-500">/ unit</span>}
             </p>
+            <p className="text-[10px] text-gray-400 mt-0.5">GST {gstRate}% added in cart</p>
           </div>
           <span className="text-[10px] font-medium text-emerald-600">{product.inStock ? "Available" : "Unavailable"}</span>
         </div>

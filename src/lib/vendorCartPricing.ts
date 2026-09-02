@@ -11,6 +11,8 @@ export type VendorCartLine = {
   priceNum: number;
   selectedVendorId?: string;
   vendorPrice?: number;
+  /** Client selling price before GST, snapshotted when the item is added. */
+  clientSellingPriceExclGst?: number;
   gstSnapshot?: number;
   category?: string;
 };
@@ -25,6 +27,12 @@ function hasVendorPrice(item: VendorCartLine): boolean {
 
 /** Customer-facing unit price before GST. Legacy lines use their stored price. */
 export function getCartUnitPriceExclGst(item: VendorCartLine, fallbackTaxRate = 0): number {
+  if (
+    typeof item.clientSellingPriceExclGst === "number" &&
+    Number.isFinite(item.clientSellingPriceExclGst)
+  ) {
+    return Math.max(0, item.clientSellingPriceExclGst);
+  }
   return hasVendorPrice(item)
     ? Math.max(0, item.vendorPrice ?? 0)
     : Math.max(0, (item.priceNum || 0) * 100 / (100 + fallbackTaxRate));
