@@ -2219,7 +2219,7 @@ function ThreeDotMenu({
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button
             disabled={!cancelEnabled}
-            title={!cancelEnabled ? "Cancellation is unavailable after the purchase order is confirmed." : undefined}
+            title={!cancelEnabled ? "Cancellation is unavailable after a purchase order has been generated or the item is locked." : undefined}
             style={{
               ...menuItemSt,
               color: cancelEnabled ? "#dc2626" : "#d1d5db",
@@ -2429,6 +2429,7 @@ export default function MyOrderPage() {
     () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
     [poRefreshKey, orderId],
   );
+  const hasGeneratedOrderPO = orderPOs.length > 0;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const setMasterStatus = (status: string) => {
     if (isClientPortalUser) return; // portal is read-only for order status
@@ -2456,7 +2457,7 @@ export default function MyOrderPage() {
   // Stock restoration (if any POs were already raised) is handled when the PO itself
   // is cancelled from the Vendor Orders page.
   const handleCancelOrder = (reason: string) => {
-    if (isOrderCancelled) return;
+    if (isOrderCancelled || hasGeneratedOrderPO) return;
     updateOrderStatus(orderId, "Cancelled" as any, reason);
   };
   // Per-item overrides (status, tracking) are persisted separately from the
@@ -2525,12 +2526,12 @@ export default function MyOrderPage() {
   };
 
   const handleCancelItem = (subId: string, reason: string) => {
-    if (isOrderInactive) return;
+    if (isOrderInactive || hasGeneratedOrderPO) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target || target.itemStatus === "Cancelled" || target.itemStatus === "Delivered") return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
-    if (targetPOs.some(isConfirmedPO)) return;
+    if (targetPOs.length > 0) return;
 
     // Return the pre-PO reservation to vendor availability.
     if (target.stockAllocations?.length) releaseStock(target.stockAllocations);
@@ -2877,7 +2878,14 @@ export default function MyOrderPage() {
                   )}
                 </div>
               ) : (
-                hasConfirmedOrderPO ? (
+                hasGeneratedOrderPO ? (
+                  <span
+                    title="This order cannot be cancelled because a purchase order has already been generated."
+                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
+                  >
+                    🔒 PO generated — order locked
+                  </span>
+                ) : (
                   <button
                     onClick={() => setPendingCancelStatus(true)}
                     style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #fca5a5", borderRadius: 8, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0, transition: "background 0.15s" }}
@@ -2886,13 +2894,6 @@ export default function MyOrderPage() {
                   >
                     ✕ Cancel Order
                   </button>
-                ) : (
-                  <span
-                    title="Confirm at least one purchase order before changing the master order."
-                    style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
-                  >
-                    🔒 Confirm PO to update order
-                  </span>
                 )
               )
             )}
@@ -3171,12 +3172,12 @@ export default function MyOrderPage() {
                         <div style={{ minWidth: 0 }}>
                            {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
                             <button
-                               disabled={hasConfirmedPO}
-                               title={hasConfirmedPO ? "Cancellation is unavailable after the purchase order is confirmed." : undefined}
+                                disabled={hasGeneratedOrderPO}
+                                title={hasGeneratedOrderPO ? "Cancellation is unavailable after a purchase order has been generated." : undefined}
                               onClick={() => setCancelTarget(sub.id)}
-                               style={{ padding: "5px 10px", border: `1px solid ${hasConfirmedPO ? "#e5e7eb" : "#fca5a5"}`, borderRadius: 6, background: hasConfirmedPO ? "#f9fafb" : "#fff", color: hasConfirmedPO ? "#9ca3af" : "#dc2626", cursor: hasConfirmedPO ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                                style={{ padding: "5px 10px", border: `1px solid ${hasGeneratedOrderPO ? "#e5e7eb" : "#fca5a5"}`, borderRadius: 6, background: hasGeneratedOrderPO ? "#f9fafb" : "#fff", color: hasGeneratedOrderPO ? "#9ca3af" : "#dc2626", cursor: hasGeneratedOrderPO ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
                             >
-                               {hasConfirmedPO ? "Cancel Item (Locked)" : "Cancel Item"}
+                               {hasGeneratedOrderPO ? "Cancel Item (Locked)" : "Cancel Item"}
                             </button>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
@@ -3191,7 +3192,7 @@ export default function MyOrderPage() {
                             onSetReference={() => setReferenceTarget(sub.id)}
                             referenceLocked={hasPO || ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus) >= ITEM_STATUS_SEQUENCE.indexOf("Shipped")}
                             onCancel={() => setCancelTarget(sub.id)}
-                            cancelEnabled={!hasConfirmedPO && sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered"}
+                            cancelEnabled={!hasGeneratedOrderPO && !hasConfirmedPO && sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}

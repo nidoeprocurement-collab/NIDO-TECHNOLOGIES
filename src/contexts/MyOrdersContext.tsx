@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
-import { savePO, generatePoNumber, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
+import { savePO, generatePoNumber, getAllPOs, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
 import { getVendorById } from "../lib/vendorDataStore";
 import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
@@ -338,6 +338,9 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
+      // Once any PO has been generated for an order (including a draft PO),
+      // the master order must not be cancelled.
+      if (status === "Cancelled" && getAllPOs().some((po) => po.orderId === orderId)) return prev;
       // Release reserved stock when an order is cancelled before a PO is raised.
       // If a PO was already raised for some qty, that qty's reservedStock was
       // already cleared at PO-creation time, so the Math.max(0, ...) floor in
@@ -362,10 +365,20 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     const idSet = new Set(orderIds);
     setOrders((prev) => {
       prev.forEach((o) => {
-        if (idSet.has(o.id) && o.status !== "Cancelled") cascadeStatusToSubOrders(o, status);
+        if (
+          idSet.has(o.id) &&
+          o.status !== "Cancelled" &&
+          !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id))
+        ) cascadeStatusToSubOrders(o, status);
       });
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
-      return prev.map((o) => (idSet.has(o.id) && o.status !== "Cancelled" ? { ...o, status, ...extra } : o));
+      return prev.map((o) => (
+        idSet.has(o.id) &&
+        o.status !== "Cancelled" &&
+        !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id))
+          ? { ...o, status, ...extra }
+          : o
+      ));
     });
   };
 

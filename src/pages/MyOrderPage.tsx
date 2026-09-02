@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
+import { getAllPOs } from "@/lib/purchaseOrderStore";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -519,17 +520,31 @@ export default function MyOrderPage() {
     // Cascades to sub-orders (and clears vendor selection) when moving to
     // Cancelled/Draft, and stays in sync with the order detail page since
     // both read/write the same shared order + sub-order state. Orders that
-    // are already Cancelled are a terminal state and are skipped by the
-    // context itself, so they can't be edited or processed further.
+    // are already Cancelled or have a generated PO are skipped by the
+    // context itself, so they cannot be cancelled or processed further.
     const ids = [...selected];
-    const skipped = ids.filter(id => orders.find(o => o.id === id)?.status === "Cancelled").length;
-    updateOrdersStatus(ids, status, cancelReason);
+    const alreadyCancelledIds = ids.filter(id => orders.find(o => o.id === id)?.status === "Cancelled");
+    const poLockedIds = status === "Cancelled"
+      ? ids.filter(id => getAllPOs().some(po => po.orderId === id))
+      : [];
+    const skippedIds = new Set([...alreadyCancelledIds, ...poLockedIds]);
+    const eligibleIds = ids.filter(id => !skippedIds.has(id));
+    updateOrdersStatus(eligibleIds, status, cancelReason);
+    const skipped = skippedIds.size;
     const applied = ids.length - skipped;
-    showToast(
-      skipped > 0
-        ? `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}". ${skipped} already-cancelled order(s) were skipped.`
-        : `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}"`
-    );
+    if (skipped > 0 && status === "Cancelled") {
+      const reasons = [
+        alreadyCancelledIds.length > 0 ? `${alreadyCancelledIds.length} already-cancelled` : "",
+        poLockedIds.length > 0 ? `${poLockedIds.length} with generated POs` : "",
+      ].filter(Boolean).join(" and ");
+      showToast(`Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}". ${skipped} order${skipped !== 1 ? "s" : ""} skipped (${reasons}).`);
+    } else {
+      showToast(
+        skipped > 0
+          ? `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}". ${skipped} already-cancelled order(s) were skipped.`
+          : `Updated ${applied} order${applied !== 1 ? "s" : ""} to "${status}"`
+      );
+    }
     setPendingBulkCancel(false);
     setBulkCancelReason("");
   };
