@@ -517,7 +517,12 @@ export default function ProductDetailPage() {
                         const leadTime = formatLeadTimeByType(selectedVendor.leadTime, productType);
                         return (
                           <>
-                            <div><p className="text-[9px] text-gray-400 uppercase">Price / Unit</p><p className="text-xs font-bold text-gray-900">₹{selectedVendor.basePrice.toLocaleString("en-IN")}</p></div>
+                            <div>
+                              <p className="text-[9px] text-gray-400 uppercase">Client Selling Price / Unit</p>
+                              <p className="text-xs font-bold text-gray-900">
+                                {selectedClientPriceExcl && selectedClientPriceExcl > 0 ? formatPrice(selectedClientPriceExcl) : "—"}
+                              </p>
+                            </div>
                             <div><p className="text-[9px] text-gray-400 uppercase">Availability</p><p className="text-xs font-semibold text-emerald-600">{availability.primary}</p><p className="text-[9px] text-gray-400">{availability.isUnlimited ? "Instant" : availability.status}</p></div>
                             <div><p className="text-[9px] text-gray-400 uppercase">Lead Time / SLA</p><p className="text-xs font-semibold text-gray-800">{leadTime.primary}</p><p className="text-[9px] text-gray-400">{leadTime.secondary || "Subject to Availability"}</p></div>
                             <div><p className="text-[9px] text-gray-400 uppercase">MOQ / Min Qty</p><p className="text-xs font-semibold text-gray-800">{selectedVendor.moq > 0 ? `${selectedVendor.moq} ${productQuantityLabel}` : "—"}</p></div>
@@ -534,7 +539,7 @@ export default function ProductDetailPage() {
                         <div className="grid grid-cols-[1.5fr_1.55fr_0.9fr_1.15fr_1.2fr_1fr] gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Vendor</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Pricing Model</span>
-                          <span className="text-[8px] font-bold text-gray-500 uppercase">Price / Unit</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Client Selling Price / Unit</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Availability</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Lead Time / SLA</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">MOQ / Min Qty</span>
@@ -557,7 +562,16 @@ export default function ProductDetailPage() {
                                 {badge && <span className="text-[8px] text-blue-700 font-bold">{badge === "Recommended" ? "★ " : ""}{badge}</span>}
                               </div>
                               <span className="text-[9px] leading-tight text-gray-700">{productPricingModel}</span>
-                              <span className="text-[10px] font-semibold text-gray-800">{eligible ? `₹${comp.basePrice.toLocaleString("en-IN")}` : "—"}</span>
+                              <span className="text-[10px] font-semibold text-gray-800">
+                                {eligible && clientId
+                                  ? formatPrice(computeClientSellingPriceExclGst(
+                                      clientId,
+                                      product.productCode,
+                                      product.category,
+                                      comp.landedCostPerUnit,
+                                    ))
+                                  : "—"}
+                              </span>
                               <span className={`text-[9px] leading-tight font-semibold ${availability.status === "Out of Stock" ? "text-red-500" : availability.status === "Low Stock" ? "text-amber-600" : "text-emerald-600"}`}>
                                 {availability.primary}<span className="block text-[8px] text-gray-400 font-medium">{availability.isUnlimited ? "Instant" : availability.status}</span>
                               </span>

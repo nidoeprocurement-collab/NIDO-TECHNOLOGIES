@@ -701,14 +701,14 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   });
 
   const cardGstRate = getEffectiveTaxPctForCategory(product.category);
-  const clientSellingPriceExclGst = termsVendor && clientId
+  const clientSellingPriceExclGst = selectedVendor && clientId
     ? computeClientSellingPriceExclGst(
         clientId,
         product.productCode,
         product.category,
-        termsVendor.landedCostPerUnit,
+        selectedVendor.landedCostPerUnit,
       )
-    : product.priceNum * 100 / (100 + cardGstRate);
+    : undefined;
 
   const hsnForCategory = (() => {
     const map = new Map<string, string>();
@@ -890,7 +890,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
             <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1.7fr 1fr 1.25fr 1.25fr 1fr" }}>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Pricing Model</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor Cost / Unit</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Client Selling Price / Unit</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Availability</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time / SLA</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ / Min Qty</span>
@@ -903,7 +903,14 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
                 const badge = getVendorComparisonBadge(comp, vendorComps);
                 const availability = getAvailabilityByType(comp.stock, productType);
                 const leadTime = formatLeadTimeByType(comp.leadTime, productType);
-                const price = !isOOS ? comp.basePrice : 0;
+                const price = !isOOS && clientId
+                  ? computeClientSellingPriceExclGst(
+                      clientId,
+                      product.productCode,
+                      product.category,
+                      comp.landedCostPerUnit,
+                    )
+                  : 0;
                 return (
                   <button
                     key={comp.vendorId}
@@ -989,7 +996,8 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
         <ChevronRight size={12} />
       </button>
 
-      {/* Client price is shown before tax; GST is calculated in the cart. */}
+      {/* Client price is shown after vendor selection; GST is calculated in the cart. */}
+      {selectedVendor && (
       <div className="px-3 pt-2" onClick={e => e.stopPropagation()}>
         <div className="flex items-end justify-between gap-2">
           <div>
@@ -1002,6 +1010,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
           <span className="text-[9px] text-gray-400 text-right">GST {cardGstRate}%<br />added in cart</span>
         </div>
       </div>
+      )}
 
       {/* Commercial details are revealed only after a vendor is selected. */}
       {selectedVendor && (
