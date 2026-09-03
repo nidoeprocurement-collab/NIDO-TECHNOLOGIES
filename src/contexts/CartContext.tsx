@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { ProductCommercialTerms } from '@/lib/productCommercialTerms';
+import { useAuth } from './AuthContext';
 
 export interface StockAllocation {
   vendorId: string;
@@ -59,8 +60,62 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+const CART_STORAGE_KEY = 'nido_cart_v1';
+
+function getCartStorageKey(user: { id?: string } | null): string {
+  return `${CART_STORAGE_KEY}:${encodeURIComponent(user?.id || 'guest')}`;
+}
+
+function loadCart(storageKey: string): CartItem[] {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item): item is CartItem => item && typeof item === 'object')
+      .map(item => ({
+        ...item,
+        vendorAllocations: Array.isArray(item.vendorAllocations) ? item.vendorAllocations : [],
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const { effectiveUser } = useAuth();
+  const storageKey = getCartStorageKey(effectiveUser);
+  const [items, setItems] = useState<CartItem[]>(() => loadCart(storageKey));
+  const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
+
+  // Auth and impersonation can change after the provider first mounts. Load
+  // that identity's cart rather than carrying another user's in-memory cart.
+  useEffect(() => {
+    setItems(loadCart(storageKey));
+    setHydratedStorageKey(storageKey);
+  }, [storageKey]);
+
+  // Persist every cart mutation so a browser refresh does not empty the cart.
+  // The hydration guard prevents a user switch from saving the previous user's
+  // in-memory items into the new user's storage key.
+  useEffect(() => {
+    if (hydratedStorageKey !== storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(items));
+    } catch {
+      // Keep cart interactions working if browser storage is unavailable/full.
+    }
+  }, [items, storageKey, hydratedStorageKey]);
+
+  // Keep another open tab/window in sync with this cart.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === storageKey) setItems(loadCart(storageKey));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [storageKey]);
 
   const addItem = (
     product: Omit<CartItem, 'quantity' | 'vendorAllocations'>,
