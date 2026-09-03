@@ -518,7 +518,7 @@ export default function ProductDetailPage() {
                         return (
                           <>
                             <div>
-                              <p className="text-[9px] text-gray-400 uppercase">Client Selling Price / Unit</p>
+                              <p className="text-[9px] text-gray-400 uppercase">Price</p>
                               <p className="text-xs font-bold text-gray-900">
                                 {selectedClientPriceExcl && selectedClientPriceExcl > 0 ? formatPrice(selectedClientPriceExcl) : "—"}
                               </p>
@@ -539,7 +539,7 @@ export default function ProductDetailPage() {
                         <div className="grid grid-cols-[1.5fr_1.55fr_0.9fr_1.15fr_1.2fr_1fr] gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Vendor</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Pricing Model</span>
-                          <span className="text-[8px] font-bold text-gray-500 uppercase">Client Selling Price / Unit</span>
+                          <span className="text-[8px] font-bold text-gray-500 uppercase">Price</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Availability</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">Lead Time / SLA</span>
                           <span className="text-[8px] font-bold text-gray-500 uppercase">MOQ / Min Qty</span>

@@ -890,7 +890,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
             <div className="grid px-3 py-1.5 border-b border-gray-100 bg-gray-50" style={{ gridTemplateColumns: "2fr 1.7fr 1fr 1.25fr 1.25fr 1fr" }}>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Pricing Model</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Client Selling Price / Unit</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Price</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Availability</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time / SLA</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ / Min Qty</span>
@@ -1003,7 +1003,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
           <div>
             <div className="flex items-center gap-1 text-[9px] text-gray-500">
               <Tag size={10} className="text-gray-400 shrink-0" />
-              <span className="font-medium">Client Selling Price (Excl. GST)</span>
+              <span className="font-medium">Price</span>
             </div>
             <p className="text-[15px] font-bold text-gray-900 mt-0.5">{displayPrice}</p>
           </div>
@@ -1225,7 +1225,7 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
       <div className="mt-auto px-3 pb-3 pt-2.5">
         <div className="mb-3 flex items-end justify-between gap-2">
           <div>
-            <p className="text-[10px] text-gray-500">Client Selling Price (Excl. GST)</p>
+            <p className="text-[10px] text-gray-500">Price</p>
             <p className={`text-[17px] font-bold ${discountPct > 0 ? "text-emerald-600" : "text-gray-900"}`}>
               {formatPrice(displayPrice)}
               {product.priceNum > 0 && <span className="ml-1 text-[10px] font-normal text-gray-500">/ unit</span>}
