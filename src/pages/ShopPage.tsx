@@ -793,7 +793,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
 
   return (
     <div
-      className={`group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${isGrid ? "h-[520px]" : "h-full"} ${vendorPanelOpen ? "z-20" : ""}`}
+      className={`group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer ${isGrid ? "min-h-[520px]" : "h-full"} ${vendorPanelOpen ? "z-20" : ""}`}
       onClick={() => onPreview(product)}
     >
       {/* Top row: product type badge + Heart */}
@@ -1162,7 +1162,7 @@ function DigitalProductCard({ product, onPreview, clientId, isGrid }: { product:
 
   return (
     <div
-      className={`group relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "h-[520px]" : "h-full"}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "min-h-[520px]" : "h-full"}`}
       onClick={() => onPreview(product)}
     >
       <div className="flex items-center justify-between px-3 pt-3">
