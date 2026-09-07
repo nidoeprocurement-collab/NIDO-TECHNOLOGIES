@@ -7,14 +7,10 @@ import {
   saveGlobalCategoryRules,
   type CategoryPricingRule,
 } from "@/lib/priceEngineStore";
-import { getCatalogProducts } from "@/lib/catalogStore";
+import { getMasterCatalogCategories } from "@/lib/catalogStore";
 
 function loadCatalogCategories(): string[] {
-  const categories = getCatalogProducts().map((product) => product.category).filter(Boolean);
-  const unique = Array.from(new Set(categories)).sort();
-  return unique.length > 0
-    ? unique
-    : ["Computers", "Networking", "Office Supplies", "Furniture", "Electrical", "Cloud", "Software", "Stationery", "Pantry", "Cleaning Supplies", "Medical Supplies", "Services"];
+  return getMasterCatalogCategories();
 }
 
 const ADD_NEW_SENTINEL = "__ADD_NEW__";
@@ -120,7 +116,11 @@ export default function GlobalCategoryPricingPanel() {
     saveGlobalCategoryRules(next);
   };
 
-  const allCategories = Array.from(new Set([...catalogCategories, ...customCategories]));
+  const allCategories = Array.from(new Set([
+    ...catalogCategories,
+    ...customCategories,
+    ...rules.map((rule) => rule.category),
+  ])).sort();
   const usedCategories = new Set(rules.map((rule) => rule.category));
 
   const startAdd = () => {
