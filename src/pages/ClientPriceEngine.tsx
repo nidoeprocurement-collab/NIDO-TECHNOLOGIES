@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, CheckCircle2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { RefreshCw, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronRight as ChevronRightIcon, Search } from 'lucide-react';
 import {
+  computeClientFinalPrice,
+  getClientCommonSettings,
   getAllClientPricing,
+  resolveClientProfitPct,
   syncAllPricesToClientCatalogs,
   type ClientPricingRow,
 } from '@/lib/priceEngineStore';
@@ -27,6 +30,7 @@ export default function ClientPriceEngine() {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = () => setRows(getAllClientPricing());
@@ -42,6 +46,8 @@ export default function ClientPriceEngine() {
         r.category,
         r.clientProductCode,
         r.winningVendor?.vendorName,
+        r.winningVendor?.vendorProductCode,
+        ...r.vendorComparisons.flatMap(v => [v.vendorName, v.vendorProductCode]),
       ]
         .filter(Boolean)
         .join(' ')
@@ -81,6 +87,7 @@ export default function ClientPriceEngine() {
   }, []);
 
   const syncedCount = rows.filter(r => r.calc).length;
+  const toggle = (key: string) => setExpanded(current => ({ ...current, [key]: !current[key] }));
 
   return (
     <div className="max-w-full space-y-5 pb-10">
@@ -90,7 +97,7 @@ export default function ClientPriceEngine() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 uppercase tracking-wide">CLIENT PRICE ENGINE</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Automatically prices every product from its winning vendor's landed cost using each client's own
+            Automatically prices every product from its recommended vendor's landed cost using each client's own
             overhead/profit/discount/tax settings (configured on that client's Catalog page), and writes the result
             into that client's catalog Selling Price
           </p>
@@ -145,11 +152,13 @@ export default function ClientPriceEngine() {
             <table className="text-xs border-collapse min-w-full">
               <thead>
                 <tr className="bg-blue-600 text-white">
+                  <th className="py-2 px-2 text-left font-semibold">Vendors</th>
                   <th className="py-2 px-2 text-left font-semibold">Client</th>
                   <th className="py-2 px-2 text-left font-semibold">Product</th>
                   <th className="py-2 px-2 text-left font-semibold">Category</th>
                   <th className="py-2 px-2 text-left font-semibold">Client Product Code</th>
-                  <th className="py-2 px-2 text-left font-semibold">Winning Vendor</th>
+                  <th className="py-2 px-2 text-left font-semibold">Recommended Vendor</th>
+                  <th className="py-2 px-2 text-left font-semibold">Vendor Product Code</th>
                   <th className="py-2 px-2 text-right font-semibold">Landed Cost</th>
                   <th className="py-2 px-2 text-right font-semibold">Charges + Overhead</th>
                   <th className="py-2 px-2 text-right font-semibold">Profit</th>
@@ -159,30 +168,84 @@ export default function ClientPriceEngine() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedRows.map((r, i) => (
-                  <tr key={`${r.clientId}-${r.masterProductCode}-${i}`} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-2 px-2 font-medium text-gray-700">{r.clientName}</td>
-                    <td className="py-2 px-3">
-                      <div className="font-semibold text-gray-800">{r.productName}</div>
-                      <div className="text-gray-400 text-xs">{r.masterProductCode}</div>
-                    </td>
-                    <td className="py-2 px-2 text-gray-600">{r.category || '—'}</td>
-                    <td className="py-2 px-2 text-gray-700">{r.clientProductCode}</td>
-                    {r.winningVendor && r.calc ? (
-                      <>
-                        <td className="py-2 px-2 text-green-700 font-medium">{r.winningVendor.vendorName}</td>
-                        <td className="py-2 px-2 text-right">{fmt(r.landedCostPerUnit)}</td>
-                        <td className="py-2 px-2 text-right">{fmt(r.calc.perUnitTotal)}</td>
-                        <td className="py-2 px-2 text-right">{fmt(r.calc.profit)}</td>
-                        <td className="py-2 px-2 text-right text-red-600">-{fmt(r.calc.discount)}</td>
-                        <td className="py-2 px-2 text-right">{fmt(r.calc.tax)}</td>
-                        <td className="py-2 px-2 text-right font-bold text-blue-800">{fmt(r.calc.finalPrice)}</td>
-                      </>
-                    ) : (
-                      <td colSpan={6} className="py-2 px-2 text-amber-600">No active vendor — final price pending</td>
-                    )}
-                  </tr>
-                ))}
+                {paginatedRows.map((r, i) => {
+                  const rowKey = `${r.clientId}-${r.masterProductCode}-${i}`;
+                  const hasVendorOptions = r.vendorComparisons.length > 1;
+                  const isExpanded = Boolean(expanded[rowKey]);
+                  const clientSettings = getClientCommonSettings(r.clientId);
+                  const clientProfitPct = resolveClientProfitPct(r.clientId, r.masterProductCode, r.category);
+
+                  return (
+                    <Fragment key={rowKey}>
+                      <tr className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 px-2 align-top">
+                          {hasVendorOptions && (
+                            <button
+                              type="button"
+                              onClick={() => toggle(rowKey)}
+                              aria-expanded={isExpanded}
+                              aria-label={`${isExpanded ? 'Hide' : 'View'} all ${r.vendorComparisons.length} vendors for ${r.productName}`}
+                              className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 whitespace-nowrap"
+                            >
+                              {isExpanded ? <ChevronDown size={13} /> : <ChevronRightIcon size={13} />}
+                              {isExpanded ? 'Hide vendors' : `View ${r.vendorComparisons.length} vendors`}
+                            </button>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 font-medium text-gray-700">{r.clientName}</td>
+                        <td className="py-2 px-3">
+                          <div className="font-semibold text-gray-800">{r.productName}</div>
+                          <div className="text-gray-400 text-xs">{r.masterProductCode}</div>
+                        </td>
+                        <td className="py-2 px-2 text-gray-600">{r.category || '—'}</td>
+                        <td className="py-2 px-2 text-gray-700">{r.clientProductCode}</td>
+                        {r.winningVendor && r.calc ? (
+                          <>
+                            <td className="py-2 px-2 text-green-700 font-medium">{r.winningVendor.vendorName}</td>
+                            <td className="py-2 px-2 text-gray-700">{r.winningVendor.vendorProductCode}</td>
+                            <td className="py-2 px-2 text-right">{fmt(r.landedCostPerUnit)}</td>
+                            <td className="py-2 px-2 text-right">{fmt(r.calc.perUnitTotal)}</td>
+                            <td className="py-2 px-2 text-right">{fmt(r.calc.profit)}</td>
+                            <td className="py-2 px-2 text-right text-red-600">-{fmt(r.calc.discount)}</td>
+                            <td className="py-2 px-2 text-right">{fmt(r.calc.tax)}</td>
+                            <td className="py-2 px-2 text-right font-bold text-blue-800">{fmt(r.calc.finalPrice)}</td>
+                          </>
+                        ) : (
+                          <td colSpan={8} className="py-2 px-2 text-amber-600">No active vendor — final price pending</td>
+                        )}
+                      </tr>
+                      {isExpanded && r.vendorComparisons.map(vendor => {
+                        const vendorCalc = computeClientFinalPrice(
+                          vendor.landedCostPerUnit,
+                          clientSettings,
+                          clientProfitPct,
+                          r.category,
+                        );
+                        const isRecommended = vendor.vendorId === r.winningVendor?.vendorId;
+                        return (
+                          <tr
+                            key={`${rowKey}-${vendor.vendorId}`}
+                            className={`border-b border-gray-50 bg-gray-50/50 ${isRecommended ? 'bg-green-50/60' : ''}`}
+                          >
+                            <td></td>
+                            <td></td>
+                            <td className="py-1.5 px-2 pl-8 text-gray-500">↳ {isRecommended ? 'Recommended' : 'Compared'}</td>
+                            <td></td>
+                            <td></td>
+                            <td className="py-1.5 px-2 text-gray-700">{vendor.vendorName}</td>
+                            <td className="py-1.5 px-2 text-gray-700">{vendor.vendorProductCode}</td>
+                            <td className="py-1.5 px-2 text-right text-gray-700">{fmt(vendor.landedCostPerUnit)}</td>
+                            <td className="py-1.5 px-2 text-right text-gray-700">{fmt(vendorCalc.perUnitTotal)}</td>
+                            <td className="py-1.5 px-2 text-right text-gray-700">{fmt(vendorCalc.profit)}</td>
+                            <td className="py-1.5 px-2 text-right text-red-600">-{fmt(vendorCalc.discount)}</td>
+                            <td className="py-1.5 px-2 text-right text-gray-700">{fmt(vendorCalc.tax)}</td>
+                            <td className="py-1.5 px-2 text-right font-bold text-blue-800">{fmt(vendorCalc.finalPrice)}</td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
             <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-3 mt-3 text-xs text-gray-600">

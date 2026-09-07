@@ -633,6 +633,7 @@ export interface ClientPricingRow {
   sku: string;
   category: string;
   clientProductCode: string;
+  vendorComparisons: VendorComparisonRow[];
   winningVendor: VendorComparisonRow | null;
   landedCostPerUnit: number;
   calc: ClientPriceCalc | null;
@@ -666,6 +667,7 @@ export function getAllClientPricing(): ClientPricingRow[] {
         sku: pp.sku,
         category: pp.category,
         clientProductCode: entry.cpc || '—',
+        vendorComparisons: pp.vendorComparisons,
         winningVendor: pp.winningVendor,
         landedCostPerUnit: pp.landedCostPerUnit,
         calc,
