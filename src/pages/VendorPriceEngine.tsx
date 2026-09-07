@@ -122,7 +122,7 @@ export default function VendorPriceEngine() {
             <table className="text-xs border-collapse min-w-full">
               <thead>
                 <tr className="bg-blue-600 text-white">
-                  <th className="py-2 px-2 w-6"></th>
+                  <th className="py-2 px-2 text-left font-semibold">Vendors</th>
                   <th className="py-2 px-2 text-left font-semibold">Product</th>
                   <th className="py-2 px-2 text-left font-semibold">Category</th>
                   <th className="py-2 px-2 text-left font-semibold">Recommended Vendor</th>
@@ -140,10 +140,17 @@ export default function VendorPriceEngine() {
                 {paginatedProducts.map(p => (
                   <React.Fragment key={p.masterProductCode}>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 px-2 text-center">
+                      <td className="py-2 px-2 align-top">
                         {p.vendorComparisons.length > 1 && (
-                          <button onClick={() => toggle(p.masterProductCode)} className="text-gray-400 hover:text-gray-700">
-                            {expanded[p.masterProductCode] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          <button
+                            type="button"
+                            onClick={() => toggle(p.masterProductCode)}
+                            aria-expanded={Boolean(expanded[p.masterProductCode])}
+                            aria-label={`${expanded[p.masterProductCode] ? 'Hide' : 'View'} all ${p.vendorComparisons.length} vendors for ${p.productName}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 whitespace-nowrap"
+                          >
+                            {expanded[p.masterProductCode] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                            {expanded[p.masterProductCode] ? 'Hide vendors' : `View ${p.vendorComparisons.length} vendors`}
                           </button>
                         )}
                       </td>
