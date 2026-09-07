@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, CheckCircle2, Search } from 'lucide-react';
+import { RefreshCw, CheckCircle2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import {
   getAllClientPricing,
   syncAllPricesToClientCatalogs,
@@ -10,6 +10,7 @@ import GlobalCategoryPricingPanel from './GlobalCategoryPricingPanel';
 
 const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const PRODUCTS_PER_PAGE = 10;
 
 const SYNC_EVENTS = [
   'catalogUpdated',
@@ -25,6 +26,7 @@ export default function ClientPriceEngine() {
   const [lastSyncCount, setLastSyncCount] = useState<number | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = () => setRows(getAllClientPricing());
@@ -47,6 +49,13 @@ export default function ClientPriceEngine() {
       return haystack.includes(q);
     });
   }, [rows, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedRows = filteredRows.slice(
+    (currentPage - 1) * PRODUCTS_PER_PAGE,
+    currentPage * PRODUCTS_PER_PAGE,
+  );
 
   const syncNow = () => {
     const updated = syncAllPricesToClientCatalogs();
@@ -113,7 +122,10 @@ export default function ClientPriceEngine() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search by client, product, code, category or vendor..."
             className="w-full text-xs pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
@@ -147,7 +159,7 @@ export default function ClientPriceEngine() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((r, i) => (
+                {paginatedRows.map((r, i) => (
                   <tr key={`${r.clientId}-${r.masterProductCode}-${i}`} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-2 px-2 font-medium text-gray-700">{r.clientName}</td>
                     <td className="py-2 px-3">
@@ -173,6 +185,32 @@ export default function ClientPriceEngine() {
                 ))}
               </tbody>
             </table>
+            <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-3 mt-3 text-xs text-gray-600">
+              <span>
+                Showing {(currentPage - 1) * PRODUCTS_PER_PAGE + 1}–{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredRows.length)} of {filteredRows.length} products
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+                <span className="min-w-16 text-center font-medium text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import {
   getAllProductPricing,
   type ProductPricing,
@@ -10,6 +10,7 @@ import {
 const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtNos = (n: number) => n.toLocaleString('en-IN');
+const PRODUCTS_PER_PAGE = 10;
 
 function Stars({ r }: { r: number }) {
   return (
@@ -28,6 +29,7 @@ export default function VendorPriceEngine() {
   const [products, setProducts] = useState<ProductPricing[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   const refresh = () => setProducts(getAllProductPricing());
 
@@ -49,6 +51,13 @@ export default function VendorPriceEngine() {
       return haystack.includes(q);
     });
   }, [products, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * PRODUCTS_PER_PAGE,
+    currentPage * PRODUCTS_PER_PAGE,
+  );
 
   useEffect(() => {
     refresh();
@@ -85,7 +94,10 @@ export default function VendorPriceEngine() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search by product, code, category or vendor..."
             className="w-full text-xs pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
@@ -120,7 +132,7 @@ export default function VendorPriceEngine() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map(p => (
+                {paginatedProducts.map(p => (
                   <React.Fragment key={p.masterProductCode}>
                     <tr className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-2 px-2 text-center">
@@ -173,6 +185,32 @@ export default function VendorPriceEngine() {
                 ))}
               </tbody>
             </table>
+            <div className="flex items-center justify-between gap-3 border-t border-gray-200 pt-3 mt-3 text-xs text-gray-600">
+              <span>
+                Showing {(currentPage - 1) * PRODUCTS_PER_PAGE + 1}–{Math.min(currentPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+                <span className="min-w-16 text-center font-medium text-gray-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
