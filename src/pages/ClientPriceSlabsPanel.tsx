@@ -15,14 +15,14 @@ function buildApplyToOptions(): string[] {
   return ['All Products', ...getMasterCatalogCategories()];
 }
 
-function emptySlab(applyToOptions: string[]): PriceSlab {
+function emptySlab(): PriceSlab {
   return {
     id: `slab-${Date.now()}`,
     name: '',
-    minQty: 1,
-    maxQty: 100,
+    minQty: 0,
+    maxQty: 0,
     discountPct: 0,
-    applyTo: applyToOptions[0] ?? 'All Products',
+    applyTo: '',
     status: 'Active',
   };
 }
@@ -54,7 +54,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
   };
 
   const startAdd = () => {
-    const slab = emptySlab(applyToOptions);
+    const slab = emptySlab();
     setDraft(slab);
     setEditingId(slab.id);
     setIsNew(true);
@@ -74,7 +74,15 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
 
   const saveDraft = () => {
     if (!draft) return;
-    if (!draft.name.trim()) return;
+    if (
+      !draft.name.trim()
+      || draft.minQty < 1
+      || draft.maxQty < draft.minQty
+      || draft.discountPct <= 0
+      || !draft.applyTo
+    ) {
+      return;
+    }
     if (isNew) {
       persist([...slabs, draft]);
     } else {
@@ -132,7 +140,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     <td className="px-4 py-2">
                       <Input
                         type="number"
-                        value={draft.minQty}
+                          value={draft.minQty || ""}
                         onChange={(e) => setDraft({ ...draft, minQty: parseInt(e.target.value) || 0 })}
                         className="h-8 text-xs w-20 bg-white"
                       />
@@ -140,7 +148,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     <td className="px-4 py-2">
                       <Input
                         type="number"
-                        value={draft.maxQty}
+                          value={draft.maxQty || ""}
                         onChange={(e) => setDraft({ ...draft, maxQty: parseInt(e.target.value) || 0 })}
                         className="h-8 text-xs w-20 bg-white"
                       />
@@ -148,7 +156,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     <td className="px-4 py-2">
                       <Input
                         type="number"
-                        value={draft.discountPct}
+                          value={draft.discountPct || ""}
                         onChange={(e) => setDraft({ ...draft, discountPct: parseFloat(e.target.value) || 0 })}
                         className="h-8 text-xs w-20 bg-white"
                       />
@@ -159,6 +167,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                         onChange={(e) => setDraft({ ...draft, applyTo: e.target.value })}
                         className="h-8 text-xs border border-gray-300 rounded px-2 bg-white"
                       >
+                          <option value="">Select category</option>
                         {applyToOptions.map((opt) => (
                           <option key={opt} value={opt}>{opt}</option>
                         ))}
@@ -226,7 +235,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                 <td className="px-4 py-2">
                   <Input
                     type="number"
-                    value={draft.minQty}
+                      value={draft.minQty || ""}
                     onChange={(e) => setDraft({ ...draft, minQty: parseInt(e.target.value) || 0 })}
                     className="h-8 text-xs w-20 bg-white"
                   />
@@ -234,7 +243,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                 <td className="px-4 py-2">
                   <Input
                     type="number"
-                    value={draft.maxQty}
+                      value={draft.maxQty || ""}
                     onChange={(e) => setDraft({ ...draft, maxQty: parseInt(e.target.value) || 0 })}
                     className="h-8 text-xs w-20 bg-white"
                   />
@@ -242,7 +251,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                 <td className="px-4 py-2">
                   <Input
                     type="number"
-                    value={draft.discountPct}
+                      value={draft.discountPct || ""}
                     onChange={(e) => setDraft({ ...draft, discountPct: parseFloat(e.target.value) || 0 })}
                     className="h-8 text-xs w-20 bg-white"
                   />
@@ -253,6 +262,7 @@ export default function ClientPriceSlabsPanel({ clientId }: { clientId: string }
                     onChange={(e) => setDraft({ ...draft, applyTo: e.target.value })}
                     className="h-8 text-xs border border-gray-300 rounded px-2 bg-white"
                   >
+                      <option value="">Select category</option>
                     {applyToOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}

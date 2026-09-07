@@ -141,7 +141,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
                 <Input
                   type="number"
                   min={0}
-                  value={settings.profitPct}
+                    value={settings.profitPct || ""}
                   onChange={(event) => updateField("profitPct", Math.max(0, parseFloat(event.target.value) || 0))}
                   className="h-8 bg-white text-xs"
                 />
@@ -156,7 +156,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
                   type="number"
                   min={0}
                   max={100}
-                  value={settings.discountPct}
+                    value={settings.discountPct || ""}
                   onChange={(event) => updateField("discountPct", Math.min(100, Math.max(0, parseFloat(event.target.value) || 0)))}
                   className="h-8 bg-white text-xs"
                 />
@@ -171,7 +171,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
                 <Input
                   type="number"
                   min={0}
-                  value={settings.shippingDeliveryFee}
+                    value={settings.shippingDeliveryFee || ""}
                   onChange={(event) => updateField("shippingDeliveryFee", Math.max(0, parseFloat(event.target.value) || 0))}
                   className="h-8 bg-white text-xs"
                 />
@@ -185,7 +185,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
                   type="number"
                   min={0}
                   max={100}
-                  value={settings.platformFeePct}
+                    value={settings.platformFeePct || ""}
                   onChange={(event) => updateField("platformFeePct", Math.min(100, Math.max(0, parseFloat(event.target.value) || 0)))}
                   className="h-8 bg-white text-xs"
                 />

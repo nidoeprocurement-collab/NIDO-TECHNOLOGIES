@@ -72,7 +72,7 @@ export interface ClientCommonSettings {
 const DEFAULT_CLIENT_SETTINGS: ClientCommonSettings = {
   perUnitCharges: [],
   overheadPct: 0,
-  profitPct: 20,
+  profitPct: 0,
   discountPct: 0,
   shippingDeliveryFee: 0,
   platformFeePct: 0,
@@ -138,12 +138,6 @@ export interface PriceSlab {
   status: 'Active' | 'Inactive';
 }
 
-const DEFAULT_PRICE_SLABS: PriceSlab[] = [
-  { id: 'slab-1', name: 'Bulk Order - Tier 1', minQty: 1, maxQty: 50, discountPct: 0, applyTo: 'All Products', status: 'Active' },
-  { id: 'slab-2', name: 'Bulk Order - Tier 2', minQty: 51, maxQty: 100, discountPct: 5, applyTo: 'All Products', status: 'Active' },
-  { id: 'slab-3', name: 'Bulk Order - Tier 3', minQty: 101, maxQty: 500, discountPct: 10, applyTo: 'All Products', status: 'Active' },
-];
-
 function getAllClientSlabs(): Record<string, PriceSlab[]> {
   try {
     const raw = localStorage.getItem(CLIENT_SLABS_KEY);
@@ -157,7 +151,7 @@ function getAllClientSlabs(): Record<string, PriceSlab[]> {
 export function getClientPriceSlabs(clientId: string): PriceSlab[] {
   const all = getAllClientSlabs();
   if (all[clientId]) return all[clientId];
-  return DEFAULT_PRICE_SLABS;
+  return [];
 }
 
 export function saveClientPriceSlabs(clientId: string, slabs: PriceSlab[]): void {
