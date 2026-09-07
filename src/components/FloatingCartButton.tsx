@@ -1,16 +1,12 @@
 import { ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
-import { useI18n } from '@/i18n/I18nProvider';
-import { formatCurrency } from '@/lib/formatters';
 
 export default function FloatingCartButton() {
   const navigate = useNavigate();
   const { items } = useCart();
-  useI18n();
 
   const totalQty = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce((sum, item) => sum + (item.priceNum || 0) * item.quantity, 0);
 
   return (
     <button
@@ -29,9 +25,6 @@ export default function FloatingCartButton() {
       {/* Text block */}
       <div className="flex flex-col items-start leading-none">
         <span className="text-[13px] font-semibold tracking-wide">Cart</span>
-        <span className="text-[11px] font-medium text-blue-200 mt-0.5">
-          {formatCurrency(totalPrice)}
-        </span>
       </div>
     </button>
   );
