@@ -305,11 +305,14 @@ export default function CartPage() {
                   const vendorInclusivePrice = getCartUnitPriceInclusive(item, taxRate);
                   const slabPrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
                   const effectivePrice = clientDiscountPct > 0 ? slabPrice * (1 - clientDiscountPct / 100) : slabPrice;
+                   const hasDiscount = discountPct > 0 || clientDiscountPct > 0;
                   const inclusiveTotal = effectivePrice * item.quantity;
                   const gstRate        = taxRate;
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
                    const gstAmount      = inclusiveTotal - preTaxUnit * item.quantity;
-                  const originalUnit   = discountPct > 0 ? unitPriceExcl : preTaxUnit;
+                   // Keep the Shop selling price as the reference price. The
+                   // discounted unit price is calculated separately below.
+                   const originalUnit   = unitPriceExcl;
                   const catalog        = catalogMap.get(item.productCode || "");
                    const stockInfo      = vendorMatchMap.get(item.productCode || "");
                    const selectedAllocation = item.selectedVendorId
@@ -445,7 +448,7 @@ export default function CartPage() {
 
                         {/* ── Unit Price ──────────────────────────────── */}
                         <div className="flex flex-col items-center justify-start pt-1">
-                           {(discountPct > 0 || clientDiscountPct > 0) && (
+                            {hasDiscount && (
                             <p className="text-xs text-gray-400 line-through leading-tight">{formatPrice(originalUnit)}</p>
                           )}
                           <p className="text-sm font-bold text-gray-900">{formatPrice(preTaxUnit)}</p>
