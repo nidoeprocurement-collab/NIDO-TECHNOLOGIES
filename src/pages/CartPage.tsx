@@ -8,7 +8,13 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import type { CartItem } from "@/contexts/CartContext";
 import { releaseVendorReservation } from "@/lib/vendorStore";
-import { getSlabDiscountPct, getAllProductPricing, getRecommendedVendor, type VendorStockAllocation } from "@/lib/priceEngineStore";
+import {
+  getSlabDiscountPct,
+  getClientCartPricingSettings,
+  getAllProductPricing,
+  getRecommendedVendor,
+  type VendorStockAllocation,
+} from "@/lib/priceEngineStore";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
@@ -216,18 +222,36 @@ export default function CartPage() {
   }, []);
 
   const totalItems = cart.length;
+  const primaryClientId = cart.find((item) => item.clientId)?.clientId;
+  const primaryClientPricing = primaryClientId
+    ? getClientCartPricingSettings(primaryClientId)
+    : { discountPct: 0, shippingDeliveryFee: 0, platformFeePct: 0 };
 
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
     cart.map(i => {
       const discountPct    = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
+      const clientDiscountPct = i.clientId ? getClientCartPricingSettings(i.clientId).discountPct : 0;
+      const taxRate = getCartTaxRate(i) ?? getEffectiveTaxPctForCategory(i.category || "");
+      const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate);
+      const slabPrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
+      const effectivePrice = clientDiscountPct > 0 ? slabPrice * (1 - clientDiscountPct / 100) : slabPrice;
+      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
+    })
+  );
+  const { preTaxSubtotal: preClientDiscountSubtotal } = computeCartGST(
+    cart.map(i => {
+      const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
       const taxRate = getCartTaxRate(i) ?? getEffectiveTaxPctForCategory(i.category || "");
       const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate);
       const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
       return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
     })
   );
-  const subtotal = preTaxSubtotal;
-  const grandTotal = preTaxSubtotal + totalGst;
+  const clientDiscountAmount = Math.max(0, preClientDiscountSubtotal - preTaxSubtotal);
+  const platformFee = (preTaxSubtotal * primaryClientPricing.platformFeePct) / 100;
+  const shippingDeliveryFee = primaryClientPricing.shippingDeliveryFee;
+  const subtotal = preClientDiscountSubtotal;
+  const grandTotal = preTaxSubtotal + totalGst + shippingDeliveryFee + platformFee;
 
   const visibleCount = 4;
   const maxScroll = Math.max(0, suggested.length - visibleCount);
@@ -275,10 +299,12 @@ export default function CartPage() {
                 {/* Rows */}
                 {cart.map((item, idx) => {
                   const discountPct    = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
+                  const clientDiscountPct = item.clientId ? getClientCartPricingSettings(item.clientId).discountPct : 0;
                   const taxRate        = getCartTaxRate(item) ?? getEffectiveTaxPctForCategory(item.category || "");
                   const unitPriceExcl   = getCartUnitPriceExclGst(item, taxRate);
                   const vendorInclusivePrice = getCartUnitPriceInclusive(item, taxRate);
-                  const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
+                  const slabPrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
+                  const effectivePrice = clientDiscountPct > 0 ? slabPrice * (1 - clientDiscountPct / 100) : slabPrice;
                   const inclusiveTotal = effectivePrice * item.quantity;
                   const gstRate        = taxRate;
                   const preTaxUnit     = effectivePrice * 100 / (100 + gstRate);
@@ -407,10 +433,10 @@ export default function CartPage() {
                             </div>
 
                             {/* Slab discount badge */}
-                            {discountPct > 0 && (
+                            {(discountPct > 0 || clientDiscountPct > 0) && (
                               <div className="mt-1.5">
                                 <span className="text-[10px] font-semibold text-green-700 bg-green-100 border border-green-200 rounded-full px-2 py-0.5">
-                                  {discountPct}% slab discount applied
+                                  {discountPct + clientDiscountPct}% discount applied
                                 </span>
                               </div>
                             )}
@@ -419,7 +445,7 @@ export default function CartPage() {
 
                         {/* ── Unit Price ──────────────────────────────── */}
                         <div className="flex flex-col items-center justify-start pt-1">
-                          {discountPct > 0 && (
+                           {(discountPct > 0 || clientDiscountPct > 0) && (
                             <p className="text-xs text-gray-400 line-through leading-tight">{formatPrice(originalUnit)}</p>
                           )}
                           <p className="text-sm font-bold text-gray-900">{formatPrice(preTaxUnit)}</p>
@@ -525,10 +551,28 @@ export default function CartPage() {
                 <span className="text-gray-500">Subtotal ({totalItems} Item{totalItems !== 1 ? "s" : ""})</span>
                 <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
               </div>
+              {clientDiscountAmount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Client Discount</span>
+                  <span className="font-semibold text-green-600">-{formatPrice(clientDiscountAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Total GST</span>
                 <span className="font-semibold text-gray-900">{formatPrice(totalGst)}</span>
               </div>
+              {shippingDeliveryFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Shipping / Delivery Fee</span>
+                  <span className="font-semibold text-gray-900">{formatPrice(shippingDeliveryFee)}</span>
+                </div>
+              )}
+              {platformFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Platform Fee</span>
+                  <span className="font-semibold text-gray-900">{formatPrice(platformFee)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-gray-100 mt-4 pt-4 mb-1">

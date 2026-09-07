@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Filter, X, UserPlus, CheckCircle } from "lucide-react";
 import { StatusBadge } from "./ClientUsersPage";
-import ClientPricingSettingsPanel from "./ClientPricingSettingsPanel";
-import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
+import ClientPricingSettingsPanel from "./ClientPricingSettingsTabsPanel";
 import { getPortalRoles, getPortalUsersByClient, updatePortalUser, type PortalUser } from "@/lib/portalUserStore";
 
 type InviteUser = {
@@ -170,11 +169,6 @@ export default function ClientConfigurationPage({ clientId = "CLI-DEFAULT" }: { 
       {configTab === "Price Setting" && (
         <div className="flex flex-col">
           <ClientPricingSettingsPanel clientId={clientId} />
-          <ClientPriceSlabsPanel clientId={clientId} />
-          <div className="mt-6 bg-blue-50 border border-blue-100 rounded-lg px-2 py-2 text-sm text-gray-700">
-            Category Pricing Rules are now configured globally for all clients in{" "}
-            <span className="font-semibold text-gray-900">Configuration → Price Engine → Client Price Engine</span>.
-          </div>
         </div>
       )}
 

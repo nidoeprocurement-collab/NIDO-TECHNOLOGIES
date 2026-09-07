@@ -3,7 +3,7 @@ import { Shield, Truck, RotateCcw, Mail, Phone, Pencil } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
 import { useOrgConfig } from "@/contexts/ConfigContext";
-import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { getSlabDiscountPct, getClientCartPricingSettings } from "@/lib/priceEngineStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
@@ -24,9 +24,24 @@ export default function OrderSummaryPanel({
 
   const totalItems = cart.length;
   const totalQty = cart.reduce((s, i) => s + i.quantity, 0);
+  const primaryClientId = cart.find((item) => item.clientId)?.clientId;
+  const primaryClientPricing = primaryClientId
+    ? getClientCartPricingSettings(primaryClientId)
+    : { discountPct: 0, shippingDeliveryFee: 0, platformFeePct: 0 };
   // priceNum is tax-inclusive — extract embedded GST, don't add on top.
   // Apply slab discount (same logic as CartPage) before computing GST.
   const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
+    cart.map(i => {
+      const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
+      const clientDiscountPct = i.clientId ? getClientCartPricingSettings(i.clientId).discountPct : 0;
+      const taxRate = getCartTaxRate(i);
+      const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate ?? 0);
+      const slabPrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
+      const effectivePrice = clientDiscountPct > 0 ? slabPrice * (1 - clientDiscountPct / 100) : slabPrice;
+      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
+    })
+  );
+  const { preTaxSubtotal: preClientDiscountSubtotal } = computeCartGST(
     cart.map(i => {
       const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
       const taxRate = getCartTaxRate(i);
@@ -35,8 +50,11 @@ export default function OrderSummaryPanel({
       return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
     })
   );
-  const subtotal = preTaxSubtotal;
-  const total = preTaxSubtotal + totalGst;
+  const clientDiscountAmount = Math.max(0, preClientDiscountSubtotal - preTaxSubtotal);
+  const shippingDeliveryFee = primaryClientPricing.shippingDeliveryFee;
+  const platformFee = (preTaxSubtotal * primaryClientPricing.platformFeePct) / 100;
+  const subtotal = preClientDiscountSubtotal;
+  const total = preTaxSubtotal + totalGst + shippingDeliveryFee + platformFee;
   return (
     <div className="w-72 shrink-0 space-y-4">
       {/* Order Summary card */}
@@ -70,7 +88,12 @@ export default function OrderSummaryPanel({
                     <p className="text-xs text-gray-400 mt-0.5">Qty: {item.quantity}</p>
                   </div>
                   <p className="text-xs font-semibold text-gray-900 shrink-0">
-                     {formatPrice(getCartUnitPriceInclusive(item, getCartTaxRate(item) ?? 0) * item.quantity)}
+                     {formatPrice(
+                       getCartUnitPriceInclusive(item, getCartTaxRate(item) ?? 0)
+                       * (1 - (item.clientId ? getClientCartPricingSettings(item.clientId).discountPct : 0) / 100)
+                       * (1 - (item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0) / 100)
+                       * item.quantity
+                     )}
                   </p>
                 </div>
               ))}
@@ -80,12 +103,30 @@ export default function OrderSummaryPanel({
                 <span className="text-gray-500">Subtotal</span>
                 <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
               </div>
+               {clientDiscountAmount > 0 && (
+                 <div className="flex justify-between">
+                   <span className="text-gray-500">Client Discount</span>
+                   <span className="font-medium text-green-600">-{formatPrice(clientDiscountAmount)}</span>
+                 </div>
+               )}
               {gstSlabs.map(sl => (
                 <div key={sl.rate} className="flex justify-between">
                   <span className="text-gray-500">GST ({sl.rate}%)</span>
                   <span className="font-medium text-gray-900">{formatPrice(sl.gst)}</span>
                 </div>
               ))}
+               {shippingDeliveryFee > 0 && (
+                 <div className="flex justify-between">
+                   <span className="text-gray-500">Shipping / Delivery Fee</span>
+                   <span className="font-medium text-gray-900">{formatPrice(shippingDeliveryFee)}</span>
+                 </div>
+               )}
+               {platformFee > 0 && (
+                 <div className="flex justify-between">
+                   <span className="text-gray-500">Platform Fee</span>
+                   <span className="font-medium text-gray-900">{formatPrice(platformFee)}</span>
+                 </div>
+               )}
               <div className="flex justify-between pt-1 border-t border-gray-100">
                 <span className="font-semibold text-gray-900">Total Amount</span>
                 <span className="font-bold text-gray-900">{formatPrice(total)}</span>

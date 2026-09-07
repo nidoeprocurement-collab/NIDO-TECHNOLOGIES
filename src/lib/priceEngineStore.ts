@@ -64,6 +64,8 @@ export interface ClientCommonSettings {
   overheadPct: number;
   profitPct: number;
   discountPct: number;
+  shippingDeliveryFee: number;
+  platformFeePct: number;
   roundOff: 'none' | 'nearest' | 'up' | 'down';
 }
 
@@ -72,6 +74,8 @@ const DEFAULT_CLIENT_SETTINGS: ClientCommonSettings = {
   overheadPct: 0,
   profitPct: 20,
   discountPct: 0,
+  shippingDeliveryFee: 0,
+  platformFeePct: 0,
   roundOff: 'none',
 };
 
@@ -99,6 +103,22 @@ export function saveClientCommonSettings(clientId: string, settings: ClientCommo
   // requiring the user to visit the Price Engine tab first.
   syncClientPrices(clientId);
   window.dispatchEvent(new Event('priceEngineSettingsUpdated'));
+}
+
+export interface ClientCartPricingSettings {
+  discountPct: number;
+  shippingDeliveryFee: number;
+  platformFeePct: number;
+}
+
+/** Checkout-only adjustments configured for one client in Price Settings. */
+export function getClientCartPricingSettings(clientId: string): ClientCartPricingSettings {
+  const settings = getClientCommonSettings(clientId);
+  return {
+    discountPct: Math.max(0, settings.discountPct || 0),
+    shippingDeliveryFee: Math.max(0, settings.shippingDeliveryFee || 0),
+    platformFeePct: Math.max(0, settings.platformFeePct || 0),
+  };
 }
 
 // ─── Client price slabs (volume-based discounts) ───────────────────────────
@@ -655,8 +675,11 @@ export function computeClientFinalPrice(
   const perUnitTotal = (landedCostPerUnit * totalPct) / 100;
   const subtotal = landedCostPerUnit + perUnitTotal;
   const profit = (subtotal * effectiveProfitPct) / 100;
-  const discount = ((subtotal + profit) * s.discountPct) / 100;
-  const preTaxFinalPrice = subtotal + profit - discount;
+  // Profit margin is part of the Shop price. The client discount is applied
+  // separately in Cart, alongside shipping/delivery and platform fees.
+  const preDiscountFinalPrice = subtotal + profit;
+  const discount = (preDiscountFinalPrice * s.discountPct) / 100;
+  const preTaxFinalPrice = preDiscountFinalPrice;
   const taxBase = preTaxFinalPrice;
   // Tax always comes from the Tax Settings engine — never a local override.
   const effectiveTaxPct = getEffectiveTaxPctForCategory(productCategory || '');
