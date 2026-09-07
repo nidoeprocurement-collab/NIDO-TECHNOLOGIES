@@ -75,7 +75,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
       const pricing = pricingMap.get(product.code);
       const vendorCost = pricing?.landedCostPerUnit ?? 0;
       const retailPrice = retailPrices[product.code] ?? 0;
-      const profitPct = resolveClientProfitPct(clientId, product.code);
+      const profitPct = resolveClientProfitPct(clientId, product.code, product.category);
       const calc = pricing?.winningVendor
         ? computeClientFinalPrice(vendorCost, settings, profitPct, product.category)
         : null;

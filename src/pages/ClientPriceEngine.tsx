@@ -6,6 +6,7 @@ import {
   syncAllPricesToClientCatalogs,
   type ClientPricingRow,
 } from '@/lib/priceEngineStore';
+import GlobalCategoryPricingPanel from './GlobalCategoryPricingPanel';
 
 const fmt = (n: number) =>
   '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -106,6 +107,9 @@ export default function ClientPriceEngine() {
           Master Catalog, Vendor Listings, or Client Catalogs change.
         </div>
       )}
+
+      {/* ── Centralized category pricing rules — applies to every client ── */}
+      <GlobalCategoryPricingPanel />
 
       {/* ── Final price per client per product (settings are per-client, configured on Client Catalog page) ── */}
       <div className="border border-gray-300 rounded-lg p-4">
