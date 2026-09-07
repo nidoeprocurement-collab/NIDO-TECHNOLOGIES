@@ -14,6 +14,7 @@ import {
 } from "@/lib/priceEngineStore";
 import { getClientCatalog } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
+import ClientCategoryProfitRulesPanel from "./ClientCategoryProfitRulesPanel";
 import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
 
 function fmt(n: number) {
@@ -200,6 +201,8 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
               Profit Margin is included in the Shop price. Discount, Shipping / Delivery, and Platform Fee are added separately in Cart.
             </span>
           </div>
+
+          <ClientCategoryProfitRulesPanel clientId={clientId} />
         </div>
       )}
 
