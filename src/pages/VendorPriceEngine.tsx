@@ -35,21 +35,26 @@ export default function VendorPriceEngine() {
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return products;
-    return products.filter(p => {
-      const haystack = [
-        p.productName,
-        p.masterProductCode,
-        p.category,
-        p.winningVendor?.vendorName,
-        p.winningVendor?.vendorProductCode,
-        ...p.vendorComparisons.map(v => v.vendorName),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(q);
-    });
+    const matchingProducts = q
+      ? products.filter(p => {
+          const haystack = [
+            p.productName,
+            p.masterProductCode,
+            p.category,
+            p.winningVendor?.vendorName,
+            p.winningVendor?.vendorProductCode,
+            ...p.vendorComparisons.map(v => v.vendorName),
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(q);
+        })
+      : [...products];
+
+    return matchingProducts.sort(
+      (a, b) => Number(Boolean(b.winningVendor)) - Number(Boolean(a.winningVendor)),
+    );
   }, [products, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
