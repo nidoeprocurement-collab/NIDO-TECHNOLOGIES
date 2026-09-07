@@ -27,8 +27,18 @@ import {
   Layers,
   Timer,
   Warehouse,
+  Check,
 } from "lucide-react";
-import { getVendorProducts, removeVendorProduct, updateVendorProduct, VendorProduct } from "@/lib/vendorStore";
+import { toast } from "sonner";
+import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
+import {
+  getVendorProducts,
+  removeVendorProduct,
+  updateVendorProduct,
+  addVendorProducts,
+  reserveVendorProductCodes,
+  VendorProduct,
+} from "@/lib/vendorStore";
 import {
   formatLeadTimeByType,
   getAvailabilityByType,
@@ -116,6 +126,228 @@ const MENU_ITEMS = [
   { icon: <RefreshCcw className="w-4 h-4" />, label: "Sync Vendor Feed" },
   { icon: <BookOpen className="w-4 h-4" />, label: "Assign to Master Catalog" },
 ];
+
+type ToolDialog = "bulkPrice" | "assign" | null;
+type BulkPriceMode = "increase" | "decrease";
+
+function csvEscape(value: unknown): string {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function parseCsvRows(text: string): Record<string, string>[] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+    if (char === '"' && quoted && next === '"') {
+      field += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(field.trim());
+      field = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") i += 1;
+      row.push(field.trim());
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+  row.push(field.trim());
+  if (row.some((value) => value !== "")) rows.push(row);
+
+  if (rows.length < 2) return [];
+  const normalizeHeader = (header: string) => header.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const headers = rows[0].map(normalizeHeader);
+  return rows.slice(1).map((values) =>
+    headers.reduce<Record<string, string>>((result, header, index) => {
+      if (header) result[header] = values[index] ?? "";
+      return result;
+    }, {}),
+  );
+}
+
+function normalizeImportValue(row: Record<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = row[key.replace(/[^a-z0-9]/gi, "").toLowerCase()];
+    if (value !== undefined && value.trim() !== "") return value.trim();
+  }
+  return "";
+}
+
+function masterSnapshot(product: CatalogProduct) {
+  return {
+    masterProductCode: product.masterProductCode,
+    skuCode: product.skuCode,
+    productName: product.productName,
+    category: product.category,
+    brand: product.brand,
+    physicalType: product.physicalType,
+    images: product.images,
+  };
+}
+
+function BulkPriceDialog({
+  productCount,
+  onCancel,
+  onApply,
+}: {
+  productCount: number;
+  onCancel: () => void;
+  onApply: (mode: BulkPriceMode, percentage: number) => void;
+}) {
+  const [mode, setMode] = useState<BulkPriceMode>("increase");
+  const [percentage, setPercentage] = useState("5");
+
+  const submit = () => {
+    const value = Number(percentage);
+    if (!Number.isFinite(value) || value <= 0 || value > 100) {
+      toast.error("Enter a percentage between 0.01 and 100.");
+      return;
+    }
+    onApply(mode, value);
+  };
+
+  return (
+    <div data-confirmation-skip className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Bulk Price Update</h3>
+            <p className="mt-0.5 text-xs text-gray-500">Update prices for {productCount} vendor product{productCount === 1 ? "" : "s"}.</p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4 px-5 py-5">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-gray-700">Change</span>
+            <select
+              value={mode}
+              onChange={(event) => setMode(event.target.value as BulkPriceMode)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="increase">Increase prices by</option>
+              <option value="decrease">Decrease prices by</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-gray-700">Percentage</span>
+            <div className="relative">
+              <input
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                value={percentage}
+                onChange={(event) => setPercentage(event.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 pr-10 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
+            </div>
+          </label>
+          <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-700">
+            Prices are rounded to two decimal places. Products without a valid price are left unchanged.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="button" onClick={submit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Apply Update</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignMasterCatalogDialog({
+  products,
+  catalog,
+  onCancel,
+  onAssign,
+}: {
+  products: VendorProduct[];
+  catalog: CatalogProduct[];
+  onCancel: () => void;
+  onAssign: (assignments: Record<string, string>) => void;
+}) {
+  const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const hasProducts = products.length > 0;
+
+  const submit = () => {
+    const missing = products.some((product) => !assignments[product.id]);
+    if (missing) {
+      toast.error("Choose a master catalog product for every unmatched item.");
+      return;
+    }
+    onAssign(assignments);
+  };
+
+  return (
+    <div data-confirmation-skip className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Assign to Master Catalog</h3>
+            <p className="mt-0.5 text-xs text-gray-500">Repair vendor products that no longer match a master catalog item.</p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {hasProducts ? (
+          <>
+            <div className="max-h-[55vh] space-y-3 overflow-y-auto px-5 py-5">
+              {products.map((product) => (
+                <div key={product.id} className="grid grid-cols-1 items-center gap-3 rounded-xl border border-gray-200 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-800">{product.productName}</p>
+                    <p className="mt-0.5 truncate font-mono text-xs text-gray-400">{product.masterProductCode || "No master code"} · {product.id}</p>
+                  </div>
+                  <select
+                    value={assignments[product.id] || ""}
+                    onChange={(event) => setAssignments((current) => ({ ...current, [product.id]: event.target.value }))}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select master product…</option>
+                    {catalog.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.productName} · {item.masterProductCode}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-gray-100 bg-amber-50 px-5 py-3 text-xs leading-relaxed text-amber-800">
+              Assigning replaces the vendor product’s master-catalog snapshot fields but keeps its vendor price, MOQ, lead time, stock, and vendor product code.
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
+              <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={submit} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Assign Products</button>
+            </div>
+          </>
+        ) : (
+          <div className="px-5 py-10 text-center">
+            <Check className="mx-auto h-9 w-9 text-emerald-500" />
+            <p className="mt-3 text-sm font-medium text-gray-800">All vendor products are assigned</p>
+            <p className="mt-1 text-xs text-gray-500">Every product on this vendor already matches an item in the master catalog.</p>
+            <button type="button" onClick={onCancel} className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Done</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Edit Product Screen ────────────────────────────────────────────────────────
 
@@ -463,15 +695,26 @@ export default function VendorProductsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<CatalogProduct[]>([]);
   const [editProduct, setEditProduct] = useState<VendorProduct | null>(null);
   const [removeProduct, setRemoveProduct] = useState<VendorProduct | null>(null);
+  const [toolDialog, setToolDialog] = useState<ToolDialog>(null);
+  const [importing, setImporting] = useState(false);
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Load vendor products from store
   useEffect(() => {
     if (vendorId) setVendorProducts(getVendorProducts(vendorId));
   }, [vendorId]);
+
+  useEffect(() => {
+    const loadCatalog = () => setCatalogProducts(getCatalogProducts());
+    loadCatalog();
+    window.addEventListener("catalogUpdated", loadCatalog);
+    return () => window.removeEventListener("catalogUpdated", loadCatalog);
+  }, []);
 
   useEffect(() => {
     const handler = () => { if (vendorId) setVendorProducts(getVendorProducts(vendorId)); };
@@ -498,8 +741,240 @@ export default function VendorProductsPage() {
     setRemoveProduct(null);
   };
 
+  const handleBulkPriceUpdate = (mode: BulkPriceMode, percentage: number) => {
+    const multiplier = mode === "increase" ? 1 + percentage / 100 : 1 - percentage / 100;
+    let updatedCount = 0;
+    vendorProducts.forEach((product) => {
+      const currentPrice = Number(product.price);
+      if (!Number.isFinite(currentPrice) || currentPrice <= 0) return;
+      updateVendorProduct(vendorId, product.id, { price: (currentPrice * multiplier).toFixed(2) });
+      updatedCount += 1;
+    });
+    setVendorProducts(getVendorProducts(vendorId));
+    setToolDialog(null);
+    toast.success(`${updatedCount} vendor price${updatedCount === 1 ? "" : "s"} updated.`);
+  };
+
+  const handleExportCatalog = () => {
+    const headers = [
+      "vendorProductCode",
+      "masterProductCode",
+      "productName",
+      "category",
+      "brand",
+      "price",
+      "moq",
+      "leadTime",
+      "stock",
+      "reservedStock",
+      "incomingStock",
+      "status",
+    ];
+    const rows = vendorProducts.map((product) =>
+      [
+        product.vendorProductCode,
+        product.masterProductCode,
+        product.productName,
+        product.category,
+        product.brand,
+        product.price,
+        product.moq,
+        product.leadTime,
+        product.stock,
+        product.reservedStock,
+        product.incomingStock || "0",
+        product.status,
+      ].map(csvEscape).join(","),
+    );
+    const blob = new Blob([`\uFEFF${headers.join(",")}\n${rows.join("\n")}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `vendor-catalog-${vendorId}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${vendorProducts.length} product${vendorProducts.length === 1 ? "" : "s"} exported.`);
+  };
+
+  const handleSyncVendorFeed = () => {
+    const catalogById = new Map(catalogProducts.map((product) => [product.id, product]));
+    const catalogByCode = new Map(catalogProducts.map((product) => [product.masterProductCode.toLowerCase(), product]));
+    let syncedCount = 0;
+    let unmatchedCount = 0;
+
+    vendorProducts.forEach((product) => {
+      const master = catalogById.get(product.id) || catalogByCode.get((product.masterProductCode || "").toLowerCase());
+      if (!master) {
+        unmatchedCount += 1;
+        return;
+      }
+      updateVendorProduct(vendorId, product.id, masterSnapshot(master));
+      syncedCount += 1;
+    });
+
+    setVendorProducts(getVendorProducts(vendorId));
+    toast.success(
+      `${syncedCount} product${syncedCount === 1 ? "" : "s"} synced from the master catalog${unmatchedCount ? `; ${unmatchedCount} unmatched` : ""}.`,
+    );
+  };
+
+  const handleImportFile = (file: File) => {
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = String(reader.result || "");
+        const parsed = file.name.toLowerCase().endsWith(".json")
+          ? JSON.parse(raw)
+          : parseCsvRows(raw);
+        const rows = Array.isArray(parsed) ? parsed : [];
+        if (rows.length === 0) throw new Error("The file has no product rows.");
+
+        const catalogById = new Map(catalogProducts.map((product) => [product.id.toLowerCase(), product]));
+        const catalogByCode = new Map(catalogProducts.map((product) => [product.masterProductCode.toLowerCase(), product]));
+        const catalogBySku = new Map(catalogProducts.map((product) => [product.skuCode.toLowerCase(), product]));
+        const catalogByName = new Map(catalogProducts.map((product) => [product.productName.trim().toLowerCase(), product]));
+        const existingById = new Map(getVendorProducts(vendorId).map((product) => [product.id, product]));
+        const pending: Omit<VendorProduct, "vendorProductCode">[] = [];
+        let updatedCount = 0;
+        let skippedCount = 0;
+        let missingCount = 0;
+
+        for (const rawRow of rows) {
+          const row = Object.entries(rawRow as Record<string, unknown>).reduce<Record<string, string>>((result, [key, value]) => {
+            result[key.replace(/[^a-z0-9]/gi, "").toLowerCase()] = String(value ?? "").trim();
+            return result;
+          }, {});
+          const identity = normalizeImportValue(row, "masterProductCode", "masterCode", "productCode", "id");
+          const sku = normalizeImportValue(row, "skuCode", "sku");
+          const name = normalizeImportValue(row, "productName", "name");
+          const master = catalogById.get(identity.toLowerCase()) ||
+            catalogByCode.get(identity.toLowerCase()) ||
+            catalogBySku.get(sku.toLowerCase()) ||
+            catalogByName.get(name.toLowerCase());
+          if (!master) {
+            missingCount += 1;
+            continue;
+          }
+
+          const existing = existingById.get(master.id);
+          const updates: Partial<VendorProduct> = {
+            ...masterSnapshot(master),
+            price: normalizeImportValue(row, "price", "purchasePrice") || existing?.price || "",
+            moq: normalizeImportValue(row, "moq", "minimumOrderQuantity") || existing?.moq || "",
+            leadTime: normalizeImportValue(row, "leadTime", "leadTimeDays") || existing?.leadTime || "",
+            stock: normalizeImportValue(row, "stock", "currentStock") || existing?.stock || "0",
+            physicalStock: normalizeImportValue(row, "physicalStock") || existing?.physicalStock || existing?.stock || "0",
+            incomingStock: normalizeImportValue(row, "incomingStock") || existing?.incomingStock || "0",
+            status: normalizeImportValue(row, "status") === "Inactive" ? "Inactive" : "Active",
+          };
+
+          if (existing) {
+            updateVendorProduct(vendorId, master.id, updates);
+            updatedCount += 1;
+          } else {
+            pending.push({
+              id: master.id,
+              vendorId,
+              ...updates,
+              reservedStock: "0",
+              addedAt: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+            } as Omit<VendorProduct, "vendorProductCode">);
+          }
+        }
+
+        if (pending.length > 0) {
+          const codes = reserveVendorProductCodes(pending.length);
+          addVendorProducts(vendorId, pending.map((product, index) => ({ ...product, vendorProductCode: codes[index] } as VendorProduct)));
+        }
+
+        setVendorProducts(getVendorProducts(vendorId));
+        const importedCount = pending.length + updatedCount;
+        if (importedCount === 0) {
+          toast.error("No rows could be imported. Match each row to a master product code, SKU, ID, or product name.");
+        } else {
+          toast.success(`${importedCount} product${importedCount === 1 ? "" : "s"} imported${missingCount ? `; ${missingCount} row${missingCount === 1 ? "" : "s"} skipped` : ""}.`);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not read the import file.");
+      } finally {
+        setImporting(false);
+        if (importInputRef.current) importInputRef.current.value = "";
+      }
+    };
+    reader.onerror = () => {
+      setImporting(false);
+      toast.error("Could not read the import file.");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleAssignProducts = (assignments: Record<string, string>) => {
+    const catalogById = new Map(catalogProducts.map((product) => [product.id, product]));
+    const existingIds = new Set(vendorProducts.map((product) => product.id));
+    let assignedCount = 0;
+    let conflictCount = 0;
+
+    Object.entries(assignments).forEach(([vendorProductId, catalogId]) => {
+      const master = catalogById.get(catalogId);
+      if (!master) return;
+      if (existingIds.has(catalogId) && catalogId !== vendorProductId) {
+        conflictCount += 1;
+        return;
+      }
+      updateVendorProduct(vendorId, vendorProductId, { id: catalogId, ...masterSnapshot(master) });
+      assignedCount += 1;
+    });
+
+    setVendorProducts(getVendorProducts(vendorId));
+    setToolDialog(null);
+    toast.success(`${assignedCount} product${assignedCount === 1 ? "" : "s"} assigned${conflictCount ? `; ${conflictCount} conflict${conflictCount === 1 ? "" : "s"} skipped` : ""}.`);
+  };
+
+  const unmatchedProducts = vendorProducts.filter((product) => {
+    const matchesId = catalogProducts.some((catalog) => catalog.id === product.id);
+    const matchesCode = catalogProducts.some((catalog) => catalog.masterProductCode.toLowerCase() === (product.masterProductCode || "").toLowerCase());
+    return !matchesId && !matchesCode;
+  });
+
+  const handleMenuAction = (label: string) => {
+    setMenuOpen(false);
+    if (label === "Add Product") navigate(`/vendors/${vendorId}/add-products`);
+    if (label === "Bulk Price Update") setToolDialog("bulkPrice");
+    if (label === "Import Products") importInputRef.current?.click();
+    if (label === "Export Catalog") handleExportCatalog();
+    if (label === "Sync Vendor Feed") handleSyncVendorFeed();
+    if (label === "Assign to Master Catalog") setToolDialog("assign");
+  };
+
   return (
     <div className="min-h-screen bg-white font-sans">
+      {toolDialog === "bulkPrice" && (
+        <BulkPriceDialog
+          productCount={vendorProducts.length}
+          onCancel={() => setToolDialog(null)}
+          onApply={handleBulkPriceUpdate}
+        />
+      )}
+      {toolDialog === "assign" && (
+        <AssignMasterCatalogDialog
+          products={unmatchedProducts}
+          catalog={catalogProducts}
+          onCancel={() => setToolDialog(null)}
+          onAssign={handleAssignProducts}
+        />
+      )}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".csv,.json,text/csv,application/json"
+        className="hidden"
+        disabled={importing}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) handleImportFile(file);
+        }}
+      />
       {editProduct && (
         <EditProductScreen
           product={editProduct}
@@ -542,10 +1017,7 @@ export default function VendorProductsPage() {
                       {i === 1 && <div className="my-1 border-t border-gray-100" />}
                       <button
                         className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                        onClick={() => {
-                          setMenuOpen(false);
-                          if (item.label === "Add Product") navigate(`/vendors/${vendorId}/add-products`);
-                        }}
+                        onClick={() => handleMenuAction(item.label)}
                       >
                         <span className="text-gray-400">{item.icon}</span>
                         {item.label}
