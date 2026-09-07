@@ -1278,10 +1278,7 @@ export default function ShopPage() {
   }, [isClientPortalUser, user?.clientId]);
   const [category, setCategory] = useState("All Categories");
   const [availability, setAvailability] = useState("All");
-  const [catOpen, setCatOpen] = useState(false);
-  const [availOpen, setAvailOpen] = useState(false);
   const [clientOpen, setClientOpen] = useState(false);
-  const [brandOpen, setBrandOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1325,10 +1322,7 @@ export default function ShopPage() {
   const allBrands = ["All Brands", ...Array.from(new Set(catalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
 
   const closeFilterMenus = () => {
-    setCatOpen(false);
-    setAvailOpen(false);
     setClientOpen(false);
-    setBrandOpen(false);
     setSortOpen(false);
     setMoreFiltersOpen(false);
   };
@@ -1398,8 +1392,47 @@ export default function ShopPage() {
               : "Browse and order physical products, digital licenses, subscriptions, cloud services and more."}
           </p>
         </div>
-        <div className="flex w-full max-w-xs items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
-          <Search size={15} className="text-gray-400 shrink-0" />
+        {!isClientPortalUser && (
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => { setClientOpen(o => !o); setSortOpen(false); setMoreFiltersOpen(false); }}
+              className={`flex min-w-[180px] items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${
+                clientOpen || selectedClientId
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <Building2 size={14} className="shrink-0" />
+              <span className="flex-1 truncate text-left">{selectedClient ? selectedClient.name : "Select Client"}</span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform ${clientOpen ? "rotate-180" : ""}`} />
+            </button>
+            {clientOpen && (
+              <div className="absolute right-0 top-full z-40 mt-1 max-h-64 min-w-[230px] overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {clients.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleClientChange(c.id)}
+                    className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50 ${
+                      selectedClientId === c.id ? "bg-blue-50 font-medium text-blue-600" : "text-gray-700"
+                    }`}
+                  >
+                    <span className="block font-medium">{c.name}</span>
+                    <span className="block text-[10px] text-gray-400">{c.id}</span>
+                  </button>
+                ))}
+                {clients.length === 0 && <div className="px-3 py-3 text-xs text-gray-400">No clients found</div>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Filters row */}
+      <div className="mb-5 flex items-center gap-2.5 flex-wrap">
+        <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm md:max-w-sm">
+          <Search size={15} className="shrink-0 text-gray-400" />
           <input
             type="text"
             placeholder="Search products by name or category..."
@@ -1408,160 +1441,88 @@ export default function ShopPage() {
             className="w-full bg-transparent text-xs text-gray-700 outline-none placeholder:text-gray-400 md:text-sm"
           />
           {search && (
-            <button onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
+            <button type="button" onClick={() => { setSearch(""); resetPage(); }} className="text-gray-400 hover:text-gray-600">
               <X size={13} />
             </button>
           )}
         </div>
-      </div>
-
-      {/* Product type tabs */}
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-        {SHOP_TABS.map(tab => {
-          const Icon = tab.icon;
-          const active = shopTab === tab.id;
-          const count = tab.id === "all"
-            ? catalogProducts.length
-            : catalogProducts.filter(product => getShopProductKind(product) === tab.id).length;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => handleShopTabChange(tab.id)}
-              className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-[11px] font-semibold transition-colors md:text-xs ${
-                active
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-blue-200 hover:bg-blue-50/50"
-              }`}
-            >
-              <Icon size={14} className={active ? "text-blue-600" : "text-gray-400"} />
-              {tab.label}
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-white text-blue-600" : "bg-gray-100 text-gray-500"}`}>{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filters row */}
-      <div className="mb-5 flex items-center gap-2.5 flex-wrap">
-
-        {/* ── Client dropdown — hidden in the client portal, where the
-            catalog is always scoped to the logged-in client's own account ── */}
-        {!isClientPortalUser && (
-          <div className="relative">
-            <button
-              onClick={() => { setClientOpen(o => !o); setCatOpen(false); setAvailOpen(false); }}
-              className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors min-w-[180px] ${clientOpen ? "border-blue-500 text-blue-600 bg-blue-50" : selectedClientId ? "border-blue-500 text-blue-700 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
-            >
-              <Building2 size={14} className="shrink-0" />
-              <span className="flex-1 text-left truncate">
-                {selectedClient ? selectedClient.name : "Select Client"}
-              </span>
-              <ChevronDown size={14} className={`transition-transform shrink-0 ${clientOpen ? "rotate-180" : ""}`} />
-            </button>
-            {clientOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[220px] max-h-64 overflow-y-auto">
-                {clients.map(c => (
-                  <button key={c.id} onClick={() => handleClientChange(c.id)}
-                    className={`w-full text-left px-2 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedClientId === c.id ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
-                    <span className="block font-medium">{c.name}</span>
-                    <span className="block text-xs text-gray-400">{c.id}</span>
-                  </button>
-                ))}
-                {clients.length === 0 && <div className="px-2 py-2 text-sm text-gray-400">No clients found</div>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Category dropdown — only when client selected */}
-        {selectedClientId && (
-          <div className="relative">
-            <button
-              onClick={() => { setCatOpen(o => !o); setAvailOpen(false); setClientOpen(false); setBrandOpen(false); setSortOpen(false); setMoreFiltersOpen(false); }}
-              className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors ${catOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
-            >
-              {category}
-              <ChevronDown size={14} className={`transition-transform ${catOpen ? "rotate-180" : ""}`} />
-            </button>
-            {catOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[200px]">
-                {allCats.map(opt => (
-                  <button key={opt} onClick={() => { setCategory(opt); setCatOpen(false); resetPage(); }}
-                    className={`w-full text-left px-2 py-2 text-sm hover:bg-gray-50 transition-colors ${category === opt ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Brand dropdown */}
-        {selectedClientId && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => { setBrandOpen(o => !o); setCatOpen(false); setAvailOpen(false); setClientOpen(false); setSortOpen(false); setMoreFiltersOpen(false); }}
-              className={`flex min-w-[112px] items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${brandOpen ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
-            >
-              <span className="truncate">{brand}</span>
-              <ChevronDown size={14} className={`shrink-0 transition-transform ${brandOpen ? "rotate-180" : ""}`} />
-            </button>
-            {brandOpen && (
-              <div className="absolute left-0 top-full z-30 mt-1 max-h-64 min-w-[180px] overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                {allBrands.map(option => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => { setBrand(option); setBrandOpen(false); resetPage(); }}
-                    className={`w-full px-3 py-2 text-left text-xs transition-colors hover:bg-gray-50 ${brand === option ? "bg-blue-50 font-medium text-blue-600" : "text-gray-700"}`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Availability dropdown — only when client selected */}
-        {selectedClientId && (
-          <div className="relative">
-            <button
-              onClick={() => { setAvailOpen(o => !o); setCatOpen(false); setClientOpen(false); setBrandOpen(false); setSortOpen(false); setMoreFiltersOpen(false); }}
-              className={`flex items-center gap-2 text-sm border rounded-lg px-2 py-2 transition-colors ${availOpen ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-200 text-gray-700 bg-white hover:bg-gray-50"}`}
-            >
-              Availability: {availability}
-              <ChevronDown size={14} className={`transition-transform ${availOpen ? "rotate-180" : ""}`} />
-            </button>
-            {availOpen && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[180px]">
-                {["All", "In Stock", "Out of Stock"].map(opt => (
-                  <button key={opt} onClick={() => { setAvailability(opt); setAvailOpen(false); resetPage(); }}
-                    className={`w-full text-left px-2 py-2 text-sm hover:bg-gray-50 transition-colors ${availability === opt ? "text-blue-600 font-medium bg-blue-50" : "text-gray-700"}`}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* More Filters */}
         {selectedClientId && (
           <div className="relative">
             <button
               type="button"
-              onClick={() => { setMoreFiltersOpen(o => !o); setCatOpen(false); setAvailOpen(false); setClientOpen(false); setBrandOpen(false); setSortOpen(false); }}
+              onClick={() => { setMoreFiltersOpen(o => !o); setClientOpen(false); setSortOpen(false); }}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${moreFiltersOpen ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
             >
               <Filter size={14} />
               More Filters
+              <ChevronDown size={14} className={`transition-transform ${moreFiltersOpen ? "rotate-180" : ""}`} />
             </button>
             {moreFiltersOpen && (
-              <div className="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Quick filters</p>
+              <div className="absolute left-0 top-full z-40 mt-1 w-[min(92vw,360px)] rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Product type</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {SHOP_TABS.map(tab => {
+                    const Icon = tab.icon;
+                    const active = shopTab === tab.id;
+                    const count = tab.id === "all"
+                      ? catalogProducts.length
+                      : catalogProducts.filter(product => getShopProductKind(product) === tab.id).length;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => handleShopTabChange(tab.id)}
+                        className={`flex min-h-14 flex-col items-start justify-between rounded-lg border px-2 py-1.5 text-left text-[10px] transition-colors ${
+                          active ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-blue-200 hover:bg-blue-50/50"
+                        }`}
+                      >
+                        <span className="flex w-full items-center justify-between gap-1">
+                          <Icon size={12} className={active ? "text-blue-600" : "text-gray-400"} />
+                          <span className={`rounded-full px-1 text-[9px] ${active ? "bg-white text-blue-600" : "bg-gray-100 text-gray-500"}`}>{count}</span>
+                        </span>
+                        <span className="leading-tight">{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <label className="text-[10px] font-medium text-gray-500">
+                    Category
+                    <select
+                      value={category}
+                      onChange={event => { setCategory(event.target.value); resetPage(); }}
+                      className="mt-1 h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-700 outline-none focus:border-blue-400"
+                    >
+                      {allCats.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-[10px] font-medium text-gray-500">
+                    Brand
+                    <select
+                      value={brand}
+                      onChange={event => { setBrand(event.target.value); resetPage(); }}
+                      className="mt-1 h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-700 outline-none focus:border-blue-400"
+                    >
+                      {allBrands.map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-[10px] font-medium text-gray-500">
+                    Availability
+                    <select
+                      value={availability}
+                      onChange={event => { setAvailability(event.target.value); resetPage(); }}
+                      className="mt-1 h-8 w-full rounded-md border border-gray-200 bg-white px-2 text-[10px] text-gray-700 outline-none focus:border-blue-400"
+                    >
+                      {["All", "In Stock", "Out of Stock"].map(option => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-3 border-t border-gray-100 pt-2">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Quick availability</p>
                 <button
                   type="button"
                   onClick={() => { setAvailability(availability === "In Stock" ? "All" : "In Stock"); setMoreFiltersOpen(false); resetPage(); }}
@@ -1582,6 +1543,7 @@ export default function ShopPage() {
                     {availability === "Out of Stock" && <Check size={12} className="text-white" />}
                   </span>
                 </button>
+                </div>
               </div>
             )}
           </div>
@@ -1591,7 +1553,7 @@ export default function ShopPage() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => { setSortOpen(o => !o); setCatOpen(false); setAvailOpen(false); setClientOpen(false); setBrandOpen(false); setMoreFiltersOpen(false); }}
+              onClick={() => { setSortOpen(o => !o); setClientOpen(false); setMoreFiltersOpen(false); }}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs transition-colors md:text-sm ${sortOpen ? "border-blue-500 bg-blue-50 text-blue-600" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
             >
               <ArrowDownAZ size={14} />
@@ -1715,7 +1677,7 @@ export default function ShopPage() {
       )}
 
       {/* Close dropdowns on outside click */}
-      {(catOpen || availOpen || clientOpen || brandOpen || sortOpen || moreFiltersOpen) && (
+      {(clientOpen || sortOpen || moreFiltersOpen) && (
         <div className="fixed inset-0 z-20" onClick={closeFilterMenus} />
       )}
     </div>
