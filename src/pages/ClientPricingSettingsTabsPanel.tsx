@@ -14,7 +14,6 @@ import {
 } from "@/lib/priceEngineStore";
 import { getClientCatalog } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
-import ClientCategoryProfitRulesPanel from "./ClientCategoryProfitRulesPanel";
 import ClientPriceSlabsPanel from "./ClientPriceSlabsPanel";
 
 function fmt(n: number) {
@@ -76,7 +75,7 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
       const pricing = pricingMap.get(product.code);
       const vendorCost = pricing?.landedCostPerUnit ?? 0;
       const retailPrice = retailPrices[product.code] ?? 0;
-      const profitPct = resolveClientProfitPct(clientId, product.code, product.category);
+      const profitPct = resolveClientProfitPct(clientId, product.code);
       const calc = pricing?.winningVendor
         ? computeClientFinalPrice(vendorCost, settings, profitPct, product.category)
         : null;
@@ -202,7 +201,6 @@ export default function ClientPricingSettingsTabsPanel({ clientId }: { clientId:
             </span>
           </div>
 
-          <ClientCategoryProfitRulesPanel clientId={clientId} />
         </div>
       )}
 
