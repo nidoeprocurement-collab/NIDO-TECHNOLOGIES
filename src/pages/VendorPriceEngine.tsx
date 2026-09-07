@@ -81,7 +81,7 @@ export default function VendorPriceEngine() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 uppercase tracking-wide">VENDOR PRICE ENGINE</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Automatically compares real vendor listings for every catalog product and picks the winning vendor.
+            Automatically compares real vendor listings for every catalog product and picks the recommended vendor.
             Logistics, handling, tax and extra charges are configured individually per vendor from that vendor's
             <span className="font-semibold"> Configuration </span> tab on their profile page.
           </p>
@@ -91,7 +91,7 @@ export default function VendorPriceEngine() {
       {/* ── Automatic Vendor Comparison for every product ── */}
       <div className="border border-gray-300 rounded-lg p-4">
         <h2 className="text-xs font-bold text-blue-700 uppercase mb-3">
-          Winning Vendor by Product ({filteredProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''} in Master Catalog)
+          Recommended Vendor by Product ({filteredProducts.length} of {products.length} product{products.length !== 1 ? 's' : ''} in Master Catalog)
         </h2>
 
         <div className="relative mb-3 max-w-sm">
@@ -125,7 +125,7 @@ export default function VendorPriceEngine() {
                   <th className="py-2 px-2 w-6"></th>
                   <th className="py-2 px-2 text-left font-semibold">Product</th>
                   <th className="py-2 px-2 text-left font-semibold">Category</th>
-                  <th className="py-2 px-2 text-left font-semibold">Winning Vendor</th>
+                  <th className="py-2 px-2 text-left font-semibold">Recommended Vendor</th>
                   <th className="py-2 px-2 text-left font-semibold">Vendor Product Code</th>
                   <th className="py-2 px-2 text-right font-semibold">Base Price</th>
                   <th className="py-2 px-2 text-right font-semibold">MOQ</th>
@@ -173,7 +173,7 @@ export default function VendorPriceEngine() {
                     {expanded[p.masterProductCode] && p.vendorComparisons.map(v => (
                       <tr key={v.vendorId} className={`border-b border-gray-50 bg-gray-50/50 ${v.vendorId === p.winningVendor?.vendorId ? 'bg-green-50/60' : ''}`}>
                         <td></td>
-                        <td className="py-1.5 px-2 pl-8 text-gray-500">↳ {v.vendorId === p.winningVendor?.vendorId ? 'Winning' : 'Compared'}</td>
+                        <td className="py-1.5 px-2 pl-8 text-gray-500">↳ {v.vendorId === p.winningVendor?.vendorId ? 'Recommended' : 'Compared'}</td>
                         <td></td>
                         <td className="py-1.5 px-2 text-gray-700">{v.vendorName}</td>
                         <td className="py-1.5 px-2 text-gray-700">{v.vendorProductCode}</td>
