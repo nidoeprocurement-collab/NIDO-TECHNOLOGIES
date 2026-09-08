@@ -1090,7 +1090,7 @@ export default function MyRenewalsPage() {
   }
 
   return (
-    <div className="renewals-page min-h-screen bg-white px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
+    <div className="renewals-page min-h-screen bg-white px-1.5 pb-10 pt-5 text-gray-900 sm:pt-7">
       <RenewalTypography />
       <header className="flex items-start justify-between gap-4 px-1.5 pb-2 pt-1.5 sm:px-2">
         <div>
