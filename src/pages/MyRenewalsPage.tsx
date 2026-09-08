@@ -503,6 +503,23 @@ function RenewalTypography() {
       .renewals-page [class~="leading-3.5"] {
         line-height: 1.5rem !important;
       }
+      .renewals-page .renewal-list-table {
+        width: 100%;
+        table-layout: fixed;
+      }
+      .renewals-page .renewal-list-table th,
+      .renewals-page .renewal-list-table td {
+        overflow-wrap: anywhere;
+        padding-left: 0.375rem;
+        padding-right: 0.375rem;
+      }
+      @media (min-width: 640px) {
+        .renewals-page .renewal-list-table th,
+        .renewals-page .renewal-list-table td {
+          padding-left: 0.75rem;
+          padding-right: 0.75rem;
+        }
+      }
       .renewals-page textarea,
       .renewals-page input,
       .renewals-page select,
@@ -577,7 +594,7 @@ function RenewalDetailsPage({
   };
 
   return (
-    <div className="renewals-page min-h-screen bg-[#fbfcfe] px-7 pb-10 pt-7 text-gray-900">
+    <div className="renewals-page min-h-screen bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
       <RenewalTypography />
       <header className="px-1.5 pb-3 pt-2 sm:px-2">
         <button type="button" onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-[9px] text-gray-500 hover:text-blue-600">
@@ -1080,7 +1097,7 @@ export default function MyRenewalsPage() {
   }
 
   return (
-    <div className="renewals-page min-h-screen bg-white px-7 pb-10 pt-7 text-gray-900">
+    <div className="renewals-page min-h-screen bg-white px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
       <RenewalTypography />
       <header className="flex items-start justify-between gap-4 px-1.5 pb-2 pt-1.5 sm:px-2">
         <div>
@@ -1353,19 +1370,19 @@ export default function MyRenewalsPage() {
           </div>
 
           {viewMode === "table" ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] table-fixed text-[10px]">
+          <div className="w-full overflow-hidden">
+            <table className="renewal-list-table text-[10px]">
               <colgroup>
                 <col style={{ width: "9%" }} />
                 <col style={{ width: "16%" }} />
-                <col style={{ width: "13.5%" }} />
-                <col style={{ width: "13%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "11%" }} />
                 <col style={{ width: "10%" }} />
-                <col style={{ width: "10.5%" }} />
-                <col style={{ width: "10.5%" }} />
                 <col style={{ width: "10%" }} />
+                <col style={{ width: "8%" }} />
+                <col style={{ width: "5%" }} />
                 <col style={{ width: "7%" }} />
-                <col style={{ width: "3.5%" }} />
               </colgroup>
               <thead>
                 <tr className="h-8 border-b border-gray-100 bg-gray-50/80 text-[8px] font-semibold uppercase text-gray-500">
