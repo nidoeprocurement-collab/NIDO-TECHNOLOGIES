@@ -475,6 +475,44 @@ function DetailField({ label, value }: { label: string; value: React.ReactNode }
   );
 }
 
+function RenewalTypography() {
+  return (
+    <style>{`
+      .renewals-page {
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+        font-size: 13.5px;
+      }
+      .renewals-page [class~="text-[8px]"] {
+        font-size: 12px !important;
+      }
+      .renewals-page [class~="text-[9px]"] {
+        font-size: 13px !important;
+      }
+      .renewals-page [class~="text-[10px]"] {
+        font-size: 13.5px !important;
+      }
+      .renewals-page [class~="text-[11px]"] {
+        font-size: 14px !important;
+      }
+      .renewals-page [class~="text-[17px]"] {
+        font-size: 22px !important;
+      }
+      .renewals-page [class~="text-[19px]"] {
+        font-size: 24px !important;
+      }
+      .renewals-page [class~="leading-3.5"] {
+        line-height: 1.5rem !important;
+      }
+      .renewals-page textarea,
+      .renewals-page input,
+      .renewals-page select,
+      .renewals-page button {
+        font-family: inherit;
+      }
+    `}</style>
+  );
+}
+
 function RenewalDetailsPage({
   row,
   onBack,
@@ -539,7 +577,8 @@ function RenewalDetailsPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#fbfcfe] px-2 pb-8 text-gray-900 sm:px-3">
+    <div className="renewals-page min-h-screen bg-[#fbfcfe] px-7 pb-10 pt-7 text-gray-900">
+      <RenewalTypography />
       <header className="px-1.5 pb-3 pt-2 sm:px-2">
         <button type="button" onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-[9px] text-gray-500 hover:text-blue-600">
           <ArrowLeft className="h-3 w-3" /> Back to Renewals
@@ -1041,7 +1080,8 @@ export default function MyRenewalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white px-1.5 pb-4 text-gray-900 sm:px-2">
+    <div className="renewals-page min-h-screen bg-white px-7 pb-10 pt-7 text-gray-900">
+      <RenewalTypography />
       <header className="flex items-start justify-between gap-4 px-1.5 pb-2 pt-1.5 sm:px-2">
         <div>
           <h1 className="text-[19px] font-bold leading-6 tracking-[-0.35px] text-gray-900">
