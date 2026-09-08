@@ -113,6 +113,7 @@ type RenewalWizardProduct = {
 
 type RenewalWizardOrder = {
   id: string;
+  clientId?: string;
   client: string;
   orderDate: string;
   deliveryDate: string;
@@ -516,6 +517,7 @@ function formatSourceDate(value: string | undefined): string {
 function createRenewalWizardOrders(orders: MyOrder[], products: CatalogProduct[]): RenewalWizardOrder[] {
   return orders.map(order => ({
     id: order.id,
+    clientId: order.clientId,
     client: order.client,
     orderDate: formatSourceDate(order.orderDate),
     deliveryDate: "",
@@ -778,17 +780,28 @@ function NewRenewalWizard({
   };
 
   const selectClient = (clientName: string) => {
+    const selectedClient = clients.find(client => client.name === clientName);
+    const relatedOrders = orders.filter(order =>
+      (selectedClient?.id && order.clientId === selectedClient.id) ||
+      order.client === clientName
+    );
+    const order = relatedOrders.find(item => item.products.length > 0) || relatedOrders[0];
+    const product = order?.products[0];
     setValues(current => ({
       ...current,
       client: clientName,
-      order: "",
-      product: "",
-      brand: "other",
-      licenseType: "",
-      orderDate: "",
-      deliveryDate: "",
-      quantity: "",
-      unitPrice: "",
+      order: order?.id || "",
+      product: product?.name || "",
+      brand: product?.brand || "other",
+      licenseType: product?.licenseType || "",
+      orderDate: order?.orderDate || "",
+      deliveryDate: order?.deliveryDate || "",
+      quantity: product?.quantity || "",
+      unitPrice: product?.unitPrice || "",
+      currentExpiryDate: "",
+      renewalStartDate: "",
+      contractNo: "",
+      purchaseOrderNo: "",
     }));
   };
 
@@ -867,7 +880,7 @@ function NewRenewalWizard({
               <WizardCard title="1. Select Order & Product">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <WizardField label="Client" required><WizardSelect value={values.client} onChange={selectClient}><option value="" disabled>Select a client</option>{clients.map(client => <option key={client.id} value={client.name}>{client.name}</option>)}</WizardSelect></WizardField>
-                  <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>Select an order</option>{orders.filter(order => !values.client || order.client === values.client).map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Select an order to load its live details"}</span></WizardField>
+                  <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>Select an order</option>{orders.filter(order => { const selectedClient = clients.find(client => client.name === values.client); return (selectedClient?.id && order.clientId === selectedClient.id) || order.client === values.client; }).map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Select an order to load its live details"}</span></WizardField>
                   <WizardField label="Product / License" required className="sm:col-span-2">
                     <WizardSelect value={values.product} onChange={selectProduct}><option value="" disabled>{availableProducts.length ? "Select a product from the order" : "Select an order first"}</option>{availableProducts.map(product => <option key={product.name} value={product.name}>{product.name}</option>)}</WizardSelect>
                   </WizardField>
