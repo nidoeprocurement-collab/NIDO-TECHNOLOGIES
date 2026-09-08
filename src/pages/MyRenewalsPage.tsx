@@ -33,6 +33,9 @@ import {
   Home,
 } from "lucide-react";
 import jsPDF from "jspdf";
+import { getClients, type StoredClient } from "@/lib/clientStore";
+import { getCatalogProducts, type CatalogProduct } from "@/lib/catalogStore";
+import { useMyOrders, type MyOrder } from "@/contexts/MyOrdersContext";
 
 type RenewalStatus = "Overdue" | "Upcoming" | "Due Soon";
 type AutoRenew = "Enabled" | "Disabled";
@@ -40,7 +43,7 @@ type AutoRenew = "Enabled" | "Disabled";
 interface Renewal {
   id: string;
   product: string;
-  brand: "microsoft" | "adobe" | "vmware" | "fortinet";
+  brand: "microsoft" | "adobe" | "vmware" | "fortinet" | "other";
   client: string;
   licenseType: string;
   seats: string;
@@ -49,6 +52,20 @@ interface Renewal {
   amount: string;
   renewalStatus: RenewalStatus;
   autoRenew: AutoRenew;
+  orderId?: string;
+  orderDate?: string;
+  deliveryDate?: string;
+  currentExpiryDate?: string;
+  renewalStartDate?: string;
+  renewalTerm?: string;
+  quantity?: string;
+  unitPrice?: string;
+  contractNo?: string;
+  purchaseOrderNo?: string;
+  reminders?: string[];
+  notifyTo?: string[];
+  notificationMessage?: string;
+  notes?: string;
 }
 
 interface RenewalNote {
@@ -70,6 +87,8 @@ type RenewalWizardValues = {
   product: string;
   brand: Renewal["brand"];
   licenseType: string;
+  orderDate: string;
+  deliveryDate: string;
   currentExpiryDate: string;
   renewalStartDate: string;
   renewalTerm: string;
@@ -82,6 +101,22 @@ type RenewalWizardValues = {
   notifyTo: string[];
   notificationMessage: string;
   notes: string;
+};
+
+type RenewalWizardProduct = {
+  name: string;
+  brand: Renewal["brand"];
+  licenseType: string;
+  quantity: string;
+  unitPrice: string;
+};
+
+type RenewalWizardOrder = {
+  id: string;
+  client: string;
+  orderDate: string;
+  deliveryDate: string;
+  products: RenewalWizardProduct[];
 };
 
 const TABS = [
@@ -329,6 +364,21 @@ function getRenewalStatus(dueDate: string): RenewalStatus {
   return "Due Soon";
 }
 
+const RENEWALS_STORAGE_KEY = "nidoRenewals";
+const RENEWAL_HISTORY_STORAGE_KEY = "nidoRenewalHistory";
+
+function readStoredRenewals(key: string, fallback: Renewal[]): Renewal[] {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (!stored) return fallback;
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 function RenewalFormModal({
   initial,
   onClose,
@@ -424,25 +474,86 @@ function RenewalFormModal({
   );
 }
 
-const DEFAULT_RENEWAL_WIZARD_VALUES: RenewalWizardValues = {
-  client: "Nido Tech CorpEssentials",
-  order: "ORD-000001",
-  product: "Microsoft 365 Business Standard",
-  brand: "microsoft",
-  licenseType: "Subscription (License)",
-  currentExpiryDate: "2026-08-24",
-  renewalStartDate: "2026-08-25",
+function createEmptyRenewalWizardValues(): RenewalWizardValues {
+  return {
+  client: "",
+  order: "",
+  product: "",
+  brand: "other",
+  licenseType: "",
+  orderDate: "",
+  deliveryDate: "",
+  currentExpiryDate: "",
+  renewalStartDate: "",
   renewalTerm: "1 Year",
-  quantity: "10",
-  unitPrice: "5900",
-  contractNo: "CNT-000123",
+  quantity: "",
+  unitPrice: "",
+  contractNo: "",
   purchaseOrderNo: "",
   autoRenew: false,
-  reminders: ["30", "15", "7"],
-  notifyTo: ["System Owner (You)", "Client Admin"],
+  reminders: ["30"],
+  notifyTo: [],
   notificationMessage: "Your license for {product_name} is expiring soon. Please review and renew to avoid service interruption.",
   notes: "",
-};
+  };
+}
+
+function normalizeRenewalBrand(value: string | undefined): Renewal["brand"] {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("microsoft")) return "microsoft";
+  if (normalized.includes("adobe")) return "adobe";
+  if (normalized.includes("vmware")) return "vmware";
+  if (normalized.includes("fortinet")) return "fortinet";
+  return "other";
+}
+
+function formatSourceDate(value: string | undefined): string {
+  if (!value) return "";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().slice(0, 10);
+}
+
+function createRenewalWizardOrders(orders: MyOrder[], products: CatalogProduct[]): RenewalWizardOrder[] {
+  return orders.map(order => ({
+    id: order.id,
+    client: order.client,
+    orderDate: formatSourceDate(order.orderDate),
+    deliveryDate: "",
+    products: (order.cartItems || []).map(item => {
+      const catalogProduct = products.find(product =>
+        product.productName.trim().toLowerCase() === item.name.trim().toLowerCase()
+      );
+      return {
+        name: item.name,
+        brand: normalizeRenewalBrand(catalogProduct?.brand),
+        licenseType: item.productType || catalogProduct?.productType || "",
+        quantity: String(item.quantity || ""),
+        unitPrice: String(item.priceNum || catalogProduct?.price || ""),
+      };
+    }),
+  }));
+}
+
+function createInitialRenewalWizardValues(
+  clients: StoredClient[],
+  orders: RenewalWizardOrder[],
+): RenewalWizardValues {
+  const values = createEmptyRenewalWizardValues();
+  const order = orders.find(item => item.products.length > 0);
+  const product = order?.products[0];
+  return {
+    ...values,
+    client: order?.client || clients[0]?.name || "",
+    order: order?.id || "",
+    product: product?.name || "",
+    brand: product?.brand || "other",
+    licenseType: product?.licenseType || "",
+    orderDate: order?.orderDate || "",
+    deliveryDate: order?.deliveryDate || "",
+    quantity: product?.quantity || "",
+    unitPrice: product?.unitPrice || "",
+  };
+}
 
 function wizardDateLabel(value: string): string {
   if (!value) return "—";
@@ -592,8 +703,8 @@ function RenewalProductSummary({
         <div className="space-y-3 border-b border-gray-100 py-4 text-xs">
           <div className="flex justify-between gap-4"><span className="text-gray-500">Client</span><span className="text-right font-medium text-gray-800">{values.client}</span></div>
           <div className="flex justify-between gap-4"><span className="text-gray-500">Order ID</span><span className="font-medium text-gray-800">{values.order}</span></div>
-          <div className="flex justify-between gap-4"><span className="text-gray-500">Order Date</span><span className="font-medium text-gray-800">Aug 12, 2025</span></div>
-          <div className="flex justify-between gap-4"><span className="text-gray-500">Delivery Date</span><span className="font-medium text-gray-800">Aug 14, 2025</span></div>
+          <div className="flex justify-between gap-4"><span className="text-gray-500">Order Date</span><span className="font-medium text-gray-800">{wizardDateLabel(values.orderDate)}</span></div>
+          <div className="flex justify-between gap-4"><span className="text-gray-500">Delivery Date</span><span className="font-medium text-gray-800">{wizardDateLabel(values.deliveryDate)}</span></div>
           <div className="flex justify-between gap-4"><span className="text-gray-500">Current Expiry</span><span className="font-medium text-gray-800">{wizardDateLabel(values.currentExpiryDate)} <span className="ml-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-600">Active</span></span></div>
         </div>
       )}
@@ -619,19 +730,78 @@ function NewRenewalWizard({
   onCancel,
   onCreate,
   onView,
+  initialValues,
+  clients,
+  orders,
 }: {
   onCancel: () => void;
   onCreate: (values: RenewalWizardValues) => Renewal;
   onView: (renewal: Renewal) => void;
+  initialValues: RenewalWizardValues;
+  clients: StoredClient[];
+  orders: RenewalWizardOrder[];
 }) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [values, setValues] = useState<RenewalWizardValues>(DEFAULT_RENEWAL_WIZARD_VALUES);
+  const [values, setValues] = useState<RenewalWizardValues>(initialValues);
   const [createdRenewal, setCreatedRenewal] = useState<Renewal>();
   const nextExpiryDate = wizardNextExpiryDate(values.renewalStartDate, values.renewalTerm);
   const estimatedAmount = (Number(values.quantity) || 0) * (Number(values.unitPrice) || 0);
+  const selectedOrder = orders.find(order => order.id === values.order);
+  const availableProducts = selectedOrder?.products || [];
+  const canCreate = Boolean(
+    values.order &&
+    values.product &&
+    values.renewalStartDate &&
+    values.quantity &&
+    values.unitPrice,
+  );
 
   const update = <K extends keyof RenewalWizardValues>(key: K, value: RenewalWizardValues[K]) => {
     setValues(current => ({ ...current, [key]: value }));
+  };
+
+  const selectOrder = (orderId: string) => {
+    const order = orders.find(item => item.id === orderId);
+    const product = order?.products[0];
+    setValues(current => ({
+      ...current,
+      order: orderId,
+      client: order?.client || current.client,
+      orderDate: order?.orderDate || "",
+      deliveryDate: order?.deliveryDate || "",
+      product: product?.name || "",
+      brand: product?.brand || "other",
+      licenseType: product?.licenseType || "",
+      quantity: product?.quantity || "",
+      unitPrice: product?.unitPrice || "",
+    }));
+  };
+
+  const selectClient = (clientName: string) => {
+    setValues(current => ({
+      ...current,
+      client: clientName,
+      order: "",
+      product: "",
+      brand: "other",
+      licenseType: "",
+      orderDate: "",
+      deliveryDate: "",
+      quantity: "",
+      unitPrice: "",
+    }));
+  };
+
+  const selectProduct = (productName: string) => {
+    const product = availableProducts.find(item => item.name === productName);
+    setValues(current => ({
+      ...current,
+      product: productName,
+      brand: product?.brand || "other",
+      licenseType: product?.licenseType || "",
+      quantity: product?.quantity || current.quantity,
+      unitPrice: product?.unitPrice || current.unitPrice,
+    }));
   };
 
   const toggleNotifyTo = (name: string) => {
@@ -645,7 +815,9 @@ function NewRenewalWizard({
 
   const goNext = () => setStep(current => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
   const goBack = () => setStep(current => Math.max(1, current - 1) as 1 | 2 | 3 | 4);
-  const create = () => setCreatedRenewal(onCreate(values));
+  const create = () => {
+    if (canCreate) setCreatedRenewal(onCreate(values));
+  };
 
   if (createdRenewal) {
     return (
@@ -657,7 +829,7 @@ function NewRenewalWizard({
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-center gap-4"><div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg"><Check className="h-9 w-9" /></div><div><h1 className="text-2xl font-bold text-gray-900">Renewal Created Successfully!</h1><p className="mt-1 text-sm text-gray-600">The renewal has been created and reminder notifications have been scheduled.</p></div></div>
               <div className="rounded-lg bg-emerald-100 px-5 py-3"><p className="text-xs text-gray-600">Renewal ID</p><p className="text-2xl font-bold text-gray-900">{createdRenewal.id}</p><p className="text-xs text-gray-600">Created on {wizardDateLabel(new Date().toISOString().slice(0, 10))}</p></div>
-              <div className="flex flex-col gap-2 sm:min-w-[190px]"><button type="button" onClick={() => onView(createdRenewal)} className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">View Renewal</button><button type="button" onClick={() => { setCreatedRenewal(undefined); setStep(1); setValues(DEFAULT_RENEWAL_WIZARD_VALUES); }} className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-blue-700 hover:bg-blue-50">Create Another Renewal</button></div>
+              <div className="flex flex-col gap-2 sm:min-w-[190px]"><button type="button" onClick={() => onView(createdRenewal)} className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">View Renewal</button><button type="button" onClick={() => { setCreatedRenewal(undefined); setStep(1); setValues(initialValues); }} className="h-10 rounded-lg border border-gray-300 bg-white px-5 text-sm font-semibold text-blue-700 hover:bg-blue-50">Create Another Renewal</button></div>
             </div>
           </section>
           <WizardCard title="Renewal Summary" className="mt-4">
@@ -694,10 +866,10 @@ function NewRenewalWizard({
             <div className="space-y-4">
               <WizardCard title="1. Select Order & Product">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <WizardField label="Client" required><WizardSelect value={values.client} onChange={value => update("client", value)}><option>Nido Tech CorpEssentials</option><option>Cloud Systems India</option><option>Apex Tech Solutions</option><option>InfoTech Pvt. Ltd.</option></WizardSelect></WizardField>
-                  <WizardField label="Order" required><WizardSelect value={values.order} onChange={value => update("order", value)}><option>ORD-000001</option><option>ORD-000002</option><option>ORD-000003</option></WizardSelect><span className="mt-1 block text-xs text-gray-500">Ordered on 12 Aug, 2025 | Delivered on 14 Aug, 2025</span></WizardField>
+                  <WizardField label="Client" required><WizardSelect value={values.client} onChange={selectClient}><option value="" disabled>Select a client</option>{clients.map(client => <option key={client.id} value={client.name}>{client.name}</option>)}</WizardSelect></WizardField>
+                  <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>Select an order</option>{orders.filter(order => !values.client || order.client === values.client).map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Select an order to load its live details"}</span></WizardField>
                   <WizardField label="Product / License" required className="sm:col-span-2">
-                    <WizardSelect value={values.product} onChange={value => update("product", value)}><option>Microsoft 365 Business Standard</option><option>Adobe Acrobat Pro</option><option>VMware vSphere Standard</option><option>FortiGate 100F (UTM Firewall)</option></WizardSelect>
+                    <WizardSelect value={values.product} onChange={selectProduct}><option value="" disabled>{availableProducts.length ? "Select a product from the order" : "Select an order first"}</option>{availableProducts.map(product => <option key={product.name} value={product.name}>{product.name}</option>)}</WizardSelect>
                   </WizardField>
                 </div>
               </WizardCard>
@@ -711,8 +883,8 @@ function NewRenewalWizard({
               </WizardCard>
               <WizardCard title="3. Renewal Notifications">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <WizardField label="Reminder Days Before Expiry" required><WizardSelect value={values.reminders[0] || "30"} onChange={value => updateReminder(0, value)}><option>30</option><option>15</option><option>7</option></WizardSelect></WizardField>
-                  <WizardField label="Notify To" required><WizardSelect value={values.notifyTo.join(", ")} onChange={() => undefined}><option>{values.notifyTo.join(", ")}</option></WizardSelect></WizardField>
+                  <WizardField label="Reminder Days Before Expiry" required><WizardSelect value={values.reminders[0] || ""} onChange={value => updateReminder(0, value)}><option value="" disabled>Select reminder days</option><option>30</option><option>15</option><option>7</option></WizardSelect></WizardField>
+                  <WizardField label="Notify To" required><WizardSelect value={values.notifyTo.join(", ")} onChange={() => undefined}><option value="" disabled>{values.notifyTo.length ? values.notifyTo.join(", ") : "Choose recipients in Notifications"}</option></WizardSelect></WizardField>
                 </div>
               </WizardCard>
               <WizardCard title="4. Additional Notes (Optional)">
@@ -775,7 +947,7 @@ function NewRenewalWizard({
               <WizardCard title="Review Renewal Information">
                 <p className="mb-4 text-sm text-gray-500">Please review all details before creating the renewal. You can go back and make changes if needed.</p>
                 <div className="space-y-4">
-                  <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Order & Product</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><div className="space-y-2"><p><span className="text-gray-500">Client :</span> <strong>{values.client}</strong></p><p><span className="text-gray-500">Order ID :</span> <strong>{values.order}</strong></p><p><span className="text-gray-500">Order Date :</span> <strong>Aug 12, 2025</strong></p><p><span className="text-gray-500">Delivery Date :</span> <strong>Aug 14, 2025</strong></p></div><div className="space-y-2"><p><span className="text-gray-500">Product / License :</span> <strong>{values.product}</strong></p><p><span className="text-gray-500">License Type :</span> <strong>{values.licenseType}</strong></p><p><span className="text-gray-500">Users / Quantity :</span> <strong>{values.quantity} Users</strong></p><p><span className="text-gray-500">Unit Price :</span> <strong>{formatCurrencyAmount(values.unitPrice)}</strong></p></div></div></div>
+                  <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Order & Product</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><div className="space-y-2"><p><span className="text-gray-500">Client :</span> <strong>{values.client || "—"}</strong></p><p><span className="text-gray-500">Order ID :</span> <strong>{values.order || "—"}</strong></p><p><span className="text-gray-500">Order Date :</span> <strong>{wizardDateLabel(values.orderDate)}</strong></p><p><span className="text-gray-500">Delivery Date :</span> <strong>{wizardDateLabel(values.deliveryDate)}</strong></p></div><div className="space-y-2"><p><span className="text-gray-500">Product / License :</span> <strong>{values.product || "—"}</strong></p><p><span className="text-gray-500">License Type :</span> <strong>{values.licenseType || "—"}</strong></p><p><span className="text-gray-500">Users / Quantity :</span> <strong>{values.quantity ? `${values.quantity} Users` : "—"}</strong></p><p><span className="text-gray-500">Unit Price :</span> <strong>{values.unitPrice ? formatCurrencyAmount(values.unitPrice) : "—"}</strong></p></div></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Renewal Details</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-gray-500">Renewal Start Date :</span> <strong>{wizardDateLabel(values.renewalStartDate)}</strong></p><p><span className="text-gray-500">Contract No. :</span> <strong>{values.contractNo}</strong></p><p><span className="text-gray-500">Next Expiry Date :</span> <strong>{wizardDateLabel(nextExpiryDate)}</strong></p><p><span className="text-gray-500">Purchase Order No. :</span> <strong>{values.purchaseOrderNo || "—"}</strong></p><p><span className="text-gray-500">Renewal Term :</span> <strong>{values.renewalTerm}</strong></p><p><span className="text-gray-500">Expected Amount :</span> <strong>{formatCurrencyAmount(String(estimatedAmount))}</strong></p></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Reminder & Notifications</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><div className="space-y-2">{values.reminders.map((reminder, index) => <p key={index}><span className="text-gray-500">Reminder {index + 1} :</span> <strong>{reminder} days before expiry</strong></p>)}</div><div className="space-y-2"><p><span className="text-gray-500">Notify To :</span> <strong>{values.notifyTo.join(", ") || "—"}</strong></p><p><span className="text-gray-500">Auto Renewal :</span> <strong>{values.autoRenew ? "Enabled" : "Disabled"}</strong></p></div></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-2 text-sm font-bold text-gray-800">Message</h3><p className="text-sm text-gray-700">{values.notificationMessage}</p></div>
@@ -788,7 +960,7 @@ function NewRenewalWizard({
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <button type="button" onClick={step === 1 ? onCancel : goBack} className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"><ArrowLeft className="h-4 w-4" /> {step === 1 ? "Cancel" : "Back"}</button>
-          {step < 4 ? <button type="button" onClick={goNext} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">Next <ChevronRight className="h-4 w-4" /></button> : <button type="button" onClick={create} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700"><Check className="h-4 w-4" /> Create Renewal</button>}
+           {step < 4 ? <button type="button" onClick={goNext} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700">Next <ChevronRight className="h-4 w-4" /></button> : <button type="button" onClick={create} disabled={!canCreate} className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"><Check className="h-4 w-4" /> Create Renewal</button>}
         </div>
       </div>
     </div>
@@ -844,7 +1016,7 @@ function downloadRenewalInvoice(row: Renewal) {
 
 function downloadRenewalFile(row: Renewal, type: "license" | "renewal") {
   const contents = type === "license"
-    ? `Nido Tech License Details\n\nRenewal ID: ${row.id}\nProduct: ${row.product}\nClient: ${row.client}\nLicense type: ${row.licenseType}\nQuantity: ${row.seats}\nActivation domain: nido-tech.onmicrosoft.com\nLicense key: abcd1234-ef56-7890-abcd-1234567890ef\n`
+    ? `Nido Tech License Details\n\nRenewal ID: ${row.id}\nProduct: ${row.product}\nClient: ${row.client}\nLicense type: ${row.licenseType || "—"}\nQuantity: ${row.seats}\nOrder ID: ${row.orderId || "—"}\nActivation domain: —\nLicense key: —\n`
     : `Nido Tech Renewal Summary\n\nRenewal ID: ${row.id}\nProduct: ${row.product}\nClient: ${row.client}\nNext renewal: ${row.dueDate}\nRenewal amount: ${row.amount}\nAuto renewal: ${row.autoRenew}\n`;
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([contents], { type: "text/plain;charset=utf-8" }));
@@ -995,7 +1167,7 @@ function RenewalDetailsPage({
               <h1 className="text-[17px] font-bold leading-6 tracking-[-0.25px] text-gray-900">Renewal Details / #{row.id}</h1>
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[8px] font-semibold text-emerald-700">Delivered</span>
             </div>
-            <p className="mt-0.5 text-[9px] text-gray-500">Master Order · Created on Aug 24, 2026 04:21 PM · Requested by Rahul Sharma (Client Operations)</p>
+            <p className="mt-0.5 text-[9px] text-gray-500">Master Order {row.orderId ? `· ${row.orderId}` : ""} · Created on {wizardDateLabel(row.orderDate || "")}</p>
           </div>
           <div className="relative flex shrink-0 items-center gap-1.5">
             <button type="button" onClick={() => downloadRenewalInvoice(row)} className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-[9px] font-medium text-gray-700 shadow-sm hover:bg-gray-50">
@@ -1007,7 +1179,7 @@ function RenewalDetailsPage({
             {menuOpen && (
               <div className="absolute right-0 top-8 z-30 w-36 rounded-lg border border-gray-200 bg-white p-1 shadow-xl">
                 <button type="button" onClick={() => { window.print(); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-gray-700 hover:bg-gray-50">Print details</button>
-                <button type="button" onClick={() => { navigator.clipboard?.writeText("ORD-000014"); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-gray-700 hover:bg-gray-50">Copy order ID</button>
+                <button type="button" onClick={() => { navigator.clipboard?.writeText(row.orderId || ""); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-gray-700 hover:bg-gray-50">Copy order ID</button>
                 <button type="button" onClick={() => { onRemove(); setMenuOpen(false); }} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[9px] text-rose-600 hover:bg-rose-50">Remove renewal</button>
               </div>
             )}
@@ -1021,8 +1193,8 @@ function RenewalDetailsPage({
           <p className="mt-1 text-[9px] text-gray-600">Target: 24h <span className="ml-2 font-bold text-emerald-700">SLA Met in 6h 45m</span></p>
         </div>
         <div className="bg-emerald-50/70 px-3 py-2.5">
-          <p className="text-[8px] font-semibold uppercase text-gray-500">SLA Deadline: Aug 24, 2026 04:21 PM</p>
-          <p className="mt-1 text-[9px] text-gray-600">Completed On: Aug 24, 2026 11:06 PM</p>
+          <p className="text-[8px] font-semibold uppercase text-gray-500">SLA Deadline: {wizardDateLabel(row.orderDate || "")}</p>
+          <p className="mt-1 text-[9px] text-gray-600">Completed On: {wizardDateLabel(row.deliveryDate || "")}</p>
         </div>
         <div className="bg-emerald-50/70 px-3 py-2.5">
           <p className="text-[8px] font-semibold uppercase text-gray-500">Renewal ID</p>
@@ -1034,34 +1206,34 @@ function RenewalDetailsPage({
         <DetailCard title="Billing Information">
           <div className="space-y-2.5">
             <DetailField label="Client" value={row.client} />
-            <DetailField label="Payment Method" value="Company Account" />
-            <DetailField label="Payment Term" value="Net 30 (Payment due in 30 days)" />
-            <DetailField label="Billing Address" value="41/10, C Cross, Wilson garden, Bangalore – 560027" />
+            <DetailField label="Payment Method" value="—" />
+            <DetailField label="Payment Term" value="—" />
+            <DetailField label="Billing Address" value="—" />
           </div>
         </DetailCard>
         <DetailCard title="Delivery Information">
           <div className="space-y-2.5">
-            <DetailField label="Ship To" value="41/10, C Cross, Wilson garden, Bangalore – 560027" />
-            <DetailField label="Delivery Type" value="Digital Delivery" />
+            <DetailField label="Ship To" value="—" />
+            <DetailField label="Delivery Type" value="—" />
             <DetailField label="Delivery Status" value={<span className="text-emerald-600">Delivered</span>} />
-            <DetailField label="Delivered On" value="Aug 24, 2026 11:06 PM" />
+            <DetailField label="Delivered On" value={wizardDateLabel(row.deliveryDate || "")} />
           </div>
         </DetailCard>
         <DetailCard title="Requester / Client Information">
           <div className="space-y-2.5">
-            <DetailField label="Name" value="Rahul Sharma" />
-            <DetailField label="Role" value="Client Operations Analyst" />
+            <DetailField label="Name" value="—" />
+            <DetailField label="Role" value="—" />
             <DetailField label="Organization" value={row.client} />
-            <DetailField label="Client Operations" value="Procurement" />
+            <DetailField label="Client Operations" value="—" />
           </div>
         </DetailCard>
         <DetailCard title="Order Summary">
           <div className="space-y-2.5">
-            <DetailField label="Master Order ID" value="ORD-000014" />
+            <DetailField label="Master Order ID" value={row.orderId || "—"} />
             <DetailField label="Sub Orders" value="1" />
-            <DetailField label="Total Items" value="1" />
+            <DetailField label="Total Items" value={row.product ? "1" : "0"} />
             <DetailField label="Total Amount" value={<span className="font-bold">{formatCurrencyAmount(String(total))}</span>} />
-            <DetailField label="Created On" value="Aug 24, 2026 04:21 PM" />
+            <DetailField label="Created On" value={wizardDateLabel(row.orderDate || "")} />
           </div>
         </DetailCard>
       </div>
@@ -1094,7 +1266,7 @@ function RenewalDetailsPage({
           <div id="renewal-detail-order-items" className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-[9px]">
               <thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">#</th><th className="pb-2">Item Details</th><th className="pb-2">Type</th><th className="pb-2">Qty</th><th className="pb-2">Unit Price</th><th className="pb-2">Total</th><th className="pb-2">Status</th><th className="pb-2">Vendor</th></tr></thead>
-              <tbody><tr className="border-b border-gray-100"><td className="py-3">1</td><td className="py-3"><div className="flex items-center gap-2"><BrandMark brand={row.brand} /><span className="font-semibold text-gray-700">{row.product}<span className="mt-1 block w-fit rounded bg-purple-50 px-1 text-[7px] font-semibold uppercase text-purple-700">Digital License</span></span></div></td><td>Subscription<br />(License)</td><td>{row.seats.replace(/[^\d]/g, "") || "1"}</td><td>{formatCurrencyAmount(row.amount)}</td><td>{formatCurrencyAmount(row.amount)}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Delivered</span><span className="mt-1 block text-[7px] text-gray-400">Delivered on<br />Aug 24, 2026</span></td><td className="text-blue-600">TechCloud Solutions Pvt. Ltd.</td></tr></tbody>
+               <tbody><tr className="border-b border-gray-100"><td className="py-3">1</td><td className="py-3"><div className="flex items-center gap-2"><BrandMark brand={row.brand} /><span className="font-semibold text-gray-700">{row.product || "—"}<span className="mt-1 block w-fit rounded bg-purple-50 px-1 text-[7px] font-semibold uppercase text-purple-700">{row.licenseType || "License"}</span></span></div></td><td>{row.licenseType || "—"}</td><td>{row.quantity || row.seats.replace(/[^\d]/g, "") || "—"}</td><td>{row.unitPrice ? formatCurrencyAmount(row.unitPrice) : formatCurrencyAmount(row.amount)}</td><td>{formatCurrencyAmount(row.amount)}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Delivered</span><span className="mt-1 block text-[7px] text-gray-400">Delivered on<br />{wizardDateLabel(row.deliveryDate || "")}</span></td><td className="text-blue-600">—</td></tr></tbody>
             </table>
           </div>
           <div className="mt-3 ml-auto w-56 space-y-1.5 text-right text-[9px]"><p>Sub-total (incl. GST) <span className="float-right font-semibold">{formatCurrencyAmount(String(amount))}</span></p><p>GST (18%) <span className="float-right font-semibold">{formatCurrencyAmount(String(gst))}</span></p><p className="border-t border-gray-200 pt-1.5 font-bold">Total Order Amount <span className="float-right">{formatCurrencyAmount(String(total))}</span></p></div>
@@ -1103,9 +1275,9 @@ function RenewalDetailsPage({
         <section id="renewal-detail-license-details">
           <DetailCard title="License Details">
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="flex items-start gap-3"><div className="flex h-10 w-10 items-center justify-center rounded bg-purple-50 text-purple-500"><ShieldCheck className="h-5 w-5" /></div><div className="space-y-2"><DetailField label="License Type" value={row.product} /><DetailField label="License Model" value="Subscription" /><DetailField label="Quantity Licensed" value={row.seats} /><DetailField label="Vendor" value={<span className="text-blue-600">TechCloud Solutions Pvt. Ltd.</span>} /></div></div>
-              <div className="space-y-2"><DetailField label="Activation / Tenant Domain" value="nido-tech.onmicrosoft.com" /><DetailField label="Assigned To" value={row.client} /><DetailField label="Assigned Users (10)" value={<button type="button" onClick={() => alert(`Showing assigned users for ${row.id}`)} className="text-blue-600 hover:underline">View Assigned Users →</button>} /><DetailField label="License Key / Notes" value="abcd1234-ef56-7890-abcd-1234567890ef" /></div>
-              <div className="space-y-2"><DetailField label="Start Date" value="Aug 24, 2026" /><DetailField label="End / Expiry Date" value="Aug 24, 2027" /><DetailField label="Status" value={<span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Active</span>} /><DetailField label="Auto Renewal" value={<span className="text-emerald-600">● Enabled</span>} /></div>
+               <div className="flex items-start gap-3"><div className="flex h-10 w-10 items-center justify-center rounded bg-purple-50 text-purple-500"><ShieldCheck className="h-5 w-5" /></div><div className="space-y-2"><DetailField label="License Type" value={row.licenseType || "—"} /><DetailField label="License Model" value="Subscription" /><DetailField label="Quantity Licensed" value={row.seats} /><DetailField label="Vendor" value="—" /></div></div>
+               <div className="space-y-2"><DetailField label="Activation / Tenant Domain" value="—" /><DetailField label="Assigned To" value={row.client} /><DetailField label="Assigned Users" value={row.quantity || row.seats} /><DetailField label="License Key / Notes" value={row.notes || "—"} /></div>
+               <div className="space-y-2"><DetailField label="Start Date" value={wizardDateLabel(row.renewalStartDate || "")} /><DetailField label="End / Expiry Date" value={row.dueDate} /><DetailField label="Status" value={<span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Active</span>} /><DetailField label="Auto Renewal" value={<span className="text-emerald-600">● {row.autoRenew}</span>} /></div>
             </div>
             <div className="mt-3 flex justify-end"><button type="button" onClick={() => downloadRenewalFile(row, "license")} className="inline-flex items-center gap-1 text-[9px] font-medium text-blue-600 hover:underline"><Download className="h-3 w-3" /> Download license details</button></div>
           </DetailCard>
@@ -1122,7 +1294,7 @@ function RenewalDetailsPage({
             </div>
           </DetailCard>
           <DetailCard title="Renewal History">
-            <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-[9px]"><thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">Renewal ID</th><th className="pb-2">Period</th><th className="pb-2">Amount</th><th className="pb-2">Status</th><th className="pb-2">Renewed On</th><th className="pb-2">Invoice</th></tr></thead><tbody><tr><td className="py-2 text-blue-600">REN-000001</td><td>Aug 24, 2025 – Aug 24, 2026</td><td>{formatCurrencyAmount(row.amount)}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Completed</span></td><td>Aug 22, 2025</td><td><button type="button" onClick={() => downloadRenewalInvoice(row)} className="text-blue-600 hover:underline">INV-000039 ↓</button></td></tr></tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-[9px]"><thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">Renewal ID</th><th className="pb-2">Period</th><th className="pb-2">Amount</th><th className="pb-2">Status</th><th className="pb-2">Renewed On</th><th className="pb-2">Invoice</th></tr></thead><tbody>{row.renewalStartDate ? <tr><td className="py-2 text-blue-600">{row.id}</td><td>{wizardDateLabel(row.renewalStartDate)} – {row.dueDate}</td><td>{formatCurrencyAmount(row.amount)}</td><td><span className="rounded-full bg-blue-50 px-1.5 py-1 text-[8px] font-semibold text-blue-600">Upcoming</span></td><td>{wizardDateLabel(row.renewalStartDate)}</td><td><button type="button" onClick={() => downloadRenewalInvoice(row)} className="text-blue-600 hover:underline">Download ↓</button></td></tr> : <tr><td colSpan={6} className="py-4 text-center text-gray-400">No renewal history available</td></tr>}</tbody></table></div>
             <button type="button" onClick={() => setActiveTab("Renewals")} className="mt-3 block w-full text-center text-[9px] font-medium text-blue-600 hover:underline">View all renewal history →</button>
           </DetailCard>
         </section>
@@ -1136,14 +1308,14 @@ function RenewalDetailsPage({
 
         <section id="renewal-detail-invoices">
           <DetailCard title="Invoices">
-            <div className="overflow-x-auto"><table className="w-full min-w-[550px] text-[9px]"><thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">Invoice ID</th><th className="pb-2">Invoice Date</th><th className="pb-2">Amount</th><th className="pb-2">Status</th><th className="pb-2">Due Date</th><th className="pb-2">Actions</th></tr></thead><tbody><tr><td className="py-2 text-blue-600">INV-000123</td><td>Aug 24, 2026</td><td>{formatCurrencyAmount(String(total))}</td><td><span className="rounded-full bg-emerald-50 px-1.5 py-1 text-[8px] font-semibold text-emerald-600">Paid</span></td><td>Sep 23, 2026</td><td><button type="button" onClick={() => downloadRenewalInvoice(row)} className="text-blue-600 hover:underline">View</button><button type="button" onClick={() => downloadRenewalInvoice(row)} className="ml-2 rounded border border-gray-200 p-1 text-gray-500 hover:bg-gray-50" aria-label="Download invoice"><Download className="h-3 w-3" /></button></td></tr></tbody></table></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[550px] text-[9px]"><thead><tr className="border-b border-gray-100 text-left text-[8px] uppercase text-gray-400"><th className="pb-2">Invoice ID</th><th className="pb-2">Invoice Date</th><th className="pb-2">Amount</th><th className="pb-2">Status</th><th className="pb-2">Due Date</th><th className="pb-2">Actions</th></tr></thead><tbody><tr><td className="py-2 text-blue-600">{row.id}-INV</td><td>{wizardDateLabel(row.orderDate || "")}</td><td>{formatCurrencyAmount(String(total))}</td><td><span className="rounded-full bg-gray-100 px-1.5 py-1 text-[8px] font-semibold text-gray-600">Pending</span></td><td>{row.dueDate || "—"}</td><td><button type="button" onClick={() => downloadRenewalInvoice(row)} className="text-blue-600 hover:underline">View</button><button type="button" onClick={() => downloadRenewalInvoice(row)} className="ml-2 rounded border border-gray-200 p-1 text-gray-500 hover:bg-gray-50" aria-label="Download invoice"><Download className="h-3 w-3" /></button></td></tr></tbody></table></div>
             <button type="button" onClick={() => scrollToTab("Invoices")} className="mt-3 block w-full text-center text-[9px] font-medium text-blue-600 hover:underline">View all invoices →</button>
           </DetailCard>
         </section>
 
         <section id="renewal-detail-activity-log">
           <DetailCard title="Activity Log">
-            <div className="space-y-3 text-[9px]"><div className="flex gap-2"><Activity className="mt-0.5 h-3 w-3 text-blue-500" /><p><span className="font-semibold text-gray-700">Order delivered</span><span className="ml-2 text-gray-400">Aug 24, 2026 11:06 PM</span><br /><span className="text-gray-500">Digital license was delivered to the client.</span></p></div><div className="flex gap-2"><Activity className="mt-0.5 h-3 w-3 text-gray-400" /><p><span className="font-semibold text-gray-700">Renewal created</span><span className="ml-2 text-gray-400">Aug 24, 2026 04:21 PM</span><br /><span className="text-gray-500">Renewal request was submitted by Rahul Sharma.</span></p></div></div>
+            <div className="space-y-3 text-[9px]"><div className="flex gap-2"><Activity className="mt-0.5 h-3 w-3 text-blue-500" /><p><span className="font-semibold text-gray-700">Order delivered</span><span className="ml-2 text-gray-400">{wizardDateLabel(row.deliveryDate || "")}</span><br /><span className="text-gray-500">Delivery information from the selected order.</span></p></div><div className="flex gap-2"><Activity className="mt-0.5 h-3 w-3 text-gray-400" /><p><span className="font-semibold text-gray-700">Renewal created</span><span className="ml-2 text-gray-400">{wizardDateLabel(row.orderDate || "")}</span><br /><span className="text-gray-500">Renewal request was created from the selected order.</span></p></div></div>
           </DetailCard>
         </section>
 
@@ -1277,9 +1449,12 @@ function RenewalActionMenu({
 }
 
 export default function MyRenewalsPage() {
+  const { orders: liveOrders } = useMyOrders();
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("Overview");
-  const [renewals, setRenewals] = useState<Renewal[]>(RENEWALS);
-  const [renewalHistory, setRenewalHistory] = useState<Renewal[]>(RENEWAL_HISTORY);
+  const [renewals, setRenewals] = useState<Renewal[]>(() => readStoredRenewals(RENEWALS_STORAGE_KEY, RENEWALS));
+  const [renewalHistory, setRenewalHistory] = useState<Renewal[]>(() => readStoredRenewals(RENEWAL_HISTORY_STORAGE_KEY, RENEWAL_HISTORY));
+  const [liveClients, setLiveClients] = useState<StoredClient[]>(() => getClients());
+  const [liveCatalog, setLiveCatalog] = useState<CatalogProduct[]>(() => getCatalogProducts());
   const [client, setClient] = useState("All Clients");
   const [status, setStatus] = useState("All Statuses");
   const [renewalStatus, setRenewalStatus] = useState("All");
@@ -1297,6 +1472,35 @@ export default function MyRenewalsPage() {
   const [selectedRenewal, setSelectedRenewal] = useState<Renewal | undefined>();
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(2026, 7, 1));
+  const liveWizardOrders = useMemo(
+    () => createRenewalWizardOrders(liveOrders, liveCatalog),
+    [liveCatalog, liveOrders],
+  );
+  const liveWizardInitialValues = useMemo(
+    () => createInitialRenewalWizardValues(liveClients, liveWizardOrders),
+    [liveClients, liveWizardOrders],
+  );
+
+  useEffect(() => {
+    const reloadLiveSources = () => {
+      setLiveClients(getClients());
+      setLiveCatalog(getCatalogProducts());
+    };
+    window.addEventListener("nidoClientsUpdated", reloadLiveSources);
+    window.addEventListener("catalogUpdated", reloadLiveSources);
+    return () => {
+      window.removeEventListener("nidoClientsUpdated", reloadLiveSources);
+      window.removeEventListener("catalogUpdated", reloadLiveSources);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(RENEWALS_STORAGE_KEY, JSON.stringify(renewals));
+  }, [renewals]);
+
+  useEffect(() => {
+    window.localStorage.setItem(RENEWAL_HISTORY_STORAGE_KEY, JSON.stringify(renewalHistory));
+  }, [renewalHistory]);
 
   useEffect(() => {
     if (!actionMenuId) return;
@@ -1470,6 +1674,20 @@ export default function MyRenewalsPage() {
       amount: formatCurrencyAmount(String(total)),
       renewalStatus: getRenewalStatus(dueDateInput),
       autoRenew: values.autoRenew ? "Enabled" : "Disabled",
+      orderId: values.order,
+      orderDate: values.orderDate,
+      deliveryDate: values.deliveryDate,
+      currentExpiryDate: values.currentExpiryDate,
+      renewalStartDate: values.renewalStartDate,
+      renewalTerm: values.renewalTerm,
+      quantity: values.quantity,
+      unitPrice: values.unitPrice,
+      contractNo: values.contractNo,
+      purchaseOrderNo: values.purchaseOrderNo,
+      reminders: values.reminders,
+      notifyTo: values.notifyTo,
+      notificationMessage: values.notificationMessage,
+      notes: values.notes,
     };
     setRenewals(current => [renewal, ...current]);
     return renewal;
@@ -1506,6 +1724,9 @@ export default function MyRenewalsPage() {
       <NewRenewalWizard
         onCancel={() => setShowNewRenewal(false)}
         onCreate={createRenewalFromWizard}
+        initialValues={liveWizardInitialValues}
+        clients={liveClients}
+        orders={liveWizardOrders}
         onView={renewal => {
           setShowNewRenewal(false);
           setSelectedRenewal(renewal);
