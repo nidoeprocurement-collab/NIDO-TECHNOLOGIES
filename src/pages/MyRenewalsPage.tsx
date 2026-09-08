@@ -510,15 +510,8 @@ function RenewalTypography() {
       .renewals-page .renewal-list-table th,
       .renewals-page .renewal-list-table td {
         overflow-wrap: anywhere;
-        padding-left: 0.375rem;
-        padding-right: 0.375rem;
-      }
-      @media (min-width: 640px) {
-        .renewals-page .renewal-list-table th,
-        .renewals-page .renewal-list-table td {
-          padding-left: 0.75rem;
-          padding-right: 0.75rem;
-        }
+        padding-left: 0.375rem !important;
+        padding-right: 0.375rem !important;
       }
       .renewals-page textarea,
       .renewals-page input,
