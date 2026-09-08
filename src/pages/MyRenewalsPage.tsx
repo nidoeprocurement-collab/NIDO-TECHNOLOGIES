@@ -851,7 +851,7 @@ function RenewalActionMenu({
   onRemove: () => void;
 }) {
   return (
-    <div className={`relative inline-block ${open ? "z-50" : ""}`}>
+    <div data-renewal-action-menu className={`relative inline-block ${open ? "z-50" : ""}`}>
       <button
         type="button"
         aria-label={`Actions for ${row.id}`}
@@ -901,6 +901,20 @@ export default function MyRenewalsPage() {
   const [selectedRenewal, setSelectedRenewal] = useState<Renewal | undefined>();
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(2026, 7, 1));
+
+  useEffect(() => {
+    if (!actionMenuId) return;
+
+    const closeMenuOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && !target.closest("[data-renewal-action-menu]")) {
+        setActionMenuId(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeMenuOnOutsidePointer);
+  }, [actionMenuId]);
 
   const activeRows = activeTab === "Renewal History" ? renewalHistory : renewals;
 
