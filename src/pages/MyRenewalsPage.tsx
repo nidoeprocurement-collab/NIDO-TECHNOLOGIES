@@ -851,7 +851,7 @@ function RenewalActionMenu({
   onRemove: () => void;
 }) {
   return (
-    <div className="relative inline-block">
+    <div className={`relative inline-block ${open ? "z-50" : ""}`}>
       <button
         type="button"
         aria-label={`Actions for ${row.id}`}
@@ -864,7 +864,7 @@ function RenewalActionMenu({
         <MoreVertical className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute right-0 top-7 z-30 w-40 rounded-lg border border-gray-200 bg-white p-1 text-left shadow-xl">
+        <div className="absolute right-0 top-7 z-50 w-48 rounded-lg border border-gray-200 bg-white p-1 text-left shadow-xl">
           <button type="button" onClick={event => { event.stopPropagation(); onEdit(); }} className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-[10px] text-gray-700 hover:bg-gray-50">
             <Pencil className="h-3 w-3" /> Edit renewal
           </button>
@@ -1332,7 +1332,7 @@ export default function MyRenewalsPage() {
             </div>
           </section>
         ) : (
-        <section className="overflow-hidden rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <section className="overflow-visible rounded-[10px] border border-gray-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex h-11 items-center justify-between gap-3 border-b border-gray-100 px-3.5">
             <h2 className="text-[11px] font-semibold text-gray-800">
               {activeTab === "Overview" ? "Renewal List" : activeTab} ({filteredRenewals.length})
@@ -1363,7 +1363,7 @@ export default function MyRenewalsPage() {
           </div>
 
           {viewMode === "table" ? (
-          <div className="w-full overflow-hidden">
+          <div className="w-full overflow-visible">
             <table className="renewal-list-table text-[10px]">
               <colgroup>
                 <col style={{ width: "9%" }} />
