@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ArrowLeft,
@@ -44,6 +44,14 @@ interface Renewal {
   amount: string;
   renewalStatus: RenewalStatus;
   autoRenew: AutoRenew;
+}
+
+interface RenewalNote {
+  id: string;
+  author: string;
+  date: string;
+  text: string;
+  visibility: "Internal Note" | "External Note";
 }
 
 type RenewalFormValues = Pick<
@@ -484,11 +492,47 @@ function RenewalDetailsPage({
 }) {
   const [activeTab, setActiveTab] = useState<DetailTab>("Order Items");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [note, setNote] = useState("");
-  const [notes, setNotes] = useState<string[]>([]);
+  const notesKey = `nido_renewal_notes_${row.id}`;
+  const [noteText, setNoteText] = useState("");
+  const [visibility, setVisibility] = useState<RenewalNote["visibility"]>("Internal Note");
+  const [notes, setNotes] = useState<RenewalNote[]>([]);
   const amount = Number(row.amount.replace(/[^\d.-]/g, "").replace(/,/g, "")) || 0;
   const gst = amount * 0.18;
   const total = amount + gst;
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(notesKey) || "null");
+      setNotes(Array.isArray(stored) ? stored : []);
+    } catch {
+      setNotes([]);
+    }
+    setNoteText("");
+    setVisibility("Internal Note");
+  }, [notesKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(notesKey, JSON.stringify(notes));
+    } catch {
+      // Notes remain available in the current view if browser storage is unavailable.
+    }
+  }, [notes, notesKey]);
+
+  const handleAddNote = () => {
+    if (!noteText.trim()) return;
+    const now = new Date();
+    const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    setNotes(current => [{
+      id: `n${Date.now()}`,
+      author: "System Owner",
+      date,
+      text: noteText.trim(),
+      visibility,
+    }, ...current]);
+    setNoteText("");
+  };
   const scrollToTab = (tab: DetailTab) => {
     setActiveTab(tab);
     document.getElementById(`renewal-detail-${tab.toLowerCase().replaceAll(" ", "-")}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -660,8 +704,75 @@ function RenewalDetailsPage({
 
         <section id="renewal-detail-notes">
           <DetailCard title="Notes">
-            <div className="flex gap-2"><input value={note} onChange={event => setNote(event.target.value)} placeholder="Add a note about this renewal..." className="h-8 min-w-0 flex-1 rounded border border-gray-200 px-2 text-[9px] outline-none focus:border-blue-400" /><button type="button" onClick={() => { if (note.trim()) { setNotes(current => [note.trim(), ...current]); setNote(""); } }} className="h-8 rounded bg-blue-600 px-3 text-[9px] font-semibold text-white hover:bg-blue-700">Add Note</button></div>
-            {notes.length > 0 && <div className="mt-3 space-y-2">{notes.map((item, index) => <p key={`${item}-${index}`} className="rounded bg-gray-50 p-2 text-[9px] text-gray-600">{item}</p>)}</div>}
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ fontWeight: 700, fontSize: 14.5, color: "#111827", marginBottom: 1 }}>Notes</div>
+              <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>
+                {notes.length} note{notes.length !== 1 ? "s" : ""}
+              </div>
+              {notes.map((item, index) => (
+                <div key={item.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: index < notes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                    {(item.author?.[0] || "S").toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{item.author}</span>
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>{item.date}</span>
+                      <span style={{ fontSize: 11, background: item.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: item.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                        {item.visibility === "Internal Note" ? "🔒 Internal" : "🌐 Visible to client"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{item.text}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
+                  <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
+                    <textarea
+                      value={noteText}
+                      onChange={event => { if (event.target.value.length <= 500) setNoteText(event.target.value); }}
+                      placeholder="Write your note here..."
+                      rows={4}
+                      style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: 13.5, fontFamily: "inherit", color: "#374151", boxSizing: "border-box", background: "transparent" }}
+                    />
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+                      <div style={{ fontSize: 12, color: "#9ca3af" }}>{noteText.length} / 500</div>
+                    </div>
+                  </div>
+                  <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 12 }}>Visibility</div>
+                      {[
+                        ["Internal Note", "🔒", "Only visible to internal users"],
+                        ["External Note", "🌐", "Visible to the client on the portal"],
+                      ].map(([label, icon, sub]) => (
+                        <div key={label} onClick={() => setVisibility(label as RenewalNote["visibility"])} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14, cursor: "pointer" }}>
+                          <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${visibility === label ? "#2563eb" : "#d1d5db"}`, background: visibility === label ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2, flexShrink: 0 }}>
+                            {visibility === label && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: "#111827", display: "flex", alignItems: "center", gap: 5 }}>{icon} {label}</div>
+                            <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{sub}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        onClick={handleAddNote}
+                        disabled={!noteText.trim()}
+                        style={{ padding: "8px 22px", border: "none", borderRadius: 8, background: noteText.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: noteText.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </DetailCard>
         </section>
 
