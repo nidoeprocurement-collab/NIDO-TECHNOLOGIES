@@ -503,7 +503,7 @@ function RenewalDetailsPage({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[17px] font-bold leading-6 tracking-[-0.25px] text-gray-900">Order Details / #ORD-000014</h1>
+              <h1 className="text-[17px] font-bold leading-6 tracking-[-0.25px] text-gray-900">Renewal Details / #{row.id}</h1>
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[8px] font-semibold text-emerald-700">Delivered</span>
             </div>
             <p className="mt-0.5 text-[9px] text-gray-500">Master Order · Created on Aug 24, 2026 04:21 PM · Requested by Rahul Sharma (Client Operations)</p>
