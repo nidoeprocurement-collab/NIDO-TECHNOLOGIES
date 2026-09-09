@@ -367,7 +367,11 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true }: { st
     ...ORDER_FULFILLMENT_STATUSES,
     status,
     ...(allowCancel ? ["Cancelled"] : []),
-  ])).filter(option => option !== "Cancelled" || allowCancel);
+  ])).filter(option =>
+    option !== "Partially Shipped" &&
+    option !== "Partially Delivered" &&
+    (option !== "Cancelled" || allowCancel)
+  );
 
   useEffect(() => {
     const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
