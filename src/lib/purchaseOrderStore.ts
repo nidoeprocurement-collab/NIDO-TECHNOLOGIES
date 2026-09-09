@@ -4,6 +4,10 @@
 
 import { getPrefix } from "./configService";
 import type { ProductCommercialTerms } from "./productCommercialTerms";
+import {
+  syncMasterOrderFulfillmentStatus,
+  syncSubOrderStatesFromPO,
+} from "./orderFulfillmentStatus";
 
 export interface PODocument {
   id: string;
@@ -154,6 +158,11 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
     ) return;
     all[idx] = { ...all[idx], ...changes };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+
+    syncSubOrderStatesFromPO(all[idx]);
+    // Fulfillment status is derived from PO line/sub-order state. Keep the
+    // master order synchronized whenever a vendor operation changes a PO.
+    syncMasterOrderFulfillmentStatus(all[idx].orderId);
 
     // When a PO is cancelled, clean up the order-level PO and vendor-selection
     // localStorage keys so OrderDetailsPage resets to its default (unselected) state.

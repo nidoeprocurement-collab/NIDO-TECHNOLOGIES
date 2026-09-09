@@ -19,6 +19,7 @@ import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
 import { createApprovalRequest } from "@/lib/approvalEngine";
+import { syncMasterOrderFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import {
   getAvailabilityLabel,
   getProductCommercialTerms,
@@ -2502,32 +2503,9 @@ export default function MyOrderPage() {
     && orderPOs.every(po => String(po.status || "").toLowerCase() === "cancelled");
   const canCancelOrder = !hasGeneratedOrderPO || allOrderPOsCancelled;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
-  const setMasterStatus = (status: string) => {
-    if (isClientPortalUser) return; // portal is read-only for order status
-    if (isOrderCancelled || isOrderDelivered) return; // terminal orders can no longer be updated
-    if (!hasConfirmedOrderPO) return; // master status stays locked until a PO is confirmed
-    if (status === "Delivered" && masterStatus !== "Shipped" && masterStatus !== "Partially Delivered") return;
-    // Centralized in MyOrdersContext so a Cancelled/Draft transition always
-    // cascades to sub-orders and clears vendor selection, whether triggered
-    // here or from the order list's bulk status update.
-    updateOrderStatus(orderId, status as any);
-  };
-  const [showStatusDd, setShowStatusDd] = useState(false);
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
-  const [pendingDeliveredStatus, setPendingDeliveredStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
-  const masterStatusOptions = [
-    "Processing",
-    "Pending Shipping",
-    "Partially Shipped",
-    "Shipped",
-    "Partially Delivered",
-    "Delivered",
-  ];
-  const selectableMasterStatusOptions = masterStatusOptions.filter(opt =>
-    opt !== "Delivered" || masterStatus === "Shipped" || masterStatus === "Partially Delivered"
-  );
 
   // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
   // Stock is no longer reserved at cart time, so no stock release is needed here.
@@ -2901,6 +2879,7 @@ export default function MyOrderPage() {
     const state: Record<string, any> = {};
     subOrders.forEach(s => { state[s.id] = { itemStatus: s.itemStatus, tracking: s.tracking, updatedOn: s.updatedOn, deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null, referenceNumber: s.referenceNumber }; });
     localStorage.setItem(itemStateKey, JSON.stringify(state));
+     syncMasterOrderFulfillmentStatus(orderId);
   }, [subOrders, itemStateKey]);
 
   useEffect(() => {
@@ -3156,7 +3135,7 @@ export default function MyOrderPage() {
   }
 
   return (
-    <div className="bg-background text-foreground min-h-screen" style={{ fontFamily: "'Inter','Segoe UI',sans-serif", minHeight: "100vh" }} onClick={() => setShowStatusDd(false)}>
+    <div className="bg-background text-foreground min-h-screen" style={{ fontFamily: "'Inter','Segoe UI',sans-serif", minHeight: "100vh" }}>
       {/* No maxWidth cap here — on wide monitors a fixed cap left visible
           empty gutters on both sides of the page. The content now stretches
           to fill whatever width AppLayout's <main> actually gives it. */}
@@ -3306,35 +3285,13 @@ export default function MyOrderPage() {
               </div>
               <Stepper currentStatus={masterStatus} orderDate={order?.orderDate} />
             </div>
-            {!isClientPortalUser && (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-                {isOrderCancelled ? (
-                  <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This order is cancelled and can no longer be updated.</span>
-                ) : isOrderDelivered ? (
-                  <span style={{ fontSize: 12.5, color: "#166534", fontStyle: "italic" }}>This order is Delivered and can no longer be updated.</span>
-                ) : !hasConfirmedOrderPO ? (
-                  <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>Confirm a purchase order before updating the master order status.</span>
-                ) : (
-                  <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setShowStatusDd(v => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", border: "1px solid hsl(var(--primary))", borderRadius: 8, background: "hsl(var(--card))", color: "hsl(var(--primary))", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}>Update Master Status ▾</button>
-                    {showStatusDd && (
-                      <div style={{ position: "absolute", bottom: 42, right: 0, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 9, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 210, overflow: "hidden" }}>
-                        {selectableMasterStatusOptions.map(opt => (
-                          <button key={opt} onClick={() => {
-                            setShowStatusDd(false);
-                            if (opt === "Cancelled") { setPendingCancelStatus(true); return; }
-                            if (opt === "Delivered") { setPendingDeliveredStatus(true); return; }
-                            setMasterStatus(opt);
-                          }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 16px", border: "none", background: opt === masterStatus ? "#eff6ff" : "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: opt === masterStatus ? "#2563eb" : "#374151", fontWeight: opt === masterStatus ? 600 : 400 }}>
-                            {opt} {opt === masterStatus && <span>✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+             {!isClientPortalUser && (
+               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+                 <span style={{ fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
+                   Status updates automatically from sub-order and PO line-item progress.
+                 </span>
+               </div>
+             )}
           </div>
           {!isClientPortalUser && (
             <div style={card}>
@@ -3783,10 +3740,6 @@ export default function MyOrderPage() {
                                        };
                                      });
                                      localStorage.setItem(itemStateKey, JSON.stringify(persistedState));
-                                    // Confirming a PO starts fulfillment; it
-                                    // must not jump the master order to a
-                                    // terminal Delivered state.
-                                    updateOrderStatus(po.orderId, "Processing");
                                     navigate(`/vendor-orders/${po.poNumber}`);
                                   } catch (error: any) {
                                     setApprovalError(error?.message || "Approval service is unavailable. The PO was not confirmed.");
@@ -3838,13 +3791,6 @@ export default function MyOrderPage() {
         />
       )}
       {pendingCancelStatus && <CancelOrderStatusModal onConfirm={handleCancelOrder} onClose={() => setPendingCancelStatus(false)} />}
-      {pendingDeliveredStatus && (
-        <DeliveredConfirmationModal
-          subject="master order"
-          onConfirm={() => setMasterStatus("Delivered")}
-          onClose={() => setPendingDeliveredStatus(false)}
-        />
-      )}
       {pendingItemDelivered && (
         <DeliveredConfirmationModal
           subject={`item ${subOrders.find(sub => sub.id === pendingItemDelivered)?.itemName || ""}`}

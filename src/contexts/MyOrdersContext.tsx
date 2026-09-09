@@ -326,6 +326,24 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // A PO or sub-order can be operated from another page in the same tab.
+  // Fulfillment status sync writes the shared order record directly and emits
+  // this event so the context (and every order page) reflects it immediately.
+  useEffect(() => {
+    const onFulfillmentStatusUpdated = (event: Event) => {
+      const detailOrderId = (event as CustomEvent).detail?.orderId;
+      if (!detailOrderId) return;
+      try {
+        const latest: MyOrder[] = JSON.parse(localStorage.getItem(ORDERS_KEY) || "[]");
+        setOrders(latest);
+      } catch {
+        /* ignore malformed payloads */
+      }
+    };
+    window.addEventListener("orderFulfillmentStatusUpdated", onFulfillmentStatusUpdated);
+    return () => window.removeEventListener("orderFulfillmentStatusUpdated", onFulfillmentStatusUpdated);
+  }, []);
+
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
     const id = nextOrderId();
     const cartItems = order.cartItems?.map((item, index) => ({

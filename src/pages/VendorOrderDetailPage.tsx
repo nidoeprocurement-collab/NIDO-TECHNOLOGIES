@@ -5,6 +5,7 @@ import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
+import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -628,7 +629,10 @@ function storedPOToDetail(po: StoredPO) {
     dateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
   return {
     poNumber: po.poNumber,
-    status: po.status,
+    // Procurement lifecycle (Draft/Confirmed) remains stored separately.
+    // The visible order status is always derived from line-item fulfillment.
+    status: derivePOFulfillmentStatus(po),
+    lifecycleStatus: po.status,
     createdOn: dateDisp,
     vendorName: po.vendorName,
     linkedMasterOrder: po.orderId,
@@ -733,14 +737,15 @@ export default function VendorOrderDetailPage() {
   const [updateTrackingItem, setUpdateTrackingItem] = useState<{ id: string; name: string; tracking: any } | null>(null);
   const [showUploadDocument, setShowUploadDocument] = useState(false);
   const [pendingItemCancel, setPendingItemCancel] = useState<{ id: string; name: string } | null>(null);
-  const [pendingDeliveredStatus, setPendingDeliveredStatus] = useState(false);
 
   // A cancelled PO is a terminal state: no further status changes, item
   // edits, vendor/reference updates, or tracking changes are allowed. Derive
   // from orderStatus (single source of truth) rather than only the local
   // `cancelled` flag, so a PO cancelled elsewhere (e.g. bulk status update
   // on the orders list) is also locked here.
-  const isCancelled = orderStatus === "Cancelled" || cancelled;
+  const lifecycleStatus = realPO?.status || initialData.lifecycleStatus || initialData.status;
+  const isDraft = lifecycleStatus === "Draft";
+  const isCancelled = lifecycleStatus === "Cancelled" || orderStatus === "Cancelled" || cancelled;
   const isDelivered = orderStatus === "Delivered";
 
   // Reset all state when navigating between different PO detail pages
@@ -781,25 +786,10 @@ export default function VendorOrderDetailPage() {
     };
   }, [poKey]);
 
-  // Sync status changes back to the shared PO store (only for real POs)
-  useEffect(() => {
-    const currentRealPO = getPOByNumber(poKey);
-    if (currentRealPO) updatePO(poKey, { status: orderStatus as any });
-  }, [orderStatus, poKey]);
-
   const filteredItems = items.filter(it =>
     it.name.toLowerCase().includes(search.toLowerCase()) ||
     (it.referenceNumber || "").toLowerCase().includes(search.toLowerCase())
   );
-
-  const handleOrderStatusChange = (status: string) => {
-    if (isCancelled || isDelivered) return;
-    if (status === "Delivered") {
-      setPendingDeliveredStatus(true);
-      return;
-    }
-    setOrderStatus(status);
-  };
 
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
@@ -813,9 +803,11 @@ export default function VendorOrderDetailPage() {
     const po = getPOByNumber(poKey);
     const itemIndex = items.findIndex(it => it.id === id);
     if (po && itemIndex >= 0) {
+      const updatedLines = po.items.map((line, index) => index === itemIndex ? { ...line, status } : line);
       updatePO(poKey, {
-        items: po.items.map((line, index) => index === itemIndex ? { ...line, status } : line),
+        items: updatedLines,
       });
+      setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
     }
   };
   const confirmItemCancel = (reason: string) => {
@@ -883,7 +875,7 @@ export default function VendorOrderDetailPage() {
       ? (po.status === "Draft" ? "Draft" : "Processing")
       : trackedCount === activeLines.length ? "Shipped" : "Partially Shipped";
     updatePO(poKey, { items: updatedLines, status: shipmentStatus as StoredPO["status"] });
-    setOrderStatus(shipmentStatus);
+     setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
 
     const subOrderId = po.items[itemIndex]?.subOrderId;
     if (subOrderId) {
@@ -943,7 +935,7 @@ export default function VendorOrderDetailPage() {
 
     // 3. Update PO status to Confirmed + persist audit note
     updatePO(poKey, { status: "Confirmed", notes: updatedNotes });
-    setOrderStatus("Confirmed");
+    setOrderStatus("Processing");
     setNotes(updatedNotes);
 
     // 4. Send vendor email notification
@@ -1064,7 +1056,7 @@ export default function VendorOrderDetailPage() {
           </div>
           {!isCancelled && (
             <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
-              {orderStatus === "Draft" && (
+              {isDraft && (
                 <button
                   onClick={handleConfirmPO}
                   style={{ padding: "9px 20px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13.5, fontFamily: "inherit" }}
@@ -1144,7 +1136,7 @@ export default function VendorOrderDetailPage() {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
               {isCancelled ? (
                 <span style={{ fontSize: 12.5, color: "#9ca3af", fontStyle: "italic" }}>This PO is cancelled and can no longer be updated.</span>
-              ) : orderStatus === "Draft" ? (
+              ) : isDraft ? (
                 <>
                   <span style={{ fontSize: 12.5, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 7, padding: "6px 12px", fontWeight: 500 }}>
                     Draft – Review items, then confirm to send to vendor
@@ -1159,7 +1151,9 @@ export default function VendorOrderDetailPage() {
               ) : isDelivered ? (
                 <span style={{ fontSize: 12.5, color: "#166534", fontStyle: "italic" }}>This PO is Delivered and can no longer be updated.</span>
               ) : (
-                <UpdateStatusDropdown current={orderStatus} onChange={handleOrderStatusChange} />
+                <span style={{ fontSize: 12.5, color: "#6b7280", fontStyle: "italic" }}>
+                  Status updates automatically from item fulfillment progress.
+                </span>
               )}
             </div>
           </div>
@@ -1503,13 +1497,6 @@ export default function VendorOrderDetailPage() {
           tracking={updateTrackingItem.tracking}
           onSave={t => handleUpdateTracking(updateTrackingItem.id, t)}
           onClose={() => setUpdateTrackingItem(null)}
-        />
-      )}
-      {pendingDeliveredStatus && (
-        <DeliveredConfirmationModal
-          subject="purchase order"
-          onConfirm={() => setOrderStatus("Delivered")}
-          onClose={() => setPendingDeliveredStatus(false)}
         />
       )}
       {showUploadDocument && (
