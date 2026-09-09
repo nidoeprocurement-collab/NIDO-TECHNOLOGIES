@@ -7,7 +7,6 @@ export type FulfillmentStatus =
   | "Cancelled";
 
 const ORDERS_KEY = "nido_my_orders";
-const PO_KEY = "nido_all_purchase_orders";
 
 const normalize = (value: unknown) => String(value || "").trim().toLowerCase();
 
@@ -65,37 +64,10 @@ function lineStatus(line: any, po: any): string {
   return "Processing";
 }
 
-function lineForSubOrder(pos: any[], subOrderId: string): { line: any; po: any } | null {
-  let selected: { line: any; po: any } | null = null;
-  let selectedRank = -1;
-  const rank = (status: unknown) => {
-    const value = normalize(status);
-    if (value === "delivered") return 5;
-    if (value === "shipped" || value === "dispatched") return 4;
-    if (value === "partially shipped") return 3;
-    if (value === "cancelled" || value === "canceled") return 0;
-    return 1;
-  };
-
-  for (const po of pos) {
-    if (isCancelled(po?.status)) continue;
-    const lines = Array.isArray(po?.items) ? po.items : [];
-    for (const line of lines) {
-      if (line?.subOrderId !== subOrderId) continue;
-      const candidateRank = rank(lineStatus(line, po));
-      if (candidateRank > selectedRank) {
-        selected = { line, po };
-        selectedRank = candidateRank;
-      }
-    }
-  }
-  return selected;
-}
-
 /**
- * Recalculates and persists the master order status from sub-order state and
- * PO line state. This is deliberately localStorage-based because the current
- * application uses localStorage as its shared cross-page store.
+ * Recalculates and persists the master order status from the customer-facing
+ * sub-order state. Vendor PO-line status is intentionally not included here:
+ * vendor fulfillment only unlocks the Shipped action in Order Details.
  */
 export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentStatus | null {
   if (!orderId || typeof window === "undefined") return null;
@@ -108,14 +80,11 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
   }
 
   const saved = readJson<Record<string, any>>(`nido_subitems_${orderId}`, {});
-  const pos = readJson<any[]>(PO_KEY, []).filter(po => po?.orderId === orderId);
   const items = Array.isArray(order.cartItems) ? order.cartItems : [];
 
   const statuses = items.map((item: any, index: number) => {
     const subOrderId = item?.subOrderId || `SO-${orderId}-${String(index + 1).padStart(3, "0")}`;
-    const poLine = lineForSubOrder(pos, subOrderId);
     const storedStatus = saved[subOrderId]?.itemStatus;
-    if (poLine) return lineStatus(poLine.line, poLine.po);
     return storedStatus || "Processing";
   });
 
@@ -136,27 +105,29 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
 }
 
 /**
- * Mirrors vendor line operations into the sub-order projection used by the
- * master-order and client-portal views.
+ * Shares vendor tracking/readiness with the sub-order projection without
+ * changing the customer-facing itemStatus owned by Order Details.
  */
 export function syncSubOrderStatesFromPO(po: any): void {
   if (!po?.orderId || typeof window === "undefined") return;
   const saved = readJson<Record<string, any>>(`nido_subitems_${po.orderId}`, {});
   const lines = Array.isArray(po.items) ? po.items : [];
-  const poState = normalize(po.status);
 
   for (const line of lines) {
     if (!line?.subOrderId) continue;
-    const status = isCancelled(po.status)
-      ? "Cancelled"
-      : line.status ||
-        (poState === "draft" ? "Pending" : poState === "confirmed" ? "Processing" : po.status || "Processing");
-    saved[line.subOrderId] = {
-      ...(saved[line.subOrderId] || {}),
-      itemStatus: status,
-      tracking: line.tracking ?? saved[line.subOrderId]?.tracking ?? null,
+    const existing = saved[line.subOrderId] || {};
+    const nextState = {
+      ...existing,
+      tracking: line.tracking ?? existing.tracking ?? null,
       updatedOn: new Date().toLocaleDateString("en-IN"),
     };
+    // Before status ownership was separated, vendor PO updates could leave
+    // their line status in this shared record. Discard only unowned legacy
+    // values; statuses explicitly set from Order Details remain untouched.
+    if (existing.statusOwner !== "order-details") {
+      delete nextState.itemStatus;
+    }
+    saved[line.subOrderId] = nextState;
   }
   localStorage.setItem(`nido_subitems_${po.orderId}`, JSON.stringify(saved));
   window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));

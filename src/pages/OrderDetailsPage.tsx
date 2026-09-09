@@ -2570,7 +2570,10 @@ export default function MyOrderPage() {
   const updateStatus = (subId: string, status: string) => {
     if (!hasConfirmedOrderPO || isOrderInactive) return;
     if (status === "Shipped" && !getAllPOs().some(po => po.orderId === orderId && isPOItemShipped(po, subId))) return;
-    setSubOrders(prev => prev.map(s => s.id === subId ? { ...s, itemStatus: status, updatedOn: new Date().toLocaleDateString("en-IN") } : s));
+    setSubOrders(prev => prev.map(s => s.id === subId
+      ? { ...s, itemStatus: status, statusOwner: "order-details", updatedOn: new Date().toLocaleDateString("en-IN") }
+      : s
+    ));
   };
 
   const saveTrackingForSubOrder = (tracking: any) => {
@@ -2580,10 +2583,6 @@ export default function MyOrderPage() {
       ? {
           ...s,
           tracking,
-          // The tracking dialog is opened from the Shipped status action.
-          // Preserve that state explicitly so saving tracking details cannot
-          // rehydrate the item's default Processing/Pending status.
-          itemStatus: "Shipped",
           updatedOn,
         }
       : s
@@ -2883,7 +2882,16 @@ export default function MyOrderPage() {
   useEffect(() => {
     if (!subOrders.length) return;
     const state: Record<string, any> = {};
-    subOrders.forEach(s => { state[s.id] = { itemStatus: s.itemStatus, tracking: s.tracking, updatedOn: s.updatedOn, deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null, referenceNumber: s.referenceNumber }; });
+    subOrders.forEach(s => {
+      state[s.id] = {
+        itemStatus: s.itemStatus,
+        statusOwner: "order-details",
+        tracking: s.tracking,
+        updatedOn: s.updatedOn,
+        deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null,
+        referenceNumber: s.referenceNumber,
+      };
+    });
     localStorage.setItem(itemStateKey, JSON.stringify(state));
      syncMasterOrderFulfillmentStatus(orderId);
   }, [subOrders, itemStateKey]);
