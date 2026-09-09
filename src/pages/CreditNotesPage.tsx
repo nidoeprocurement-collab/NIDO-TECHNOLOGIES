@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getPrefix } from "@/lib/configService";
+import { getPrefix, loadConfig } from "@/lib/configService";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -28,7 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useData } from "@/contexts/DataContext";
 import { safeReadJson } from "@/lib/utils";
 import { downloadCreditNotePdf } from "@/lib/creditNotePdf";
 
@@ -704,8 +703,7 @@ function CreditNotePreviewDrawer({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function CreditNotesPage() {
   const navigate = useNavigate();
-  const { generalSettings: rawSettings } = useData();
-  const generalSettings = rawSettings ?? {};
+  const organization = loadConfig().organization;
 
   const [notes, setNotes] = useState<CreditNoteEntry[]>(() => {
     const stored = safeReadJson<CreditNoteEntry[]>(STORAGE_KEY, defaultNotes);
@@ -718,7 +716,7 @@ export default function CreditNotesPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [previewNote, setPreviewNote] = useState<CreditNoteEntry | null>(null);
 
-  const companyLogoUrl = Object.values(generalSettings).find((s) => s.companyLogo)?.companyLogo;
+  const companyLogoUrl = organization.logoUrl;
 
   const persist = (next: CreditNoteEntry[]) => {
     setNotes(next);

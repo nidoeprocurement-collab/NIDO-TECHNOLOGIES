@@ -2080,6 +2080,7 @@ const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shi
 function ThreeDotMenu({
   sub,
   onUpdateStatus,
+  onRequestShipped,
   canMarkShipped,
   onRequestDelivered,
   onAddTracking,
@@ -2208,7 +2209,9 @@ function ThreeDotMenu({
                       setStatusSub(false);
                       return;
                     }
-                    if (s === "Delivered" && onRequestDelivered) {
+                    if (s === "Shipped" && onRequestShipped) {
+                      onRequestShipped();
+                    } else if (s === "Delivered" && onRequestDelivered) {
                       onRequestDelivered();
                     } else {
                       onUpdateStatus(s);
@@ -2600,18 +2603,28 @@ export default function MyOrderPage() {
     ));
   };
 
+  const requestShipped = (subId: string) => {
+    if (!hasConfirmedOrderPO || isOrderInactive) return;
+    setPendingShippedTarget(subId);
+    setTrackingTarget(subId);
+  };
+
   const saveTrackingForSubOrder = (tracking: any) => {
     if (!trackingTarget) return;
     const updatedOn = new Date().toLocaleDateString("en-IN");
+    const shouldMarkShipped = pendingShippedTarget === trackingTarget;
     setSubOrders(prev => prev.map(s => s.id === trackingTarget
       ? {
           ...s,
+          itemStatus: shouldMarkShipped ? "Shipped" : s.itemStatus,
+          statusOwner: "order-details",
           tracking,
           trackingOwner: "order-details",
           updatedOn,
         }
       : s
     ));
+    setPendingShippedTarget(null);
   };
 
   const handleCancelItem = (subId: string, reason: string) => {
@@ -2875,6 +2888,7 @@ export default function MyOrderPage() {
 
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
+  const [pendingShippedTarget, setPendingShippedTarget] = useState<string | null>(null);
   const [referenceTarget, setReferenceTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [vendorTarget, setVendorTarget] = useState<any>(null);
@@ -3584,6 +3598,7 @@ export default function MyOrderPage() {
                           <ThreeDotMenu
                             sub={sub}
                             onUpdateStatus={s => updateStatus(sub.id, s)}
+                            onRequestShipped={() => requestShipped(sub.id)}
                             canMarkShipped={canMarkShipped}
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
