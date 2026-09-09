@@ -2121,7 +2121,13 @@ function ThreeDotMenu({
       window.removeEventListener("resize", closeMenu);
     };
   }, [open]);
-  const statuses = ["Pending", "Processing", "Pending Shipping", "Shipped", "Delivered"];
+  const statuses = [
+    "Pending",
+    "Processing",
+    "Pending Shipping",
+    ...(canMarkShipped ? ["Shipped"] : []),
+    "Delivered",
+  ];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
     if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";

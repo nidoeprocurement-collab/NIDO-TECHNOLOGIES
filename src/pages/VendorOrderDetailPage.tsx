@@ -897,7 +897,14 @@ export default function VendorOrderDetailPage() {
       try {
         const key = `nido_subitems_${po.orderId}`;
         const saved = JSON.parse(localStorage.getItem(key) || "{}");
-        saved[subOrderId] = { ...(saved[subOrderId] || {}), tracking: normalizedTracking, itemStatus: normalizedTracking ? "Shipped" : "Processing", updatedOn: new Date().toLocaleDateString("en-IN") };
+        // Vendor fulfillment is recorded on the PO line above. Do not write
+        // itemStatus here: Order Details owns the customer-facing sub-order
+        // status and should only offer "Shipped" after this PO line is shipped.
+        saved[subOrderId] = {
+          ...(saved[subOrderId] || {}),
+          tracking: normalizedTracking,
+          updatedOn: new Date().toLocaleDateString("en-IN"),
+        };
         localStorage.setItem(key, JSON.stringify(saved));
         window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
       } catch { /* storage unavailable */ }

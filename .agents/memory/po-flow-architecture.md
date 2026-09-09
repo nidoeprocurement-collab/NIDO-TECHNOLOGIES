@@ -35,6 +35,22 @@ the primary sub-order makes later items lose their PO number and vendor state.
 projects PO data into per-item or per-sub-order UI, and derive its label from
 the persisted PO status.
 
+## Vendor shipment vs. customer-facing status
+
+Vendor Order Details owns PO-line fulfillment and tracking. It must not write a
+customer-facing sub-order `itemStatus` when a vendor marks a line as shipped.
+Order Details may expose its own Shipped action only after the matching PO line
+is shipped, and the customer-facing status changes only when that action is
+selected there.
+
+**Why:** Vendor shipment confirmation is a prerequisite for the customer/order
+status transition, not the transition itself. Sharing the vendor status directly
+made Order Details appear Shipped before the order owner confirmed it.
+
+**How to apply:** Persist the vendor result on the PO item (`status` and
+tracking), use `isPOItemShipped` to unlock Order Details’ Shipped action, and
+keep `nido_subitems_<orderId>.itemStatus` owned by Order Details.
+
 **PDF generation** (`src/lib/generatePO.ts`)
 - Uses jsPDF v4 + jspdf-autotable v5 (already installed)
 - `₹` symbol rendered as `Rs.` in totals (standard jsPDF fonts lack the Rupee glyph U+20B9)
