@@ -76,6 +76,11 @@ const ORDER_FULFILLMENT_STATUSES = [
   "Partially Delivered",
   "Delivered",
 ];
+const ITEM_STATUS_SEQUENCE = [
+  "Pending",
+  "Confirmed",
+  ...ORDER_FULFILLMENT_STATUSES,
+];
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
   Pending:    { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
@@ -375,7 +380,11 @@ function StatusDropdown({ status, onChange, disabled, allowCancel = true }: { st
   ])).filter(option =>
     option !== "Partially Shipped" &&
     option !== "Partially Delivered" &&
-    (option !== "Cancelled" || allowCancel)
+    (option !== "Cancelled" || allowCancel) &&
+    (option === "Cancelled" ||
+      ITEM_STATUS_SEQUENCE.indexOf(status) < 0 ||
+      ITEM_STATUS_SEQUENCE.indexOf(option) < 0 ||
+      ITEM_STATUS_SEQUENCE.indexOf(option) > ITEM_STATUS_SEQUENCE.indexOf(status))
   );
 
   useEffect(() => {
@@ -802,14 +811,24 @@ export default function VendorOrderDetailPage() {
 
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
+    const currentItem = items.find(item => item.id === id);
+    const currentIndex = currentItem ? ITEM_STATUS_SEQUENCE.indexOf(currentItem.status) : -1;
+    const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
+    if (
+      currentIndex >= 0 &&
+      nextIndex >= 0 &&
+      nextIndex < currentIndex
+    ) {
+      return;
+    }
     if (status === "Cancelled") {
-      const it = items.find(i => i.id === id);
+      const it = currentItem;
       if (it?.status === "Shipped" || it?.status === "Delivered") return;
       setPendingItemCancel({ id, name: it?.name || "this item" });
       return;
     }
     if (status === "Shipped") {
-      const it = items.find(i => i.id === id);
+      const it = currentItem;
       if (!it) return;
       setUpdateTrackingItem({ id: it.id, name: it.name, tracking: it.tracking });
       return;
