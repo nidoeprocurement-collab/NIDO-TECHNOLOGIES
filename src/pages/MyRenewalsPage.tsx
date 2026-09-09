@@ -53,6 +53,7 @@ interface Renewal {
   renewalStatus: RenewalStatus;
   autoRenew: AutoRenew;
   orderId?: string;
+  subOrderId?: string;
   orderDate?: string;
   deliveryDate?: string;
   currentExpiryDate?: string;
@@ -84,6 +85,7 @@ type RenewalFormValues = Pick<
 type RenewalWizardValues = {
   client: string;
   order: string;
+  subOrder: string;
   product: string;
   brand: Renewal["brand"];
   licenseType: string;
@@ -105,10 +107,27 @@ type RenewalWizardValues = {
 
 type RenewalWizardProduct = {
   name: string;
+  productType: string;
   brand: Renewal["brand"];
   licenseType: string;
   quantity: string;
   unitPrice: string;
+  currentExpiryDate: string;
+  renewalStartDate: string;
+  renewalTerm: string;
+  contractNo: string;
+  purchaseOrderNo: string;
+  notes: string;
+  reminders: string[];
+  notifyTo: string[];
+  notificationMessage: string;
+};
+
+type RenewalWizardSubOrder = {
+  id: string;
+  products: RenewalWizardProduct[];
+  orderDate: string;
+  deliveryDate: string;
 };
 
 type RenewalWizardOrder = {
@@ -118,6 +137,7 @@ type RenewalWizardOrder = {
   orderDate: string;
   deliveryDate: string;
   products: RenewalWizardProduct[];
+  subOrders: RenewalWizardSubOrder[];
 };
 
 const TABS = [
@@ -479,6 +499,7 @@ function createEmptyRenewalWizardValues(): RenewalWizardValues {
   return {
   client: "",
   order: "",
+  subOrder: "",
   product: "",
   brand: "other",
   licenseType: "",
@@ -486,15 +507,15 @@ function createEmptyRenewalWizardValues(): RenewalWizardValues {
   deliveryDate: "",
   currentExpiryDate: "",
   renewalStartDate: "",
-  renewalTerm: "1 Year",
+  renewalTerm: "",
   quantity: "",
   unitPrice: "",
   contractNo: "",
   purchaseOrderNo: "",
   autoRenew: false,
-  reminders: ["30"],
+  reminders: [],
   notifyTo: [],
-  notificationMessage: "Your license for {product_name} is expiring soon. Please review and renew to avoid service interruption.",
+  notificationMessage: "",
   notes: "",
   };
 }
@@ -514,26 +535,111 @@ function formatSourceDate(value: string | undefined): string {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().slice(0, 10);
 }
 
+function sourceValue(source: unknown, keys: string[]): string {
+  if (!source || typeof source !== "object") return "";
+  const record = source as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+function sourceArray(source: unknown, keys: string[]): string[] {
+  const value = source && typeof source === "object"
+    ? (source as Record<string, unknown>)[keys.find(key => (source as Record<string, unknown>)[key] !== undefined) || ""]
+    : undefined;
+  if (Array.isArray(value)) return value.map(String).map(item => item.trim()).filter(Boolean);
+  if (typeof value === "string") return value.split(",").map(item => item.trim()).filter(Boolean);
+  return [];
+}
+
+function isRenewableOrderItem(
+  item: NonNullable<MyOrder["cartItems"]>[number],
+  catalogProduct?: CatalogProduct,
+): boolean {
+  const fulfillmentType = String(item.fulfillmentType || "").toLowerCase();
+  const physicalType = String(item.physicalType || catalogProduct?.physicalType || "").toLowerCase();
+  const productType = String(item.productType || catalogProduct?.productType || "").toLowerCase();
+
+  // Physical goods are not renewal candidates. Older orders may not have a
+  // fulfillmentType, so the catalog physicalType/productType checks cover
+  // those records as well.
+  if (fulfillmentType === "physical") return false;
+  if (physicalType.includes("physical")) return false;
+  if (!fulfillmentType && !productType && !physicalType) return false;
+  if (productType === "physical product" || productType === "physical") return false;
+  return true;
+}
+
+function createRenewalWizardProduct(
+  item: NonNullable<MyOrder["cartItems"]>[number],
+  order: MyOrder,
+  catalogProduct?: CatalogProduct,
+): RenewalWizardProduct {
+  const itemSource = item as unknown as Record<string, unknown>;
+  const orderSource = order as unknown as Record<string, unknown>;
+  const valueFromItemOrOrder = (keys: string[]) =>
+    sourceValue(itemSource, keys) || sourceValue(orderSource, keys);
+  const reminders = sourceArray(itemSource, ["reminders", "renewalReminders"])
+    .concat(sourceArray(orderSource, ["reminders", "renewalReminders"]));
+  const notifyTo = sourceArray(itemSource, ["notifyTo", "renewalNotifyTo"])
+    .concat(sourceArray(orderSource, ["notifyTo", "renewalNotifyTo"]));
+
+  return {
+    name: item.name,
+    productType: item.productType || catalogProduct?.productType || "",
+    brand: normalizeRenewalBrand(sourceValue(itemSource, ["brand"]) || catalogProduct?.brand),
+    licenseType: item.productType || catalogProduct?.productType || "",
+    quantity: String(item.quantity || ""),
+    unitPrice: String(item.clientSellingPriceExclGst ?? item.priceNum ?? catalogProduct?.price ?? ""),
+    currentExpiryDate: formatSourceDate(valueFromItemOrOrder(["currentExpiryDate", "expiryDate", "licenseExpiryDate", "expiresOn"])),
+    renewalStartDate: formatSourceDate(valueFromItemOrOrder(["renewalStartDate", "licenseStartDate", "subscriptionStartDate"])),
+    renewalTerm: valueFromItemOrOrder(["renewalTerm", "licenseTerm", "subscriptionTerm", "term"]),
+    contractNo: valueFromItemOrOrder(["contractNo", "contractNumber"]),
+    purchaseOrderNo: order.poNumber || valueFromItemOrOrder(["purchaseOrderNo", "purchaseOrderNumber"]),
+    notes: valueFromItemOrOrder(["notes", "renewalNotes"]),
+    reminders: [...new Set(reminders)],
+    notifyTo: [...new Set(notifyTo)],
+    notificationMessage: valueFromItemOrOrder(["notificationMessage", "renewalNotificationMessage"]),
+  };
+}
+
 function createRenewalWizardOrders(orders: MyOrder[], products: CatalogProduct[]): RenewalWizardOrder[] {
-  return orders.map(order => ({
-    id: order.id,
-    clientId: order.clientId,
-    client: order.client,
-    orderDate: formatSourceDate(order.orderDate),
-    deliveryDate: "",
-    products: (order.cartItems || []).map(item => {
+  return orders.map(order => {
+    const orderDate = formatSourceDate(order.orderDate);
+    const orderDeliveryDate = formatSourceDate(sourceValue(order, ["deliveryDate", "deliveredAt"]));
+    const grouped = new Map<string, RenewalWizardProduct[]>();
+
+    (order.cartItems || []).forEach((item, index) => {
       const catalogProduct = products.find(product =>
         product.productName.trim().toLowerCase() === item.name.trim().toLowerCase()
       );
-      return {
-        name: item.name,
-        brand: normalizeRenewalBrand(catalogProduct?.brand),
-        licenseType: item.productType || catalogProduct?.productType || "",
-        quantity: String(item.quantity || ""),
-        unitPrice: String(item.priceNum || catalogProduct?.price || ""),
-      };
-    }),
-  }));
+      if (!isRenewableOrderItem(item, catalogProduct)) return;
+      const subOrderId = item.subOrderId || `SO-${order.id}-${String(index + 1).padStart(3, "0")}`;
+      const product = createRenewalWizardProduct(item, order, catalogProduct);
+      grouped.set(subOrderId, [...(grouped.get(subOrderId) || []), product]);
+    });
+
+    const subOrders: RenewalWizardSubOrder[] = Array.from(grouped.entries()).map(([id, subOrderProducts]) => ({
+      id,
+      products: subOrderProducts,
+      orderDate,
+      deliveryDate: orderDeliveryDate,
+    }));
+
+    return {
+      id: order.id,
+      clientId: order.clientId,
+      client: order.client,
+      orderDate,
+      deliveryDate: orderDeliveryDate,
+      products: subOrders.flatMap(subOrder => subOrder.products),
+      subOrders,
+    };
+  }).filter(order => order.subOrders.length > 0);
 }
 
 function createInitialRenewalWizardValues(
@@ -542,18 +648,29 @@ function createInitialRenewalWizardValues(
 ): RenewalWizardValues {
   const values = createEmptyRenewalWizardValues();
   const order = orders.find(item => item.products.length > 0);
-  const product = order?.products[0];
+  const subOrder = order?.subOrders[0];
+  const product = subOrder?.products[0];
   return {
     ...values,
     client: order?.client || clients[0]?.name || "",
     order: order?.id || "",
+    subOrder: subOrder?.id || "",
     product: product?.name || "",
     brand: product?.brand || "other",
     licenseType: product?.licenseType || "",
     orderDate: order?.orderDate || "",
     deliveryDate: order?.deliveryDate || "",
+    currentExpiryDate: product?.currentExpiryDate || "",
+    renewalStartDate: product?.renewalStartDate || "",
+    renewalTerm: product?.renewalTerm || "",
     quantity: product?.quantity || "",
     unitPrice: product?.unitPrice || "",
+    contractNo: product?.contractNo || "",
+    purchaseOrderNo: product?.purchaseOrderNo || "",
+    notes: product?.notes || "",
+    reminders: product?.reminders || [],
+    notifyTo: product?.notifyTo || [],
+    notificationMessage: product?.notificationMessage || "",
   };
 }
 
@@ -697,7 +814,7 @@ function RenewalProductSummary({
         <BrandMark brand={values.brand} />
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">{values.product}</p>
-          <span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">Digital License</span>
+          <span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">{values.licenseType || "Renewable Product"}</span>
           <p className="mt-1 text-xs text-gray-500">{values.licenseType} | {values.quantity} Users</p>
         </div>
       </div>
@@ -749,11 +866,14 @@ function NewRenewalWizard({
   const nextExpiryDate = wizardNextExpiryDate(values.renewalStartDate, values.renewalTerm);
   const estimatedAmount = (Number(values.quantity) || 0) * (Number(values.unitPrice) || 0);
   const selectedOrder = orders.find(order => order.id === values.order);
-  const availableProducts = selectedOrder?.products || [];
+  const selectedSubOrder = selectedOrder?.subOrders.find(subOrder => subOrder.id === values.subOrder);
+  const availableProducts = selectedSubOrder?.products || [];
   const canCreate = Boolean(
     values.order &&
+    values.subOrder &&
     values.product &&
     values.renewalStartDate &&
+    values.renewalTerm &&
     values.quantity &&
     values.unitPrice,
   );
@@ -764,18 +884,54 @@ function NewRenewalWizard({
 
   const selectOrder = (orderId: string) => {
     const order = orders.find(item => item.id === orderId);
-    const product = order?.products[0];
+    const subOrder = order?.subOrders[0];
+    const product = subOrder?.products[0];
     setValues(current => ({
       ...current,
       order: orderId,
+      subOrder: subOrder?.id || "",
       client: order?.client || current.client,
       orderDate: order?.orderDate || "",
       deliveryDate: order?.deliveryDate || "",
       product: product?.name || "",
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
+      currentExpiryDate: product?.currentExpiryDate || "",
+      renewalStartDate: product?.renewalStartDate || "",
+      renewalTerm: product?.renewalTerm || "",
       quantity: product?.quantity || "",
       unitPrice: product?.unitPrice || "",
+      contractNo: product?.contractNo || "",
+      purchaseOrderNo: product?.purchaseOrderNo || "",
+      notes: product?.notes || "",
+      reminders: product?.reminders || [],
+      notifyTo: product?.notifyTo || [],
+      notificationMessage: product?.notificationMessage || "",
+    }));
+  };
+
+  const selectSubOrder = (subOrderId: string) => {
+    const subOrder = selectedOrder?.subOrders.find(item => item.id === subOrderId);
+    const product = subOrder?.products[0];
+    setValues(current => ({
+      ...current,
+      subOrder: subOrderId,
+      orderDate: selectedOrder?.orderDate || current.orderDate,
+      deliveryDate: selectedOrder?.deliveryDate || current.deliveryDate,
+      product: product?.name || "",
+      brand: product?.brand || "other",
+      licenseType: product?.licenseType || "",
+      currentExpiryDate: product?.currentExpiryDate || "",
+      renewalStartDate: product?.renewalStartDate || "",
+      renewalTerm: product?.renewalTerm || "",
+      quantity: product?.quantity || "",
+      unitPrice: product?.unitPrice || "",
+      contractNo: product?.contractNo || "",
+      purchaseOrderNo: product?.purchaseOrderNo || "",
+      notes: product?.notes || "",
+      reminders: product?.reminders || [],
+      notifyTo: product?.notifyTo || [],
+      notificationMessage: product?.notificationMessage || "",
     }));
   };
 
@@ -785,23 +941,30 @@ function NewRenewalWizard({
       (selectedClient?.id && order.clientId === selectedClient.id) ||
       order.client === clientName
     );
-    const order = relatedOrders.find(item => item.products.length > 0) || relatedOrders[0];
-    const product = order?.products[0];
+    const order = relatedOrders.find(item => item.subOrders.length > 0) || relatedOrders[0];
+    const subOrder = order?.subOrders[0];
+    const product = subOrder?.products[0];
     setValues(current => ({
       ...current,
       client: clientName,
       order: order?.id || "",
+      subOrder: subOrder?.id || "",
       product: product?.name || "",
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
       orderDate: order?.orderDate || "",
       deliveryDate: order?.deliveryDate || "",
+      currentExpiryDate: product?.currentExpiryDate || "",
+      renewalStartDate: product?.renewalStartDate || "",
+      renewalTerm: product?.renewalTerm || "",
       quantity: product?.quantity || "",
       unitPrice: product?.unitPrice || "",
-      currentExpiryDate: "",
-      renewalStartDate: "",
-      contractNo: "",
-      purchaseOrderNo: "",
+      contractNo: product?.contractNo || "",
+      purchaseOrderNo: product?.purchaseOrderNo || "",
+      notes: product?.notes || "",
+      reminders: product?.reminders || [],
+      notifyTo: product?.notifyTo || [],
+      notificationMessage: product?.notificationMessage || "",
     }));
   };
 
@@ -812,8 +975,17 @@ function NewRenewalWizard({
       product: productName,
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
+      currentExpiryDate: product?.currentExpiryDate || "",
+      renewalStartDate: product?.renewalStartDate || "",
+      renewalTerm: product?.renewalTerm || "",
       quantity: product?.quantity || current.quantity,
       unitPrice: product?.unitPrice || current.unitPrice,
+      contractNo: product?.contractNo || "",
+      purchaseOrderNo: product?.purchaseOrderNo || "",
+      notes: product?.notes || "",
+      reminders: product?.reminders || [],
+      notifyTo: product?.notifyTo || [],
+      notificationMessage: product?.notificationMessage || "",
     }));
   };
 
@@ -823,7 +995,7 @@ function NewRenewalWizard({
       : [...values.notifyTo, name]);
   };
 
-  const addReminder = () => update("reminders", [...values.reminders, "3"]);
+  const addReminder = () => update("reminders", [...values.reminders, ""]);
   const updateReminder = (index: number, value: string) => update("reminders", values.reminders.map((item, itemIndex) => itemIndex === index ? value : item));
 
   const goNext = () => setStep(current => Math.min(4, current + 1) as 1 | 2 | 3 | 4);
@@ -880,7 +1052,8 @@ function NewRenewalWizard({
               <WizardCard title="1. Select Order & Product">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <WizardField label="Client" required><WizardSelect value={values.client} onChange={selectClient}><option value="" disabled>Select a client</option>{clients.map(client => <option key={client.id} value={client.name}>{client.name}</option>)}</WizardSelect></WizardField>
-                  <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>Select an order</option>{orders.filter(order => { const selectedClient = clients.find(client => client.name === values.client); return (selectedClient?.id && order.clientId === selectedClient.id) || order.client === values.client; }).map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Select an order to load its live details"}</span></WizardField>
+                   <WizardField label="Order" required><WizardSelect value={values.order} onChange={selectOrder}><option value="" disabled>Select an order</option>{orders.filter(order => { const selectedClient = clients.find(client => client.name === values.client); return (selectedClient?.id && order.clientId === selectedClient.id) || order.client === values.client; }).map(order => <option key={order.id} value={order.id}>{order.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">{values.orderDate ? `Ordered on ${wizardDateLabel(values.orderDate)}${values.deliveryDate ? ` | Delivered on ${wizardDateLabel(values.deliveryDate)}` : ""}` : "Select an order to load its live details"}</span></WizardField>
+                   <WizardField label="Sub Order" required><WizardSelect value={values.subOrder} onChange={selectSubOrder}><option value="" disabled>{selectedOrder?.subOrders.length ? "Select a sub order" : "Select an order first"}</option>{(selectedOrder?.subOrders || []).map(subOrder => <option key={subOrder.id} value={subOrder.id}>{subOrder.id}</option>)}</WizardSelect><span className="mt-1 block text-xs text-gray-500">Each eligible sub order can be renewed separately.</span></WizardField>
                   <WizardField label="Product / License" required className="sm:col-span-2">
                     <WizardSelect value={values.product} onChange={selectProduct}><option value="" disabled>{availableProducts.length ? "Select a product from the order" : "Select an order first"}</option>{availableProducts.map(product => <option key={product.name} value={product.name}>{product.name}</option>)}</WizardSelect>
                   </WizardField>
@@ -889,14 +1062,15 @@ function NewRenewalWizard({
               <WizardCard title="2. Renewal Details">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <WizardField label="Current Expiry Date"><WizardInput type="date" value={values.currentExpiryDate} onChange={value => update("currentExpiryDate", value)} /></WizardField>
-                  <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
+                   <WizardField label="Current Expiry Date"><WizardInput type="date" value={values.currentExpiryDate} onChange={value => update("currentExpiryDate", value)} /></WizardField>
+                   <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
                   <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
                   <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
                 </div>
               </WizardCard>
               <WizardCard title="3. Renewal Notifications">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <WizardField label="Reminder Days Before Expiry" required><WizardSelect value={values.reminders[0] || ""} onChange={value => updateReminder(0, value)}><option value="" disabled>Select reminder days</option><option>30</option><option>15</option><option>7</option></WizardSelect></WizardField>
+                   <WizardField label="Reminder Days Before Expiry" required><WizardSelect value={values.reminders[0] || ""} onChange={value => update("reminders", [value, ...values.reminders.slice(1)])}><option value="" disabled>Select reminder days</option><option>30</option><option>15</option><option>7</option></WizardSelect></WizardField>
                   <WizardField label="Notify To" required><WizardSelect value={values.notifyTo.join(", ")} onChange={() => undefined}><option value="" disabled>{values.notifyTo.length ? values.notifyTo.join(", ") : "Choose recipients in Notifications"}</option></WizardSelect></WizardField>
                 </div>
               </WizardCard>
@@ -960,8 +1134,8 @@ function NewRenewalWizard({
               <WizardCard title="Review Renewal Information">
                 <p className="mb-4 text-sm text-gray-500">Please review all details before creating the renewal. You can go back and make changes if needed.</p>
                 <div className="space-y-4">
-                  <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Order & Product</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><div className="space-y-2"><p><span className="text-gray-500">Client :</span> <strong>{values.client || "—"}</strong></p><p><span className="text-gray-500">Order ID :</span> <strong>{values.order || "—"}</strong></p><p><span className="text-gray-500">Order Date :</span> <strong>{wizardDateLabel(values.orderDate)}</strong></p><p><span className="text-gray-500">Delivery Date :</span> <strong>{wizardDateLabel(values.deliveryDate)}</strong></p></div><div className="space-y-2"><p><span className="text-gray-500">Product / License :</span> <strong>{values.product || "—"}</strong></p><p><span className="text-gray-500">License Type :</span> <strong>{values.licenseType || "—"}</strong></p><p><span className="text-gray-500">Users / Quantity :</span> <strong>{values.quantity ? `${values.quantity} Users` : "—"}</strong></p><p><span className="text-gray-500">Unit Price :</span> <strong>{values.unitPrice ? formatCurrencyAmount(values.unitPrice) : "—"}</strong></p></div></div></div>
-                  <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Renewal Details</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-gray-500">Renewal Start Date :</span> <strong>{wizardDateLabel(values.renewalStartDate)}</strong></p><p><span className="text-gray-500">Contract No. :</span> <strong>{values.contractNo}</strong></p><p><span className="text-gray-500">Next Expiry Date :</span> <strong>{wizardDateLabel(nextExpiryDate)}</strong></p><p><span className="text-gray-500">Purchase Order No. :</span> <strong>{values.purchaseOrderNo || "—"}</strong></p><p><span className="text-gray-500">Renewal Term :</span> <strong>{values.renewalTerm}</strong></p><p><span className="text-gray-500">Expected Amount :</span> <strong>{formatCurrencyAmount(String(estimatedAmount))}</strong></p></div></div>
+                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Order & Product</h3><div className="grid gap-3 text-sm sm:grid-cols-2"><div className="space-y-2"><p><span className="text-gray-500">Client :</span> <strong>{values.client || "—"}</strong></p><p><span className="text-gray-500">Order ID :</span> <strong>{values.order || "—"}</strong></p><p><span className="text-gray-500">Sub Order ID :</span> <strong>{values.subOrder || "—"}</strong></p><p><span className="text-gray-500">Order Date :</span> <strong>{wizardDateLabel(values.orderDate)}</strong></p><p><span className="text-gray-500">Delivery Date :</span> <strong>{wizardDateLabel(values.deliveryDate)}</strong></p></div><div className="space-y-2"><p><span className="text-gray-500">Product / License :</span> <strong>{values.product || "—"}</strong></p><p><span className="text-gray-500">License Type :</span> <strong>{values.licenseType || "—"}</strong></p><p><span className="text-gray-500">Users / Quantity :</span> <strong>{values.quantity ? `${values.quantity} Users` : "—"}</strong></p><p><span className="text-gray-500">Unit Price :</span> <strong>{values.unitPrice ? formatCurrencyAmount(values.unitPrice) : "—"}</strong></p></div></div></div>
+                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Renewal Details</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-gray-500">Current Expiry Date :</span> <strong>{wizardDateLabel(values.currentExpiryDate)}</strong></p><p><span className="text-gray-500">Renewal Start Date :</span> <strong>{wizardDateLabel(values.renewalStartDate)}</strong></p><p><span className="text-gray-500">Contract No. :</span> <strong>{values.contractNo || "—"}</strong></p><p><span className="text-gray-500">Next Expiry Date :</span> <strong>{wizardDateLabel(nextExpiryDate)}</strong></p><p><span className="text-gray-500">Purchase Order No. :</span> <strong>{values.purchaseOrderNo || "—"}</strong></p><p><span className="text-gray-500">Renewal Term :</span> <strong>{values.renewalTerm || "—"}</strong></p><p><span className="text-gray-500">Expected Amount :</span> <strong>{formatCurrencyAmount(String(estimatedAmount))}</strong></p></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-3 text-sm font-bold text-gray-800">Reminder & Notifications</h3><div className="grid gap-2 text-sm sm:grid-cols-2"><div className="space-y-2">{values.reminders.map((reminder, index) => <p key={index}><span className="text-gray-500">Reminder {index + 1} :</span> <strong>{reminder} days before expiry</strong></p>)}</div><div className="space-y-2"><p><span className="text-gray-500">Notify To :</span> <strong>{values.notifyTo.join(", ") || "—"}</strong></p><p><span className="text-gray-500">Auto Renewal :</span> <strong>{values.autoRenew ? "Enabled" : "Disabled"}</strong></p></div></div></div>
                   <div className="rounded-lg bg-gray-50 p-4"><h3 className="mb-2 text-sm font-bold text-gray-800">Message</h3><p className="text-sm text-gray-700">{values.notificationMessage}</p></div>
                 </div>
@@ -1688,6 +1862,7 @@ export default function MyRenewalsPage() {
       renewalStatus: getRenewalStatus(dueDateInput),
       autoRenew: values.autoRenew ? "Enabled" : "Disabled",
       orderId: values.order,
+      subOrderId: values.subOrder,
       orderDate: values.orderDate,
       deliveryDate: values.deliveryDate,
       currentExpiryDate: values.currentExpiryDate,
