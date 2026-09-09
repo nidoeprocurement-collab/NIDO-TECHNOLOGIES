@@ -696,8 +696,8 @@ function wizardDateLabel(value: string): string {
 
 function wizardNextExpiryDate(startDate: string, term: string): string {
   const [year, month, day] = startDate.split("-").map(Number);
-  if (!year || !month || !day) return "";
-  const years = Number.parseInt(term, 10) || 1;
+  const years = Number.parseInt(term, 10);
+  if (!year || !month || !day || !years) return "";
   const expiry = new Date(year + years, month - 1, day);
   expiry.setDate(expiry.getDate() - 1);
   return `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, "0")}-${String(expiry.getDate()).padStart(2, "0")}`;
@@ -1042,8 +1042,8 @@ function NewRenewalWizard({
             </div>
           </WizardCard>
           <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,2fr)_300px]">
-            <WizardCard title="Reminder Schedule">
-              <div className="overflow-hidden rounded-lg border border-gray-200"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Reminder Date</th><th className="px-3 py-2">Days Before Expiry</th><th className="px-3 py-2">Notify To</th><th className="px-3 py-2">Status</th></tr></thead><tbody>{values.reminders.map((days, index) => { const date = new Date(`${nextExpiryDate}T00:00:00`); date.setDate(date.getDate() - Number(days)); return <tr key={`${days}-${index}`} className="border-t border-gray-100"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3">{date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td><td className="px-3 py-3">{days} days</td><td className="px-3 py-3">{values.notifyTo.join(", ")}</td><td className="px-3 py-3"><span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">Scheduled</span></td></tr>; })}</tbody></table></div>
+              <WizardCard title="Reminder Schedule">
+               <div className="overflow-hidden rounded-lg border border-gray-200"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Reminder Date</th><th className="px-3 py-2">Days Before Expiry</th><th className="px-3 py-2">Notify To</th><th className="px-3 py-2">Status</th></tr></thead><tbody>{values.reminders.map((days, index) => { const date = nextExpiryDate ? new Date(`${nextExpiryDate}T00:00:00`) : undefined; if (date && days) date.setDate(date.getDate() - Number(days)); return <tr key={`${days}-${index}`} className="border-t border-gray-100"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3">{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td><td className="px-3 py-3">{days ? `${days} days` : "—"}</td><td className="px-3 py-3">{values.notifyTo.join(", ") || "—"}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 ${date && days ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>{date && days ? "Scheduled" : "Incomplete"}</span></td></tr>; })}</tbody></table></div>
             </WizardCard>
             <WizardCard title="Quick Actions"><div className="divide-y divide-gray-100 text-sm"><button type="button" onClick={() => onView(createdRenewal)} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><Eye className="h-4 w-4 text-blue-600" /> View Renewal Details</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={() => setCreatedRenewal(undefined)} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><Pencil className="h-4 w-4 text-blue-600" /> Edit Renewal</span><ChevronRight className="h-4 w-4" /></button><button type="button" onClick={onCancel} className="flex w-full items-center justify-between py-3 text-left text-gray-700 hover:text-blue-700"><span className="flex items-center gap-2"><ArrowLeft className="h-4 w-4 text-blue-600" /> Back to Renewals</span><ChevronRight className="h-4 w-4" /></button></div></WizardCard>
           </div>
@@ -1078,10 +1078,9 @@ function NewRenewalWizard({
               </WizardCard>
               <WizardCard title="2. Renewal Details">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <WizardField label="Current Expiry Date"><WizardInput type="date" value={values.currentExpiryDate} onChange={value => update("currentExpiryDate", value)} /></WizardField>
                    <WizardField label="Current Expiry Date"><WizardInput type="date" value={values.currentExpiryDate} onChange={value => update("currentExpiryDate", value)} /></WizardField>
                    <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
-                  <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
+                  <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Select renewal term</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
                   <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
                 </div>
               </WizardCard>
@@ -1107,7 +1106,7 @@ function NewRenewalWizard({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} onChange={value => update("renewalStartDate", value)} /></WizardField>
                   <WizardField label="Next Expiry Date"><WizardInput type="date" value={nextExpiryDate} readOnly /></WizardField>
-                  <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
+                   <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Select renewal term</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
                   <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
                   <WizardField label="Unit Price"><WizardInput value={formatCurrencyAmount(values.unitPrice)} readOnly /></WizardField>
                   <WizardField label="Expected Renewal Amount"><WizardInput value={formatCurrencyAmount(String(estimatedAmount))} readOnly /></WizardField>
