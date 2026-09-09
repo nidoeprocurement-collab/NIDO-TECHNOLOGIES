@@ -64,6 +64,14 @@ function lineStatus(line: any, po: any): string {
   return "Processing";
 }
 
+function hasTracking(tracking: any): boolean {
+  return Boolean(
+    tracking?.number?.trim?.() ||
+    tracking?.trackingNumber?.trim?.() ||
+    tracking?.carrier?.trim?.(),
+  );
+}
+
 /**
  * Recalculates and persists the master order status from the customer-facing
  * sub-order state. Vendor PO-line status is intentionally not included here:
@@ -118,7 +126,6 @@ export function syncSubOrderStatesFromPO(po: any): void {
     const existing = saved[line.subOrderId] || {};
     const nextState = {
       ...existing,
-      tracking: line.tracking ?? existing.tracking ?? null,
       updatedOn: new Date().toLocaleDateString("en-IN"),
     };
     // Before status ownership was separated, vendor PO updates could leave
@@ -126,6 +133,14 @@ export function syncSubOrderStatesFromPO(po: any): void {
     // values; statuses explicitly set from Order Details remain untouched.
     if (existing.statusOwner !== "order-details") {
       delete nextState.itemStatus;
+    }
+    // Vendor tracking becomes visible to Order Details only after the
+    // explicit Shipped action has been saved with tracking information.
+    if (normalize(line.status) === "shipped" && hasTracking(line.tracking)) {
+      nextState.tracking = line.tracking;
+    } else if (existing.statusOwner !== "order-details") {
+      // Remove tracking values left by the old cross-page synchronization.
+      delete nextState.tracking;
     }
     saved[line.subOrderId] = nextState;
   }

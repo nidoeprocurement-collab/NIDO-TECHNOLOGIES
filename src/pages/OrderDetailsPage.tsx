@@ -2341,10 +2341,19 @@ function poCoversSubOrder(po: any, subOrderId: string): boolean {
 
 function isPOItemShipped(po: any, subOrderId: string): boolean {
   if (!poCoversSubOrder(po, subOrderId)) return false;
-  if (po.status === "Shipped") return true;
-  return (po.items || []).some((line: any) =>
-    line.subOrderId === subOrderId &&
-    (line.status === "Shipped" || Boolean(line.tracking?.number || line.tracking?.trackingNumber))
+  const matchingLine = (po.items || []).find((line: any) => line.subOrderId === subOrderId);
+  if (matchingLine) {
+    const trackingSaved = Boolean(
+      matchingLine.tracking?.number ||
+      matchingLine.tracking?.trackingNumber ||
+      matchingLine.tracking?.carrier,
+    );
+    return matchingLine.status === "Shipped" && trackingSaved;
+  }
+  return po.status === "Shipped" && Boolean(
+    po.tracking?.number ||
+    po.tracking?.trackingNumber ||
+    po.tracking?.carrier,
   );
 }
 

@@ -911,23 +911,6 @@ export default function VendorOrderDetailPage() {
     updatePO(poKey, { items: updatedLines, status: shipmentStatus as StoredPO["status"] });
      setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
 
-    const subOrderId = po.items[itemIndex]?.subOrderId;
-    if (subOrderId) {
-      try {
-        const key = `nido_subitems_${po.orderId}`;
-        const saved = JSON.parse(localStorage.getItem(key) || "{}");
-        // Vendor fulfillment is recorded on the PO line above. Do not write
-        // itemStatus here: Order Details owns the customer-facing sub-order
-        // status and should only offer "Shipped" after this PO line is shipped.
-        saved[subOrderId] = {
-          ...(saved[subOrderId] || {}),
-          tracking: normalizedTracking,
-          updatedOn: new Date().toLocaleDateString("en-IN"),
-        };
-        localStorage.setItem(key, JSON.stringify(saved));
-        window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
-      } catch { /* storage unavailable */ }
-    }
   };
   const handleDeleteDoc = (id: string) => {
     setDocuments(prev => prev.filter(d => d.id !== id));
@@ -1294,7 +1277,7 @@ export default function VendorOrderDetailPage() {
                     <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
                   </>
                 ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                {!isCancelled && (
+                {!isCancelled && item.status === "Shipped" && (
                   <div style={{ marginTop: 7 }}>
                     <button
                       onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
