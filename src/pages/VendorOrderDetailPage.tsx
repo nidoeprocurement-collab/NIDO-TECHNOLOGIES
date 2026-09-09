@@ -181,9 +181,14 @@ function UpdateTrackingModal({ itemName, tracking, onSave, onClose }: { itemName
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid #d1d5db", borderRadius: 7, background: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Cancel</button>
           <button
-            onClick={() => { onSave({ ...form, link: form.link || "Track Package" }); onClose(); }}
+            onClick={() => {
+              if (!form.number.trim() && !form.carrier.trim()) return;
+              onSave({ ...form, link: form.link || "Track Package" });
+              onClose();
+            }}
+            disabled={!form.number.trim() && !form.carrier.trim()}
             data-confirmation-skip=""
-            style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
+            style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: form.number.trim() || form.carrier.trim() ? "#2563eb" : "#93c5fd", color: "#fff", cursor: form.number.trim() || form.carrier.trim() ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}
           >
             Save Tracking
           </button>
@@ -801,6 +806,12 @@ export default function VendorOrderDetailPage() {
       const it = items.find(i => i.id === id);
       if (it?.status === "Shipped" || it?.status === "Delivered") return;
       setPendingItemCancel({ id, name: it?.name || "this item" });
+      return;
+    }
+    if (status === "Shipped") {
+      const it = items.find(i => i.id === id);
+      if (!it) return;
+      setUpdateTrackingItem({ id: it.id, name: it.name, tracking: it.tracking });
       return;
     }
     setItems(prev => prev.map(it => it.id === id ? { ...it, status } : it));
