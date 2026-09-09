@@ -567,6 +567,31 @@ function sourceArray(source: unknown, keys: string[]): string[] {
   return [];
 }
 
+function getSavedSubOrderState(orderId: string): Record<string, Record<string, unknown>> {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(`nido_subitems_${orderId}`) || "{}");
+    return saved && typeof saved === "object" ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function isDeliveredOrderItem(
+  order: MyOrder,
+  item: NonNullable<MyOrder["cartItems"]>[number],
+  subOrderId: string,
+  savedSubOrderState: Record<string, Record<string, unknown>>,
+): boolean {
+  const itemSource = item as unknown as Record<string, unknown>;
+  const savedState = savedSubOrderState[subOrderId];
+  const storedStatus = String(savedState?.itemStatus || savedState?.status || itemSource.itemStatus || itemSource.status || "").toLowerCase();
+
+  // Per-sub-order state is authoritative for partially delivered orders and
+  // for an item that was changed after the master order was created.
+  if (storedStatus) return storedStatus === "delivered";
+  return order.status === "Delivered";
+}
+
 function isRenewableOrderItem(
   item: NonNullable<MyOrder["cartItems"]>[number],
   catalogProduct?: CatalogProduct,
@@ -623,14 +648,16 @@ function createRenewalWizardOrders(orders: MyOrder[], products: CatalogProduct[]
   return orders.map(order => {
     const orderDate = formatSourceDate(order.orderDate);
     const orderDeliveryDate = formatSourceDate(sourceValue(order, ["deliveryDate", "deliveredAt"]));
+    const savedSubOrderState = getSavedSubOrderState(order.id);
     const grouped = new Map<string, RenewalWizardProduct[]>();
 
     (order.cartItems || []).forEach((item, index) => {
       const catalogProduct = products.find(product =>
         product.productName.trim().toLowerCase() === item.name.trim().toLowerCase()
       );
-      if (!isRenewableOrderItem(item, catalogProduct)) return;
       const subOrderId = item.subOrderId || `SO-${order.id}-${String(index + 1).padStart(3, "0")}`;
+      if (!isDeliveredOrderItem(order, item, subOrderId, savedSubOrderState)) return;
+      if (!isRenewableOrderItem(item, catalogProduct)) return;
       const product = createRenewalWizardProduct(item, order, catalogProduct);
       grouped.set(subOrderId, [...(grouped.get(subOrderId) || []), product]);
     });
@@ -1674,10 +1701,11 @@ export default function MyRenewalsPage() {
   const [editingRenewal, setEditingRenewal] = useState<Renewal | undefined>();
   const [selectedRenewal, setSelectedRenewal] = useState<Renewal | undefined>();
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
+  const [orderStatusVersion, setOrderStatusVersion] = useState(0);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(2026, 7, 1));
   const liveWizardOrders = useMemo(
     () => createRenewalWizardOrders(liveOrders, liveCatalog),
-    [liveCatalog, liveOrders],
+    [liveCatalog, liveOrders, orderStatusVersion],
   );
   const liveWizardInitialValues = useMemo(
     () => createInitialRenewalWizardValues(liveClients, liveWizardOrders),
@@ -1691,9 +1719,12 @@ export default function MyRenewalsPage() {
     };
     window.addEventListener("nidoClientsUpdated", reloadLiveSources);
     window.addEventListener("catalogUpdated", reloadLiveSources);
+    const reloadOrderStatuses = () => setOrderStatusVersion(current => current + 1);
+    window.addEventListener("orderSubItemsUpdated", reloadOrderStatuses);
     return () => {
       window.removeEventListener("nidoClientsUpdated", reloadLiveSources);
       window.removeEventListener("catalogUpdated", reloadLiveSources);
+      window.removeEventListener("orderSubItemsUpdated", reloadOrderStatuses);
     };
   }, []);
 
