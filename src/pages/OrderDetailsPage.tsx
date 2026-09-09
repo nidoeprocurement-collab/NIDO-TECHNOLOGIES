@@ -2516,7 +2516,7 @@ export default function MyOrderPage() {
   const hasGeneratedOrderPO = orderPOs.length > 0;
   const allOrderPOsCancelled = hasGeneratedOrderPO
     && orderPOs.every(po => String(po.status || "").toLowerCase() === "cancelled");
-  const canCancelOrder = !hasGeneratedOrderPO || allOrderPOsCancelled;
+  const canCancelOrderByPO = !hasGeneratedOrderPO || allOrderPOsCancelled;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
@@ -2526,25 +2526,40 @@ export default function MyOrderPage() {
   // Stock is no longer reserved at cart time, so no stock release is needed here.
   // Stock restoration (if any POs were already raised) is handled when the PO itself
   // is cancelled from the Vendor Orders page.
-  const handleCancelOrder = (reason: string) => {
-    if (isOrderCancelled || !canCancelOrder) return;
-    updateOrderStatus(orderId, "Cancelled" as any, reason);
-  };
-  // Per-item overrides (status, tracking) are persisted separately from the
-  // base cart-item snapshot so a cancel/status/tracking change made on one
-  // platform (owner or client portal) is picked up by the other immediately.
+  // Per-item customer-facing overrides are persisted separately from the base
+  // cart-item snapshot. Vendor/PO status and tracking stay on the PO store.
   const itemStateKey = `nido_subitems_${orderId}`;
   const loadItemState = (): Record<string, any> => {
     try { return JSON.parse(localStorage.getItem(itemStateKey) || "{}"); } catch { return {}; }
   };
   const applyItemState = (base: any[], saved: Record<string, any>) =>
-    base.map(s => saved[s.id] ? { ...s, ...saved[s.id], deliveredAt: saved[s.id].deliveredAt ? new Date(saved[s.id].deliveredAt) : s.deliveredAt } : s);
+    base.map(s => {
+      const savedState = saved[s.id];
+      if (!savedState) return s;
+      return {
+        ...s,
+        ...savedState,
+        // Tracking entered on the vendor/PO page is not part of the
+        // customer-facing projection. Only Order Details-owned tracking is
+        // allowed to render here.
+        tracking: savedState.trackingOwner === "order-details" ? savedState.tracking : null,
+        deliveredAt: savedState.deliveredAt ? new Date(savedState.deliveredAt) : s.deliveredAt,
+      };
+    });
 
   const [subOrders, setSubOrders] = useState(() =>
     order?.cartItems?.length
       ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
       : []
   );
+  const hasShippedCustomerItem = subOrders.some(
+    sub => sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered",
+  );
+  const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
+  const handleCancelOrder = (reason: string) => {
+    if (isOrderCancelled || !canCancelOrder) return;
+    updateOrderStatus(orderId, "Cancelled" as any, reason);
+  };
   const [subSearch, setSubSearch] = useState("");
   const filtered = subSearch
     ? subOrders.filter(s =>
@@ -2592,6 +2607,7 @@ export default function MyOrderPage() {
       ? {
           ...s,
           tracking,
+          trackingOwner: "order-details",
           updatedOn,
         }
       : s
@@ -2601,7 +2617,12 @@ export default function MyOrderPage() {
   const handleCancelItem = (subId: string, reason: string) => {
     if (isOrderInactive) return;
     const target = subOrders.find(s => s.id === subId);
-    if (!target || target.itemStatus === "Cancelled" || target.itemStatus === "Delivered") return;
+    if (
+      !target ||
+      target.itemStatus === "Cancelled" ||
+      target.itemStatus === "Shipped" ||
+      target.itemStatus === "Delivered"
+    ) return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
 
@@ -2884,10 +2905,8 @@ export default function MyOrderPage() {
   }, [orderId, order?.id]);
 
 
-  // Persist per-item status/tracking changes (cancel, status update, add
-  // tracking) so they are visible immediately to the other platform (owner
-  // vs. client portal) on next render/reload, and pick up remote changes
-  // made in another open tab in real time.
+  // Persist customer-facing status/tracking changes for Order Details and the
+  // client portal. Vendor/PO changes use the separate PO store.
   useEffect(() => {
     if (!subOrders.length) return;
     const state: Record<string, any> = {};
@@ -2896,6 +2915,7 @@ export default function MyOrderPage() {
         itemStatus: s.itemStatus,
         statusOwner: "order-details",
         tracking: s.tracking,
+        trackingOwner: s.tracking ? "order-details" : undefined,
         updatedOn: s.updatedOn,
         deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null,
         referenceNumber: s.referenceNumber,
@@ -2910,7 +2930,7 @@ export default function MyOrderPage() {
       if (e.key !== itemStateKey) return;
       let saved: Record<string, any> = {};
       try { saved = JSON.parse(e.newValue || "{}"); } catch { return; }
-      setSubOrders(prev => prev.map(s => saved[s.id] ? { ...s, ...saved[s.id], deliveredAt: saved[s.id].deliveredAt ? new Date(saved[s.id].deliveredAt) : s.deliveredAt } : s));
+      setSubOrders(prev => applyItemState(prev, saved));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -3546,7 +3566,7 @@ export default function MyOrderPage() {
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                       ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
-                           {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Delivered" ? (
+                           {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" ? (
                             <button
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
@@ -3570,7 +3590,7 @@ export default function MyOrderPage() {
                             onSetReference={() => setReferenceTarget(sub.id)}
                             referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
                             onCancel={() => setCancelTarget(sub.id)}
-                            cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Delivered"}
+                             cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}

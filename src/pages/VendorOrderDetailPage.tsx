@@ -106,6 +106,17 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function isCustomerSubOrderLocked(po: any, subOrderId?: string): boolean {
+  if (!po?.orderId || !subOrderId || typeof window === "undefined") return false;
+  try {
+    const saved = JSON.parse(localStorage.getItem(`nido_subitems_${po.orderId}`) || "{}");
+    const status = saved?.[subOrderId]?.itemStatus;
+    return status === "Shipped" || status === "Delivered";
+  } catch {
+    return false;
+  }
+}
+
 function Avatar({ initials, color, size = 32 }: { initials: string; color: string; size?: number }) {
   return (
     <div style={{ width: size, height: size, borderRadius: "50%", background: color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.35, fontWeight: 700, flexShrink: 0 }}>
@@ -685,6 +696,7 @@ function storedPOToDetail(po: StoredPO) {
         ? po.items.map((li, i) => ({
             id: `i${i + 1}`,
             num: i + 1,
+            subOrderId: li.subOrderId,
             name: li.item,
             image: "📦",
             referenceNumber: li.referenceNumber || "",
@@ -702,6 +714,7 @@ function storedPOToDetail(po: StoredPO) {
             {
               id: "i1",
               num: 1,
+              subOrderId: po.subOrderId,
               name: po.item,
               image: "📦",
               referenceNumber: po.referenceNumber || "",

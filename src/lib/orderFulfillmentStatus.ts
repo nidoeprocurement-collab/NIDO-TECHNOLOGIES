@@ -64,14 +64,6 @@ function lineStatus(line: any, po: any): string {
   return "Processing";
 }
 
-function hasTracking(tracking: any): boolean {
-  return Boolean(
-    tracking?.number?.trim?.() ||
-    tracking?.trackingNumber?.trim?.() ||
-    tracking?.carrier?.trim?.(),
-  );
-}
-
 /**
  * Recalculates and persists the master order status from the customer-facing
  * sub-order state. Vendor PO-line status is intentionally not included here:
@@ -110,42 +102,6 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
     }));
   }
   return nextStatus;
-}
-
-/**
- * Shares vendor tracking/readiness with the sub-order projection without
- * changing the customer-facing itemStatus owned by Order Details.
- */
-export function syncSubOrderStatesFromPO(po: any): void {
-  if (!po?.orderId || typeof window === "undefined") return;
-  const saved = readJson<Record<string, any>>(`nido_subitems_${po.orderId}`, {});
-  const lines = Array.isArray(po.items) ? po.items : [];
-
-  for (const line of lines) {
-    if (!line?.subOrderId) continue;
-    const existing = saved[line.subOrderId] || {};
-    const nextState = {
-      ...existing,
-      updatedOn: new Date().toLocaleDateString("en-IN"),
-    };
-    // Before status ownership was separated, vendor PO updates could leave
-    // their line status in this shared record. Discard only unowned legacy
-    // values; statuses explicitly set from Order Details remain untouched.
-    if (existing.statusOwner !== "order-details") {
-      delete nextState.itemStatus;
-    }
-    // Vendor tracking becomes visible to Order Details only after the
-    // explicit Shipped action has been saved with tracking information.
-    if (normalize(line.status) === "shipped" && hasTracking(line.tracking)) {
-      nextState.tracking = line.tracking;
-    } else if (existing.statusOwner !== "order-details") {
-      // Remove tracking values left by the old cross-page synchronization.
-      delete nextState.tracking;
-    }
-    saved[line.subOrderId] = nextState;
-  }
-  localStorage.setItem(`nido_subitems_${po.orderId}`, JSON.stringify(saved));
-  window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
 }
 
 /**
