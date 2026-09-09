@@ -87,6 +87,7 @@ type RenewalWizardValues = {
   order: string;
   subOrder: string;
   product: string;
+  productImage: string;
   brand: Renewal["brand"];
   licenseType: string;
   orderDate: string;
@@ -107,6 +108,7 @@ type RenewalWizardValues = {
 
 type RenewalWizardProduct = {
   name: string;
+  image: string;
   productType: string;
   brand: Renewal["brand"];
   licenseType: string;
@@ -252,7 +254,15 @@ const STATUS_STYLES: Record<RenewalStatus, string> = {
   "Due Soon": "bg-amber-50 text-amber-700",
 };
 
-function BrandMark({ brand }: { brand: Renewal["brand"] }) {
+function BrandMark({ brand, image }: { brand: Renewal["brand"]; image?: string }) {
+  if (image) {
+    return (
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-100 bg-white">
+        <img src={image} alt="" className="h-full w-full object-contain p-1" />
+      </div>
+    );
+  }
+
   if (brand === "adobe") {
     return (
       <div className="flex h-5 w-5 items-center justify-center text-[#e21b2d]">
@@ -501,6 +511,7 @@ function createEmptyRenewalWizardValues(): RenewalWizardValues {
   order: "",
   subOrder: "",
   product: "",
+  productImage: "",
   brand: "other",
   licenseType: "",
   orderDate: "",
@@ -590,6 +601,7 @@ function createRenewalWizardProduct(
 
   return {
     name: item.name,
+    image: item.image || catalogProduct?.images?.[0] || "",
     productType: item.productType || catalogProduct?.productType || "",
     brand: normalizeRenewalBrand(sourceValue(itemSource, ["brand"]) || catalogProduct?.brand),
     licenseType: item.productType || catalogProduct?.productType || "",
@@ -656,6 +668,7 @@ function createInitialRenewalWizardValues(
     order: order?.id || "",
     subOrder: subOrder?.id || "",
     product: product?.name || "",
+    productImage: product?.image || "",
     brand: product?.brand || "other",
     licenseType: product?.licenseType || "",
     orderDate: order?.orderDate || "",
@@ -811,7 +824,7 @@ function RenewalProductSummary({
         </button>
       </div>
       <div className="flex items-start gap-3 border-b border-gray-100 pb-4">
-        <BrandMark brand={values.brand} />
+        <BrandMark brand={values.brand} image={values.productImage} />
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">{values.product}</p>
           <span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">{values.licenseType || "Renewable Product"}</span>
@@ -894,6 +907,7 @@ function NewRenewalWizard({
       orderDate: order?.orderDate || "",
       deliveryDate: order?.deliveryDate || "",
       product: product?.name || "",
+      productImage: product?.image || "",
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
       currentExpiryDate: product?.currentExpiryDate || "",
@@ -919,6 +933,7 @@ function NewRenewalWizard({
       orderDate: selectedOrder?.orderDate || current.orderDate,
       deliveryDate: selectedOrder?.deliveryDate || current.deliveryDate,
       product: product?.name || "",
+      productImage: product?.image || "",
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
       currentExpiryDate: product?.currentExpiryDate || "",
@@ -950,6 +965,7 @@ function NewRenewalWizard({
       order: order?.id || "",
       subOrder: subOrder?.id || "",
       product: product?.name || "",
+      productImage: product?.image || "",
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
       orderDate: order?.orderDate || "",
@@ -973,6 +989,7 @@ function NewRenewalWizard({
     setValues(current => ({
       ...current,
       product: productName,
+      productImage: product?.image || "",
       brand: product?.brand || "other",
       licenseType: product?.licenseType || "",
       currentExpiryDate: product?.currentExpiryDate || "",
@@ -1019,7 +1036,7 @@ function NewRenewalWizard({
           </section>
           <WizardCard title="Renewal Summary" className="mt-4">
             <div className="grid gap-5 md:grid-cols-4">
-              <div className="flex items-start gap-3 md:col-span-2"><BrandMark brand={values.brand} /><div><p className="font-semibold text-gray-900">{values.product}</p><span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">Digital License</span><p className="mt-1 text-xs text-gray-500">{values.licenseType} | {values.quantity} Users</p></div></div>
+              <div className="flex items-start gap-3 md:col-span-2"><BrandMark brand={values.brand} image={values.productImage} /><div><p className="font-semibold text-gray-900">{values.product}</p><span className="mt-1 inline-flex rounded bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-purple-700">{values.licenseType || "Renewable Product"}</span><p className="mt-1 text-xs text-gray-500">{values.licenseType} | {values.quantity} Users</p></div></div>
               <div className="space-y-2 text-sm"><p><span className="text-gray-500">Status</span> <span className="ml-4 rounded-full bg-blue-50 px-2 py-1 text-blue-700">Upcoming</span></p><p><span className="text-gray-500">Next Expiry Date</span> <strong className="ml-3">{wizardDateLabel(nextExpiryDate)}</strong></p><p><span className="text-gray-500">Renewal Term</span> <strong className="ml-8">{values.renewalTerm}</strong></p></div>
               <div className="space-y-2 text-sm"><p><span className="text-gray-500">Client</span> <strong className="float-right">{values.client}</strong></p><p><span className="text-gray-500">Order ID</span> <strong className="float-right">{values.order}</strong></p><p><span className="text-gray-500">Contract No.</span> <strong className="float-right">{values.contractNo}</strong></p></div>
             </div>
