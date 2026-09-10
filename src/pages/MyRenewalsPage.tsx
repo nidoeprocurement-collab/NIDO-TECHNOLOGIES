@@ -756,7 +756,7 @@ function renewalTermYears(term: string): number {
 
 function WizardCard({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5 ${className}`}>
+    <section className={`min-w-0 rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5 ${className}`}>
       <h2 className="mb-4 text-sm font-bold text-gray-900">{title}</h2>
       {children}
     </section>
@@ -870,7 +870,7 @@ function RenewalProductSummary({
     (Number(values.unitPrice) || 0) *
     renewalTermYears(values.renewalTerm);
   return (
-    <aside className="rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
+    <aside className="min-w-0 w-full rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-900">Selected Product</h2>
         <button type="button" className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50">
@@ -1084,7 +1084,7 @@ function NewRenewalWizard({
 
   if (createdRenewal) {
     return (
-      <div className="renewals-page min-h-screen bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
+      <div className="renewals-page min-h-screen w-full max-w-full min-w-0 bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
         <RenewalTypography />
         <div className="mx-auto max-w-[1280px]">
           <div className="mb-4 flex items-center gap-2 text-xs text-gray-500"><Home className="h-3.5 w-3.5" /> Home <ChevronRight className="h-3.5 w-3.5" /> Renewals <ChevronRight className="h-3.5 w-3.5" /> New Renewal <ChevronRight className="h-3.5 w-3.5" /><span className="rounded bg-emerald-50 px-2 py-1 text-emerald-700">Success</span></div>
@@ -1102,7 +1102,7 @@ function NewRenewalWizard({
               <div className="space-y-2 text-sm"><p><span className="text-gray-500">Client</span> <strong className="float-right">{values.client}</strong></p><p><span className="text-gray-500">Order ID</span> <strong className="float-right">{values.order}</strong></p><p><span className="text-gray-500">Contract No.</span> <strong className="float-right">{values.contractNo}</strong></p></div>
             </div>
           </WizardCard>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,2fr)_300px]">
+          <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,300px)]">
               <WizardCard title="Reminder Schedule">
                <div className="overflow-hidden rounded-lg border border-gray-200"><table className="w-full text-sm"><thead className="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Reminder Date</th><th className="px-3 py-2">Days Before Expiry</th><th className="px-3 py-2">Notify To</th><th className="px-3 py-2">Status</th></tr></thead><tbody>{values.reminders.map((days, index) => { const date = nextExpiryDate ? new Date(`${nextExpiryDate}T00:00:00`) : undefined; if (date && days) date.setDate(date.getDate() - Number(days)); return <tr key={`${days}-${index}`} className="border-t border-gray-100"><td className="px-3 py-3">{index + 1}</td><td className="px-3 py-3">{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td><td className="px-3 py-3">{days ? `${days} days` : "—"}</td><td className="px-3 py-3">{values.notifyTo.join(", ") || "—"}</td><td className="px-3 py-3"><span className={`rounded-full px-2 py-1 ${date && days ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>{date && days ? "Scheduled" : "Incomplete"}</span></td></tr>; })}</tbody></table></div>
             </WizardCard>
@@ -1116,7 +1116,7 @@ function NewRenewalWizard({
   const sidebar = <RenewalProductSummary values={values} nextExpiryDate={nextExpiryDate} />;
 
   return (
-    <div className="renewals-page min-h-screen bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
+    <div className="renewals-page min-h-screen w-full max-w-full min-w-0 bg-[#fbfcfe] px-3 pb-10 pt-5 text-gray-900 sm:px-7 sm:pt-7">
       <RenewalTypography />
       <div className="mx-auto max-w-[1280px]">
         <div className="mb-4 flex items-center gap-2 text-xs text-gray-500"><Home className="h-3.5 w-3.5" /> Home <ChevronRight className="h-3.5 w-3.5" /> Renewals <ChevronRight className="h-3.5 w-3.5" /><span className="rounded bg-blue-50 px-2 py-1 text-blue-700">New Renewal</span></div>
@@ -1125,8 +1125,8 @@ function NewRenewalWizard({
         <div className="mt-5"><RenewalWizardStepper step={step} /></div>
 
         {step === 1 && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+            <div className="min-w-0 space-y-4">
               <WizardCard title="1. Select Order & Product">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <WizardField label="Client" required><WizardSelect value={values.client} onChange={selectClient}><option value="" disabled>Select a client</option>{clients.map(client => <option key={client.id} value={client.name}>{client.name}</option>)}</WizardSelect></WizardField>
@@ -1162,8 +1162,8 @@ function NewRenewalWizard({
         )}
 
         {step === 2 && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+            <div className="min-w-0 space-y-4">
               <WizardCard title="Renewal Details">
                 <div className="grid gap-4 sm:grid-cols-2">
                    <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} readOnly /></WizardField>
@@ -1184,8 +1184,8 @@ function NewRenewalWizard({
         )}
 
         {step === 3 && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+            <div className="min-w-0 space-y-4">
               <WizardCard title="Reminder Settings">
                 <div className="mb-4 rounded-lg bg-blue-50 p-3 text-xs text-blue-800"><Info className="mr-2 inline h-4 w-4" />Set when you want to be notified before the renewal expiry date. You can add multiple reminders.</div>
                 <div className="grid gap-3 sm:grid-cols-3">{values.reminders.map((reminder, index) => <WizardField key={index} label={`Reminder ${index + 1}`} required><div className="flex"><WizardInput value={reminder} onChange={value => updateReminder(index, value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-600">Days before expiry</span></div></WizardField>)}</div>
@@ -1207,8 +1207,8 @@ function NewRenewalWizard({
         )}
 
         {step === 4 && (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-4">
+          <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
+            <div className="min-w-0 space-y-4">
               <WizardCard title="Review Renewal Information">
                 <p className="mb-4 text-sm text-gray-500">Please review all details before creating the renewal. You can go back and make changes if needed.</p>
                 <div className="space-y-4">
