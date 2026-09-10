@@ -1129,6 +1129,7 @@ function NewRenewalWizard({
                    <WizardField label="Renewal Start Date" required><WizardInput type="date" value={values.renewalStartDate} readOnly /></WizardField>
                   <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Select renewal term</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
                   <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
+                   <WizardField label="Unit Price" required><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Enter unit price" /></WizardField>
                 </div>
               </WizardCard>
               <WizardCard title="3. Renewal Notifications">
@@ -1155,7 +1156,7 @@ function NewRenewalWizard({
                   <WizardField label="Next Expiry Date"><WizardInput type="date" value={nextExpiryDate} readOnly /></WizardField>
                    <WizardField label="Renewal Term" required><WizardSelect value={values.renewalTerm} onChange={value => update("renewalTerm", value)}><option value="" disabled>Select renewal term</option><option>1 Year</option><option>2 Years</option><option>3 Years</option></WizardSelect></WizardField>
                   <WizardField label="Quantity / Users" required><div className="flex"><WizardInput value={values.quantity} onChange={value => update("quantity", value)} /><span className="flex h-10 items-center rounded-r-lg border border-l-0 border-gray-200 bg-gray-50 px-3 text-xs text-gray-500">Users</span></div></WizardField>
-                  <WizardField label="Unit Price"><WizardInput value={formatCurrencyAmount(values.unitPrice)} readOnly /></WizardField>
+                  <WizardField label="Unit Price" required><WizardInput type="number" value={values.unitPrice} onChange={value => update("unitPrice", value)} placeholder="Enter unit price" /></WizardField>
                   <WizardField label="Expected Renewal Amount"><WizardInput value={formatCurrencyAmount(String(estimatedAmount))} readOnly /></WizardField>
                   <WizardField label="Contract No."><WizardInput value={values.contractNo} onChange={value => update("contractNo", value)} /></WizardField>
                   <WizardField label="Purchase Order No. (Optional)"><WizardInput value={values.purchaseOrderNo} onChange={value => update("purchaseOrderNo", value)} placeholder="Enter PO number" /></WizardField>
