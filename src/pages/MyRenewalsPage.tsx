@@ -750,6 +750,10 @@ function wizardNextExpiryDate(startDate: string, term: string): string {
   return `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, "0")}-${String(expiry.getDate()).padStart(2, "0")}`;
 }
 
+function renewalTermYears(term: string): number {
+  return Number.parseInt(term, 10) || 0;
+}
+
 function WizardCard({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
   return (
     <section className={`rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5 ${className}`}>
@@ -861,7 +865,10 @@ function RenewalProductSummary({
   nextExpiryDate: string;
   showOrderDetails?: boolean;
 }) {
-  const estimatedAmount = (Number(values.quantity) || 0) * (Number(values.unitPrice) || 0);
+  const estimatedAmount =
+    (Number(values.quantity) || 0) *
+    (Number(values.unitPrice) || 0) *
+    renewalTermYears(values.renewalTerm);
   return (
     <aside className="rounded-xl border border-gray-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:p-5">
       <div className="mb-4 flex items-center justify-between">
@@ -924,18 +931,25 @@ function NewRenewalWizard({
   const [values, setValues] = useState<RenewalWizardValues>(initialValues);
   const [createdRenewal, setCreatedRenewal] = useState<Renewal>();
   const nextExpiryDate = wizardNextExpiryDate(values.renewalStartDate, values.renewalTerm);
-  const estimatedAmount = (Number(values.quantity) || 0) * (Number(values.unitPrice) || 0);
+  const estimatedAmount =
+    (Number(values.quantity) || 0) *
+    (Number(values.unitPrice) || 0) *
+    renewalTermYears(values.renewalTerm);
   const selectedOrder = orders.find(order => order.id === values.order);
   const selectedSubOrder = selectedOrder?.subOrders.find(subOrder => subOrder.id === values.subOrder);
   const availableProducts = selectedSubOrder?.products || [];
   const canCreate = Boolean(
+    values.client &&
     values.order &&
     values.subOrder &&
     values.product &&
     values.renewalStartDate &&
     values.renewalTerm &&
     values.quantity &&
-    values.unitPrice,
+    values.unitPrice &&
+    values.reminders.length > 0 &&
+    values.reminders.every(reminder => reminder.trim()) &&
+    values.notifyTo.length > 0,
   );
 
   const update = <K extends keyof RenewalWizardValues>(key: K, value: RenewalWizardValues[K]) => {
@@ -1916,7 +1930,10 @@ export default function MyRenewalsPage() {
   const createRenewalFromWizard = (values: RenewalWizardValues): Renewal => {
     const dueDateInput = wizardNextExpiryDate(values.renewalStartDate, values.renewalTerm);
     const dueDays = Math.ceil((new Date(`${dueDateInput}T00:00:00`).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-    const total = (Number(values.quantity) || 0) * (Number(values.unitPrice) || 0);
+    const total =
+      (Number(values.quantity) || 0) *
+      (Number(values.unitPrice) || 0) *
+      renewalTermYears(values.renewalTerm);
     const renewal: Renewal = {
       id: `REN-${String(renewals.length + renewalHistory.length + 41).padStart(6, "0")}`,
       product: values.product,
