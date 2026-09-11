@@ -88,6 +88,28 @@ export type AssignedDeviceEntry = {
   status: "Active" | "In Repair";
 };
 
+function getOrganizationOptions(
+  clients: Array<{ id: string; name: string }>,
+  additionalNames: Array<string | undefined> = [],
+) {
+  const options = [...clients];
+  additionalNames
+    .map(name => name?.trim())
+    .filter((name): name is string => Boolean(name))
+    .forEach(name => {
+      if (!options.some(client => client.name.toLowerCase() === name.toLowerCase())) {
+        options.push({ id: `organization-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name });
+      }
+    });
+  return options;
+}
+
+function getCurrentOrganizationName(clientId?: string, clientName?: string) {
+  return clientName
+    || getClients().find(client => client.id === clientId)?.name
+    || "";
+}
+
 function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: string; clientName?: string; onClose: () => void; onCreate: (user: UserRecord) => void }) {
   const [activeTab, setActiveTab] = useState("Overview");
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
@@ -104,7 +126,7 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
     gender: "",
     joiningDate: "",
     role: getPortalRoles(clientId || "").find(item => item.status === "active")?.name || "",
-    orgAccess: clientName || "",
+    orgAccess: getCurrentOrganizationName(clientId, clientName),
     dataVisibility: "All Data",
     locationAccess: "All Locations",
     status: "Active",
@@ -114,9 +136,13 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
-  const [availableClients, setAvailableClients] = useState(() => getClients());
+  const [availableClients, setAvailableClients] = useState(() =>
+    getOrganizationOptions(getClients(), [getCurrentOrganizationName(clientId, clientName)]),
+  );
   useEffect(() => {
-    const refreshClients = () => setAvailableClients(getClients());
+    const refreshClients = () => setAvailableClients(getOrganizationOptions(getClients(), [
+      getCurrentOrganizationName(clientId, clientName),
+    ]));
     refreshClients();
     window.addEventListener("nidoClientsUpdated", refreshClients);
     return () => window.removeEventListener("nidoClientsUpdated", refreshClients);
@@ -762,21 +788,57 @@ export function exportUsersCSV(currentUsers: Array<Record<string, unknown>>) {
     "provisionReason",
     "initials",
   ];
-  const keys = Array.from(new Set(currentUsers.flatMap(user => Object.keys(user))))
-    .filter(key => key.toLowerCase() !== "password");
+
+  const flattenUser = (user: Record<string, unknown>) => {
+    const flattened: Record<string, string> = {};
+    const flatten = (value: unknown, prefix: string) => {
+      if (prefix.toLowerCase().includes("password")) return;
+      if (value === null || value === undefined) {
+        flattened[prefix] = "";
+        return;
+      }
+      if (Array.isArray(value)) {
+        flattened[prefix] = value.every(item => item === null || ["string", "number", "boolean"].includes(typeof item))
+          ? value.map(item => String(item ?? "")).join("; ")
+          : JSON.stringify(value);
+        return;
+      }
+      if (typeof value === "object") {
+        Object.entries(value as Record<string, unknown>).forEach(([key, nestedValue]) =>
+          flatten(nestedValue, `${prefix}.${key}`),
+        );
+        return;
+      }
+      flattened[prefix] = String(value);
+    };
+
+    Object.entries(user).forEach(([key, value]) => {
+      if (key.toLowerCase() === "password" || key === "details") {
+        if (key === "details" && value && typeof value === "object") {
+          Object.entries(value as Record<string, unknown>).forEach(([detailKey, detailValue]) =>
+            flatten(detailValue, `details.${detailKey}`),
+          );
+        }
+        return;
+      }
+      flatten(value, key);
+    });
+    return flattened;
+  };
+
+  const flattenedUsers = currentUsers.map(flattenUser);
+  const keys = Array.from(new Set(flattenedUsers.flatMap(user => Object.keys(user))))
+    .filter(key => !key.toLowerCase().includes("password"));
+  const detailKeys = keys.filter(key => key.startsWith("details."));
   const headers = [
     ...preferredOrder.filter(key => keys.includes(key)),
-    ...keys.filter(key => !preferredOrder.includes(key)),
+    ...detailKeys.sort(),
+    ...keys.filter(key => !preferredOrder.includes(key) && !key.startsWith("details.")),
   ];
-  const formatValue = (value: unknown) => {
-    if (value === null || value === undefined) return "";
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
-  };
-  const escapeCsv = (value: unknown) => `"${formatValue(value).replace(/"/g, '""')}"`;
+  const escapeCsv = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
   const csv = [
     headers.map(header => escapeCsv(header)),
-    ...currentUsers.map(user => headers.map(header => escapeCsv(user[header]))),
+    ...flattenedUsers.map(user => headers.map(header => escapeCsv(user[header]))),
   ].map(row => row.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -983,7 +1045,7 @@ function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[numb
   };
 }
 
-function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
+function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId?: string; clientName?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [activeTab, setActiveTab] = useState("Overview");
   const savedDetails = user.details ?? {};
@@ -1003,13 +1065,17 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
     fullName: user.name,
     email: user.email,
     phone: user.phone || savedDetailString("phone"),
+    employeeId: savedDetailString("employeeId"),
     jobTitle: savedDetailString("jobTitle", user.role),
     department: savedDetailString("department"),
     reportingManager: savedDetailString("reportingManager"),
     gender: savedDetailString("gender"),
     joiningDate: savedDetailString("joiningDate"),
     role: user.role,
-    orgAccess: savedDetailString("orgAccess", "Nitin Supplies HQ"),
+    orgAccess: savedDetailString(
+      "orgAccess",
+      getCurrentOrganizationName(clientId, clientName || user.clientName),
+    ),
     dataVisibility: savedDetailString("dataVisibility", "All Data"),
     locationAccess: savedDetailString("locationAccess", "All Locations"),
     status: user.status,
@@ -1019,17 +1085,59 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
+  const [availableClients, setAvailableClients] = useState(() =>
+    getOrganizationOptions(getClients(), [
+      getCurrentOrganizationName(clientId, clientName),
+      user.clientName,
+      savedDetailString("orgAccess"),
+    ]),
+  );
+  useEffect(() => {
+    const refreshClients = () => setAvailableClients(getOrganizationOptions(getClients(), [
+      getCurrentOrganizationName(clientId, clientName),
+      user.clientName,
+      savedDetailString("orgAccess"),
+      form.orgAccess,
+    ]));
+    refreshClients();
+    window.addEventListener("nidoClientsUpdated", refreshClients);
+    return () => window.removeEventListener("nidoClientsUpdated", refreshClients);
+  }, [clientName, user.clientName, user.id]);
+
+  const handleOrganizationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value !== "__add_new__") {
+      setForm((p) => ({ ...p, orgAccess: e.target.value }));
+      return;
+    }
+    const name = window.prompt("Enter the new client name");
+    if (!name?.trim()) return;
+    const trimmedName = name.trim();
+    const existing = availableClients.find(client => client.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      setForm((p) => ({ ...p, orgAccess: existing.name }));
+      return;
+    }
+    const newClient = {
+      id: `CI-${Date.now()}`,
+      name: trimmedName,
+      status: "active",
+    };
+    addClient(newClient);
+    setAvailableClients(getOrganizationOptions(getClients(), [trimmedName, clientName, user.clientName]));
+    setForm((p) => ({ ...p, orgAccess: newClient.name }));
+  };
+
   const addUserModules = [...PORTAL_MODULES];
   const addUserPermCols = ["View", "Create", "Edit", "Delete", "Approve"] as const;
   const inheritedPermissions = getPortalRoles(clientId || "")
     .find(role => role.name === form.role)?.permissions ?? [];
 
   const [expenseForm, setExpenseForm] = useState({
-    monthlyLimit: typeof savedExpense.monthlyLimit === "string" ? savedExpense.monthlyLimit : "50000",
-    annualLimit: typeof savedExpense.annualLimit === "string" ? savedExpense.annualLimit : "500000",
+    monthlyLimit: typeof savedExpense.monthlyLimit === "string" ? savedExpense.monthlyLimit : "",
+    annualLimit: typeof savedExpense.annualLimit === "string" ? savedExpense.annualLimit : "",
     currency: typeof savedExpense.currency === "string" ? savedExpense.currency : "INR",
     approvalRequired: typeof savedExpense.approvalRequired === "boolean" ? savedExpense.approvalRequired : true,
-    approvalThreshold: typeof savedExpense.approvalThreshold === "string" ? savedExpense.approvalThreshold : "5000",
+    approvalThreshold: typeof savedExpense.approvalThreshold === "string" ? savedExpense.approvalThreshold : "",
     categories: savedCategories,
   });
   const expenseCategories = ["Hardware", "Software", "Travel", "Furniture", "Accessories", "Training"];
@@ -1062,6 +1170,7 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
       initials,
       details: {
         ...savedDetails,
+         employeeId: form.employeeId,
         jobTitle: form.jobTitle,
         department: form.department,
         reportingManager: form.reportingManager,
@@ -1127,9 +1236,8 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
               <div className="p-4 flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={labelCls}>User ID</label>
-                    <input type="text" value={`UI-${String(usersData.findIndex(u => u.id === user.id) + 1).padStart(5, "0")}`} disabled className={disabledCls} />
-                    <p className="text-[10px] text-gray-400 mt-0.5">Auto-generated</p>
+                    <label className={labelCls}>Employee ID</label>
+                    <input type="text" value={form.employeeId} onChange={set("employeeId")} placeholder="e.g. EMP-001" className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Full Name <span className="text-red-400">*</span></label>
@@ -1158,11 +1266,19 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
+                    <label className={labelCls}>Reporting Manager</label>
+                    <input type="text" value={form.reportingManager} onChange={set("reportingManager")} placeholder="e.g. John Smith" className={inputCls} />
+                  </div>
+                  <div>
                     <label className={labelCls}>Gender</label>
                     <select value={form.gender} onChange={set("gender")} className={inputCls + " appearance-none"}>
                       <option value="">Select gender</option>
                       <option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Joining Date</label>
+                    <input type="date" value={form.joiningDate} onChange={set("joiningDate")} className={inputCls + " text-gray-600"} />
                   </div>
                   <div>
                     <label className={labelCls}>Status <span className="text-red-400">*</span></label>
@@ -1187,8 +1303,12 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                   </div>
                   <div>
                     <label className={labelCls}>Organization Access</label>
-                    <select value={form.orgAccess} onChange={set("orgAccess")} className={inputCls + " appearance-none text-gray-700"}>
-                      <option>Nitin Supplies HQ</option><option>Nitin Supplies — South Division</option><option>Nitin Supplies — North Division</option>
+                    <select value={form.orgAccess} onChange={handleOrganizationChange} className={inputCls + " appearance-none text-gray-700"}>
+                      <option value="">Select organization</option>
+                      {availableClients.map(client => (
+                        <option key={client.id} value={client.name}>{client.name}</option>
+                      ))}
+                      <option value="__add_new__">＋ Add New Client</option>
                     </select>
                   </div>
                 </div>
@@ -1274,6 +1394,39 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100"><p className="text-xs font-semibold text-gray-700">Approval Settings</p></div>
+              <div className="p-4 flex flex-col gap-4">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={expenseForm.approvalRequired}
+                    onChange={() => setExpenseForm((p) => ({ ...p, approvalRequired: !p.approvalRequired }))}
+                    className="mt-0.5 rounded border-gray-300 accent-blue-600 cursor-pointer"
+                  />
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Require Approval</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Expenses above the threshold need manager approval</p>
+                  </div>
+                </label>
+                {expenseForm.approvalRequired && (
+                  <div className="max-w-xs">
+                    <label className={labelCls}>Approval Threshold</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs select-none">₹</span>
+                      <input
+                        type="number"
+                        value={expenseForm.approvalThreshold}
+                        onChange={(e) => setExpenseForm((p) => ({ ...p, approvalThreshold: e.target.value }))}
+                        placeholder="e.g. 5000"
+                        min="0"
+                        className={inputCls + " pl-7"}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="border border-gray-100 rounded-xl overflow-hidden">
@@ -2813,7 +2966,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   const liveSelectedUser = selectedUser ? (users.find((u) => u.id === selectedUser.id) ?? selectedUser) : null;
 
   if (showArchivedUsers) return <ArchivedUsersPage onBack={() => setShowArchivedUsers(false)} archivedUsers={archived} />;
-  if (editingUser) return <EditUserPage clientId={clientId} user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
+  if (editingUser) return <EditUserPage clientId={clientId} clientName={clientName} user={editingUser} onBack={() => setEditingUser(null)} onSave={saveEditedUser} />;
   if (assigningDeviceFor) return (
     <AssignDevicePage
       userName={assigningDeviceFor.name}

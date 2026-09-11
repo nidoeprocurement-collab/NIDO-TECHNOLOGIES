@@ -888,6 +888,7 @@ export default function ClientRolesPage() {
   const [newRoleDescription, setNewRoleDescription] = useState("");
   const [moduleToAdd, setModuleToAdd] = useState("");
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [draftRole, setDraftRole] = useState<PortalRole | null>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -901,29 +902,32 @@ export default function ClientRolesPage() {
   }, [clientId]);
 
   const selected = roles.find(role => role.id === selectedId) || null;
+  const displayedRole = draftRole || selected;
+  const isEditing = Boolean(draftRole);
   const persist = (next: PortalRole[]) => {
     setRoles(next);
     savePortalRoles(clientId, next);
   };
 
   const togglePermission = (module: string, action: keyof Omit<PortalRolePermission, "module">) => {
-    if (!selected) return;
-    persist(roles.map(role => role.id !== selected.id ? role : {
-      ...role,
-      permissions: role.permissions.map(permission =>
+    if (!draftRole) return;
+    setDraftRole({
+      ...draftRole,
+      permissions: draftRole.permissions.map(permission =>
         permission.module === module ? { ...permission, [action]: !permission[action] } : permission
       ),
-    }));
+    });
   };
 
   const addModule = () => {
-    if (!selected || !moduleToAdd) return;
+    if (!draftRole || !moduleToAdd) return;
     const permission = createPortalRolePermission(moduleToAdd);
-    persist(roles.map(role => role.id !== selected.id ? role : (
-      role.permissions.some(item => item.module === moduleToAdd)
-        ? role
-        : { ...role, permissions: [...role.permissions, permission] }
-    )));
+    if (!draftRole.permissions.some(item => item.module === moduleToAdd)) {
+      setDraftRole({
+        ...draftRole,
+        permissions: [...draftRole.permissions, permission],
+      });
+    }
     setModuleToAdd("");
   };
 
@@ -945,21 +949,41 @@ export default function ClientRolesPage() {
 
   const renameRole = () => {
     if (!selected) return;
-    const name = window.prompt("Role name", selected.name)?.trim();
-    if (!name || name === selected.name) return;
-    const description = window.prompt("Role description", selected.description) ?? selected.description;
-    const updatedRoles = roles.map(role => role.id === selected.id ? { ...role, name, description } : role);
-    // Persist the new role name before updating users. The user store rejects
-    // assignments to roles that are not yet present in the role catalog.
-    persist(updatedRoles);
-    getPortalUsersByClient(clientId).filter(user => user.role === selected.name)
-      .forEach(user => updatePortalUser(user.id, { role: name }));
+    setDraftRole({
+      ...selected,
+      permissions: selected.permissions.map(permission => ({ ...permission })),
+    });
   };
 
   const toggleRoleStatus = () => {
-    if (!selected) return;
-    const nextStatus = selected.status === "active" ? "inactive" : "active";
-    persist(roles.map(role => role.id === selected.id ? { ...role, status: nextStatus } : role));
+    if (!draftRole) return;
+    setDraftRole({
+      ...draftRole,
+      status: draftRole.status === "active" ? "inactive" : "active",
+    });
+  };
+
+  const saveDraftRole = () => {
+    if (!draftRole || !draftRole.name.trim()) return;
+    const previous = roles.find(role => role.id === draftRole.id);
+    if (!previous) return;
+    const normalizedDraft = {
+      ...draftRole,
+      name: draftRole.name.trim(),
+      description: draftRole.description.trim(),
+    };
+    persist(roles.map(role => role.id === normalizedDraft.id ? normalizedDraft : role));
+    if (previous.name !== normalizedDraft.name) {
+      getPortalUsersByClient(clientId)
+        .filter(user => user.role === previous.name)
+        .forEach(user => updatePortalUser(user.id, { role: normalizedDraft.name }));
+    }
+    setDraftRole(null);
+  };
+
+  const discardDraftRole = () => {
+    setDraftRole(null);
+    setModuleToAdd("");
   };
 
   const downloadCsvTemplate = () => {
@@ -1144,10 +1168,17 @@ export default function ClientRolesPage() {
 
       <div className="grid grid-cols-[240px_1fr] gap-5">
         <div className="space-y-1">
-          {roles.map(role => {
+           {roles.map(role => {
             const assigned = getPortalUsersByClient(clientId).filter(user => user.role === role.name).length;
             return (
-              <button key={role.id} onClick={() => setSelectedId(role.id)}
+              <button key={role.id} onClick={() => {
+                if (isEditing) {
+                  if (!window.confirm("Discard unsaved role changes?")) return;
+                  discardDraftRole();
+                }
+                setSelectedId(role.id);
+              }}
+                disabled={isEditing && role.id !== selectedId}
                 className={`w-full text-left px-3 py-2.5 rounded-lg border ${selectedId === role.id ? "border-blue-300 bg-blue-50" : "border-transparent hover:bg-gray-50"}`}>
                 <div className="text-sm font-medium text-gray-800">{role.name}</div>
                 <div className="text-[11px] text-gray-400 mt-0.5">{assigned} assigned user{assigned === 1 ? "" : "s"}</div>
@@ -1156,31 +1187,55 @@ export default function ClientRolesPage() {
           })}
         </div>
 
-        {selected && (
+         {displayedRole && (
           <div className="border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-900">{selected.name}</h3>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${selected.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                    {selected.status === "active" ? "Active" : "Inactive"}
+                   {isEditing ? (
+                     <input
+                       value={displayedRole.name}
+                       onChange={event => setDraftRole(current => current ? { ...current, name: event.target.value } : current)}
+                       className="rounded-lg border border-blue-200 px-2 py-1 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                       aria-label="Role name"
+                     />
+                   ) : (
+                     <h3 className="text-sm font-semibold text-gray-900">{displayedRole.name}</h3>
+                   )}
+                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${displayedRole.status === "active" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                     {displayedRole.status === "active" ? "Active" : "Inactive"}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">{selected.description || "No description"}</p>
+                 {isEditing ? (
+                   <textarea
+                     value={displayedRole.description}
+                     onChange={event => setDraftRole(current => current ? { ...current, description: event.target.value } : current)}
+                     className="mt-1 w-full max-w-xl rounded-lg border border-blue-200 px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                     rows={2}
+                     aria-label="Role description"
+                   />
+                 ) : (
+                   <p className="text-xs text-gray-500 mt-1">{displayedRole.description || "No description"}</p>
+                 )}
               </div>
                <div className="flex items-center gap-3">
-                 <button onClick={toggleRoleStatus} className="text-xs text-gray-600 hover:underline">
-                   {selected.status === "active" ? "Deactivate" : "Activate"}
-                 </button>
-                 <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit role</button>
+                  {isEditing ? (
+                    <>
+                      <button onClick={discardDraftRole} className="text-xs text-gray-600 hover:underline">Cancel</button>
+                      <button onClick={saveDraftRole} disabled={!displayedRole.name.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40">Save Changes</button>
+                    </>
+                  ) : (
+                    <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit role</button>
+                  )}
                </div>
             </div>
               <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
               <select value={moduleToAdd} onChange={event => setModuleToAdd(event.target.value)}
+                 disabled={!isEditing}
                 className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
                 <option value="">Add module...</option>
-                  {PORTAL_MODULE_CATALOG.map(module => {
-                    const alreadyAdded = selected.permissions.some(item => item.module === module.name);
+                   {PORTAL_MODULE_CATALOG.map(module => {
+                     const alreadyAdded = displayedRole.permissions.some(item => item.module === module.name);
                     return (
                       <option key={module.name} value={module.name} disabled={alreadyAdded}>
                         {module.name} — {module.description}{alreadyAdded ? " (already added)" : ""}
@@ -1188,9 +1243,15 @@ export default function ClientRolesPage() {
                     );
                   })}
               </select>
-              <button onClick={addModule} disabled={!moduleToAdd} className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40">Add Module</button>
+               <button onClick={addModule} disabled={!isEditing || !moduleToAdd} className="px-3 py-1.5 text-xs border border-blue-200 text-blue-600 rounded-lg disabled:opacity-40">Add Module</button>
+               {!isEditing && <button onClick={renameRole} className="text-xs text-blue-600 hover:underline">Edit Role to Change Permissions</button>}
+               {isEditing && (
+                 <button onClick={toggleRoleStatus} className="text-xs text-gray-600 hover:underline">
+                   {displayedRole.status === "active" ? "Deactivate" : "Activate"}
+                 </button>
+               )}
                <span className="text-[11px] text-gray-400 ml-auto">
-                 {selected.permissions.length} of {PORTAL_MODULE_CATALOG.length} modules
+                  {displayedRole.permissions.length} of {PORTAL_MODULE_CATALOG.length} modules
                </span>
             </div>
             <div className="overflow-x-auto">
@@ -1201,13 +1262,13 @@ export default function ClientRolesPage() {
                   {CLIENT_ACTIONS.map(action => <th key={action} className="text-center px-3 py-2.5 font-semibold text-gray-500 uppercase">{action}</th>)}
                 </tr></thead>
                 <tbody>
-                  {selected.permissions.map((permission, index) => (
+                   {displayedRole.permissions.map((permission, index) => (
                     <tr key={permission.module} className={index % 2 ? "bg-gray-50/50" : "bg-white"}>
                       <td className="px-4 py-2.5 font-medium text-gray-700">{permission.module}</td>
                        <td className="px-3 py-2.5 text-[11px] text-gray-400 min-w-[220px]">{getPortalModuleDescription(permission.module)}</td>
                       {CLIENT_ACTIONS.map(action => (
                         <td key={action} className="text-center px-3 py-2.5">
-                          <button onClick={() => togglePermission(permission.module, action)} className={`w-4 h-4 rounded-full border-2 inline-flex items-center justify-center ${permission[action] ? "bg-blue-600 border-blue-600" : "border-gray-300 hover:border-blue-300"}`}>
+                           <button disabled={!isEditing} onClick={() => togglePermission(permission.module, action)} className={`w-4 h-4 rounded-full border-2 inline-flex items-center justify-center ${permission[action] ? "bg-blue-600 border-blue-600" : "border-gray-300 hover:border-blue-300"} disabled:cursor-not-allowed disabled:opacity-60`}>
                             {permission[action] && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
                           </button>
                         </td>
@@ -1217,7 +1278,11 @@ export default function ClientRolesPage() {
                 </tbody>
               </table>
             </div>
-            <p className="px-4 py-3 text-[11px] text-gray-400 border-t border-gray-100">Changes save automatically and are used by client users when they access the portal.</p>
+             <p className="px-4 py-3 text-[11px] text-gray-400 border-t border-gray-100">
+               {isEditing
+                 ? "Changes are staged locally. Press Save Changes to update this role, or Cancel to discard them."
+                 : "Select Edit role to stage permission, module, status, name, and description changes."}
+             </p>
           </div>
         )}
       </div>

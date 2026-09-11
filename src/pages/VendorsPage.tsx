@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Star,
-  ChevronDown,
   X,
   Building2,
   Mail,
@@ -285,19 +284,6 @@ function ArchivedModal({ vendors, onClose, onVendorClick }: { vendors: Vendor[];
           <p className="text-xs text-gray-400">This list is read-only. No actions can be performed on archived vendors.</p>
         </div>
       </div>
-    </div>
-  );
-}
-
-// ----- Filter Select -----
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {
-  return (
-    <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className="appearance-none pl-2.5 pr-6 py-1 text-xs border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:border-blue-400 cursor-pointer font-medium">
-        {options.map(o => <option key={o} value={o}>{o === "All" ? label : o}</option>)}
-      </select>
-      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
     </div>
   );
 }
