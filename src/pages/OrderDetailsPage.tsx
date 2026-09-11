@@ -2281,7 +2281,7 @@ function Field({ label, value }) {
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 11.5, color: "#9ca3af", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 13.5, fontWeight: 500, color: "#111827" }}>{value}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 500, color: "#111827", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{value}</div>
     </div>
   );
 }
@@ -2404,6 +2404,12 @@ export default function MyOrderPage() {
   // Find the real order from context
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
+  const clientInfo = useMemo(() => {
+    return getClients().find((entry: any) =>
+      entry.id === order?.clientId || entry.name === order?.client
+    ) as any ?? null;
+  }, [order?.clientId, order?.client]);
+
   // ── Checkout fallbacks ────────────────────────────────────────────────────
   // For orders placed before paymentMethod/deliveryAddress were persisted on
   // the order itself, read them live from the same localStorage keys the
@@ -2469,9 +2475,7 @@ export default function MyOrderPage() {
       savedAddress = null;
     }
 
-    const client = getClients().find((entry: any) =>
-      entry.id === order?.clientId || entry.name === order?.client
-    ) as any;
+    const client = clientInfo;
     const source = stored || savedAddress || {};
     const address = order?.deliveryAddress || [
       source.line1, source.line2, source.city, source.state, source.country, source.zip,
@@ -2492,7 +2496,7 @@ export default function MyOrderPage() {
       phone: source.phone || "",
       instructions: source.instructions || (order as any)?.deliveryInstructions || "",
     };
-  }, [order]);
+  }, [clientInfo, order]);
 
   // Client portal users only ever see the read-only Sub Orders / Items tab —
   // vendor sourcing (Vendor Selected Summary) is an owner-platform concern.
@@ -3141,6 +3145,7 @@ export default function MyOrderPage() {
   };
 
   const card: any = { background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 };
+  const topInfoCard: any = { ...card, padding: 16, minWidth: 0 };
 
   // poRefreshKey is updated by the poCreated/storage listeners above so this
   // expression re-runs whenever POs are added or changed.
@@ -3169,6 +3174,32 @@ export default function MyOrderPage() {
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
   // instead of clipping; above it the fr tracks grow to fill the tab.
   const subOrdersMinWidth = isClientPortalUser ? 1056 : 1320;
+
+  const billingAddress = [
+    clientInfo?.billing_address || clientInfo?.billingAddress,
+    clientInfo?.billing_city || clientInfo?.billingCity,
+    clientInfo?.billing_state || clientInfo?.billingState,
+    clientInfo?.billing_country || clientInfo?.billingCountry,
+    clientInfo?.billing_pincode || clientInfo?.billingPincode,
+  ].filter(Boolean).join(", ") || "—";
+  const shippingAddress = deliveryInfo.line1
+    ? [
+        deliveryInfo.line1,
+        deliveryInfo.line2,
+        [deliveryInfo.city, deliveryInfo.state, deliveryInfo.country, deliveryInfo.zip].filter(Boolean).join(", "),
+      ].filter(Boolean).join("\n")
+    : deliveryInfo.address || "—";
+  const requesterName = isClientPortalUser
+    ? user?.name || "—"
+    : order?.requester || "—";
+  const orderedFor = isClientPortalUser
+    ? user?.clientName || order?.client || "—"
+    : order?.client || "—";
+  const requesterRole = order?.cartItems?.[0]?.category
+    || subOrders[0]?.category
+    || clientInfo?.category
+    || order?.requesterRole
+    || "—";
 
   // ── Order not found ───────────────────────────────────────────────────────────
   if (!order) {
@@ -3287,43 +3318,39 @@ export default function MyOrderPage() {
           );
         })()}
 
-        {/* Top billing and delivery information */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16, marginBottom: 20 }}>
-          <div style={card}>
+        {/* Top information cards — matched to the compact reference layout */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
+          <div style={topInfoCard}>
             <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
             <Field label="Client" value={order?.client || "—"} />
-            <Field label="Payment Method" value={order?.paymentMethod || paymentFallback?.label || "—"} />
-            {(order?.paymentDetail || paymentFallback?.detail) && (
-              <Field label="Payment Detail" value={order?.paymentDetail || paymentFallback?.detail || ""} />
-            )}
-            <Field label="Payment Terms" value={order?.paymentTerms || "Net 30 (Payment due in 30 days)"} />
+            <Field label="Billing Address" value={billingAddress} />
+            <Field label="Email" value={clientInfo?.email || "—"} />
+            <Field label="Phone" value={clientInfo?.billing_phone || clientInfo?.billingPhone || clientInfo?.phone || clientInfo?.mobile || "—"} />
           </div>
-          <div style={card}>
-            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Delivery Information</div>
+          <div style={topInfoCard}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Shipping Information</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16 }}>
               <Field label="Address Label" value={deliveryInfo.label || "—"} />
-              <Field label="Attention Name" value={deliveryInfo.attentionName || "—"} />
-              <Field label="Address Line 1" value={deliveryInfo.line1 || deliveryInfo.address || "—"} />
-              <Field label="Address Line 2" value={deliveryInfo.line2 || "—"} />
-              <Field label="City" value={deliveryInfo.city || "—"} />
-              <Field label="State" value={deliveryInfo.state || "—"} />
-              <Field label="Country" value={deliveryInfo.country || "—"} />
-              <Field label="PIN / ZIP Code" value={deliveryInfo.zip || "—"} />
+              <Field label="Attention" value={deliveryInfo.attentionName || "—"} />
+            </div>
+            <Field label="Address" value={shippingAddress} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 16 }}>
               <Field label="Phone" value={deliveryInfo.phone || "—"} />
             </div>
             <div style={{ marginTop: 2 }}>
-              <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Delivery Instructions</div>
-              <div style={{ fontSize: 13.5, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+              <div style={{ fontSize: 11.5, color: "#9ca3af", marginBottom: 2 }}>Delivery Instructions</div>
+              <div style={{ fontSize: 13.5, fontWeight: 500, color: deliveryInfo.instructions ? "#111827" : "#9ca3af", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                 {deliveryInfo.instructions || "No delivery instructions provided"}
               </div>
             </div>
           </div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor / Client Information</div>{isClientPortalUser ? (
-            <><Field label="Name" value={user?.name || "—"} /><Field label="Role" value={user?.role || (user?.userType === "client_admin" ? "Client Admin" : "Client User")} /><Field label="Organization" value={user?.clientName || order?.client || "—"} /></>
-          ) : (
-            <><Field label="Name" value={order?.requester || "—"} /><Field label="Role" value={order?.requesterRole || "—"} /><Field label="Organization" value={order?.client || "—"} /></>
-          )}</div>
-          <div style={card}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[
+          <div style={topInfoCard}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Requestor Information</div>
+            <Field label="Ordered By" value={requesterName} />
+            <Field label="Ordered For" value={orderedFor} />
+            <Field label="Role" value={requesterRole} />
+          </div>
+          <div style={topInfoCard}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[
             ["Master Order ID", orderId],
             ["Sub Orders", String(subOrders.length)],
             ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
