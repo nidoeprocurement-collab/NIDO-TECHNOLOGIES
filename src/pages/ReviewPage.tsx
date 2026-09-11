@@ -12,6 +12,11 @@
   import { useI18n } from "@/i18n/I18nProvider";
   import { formatCurrency } from "@/lib/formatters";
 import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
+import {
+  DELIVERY_INSTRUCTIONS_KEY,
+  ORDER_NOTES_KEY,
+  limitCheckoutNote,
+} from "@/lib/checkoutNotes";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -69,7 +74,7 @@ import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPrici
         ?? loadedAddresses[0]?.id
         ?? null;
       setSelectedAddressId(nextAddressId);
-      setDeliveryInstructions(localStorage.getItem("nido_delivery_instructions") || "");
+      setDeliveryInstructions(limitCheckoutNote(localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || ""));
     }, [clientId]);
 
     const selectedAddr = addresses.find((a) => a.id === selectedAddressId) ?? null;
@@ -247,7 +252,8 @@ import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPrici
       }
 
       consumeCart();
-      localStorage.removeItem("nido_delivery_instructions");
+      localStorage.removeItem(DELIVERY_INSTRUCTIONS_KEY);
+      localStorage.removeItem(ORDER_NOTES_KEY);
       localStorage.removeItem(selectedAddressKey(clientId));
       navigate(`/shop/order-confirmation/${orderNumber}`, {
         state: {

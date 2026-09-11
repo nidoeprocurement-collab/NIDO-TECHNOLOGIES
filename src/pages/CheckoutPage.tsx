@@ -8,6 +8,12 @@
                       import OrderSummaryPanel from "./OrderSummaryPanel";
                       import { getClients } from "@/lib/clientStore";
                       import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
+import {
+  CHECKOUT_NOTE_MAX_LENGTH,
+  DELIVERY_INSTRUCTIONS_KEY,
+  ORDER_NOTES_KEY,
+  limitCheckoutNote,
+} from "@/lib/checkoutNotes";
 
                       // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -244,8 +250,12 @@
                         const navigate = useNavigate();
                         const [notesOpen, setNotesOpen] = useState(false);
                         const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
-                        const [deliveryInstructions, setDeliveryInstructions] = useState("");
-                        const [orderNotes, setOrderNotes] = useState("");
+                        const [deliveryInstructions, setDeliveryInstructions] = useState(() =>
+                          limitCheckoutNote(localStorage.getItem(DELIVERY_INSTRUCTIONS_KEY) || "")
+                        );
+                        const [orderNotes, setOrderNotes] = useState(() =>
+                          limitCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "")
+                        );
                         const [paymentTerms, setPaymentTerms] = useState<string>(() => {
                           return localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
                         });
@@ -432,16 +442,17 @@
                                       <div className="border border-gray-200 rounded-lg overflow-hidden">
                                         <textarea
                                           rows={3}
-                                          maxLength={250}
+                                          maxLength={CHECKOUT_NOTE_MAX_LENGTH}
                                           placeholder="Add delivery instructions, gate entry details, timing preferences, etc."
                                           value={deliveryInstructions}
                                           onChange={(e) => {
-                                            setDeliveryInstructions(e.target.value);
-                                            localStorage.setItem("nido_delivery_instructions", e.target.value);
+                                            const value = limitCheckoutNote(e.target.value);
+                                            setDeliveryInstructions(value);
+                                            localStorage.setItem(DELIVERY_INSTRUCTIONS_KEY, value);
                                           }}
                                           className="w-full px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                                         />
-                                        <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/250</div>
+                                        <div className="px-4 pb-2 text-right text-xs text-gray-400">{deliveryInstructions.length}/{CHECKOUT_NOTE_MAX_LENGTH}</div>
                                       </div>
                                     </div>
                                   </div>
@@ -462,11 +473,17 @@
                                       <div className="px-6 pb-4">
                                         <textarea
                                           rows={3}
+                                          maxLength={CHECKOUT_NOTE_MAX_LENGTH}
                                           placeholder="Add any special notes for this order..."
                                           value={orderNotes}
-                                          onChange={(e) => setOrderNotes(e.target.value)}
+                                          onChange={(e) => {
+                                            const value = limitCheckoutNote(e.target.value);
+                                            setOrderNotes(value);
+                                            localStorage.setItem(ORDER_NOTES_KEY, value);
+                                          }}
                                           className="w-full border border-gray-200 rounded-lg px-2 py-2 text-sm text-gray-700 placeholder-gray-400 resize-none outline-none"
                                         />
+                                        <div className="mt-1 text-right text-xs text-gray-400">{orderNotes.length}/{CHECKOUT_NOTE_MAX_LENGTH}</div>
                                       </div>
                                     )}
                                   </div>
