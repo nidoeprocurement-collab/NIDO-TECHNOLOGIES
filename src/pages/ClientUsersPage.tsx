@@ -726,18 +726,44 @@ export function downloadUserTemplate() {
   URL.revokeObjectURL(url);
 }
 
-export function exportUsersCSV() {
-  const headers = ["User ID", "Full Name", "Role", "Email", "Phone", "Last Active", "Status"];
-  const rows = usersData.map((u, i) => [
-    `UI-${String(i + 1).padStart(5, "0")}`,
-    u.name,
-    u.role,
-    u.email,
-    u.phone,
-    new Date(u.lastActive).toLocaleDateString("en-US"),
-    u.status,
-  ]);
-  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+export function exportUsersCSV(currentUsers: Array<Record<string, unknown>>) {
+  if (!currentUsers.length) return;
+
+  const preferredOrder = [
+    "id",
+    "employeeId",
+    "userType",
+    "name",
+    "email",
+    "phone",
+    "role",
+    "jobTitle",
+    "department",
+    "clientId",
+    "clientName",
+    "status",
+    "lastActive",
+    "createdAt",
+    "provisionedAt",
+    "provisionReason",
+    "initials",
+  ];
+  const keys = Array.from(new Set(currentUsers.flatMap(user => Object.keys(user))))
+    .filter(key => key.toLowerCase() !== "password");
+  const headers = [
+    ...preferredOrder.filter(key => keys.includes(key)),
+    ...keys.filter(key => !preferredOrder.includes(key)),
+  ];
+  const formatValue = (value: unknown) => {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
+  const escapeCsv = (value: unknown) => `"${formatValue(value).replace(/"/g, '""')}"`;
+  const csv = [
+    headers.map(header => escapeCsv(header)),
+    ...currentUsers.map(user => headers.map(header => escapeCsv(user[header]))),
+  ].map(row => row.join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -920,7 +946,9 @@ export type UserRecord = typeof usersData[0];
 
 function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[number]): UserRecord {
   const initials = user.name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "U";
+  const { password: _password, ...safeUser } = user;
   return {
+    ...safeUser,
     id: user.id,
     name: user.name,
     role: user.role,
@@ -2790,7 +2818,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
             <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-20 w-48" onClick={(e) => e.stopPropagation()}>
               {[
                 { icon: <UserPlus size={13} />, label: "Add Users", action: () => { setShowAddUser(true); setHeaderMenuOpen(false); } },
-                { icon: <Download size={13} />, label: "Export Users", action: () => { exportUsersCSV(); setHeaderMenuOpen(false); } },
+                { icon: <Download size={13} />, label: "Export Users", action: () => { exportUsersCSV(users); setHeaderMenuOpen(false); } },
                 { icon: <Upload size={13} />, label: "Import Users", action: () => { setShowImportUsers(true); setHeaderMenuOpen(false); } },
                 { icon: <FileText size={13} />, label: "Download Template", action: () => { downloadUserTemplate(); setHeaderMenuOpen(false); } },
                 { icon: <Users size={13} />, label: "Archived Users", action: () => { setShowArchivedUsers(true); setHeaderMenuOpen(false); }, divider: true },
