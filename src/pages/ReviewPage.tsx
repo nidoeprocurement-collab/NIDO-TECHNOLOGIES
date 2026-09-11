@@ -17,6 +17,8 @@ import {
   ORDER_NOTES_KEY,
   limitCheckoutNote,
 } from "@/lib/checkoutNotes";
+import { useAuth } from "@/contexts/AuthContext";
+import { ORDER_REQUESTER_KEY, resolveOrderRequester } from "@/lib/orderRequester";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -56,6 +58,7 @@ import {
     useI18n();
     const { items: cart, consumeCart } = useCart();
     const { addOrder } = useMyOrders();
+    const { user } = useAuth();
 
     const clientId = localStorage.getItem("nido_shop_selected_client") || "";
     const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
@@ -172,6 +175,10 @@ import {
       const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
       const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
       const poRef = Date.now().toString().slice(-6);
+      const requester = resolveOrderRequester(
+        localStorage.getItem(ORDER_REQUESTER_KEY),
+        user?.name,
+      );
 
       const orderNumber = addOrder({
         clientId: cart[0]?.clientId,
@@ -179,9 +186,9 @@ import {
         clientColor: "#2563eb",
         clientInitial: "N",
         poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
-        requester: "Owner",
-        requesterRole: "System Owner",
-        requesterInitial: "O",
+        requester,
+        requesterRole: user?.role || "System Owner",
+        requesterInitial: requester.charAt(0).toUpperCase() || "O",
         requesterColor: "#6b46c1",
         assigned: "Admin",
         assignedRole: "Admin",

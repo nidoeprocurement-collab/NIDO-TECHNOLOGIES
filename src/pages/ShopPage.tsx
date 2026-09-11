@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus, Cloud, KeyRound, Repeat2, Layers3, LayoutGrid, List, ArrowDownAZ } from "lucide-react";
+import { Search, Filter, ShoppingCart, Check, ChevronDown, ChevronLeft, ChevronRight, X, Package, Shield, Clock, Printer, Wifi, FileText, Cpu, HardDrive, Monitor, Settings2, Timer, ZoomIn, Building2, Heart, Tag, Plus, Cloud, KeyRound, Repeat2, Layers3, LayoutGrid, List, ArrowDownAZ, UserRound } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
@@ -34,6 +34,12 @@ import {
   getAvailabilityLabel,
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
+import {
+  ORDER_REQUESTER_KEY,
+  ORDER_REQUESTER_OPTIONS,
+  normalizeOrderRequester,
+  type OrderRequesterValue,
+} from "@/lib/orderRequester";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1281,6 +1287,9 @@ export default function ShopPage() {
   const [clientOpen, setClientOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [orderedBy, setOrderedBy] = useState<OrderRequesterValue>(() =>
+    normalizeOrderRequester(localStorage.getItem(ORDER_REQUESTER_KEY))
+  );
   const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
@@ -1325,6 +1334,12 @@ export default function ShopPage() {
     setClientOpen(false);
     setSortOpen(false);
     setMoreFiltersOpen(false);
+  };
+
+  const handleOrderedByChange = (value: string) => {
+    const normalized = normalizeOrderRequester(value);
+    setOrderedBy(normalized);
+    localStorage.setItem(ORDER_REQUESTER_KEY, normalized);
   };
 
   const filtered = catalogProducts
@@ -1446,6 +1461,23 @@ export default function ShopPage() {
             </button>
           )}
         </div>
+
+        {!isClientPortalUser && selectedClientId && (
+          <div className="relative shrink-0">
+            <UserRound size={13} className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
+            <select
+              aria-label="Ordered by"
+              value={orderedBy}
+              onChange={event => handleOrderedByChange(event.target.value)}
+              className="h-[38px] min-w-[145px] appearance-none rounded-lg border border-gray-200 bg-white pl-8 pr-8 text-xs text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-400 md:text-sm"
+            >
+              {ORDER_REQUESTER_OPTIONS.map(option => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          </div>
+        )}
 
         {/* More Filters */}
         {selectedClientId && (
