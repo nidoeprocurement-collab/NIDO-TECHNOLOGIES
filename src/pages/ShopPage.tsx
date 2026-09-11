@@ -36,10 +36,11 @@ import {
 } from "@/lib/productCommercialTerms";
 import {
   ORDER_REQUESTER_KEY,
-  ORDER_REQUESTER_OPTIONS,
+  getOrderRequesterOptions,
   normalizeOrderRequester,
   type OrderRequesterValue,
 } from "@/lib/orderRequester";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1327,6 +1328,10 @@ export default function ShopPage() {
   const resetPage = () => setCurrentPage(1);
 
   const selectedClient = clients.find(c => c.id === selectedClientId);
+  const selectedClientUsers = selectedClientId
+    ? getPortalUsersByClient(selectedClientId).filter(user => user.status === "active")
+    : [];
+  const orderRequesterOptions = getOrderRequesterOptions(selectedClientUsers);
   const allCats = ["All Categories", ...Array.from(new Set(catalogProducts.map(p => p.category)))];
   const allBrands = ["All Brands", ...Array.from(new Set(catalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
 
@@ -1366,6 +1371,8 @@ export default function ShopPage() {
   const handleClientChange = (id: string) => {
     setSelectedClientId(id);
     localStorage.setItem("nido_shop_selected_client", id);
+    setOrderedBy("self");
+    localStorage.setItem(ORDER_REQUESTER_KEY, "self");
     setCategory("All Categories");
     setBrand("All Brands");
     setShopTab("all");
@@ -1471,7 +1478,7 @@ export default function ShopPage() {
               onChange={event => handleOrderedByChange(event.target.value)}
               className="h-[38px] min-w-[145px] appearance-none rounded-lg border border-gray-200 bg-white pl-8 pr-8 text-xs text-gray-700 outline-none transition-colors hover:bg-gray-50 focus:border-blue-400 md:text-sm"
             >
-              {ORDER_REQUESTER_OPTIONS.map(option => (
+              {orderRequesterOptions.map(option => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>

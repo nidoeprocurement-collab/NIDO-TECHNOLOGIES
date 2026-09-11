@@ -18,7 +18,8 @@ import {
   limitCheckoutNote,
 } from "@/lib/checkoutNotes";
 import { useAuth } from "@/contexts/AuthContext";
-import { ORDER_REQUESTER_KEY, resolveOrderRequester } from "@/lib/orderRequester";
+import { getOrderRequesterOptions, ORDER_REQUESTER_KEY, resolveOrderRequester } from "@/lib/orderRequester";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -175,9 +176,13 @@ import { ORDER_REQUESTER_KEY, resolveOrderRequester } from "@/lib/orderRequester
       const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
       const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
       const poRef = Date.now().toString().slice(-6);
+      const requesterOptions = getOrderRequesterOptions(
+        getPortalUsersByClient(cart[0]?.clientId || clientId).filter(user => user.status === "active"),
+      );
       const requester = resolveOrderRequester(
         localStorage.getItem(ORDER_REQUESTER_KEY),
         user?.name,
+        requesterOptions,
       );
 
       const orderNumber = addOrder({
