@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
-  Banknote, Building2, Info, Smartphone, QrCode, AlertCircle
+  Banknote, Building2, Info, Smartphone, QrCode, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import CheckoutStepper from "./CheckoutStepper";
@@ -70,6 +70,29 @@ type PaymentState = {
   selectedWallet: string; walletMobile: string;
   neftAccountName: string; neftAccountNumber: string; neftIfscCode: string; neftBankName: string;
 };
+
+const PAYMENT_SELECTION_KEY = "nido_payment_selection";
+
+const DEFAULT_PAYMENT_STATE: PaymentState = {
+  paymentMethod: "card",
+  cardNumber: "", cardName: "", expiryDate: "", cvv: "", saveCard: true,
+  netBankingBank: "",
+  upiId: "",
+  selectedWallet: "", walletMobile: "",
+  neftAccountName: "", neftAccountNumber: "", neftIfscCode: "", neftBankName: "",
+};
+
+function loadPaymentState(): PaymentState {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PAYMENT_SELECTION_KEY) || "null");
+    if (saved && typeof saved === "object") {
+      return { ...DEFAULT_PAYMENT_STATE, ...saved };
+    }
+  } catch {
+    // Ignore malformed checkout state and start with the defaults.
+  }
+  return DEFAULT_PAYMENT_STATE;
+}
 
 function CardPanel({ state, onChange }: { state: PaymentState; onChange: (d: Partial<PaymentState>) => void }) {
   return (
@@ -265,16 +288,15 @@ function CompanyBanPanel() {
 
 export default function PaymentPage() {
   const navigate = useNavigate();
-  const [state, setState] = useState<PaymentState>({
-    paymentMethod: "card",
-    cardNumber: "", cardName: "", expiryDate: "", cvv: "", saveCard: true,
-    netBankingBank: "",
-    upiId: "",
-    selectedWallet: "", walletMobile: "",
-    neftAccountName: "", neftAccountNumber: "", neftIfscCode: "", neftBankName: "",
-  });
+  const [state, setState] = useState<PaymentState>(loadPaymentState);
 
-  const onChange = (d: Partial<PaymentState>) => setState((prev) => ({ ...prev, ...d }));
+  const onChange = (d: Partial<PaymentState>) => {
+    setState((prev) => {
+      const next = { ...prev, ...d };
+      localStorage.setItem(PAYMENT_SELECTION_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
   function renderDetailsPanel() {
     switch (state.paymentMethod) {
       case "card":       return <CardPanel state={state} onChange={onChange} />;
@@ -362,7 +384,7 @@ export default function PaymentPage() {
                     toast.error("Registered mobile number must contain exactly 10 digits.");
                     return;
                   }
-                  localStorage.setItem("nido_payment_selection", JSON.stringify(state));
+                  localStorage.setItem(PAYMENT_SELECTION_KEY, JSON.stringify(state));
                   navigate("/shop/checkout/review");
                 }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors">
