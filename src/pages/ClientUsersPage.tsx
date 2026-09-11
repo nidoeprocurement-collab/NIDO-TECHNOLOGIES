@@ -239,6 +239,20 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
       status: form.status,
       initials,
       color: "bg-blue-500",
+      details: {
+        employeeId: form.employeeId.trim(),
+        jobTitle: form.jobTitle.trim(),
+        department: form.department.trim(),
+        reportingManager: form.reportingManager.trim(),
+        gender: form.gender,
+        joiningDate: form.joiningDate,
+        orgAccess: form.orgAccess,
+        dataVisibility: form.dataVisibility,
+        locationAccess: form.locationAccess,
+        expenseForm: { ...expenseForm },
+        assignedDevices: [...assignedDevices],
+        permissions: [...inheritedPermissions],
+      },
     };
 
     onCreate(newUser);
@@ -942,7 +956,15 @@ function ArchivedUserDetailPage({ user, onBack }: { user: typeof archivedUsersDa
   );
 }
 
-export type UserRecord = typeof usersData[0];
+export type UserRecord = typeof usersData[0] & {
+  details?: Record<string, unknown>;
+  userType?: string;
+  clientId?: string;
+  clientName?: string;
+  provisionReason?: string;
+  provisionedAt?: string;
+  createdAt?: string;
+};
 
 function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[number]): UserRecord {
   const initials = user.name.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "U";
@@ -953,7 +975,7 @@ function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[numb
     name: user.name,
     role: user.role,
     email: user.email,
-    phone: "",
+    phone: user.phone || "",
     lastActive: user.createdAt,
     status: user.status === "active" ? "Active" : "Inactive",
     initials,
@@ -964,20 +986,32 @@ function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[numb
 function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [activeTab, setActiveTab] = useState("Overview");
+  const savedDetails = user.details ?? {};
+  const savedDetailString = (key: string, fallback = "") =>
+    typeof savedDetails[key] === "string" ? savedDetails[key] as string : fallback;
+  const savedExpense = savedDetails.expenseForm && typeof savedDetails.expenseForm === "object"
+    ? savedDetails.expenseForm as Record<string, unknown>
+    : {};
+  const savedCategories = Array.isArray(savedExpense.categories)
+    ? savedExpense.categories.filter((category): category is string => typeof category === "string")
+    : [];
+  const savedDevices = Array.isArray(savedDetails.assignedDevices)
+    ? savedDetails.assignedDevices as typeof addUserDeviceOptions
+    : [];
 
   const [form, setForm] = useState({
     fullName: user.name,
     email: user.email,
-    phone: user.phone,
-    jobTitle: user.role,
-    department: "",
-    reportingManager: "",
-    gender: "",
-    joiningDate: "",
+    phone: user.phone || savedDetailString("phone"),
+    jobTitle: savedDetailString("jobTitle", user.role),
+    department: savedDetailString("department"),
+    reportingManager: savedDetailString("reportingManager"),
+    gender: savedDetailString("gender"),
+    joiningDate: savedDetailString("joiningDate"),
     role: user.role,
-    orgAccess: "Nitin Supplies HQ",
-    dataVisibility: "All Data",
-    locationAccess: "All Locations",
+    orgAccess: savedDetailString("orgAccess", "Nitin Supplies HQ"),
+    dataVisibility: savedDetailString("dataVisibility", "All Data"),
+    locationAccess: savedDetailString("locationAccess", "All Locations"),
     status: user.status,
   });
 
@@ -990,12 +1024,19 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
   const inheritedPermissions = getPortalRoles(clientId || "")
     .find(role => role.name === form.role)?.permissions ?? [];
 
-  const [expenseForm, setExpenseForm] = useState({ monthlyLimit: "50000", annualLimit: "500000", currency: "INR", approvalRequired: true, approvalThreshold: "5000", categories: [] as string[] });
+  const [expenseForm, setExpenseForm] = useState({
+    monthlyLimit: typeof savedExpense.monthlyLimit === "string" ? savedExpense.monthlyLimit : "50000",
+    annualLimit: typeof savedExpense.annualLimit === "string" ? savedExpense.annualLimit : "500000",
+    currency: typeof savedExpense.currency === "string" ? savedExpense.currency : "INR",
+    approvalRequired: typeof savedExpense.approvalRequired === "boolean" ? savedExpense.approvalRequired : true,
+    approvalThreshold: typeof savedExpense.approvalThreshold === "string" ? savedExpense.approvalThreshold : "5000",
+    categories: savedCategories,
+  });
   const expenseCategories = ["Hardware", "Software", "Travel", "Furniture", "Accessories", "Training"];
   const toggleCategory = (cat: string) =>
     setExpenseForm((p) => ({ ...p, categories: p.categories.includes(cat) ? p.categories.filter((c) => c !== cat) : [...p.categories, cat] }));
 
-  const [assignedDevices, setAssignedDevices] = useState<typeof addUserDeviceOptions>([]);
+  const [assignedDevices, setAssignedDevices] = useState<typeof addUserDeviceOptions>(savedDevices);
   const [deviceSearch, setDeviceSearch] = useState("");
   const [deviceDropOpen, setDeviceDropOpen] = useState(false);
   const filteredDeviceOptions = addUserDeviceOptions.filter(
@@ -1011,7 +1052,29 @@ function EditUserPage({ clientId, user, onBack, onSave }: { clientId?: string; u
     const initials = nameParts.length >= 2
       ? (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase()
       : form.fullName.slice(0, 2).toUpperCase();
-    onSave({ ...user, name: form.fullName || user.name, role: form.role || user.role, email: form.email || user.email, phone: form.phone || user.phone, status: form.status, initials });
+    onSave({
+      ...user,
+      name: form.fullName || user.name,
+      role: form.role || user.role,
+      email: form.email || user.email,
+      phone: form.phone,
+      status: form.status,
+      initials,
+      details: {
+        ...savedDetails,
+        jobTitle: form.jobTitle,
+        department: form.department,
+        reportingManager: form.reportingManager,
+        gender: form.gender,
+        joiningDate: form.joiningDate,
+        orgAccess: form.orgAccess,
+        dataVisibility: form.dataVisibility,
+        locationAccess: form.locationAccess,
+        expenseForm: { ...expenseForm },
+        assignedDevices: [...assignedDevices],
+        permissions: [...inheritedPermissions],
+      },
+    });
     onBack();
   };
 
@@ -2679,6 +2742,8 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
       email: row.email,
       name: row.name,
       role: "Employee",
+      phone: row.phone,
+      details: row.details,
     });
     setRowMenu(null);
     window.alert(
@@ -2693,6 +2758,8 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         name: user.name,
         role: user.role,
         status: user.status === "Active" ? "active" : "inactive",
+        phone: user.phone,
+        details: user.details,
       });
       // Use the canonical persisted record (and its ID) rather than the
       // temporary table record. This keeps edit/deactivate actions live.
@@ -2735,6 +2802,8 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         email: updated.email,
         role: updated.role,
         status: updated.status === "Active" ? "active" : "inactive",
+        phone: updated.phone,
+        details: updated.details,
       });
     }
     setUsers((prev) => prev.map((u) => u.id === updated.id ? updated : u));

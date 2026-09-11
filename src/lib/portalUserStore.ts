@@ -4,6 +4,7 @@ export interface PortalUser {
   id: string;
   email: string;
   password: string; // plain-text for demo; replace with hashing when backend is live
+  phone?: string;
   name: string;
   userType: PortalUserType;
   clientId: string;
@@ -13,6 +14,7 @@ export interface PortalUser {
   createdAt: string;
   provisionReason?: string;
   provisionedAt?: string;
+  details?: Record<string, unknown>;
 }
 
 const STORE_KEY = 'nido_portal_users';
@@ -349,7 +351,14 @@ export function provisionClientPortal(
 export function provisionPortalUser(
   clientId: string,
   clientName: string,
-  details: { email: string; name: string; role?: string; status?: 'active' | 'inactive' },
+  details: {
+    email: string;
+    name: string;
+    role?: string;
+    status?: 'active' | 'inactive';
+    phone?: string;
+    details?: Record<string, unknown>;
+  },
 ): ProvisionResult {
   const email = details.email.trim().toLowerCase();
   const password = `User@${randomSuffix()}!`;
@@ -367,6 +376,7 @@ export function provisionPortalUser(
     id: userId,
     email,
     password,
+    phone: details.phone ?? existing?.phone ?? '',
     name: details.name.trim(),
     userType: existing?.userType || 'client_user',
     clientId,
@@ -375,6 +385,7 @@ export function provisionPortalUser(
     status: details.status || 'active',
     createdAt: existing?.createdAt || new Date().toISOString(),
     provisionedAt: new Date().toISOString(),
+    details: details.details ?? existing?.details,
   });
   return { email, password, userId };
 }
