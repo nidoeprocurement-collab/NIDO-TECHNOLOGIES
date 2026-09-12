@@ -778,9 +778,7 @@ export function exportUsersCSV(currentUsers: Array<Record<string, unknown>>) {
   if (!currentUsers.length) return;
 
   const preferredOrder = [
-    "id",
     "employeeId",
-    "userType",
     "name",
     "email",
     "phone",
@@ -794,8 +792,16 @@ export function exportUsersCSV(currentUsers: Array<Record<string, unknown>>) {
     "createdAt",
     "provisionedAt",
     "provisionReason",
-    "initials",
   ];
+  const excludedExportKeys = (key: string) => {
+    const normalizedKey = key.toLowerCase();
+    return normalizedKey === "id"
+      || normalizedKey === "usertype"
+      || normalizedKey === "initials"
+      || normalizedKey === "color"
+      || normalizedKey === "details.permissions"
+      || normalizedKey.startsWith("details.permissions.");
+  };
 
   const flattenUser = (user: Record<string, unknown>) => {
     const flattened: Record<string, string> = {};
@@ -836,7 +842,7 @@ export function exportUsersCSV(currentUsers: Array<Record<string, unknown>>) {
 
   const flattenedUsers = currentUsers.map(flattenUser);
   const keys = Array.from(new Set(flattenedUsers.flatMap(user => Object.keys(user))))
-    .filter(key => !key.toLowerCase().includes("password"));
+    .filter(key => !key.toLowerCase().includes("password") && !excludedExportKeys(key));
   const detailKeys = keys.filter(key => key.startsWith("details."));
   const headers = [
     ...preferredOrder.filter(key => keys.includes(key)),
