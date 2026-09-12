@@ -1053,6 +1053,12 @@ function portalUserToRecord(user: ReturnType<typeof getPortalUsersByClient>[numb
   };
 }
 
+function getDisplayedUserId(user: UserRecord, rowIndex: number) {
+  const legacyIndex = usersData.findIndex(candidate => candidate.id === user.id);
+  const displayIndex = legacyIndex >= 0 ? legacyIndex + 1 : rowIndex + 1;
+  return `UI-${String(displayIndex).padStart(5, "0")}`;
+}
+
 function EditUserPage({ clientId, clientName, user, onBack, onSave }: { clientId?: string; clientName?: string; user: UserRecord; onBack: () => void; onSave: (updated: UserRecord) => void }) {
   const modalTabs = ["Overview", "Permissions", "Expenses", "Assigned Devices"];
   const [activeTab, setActiveTab] = useState("Overview");
@@ -1901,7 +1907,7 @@ function approvalRequestToDetail(request: ApprovalRequest): UserApprovalRecord {
   };
 }
 
-function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, assignedDevices = [], onOpenAssignPage }: { user: UserRecord; onBack: () => void; onEdit?: () => void; onResetPassword?: () => void; onDeactivate?: () => void; assignedDevices?: AssignedDeviceEntry[]; onOpenAssignPage?: () => void }) {
+function UserDetailPage({ user, displayUserId, onBack, onEdit, onResetPassword, onDeactivate, assignedDevices = [], onOpenAssignPage }: { user: UserRecord; displayUserId?: string; onBack: () => void; onEdit?: () => void; onResetPassword?: () => void; onDeactivate?: () => void; assignedDevices?: AssignedDeviceEntry[]; onOpenAssignPage?: () => void }) {
   const [detailTab, setDetailTab] = useState("Overview");
   const detailTabs = ["Overview", "Activity", "Orders", "Services", "Expenses", "Assigned Devices", "Pending Approvals"];
   const [selectedApproval, setSelectedApproval] = useState<UserApprovalRecord | null>(null);
@@ -1929,7 +1935,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
   const formattedDate = new Date(user.lastActive).toLocaleDateString("en-US", {
     year: "numeric", month: "short", day: "numeric",
   });
-  const userId = user.id;
+  const userId = displayUserId || user.id;
 
   useEffect(() => {
     const reload = () => {
@@ -3196,6 +3202,10 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
   if (liveSelectedUser) return (
     <UserDetailPage
       user={liveSelectedUser}
+      displayUserId={getDisplayedUserId(
+        liveSelectedUser,
+        users.findIndex(candidate => candidate.id === liveSelectedUser.id),
+      )}
       onBack={() => setSelectedUser(null)}
       onEdit={() => setEditingUser(liveSelectedUser)}
       onResetPassword={() => setResetPasswordUser(liveSelectedUser)}
@@ -3333,7 +3343,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
                   <span
                     className="text-blue-500 font-mono text-[10px] hover:underline cursor-pointer"
                     onClick={(e) => { e.stopPropagation(); setSelectedUser(user); }}
-                  >{`UI-${String(usersData.findIndex(u => u.id === user.id) + 1 || i + 1).padStart(5, "0")}`}</span>
+                  >{getDisplayedUserId(user, i)}</span>
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex items-center gap-2">
