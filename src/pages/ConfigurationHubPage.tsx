@@ -12,6 +12,7 @@ import {
   Calculator,
   Gauge,
   Boxes,
+  UserCheck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -33,6 +34,12 @@ const menuItems = [
     description: "Define multi-level approval chains",
     icon: GitBranch,
     href: "/configuration/workflows",
+  },
+  {
+    title: "Client Approval Workflow",
+    description: "Manage approval rules for each client portal",
+    icon: UserCheck,
+    href: "/configuration/client-approval-workflows",
   },
   {
     title: "Order Status",

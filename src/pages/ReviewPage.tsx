@@ -8,6 +8,7 @@
   import { computeCartGST } from "@/lib/cartGstHelper";
   import { getSlabDiscountPct } from "@/lib/priceEngineStore";
   import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
+import { createApprovalRequest } from "@/lib/approvalEngine";
   import { reserveVendorStock } from "@/lib/vendorStore";
   import { useI18n } from "@/i18n/I18nProvider";
   import { formatCurrency } from "@/lib/formatters";
@@ -167,7 +168,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
       cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category, taxRate: getCartTaxRate(i) }))
     );
     const subtotal = preTaxSubtotal;
-    const handlePlaceOrder = () => {
+    const handlePlaceOrder = async () => {
       const now = new Date();
       const today = now.toISOString().split("T")[0];
       const itemsSnapshot = cart.map((i) => ({ ...i }));
@@ -185,8 +186,9 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
         requesterOptions,
       );
 
+      const selectedClientId = cart[0]?.clientId || clientId || "";
       const orderNumber = addOrder({
-        clientId: cart[0]?.clientId,
+        clientId: selectedClientId,
         client: "Nido Tech CorpEssentials",
         clientColor: "#2563eb",
         clientInitial: "N",
@@ -250,6 +252,27 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
           vendorRating: i.vendorRating,
           stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
         })) satisfies OrderCartItem[],
+      });
+
+      // Evaluate the selected client's active portal workflow immediately after
+      // the order is created. If no workflow matches, the existing order flow
+      // remains unchanged; matching requests become visible in the portal.
+      await createApprovalRequest({
+        module: "Order",
+        trigger: "Order created",
+        reference: orderNumber,
+        amount: totalAmount,
+        requestedBy: user?.id || "system",
+        requestedByName: requester,
+        requestedByRole: user?.role || "",
+        clientId: selectedClientId,
+        clientName: "Nido Tech CorpEssentials",
+        context: {
+          amount: totalAmount,
+          orderNumber,
+          client: selectedClientId,
+          requester,
+        },
       });
 
       // Reserve stock immediately so the shop shows reduced available qty.

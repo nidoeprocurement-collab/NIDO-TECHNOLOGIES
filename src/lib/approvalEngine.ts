@@ -402,9 +402,13 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
   const step = request.steps?.find((item: any) => Number(item.level_number) === Number(request.currentLevel)) as any;
   const actorId = String(payload.userId || "system");
   const actorRole = String(payload.userRole || "");
+  const actorDepartment = String(payload.userDepartment || "");
   const authorized = actorRole === "System Owner" ||
     (step?.approver_type === "Role" && step.approver_role === actorRole) ||
-    (step?.approver_type === "Specific User" && step.specific_user_id === actorId);
+    (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
+    (step?.approver_type === "Department" && step.approver_role === actorDepartment) ||
+    (step?.approver_type === "Manager" && actorId === String(request.requestedBy)) ||
+    (step?.approver_type === "Reporting Manager" && actorId === String(request.requestedBy));
   if (!authorized) throw new Error("You are not an eligible approver for the current level.");
 
   const previousStatus = request.status;

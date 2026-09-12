@@ -210,6 +210,7 @@ const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const ClientPortalDashboard = lazy(() => import("@/pages/ClientPortalDashboard"));
 const ClientPortalReportsPage = lazy(() => import("@/pages/ClientPortalReportsPage"));
 const ClientPortalApprovalsPage = lazy(() => import("@/pages/ClientPortalApprovalsPage"));
+const ClientApprovalWorkflowsPage = lazy(() => import("@/pages/ClientApprovalWorkflowsPage"));
 const ClientPortalUsersPage = lazy(() => import("@/pages/ClientPortalUsersPage"));
 const ClientPortalRolesPage = lazy(() => import("@/pages/ClientPortalRolesPage"));
 const ClientPortalAddressesPage = lazy(() => import("@/pages/ClientPortalAddressesPage"));
@@ -673,6 +674,10 @@ function AppRoutes() {
           <Route
             path="configuration/workflows"
             element={<ApprovalWorkflowsPage />}
+          />
+          <Route
+            path="configuration/client-approval-workflows"
+            element={<ClientApprovalWorkflowsPage />}
           />
           <Route
             path="configuration/pricing"
