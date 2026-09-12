@@ -7,6 +7,14 @@ description: How the NIDO Client Portal is layered on top of the Admin Platform 
 
 The Client Portal is NOT a separate app. It shares the same React app, routes, and AppLayout. Differentiation is entirely by `userType`.
 
+## Portal Client Profile Resolution
+
+Portal users may authenticate under a user-specific storage scope while their client profile was created under the NIDO owner scope. Portal screens must resolve the requested client by its exact `user.clientId` across the available client records, without exposing a list of other clients.
+
+**Why:** otherwise a valid portal user can authenticate successfully but the dashboard, checkout address, and order detail screens cannot find the client profile and appear blank or show “Client not found.”
+
+**How to apply:** use a client-scoped lookup for portal profile reads; keep admin client lists account-scoped and never broaden portal reads to return all client records.
+
 ## User Types (`src/contexts/AuthContext.tsx`)
 
 `User.userType: 'nido_admin' | 'client_admin' | 'client_user'`

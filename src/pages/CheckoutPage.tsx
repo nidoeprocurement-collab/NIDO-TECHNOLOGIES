@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from "react-router-dom";
                       } from "lucide-react";
                       import CheckoutStepper from "./CheckoutStepper";
                       import OrderSummaryPanel from "./OrderSummaryPanel";
-                      import { getClients } from "@/lib/clientStore";
+import { getClientForPortal } from "@/lib/clientStore";
 import { useAuth } from "@/contexts/AuthContext";
                       import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 import {
@@ -61,19 +61,31 @@ import {
                       }
 
                       /** Build a first address from the client's stored profile data. */
-                      function buildDefaultAddress(clientId: string): DeliveryAddress | null {
-                        const client = getClients().find((c) => c.id === clientId);
+                       function buildDefaultAddress(clientId: string): DeliveryAddress | null {
+                         const client = getClientForPortal(clientId);
                         if (!client) return null;
+                         const shippingAddress = client.shippingAddress || client.shipping_address;
+                         const billingAddress = client.billingAddress || client.billing_address;
+                         const shippingAddressLine2 = client.shippingAddressLine2 || client.shipping_address_line2;
+                         const billingAddressLine2 = client.billingAddressLine2 || client.billing_address_line2;
+                         const shippingCity = client.shippingCity || client.shipping_city;
+                         const billingCity = client.billingCity || client.billing_city;
+                         const shippingState = client.shippingState || client.shipping_state;
+                         const billingState = client.billingState || client.billing_state;
+                         const shippingPincode = client.shippingPincode || client.shipping_pincode;
+                         const billingPincode = client.billingPincode || client.billing_pincode;
+                         const shippingPhone = client.shippingPhone || client.shipping_phone;
+                         const billingPhone = client.billingPhone || client.billing_phone;
                         return {
                           id: 1,
                           label: "Office",
-                          attentionName: (client as any).shippingAttention || (client as any).shipping_attention || "",
-                          line1: client.billingAddress || "",
-                          line2: "",
-                          city: client.billingCity || "",
-                          state: client.billingState || "",
-                          zip: client.billingPincode || "",
-                          phone: client.phone || client.mobile || "",
+                           attentionName: client.shippingAttention || client.shipping_attention || client.billingAttention || client.billing_attention || "",
+                           line1: shippingAddress || billingAddress || "",
+                           line2: shippingAddressLine2 || billingAddressLine2 || "",
+                           city: shippingCity || billingCity || "",
+                           state: shippingState || billingState || "",
+                           zip: shippingPincode || billingPincode || "",
+                           phone: shippingPhone || billingPhone || client.phone || client.mobile || "",
                           isDefault: true,
                         };
                       }
@@ -276,24 +288,35 @@ import {
                            : (localStorage.getItem("nido_shop_selected_client") || "");
 
                         useEffect(() => {
-                          let stored = loadAddresses(clientId);
-                          if (stored.length === 0 && clientId) {
-                            const def = buildDefaultAddress(clientId);
-                            stored = def ? [def] : [];
-                            if (stored.length) persistAddresses(clientId, stored);
-                          }
-                          setAddresses(stored);
-                          if (stored.length) {
-                            const savedId = Number(localStorage.getItem(selectedAddressKey(clientId)));
-                            const savedAddress = Number.isFinite(savedId) ? stored.find((a) => a.id === savedId) : undefined;
-                            const nextAddressId = savedAddress?.id ?? stored.find((a) => a.isDefault)?.id ?? stored[0].id;
-                            setSelectedAddressId(nextAddressId);
-                            localStorage.setItem(selectedAddressKey(clientId), String(nextAddressId));
-                          } else {
-                            setSelectedAddressId(null);
-                            localStorage.removeItem(selectedAddressKey(clientId));
-                          }
-                        }, [clientId]);
+                           const resolveAddresses = () => {
+                             let stored = loadAddresses(clientId);
+                             if (stored.length === 0 && clientId) {
+                               const def = buildDefaultAddress(clientId);
+                               stored = def ? [def] : [];
+                               if (stored.length) persistAddresses(clientId, stored);
+                             }
+                             setAddresses(stored);
+                             if (stored.length) {
+                               const savedId = Number(localStorage.getItem(selectedAddressKey(clientId)));
+                               const savedAddress = Number.isFinite(savedId) ? stored.find((a) => a.id === savedId) : undefined;
+                               const nextAddressId = savedAddress?.id ?? stored.find((a) => a.isDefault)?.id ?? stored[0].id;
+                               setSelectedAddressId(nextAddressId);
+                               localStorage.setItem(selectedAddressKey(clientId), String(nextAddressId));
+                             } else {
+                               setSelectedAddressId(null);
+                               localStorage.removeItem(selectedAddressKey(clientId));
+                             }
+                           };
+
+                           resolveAddresses();
+                           const refreshAddresses = () => resolveAddresses();
+                           window.addEventListener('nidoDeliveryAddressesUpdated', refreshAddresses);
+                           window.addEventListener('storage', refreshAddresses);
+                           return () => {
+                             window.removeEventListener('nidoDeliveryAddressesUpdated', refreshAddresses);
+                             window.removeEventListener('storage', refreshAddresses);
+                           };
+                         }, [clientId]);
 
                         // ── Handlers ──
 

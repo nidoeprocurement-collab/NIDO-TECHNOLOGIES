@@ -365,6 +365,39 @@ export function getClients(): StoredClient[] {
   return [...DEFAULT_CLIENTS.map(client => ({ ...client })), ...custom];
 }
 
+/**
+ * Resolve one client for a portal session.
+ *
+ * Portal users have their own auth scope, while the client itself is created
+ * in the owner/admin scope. We still restrict the lookup to the requested
+ * client ID so a portal session cannot receive another client's record.
+ */
+export function getClientForPortal(clientId: string): StoredClient | undefined {
+  if (!clientId) return undefined;
+
+  const current = getClients().find((client) => client.id === clientId);
+  if (current) return current;
+
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(`${SCOPED_STORE_KEY}:`)) continue;
+      const scopedClients = readList<StoredClient>(key);
+      const match = scopedClients?.find((client) => client.id === clientId);
+      if (match) return { ...match };
+    }
+
+    const legacyMatch = readList<StoredClient>(STORE_KEY)?.find(
+      (client) => client.id === clientId,
+    );
+    if (legacyMatch) return { ...legacyMatch };
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+  }
+
+  return undefined;
+}
+
 export function saveClients(clients: StoredClient[]): void {
   const custom = clients.filter(client => !DEFAULT_CLIENT_IDS.has(client.id));
   localStorage.setItem(scopedKey(SCOPED_STORE_KEY), JSON.stringify(custom));

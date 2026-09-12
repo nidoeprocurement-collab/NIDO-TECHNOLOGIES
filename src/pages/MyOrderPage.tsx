@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMyOrders, type MyOrder as Order, type MyOrderStatus as OrderStatus } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -399,6 +399,7 @@ const tdSt: React.CSSProperties = { padding: "14px 16px", verticalAlign: "middle
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { orders, updateOrdersStatus } = useMyOrders();
   const { user, isImpersonating, isClientPortalUser } = useAuth();
   const isViewOnly = isImpersonating;
@@ -611,7 +612,7 @@ export default function MyOrderPage() {
                     showToast("This action is disabled while using client-user impersonation.");
                     return;
                   }
-                  navigate("/shop");
+                  navigate(location.pathname.startsWith("/portal/") ? "/portal/catalog" : "/shop");
                 }}
                 onBulkStatus={() => {
                   if (isViewOnly) {
@@ -723,7 +724,7 @@ export default function MyOrderPage() {
                       </td>
                       <td style={tdSt}>
                         <button
-                          onClick={() => navigate(`/orders/${order.id}`)}
+                          onClick={() => navigate(`${location.pathname.startsWith("/portal/") ? "/portal/orders" : "/orders"}/${order.id}`)}
                           style={{ color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0, fontFamily: "inherit", fontSize: "inherit" }}
                         >
                           {order.id}

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
+import { getClientForPortal } from '@/lib/clientStore';
 
 interface Address {
   id: number;
@@ -12,6 +13,11 @@ interface Address {
   line1: string;
   line2: string;
   phone: string;
+  attentionName?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  isDefault?: boolean;
 }
 
 const BLANK_ADDR: Omit<Address, 'id'> = { label: '', line1: '', line2: '', phone: '' };
@@ -29,13 +35,43 @@ export default function ClientPortalAddressesPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
-      if (raw) setAddresses(JSON.parse(raw));
+      const saved = raw ? JSON.parse(raw) as Address[] : [];
+      if (saved.length > 0) {
+        setAddresses(saved);
+        return;
+      }
+
+      const client = getClientForPortal(clientId);
+      if (!client) {
+        setAddresses([]);
+        return;
+      }
+
+      const defaultAddress: Address = {
+        id: 1,
+        label: 'Office',
+        line1: client.shippingAddress || client.shipping_address || client.billingAddress || client.billing_address || '',
+        line2: client.shippingAddressLine2 || client.shipping_address_line2 || client.billingAddressLine2 || client.billing_address_line2 || '',
+        phone: client.shippingPhone || client.shipping_phone || client.billingPhone || client.billing_phone || client.phone || client.mobile || '',
+        attentionName: client.shippingAttention || client.shipping_attention || client.billingAttention || client.billing_attention || '',
+        city: client.shippingCity || client.shipping_city || client.billingCity || client.billing_city || '',
+        state: client.shippingState || client.shipping_state || client.billingState || client.billing_state || '',
+        zip: client.shippingPincode || client.shipping_pincode || client.billingPincode || client.billing_pincode || '',
+        isDefault: true,
+      };
+      if (defaultAddress.line1) {
+        setAddresses([defaultAddress]);
+        localStorage.setItem(storageKey, JSON.stringify([defaultAddress]));
+      } else {
+        setAddresses([]);
+      }
     } catch { /* ignore */ }
-  }, [storageKey]);
+  }, [clientId, storageKey]);
 
   const persist = (addrs: Address[]) => {
     setAddresses(addrs);
     localStorage.setItem(storageKey, JSON.stringify(addrs));
+    window.dispatchEvent(new Event('nidoDeliveryAddressesUpdated'));
   };
 
   const openAdd = () => {
@@ -124,6 +160,9 @@ export default function ClientPortalAddressesPage() {
                   </div>
                   <p className="text-sm text-gray-700">{a.line1}</p>
                   {a.line2 && <p className="text-sm text-gray-500">{a.line2}</p>}
+                   {(a.city || a.state || a.zip) && (
+                     <p className="text-sm text-gray-500">{[a.city, a.state, a.zip].filter(Boolean).join(', ')}</p>
+                   )}
                   {a.phone && <p className="text-xs text-gray-400 mt-2">{a.phone}</p>}
                 </CardContent>
               </Card>

@@ -24,7 +24,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClients, type StoredClient } from "@/lib/clientStore";
+import { getClientForPortal, getClients, type StoredClient } from "@/lib/clientStore";
 import {
   getClientActivities,
   getClientContract,
@@ -252,7 +252,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const { user } = useAuth();
   const { hasRoutePermission } = usePermissions();
   const navigate = useNavigate();
-  const clientId = portalMode ? user?.clientId ?? "" : params.id ?? "";
+  const clientId = portalMode ? user?.clientId?.trim() ?? "" : params.id ?? "";
   const [activeTab, setActiveTab] = useState("Overview");
   const [period, setPeriod] = useState<Period>("Year");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -260,7 +260,9 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const client = getClients().find((item) => item.id === clientId);
+  const client = portalMode
+    ? getClientForPortal(clientId)
+    : getClients().find((item) => item.id === clientId);
   const [orders, setOrders] = useState<ClientOrderRecord[]>(() => getClientOrders(clientId, client?.name));
   const [services, setServices] = useState<ClientServiceRecord[]>(() => getClientServices(clientId));
   const [activities, setActivities] = useState<ClientActivityRecord[]>(() => getClientActivities(clientId));

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { getClients } from "@/lib/clientStore";
+import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
@@ -2396,6 +2396,7 @@ function reconcileSubOrderStatuses(subOrders: any[], orderId: string): any[] {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function MyOrderPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const { orders, updateOrderStatus, setOrders } = useMyOrders();
   const { user, isClientPortalUser } = useAuth();
@@ -2405,10 +2406,13 @@ export default function MyOrderPage() {
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
   const clientInfo = useMemo(() => {
+    if (isClientPortalUser && user?.clientId) {
+      return getClientForPortal(user.clientId) as any ?? null;
+    }
     return getClients().find((entry: any) =>
       entry.id === order?.clientId || entry.name === order?.client
     ) as any ?? null;
-  }, [order?.clientId, order?.client]);
+  }, [isClientPortalUser, order?.clientId, order?.client, user?.clientId]);
 
   // ── Checkout fallbacks ────────────────────────────────────────────────────
   // For orders placed before paymentMethod/deliveryAddress were persisted on
@@ -3212,7 +3216,7 @@ export default function MyOrderPage() {
             {orderId ? `Order "${orderId}" doesn't exist or hasn't been placed yet.` : "No order ID provided."}
           </p>
           <button
-            onClick={() => navigate("/orders")}
+            onClick={() => navigate(location.pathname.startsWith("/portal/") ? "/portal/orders" : "/orders")}
             style={{ padding: "10px 28px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 14, fontFamily: "inherit" }}
           >
             Back to Orders
