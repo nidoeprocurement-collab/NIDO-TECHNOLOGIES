@@ -118,7 +118,12 @@ function EditModal({ title, fields, currentValues, onSave, onClose }: EditModalP
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg border border-gray-200">
             Cancel
           </button>
-          <button onClick={() => onSave(values)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+          <button
+            type="button"
+            onClick={() => onSave(values)}
+            data-testid="save-contract-changes"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg"
+          >
             Save Changes
           </button>
         </div>
@@ -146,6 +151,7 @@ function SectionCard({ title, children, onEdit }: { title: string; children: Rea
         <h3 className="text-xs font-bold text-gray-800">{title}</h3>
         <button
           onClick={onEdit}
+          aria-label={`Edit ${title}`}
           className="text-gray-400 hover:text-gray-600 p-1 rounded-md hover:bg-gray-100 transition-colors"
           data-testid={`edit-${title.replace(/\s+/g, "-").toLowerCase()}`}
         >
@@ -344,6 +350,7 @@ function ContractDetailView({
   const [newReminderLabel, setNewReminderLabel] = useState("");
   const [newReminderDate, setNewReminderDate] = useState("");
   const [contractHydrated, setContractHydrated] = useState(false);
+  const [saveConfirmation, setSaveConfirmation] = useState("");
 
   useEffect(() => {
     if (!clientId) {
@@ -937,9 +944,21 @@ function ContractDetailView({
           title={editModalConfig.title}
           fields={editModalConfig.fields}
           currentValues={editModalConfig.currentValues}
-          onSave={editModalConfig.onSave}
+          onSave={(values) => {
+            editModalConfig.onSave(values);
+            setSaveConfirmation("Changes saved successfully.");
+            window.setTimeout(() => setSaveConfirmation(""), 3000);
+          }}
           onClose={closeModal}
         />
+      )}
+      {saveConfirmation && (
+        <div
+          role="status"
+          className="fixed right-5 top-5 z-[60] rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg"
+        >
+          {saveConfirmation}
+        </div>
       )}
 
       {/* Header */}
