@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { safeReadJson } from "@/lib/utils";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ExpenseType = "Goods" | "Services";
@@ -49,6 +50,12 @@ interface ExpenseEntry {
   notes: string;
   reportingTags: string[];
   receipts: ReceiptFile[];
+  createdBy?: string;
+  createdById?: string;
+  createdByEmail?: string;
+  submittedBy?: string;
+  submittedById?: string;
+  submittedByEmail?: string;
 }
 
 const STORAGE_KEY = "nido_expenses_v1";
@@ -134,6 +141,7 @@ function FieldLabel({
 // ── Main component ────────────────────────────────────────────────────────────
 export default function NewExpensePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const vendorNames = getVendorNames();
@@ -239,6 +247,9 @@ export default function NewExpensePage() {
         notes: form.notes,
         reportingTags: [],
         receipts,
+        createdBy: user?.name || "",
+        createdById: user?.id || "",
+        createdByEmail: user?.email || "",
       };
 
       const existing = safeReadJson<ExpenseEntry[]>(STORAGE_KEY, []);

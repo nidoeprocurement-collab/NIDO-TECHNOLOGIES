@@ -14,6 +14,9 @@ export interface ClientOrderRecord {
   client: string;
   status: string;
   notes?: string;
+  requestedBy?: string;
+  requestedById?: string;
+  requestedByEmail?: string;
 }
 
 export interface ClientServiceRecord {
@@ -27,6 +30,9 @@ export interface ClientServiceRecord {
   status: string;
   category: string;
   description?: string;
+  requestedBy?: string;
+  requestedById?: string;
+  requestedByEmail?: string;
 }
 
 export type ClientActivityType = "Note" | "Comment" | "Update" | "Task" | "Mention";
@@ -46,6 +52,8 @@ export interface ClientActivityRecord {
   replies?: number;
   group: string;
   createdAt: string;
+  actorId?: string;
+  actorEmail?: string;
 }
 
 export interface ClientDocumentRecord {
@@ -106,6 +114,9 @@ export function getClientOrders(clientId: string, clientName?: string): ClientOr
         amountNum: Number(order.totalAmountNum || 0),
         client: order.client || clientName || clientId,
         status: order.status || "Processing",
+        requestedBy: order.requester || order.requestedBy || "",
+        requestedById: order.requesterId || order.requestedById || "",
+        requestedByEmail: order.requesterEmail || order.requestedByEmail || "",
       }));
     const byId = new Map([...saved, ...sharedOrders].map((item) => [item.id, item]));
     return Array.from(byId.values()).sort((a, b) => b.date.localeCompare(a.date));

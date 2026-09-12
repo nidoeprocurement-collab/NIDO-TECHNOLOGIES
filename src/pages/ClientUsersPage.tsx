@@ -5,7 +5,6 @@ import {
   Download,
   Users,
   DollarSign,
-  ShoppingCart,
   Building2,
   MoreVertical,
   UserPlus,
@@ -26,12 +25,21 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { servicesData } from "./ClientServicesPage";
-import { ordersData, OrderStatusBadge } from "./ClientOrdersPage";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getPortalUsersByClient, getPortalRoles, PORTAL_MODULES, provisionPortalUser, updatePortalUser } from "@/lib/portalUserStore";
 import { getClients, addClient } from "@/lib/clientStore";
+import {
+  getClientActivities,
+  getClientOrders,
+  getClientServices,
+  type ClientActivityRecord,
+  type ClientOrderRecord,
+  type ClientServiceRecord,
+} from "@/lib/clientDataStore";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
+import { OrderStatusBadge } from "./ClientOrdersPage";
 
 
 export const usersData = [
@@ -1805,17 +1813,214 @@ const pendingApprovals = [
   },
 ];
 
+type UserDetailExpense = {
+  id: string;
+  date: string;
+  expenseAccount?: string;
+  vendorName?: string;
+  amount?: number;
+  referenceNumber?: string;
+  status?: string;
+  notes?: string;
+  [key: string]: unknown;
+};
+
+type UserApprovalRecord = {
+  id: string;
+  type: string;
+  title: string;
+  requestedBy: string;
+  requestedByRole: string;
+  requestedOn: string;
+  amount: string;
+  priority: string;
+  description: string;
+  items: Array<{ name: string; qty: number; unitPrice: string; total: string }>;
+  attachments: string[];
+  statusHistory: Array<{ status: string; by: string; date: string }>;
+  status: string;
+};
+
+function recordBelongsToUser(record: unknown, user: UserRecord): boolean {
+  if (!record || typeof record !== "object") return false;
+  const value = record as Record<string, unknown>;
+  const ids = [
+    value.userId, value.requestedById, value.requesterId, value.createdById, value.actorId,
+  ].map(item => String(item || "").trim()).filter(Boolean);
+  const emails = [
+    value.email, value.requestedByEmail, value.requesterEmail, value.createdByEmail, value.actorEmail,
+  ].map(item => String(item || "").trim().toLowerCase()).filter(Boolean);
+  const names = [
+    value.name, value.requestedBy, value.requestedByName, value.requester, value.createdBy, value.actor,
+  ].map(item => String(item || "").trim().toLowerCase()).filter(Boolean);
+  return ids.includes(user.id)
+    || emails.includes(user.email.toLowerCase())
+    || names.includes(user.name.toLowerCase());
+}
+
+function formatDetailAmount(amount: number | string | null | undefined): string {
+  if (typeof amount === "number" && Number.isFinite(amount)) return `₹${amount.toLocaleString("en-IN")}`;
+  if (typeof amount === "string" && amount.trim()) return amount;
+  return "—";
+}
+
+function approvalRequestToDetail(request: ApprovalRequest): UserApprovalRecord {
+  const context = request.context || {};
+  const rawItems = Array.isArray(context.items) ? context.items : [];
+  const items = rawItems.map((item, index) => {
+    const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+    const qty = Number(row.qty || row.quantity || 1);
+    const unitPrice = row.unitPrice ?? row.unit_price ?? row.price ?? "";
+    const total = row.total ?? row.amount ?? (Number(unitPrice) * qty || "");
+    return {
+      name: String(row.name || row.item || `Item ${index + 1}`),
+      qty: Number.isFinite(qty) ? qty : 1,
+      unitPrice: formatDetailAmount(unitPrice as number | string),
+      total: formatDetailAmount(total as number | string),
+    };
+  });
+  const rawTimeline = Array.isArray(request.timeline) ? request.timeline : [];
+  return {
+    id: request.id,
+    type: String(context.type || request.module || "Approval Request"),
+    title: String(context.title || request.workflow || request.trigger || request.reference),
+    requestedBy: request.requestedByName || request.requestedBy,
+    requestedByRole: String(context.requestedByRole || context.role || ""),
+    requestedOn: request.createdAt ? request.createdAt.slice(0, 10) : "—",
+    amount: formatDetailAmount(request.amount),
+    priority: String(context.priority || "Medium"),
+    description: String(context.description || context.reason || request.trigger || ""),
+    items,
+    attachments: Array.isArray(context.attachments) ? context.attachments.map(String) : [],
+    statusHistory: rawTimeline.map((step: any) => ({
+      status: String(step.new_status || step.action || "Updated"),
+      by: String(step.user_name || step.userName || "System"),
+      date: step.created_at ? String(step.created_at).slice(0, 16).replace("T", " ") : "—",
+    })),
+    status: request.status,
+  };
+}
+
 function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, assignedDevices = [], onOpenAssignPage }: { user: UserRecord; onBack: () => void; onEdit?: () => void; onResetPassword?: () => void; onDeactivate?: () => void; assignedDevices?: AssignedDeviceEntry[]; onOpenAssignPage?: () => void }) {
   const [detailTab, setDetailTab] = useState("Overview");
   const detailTabs = ["Overview", "Activity", "Orders", "Services", "Expenses", "Assigned Devices", "Pending Approvals"];
-  const [selectedApproval, setSelectedApproval] = useState<typeof pendingApprovals[0] | null>(null);
+  const [selectedApproval, setSelectedApproval] = useState<UserApprovalRecord | null>(null);
   const [dotMenuOpen, setDotMenuOpen] = useState(false);
   const [expMonth, setExpMonth] = useState("2026-06");
+  const [activities, setActivities] = useState<ClientActivityRecord[]>([]);
+  const [orders, setOrders] = useState<ClientOrderRecord[]>([]);
+  const [services, setServices] = useState<ClientServiceRecord[]>([]);
+  const [expenses, setExpenses] = useState<UserDetailExpense[]>([]);
+  const [approvalRequests, setApprovalRequests] = useState<UserApprovalRecord[]>([]);
+
+  const userDetails = user.details ?? {};
+  const clientId = user.clientId || "";
+  const organizationName = String(userDetails.orgAccess || user.clientName || "—");
+  const employeeId = String(userDetails.employeeId || "—");
+  const gender = String(userDetails.gender || "—");
+  const department = String(userDetails.department || "—");
+  const reportingManager = String(userDetails.reportingManager || "—");
+  const joiningDate = String(userDetails.joiningDate || "—");
+  const accountInfo = String(userDetails.accountInfo || "—");
+  const userDevices = Array.isArray(userDetails.assignedDevices)
+    ? userDetails.assignedDevices as AssignedDeviceEntry[]
+    : assignedDevices;
 
   const formattedDate = new Date(user.lastActive).toLocaleDateString("en-US", {
     year: "numeric", month: "short", day: "numeric",
   });
-  const userId = `USR${String(100040 + usersData.findIndex(u => u.id === user.id) + 1)}`;
+  const userId = user.id;
+
+  useEffect(() => {
+    const reload = () => {
+      setActivities(clientId ? getClientActivities(clientId).filter(item => recordBelongsToUser(item, user)) : []);
+      setOrders(clientId ? getClientOrders(clientId, user.clientName).filter(item => recordBelongsToUser(item, user)) : []);
+      const clientServices = clientId
+        ? getClientServices(clientId).filter(item => recordBelongsToUser(item, user))
+        : [];
+      const requestedServices = getServiceRequests()
+        .filter(request => recordBelongsToUser({ requestedBy: request.requestedBy }, user))
+        .map(request => ({
+          id: request.id,
+          clientId,
+          name: request.requestType,
+          provider: "Service request",
+          startDate: request.requestDate,
+          endDate: request.requestDate,
+          amount: "—",
+          status: request.status,
+          category: request.requestType,
+          description: request.itemAsset,
+          requestedBy: request.requestedBy,
+        }));
+      setServices([...clientServices, ...requestedServices]);
+      try {
+        const raw = JSON.parse(localStorage.getItem("nido_expenses_v1") || "[]");
+        setExpenses(Array.isArray(raw)
+          ? raw.filter((item): item is UserDetailExpense => Boolean(item && typeof item === "object" && recordBelongsToUser(item, user)))
+          : []);
+      } catch {
+        setExpenses([]);
+      }
+    };
+    reload();
+    window.addEventListener("nidoClientDataUpdated", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("nidoClientDataUpdated", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, [clientId, user.id, user.email, user.name, user.clientName]);
+
+  useEffect(() => {
+    let active = true;
+    loadApprovalBootstrap()
+      .then(result => {
+        if (!active) return;
+        setApprovalRequests(result.requests
+          .filter(request => ["Pending", "In Progress", "Escalated"].includes(request.status))
+          .filter(request => recordBelongsToUser({
+            requestedById: request.requestedBy,
+            requestedByEmail: request.requestedBy,
+            requestedByName: request.requestedByName,
+          }, user))
+          .map(approvalRequestToDetail));
+      })
+      .catch(() => {
+        if (active) setApprovalRequests([]);
+      });
+    return () => { active = false; };
+  }, [user.id, user.email, user.name]);
+
+  const orderApprovals: UserApprovalRecord[] = orders
+    .filter(order => !["Delivered", "Cancelled", "Completed"].includes(order.status))
+    .map(order => ({
+      id: order.id,
+      type: "Purchase Order",
+      title: `Order ${order.id}`,
+      requestedBy: order.requestedBy || user.name,
+      requestedByRole: user.role,
+      requestedOn: order.date,
+      amount: formatDetailAmount(order.amount),
+      priority: "Medium",
+      description: order.notes || "Client order awaiting completion.",
+      items: [{ name: `${order.items} item${order.items === 1 ? "" : "s"}`, qty: order.items, unitPrice: order.amount, total: order.amount }],
+      attachments: [],
+      statusHistory: [{ status: order.status, by: order.requestedBy || user.name, date: order.date }],
+      status: order.status,
+    }));
+  const liveApprovals = [...approvalRequests, ...orderApprovals];
+  const totalExpense = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+  const selectedMonthExpense = expenses
+    .filter(expense => String(expense.date || "").slice(0, 7) === expMonth)
+    .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+  const pendingExpense = expenses.filter(expense => String(expense.status || "").toLowerCase().includes("pending"));
+  const avatarGender = gender.toLowerCase();
+  const avatarSrc = avatarGender === "male"
+    ? "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=160&h=160&fit=crop&auto=format"
+    : avatarGender === "female"
+      ? "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&h=160&fit=crop&auto=format"
+      : "";
 
   return (
     <div className="flex flex-col gap-4">
@@ -1896,12 +2101,12 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
             <div className="border-r border-gray-100 p-2 flex flex-col gap-3">
               {/* Avatar photo */}
               <div className="flex flex-col items-center gap-2 pb-3 border-b border-gray-100">
-                <div className="w-20 h-20 rounded-full overflow-hidden bg-blue-800 shrink-0 ring-2 ring-gray-100">
-                  <img
-                    src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=160&h=160&fit=crop&auto=format"
-                    alt={user.name}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-20 h-20 rounded-full overflow-hidden bg-blue-100 shrink-0 ring-2 ring-gray-100 flex items-center justify-center">
+                  {avatarSrc ? (
+                    <img src={avatarSrc} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xl font-bold text-blue-700">{user.initials}</span>
+                  )}
                 </div>
                 <p className="text-sm font-semibold text-gray-900 text-center leading-tight">{user.name}</p>
                 <p className="text-xs text-gray-500">{user.role}</p>
@@ -1918,19 +2123,19 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle size={12} className="text-green-500 shrink-0" />
-                  {user.status} · Today
+                  {user.status} · {formattedDate}
                 </div>
                 <div className="flex items-center gap-2">
                   <Building2 size={12} className="text-gray-400 shrink-0" />
-                  Apex Tech Solutions
+                  {organizationName}
                 </div>
               </div>
               <button className="mt-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded-lg transition-colors">
                 <Mail size={12} /> Send Email
               </button>
               <div className="text-[10px] text-gray-400 space-y-0.5 leading-relaxed">
-                <p>Last Login: Today, 11:15 AM</p>
-                <p>Logged in from San Diego, CA · IP 192.168.1.224</p>
+                <p>Last Login: {String(userDetails.lastLogin || formattedDate)}</p>
+                <p>{String(userDetails.location || "Location not recorded")}{userDetails.ipAddress ? ` · IP ${String(userDetails.ipAddress)}` : ""}</p>
               </div>
             </div>
 
@@ -1946,7 +2151,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                     </div>
                     <span className="text-[10px] text-gray-500">User ID</span>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">{userId}</p>
+                   <p className="text-sm font-bold text-gray-900 truncate" title={userId}>{userId}</p>
                 </div>
                 {/* Status */}
                 <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
@@ -1964,9 +2169,9 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                     <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
                       <Building2 size={11} className="text-indigo-600" />
                     </div>
-                    <span className="text-[10px] text-gray-500">Cost Center</span>
+                    <span className="text-[10px] text-gray-500">Organization</span>
                   </div>
-                  <p className="text-sm font-bold text-gray-900">IT Operations</p>
+                  <p className="text-sm font-bold text-gray-900 truncate">{organizationName}</p>
                 </div>
                 {/* Total Orders */}
                 <div className="px-4 py-2 flex flex-col gap-1.5 border-r border-gray-100">
@@ -1976,7 +2181,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                     </div>
                     <span className="text-[10px] text-gray-500">Total Orders</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900 leading-none">5</p>
+                  <p className="text-2xl font-bold text-gray-900 leading-none">{orders.length}</p>
                   <p className="text-[10px] text-gray-400">Year-to-Date</p>
                 </div>
                 {/* Expenses */}
@@ -1990,7 +2195,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                     </div>
                     <span className="text-[10px] text-blue-500 cursor-pointer hover:underline whitespace-nowrap">View All &gt;</span>
                   </div>
-                  <p className="text-2xl font-bold text-blue-600 leading-none">$15,450</p>
+                  <p className="text-2xl font-bold text-blue-600 leading-none">{formatDetailAmount(totalExpense)}</p>
                   <p className="text-[10px] text-gray-400">Year-to-Date</p>
                   <p className="text-[10px] text-gray-400">IP: 192.168.1.224</p>
                 </div>
@@ -2008,10 +2213,10 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <div className="flex flex-col gap-3">
                     {[
                       { label: "Full Name", value: user.name },
-                      { label: "Employee ID", value: "EMP-2024-0157" },
+                      { label: "Employee ID", value: employeeId },
                       { label: "Email Address", value: user.email },
-                      { label: "Phone Number", value: user.phone },
-                      { label: "Gender", value: "Male" },
+                      { label: "Phone Number", value: user.phone || "—" },
+                      { label: "Gender", value: gender },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex flex-col gap-0.5">
                         <p className="text-[10px] text-gray-400">{label}</p>
@@ -2029,11 +2234,11 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   </div>
                   <div className="flex flex-col gap-3">
                     {[
-                      { label: "Job Title", value: user.role },
-                      { label: "Department", value: "Operations" },
-                      { label: "Reporting Manager", value: "Sophia Martinez" },
-                      { label: "Joining Date", value: "2022-04-18" },
-                      { label: "Account Info", value: "Postpaid" },
+                      { label: "Job Title", value: String(userDetails.jobTitle || user.role || "—") },
+                      { label: "Department", value: department },
+                      { label: "Reporting Manager", value: reportingManager },
+                      { label: "Joining Date", value: joiningDate },
+                      { label: "Account Info", value: accountInfo },
                     ].map(({ label, value }) => (
                       <div key={label} className="flex flex-col gap-0.5">
                         <p className="text-[10px] text-gray-400">{label}</p>
@@ -2050,20 +2255,20 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
         {detailTab === "Activity" && (
           <div className="p-5 flex flex-col gap-0">
             <p className="text-xs font-semibold text-gray-700 mb-4">Recent Activity</p>
-            {userActivityLog.map((item, i) => (
-              <div key={i} className="flex gap-4">
+            {activities.length === 0 ? (
+              <p className="text-xs text-gray-400 py-8 text-center">No activity recorded for this user.</p>
+            ) : activities.map((item, i) => (
+              <div key={item.id} className="flex gap-4">
                 <div className="flex flex-col items-center">
                   <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    {item.icon === "login" && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>}
-                    {item.icon === "order" && <ShoppingCart size={13} className="text-blue-500" />}
-                    {item.icon === "edit" && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>}
-                    {item.icon === "lock" && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
+                    <FileText size={13} className="text-blue-500" />
                   </div>
-                  {i < userActivityLog.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
+                  {i < activities.length - 1 && <div className="w-px flex-1 bg-gray-100 my-1" />}
                 </div>
                 <div className="pb-5">
-                  <p className="text-xs font-medium text-gray-800">{item.action}</p>
-                  <p className="text-[11px] text-gray-400 mt-0.5">{item.date}</p>
+                  <p className="text-xs font-medium text-gray-800">{item.name} {item.action} {item.boldPart}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{item.time} · {item.createdAt?.slice(0, 10) || item.group}</p>
+                  {item.description && <p className="text-[11px] text-gray-500 mt-1 whitespace-pre-line">{item.description}</p>}
                 </div>
               </div>
             ))}
@@ -2084,7 +2289,9 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 </tr>
               </thead>
               <tbody>
-                {ordersData.slice(0, 3).map((o, i) => (
+                {orders.length === 0 ? (
+                  <tr><td colSpan={5} className="py-8 text-center text-xs text-gray-400">No orders recorded for this user.</td></tr>
+                ) : orders.map((o, i) => (
                   <tr key={o.id} className={`border-b border-gray-50 last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}>
                     <td className="py-2.5 pr-4 text-blue-500 font-medium">{o.id}</td>
                     <td className="py-2.5 pr-4 text-gray-600">{o.date}</td>
@@ -2113,15 +2320,17 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   </tr>
                 </thead>
                 <tbody>
-                  {servicesData.map((svc, i) => (
+                  {services.length === 0 ? (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-gray-400">No services recorded for this user.</td></tr>
+                  ) : services.map((svc, i) => (
                     <tr key={svc.id} className={`border-b border-gray-50 last:border-0 hover:bg-gray-50/60 transition-colors ${i % 2 === 0 ? "bg-white" : "bg-gray-50/20"}`}>
                       <td className="px-4 py-2.5 text-blue-500 font-medium">{svc.id}</td>
                       <td className="px-4 py-2.5 text-gray-600">{svc.startDate}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-800">{svc.name}</td>
-                      <td className="px-4 py-2.5 text-blue-500">{svc.provider}</td>
+                      <td className="px-4 py-2.5 text-blue-500">{svc.requestedBy || user.name}</td>
                       <td className="px-4 py-2.5 font-semibold text-gray-900">{svc.amount}</td>
                       <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">Active</span>
+                        <span className="inline-flex items-center text-[11px] font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">{svc.status}</span>
                       </td>
                     </tr>
                   ))}
@@ -2137,7 +2346,7 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
             <div className="grid grid-cols-3 gap-3">
               <div className="border border-gray-100 rounded-xl px-2 py-2 bg-gray-50/60">
                 <p className="text-[10px] text-gray-400 mb-1">Total Expenses</p>
-                <p className="text-xl font-bold text-gray-900">$15,450</p>
+                <p className="text-xl font-bold text-gray-900">{formatDetailAmount(totalExpense)}</p>
                 <p className="text-[11px] text-gray-400 mt-0.5">Year to date</p>
               </div>
               <div className="border border-blue-100 rounded-xl px-2 py-2 bg-blue-50/40">
@@ -2159,15 +2368,15 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                     <option value="2025-10">Oct 2025</option>
                   </select>
                 </div>
-                <p className="text-xl font-bold text-blue-600">$3,200</p>
+                <p className="text-xl font-bold text-blue-600">{formatDetailAmount(selectedMonthExpense)}</p>
                 <p className="text-[11px] text-blue-400 mt-0.5">
                   {new Date(expMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                 </p>
               </div>
               <div className="border border-gray-100 rounded-xl px-2 py-2 bg-gray-50/60">
                 <p className="text-[10px] text-gray-400 mb-1">Pending Approval</p>
-                <p className="text-xl font-bold text-orange-500">$1,800</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">2 requests</p>
+                <p className="text-xl font-bold text-orange-500">{formatDetailAmount(pendingExpense.reduce((sum, expense) => sum + Number(expense.amount || 0), 0))}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{pendingExpense.length} requests</p>
               </div>
             </div>
 
@@ -2181,20 +2390,15 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                 </div>
                 <ResponsiveContainer width="100%" height={140}>
                   <BarChart
-                    data={[
-                      { month: "Jan", value: 800 },
-                      { month: "Feb", value: 1200 },
-                      { month: "Mar", value: 950 },
-                      { month: "Apr", value: 2100 },
-                      { month: "May", value: 1750 },
-                      { month: "Jun", value: 3200 },
-                      { month: "Jul", value: 0 },
-                      { month: "Aug", value: 0 },
-                      { month: "Sep", value: 0 },
-                      { month: "Oct", value: 0 },
-                      { month: "Nov", value: 0 },
-                      { month: "Dec", value: 0 },
-                    ]}
+                    data={Array.from({ length: 12 }, (_, index) => {
+                      const month = String(index + 1).padStart(2, "0");
+                      return {
+                        month: new Date(2026, index, 1).toLocaleDateString("en-US", { month: "short" }),
+                        value: expenses
+                          .filter(expense => String(expense.date || "").startsWith(`2026-${month}`))
+                          .reduce((sum, expense) => sum + Number(expense.amount || 0), 0),
+                      };
+                    })}
                     barSize={10}
                     margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
                   >
@@ -2214,20 +2418,20 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
               <div className="col-span-2">
                 <p className="text-xs font-semibold text-gray-700 mb-3">Top 5 Items</p>
                 <div className="flex flex-col gap-2">
-                  {[
-                    { name: "MacBook Pro", amount: "$4,200", pct: 27 },
-                    { name: "Adobe Creative Suite", amount: "$2,800", pct: 18 },
-                    { name: "Travel — Bangalore", amount: "$1,950", pct: 13 },
-                    { name: "Ergonomic Chair", amount: "$1,740", pct: 11 },
-                    { name: "iPhone 15 Pro", amount: "$1,320", pct: 9 },
-                  ].map((item) => (
-                    <div key={item.name}>
+                  {expenses.length === 0 ? (
+                    <p className="text-xs text-gray-400">No expenses recorded for this user.</p>
+                  ) : expenses
+                    .slice()
+                    .sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0))
+                    .slice(0, 5)
+                    .map((expense) => (
+                    <div key={expense.id}>
                       <div className="flex items-center justify-between text-[11px] mb-0.5">
-                        <span className="text-gray-700 truncate max-w-[130px]">{item.name}</span>
-                        <span className="text-gray-500 font-medium shrink-0">{item.amount}</span>
+                        <span className="text-gray-700 truncate max-w-[130px]">{expense.expenseAccount || expense.vendorName || expense.referenceNumber || expense.id}</span>
+                        <span className="text-gray-500 font-medium shrink-0">{formatDetailAmount(expense.amount)}</span>
                       </div>
                       <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${item.pct * 3.7}%` }} />
+                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${totalExpense ? Math.max(4, Number(expense.amount || 0) / totalExpense * 100) : 0}%` }} />
                       </div>
                     </div>
                   ))}
@@ -2239,13 +2443,8 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
         )}
 
         {detailTab === "Assigned Devices" && (() => {
-          const staticDevices: AssignedDeviceEntry[] = [
-            { name: "Apple MacBook Pro (2023)", sku: "MBP-14-M3-512", category: "Laptop", assignedOn: "2023-09-01", status: "Active", img: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=80&h=80&fit=crop&auto=format", serialNo: "C02XL0UKJHD5", modelNo: "A2779", referenceNo: "REF-2023-0091" },
-            { name: "Apple iPhone 15 Pro", sku: "IP15PRO-128-BLK", category: "Mobile", assignedOn: "2023-10-15", status: "Active", img: "https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=80&h=80&fit=crop&auto=format", serialNo: "F7RTXK9BPQM", modelNo: "A3290", referenceNo: "REF-2023-0122" },
-            { name: "Dell UltraSharp 27\" Monitor", sku: "DELL-U2722D", category: "Display", assignedOn: "2023-09-01", status: "Active", img: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=80&h=80&fit=crop&auto=format", serialNo: "CN-0GHVMX-47122", modelNo: "U2722D", referenceNo: "REF-2023-0089" },
-            { name: "Logitech MX Keys Keyboard", sku: "LG-MX-KEYS-ADV", category: "Peripheral", assignedOn: "2024-01-10", status: "In Repair", img: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=80&h=80&fit=crop&auto=format", serialNo: "2210LZ19D310", modelNo: "920-009295", referenceNo: "REF-2024-0011" },
-          ];
-          const allDevices = [...assignedDevices, ...staticDevices];
+          const staticDevices: AssignedDeviceEntry[] = [];
+          const allDevices = userDevices;
           const activeCount = allDevices.filter((d) => d.status === "Active").length;
           const repairCount = allDevices.filter((d) => d.status === "In Repair").length;
           return (
@@ -2275,11 +2474,11 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
               </div>
 
               {/* Newly assigned devices (from AssignDevicePage) */}
-              {assignedDevices.length > 0 && (
+              {userDevices.length > 0 && (
                 <div>
                   <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">Recently Assigned</p>
                   <div className="grid grid-cols-2 gap-4">
-                    {assignedDevices.map((device) => (
+                    {userDevices.map((device) => (
                       <div key={device.sku + device.assignedOn} className="border border-blue-200 bg-blue-50/30 rounded-xl p-2 flex items-start gap-2 hover:shadow-sm transition-shadow">
                         <div className="w-16 h-16 rounded-lg bg-white border border-blue-100 overflow-hidden shrink-0">
                           <img src={device.img} alt={device.name} className="w-full h-full object-cover" />
@@ -2495,11 +2694,13 @@ function UserDetailPage({ user, onBack, onEdit, onResetPassword, onDeactivate, a
                   <p className="text-xs font-semibold text-gray-900">Pending Approvals</p>
                   <p className="text-[11px] text-gray-400 mt-0.5">Requests raised by team members awaiting your approval</p>
                 </div>
-                <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">{pendingApprovals.length} pending</span>
+                <span className="text-[11px] font-semibold bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full">{liveApprovals.length} pending</span>
               </div>
 
               <div className="flex flex-col gap-3">
-                {pendingApprovals.map((approval) => (
+                {liveApprovals.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-8 text-center">No pending approvals recorded for this user.</p>
+                ) : liveApprovals.map((approval) => (
                   <button
                     key={approval.id}
                     onClick={() => setSelectedApproval(approval)}
@@ -2972,10 +3173,22 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
       userName={assigningDeviceFor.name}
       onBack={() => setAssigningDeviceFor(null)}
       onAssign={(device) => {
+        const currentDetails = assigningDeviceFor.details ?? {};
+        const existingDevices = Array.isArray(currentDetails.assignedDevices)
+          ? currentDetails.assignedDevices as AssignedDeviceEntry[]
+          : [];
+        const updatedDetails = {
+          ...currentDetails,
+          assignedDevices: [...existingDevices, device],
+        };
+        updatePortalUser(assigningDeviceFor.id, { details: updatedDetails });
+        const updatedUser = { ...assigningDeviceFor, details: updatedDetails };
         setUserDevices((prev) => ({
           ...prev,
-          [assigningDeviceFor.id]: [...(prev[assigningDeviceFor.id] ?? []), device],
+          [assigningDeviceFor.id]: [...existingDevices, device],
         }));
+        setUsers((prev) => prev.map(item => item.id === updatedUser.id ? updatedUser : item));
+        setSelectedUser(prev => prev?.id === updatedUser.id ? updatedUser : prev);
         setAssigningDeviceFor(null);
       }}
     />
@@ -2987,7 +3200,11 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
       onEdit={() => setEditingUser(liveSelectedUser)}
       onResetPassword={() => setResetPasswordUser(liveSelectedUser)}
       onDeactivate={() => deactivateUser(liveSelectedUser.id)}
-      assignedDevices={userDevices[liveSelectedUser.id] ?? []}
+       assignedDevices={
+         Array.isArray(liveSelectedUser.details?.assignedDevices)
+           ? liveSelectedUser.details.assignedDevices as AssignedDeviceEntry[]
+           : userDevices[liveSelectedUser.id] ?? []
+       }
       onOpenAssignPage={() => setAssigningDeviceFor(liveSelectedUser)}
     />
   );

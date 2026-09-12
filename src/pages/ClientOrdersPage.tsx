@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Filter, MoreVertical, X } from "lucide-react";
 import { getClientOrders, saveClientOrder, type ClientOrderRecord } from "@/lib/clientDataStore";
 import { getPrefix } from "@/lib/configService";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const ordersData = [
   { id: "ORD-2024-1245", date: "2024-05-28", items: 12, amount: "$125,000", client: "TechSupply Co", status: "Delivered" },
@@ -154,6 +155,7 @@ export default function ClientOrdersPage({
   dateRange?: ClientDateRange;
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [showCreateOrder, setShowCreateOrder] = useState(false);
@@ -173,7 +175,12 @@ export default function ClientOrdersPage({
   }, [dateRange?.start, dateRange?.end]);
 
   const handleCreate = (order: ClientOrderRecord) => {
-    saveClientOrder(order);
+    saveClientOrder({
+      ...order,
+      requestedBy: user?.name || "",
+      requestedById: user?.id || "",
+      requestedByEmail: user?.email || "",
+    });
     reload();
   };
 

@@ -183,7 +183,13 @@ export default function ClientServicesPage({ clientId: requestedClientId, dateRa
   }, [clientId]);
 
   const handleAdd = (service: ClientServiceRecord) => {
-    saveClientService({ ...service, clientId });
+    saveClientService({
+      ...service,
+      clientId,
+      requestedBy: user?.name || "",
+      requestedById: user?.id || "",
+      requestedByEmail: user?.email || "",
+    });
     reload();
   };
 

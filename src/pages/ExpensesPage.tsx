@@ -61,6 +61,12 @@ interface ExpenseEntry {
   reportingTags: string[];
   // receipts can be ReceiptFile objects (new) or legacy strings
   receipts: (ReceiptFile | string)[];
+  createdBy?: string;
+  createdById?: string;
+  createdByEmail?: string;
+  submittedBy?: string;
+  submittedById?: string;
+  submittedByEmail?: string;
 }
 
 const STORAGE_KEY = "nido_expenses_v1";
