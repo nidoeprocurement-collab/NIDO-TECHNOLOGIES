@@ -110,7 +110,10 @@ export interface StoredPO {
 /** A PO locks its order only after it has left the editable Draft state. */
 export function isPOConfirmed(po: Pick<StoredPO, "status"> | null | undefined): boolean {
   const status = String(po?.status || "").toLowerCase();
-  return status !== "draft" && status !== "cancelled" && status !== "rejected";
+  // Missing/legacy status is not evidence that a PO was generated. Treat it
+  // as pending so an order cannot become accidentally non-cancellable merely
+  // because an incomplete PO record exists in localStorage.
+  return Boolean(status) && status !== "draft" && status !== "cancelled" && status !== "rejected";
 }
 
 const STORAGE_KEY = "nido_all_purchase_orders";

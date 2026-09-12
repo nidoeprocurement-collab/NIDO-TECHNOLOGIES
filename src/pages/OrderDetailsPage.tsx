@@ -2362,7 +2362,9 @@ function isPOItemShipped(po: any, subOrderId: string): boolean {
 
 function isConfirmedPO(po: any): boolean {
   const status = String(po?.status || "").toLowerCase();
-  return status !== "draft" && status !== "cancelled" && status !== "rejected";
+  // Only a PO with an explicit non-draft status has been generated/issued.
+  // Incomplete legacy records must not lock the customer order.
+  return Boolean(status) && status !== "draft" && status !== "cancelled" && status !== "rejected";
 }
 
 // Client-created sub-orders wait in Pending until their vendor PO is confirmed.
@@ -2405,14 +2407,16 @@ export default function MyOrderPage() {
   // Find the real order from context
   const order = useMemo(() => orders.find(o => o.id === orderId), [orders, orderId]);
 
+  const orderClientId = order?.clientId || order?.cartItems?.find(item => item.clientId)?.clientId || "";
+
   const clientInfo = useMemo(() => {
     if (isClientPortalUser && user?.clientId) {
       return getClientForPortal(user.clientId) as any ?? null;
     }
     return getClients().find((entry: any) =>
-      entry.id === order?.clientId || entry.name === order?.client
+      String(entry.id) === String(orderClientId) || entry.name === order?.client
     ) as any ?? null;
-  }, [isClientPortalUser, order?.clientId, order?.client, user?.clientId]);
+  }, [isClientPortalUser, orderClientId, order?.client, user?.clientId]);
 
   // ── Checkout fallbacks ────────────────────────────────────────────────────
   // For orders placed before paymentMethod/deliveryAddress were persisted on
@@ -3190,8 +3194,12 @@ export default function MyOrderPage() {
         [deliveryInfo.city, deliveryInfo.state, deliveryInfo.country, deliveryInfo.zip].filter(Boolean).join(", "),
       ].filter(Boolean).join("\n")
     : deliveryInfo.address || "—";
+  // Ordered By is always the authenticated person who placed the order.
+  // Ordered For is the option selected in Shop's Ordered By dropdown. Older
+  // orders stored the selected person's resolved name, so preserve that as a
+  // backward-compatible fallback instead of showing the client name.
   const requesterName = order?.requester || user?.name || "—";
-  const orderedFor = order?.orderedFor || order?.client || "—";
+  const orderedFor = order?.orderedFor || "Ordered by self";
   const requesterRole = order?.requesterRole
     || user?.role
     || "—";
@@ -3319,7 +3327,7 @@ export default function MyOrderPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
           <div style={topInfoCard}>
             <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
-             <Field label="Client" value={clientInfo?.name || order?.client || "—"} />
+            <Field label="Client" value={clientInfo?.name || order?.client || "—"} />
             <Field label="Billing Address" value={billingAddress} />
             <Field label="Email" value={clientInfo?.email || "—"} />
             <Field label="Phone" value={clientInfo?.billing_phone || clientInfo?.billingPhone || clientInfo?.phone || clientInfo?.mobile || "—"} />

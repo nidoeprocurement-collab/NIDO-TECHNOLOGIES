@@ -79,8 +79,8 @@ export default function OrderConfirmationPage() {
   const shipping = state?.shipping ?? 0;
   const total = state?.total ?? 0;
   const address = state?.address ?? null;
-  const clientEmail = state?.clientEmail ?? "owner@nidotech.com";
-  const clientName = state?.clientName ?? "Nido Tech CorpEssentials";
+  const clientEmail = state?.clientEmail ?? "—";
+  const clientName = state?.clientName ?? "—";
   const paymentMethod = state?.paymentMethod ?? "Credit Card";
   const paymentDetail = (state as any)?.paymentDetail ?? "";
   const paymentTerms = state?.paymentTerms ?? "Net 30 (Payment due in 30 days)";

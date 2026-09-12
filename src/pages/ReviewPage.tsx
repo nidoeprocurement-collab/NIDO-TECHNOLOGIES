@@ -19,7 +19,7 @@ import {
   limitCheckoutNote,
 } from "@/lib/checkoutNotes";
 import { useAuth } from "@/contexts/AuthContext";
-import { getOrderRequesterOptions, ORDER_REQUESTER_KEY, resolveOrderRequester } from "@/lib/orderRequester";
+import { getOrderRequesterOptions, ORDER_REQUESTER_KEY, normalizeOrderRequester, resolveOrderRequester } from "@/lib/orderRequester";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
 
@@ -193,12 +193,15 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
       const requesterOptions = getOrderRequesterOptions(
         getPortalUsersByClient(cart[0]?.clientId || clientId).filter(user => user.status === "active"),
       );
+      const selectedRequesterValue = normalizeOrderRequester(localStorage.getItem(requesterStorageKey));
       const requester = resolveOrderRequester(
-        localStorage.getItem(requesterStorageKey),
+        selectedRequesterValue,
         user?.name,
         requesterOptions,
       );
       const orderedBy = user?.name?.trim() || "Owner";
+      const orderedFor = requesterOptions.find(option => option.value === selectedRequesterValue)?.label
+        || "Ordered by self";
       const selectedClientId = cart[0]?.clientId || clientId || "";
       const selectedClient = isClientPortalUser
         ? getClientForPortal(selectedClientId)
@@ -212,7 +215,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
         clientInitial: "N",
         poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
         requester: orderedBy,
-        orderedFor: requester,
+        orderedFor,
         requesterRole: user?.role || "System Owner",
         requesterInitial: orderedBy.charAt(0).toUpperCase() || "O",
         requesterColor: "#6b46c1",
@@ -264,7 +267,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
           selectedVendorId: i.selectedVendorId,
           selectedVendorName: i.selectedVendorName,
           vendorPrice: i.vendorPrice,
-           clientSellingPriceExclGst: i.clientSellingPriceExclGst,
+          clientSellingPriceExclGst: i.clientSellingPriceExclGst,
           landedCost: i.landedCost,
           gstSnapshot: i.gstSnapshot,
           hsnSnapshot: i.hsnSnapshot,
@@ -282,7 +285,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
         reference: orderNumber,
         amount: totalAmount,
         requestedBy: user?.id || "system",
-        requestedByName: requester,
+        requestedByName: orderedBy,
         requestedByRole: user?.role || "",
         clientId: selectedClientId,
         clientName,
