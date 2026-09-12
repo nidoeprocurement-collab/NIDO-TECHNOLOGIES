@@ -64,6 +64,9 @@ export default function OrderConfirmationPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const [copied, setCopied] = useState(false);
   const org = useOrgConfig();
+  const isPortalFlow = location.pathname.startsWith("/portal/");
+  const ordersPath = isPortalFlow ? "/portal/orders" : "/orders";
+  const shopPath = isPortalFlow ? "/portal/catalog" : "/shop";
 
   const state = location.state as ConfirmationState | null;
 
@@ -149,7 +152,7 @@ export default function OrderConfirmationPage() {
               </p>
 
               <button
-                onClick={() => navigate(`/orders/${orderId}`)}
+                onClick={() => navigate(`${ordersPath}/${orderId}`)}
                 className="w-full max-w-xs bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg py-3 text-sm transition-colors mb-6"
               >
                 Track Order
@@ -192,7 +195,7 @@ export default function OrderConfirmationPage() {
               </ul>
 
               <button
-                onClick={() => navigate("/shop")}
+                onClick={() => navigate(shopPath)}
                 className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-blue-600 font-medium transition-colors"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

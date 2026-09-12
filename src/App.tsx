@@ -1090,13 +1090,14 @@ function AppRoutes() {
           <Route path="reports/audit" element={<AuditTrailPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
-          {/* Portal dashboard: keep the client overview scoped to the signed-in portal user. */}
+          {/* Portal dashboard is the same live Client Overview used by admins,
+              scoped to the authenticated portal user's client. */}
           <Route
             path="portal/dashboard"
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Portal dashboard failed to load" resetKey={location.pathname}>
-                  <ClientPortalDashboard />
+                  <ClientDetailPage portalMode />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }

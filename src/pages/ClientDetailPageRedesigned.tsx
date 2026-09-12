@@ -287,6 +287,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     reload();
     const events = [
       "nidoClientDataUpdated",
+      "nidoClientsUpdated",
       "clientCatalogUpdated",
       "catalogUpdated",
       "nidoInvoicesUpdated",
@@ -294,7 +295,31 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       "nidoPortalUsersUpdated",
     ] as const;
     events.forEach((event) => window.addEventListener(event, reload));
-    return () => events.forEach((event) => window.removeEventListener(event, reload));
+    const onStorage = (event: StorageEvent) => {
+      // Custom events keep same-tab screens in sync. The storage listener
+      // covers the owner platform and portal when they are open in separate
+      // tabs or windows.
+      if (
+        event.key === null ||
+        event.key === "nido_my_orders" ||
+        event.key === "nido_client_orders_v1" ||
+        event.key === "nido_client_services_v1" ||
+        event.key === "nido_client_activities_v1" ||
+        event.key === "nido_client_documents_v1" ||
+        event.key === "nido_client_contracts_v1" ||
+        event.key === "nido_client_catalogs" ||
+        event.key === "nido_sales_invoices" ||
+        event.key === "nido_support_tickets" ||
+        event.key === "nido_portal_users"
+      ) {
+        reload();
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      events.forEach((event) => window.removeEventListener(event, reload));
+      window.removeEventListener("storage", onStorage);
+    };
   }, [clientId, client?.name]);
 
   const selectedDateRange = useMemo(
@@ -354,6 +379,19 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
       : hasRoutePermission("clients", "clients", "view");
   });
   const goTo = (tab: string) => {
+    if (portalMode) {
+      const portalPaths: Record<string, string> = {
+        Catalog: "/portal/catalog",
+        Orders: "/portal/orders",
+        Services: "/portal/services",
+        Contracts: "/portal/contracts",
+        Documents: "/portal/invoices",
+        Users: "/portal/users",
+      };
+      const path = portalPaths[tab];
+      if (path) navigate(path);
+      return;
+    }
     if (visibleAdminTabs.includes(tab) || tab === "Overview") setActiveTab(tab);
   };
   const openOverviewLink = (path: string, tab: string) => {
@@ -524,7 +562,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
                 {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
               </div>
-                <button type="button" onClick={() => navigate(`/clients/${client.id}/contracts`)} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
+                <button type="button" onClick={() => portalMode ? navigate("/portal/profile") : navigate(`/clients/${client.id}/contracts`)} className="mt-4 w-full rounded border border-violet-200 bg-violet-50 py-1.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">
                 View Full Profile
               </button>
             </Panel>
