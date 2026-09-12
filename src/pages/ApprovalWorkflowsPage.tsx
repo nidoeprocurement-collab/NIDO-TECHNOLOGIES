@@ -89,10 +89,31 @@ function WorkflowDetailsDialog({ workflow, onClose }: { workflow: ApprovalWorkfl
   </div>;
 }
 
-function WorkflowBuilder({ initial, editingId, actor, onClose, onSaved }: { initial: any; editingId?: string; actor: string; onClose: () => void; onSaved: () => void }) {
+export function ApprovalWorkflowBuilder({
+  initial,
+  editingId,
+  actor,
+  onClose,
+  onSaved,
+  approverUsers,
+  approverRoles,
+  approverDepartments,
+}: {
+  initial: any;
+  editingId?: string;
+  actor: string;
+  onClose: () => void;
+  onSaved: () => void;
+  approverUsers?: Array<{ id: string; name: string; role?: string; status?: string }>;
+  approverRoles?: string[];
+  approverDepartments?: string[];
+}) {
   const [form, setForm] = useState<any>({ ...blankWorkflow(), ...initial, conditions: initial.conditions?.length ? initial.conditions : [blankCondition()], levels: initial.levels?.length ? initial.levels : [blankLevel(1)] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const availableUsers = approverUsers?.length ? approverUsers : ACTIVE_USERS();
+  const availableRoles = approverRoles?.length ? approverRoles : getRoles().filter(r => r.status === "Active").map(r => r.name);
+  const availableDepartments = approverDepartments?.length ? approverDepartments : DEPARTMENTS();
   const update = (key: string, value: any) => setForm((v: any) => ({ ...v, [key]: value }));
   const moduleTriggers = TRIGGERS[form.module] || ["Manual submission"];
   const save = async () => {
@@ -126,9 +147,9 @@ function WorkflowBuilder({ initial, editingId, actor, onClose, onSaved }: { init
            <div className="space-y-3">{form.levels.map((level: ApprovalLevel, index: number) => <div key={index} className="rounded-lg border p-4"><div className="mb-3 flex items-center justify-between"><span className="font-medium">Level {index + 1}</span><button disabled={form.levels.length === 1} onClick={() => update("levels", form.levels.filter((_: any, i: number) => i !== index).map((l: any, i: number) => ({ ...l, levelNumber: i + 1 })))} className="text-red-600 disabled:opacity-30"><Trash2 size={16} /></button></div><div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
              <label className="text-sm">Approver Type<select value={level.approverType} onChange={e => update("levels", form.levels.map((l: any, i: number) => i === index ? { ...l, approverType: e.target.value, approverRole: "", specificUserId: "" } : l))} className="mt-1 w-full rounded-md border bg-background px-2 py-2">{APPROVER_TYPES.map(v => <option key={v}>{v}</option>)}</select></label>
              <label className="text-sm">{level.approverType === "Role" ? "Approver Role" : level.approverType === "Specific User" ? "Specific User" : level.approverType === "Department" ? "Department" : "Manager Rule"}<select value={level.approverType === "Specific User" ? level.specificUserId || "" : level.approverRole || ""} onChange={e => update("levels", form.levels.map((l: any, i: number) => i === index ? (level.approverType === "Specific User" ? { ...l, specificUserId: e.target.value } : { ...l, approverRole: e.target.value }) : l))} className="mt-1 w-full rounded-md border bg-background px-2 py-2">
-               {level.approverType === "Role" && getRoles().filter(r => r.status === "Active").map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-               {level.approverType === "Specific User" && ACTIVE_USERS().map(u => <option key={u.id} value={u.id}>{u.name} · {u.role}</option>)}
-               {level.approverType === "Department" && DEPARTMENTS().map(department => <option key={department} value={department}>{department}</option>)}
+                {level.approverType === "Role" && availableRoles.map(role => <option key={role} value={role}>{role}</option>)}
+                {level.approverType === "Specific User" && availableUsers.map(u => <option key={u.id} value={u.id}>{u.name} · {u.role || "Portal user"}</option>)}
+                {level.approverType === "Department" && availableDepartments.map(department => <option key={department} value={department}>{department}</option>)}
                {(level.approverType === "Manager" || level.approverType === "Reporting Manager") && <option value="requester_manager">{level.approverType === "Manager" ? "Requester’s manager" : "Requester’s reporting manager"}</option>}
              </select></label>
              <label className="text-sm">Minimum Approvers<input type="number" min={1} value={level.minimumApprovers || 1} onChange={e => update("levels", form.levels.map((l: any, i: number) => i === index ? { ...l, minimumApprovers: Math.max(1, Number(e.target.value)) } : l))} className="mt-1 w-full rounded-md border bg-background px-2 py-2" /></label>
@@ -142,6 +163,8 @@ function WorkflowBuilder({ initial, editingId, actor, onClose, onSaved }: { init
     </div>
   </div>;
 }
+
+export { WorkflowDetailsDialog };
 
 function RequestDialog({ request, onClose, onChanged, actor }: { request: ApprovalRequest; onClose: () => void; onChanged: () => void; actor: any }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
@@ -222,7 +245,7 @@ export default function ApprovalWorkflowsPage() {
      {(tab === "Approval Requests" || tab === "Pending Approvals") && <>{tab === "Pending Approvals" && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{pendingCards.map(([label, value, Icon]) => <div key={label} className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p><Icon size={17} className="text-primary" /></div><p className="mt-2 text-2xl font-bold">{value}</p></div>)}</div>}<div className="overflow-x-auto rounded-xl border"><table className="w-full min-w-[1060px] text-sm"><thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground"><tr>{["Request ID", "Workflow", "Module", "Reference", "Requested By", "Current Approver", "Level", "Amount", "Status", "Created", "Due Date", "Actions"].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{shownRequests.filter(r => tab === "Approval Requests" || ["Pending", "In Progress", "Escalated"].includes(r.status)).map(r => <tr key={r.id} className="border-t"><td className="px-4 py-3 font-medium">{r.id}</td><td className="px-4 py-3">{r.workflow}</td><td className="px-4 py-3">{r.module}</td><td className="px-4 py-3">{r.reference || "—"}</td><td className="px-4 py-3">{r.requestedByName}</td><td className="px-4 py-3">{r.currentApprover}</td><td className="px-4 py-3">{r.currentLevel}</td><td className="px-4 py-3">{money(r.amount)}</td><td className="px-4 py-3"><Pill>{r.status}</Pill></td><td className="px-4 py-3 text-muted-foreground">{date(r.createdAt)}</td><td className={`px-4 py-3 ${r.dueAt && new Date(r.dueAt).getTime() < Date.now() ? "font-medium text-red-600" : "text-muted-foreground"}`}>{date(r.dueAt)}</td><td className="px-4 py-3"><Button onClick={() => getApprovalRequest(r.id).then(setSelectedRequest).catch(() => setSelectedRequest(r))}>Review</Button></td></tr>)}</tbody></table>{shownRequests.filter(r => tab === "Approval Requests" || ["Pending", "In Progress", "Escalated"].includes(r.status)).length === 0 && <div className="p-10 text-center text-sm text-muted-foreground">No approval requests found.</div>}</div></>}
      {tab === "History" && <div className="space-y-3">{historyWorkflow && <div className="rounded-xl border bg-muted/20 p-4"><p className="text-xs uppercase tracking-wide text-muted-foreground">Selected workflow</p><p className="mt-1 font-semibold">{historyWorkflow.name}</p><p className="text-sm text-muted-foreground">{historyWorkflow.module} · Current version v{historyWorkflow.currentVersion}</p></div>}{history.length ? history.map((h, index) => <div key={h.version} className="rounded-lg border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-medium">Version {h.version}</p><p className="text-sm text-muted-foreground">Changed by {h.changed_by} · {date(h.date)}</p></div><Pill>{h.status}</Pill></div><div className="mt-3 flex flex-wrap gap-2">{changeSummary(h.snapshot, history[index + 1]?.snapshot).map(change => <span key={change} className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">{change}</span>)}</div></div>) : <div className="rounded-xl border p-10 text-center text-sm text-muted-foreground">Select a workflow’s history action to view versions.</div>}</div>}
     {tab === "Settings" && <div className="rounded-xl border p-6"><div className="flex items-start gap-3"><Settings2 className="mt-1 text-primary" /><div><h2 className="font-semibold">Central approval settings</h2><p className="mt-1 text-sm text-muted-foreground">Workflow configuration is centralized here. Modules should submit matching transactions to the approval engine and display the resulting request status.</p><p className="mt-3 text-sm text-muted-foreground">Active workflows execute only when their module, trigger, and conditions match. Existing requests retain their workflow version.</p></div></div></div>}
-     {builder && <WorkflowBuilder initial={builder} editingId={editingId} actor={actor.name} onClose={() => setBuilder(null)} onSaved={refresh} />}
+     {builder && <ApprovalWorkflowBuilder initial={builder} editingId={editingId} actor={actor.name} onClose={() => setBuilder(null)} onSaved={refresh} />}
      {selectedWorkflow && <WorkflowDetailsDialog workflow={selectedWorkflow} onClose={() => setSelectedWorkflow(null)} />}
     {selectedRequest && <RequestDialog request={selectedRequest} actor={actor} onClose={() => setSelectedRequest(null)} onChanged={refresh} />}
   </div>;

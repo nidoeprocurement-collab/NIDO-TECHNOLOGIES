@@ -35,6 +35,9 @@ export interface ApprovalWorkflow {
   updatedBy: string;
   conditions: ApprovalCondition[];
   levels: ApprovalLevel[];
+  /** When set, this workflow applies only to the selected client portal tenant. */
+  clientId?: string;
+  clientName?: string;
 }
 
 export interface ApprovalRequest {
@@ -56,6 +59,8 @@ export interface ApprovalRequest {
   dueAt?: string | null;
   timeline?: any[];
   steps?: any[];
+  clientId?: string;
+  clientName?: string;
 }
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
@@ -163,6 +168,8 @@ function localWorkflow(
     updatedBy: input.updatedBy || input.createdBy || existing?.updatedBy || "system",
     conditions: snapshot.conditions,
     levels: snapshot.levels,
+    clientId: input.clientId || existing?.clientId,
+    clientName: input.clientName || existing?.clientName,
   };
 }
 
@@ -324,6 +331,11 @@ async function localCreateApprovalRequest(payload: Record<string, unknown>) {
   const candidates = store.workflows.filter(workflow =>
     workflow.module === payload.module &&
     workflow.status === "Active" &&
+    (
+      workflow.clientId
+        ? workflow.clientId === String(payload.clientId || "")
+        : !payload.clientId
+    ) &&
     localConditionsMatch(workflow.conditions, context),
   );
   const created: ApprovalRequest[] = [];
@@ -360,6 +372,8 @@ async function localCreateApprovalRequest(payload: Record<string, unknown>) {
         created_at: new Date().toISOString(),
       }],
       steps: localRequestSteps(requestId, levels, dueAt),
+      clientId: payload.clientId ? String(payload.clientId) : undefined,
+      clientName: payload.clientName ? String(payload.clientName) : undefined,
     };
     store.requests.unshift(request);
     created.push(structuredClone(request));
