@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
-import { savePO, generatePoNumber, getAllPOs, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
+import { savePO, generatePoNumber, getAllPOs, isPOConfirmed, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
 import { getVendorById } from "../lib/vendorDataStore";
 import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
@@ -61,6 +61,8 @@ export interface MyOrder {
   clientInitial: string;
   poNumber: string;
   requester: string;
+  /** Person selected in Shop's "Ordered By" selector. */
+  orderedFor?: string;
   requesterRole: string;
   requesterInitial: string;
   requesterColor: string;
@@ -381,7 +383,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       ) return prev;
       // Once any PO has been generated for an order (including a draft PO),
       // the master order must not be cancelled.
-      if (status === "Cancelled" && getAllPOs().some((po) => po.orderId === orderId)) return prev;
+      if (status === "Cancelled" && getAllPOs().some((po) => po.orderId === orderId && isPOConfirmed(po))) return prev;
       // Release reserved stock when an order is cancelled before a PO is raised.
       // If a PO was already raised for some qty, that qty's reservedStock was
       // already cleared at PO-creation time, so the Math.max(0, ...) floor in
@@ -409,14 +411,14 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
         if (
           idSet.has(o.id) &&
           o.status !== "Cancelled" &&
-          !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id))
+          !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
         ) cascadeStatusToSubOrders(o, status);
       });
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return prev.map((o) => (
         idSet.has(o.id) &&
         o.status !== "Cancelled" &&
-        !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id))
+        !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
           ? { ...o, status, ...extra }
           : o
       ));

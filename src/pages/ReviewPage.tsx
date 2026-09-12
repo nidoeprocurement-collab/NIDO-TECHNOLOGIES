@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { getOrderRequesterOptions, ORDER_REQUESTER_KEY, resolveOrderRequester } from "@/lib/orderRequester";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { getClientForPortal, getClients } from "@/lib/clientStore";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -197,17 +198,23 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
         user?.name,
         requesterOptions,
       );
-
+      const orderedBy = user?.name?.trim() || "Owner";
       const selectedClientId = cart[0]?.clientId || clientId || "";
+      const selectedClient = isClientPortalUser
+        ? getClientForPortal(selectedClientId)
+        : getClients().find(candidate => candidate.id === selectedClientId);
+      const clientName = selectedClient?.name || user?.clientName || selectedClientId || "—";
+
       const orderNumber = addOrder({
         clientId: selectedClientId,
-        client: "Nido Tech CorpEssentials",
+        client: clientName,
         clientColor: "#2563eb",
         clientInitial: "N",
         poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
-        requester,
+        requester: orderedBy,
+        orderedFor: requester,
         requesterRole: user?.role || "System Owner",
-        requesterInitial: requester.charAt(0).toUpperCase() || "O",
+        requesterInitial: orderedBy.charAt(0).toUpperCase() || "O",
         requesterColor: "#6b46c1",
         assigned: "Admin",
         assignedRole: "Admin",
@@ -278,7 +285,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
         requestedByName: requester,
         requestedByRole: user?.role || "",
         clientId: selectedClientId,
-        clientName: "Nido Tech CorpEssentials",
+        clientName,
         context: {
           amount: totalAmount,
           orderNumber,
@@ -319,7 +326,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
           paymentDetail: paymentSummary.detail,
           paymentTerms: paymentTermsLabel,
           clientEmail: "owner@nidotech.com",
-          clientName: "Nido Tech CorpEssentials",
+          clientName,
         },
       });
     };

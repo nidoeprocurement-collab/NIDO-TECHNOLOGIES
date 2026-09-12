@@ -2524,11 +2524,8 @@ export default function MyOrderPage() {
     () => (poRefreshKey >= 0 ? getAllPOs() : []).filter(po => po.orderId === orderId),
     [poRefreshKey, orderId],
   );
-  const hasGeneratedOrderPO = orderPOs.length > 0;
-  const allOrderPOsCancelled = hasGeneratedOrderPO
-    && orderPOs.every(po => String(po.status || "").toLowerCase() === "cancelled");
-  const canCancelOrderByPO = !hasGeneratedOrderPO || allOrderPOsCancelled;
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
+  const canCancelOrderByPO = !hasConfirmedOrderPO;
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
@@ -3193,16 +3190,10 @@ export default function MyOrderPage() {
         [deliveryInfo.city, deliveryInfo.state, deliveryInfo.country, deliveryInfo.zip].filter(Boolean).join(", "),
       ].filter(Boolean).join("\n")
     : deliveryInfo.address || "—";
-  const requesterName = isClientPortalUser
-    ? user?.name || "—"
-    : order?.requester || "—";
-  const orderedFor = isClientPortalUser
-    ? user?.clientName || order?.client || "—"
-    : order?.client || "—";
-  const requesterRole = order?.cartItems?.[0]?.category
-    || subOrders[0]?.category
-    || clientInfo?.category
-    || order?.requesterRole
+  const requesterName = order?.requester || user?.name || "—";
+  const orderedFor = order?.orderedFor || order?.client || "—";
+  const requesterRole = order?.requesterRole
+    || user?.role
     || "—";
 
   // ── Order not found ───────────────────────────────────────────────────────────
@@ -3270,10 +3261,12 @@ export default function MyOrderPage() {
               ) : (
                 !canCancelOrder ? (
                   <span
-                    title="This order cannot be cancelled because a purchase order has already been generated."
+                   title={hasConfirmedOrderPO
+                     ? "This order cannot be cancelled because a purchase order has already been generated."
+                     : "This order cannot be cancelled because an item has already shipped."}
                     style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}
                   >
-                    🔒 PO generated — order locked
+                     {hasConfirmedOrderPO ? "🔒 PO generated — order locked" : "🔒 Order shipped — order locked"}
                   </span>
                 ) : (
                   <button
@@ -3326,7 +3319,7 @@ export default function MyOrderPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 20 }}>
           <div style={topInfoCard}>
             <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Billing Information</div>
-            <Field label="Client" value={order?.client || "—"} />
+             <Field label="Client" value={clientInfo?.name || order?.client || "—"} />
             <Field label="Billing Address" value={billingAddress} />
             <Field label="Email" value={clientInfo?.email || "—"} />
             <Field label="Phone" value={clientInfo?.billing_phone || clientInfo?.billingPhone || clientInfo?.phone || clientInfo?.mobile || "—"} />
