@@ -374,6 +374,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
           contractId={contract?.contractId || ""}
           contractTitle={contract?.contractTitle || "Client Contract"}
           clientName={client.name}
+          clientContactName={client.rep || client.contact_person || ""}
           clientEmail={client.email || ""}
           clientPhone={client.phone || client.mobile || ""}
           clientGstin={client.gstin || client.gstin_number || ""}

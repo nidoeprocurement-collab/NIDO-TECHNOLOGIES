@@ -705,6 +705,7 @@ export default function App({ portalMode = false }: ClientDetailProps) {
                     contractId={liveContract?.contractId || ""}
                     contractTitle={liveContract?.contractTitle || "Client Contract"}
                     clientName={client.name}
+                    clientContactName={client.rep || client.contact_person || ""}
                     clientEmail={client.email || ""}
                     clientPhone={client.phone || client.mobile || ""}
                     clientGstin={client.gstin || client.gstin_number || ""}

@@ -37,6 +37,7 @@ interface ContractDetailViewProps {
   contractTitle: string;
   clientId?: string;
   clientName?: string;
+  clientContactName?: string;
   clientEmail?: string;
   clientPhone?: string;
   clientGstin?: string;
@@ -198,11 +199,25 @@ function getInitials(value?: string): string {
     .slice(0, 5);
 }
 
+function getDaysRemaining(value?: string): string {
+  if (!value) return "";
+  const end = new Date(value);
+  if (Number.isNaN(end.getTime())) return "";
+  return String(Math.ceil((end.getTime() - Date.now()) / 86400000));
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
 function ContractDetailView({
   contractId,
   contractTitle,
   clientId,
   clientName,
+  clientContactName,
   clientEmail,
   clientPhone,
   clientGstin,
@@ -336,50 +351,89 @@ function ContractDetailView({
       return;
     }
     const saved = getClientContract(clientId);
-    if (saved?.data) {
-      const data = saved.data as Record<string, unknown>;
-      if (data.relationshipOwners) setRelationshipOwners(data.relationshipOwners as typeof relationshipOwners);
-      if (data.overview) setOverview(data.overview as typeof overview);
-      if (data.responseTargets) setResponseTargets(data.responseTargets as typeof responseTargets);
-      if (data.commercialTerms) setCommercialTerms(data.commercialTerms as typeof commercialTerms);
-      if (data.servicesCovered) setServicesCovered(data.servicesCovered as typeof servicesCovered);
-      if (data.dataSecurity) setDataSecurity(data.dataSecurity as typeof dataSecurity);
-      if (data.confidentiality) setConfidentiality(data.confidentiality as typeof confidentiality);
-      if (data.supportMatrix) setSupportMatrix(data.supportMatrix as typeof supportMatrix);
-      if (data.renewalTerm) setRenewalTerm(data.renewalTerm as typeof renewalTerm);
-      if (data.subscription) setSubscription(data.subscription as typeof subscription);
-      if (data.slaCommitments) setSlaCommitments(data.slaCommitments as typeof slaCommitments);
-      if (data.renewalInfo) setRenewalInfo(data.renewalInfo as typeof renewalInfo);
-      if (data.supportInfo) setSupportInfo(data.supportInfo as typeof supportInfo);
-      if (data.keyContacts) setKeyContacts(data.keyContacts as typeof keyContacts);
-      if (data.reminders) setReminders(data.reminders as typeof reminders);
-    } else {
-      const clientInitials = getInitials(clientName);
-      setRelationshipOwners((current) => ({
-        ...current,
-        apex: { name: clientName || "", email: clientEmail || "", phone: clientPhone || "", initials: clientInitials },
-      }));
-      setKeyContacts((current) => ({
-        ...current,
+    const data = (saved?.data || {}) as Record<string, unknown>;
+    const clientInitials = getInitials(clientContactName || clientName);
+    const liveDefaults = {
+      relationshipOwners: {
+        nidoTech: { name: "", email: "", phone: "", initials: "" },
         apex: {
-          name: clientName || "",
+          name: clientContactName || clientName || "",
+          email: clientEmail || "",
+          phone: clientPhone || "",
+          initials: clientInitials,
+        },
+      },
+      overview: {
+        purpose: "",
+        scope: "",
+        deployment: "",
+        currency: clientCurrency || "",
+        taxation: "",
+        jurisdiction: "",
+        confidentiality: "",
+      },
+      commercialTerms: {
+        type: "",
+        model: "",
+        duration: "",
+        paymentTerms: clientPaymentTerms || "",
+        latePenalty: "",
+        extras: "",
+        priceRevision: "",
+        forceMajeure: "",
+        dispute: "",
+      },
+      renewalInfo: {
+        renewalDate: "",
+        autoRenewal: "",
+        daysRemaining: getDaysRemaining(contractEndDate),
+      },
+      supportInfo: {
+        plan: "",
+        hours: "",
+        responseSLA: "",
+      },
+      keyContacts: {
+        apex: {
+          name: clientContactName || clientName || "",
           role: "",
           email: clientEmail || "",
           phone: clientPhone || "",
           initials: clientInitials,
         },
-      }));
-      setOverview((current) => ({
-        ...current,
-        currency: clientCurrency || "",
-      }));
-      setCommercialTerms((current) => ({
-        ...current,
-        paymentTerms: clientPaymentTerms || "",
-      }));
-    }
+        nidoTech: { name: "", role: "", email: "", phone: "", initials: "" },
+      },
+    };
+
+    const savedOwners = asRecord(data.relationshipOwners);
+    const savedKeyContacts = asRecord(data.keyContacts);
+    setRelationshipOwners({
+      ...liveDefaults.relationshipOwners,
+      ...savedOwners,
+      apex: { ...liveDefaults.relationshipOwners.apex, ...asRecord(savedOwners.apex) },
+      nidoTech: { ...liveDefaults.relationshipOwners.nidoTech, ...asRecord(savedOwners.nidoTech) },
+    } as typeof relationshipOwners);
+    setOverview({ ...liveDefaults.overview, ...asRecord(data.overview) });
+    setCommercialTerms({ ...liveDefaults.commercialTerms, ...asRecord(data.commercialTerms) });
+    setRenewalInfo({ ...liveDefaults.renewalInfo, ...asRecord(data.renewalInfo) });
+    setSupportInfo({ ...liveDefaults.supportInfo, ...asRecord(data.supportInfo) });
+    setKeyContacts({
+      ...liveDefaults.keyContacts,
+      ...savedKeyContacts,
+      apex: { ...liveDefaults.keyContacts.apex, ...asRecord(savedKeyContacts.apex) },
+      nidoTech: { ...liveDefaults.keyContacts.nidoTech, ...asRecord(savedKeyContacts.nidoTech) },
+    } as typeof keyContacts);
+    if (Array.isArray(data.responseTargets)) setResponseTargets(data.responseTargets as typeof responseTargets);
+    if (Array.isArray(data.servicesCovered)) setServicesCovered(data.servicesCovered as typeof servicesCovered);
+    if (Array.isArray(data.dataSecurity)) setDataSecurity(data.dataSecurity as typeof dataSecurity);
+    if (data.confidentiality) setConfidentiality(data.confidentiality as typeof confidentiality);
+    if (Array.isArray(data.supportMatrix)) setSupportMatrix(data.supportMatrix as typeof supportMatrix);
+    if (Array.isArray(data.renewalTerm)) setRenewalTerm(data.renewalTerm as typeof renewalTerm);
+    if (data.subscription) setSubscription(data.subscription as typeof subscription);
+    if (Array.isArray(data.slaCommitments)) setSlaCommitments(data.slaCommitments as typeof slaCommitments);
+    if (Array.isArray(data.reminders)) setReminders(data.reminders as typeof reminders);
     setContractHydrated(true);
-  }, [clientId, clientName, clientEmail, clientPhone, clientCurrency, clientPaymentTerms]);
+  }, [clientId, clientName, clientContactName, clientEmail, clientPhone, clientCurrency, clientPaymentTerms, contractEndDate]);
 
   useEffect(() => {
     if (!clientId || !contractHydrated) return;
@@ -444,9 +498,9 @@ function ContractDetailView({
         { key: "nidoName", label: "Relationship Owner — Nido-Tech (Name)", type: "text" },
         { key: "nidoEmail", label: "Relationship Owner — Nido-Tech (Email)", type: "text" },
         { key: "nidoPhone", label: "Relationship Owner — Nido-Tech (Phone)", type: "text" },
-        { key: "apexName", label: "Relationship Owner — Apex (Name)", type: "text" },
-        { key: "apexEmail", label: "Relationship Owner — Apex (Email)", type: "text" },
-        { key: "apexPhone", label: "Relationship Owner — Apex (Phone)", type: "text" },
+        { key: "apexName", label: "Relationship Owner — Client (Name)", type: "text" },
+        { key: "apexEmail", label: "Relationship Owner — Client (Email)", type: "text" },
+        { key: "apexPhone", label: "Relationship Owner — Client (Phone)", type: "text" },
       ],
       currentValues: {
         ...overview,
@@ -656,10 +710,10 @@ function ContractDetailView({
     setEditModalConfig({
       title: "Edit Key Contacts",
       fields: [
-        { key: "apexName", label: "Apex — Contact Name", type: "text" },
-        { key: "apexRole", label: "Apex — Role", type: "text" },
-        { key: "apexEmail", label: "Apex — Email", type: "text" },
-        { key: "apexPhone", label: "Apex — Phone", type: "text" },
+        { key: "apexName", label: `${clientName || "Client"} — Contact Name`, type: "text" },
+        { key: "apexRole", label: `${clientName || "Client"} — Role`, type: "text" },
+        { key: "apexEmail", label: `${clientName || "Client"} — Email`, type: "text" },
+        { key: "apexPhone", label: `${clientName || "Client"} — Phone`, type: "text" },
         { key: "nidoName", label: "Nido-Tech — Contact Name", type: "text" },
         { key: "nidoRole", label: "Nido-Tech — Role", type: "text" },
         { key: "nidoEmail", label: "Nido-Tech — Email", type: "text" },
@@ -979,7 +1033,7 @@ function ContractDetailView({
                   </div>
                 </div>
                 <div className="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center shrink-0">
-                  <span className="text-white font-black text-[10px]">APEX</span>
+                  <span className="text-white font-black text-[10px]">{getInitials(clientName)}</span>
                 </div>
               </div>
               <div className="text-[11px] text-gray-500 space-y-0.5 pr-11">
@@ -1086,9 +1140,9 @@ function ContractDetailView({
                   </div>
                 </div>
 
-                {/* Relationship Owner — Apex */}
+                {/* Relationship Owner — Client */}
                 <div className="pt-1">
-                  <p className="text-[10px] text-gray-500 mb-1.5 uppercase font-medium">Relationship Owner (Apex)</p>
+                  <p className="text-[10px] text-gray-500 mb-1.5 uppercase font-medium">Relationship Owner (Client)</p>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-700 text-xs font-bold shrink-0">
@@ -1547,6 +1601,7 @@ export default function ClientContractsRoute() {
       contractTitle={contract?.contractTitle || "Client Contract"}
       clientId={clientId}
       clientName={client.name}
+      clientContactName={client.rep || client.contact_person || ""}
       clientEmail={client.email || ""}
       clientPhone={client.phone || client.mobile || ""}
       clientGstin={client.gstin || client.gstin_number || ""}
