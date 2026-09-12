@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
   Banknote, Building2, Info, Smartphone, QrCode, AlertCircle, CheckCircle2
@@ -288,6 +288,10 @@ function CompanyBanPanel() {
 
 export default function PaymentPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const shopBasePath = location.pathname.startsWith("/portal/")
+    ? "/portal/shop"
+    : "/shop";
   const [state, setState] = useState<PaymentState>(loadPaymentState);
 
   const onChange = (d: Partial<PaymentState>) => {
@@ -324,13 +328,13 @@ export default function PaymentPage() {
       <div className="max-w-6xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
-          <button onClick={() => navigate("/shop")} className="hover:text-blue-600">Home</button>
+          <button onClick={() => navigate(shopBasePath)} className="hover:text-blue-600">Home</button>
           <ChevronRight size={14} />
           <span>Shopping</span>
           <ChevronRight size={14} />
-          <button onClick={() => navigate("/shop/cart")} className="hover:text-blue-600">My Cart</button>
+          <button onClick={() => navigate(`${shopBasePath}/cart`)} className="hover:text-blue-600">My Cart</button>
           <ChevronRight size={14} />
-          <button onClick={() => navigate("/shop/checkout")} className="hover:text-blue-600">Checkout</button>
+          <button onClick={() => navigate(`${shopBasePath}/checkout`)} className="hover:text-blue-600">Checkout</button>
           <ChevronRight size={14} />
           <span className="text-gray-900 font-medium">Payment</span>
         </div>
@@ -374,7 +378,7 @@ export default function PaymentPage() {
 
             {/* Actions */}
             <div className="flex items-center justify-center gap-2 pt-2">
-              <button onClick={() => navigate("/shop/checkout")}
+              <button onClick={() => navigate(`${shopBasePath}/checkout`)}
                 className="flex items-center gap-2 border border-gray-300 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 <ArrowLeft size={15} />
                 Back to Delivery
@@ -385,7 +389,7 @@ export default function PaymentPage() {
                     return;
                   }
                   localStorage.setItem(PAYMENT_SELECTION_KEY, JSON.stringify(state));
-                  navigate("/shop/checkout/review");
+                  navigate(`${shopBasePath}/checkout/review`);
                 }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors">
                 Review Order

@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Shield, Truck, RotateCcw, Mail, Phone, Pencil } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { computeCartGST } from "@/lib/cartGstHelper";
@@ -19,6 +19,10 @@ export default function OrderSummaryPanel({
 }) {
   useI18n();
   const navigate = useNavigate();
+  const location = useLocation();
+  const shopBasePath = location.pathname.startsWith("/portal/")
+    ? "/portal/shop"
+    : "/shop";
   const { items: cart } = useCart();
   const org = useOrgConfig();
 
@@ -68,7 +72,7 @@ export default function OrderSummaryPanel({
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500">{totalItems} Items in Cart</span>
               <button
-                onClick={() => navigate("/shop/cart")}
+                 onClick={() => navigate(`${shopBasePath}/cart`)}
                 className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
               >
                 <Pencil size={11} />
@@ -159,7 +163,7 @@ export default function OrderSummaryPanel({
             </div>
             <div className="flex items-center justify-between mb-0">
               <button
-                onClick={() => navigate("/shop/cart")}
+                 onClick={() => navigate(`${shopBasePath}/cart`)}
                 className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
               >
                 <Pencil size={11} />

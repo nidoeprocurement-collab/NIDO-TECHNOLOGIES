@@ -6,6 +6,7 @@ import {
   Timer, ZoomIn,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import {
@@ -192,10 +193,16 @@ export default function ProductDetailPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { addItem } = useCart();
+  const { user, isClientPortalUser } = useAuth();
+  const shopBasePath = location.pathname.startsWith("/portal/")
+    ? "/portal/shop"
+    : "/shop";
 
   // Product + client come from router state (set by ShopPage on click)
   const stateProduct = location.state?.product as Product | undefined;
-  const clientId = location.state?.clientId as string | undefined;
+  const clientId = isClientPortalUser
+    ? (user?.clientId || "")
+    : (location.state?.clientId as string | undefined);
 
   const [product, setProduct] = useState<Product | null>(stateProduct ?? null);
   const [activeImg, setActiveImg] = useState(0);
@@ -336,7 +343,7 @@ export default function ProductDetailPage() {
     setActiveImg(0);
     setAdded(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    navigate(`/shop/product/${rp.productCode}`, { state: { product: rp, clientId }, replace: true });
+    navigate(`${shopBasePath}/product/${rp.productCode}`, { state: { product: rp, clientId }, replace: true });
   };
 
   // Thumbnails to display (max 4 visible, +N badge for the rest)

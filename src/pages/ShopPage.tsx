@@ -1288,8 +1288,11 @@ export default function ShopPage() {
   const [clientOpen, setClientOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const requesterStorageKey = isClientPortalUser && user?.id
+    ? `${ORDER_REQUESTER_KEY}:${user.id}`
+    : ORDER_REQUESTER_KEY;
   const [orderedBy, setOrderedBy] = useState<OrderRequesterValue>(() =>
-    normalizeOrderRequester(localStorage.getItem(ORDER_REQUESTER_KEY))
+    normalizeOrderRequester(localStorage.getItem(requesterStorageKey))
   );
   const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
@@ -1344,7 +1347,7 @@ export default function ShopPage() {
   const handleOrderedByChange = (value: string) => {
     const normalized = normalizeOrderRequester(value);
     setOrderedBy(normalized);
-    localStorage.setItem(ORDER_REQUESTER_KEY, normalized);
+    localStorage.setItem(requesterStorageKey, normalized);
   };
 
   const filtered = catalogProducts
@@ -1469,7 +1472,7 @@ export default function ShopPage() {
           )}
         </div>
 
-        {!isClientPortalUser && selectedClientId && (
+        {selectedClientId && (
           <div className="relative shrink-0">
             <UserRound size={13} className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-gray-400" />
             <select
@@ -1662,7 +1665,10 @@ export default function ShopPage() {
         <>
           <div className={viewMode === "grid" ? "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" : "grid grid-cols-1 gap-3"}>
             {paginated.map(product => {
-              const preview = (p: Product) => navigate(`/shop/product/${p.productCode}`, { state: { product: p, clientId: selectedClientId } });
+              const preview = (p: Product) => navigate(
+                `${isClientPortalUser ? "/portal" : ""}/shop/product/${p.productCode}`,
+                { state: { product: p, clientId: selectedClientId } },
+              );
               return (
                  <ProductCard
                    key={product.id}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Minus, Plus, ChevronLeft, ChevronRight,
   ShoppingCart, Lock, X, Phone, Mail, MessageCircle,
@@ -94,10 +94,11 @@ function QtyInput({
 }
 
 function SuggestedCard({
-  product, clientId,
+  product, clientId, shopBasePath,
 }: {
   product: ClientCatalogEntry;
   clientId?: string;
+  shopBasePath: string;
 }) {
   const navigate = useNavigate();
   const image = product.img ?? "";
@@ -120,7 +121,7 @@ function SuggestedCard({
           {priceNum > 0 && <span className="text-[11px] font-normal text-gray-500"> / each</span>}
         </p>
         <button
-          onClick={() => navigate(`/shop/product/${product.productCode}`, { state: { product: { id: product.productCode, productCode: product.productCode, name: product.name, category: product.category, image: product.img || "", specs: product.specs || [], leadTime: product.leadTime || "", moq: product.moq ?? 1, priceNum, inStock: (product as any).totalStock !== 0 }, clientId } })}
+          onClick={() => navigate(`${shopBasePath}/product/${product.productCode}`, { state: { product: { id: product.productCode, productCode: product.productCode, name: product.name, category: product.category, image: product.img || "", specs: product.specs || [], leadTime: product.leadTime || "", moq: product.moq ?? 1, priceNum, inStock: (product as any).totalStock !== 0 }, clientId } })}
           className="mt-auto flex items-center justify-center gap-1 text-xs font-semibold rounded-lg py-1.5 transition-colors bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
         >
           <ShoppingCart size={12} />
@@ -135,6 +136,10 @@ export default function CartPage() {
   useI18n();
   const { items: cart, updateQuantity: onUpdateQuantity, removeItem: onRemove, clearCart: onClear } = useCart();
   const navigate = useNavigate();
+  const location = useLocation();
+  const shopBasePath = location.pathname.startsWith("/portal/")
+    ? "/portal/shop"
+    : "/shop";
   const org = useOrgConfig();
   const [scrollIdx, setScrollIdx] = useState(0);
 
@@ -281,7 +286,7 @@ export default function CartPage() {
               <div className="py-20 text-center text-gray-400">
                 <ShoppingCart size={48} className="mx-auto mb-3 opacity-30" />
                 <p className="font-medium text-base">Your cart is empty</p>
-                <button onClick={() => navigate("/shop")} className="mt-3 text-blue-600 text-sm hover:underline">
+                <button onClick={() => navigate(shopBasePath)} className="mt-3 text-blue-600 text-sm hover:underline">
                   Continue shopping →
                 </button>
               </div>
@@ -526,7 +531,7 @@ export default function CartPage() {
                     style={{ transform: `translateX(-${scrollIdx * 186}px)` }}
                   >
                     {suggested.map(p => (
-                      <SuggestedCard key={p.productCode} product={p} clientId={cart[0]?.clientId} />
+                      <SuggestedCard key={p.productCode} product={p} clientId={cart[0]?.clientId} shopBasePath={shopBasePath} />
                     ))}
                   </div>
                 </div>
@@ -589,7 +594,7 @@ export default function CartPage() {
 
           {/* Proceed to Checkout */}
           <button
-            onClick={() => navigate("/shop/checkout")}
+            onClick={() => navigate(`${shopBasePath}/checkout`)}
             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 text-sm transition-colors"
           >
             <Lock size={14} />

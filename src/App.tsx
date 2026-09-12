@@ -1090,13 +1090,13 @@ function AppRoutes() {
           <Route path="reports/audit" element={<AuditTrailPage />} />
 
           {/* ── Client Portal Routes ────────────────────────────────────── */}
-          {/* Dashboard: reuses ClientDetailPage in portal mode — single source of truth */}
+          {/* Portal dashboard: keep the client overview scoped to the signed-in portal user. */}
           <Route
             path="portal/dashboard"
             element={
               <ClientPortalRoute>
                 <PageErrorBoundary title="Portal dashboard failed to load" resetKey={location.pathname}>
-                  <ClientDetailPage portalMode />
+                  <ClientPortalDashboard />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }
@@ -1108,6 +1108,16 @@ function AppRoutes() {
               <ClientPortalRoute>
                 <PageErrorBoundary title="Shop failed to load" resetKey={location.pathname}>
                   <ShopPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/shop/product/:productId"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Product detail failed to load" resetKey={location.pathname}>
+                  <ProductDetailPage />
                 </PageErrorBoundary>
               </ClientPortalRoute>
             }

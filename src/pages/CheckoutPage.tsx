@@ -1,5 +1,5 @@
                       import { useState, useEffect } from "react";
-                      import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
                       import {
                         ChevronRight, MapPin, Building2, Home, Pencil, Plus,
                         ChevronDown, X, Check,
@@ -7,6 +7,7 @@
                       import CheckoutStepper from "./CheckoutStepper";
                       import OrderSummaryPanel from "./OrderSummaryPanel";
                       import { getClients } from "@/lib/clientStore";
+import { useAuth } from "@/contexts/AuthContext";
                       import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 import {
   CHECKOUT_NOTE_MAX_LENGTH,
@@ -247,7 +248,12 @@ import {
                       const PAYMENT_TERMS_KEY = "nido_payment_terms";
 
                       export default function CheckoutPage() {
-                        const navigate = useNavigate();
+                         const navigate = useNavigate();
+                         const location = useLocation();
+                         const { user, isClientPortalUser } = useAuth();
+                         const shopBasePath = location.pathname.startsWith("/portal/")
+                           ? "/portal/shop"
+                           : "/shop";
                         const [notesOpen, setNotesOpen] = useState(false);
                         const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
                         const [deliveryInstructions, setDeliveryInstructions] = useState(() =>
@@ -265,7 +271,9 @@ import {
                         const [addingNew, setAddingNew] = useState(false);
 
                         // Load client ID and resolve addresses on mount
-                        const clientId = localStorage.getItem("nido_shop_selected_client") || "";
+                         const clientId = isClientPortalUser
+                           ? (user?.clientId || "")
+                           : (localStorage.getItem("nido_shop_selected_client") || "");
 
                         useEffect(() => {
                           let stored = loadAddresses(clientId);
@@ -318,11 +326,11 @@ import {
                             <div className="max-w-6xl mx-auto">
                               {/* Breadcrumb */}
                               <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
-                                <button onClick={() => navigate("/shop")} className="hover:text-blue-600">Home</button>
+                                <button onClick={() => navigate(shopBasePath)} className="hover:text-blue-600">Home</button>
                                 <ChevronRight size={14} />
                                 <span>Shopping</span>
                                 <ChevronRight size={14} />
-                                <button onClick={() => navigate("/shop/cart")} className="hover:text-blue-600">My Cart</button>
+                                <button onClick={() => navigate(`${shopBasePath}/cart`)} className="hover:text-blue-600">My Cart</button>
                                 <ChevronRight size={14} />
                                 <span className="text-gray-900 font-medium">Checkout</span>
                               </div>
@@ -524,7 +532,7 @@ import {
                                   {/* Actions */}
                                   <div className="flex justify-center pt-2">
                                     <button
-                                      onClick={() => navigate("/shop/checkout/payment")}
+                                      onClick={() => navigate(`${shopBasePath}/checkout/payment`)}
                                       className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
                                     >
                                       Continue to Payment

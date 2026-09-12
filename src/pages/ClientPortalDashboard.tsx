@@ -24,10 +24,12 @@ export default function ClientPortalDashboard() {
   const portalUsers = getPortalUsersByClient(clientId);
   const clientOrders = clientId ? getClientOrders(clientId, clientName) : [];
   const clientServices = clientId ? getClientServices(clientId) : [];
-  const clientInvoices = getInvoices().filter((invoice) =>
-    invoice.clientName === clientName ||
-    (invoice as typeof invoice & { clientId?: string }).clientId === clientId
-  );
+  const clientInvoices = getInvoices().filter((invoice) => {
+    const invoiceClientId = (invoice as typeof invoice & { clientId?: string }).clientId;
+    return invoiceClientId
+      ? invoiceClientId === clientId
+      : invoice.clientName === clientName;
+  });
   const pendingOrders = clientOrders.filter(order =>
     !["Delivered", "Cancelled"].includes(order.status)
   ).length;
