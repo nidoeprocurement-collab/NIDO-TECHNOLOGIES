@@ -62,9 +62,12 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
     const { items: cart, consumeCart } = useCart();
     const { addOrder } = useMyOrders();
     const { user, isClientPortalUser } = useAuth();
-    const shopBasePath = location.pathname.startsWith("/portal/")
-      ? "/portal/shop"
-      : "/shop";
+    const isPortalFlow = location.pathname.startsWith("/portal/");
+    const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
+    const cartPath = isPortalFlow ? "/portal/shop/cart" : "/shop/cart";
+    const checkoutPath = isPortalFlow ? "/portal/shop/checkout" : "/shop/checkout";
+    const paymentPath = isPortalFlow ? "/portal/shop/checkout/payment" : "/shop/checkout/payment";
+    const orderConfirmationPath = isPortalFlow ? "/portal/shop/order-confirmation" : "/shop/order-confirmation";
 
     const clientId = isClientPortalUser
       ? (user?.clientId || cart.find((item) => item.clientId)?.clientId || "")
@@ -299,7 +302,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
       localStorage.removeItem(DELIVERY_INSTRUCTIONS_KEY);
       localStorage.removeItem(ORDER_NOTES_KEY);
       localStorage.removeItem(selectedAddressKey(clientId));
-      navigate(`${shopBasePath}/order-confirmation/${orderNumber}`, {
+      navigate(`${orderConfirmationPath}/${orderNumber}`, {
         state: {
           orderNumber,
           orderDate: today,
@@ -326,15 +329,15 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
         <div className="max-w-6xl mx-auto">
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
-            <button onClick={() => navigate(shopBasePath)} className="hover:text-blue-600">Home</button>
+            <button onClick={() => navigate(catalogPath)} className="hover:text-blue-600">Home</button>
             <ChevronRight size={14} />
             <span>Shopping</span>
             <ChevronRight size={14} />
-            <button onClick={() => navigate(`${shopBasePath}/cart`)} className="hover:text-blue-600">My Cart</button>
+            <button onClick={() => navigate(cartPath)} className="hover:text-blue-600">My Cart</button>
             <ChevronRight size={14} />
-            <button onClick={() => navigate(`${shopBasePath}/checkout`)} className="hover:text-blue-600">Checkout</button>
+            <button onClick={() => navigate(checkoutPath)} className="hover:text-blue-600">Checkout</button>
             <ChevronRight size={14} />
-            <button onClick={() => navigate(`${shopBasePath}/checkout/payment`)} className="hover:text-blue-600">Payment</button>
+            <button onClick={() => navigate(paymentPath)} className="hover:text-blue-600">Payment</button>
             <ChevronRight size={14} />
             <span className="text-gray-900 font-medium">Review &amp; Place Order</span>
           </div>
@@ -352,7 +355,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
               <div className="bg-white border border-gray-200 rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-semibold text-gray-900">Delivery Details</h2>
-                  <button onClick={() => navigate(`${shopBasePath}/checkout`)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                  <button onClick={() => navigate(checkoutPath)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                     <Pencil size={11} /> Edit
                   </button>
                 </div>
@@ -376,7 +379,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">No delivery address selected. <button onClick={() => navigate(`${shopBasePath}/checkout`)} className="text-blue-600 hover:underline">Add one</button></p>
+                  <p className="text-sm text-gray-400">No delivery address selected. <button onClick={() => navigate(checkoutPath)} className="text-blue-600 hover:underline">Add one</button></p>
                 )}
               </div>
 
@@ -384,7 +387,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
               <div className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="font-semibold text-gray-900 text-sm">Payment Method</h2>
-                  <button onClick={() => navigate(`${shopBasePath}/checkout/payment`)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                  <button onClick={() => navigate(paymentPath)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                     <Pencil size={11} /> Edit
                   </button>
                 </div>
@@ -405,7 +408,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-2 py-2 border-b border-gray-100">
                   <h2 className="font-semibold text-gray-900">Order Items ({cart.length})</h2>
-                  <button onClick={() => navigate(`${shopBasePath}/cart`)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                  <button onClick={() => navigate(cartPath)} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                     <Pencil size={11} /> Edit Cart
                   </button>
                 </div>
@@ -447,7 +450,7 @@ import { getPortalUsersByClient } from "@/lib/portalUserStore";
               {/* Actions */}
               <div className="flex items-center justify-center gap-2 pt-2">
                 <button
-                  onClick={() => navigate(`${shopBasePath}/checkout/payment`)}
+                  onClick={() => navigate(paymentPath)}
                   className="flex items-center gap-2 border border-gray-300 rounded-lg px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <ArrowLeft size={15} />

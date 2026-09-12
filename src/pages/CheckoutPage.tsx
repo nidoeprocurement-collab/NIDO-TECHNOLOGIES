@@ -263,9 +263,10 @@ import {
                          const navigate = useNavigate();
                          const location = useLocation();
                          const { user, isClientPortalUser } = useAuth();
-                         const shopBasePath = location.pathname.startsWith("/portal/")
-                           ? "/portal/shop"
-                           : "/shop";
+                         const isPortalFlow = location.pathname.startsWith("/portal/");
+                         const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
+                         const cartPath = isPortalFlow ? "/portal/shop/cart" : "/shop/cart";
+                         const paymentPath = isPortalFlow ? "/portal/shop/checkout/payment" : "/shop/checkout/payment";
                         const [notesOpen, setNotesOpen] = useState(false);
                         const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
                         const [deliveryInstructions, setDeliveryInstructions] = useState(() =>
@@ -349,11 +350,11 @@ import {
                             <div className="max-w-6xl mx-auto">
                               {/* Breadcrumb */}
                               <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
-                                <button onClick={() => navigate(shopBasePath)} className="hover:text-blue-600">Home</button>
+                                <button onClick={() => navigate(catalogPath)} className="hover:text-blue-600">Home</button>
                                 <ChevronRight size={14} />
                                 <span>Shopping</span>
                                 <ChevronRight size={14} />
-                                <button onClick={() => navigate(`${shopBasePath}/cart`)} className="hover:text-blue-600">My Cart</button>
+                                <button onClick={() => navigate(cartPath)} className="hover:text-blue-600">My Cart</button>
                                 <ChevronRight size={14} />
                                 <span className="text-gray-900 font-medium">Checkout</span>
                               </div>
@@ -555,7 +556,7 @@ import {
                                   {/* Actions */}
                                   <div className="flex justify-center pt-2">
                                     <button
-                                      onClick={() => navigate(`${shopBasePath}/checkout/payment`)}
+                                      onClick={() => navigate(paymentPath)}
                                       className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors"
                                     >
                                       Continue to Payment

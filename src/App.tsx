@@ -1113,6 +1113,11 @@ function AppRoutes() {
               </ClientPortalRoute>
             }
           />
+          {/* Backwards-compatible alias for older portal shopping links. */}
+          <Route
+            path="portal/shop"
+            element={<Navigate to="/portal/catalog" replace />}
+          />
           <Route
             path="portal/shop/product/:productId"
             element={

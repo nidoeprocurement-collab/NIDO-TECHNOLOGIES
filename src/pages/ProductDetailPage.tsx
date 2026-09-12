@@ -194,9 +194,9 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { user, isClientPortalUser } = useAuth();
-  const shopBasePath = location.pathname.startsWith("/portal/")
-    ? "/portal/shop"
-    : "/shop";
+  const isPortalFlow = location.pathname.startsWith("/portal/");
+  const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
+  const productPath = isPortalFlow ? "/portal/shop/product" : "/shop/product";
 
   // Product + client come from router state (set by ShopPage on click)
   const stateProduct = location.state?.product as Product | undefined;
@@ -246,7 +246,7 @@ export default function ProductDetailPage() {
           <Package size={48} className="mx-auto mb-3 text-gray-300" />
           <p className="text-gray-500 font-medium">Product not found</p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(catalogPath)}
             className="mt-4 text-blue-600 text-sm hover:underline"
           >
             ← Back to Products
@@ -343,7 +343,7 @@ export default function ProductDetailPage() {
     setActiveImg(0);
     setAdded(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    navigate(`${shopBasePath}/product/${rp.productCode}`, { state: { product: rp, clientId }, replace: true });
+    navigate(`${productPath}/${rp.productCode}`, { state: { product: rp, clientId }, replace: true });
   };
 
   // Thumbnails to display (max 4 visible, +N badge for the rest)
@@ -359,7 +359,7 @@ export default function ProductDetailPage() {
       <div className="border-b border-gray-200 bg-white px-2 py-4">
         <div className="max-w-7xlflex items-center gap-2 text-sm">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate(catalogPath)}
             className="flex items-center gap-1.5 text-blue-600 font-medium hover:underline"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -677,7 +677,7 @@ export default function ProductDetailPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-gray-900">Related Products</h3>
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => navigate(catalogPath)}
                   className="text-sm text-blue-600 hover:underline font-medium"
                 >
                   View All

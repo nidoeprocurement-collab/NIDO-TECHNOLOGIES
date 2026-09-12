@@ -11,6 +11,7 @@ import SLANotificationPopup from '@/components/shared/SLANotificationPopup';
 // Route to label mapping for breadcrumbs
 const routeLabels: Record<string, string> = {
   'dashboard': 'Dashboard',
+  'catalog': 'Shop',
   'shop': 'Shop',
   'services': 'Services',
   'support': 'Support',
@@ -47,13 +48,15 @@ const routeLabels: Record<string, string> = {
 function generateBreadcrumbs(pathname: string) {
   // Drop generic wrapper segments ('app' for admin routes, 'portal' for
   // client portal routes) so breadcrumbs read as plain page names.
+  const isPortal = pathname.startsWith('/portal/');
+  const routePrefix = isPortal ? '/portal' : '';
   const segments = pathname.split('/').filter(s => s && s !== 'app' && s !== 'portal');
   const breadcrumbs: Array<{ label: string; path: string; isActive: boolean }> = [];
 
   // Add home
   breadcrumbs.push({
     label: 'Home',
-    path: '/dashboard',
+    path: isPortal ? '/portal/dashboard' : '/dashboard',
     isActive: segments.length === 0,
   });
 
@@ -67,7 +70,16 @@ function generateBreadcrumbs(pathname: string) {
     // `vendor-orders/:id` is the vendor PO detail route, but there is no
     // `/vendor-orders` list route — the actual list page lives at
     // `/vendors/orders`. Point the breadcrumb there instead of a 404.
-    const linkPath = segment === 'vendor-orders' ? '/vendors/orders' : cumulativePath;
+    let linkPath = segment === 'vendor-orders'
+      ? '/vendors/orders'
+      : `${routePrefix}${cumulativePath}`;
+
+    // The portal calls its catalog "Shop", while the shopping cart and
+    // checkout live under /portal/shop/*. Keep the breadcrumb's Shop link on
+    // the actual catalog route instead of sending portal users to /shop.
+    if (isPortal && segment === 'shop') {
+      linkPath = '/portal/catalog';
+    }
 
     breadcrumbs.push({
       label,

@@ -62,6 +62,14 @@ All under the existing `AppLayout` wrapper, prefixed `/portal/`:
 - `/portal/roles` → `ClientPortalRolesPage` (new)
 - `/portal/addresses` → `ClientPortalAddressesPage` (new)
 
+## Portal Shopping Route Contract
+
+The portal catalog page is `/portal/catalog`; only the transactional shopping flow uses `/portal/shop/*`: cart, checkout, payment, review, product detail, and order confirmation. Breadcrumbs and “Continue Shopping” links must target `/portal/catalog`, not `/portal/shop`.
+
+**Why:** `/portal/shop` is not the catalog route. Sending users there causes an unmatched route or a guard redirect to the dashboard, which makes the portal appear to lose its current page.
+
+**How to apply:** derive separate catalog, product, cart, checkout, payment, review, and confirmation paths in shared shopping components. Keep admin equivalents under `/shop` and `/shop/*`.
+
 ## Client Provisioning (`src/pages/ClientsPage.tsx`)
 
 Dropdown action "Provision Client Portal" on each client row calls `provisionClientPortal(clientId, clientName)`:
