@@ -2530,6 +2530,7 @@ export default function MyOrderPage() {
   );
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const canCancelOrderByPO = !hasConfirmedOrderPO;
+  const awaitingApproval = Boolean(order?.deferPurchaseOrders && orderPOs.length === 0);
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
@@ -2997,6 +2998,10 @@ export default function MyOrderPage() {
 
   // One PO per unique vendor across all selected sub-orders (handles multi-vendor splits).
   const handleCreatePurchaseOrders = (subIds: string[]) => {
+    if (awaitingApproval) {
+      window.alert("This client order is awaiting approval. Purchase orders can be raised after approval.");
+      return;
+    }
     const selectedSet = new Set(subIds);
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, "0");
@@ -3292,6 +3297,11 @@ export default function MyOrderPage() {
         </div>
 
         {/* SLA Status Panel */}
+        {awaitingApproval && (
+          <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#92400e", fontSize: 13 }}>
+            <b>Approval required:</b> This order came from the client portal. Purchase orders will be created after the approval is completed.
+          </div>
+        )}
         {(() => {
           const tiers = getClientSLA();
           const std = tiers.find(t => t.name === "Standard") ?? tiers[0];
@@ -3698,8 +3708,9 @@ export default function MyOrderPage() {
                     <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
                     <p style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No Draft Purchase Orders</p>
                     <p style={{ fontSize: 12, marginTop: 6, maxWidth: 380, margin: "8px auto 0" }}>
-                      Draft POs are created automatically when an order is placed with vendor-selected items.
-                      Each vendor gets their own Draft PO for review.
+                      {awaitingApproval
+                        ? "This client order is waiting for approval. Draft POs will be created automatically after approval."
+                        : "Draft POs are created automatically when an order is placed with vendor-selected items. Each vendor gets their own Draft PO for review."}
                     </p>
                   </div>
                 ) : (

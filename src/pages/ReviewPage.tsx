@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getOrderRequesterOptions, ORDER_REQUESTER_KEY, normalizeOrderRequester, resolveOrderRequester } from "@/lib/orderRequester";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { getClientForPortal, getClients } from "@/lib/clientStore";
+import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 
   // ── Address helpers (mirrors CheckoutPage) ─────────────────────────────────────
 
@@ -216,6 +217,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
         poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
         requester: orderedBy,
         orderedFor,
+        deferPurchaseOrders: isClientPortalUser,
         requesterRole: user?.role || "System Owner",
         requesterInitial: orderedBy.charAt(0).toUpperCase() || "O",
         requesterColor: "#6b46c1",
@@ -279,7 +281,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
       // Evaluate the selected client's active portal workflow immediately after
       // the order is created. If no workflow matches, the existing order flow
       // remains unchanged; matching requests become visible in the portal.
-      await createApprovalRequest({
+      const approvalRequests = await createApprovalRequest({
         module: "Order",
         trigger: "Order created",
         reference: orderNumber,
@@ -296,6 +298,15 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
           requester,
         },
       });
+      // Client orders are held without POs while an approval workflow is
+      // pending. If no active workflow matched, release them immediately so
+      // the normal non-approval checkout path is unchanged.
+      if (approvalRequests.length === 0 && isClientPortalUser) {
+        createDraftPOsForOrder(orderNumber, itemsSnapshot.map((item) => ({
+          ...item,
+          subOrderId: item.subOrderId,
+        })), paymentTermsLabel);
+      }
 
       // Reserve stock immediately so the shop shows reduced available qty.
       // physicalStock stays unchanged; only reservedStock increases.

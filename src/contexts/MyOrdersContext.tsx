@@ -2,10 +2,9 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
-import { savePO, generatePoNumber, getAllPOs, isPOConfirmed, type StoredPO, type POLineItem, type PONote } from "../lib/purchaseOrderStore";
-import { getVendorById } from "../lib/vendorDataStore";
-import { getEffectiveTaxPctForCategory } from "../lib/taxEngine";
+import { getAllPOs, isPOConfirmed } from "../lib/purchaseOrderStore";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
+import { createDraftPOsForOrder } from "../lib/orderPurchaseOrderService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -63,6 +62,8 @@ export interface MyOrder {
   requester: string;
   /** Person selected in Shop's "Ordered By" selector. */
   orderedFor?: string;
+  /** Client portal orders can defer PO creation until approval is complete. */
+  deferPurchaseOrders?: boolean;
   requesterRole: string;
   requesterInitial: string;
   requesterColor: string;
@@ -172,132 +173,6 @@ function nextOrderId(): string {
   return `${getPrefix("order") || "ORD-"}${String(seq).padStart(6, "0")}`;
 }
 
-// ─── Auto Draft-PO creation ───────────────────────────────────────────────────
-// Called immediately after a new order is placed. Groups cart items by the
-// vendor the client selected on the Shop page and creates one Draft PO per
-// vendor. No price-engine allocation is needed — vendor info is already
-// snapshotted on each cart item.
-function autoCreateDraftPOs(
-  orderId: string,
-  cartItems: OrderCartItem[],
-  _orderDate: string,
-  paymentTerms: string,
-  _deliveryAddress: string,
-): void {
-  // Group items by selectedVendorId (skip items with no vendor selected)
-  const vendorGroups = new Map<string, OrderCartItem[]>();
-  for (const item of cartItems) {
-    if (!item.selectedVendorId) continue;
-    if (!vendorGroups.has(item.selectedVendorId)) vendorGroups.set(item.selectedVendorId, []);
-    vendorGroups.get(item.selectedVendorId)!.push(item);
-  }
-  if (vendorGroups.size === 0) return;
-
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yyyy = now.getFullYear();
-  const displayDate = `${dd}/${mm}/${yyyy}`;
-
-  for (const [vendorId, items] of vendorGroups.entries()) {
-    const vendor = getVendorById(vendorId);
-    const poNumber = generatePoNumber();
-
-    const lineItems: POLineItem[] = items.map((item, i) => {
-      const subOrderId = item.subOrderId
-        || `${getPrefix("salesOrder") || "SO-"}${orderId}-${String(i + 1).padStart(3, "0")}`;
-      const unitPrice = item.landedCost || item.vendorPrice || item.priceNum || 0;
-      const qty = item.quantity;
-      const gstPct = item.gstSnapshot ?? getEffectiveTaxPctForCategory(item.category);
-      return {
-        subOrderId,
-        item: item.name,
-        sku: item.productCode || `${getPrefix("sku") || "SKU-"}${item.id}`,
-        productCode: item.productCode || "",
-        category: item.category || "General",
-        hsnCode: item.hsnSnapshot || "",
-        specs: Array.isArray(item.specs) ? item.specs : [],
-        referenceNumber: "",
-        qty,
-        unitPrice,
-        lineSubtotal: unitPrice * qty,
-        gstPct,
-        productType: item.productType,
-        physicalType: item.physicalType,
-        commercialTerms: item.commercialTerms,
-        status: "Pending",
-        tracking: null,
-      };
-    });
-
-    const subtotal = lineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-    const primaryGst = lineItems[0]?.gstPct ?? 18;
-    const halfGst = primaryGst / 2;
-    const sgstAmt = Math.round(lineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
-    const cgstAmt = sgstAmt;
-
-    const vendorAddrParts = [vendor?.addressLine1, vendor?.addressLine2, vendor?.city, vendor?.state, vendor?.zipCode].filter(Boolean);
-
-    const grandTotal = subtotal + sgstAmt + cgstAmt;
-    const creationNote: PONote = {
-      id: "audit_created_" + Date.now() + "_" + vendorId,
-      author: "System",
-      initials: "SY",
-      color: "#6b7280",
-      date: displayDate,
-      text: `Draft PO ${poNumber} automatically created for order ${orderId}. Vendor: ${vendor?.name || vendorId}. ${lineItems.length} item${lineItems.length !== 1 ? "s" : ""} — Grand Total ₹${grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. Awaiting admin review and confirmation.`,
-      visibility: "Internal Note",
-    };
-
-    const po: StoredPO = {
-      poNumber,
-      orderId,
-      subOrderId: lineItems[0]?.subOrderId || "",
-      subOrderIds: lineItems.map(li => li.subOrderId),
-      items: lineItems,
-      vendorId,
-      vendorName: vendor?.name || items[0].selectedVendorName || vendorId,
-      vendorContact: vendor?.primaryContact || "",
-      vendorEmail: vendor?.email || "",
-      vendorPhone: vendor?.phone || "",
-      vendorGstin: vendor?.taxId || "",
-      vendorAddress: vendorAddrParts.join(", "),
-      vendorAddressLine1: vendor?.addressLine1 || "",
-      vendorAddressLine2: vendor?.addressLine2 || "",
-      vendorCity: vendor?.city || "",
-      vendorState: vendor?.state || "",
-      vendorPincode: vendor?.zipCode || "",
-      item: lineItems[0]?.item || "",
-      sku: lineItems[0]?.sku || "",
-      category: lineItems[0]?.category || "",
-      hsnCode: lineItems[0]?.hsnCode || "",
-      specs: lineItems[0]?.specs || [],
-      referenceNumber: "",
-      qty: lineItems[0]?.qty || 0,
-      unitPrice: lineItems[0]?.unitPrice || 0,
-      subtotal,
-      sgstPct: halfGst,
-      cgstPct: halfGst,
-      sgstAmt,
-      cgstAmt,
-      grandTotal,
-      paymentTerms: paymentTerms || "Net 30",
-      status: "Draft",
-      createdOn: now.toISOString(),
-      createdOnDisplay: displayDate,
-      requestedDelivery: "",
-      documents: [],
-      notes: [creationNote],
-    };
-
-    try {
-      savePO(po);
-    } catch {
-      /* never block order creation on a PO-save failure */
-    }
-  }
-}
-
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<MyOrder[]>(() => {
     try {
@@ -355,9 +230,11 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     }));
     const normalizedOrder = { ...order, id, cartItems } as MyOrder;
     setOrders((prev) => [normalizedOrder, ...prev]);
-    // Auto-create Draft POs grouped by vendor immediately after the order is saved.
-    if (cartItems?.length) {
-      autoCreateDraftPOs(id, cartItems, order.orderDate, order.paymentTerms || "", order.deliveryAddress || "");
+    // Draft POs are created immediately for orders without an approval gate.
+    // Client orders that require approval pass deferPurchaseOrders=true and
+    // are released by the approval service after final approval.
+    if (cartItems?.length && !order.deferPurchaseOrders) {
+      createDraftPOsForOrder(id, cartItems, order.paymentTerms || "");
     }
     return id;
   };

@@ -1,5 +1,7 @@
 export type ApprovalStatus = "Pending" | "In Progress" | "Approved" | "Rejected" | "Sent Back" | "Cancelled" | "Escalated";
 
+import { createDraftPOsForStoredOrder } from "./orderPurchaseOrderService";
+
 export interface ApprovalCondition {
   joinOperator: "AND" | "OR";
   field: string;
@@ -512,9 +514,14 @@ export async function createApprovalRequest(payload: Record<string, unknown>) {
 }
 
 export async function actOnApprovalRequest(id: string, payload: Record<string, unknown>) {
-  return USE_APPROVAL_BACKEND
+  const updated = USE_APPROVAL_BACKEND
     ? api<ApprovalRequest>(`/requests/${id}/action`, { method: "POST", body: JSON.stringify(payload) })
     : localActOnApprovalRequest(id, payload);
+  const request = await updated;
+  if (request.status === "Approved" && request.module === "Order") {
+    createDraftPOsForStoredOrder(request.reference);
+  }
+  return request;
 }
 
 export async function getApprovalRequest(id: string) {
