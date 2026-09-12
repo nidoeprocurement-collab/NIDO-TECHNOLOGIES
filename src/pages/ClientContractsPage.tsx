@@ -351,8 +351,11 @@ function ContractDetailView({
   const [newReminderDate, setNewReminderDate] = useState("");
   const [contractHydrated, setContractHydrated] = useState(false);
   const [saveConfirmation, setSaveConfirmation] = useState("");
+  const initialSaveSkipped = useRef(false);
 
   useEffect(() => {
+    initialSaveSkipped.current = false;
+    setContractHydrated(false);
     if (!clientId) {
       setContractHydrated(true);
       return;
@@ -444,6 +447,10 @@ function ContractDetailView({
 
   useEffect(() => {
     if (!clientId || !contractHydrated) return;
+    if (!initialSaveSkipped.current) {
+      initialSaveSkipped.current = true;
+      return;
+    }
     saveClientContract({
       clientId,
       contractId: contractId || "CLIENT-CONTRACT",
