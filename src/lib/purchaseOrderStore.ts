@@ -338,9 +338,11 @@ export function removeSubOrderFromDraftPOs(orderId: string, subOrderId: string):
 const COUNTER_KEY = "nido_po_counter";
 
 /**
- * Generate the next PO number atomically.
- * Reads a dedicated counter, increments it, and verifies uniqueness
- * against existing records to survive concurrent tabs.
+ * Generate the next PO number.
+ * The current stored PO records are the source of truth for the next serial
+ * number. The counter is resynchronised from them so a number consumed by a
+ * temporary Draft PO does not make later vendor changes jump over an unused
+ * number.
  * Reads the current prefix from config so changes in General Settings take effect immediately.
  */
 export function generatePoNumber(): string {
@@ -355,10 +357,13 @@ export function generatePoNumber(): string {
       .map(p => { const m = p.poNumber.match(re); return m ? parseInt(m[1], 10) : 0; })
   );
 
-  // Start from the stored counter or 8 (one before the sample PO-00008)
-  let next = parseInt(localStorage.getItem(COUNTER_KEY) || "8", 10) + 1;
+  // Start after the highest currently stored PO (8 is one before the sample
+  // PO-00008). This deliberately ignores a stale counter left by a Draft PO
+  // that was merged or removed during vendor reassignment.
+  const highestExisting = Math.max(8, ...existing);
+  let next = highestExisting + 1;
 
-  // Skip any numbers already in use (defensive against concurrent writes)
+  // Skip any numbers already in use (defensive against concurrent writes).
   while (existing.has(next)) next++;
 
   localStorage.setItem(COUNTER_KEY, String(next));

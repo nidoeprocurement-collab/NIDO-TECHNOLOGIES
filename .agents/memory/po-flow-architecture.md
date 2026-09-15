@@ -43,6 +43,12 @@ When a sub-order is reassigned while its PO is still Draft, and the destination 
 
 **How to apply:** Recalculate `items`, `subOrderIds`, primary-line metadata, subtotal, GST amounts, and grand total for both the destination and any remaining source Draft PO. Never merge into a confirmed PO.
 
+New PO numbers are derived from the highest currently stored PO number rather than trusting a stale counter left by a removed Draft PO.
+
+**Why:** Vendor reassignment can create and then remove temporary Draft records; keeping that temporary counter value makes later PO numbers appear to skip serials.
+
+**How to apply:** Resynchronise the counter whenever a new PO is generated, while continuing to avoid reuse of numbers already present in stored PO records.
+
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
 when a Draft vendor change is saved.
