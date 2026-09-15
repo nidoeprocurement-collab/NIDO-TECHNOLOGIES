@@ -215,18 +215,13 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
   );
 
   const handleToggleCheck = (vendorId: string) => {
+    // An order item has exactly one vendor. The vendor selected in Shop is
+    // carried into this view; this picker is only for replacing that vendor
+    // while its PO is still Draft. Never split one item across vendors here.
     setCheckedSet(prev => {
-      const next = new Set(prev);
-      if (next.has(vendorId)) {
-        next.delete(vendorId);
-        setRowQtys(q => ({ ...q, [vendorId]: 0 }));
-      } else {
-        next.add(vendorId);
-        // Default to remaining unallocated (min 1)
-        const allocated = [...prev].reduce((s, vid) => s + (rowQtys[vid] || 0), 0);
-        const rem = Math.max(1, sub.qty - allocated);
-        setRowQtys(q => ({ ...q, [vendorId]: rem }));
-      }
+      const next = new Set<string>();
+      if (!prev.has(vendorId)) next.add(vendorId);
+      setRowQtys({ [vendorId]: next.size ? sub.qty : 0 });
       return next;
     });
     setDetailVendorId(vendorId);
@@ -234,10 +229,8 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
 
   const handleQtyChange = (vendorId: string, val: number) => {
     const n = Math.max(0, val);
-    setRowQtys(prev => ({ ...prev, [vendorId]: n }));
-    if (n > 0 && !checkedSet.has(vendorId)) {
-      setCheckedSet(prev => new Set([...prev, vendorId]));
-    }
+    setRowQtys({ [vendorId]: n });
+    setCheckedSet(n > 0 ? new Set([vendorId]) : new Set());
   };
 
   const selectedComps = comparisons.filter(c => checkedSet.has(c.vendorId));
@@ -330,19 +323,13 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
         </div>
 
         {/* ── Split-required / stock warning banner ── */}
-        {comparisons.length > 0 && (needsSplit || totalAvailable < sub.qty) && (
+            {comparisons.length > 0 && totalAvailable < sub.qty && (
           <div style={{ padding: "10px 24px", background: totalAvailable < sub.qty ? "#fef2f2" : "#fffbeb", borderBottom: "1px solid " + (totalAvailable < sub.qty ? "#fecaca" : "#fde68a"), display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 16 }}>{totalAvailable < sub.qty ? "⚠️" : "ℹ️"}</span>
             <div>
-              {totalAvailable < sub.qty ? (
-                <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>
-                  Combined stock across all vendors ({totalAvailable} Nos) is less than the required qty ({sub.qty} Nos). Contact vendors to replenish before raising POs.
-                </span>
-              ) : (
-                <span style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>
-                  No single vendor has enough stock for this order ({sub.qty} Nos). Select multiple vendors below and split the qty across them to cover the full order.
-                </span>
-              )}
+                  <span style={{ fontSize: 13, color: "#991b1b", fontWeight: 600 }}>
+                    Combined stock across all vendors ({totalAvailable} Nos) is less than the required qty ({sub.qty} Nos). Select a vendor with enough stock before confirming.
+                  </span>
             </div>
           </div>
         )}
@@ -522,7 +509,7 @@ function VendorSelectionModal({ sub, selectedVendorId, excludedVendorIds = [], o
           {/* ── Selected Vendors summary ── */}
           {selectedComps.length > 0 && (
             <div style={{ padding: "16px 20px 0" }}>
-              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#2563eb", marginBottom: 10 }}>Selected Vendors</div>
+              <div style={{ fontWeight: 700, fontSize: 13.5, color: "#2563eb", marginBottom: 10 }}>Selected Vendor</div>
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "28px 1fr 130px 1fr 130px", padding: "8px 16px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.3 }}>
                   {["#", "Vendor", "Allocate Qty", "Client Selling Price (Per Unit)", "Total Cost (₹)"].map(h => <div key={h}>{h}</div>)}
@@ -2342,6 +2329,42 @@ function poCoversSubOrder(po: any, subOrderId: string): boolean {
   return Array.isArray(po?.items) && po.items.some((item: any) => item?.subOrderId === subOrderId);
 }
 
+function poStatusRank(po: any): number {
+  const status = String(po?.status || "").toLowerCase();
+  if (status === "cancelled" || status === "rejected") return -1;
+  if (isConfirmedPO(po)) return 2;
+  if (status === "draft") return 1;
+  return 0;
+}
+
+/**
+ * A legacy order can contain more than one PO record for the same item after
+ * the old multi-vendor flow ran. The item view must never show both records:
+ * confirmed procurement wins over draft, then the newest record wins.
+ */
+function getCanonicalPOForSubOrder(pos: any[], subOrderId: string): any | null {
+  return pos
+    .filter(po => poCoversSubOrder(po, subOrderId))
+    .sort((a, b) => {
+      const rank = poStatusRank(b) - poStatusRank(a);
+      if (rank !== 0) return rank;
+      return String(b.createdOn || "").localeCompare(String(a.createdOn || ""));
+    })[0] || null;
+}
+
+function getCancelledPOForSubOrder(pos: any[], subOrderId: string): any | null {
+  return pos
+    .filter(po =>
+      String(po?.status || "").toLowerCase() === "cancelled" &&
+      (
+        po?.subOrderId === subOrderId ||
+        po?.subOrderIds?.includes?.(subOrderId) ||
+        po?.items?.some?.((item: any) => item?.subOrderId === subOrderId)
+      ),
+    )
+    .sort((a, b) => String(b.createdOn || "").localeCompare(String(a.createdOn || "")))[0] || null;
+}
+
 function isPOItemShipped(po: any, subOrderId: string): boolean {
   if (!poCoversSubOrder(po, subOrderId)) return false;
   const matchingLine = (po.items || []).find((line: any) => line.subOrderId === subOrderId);
@@ -2702,6 +2725,16 @@ export default function MyOrderPage() {
 
   const handleVendorSelection = (subId: string, allocations: any[]) => {
     if (!allocations.length) return;
+    const currentSubOrder = subOrders.find(sub => sub.id === subId);
+    const currentPOs = getAllPOs().filter(po => po.orderId === orderId);
+    // A cancelled item and a confirmed PO are terminal/locked states. This
+    // guard protects against a stale modal submitting after the row changed.
+    if (
+      currentSubOrder?.itemStatus === "Cancelled" ||
+      getCancelledPOForSubOrder(currentPOs, subId) ||
+      isConfirmedPO(getCanonicalPOForSubOrder(currentPOs, subId))
+    ) return;
+
     const primary = allocations[0];
     const meta = primary.meta || {};
     const vendor = getVendorById(primary.vendorId);
@@ -2748,10 +2781,9 @@ export default function MyOrderPage() {
     // A draft PO may already have been created automatically. A single-line
     // draft can be re-pointed in place. For a grouped draft, split only this
     // line into a new PO so the other lines keep their original vendor.
-    const draftPO = getAllPOs().find(po =>
-      po.orderId === orderId &&
-      po.status === "Draft" &&
-      po.items?.some(line => line.subOrderId === subId)
+    const draftPO = getCanonicalPOForSubOrder(
+      currentPOs.filter(po => po.status === "Draft"),
+      subId,
     );
     const vendorAddressLine1 = vendor?.addressLine1 || meta.addressLine1 || vendor?.address || "";
     const vendorAddressLine2 = vendor?.addressLine2 || meta.addressLine2 || "";
@@ -3073,7 +3105,7 @@ export default function MyOrderPage() {
   useEffect(() => {
     const refresh = () => {
       setPoRefreshKey(k => k + 1);
-      setSubOrders(prev => reconcileSubOrderStatuses(prev, orderId));
+      setSubOrders(prev => reconcileSubOrderStatuses(applyItemState(prev, loadItemState()), orderId));
     };
     const onStorage = (e: StorageEvent) => {
       if (e.key === "nido_all_purchase_orders") refresh();
@@ -3084,7 +3116,7 @@ export default function MyOrderPage() {
       window.removeEventListener("poCreated", refresh);
       window.removeEventListener("storage", onStorage);
     };
-  }, []);
+  }, [orderId]);
 
   useEffect(() => {
     void refreshApprovalStatus();
@@ -3120,13 +3152,13 @@ export default function MyOrderPage() {
     for (const sub of subOrders) {
       if (!selectedSet.has(sub.id) || Object.values(createdPOs).some((po: any) => poCoversSubOrder(po, sub.id))) continue;
 
-      // Get allocations: multi-vendor array or single-vendor fallback
+      // One order item maps to one selected vendor. Older records may contain
+      // vendorAllocations from the retired split-vendor flow; ignore those
+      // allocations and use the Shop snapshot / current single selection.
       const allocs: Array<{ vendorId: string; qty: number; meta: any }> =
-        vendorAllocations[sub.id]?.length
-          ? vendorAllocations[sub.id]
-          : selectedVendors[sub.id] && selectedVendorMeta[sub.id]
-            ? [{ vendorId: selectedVendors[sub.id], qty: sub.qty, meta: selectedVendorMeta[sub.id] }]
-            : [];
+        selectedVendors[sub.id] && selectedVendorMeta[sub.id]
+          ? [{ vendorId: selectedVendors[sub.id], qty: sub.qty, meta: selectedVendorMeta[sub.id] }]
+          : [];
 
       for (const alloc of allocs) {
         if (!alloc.vendorId || !alloc.meta) continue;
@@ -3212,7 +3244,7 @@ export default function MyOrderPage() {
         cgstAmt,
         grandTotal,
         paymentTerms: "Net 30",
-        status: "Processing",
+        status: "Draft",
         createdOn: now.toISOString(),
         createdOnDisplay: displayDate,
         requestedDelivery: primarySub.requiredDate,
@@ -3567,15 +3599,20 @@ export default function MyOrderPage() {
                   const isSubOrderCancelled = sub.itemStatus === "Cancelled";
                   // A cancelled sub-order is fully inactive in this view. Do
                   // not expose stale PO/vendor projections or action handlers.
-                   const subPOs = Object.values(createdPOs)
-                     .filter((p: any) => poCoversSubOrder(p, sub.id))
-                     .filter((p: any) => {
-                       const line = (p.items || []).find((item: any) => item.subOrderId === sub.id);
-                       return isSubOrderCancelled || !line || line.status !== "Cancelled";
-                     }) as any[];
-                  const hasPO = subPOs.length > 0;
-                  const hasConfirmedPO = subPOs.some(isConfirmedPO);
-                   const canMarkShipped = subPOs.some((po: any) => isPOItemShipped(po, sub.id));
+                    const allOrderPOs = Object.values(createdPOs) as any[];
+                    const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id);
+                    const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub.id);
+                    const cancelledLine = allOrderPOs.some((po: any) =>
+                      po.items?.some((line: any) =>
+                        line.subOrderId === sub.id &&
+                        String(line.status || "").toLowerCase() === "cancelled",
+                      ),
+                    );
+                    const itemCancelled = isSubOrderCancelled || Boolean(cancelledPO) || cancelledLine;
+                    const subPOs = canonicalPO ? [canonicalPO] : [];
+                    const hasPO = subPOs.length > 0;
+                    const hasConfirmedPO = subPOs.some(isConfirmedPO);
+                    const canMarkShipped = !itemCancelled && subPOs.some((po: any) => isPOItemShipped(po, sub.id));
                   const selVendorId = selectedVendors[sub.id];
                   const selMeta = selectedVendorMeta[sub.id] || null;
                   const selVendor = selMeta ? { id: selMeta.vendorId, name: selMeta.vendorName, color: "#2563eb", location: selMeta.location } : null;
@@ -3587,8 +3624,9 @@ export default function MyOrderPage() {
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>{sub.category}</div>
-                        {!isClientPortalUser && !isSubOrderCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
-                        {!isClientPortalUser && !isSubOrderCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
+                       {!isClientPortalUser && !itemCancelled && hasConfirmedPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#dbeafe", color: "#1d4ed8", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Created</span></div>}
+                         {!isClientPortalUser && itemCancelled && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>PO Cancelled</span></div>}
+                         {!isClientPortalUser && !itemCancelled && selectedVendors[sub.id] && !hasPO && <div style={{ marginTop: 4 }}><span style={{ fontSize: 10, background: "#f0fdf4", color: "#166534", padding: "2px 6px", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>Vendor Selected</span></div>}
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -3605,31 +3643,21 @@ export default function MyOrderPage() {
                       </div>
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
-                           {isSubOrderCancelled ? (
+                           {itemCancelled ? (
                              <div>
                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                  <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                                   {(subPOs[0]?.vendorName || sub.selectedVendorName || "V")[0].toUpperCase()}
+                                    {(cancelledPO?.vendorName || subPOs[0]?.vendorName || sub.selectedVendorName || "V")[0].toUpperCase()}
                                  </div>
                                  <div>
                                    <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", overflowWrap: "break-word" }}>
-                                     {subPOs[0]?.vendorName || sub.selectedVendorName || "Previous vendor"}
+                                      {cancelledPO?.vendorName || subPOs[0]?.vendorName || sub.selectedVendorName || "Previous vendor"}
                                    </div>
-                                   <div style={{ fontSize: 10, color: "#991b1b" }}>Cancelled</div>
+                                    <div style={{ fontSize: 10, color: "#991b1b" }}>PO Cancelled</div>
                                  </div>
                                </div>
-                               <button
-                                 onClick={() => setVendorTarget({
-                                   ...sub,
-                                   selectedVendorId: "",
-                                   selectedVendorName: null,
-                                   previousVendorId: subPOs[0]?.vendorId || sub.selectedVendorId || "",
-                                 })}
-                                 style={{ marginTop: 6, padding: "4px 8px", border: "1px solid #bfdbfe", borderRadius: 5, background: "#eff6ff", color: "#2563eb", cursor: "pointer", fontSize: 10.5, fontWeight: 600, fontFamily: "inherit" }}
-                               >
-                                 Select Different Vendor
-                               </button>
-                               </div>
+                                <div style={{ marginTop: 6, fontSize: 10.5, color: "#991b1b" }}>This item is inactive and cannot be changed.</div>
+                              </div>
                           ) : hasPO ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                               {subPOs.map((po: any) => (
@@ -3696,7 +3724,7 @@ export default function MyOrderPage() {
                                 </button>
                               )}
                             </div>
-                          ) : sub.selectedVendorName ? (
+                           ) : sub.selectedVendorName ? (
                             // Vendor was locked at cart add-to-cart time — display only
                             <div>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -3727,7 +3755,7 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       )}
-                      {isOrderInactive || isSubOrderCancelled ? (
+                       {isOrderInactive || itemCancelled ? (
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
                       ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
@@ -3756,7 +3784,7 @@ export default function MyOrderPage() {
                             onSetReference={() => setReferenceTarget(sub.id)}
                             referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
                             onCancel={() => setCancelTarget(sub.id)}
-                             cancelEnabled={!isOrderInactive && !isSubOrderCancelled && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered"}
+                             cancelEnabled={!isOrderInactive && !itemCancelled && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}

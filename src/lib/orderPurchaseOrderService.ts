@@ -24,11 +24,20 @@ export function createDraftPOsForOrder(
   paymentTerms: string,
 ): number {
   if (!orderId || !cartItems.length) return 0;
-  if (getAllPOs().some(po => po.orderId === orderId)) return 0;
+  const existingPOs = getAllPOs().filter(po => po.orderId === orderId);
+  const coveredSubOrderIds = new Set(
+    existingPOs
+      .filter(po => String(po.status || "").toLowerCase() !== "cancelled")
+      .flatMap(po => po.subOrderIds?.length ? po.subOrderIds : [po.subOrderId]),
+  );
 
   const vendorGroups = new Map<string, OrderCartItem[]>();
   for (const item of cartItems) {
     if (!item.selectedVendorId) continue;
+    const subOrderId = item.subOrderId;
+    // Idempotency is per item, not per order. A partially-created order must
+    // still receive a Draft PO for every selected item that is not covered.
+    if (subOrderId && coveredSubOrderIds.has(subOrderId)) continue;
     if (!vendorGroups.has(item.selectedVendorId)) vendorGroups.set(item.selectedVendorId, []);
     vendorGroups.get(item.selectedVendorId)!.push(item);
   }

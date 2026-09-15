@@ -159,7 +159,9 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 
     // When a PO is cancelled, clean up the order-level PO and vendor-selection
-    // localStorage keys so OrderDetailsPage resets to its default (unselected) state.
+    // localStorage keys and mark every covered order item inactive. A PO
+    // cancellation is terminal for those items; they must not become editable
+    // again just because the Order Details page was refreshed.
     if (changes.status === "Cancelled") {
       const po = all[idx];
       const orderId = po.orderId;
@@ -192,10 +194,32 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
         if (changed) localStorage.setItem(vendorsKey, JSON.stringify(vendors));
       } catch { /* storage unavailable */ }
 
+      try {
+        // Project the terminal PO state into the order-detail item state.
+        // This works for both Draft and confirmed POs and preserves the
+        // cancellation reason for the audit trail shown to the user.
+        const itemStateKey = `nido_subitems_${orderId}`;
+        const itemState: Record<string, any> = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
+        for (const subId of subOrderIds) {
+          itemState[subId] = {
+            ...(itemState[subId] || {}),
+            itemStatus: "Cancelled",
+            cancelReason: changes.cancelReason || "Purchase order cancelled",
+            tracking: null,
+            trackingOwner: undefined,
+            updatedOn: new Date().toLocaleDateString("en-IN"),
+          };
+        }
+        localStorage.setItem(itemStateKey, JSON.stringify(itemState));
+      } catch { /* storage unavailable */ }
+
       // Notify OrderDetailsPage (same tab) to sync its React state from localStorage
       try {
         window.dispatchEvent(new CustomEvent("poCancelled", {
           detail: { poNumber, orderId, subOrderIds },
+        }));
+        window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+          detail: { orderId, subOrderIds, reason: changes.cancelReason || "Purchase order cancelled" },
         }));
       } catch { /* SSR safe */ }
     }
