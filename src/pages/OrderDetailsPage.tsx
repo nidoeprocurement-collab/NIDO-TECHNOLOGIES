@@ -3299,7 +3299,7 @@ export default function MyOrderPage() {
         {/* SLA Status Panel */}
         {awaitingApproval && (
           <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#92400e", fontSize: 13 }}>
-            <b>Approval required:</b> This order came from the client portal. Purchase orders will be created after the approval is completed.
+            <b>Approval required:</b> This order is waiting for its approval workflow to complete. Purchase orders will be created after final approval.
           </div>
         )}
         {(() => {
@@ -3709,7 +3709,7 @@ export default function MyOrderPage() {
                     <p style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No Draft Purchase Orders</p>
                     <p style={{ fontSize: 12, marginTop: 6, maxWidth: 380, margin: "8px auto 0" }}>
                       {awaitingApproval
-                        ? "This client order is waiting for approval. Draft POs will be created automatically after approval."
+                        ? "This order is waiting for approval. Draft POs will be created automatically after final approval."
                         : "Draft POs are created automatically when an order is placed with vendor-selected items. Each vendor gets their own Draft PO for review."}
                     </p>
                   </div>

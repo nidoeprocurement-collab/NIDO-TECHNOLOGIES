@@ -11,8 +11,8 @@ The approval workflow service defaults to browser-local persistence so the compl
 
 ## Client order PO gate
 
-Client portal orders that match an active approval workflow must not create vendor purchase orders while the request is pending. The shared approval action completes the workflow first, then releases the order's Draft POs idempotently after the final `Approved` status. Client orders with no matching workflow continue directly to Draft PO creation.
+Orders created from either the NIDO platform or the client portal that match an active approval workflow must not create vendor purchase orders while the request is pending. The shared approval action completes the workflow first, then releases the order's Draft POs idempotently after the final `Approved` status. Orders with no matching workflow continue directly to Draft PO creation.
 
 **Why:** Creating a Draft PO before client approval lets procurement work begin on an order that may still be rejected, and repeated approval actions must never duplicate POs.
 
-**How to apply:** Keep the gate in the shared order/approval services rather than only in a page button. Both owner approvals and client-portal approvals call the same approval action path, so both release behavior and duplicate protection stay consistent.
+**How to apply:** Keep the gate in the shared order/approval services rather than only in a page button. Both owner approvals and client-portal approvals call the same approval action path, so both release behavior and duplicate protection stay consistent. Client-scoped workflows apply only to portal-originated orders; generic NIDO workflows still apply to platform orders for a selected client.

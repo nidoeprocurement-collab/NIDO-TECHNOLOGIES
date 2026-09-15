@@ -487,17 +487,19 @@ export async function takeAction(requestId, body) {
   }
 }
 
-export async function dashboard() {
+export async function dashboard(clientId) {
+  const requestFilter = clientId ? "WHERE client_id=$1" : "";
+  const workflowFilter = clientId ? "WHERE client_id=$1" : "";
   const { rows } = await pool.query(`
     SELECT
-      (SELECT COUNT(*)::int FROM approval_workflows) AS total_workflows,
-      (SELECT COUNT(*)::int FROM approval_workflows WHERE status='Active') AS active_workflows,
-      (SELECT COUNT(*)::int FROM approval_workflows WHERE status='Draft') AS draft_workflows,
-      (SELECT COUNT(*)::int FROM approval_requests WHERE status IN ('Pending','In Progress','Escalated')) AS pending_approvals,
-      (SELECT COUNT(*)::int FROM approval_requests WHERE status='Approved') AS completed_approvals,
-      (SELECT COUNT(*)::int FROM approval_requests WHERE status='Rejected') AS rejected_approvals,
-      (SELECT COUNT(*)::int FROM approval_requests WHERE due_at < now() AND status IN ('Pending','In Progress','Escalated')) AS overdue_approvals
-  `);
+      (SELECT COUNT(*)::int FROM approval_workflows ${workflowFilter}) AS total_workflows,
+      (SELECT COUNT(*)::int FROM approval_workflows ${workflowFilter ? `${workflowFilter} AND status='Active'` : "WHERE status='Active'"}) AS active_workflows,
+      (SELECT COUNT(*)::int FROM approval_workflows ${workflowFilter ? `${workflowFilter} AND status='Draft'` : "WHERE status='Draft'"}) AS draft_workflows,
+      (SELECT COUNT(*)::int FROM approval_requests ${requestFilter ? `${requestFilter} AND status IN ('Pending','In Progress','Escalated')` : "WHERE status IN ('Pending','In Progress','Escalated')"}) AS pending_approvals,
+      (SELECT COUNT(*)::int FROM approval_requests ${requestFilter ? `${requestFilter} AND status='Approved'` : "WHERE status='Approved'"}) AS completed_approvals,
+      (SELECT COUNT(*)::int FROM approval_requests ${requestFilter ? `${requestFilter} AND status='Rejected'` : "WHERE status='Rejected'"}) AS rejected_approvals,
+      (SELECT COUNT(*)::int FROM approval_requests ${requestFilter ? `${requestFilter} AND due_at < now() AND status IN ('Pending','In Progress','Escalated')` : "WHERE due_at < now() AND status IN ('Pending','In Progress','Escalated')"}) AS overdue_approvals
+  `, clientId ? [clientId] : []);
   return rows[0];
 }
 

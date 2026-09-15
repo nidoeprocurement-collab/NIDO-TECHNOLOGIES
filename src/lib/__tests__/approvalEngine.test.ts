@@ -180,6 +180,7 @@ describe("local approval engine", () => {
       clientId: "client-1",
       requestedBy: "portal-user",
       requestedByName: "Portal User",
+      userType: "client_user",
     });
     expect(duplicate).toHaveLength(1);
     expect(duplicate[0].id).toBe(created[0].id);
@@ -206,5 +207,34 @@ describe("local approval engine", () => {
     expect(completed.status).toBe("Approved");
     expect(completed.currentLevel).toBe(1);
     expect(workflow.clientId).toBe("client-1");
+
+    await saveApprovalWorkflow({
+      name: "NIDO Order Approval",
+      module: "Order",
+      trigger: "Order created",
+      status: "Active",
+      conditions: [],
+      levels: [{
+        levelNumber: 1,
+        approverType: "Role",
+        approverRole: "System Admin",
+        minimumApprovers: 1,
+        approvalMode: "Sequential",
+        slaHours: 24,
+        escalationEnabled: false,
+      }],
+      updatedBy: "System Owner",
+    });
+    const nidoOrderRequest = await createApprovalRequest({
+      module: "Order",
+      trigger: "Order created",
+      reference: "ORD-NIDO-1",
+      clientId: "client-1",
+      userType: "nido_admin",
+      requestedBy: "nido-user",
+      requestedByName: "NIDO User",
+    });
+    expect(nidoOrderRequest).toHaveLength(1);
+    expect(nidoOrderRequest[0].workflow).toBe("NIDO Order Approval");
   });
 });

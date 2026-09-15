@@ -83,6 +83,7 @@ function defaultPortalRoles(): PortalRole[] {
       create: r.create?.includes(module) ?? false,
       edit: r.edit?.includes(module) ?? false,
       delete: false,
+      approve: r.name === 'Approver' && module === 'Orders',
     })),
   }));
 }
@@ -182,6 +183,9 @@ export function hasPortalPermission(
   const role = getPortalRoles(clientId).find(item => item.name === roleName);
   if (!role || role.status !== 'active') return false;
   if (roleName === 'Client Admin') return true;
+  // Preserve the built-in approver role's intended capability for legacy
+  // records that were saved before the approve permission was added.
+  if (roleName === 'Approver' && module === 'Orders' && action === 'approve') return true;
   return !!role?.permissions.find(permission => permission.module === module)?.[action];
 }
 

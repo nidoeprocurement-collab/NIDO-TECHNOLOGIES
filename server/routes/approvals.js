@@ -58,7 +58,7 @@ router.get("/bootstrap", ah(async (req, res) => {
   const [workflows, requests, stats] = await Promise.all([
     listWorkflows(clientId),
     listRequests(undefined, clientId),
-    dashboard(),
+    dashboard(clientId),
   ]);
   res.json({ success: true, data: { workflows, requests, stats } });
 }));

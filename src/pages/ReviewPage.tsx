@@ -217,7 +217,11 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
         poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
         requester: orderedBy,
         orderedFor,
-        deferPurchaseOrders: isClientPortalUser,
+        // Hold every newly placed order until the centralized approval
+        // evaluation completes. Orders without a matching workflow are
+        // released immediately below, while matching workflows keep POs
+        // blocked until final approval.
+        deferPurchaseOrders: true,
         requesterRole: user?.role || "System Owner",
         requesterInitial: orderedBy.charAt(0).toUpperCase() || "O",
         requesterColor: "#6b46c1",
@@ -299,10 +303,10 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
           requester,
         },
       });
-      // Client orders are held without POs while an approval workflow is
-      // pending. If no active workflow matched, release them immediately so
-      // the normal non-approval checkout path is unchanged.
-      if (approvalRequests.length === 0 && isClientPortalUser) {
+      // If no active workflow matched, release the order immediately so the
+      // normal non-approval checkout path is unchanged. Matching NIDO or
+      // client workflows keep POs blocked until final approval.
+      if (approvalRequests.length === 0) {
         createDraftPOsForOrder(orderNumber, itemsSnapshot.map((item) => ({
           ...item,
           subOrderId: item.subOrderId,

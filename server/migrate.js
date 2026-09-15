@@ -168,6 +168,8 @@ export async function migrate() {
       due_at TIMESTAMPTZ,
       completed_at TIMESTAMPTZ
     );
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS client_id TEXT;
+    ALTER TABLE approval_requests ADD COLUMN IF NOT EXISTS client_name TEXT;
 
     CREATE TABLE IF NOT EXISTS approval_request_steps (
       id BIGSERIAL PRIMARY KEY,
@@ -236,6 +238,7 @@ export async function migrate() {
 
     CREATE INDEX IF NOT EXISTS approval_requests_status_idx ON approval_requests (status);
     CREATE INDEX IF NOT EXISTS approval_requests_workflow_idx ON approval_requests (workflow_id);
+    CREATE INDEX IF NOT EXISTS approval_requests_client_idx ON approval_requests (client_id);
     CREATE INDEX IF NOT EXISTS approval_actions_request_idx ON approval_actions (request_id, created_at);
   `);
 
