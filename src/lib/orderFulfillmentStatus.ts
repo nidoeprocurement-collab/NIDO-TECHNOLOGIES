@@ -125,8 +125,10 @@ export function derivePOFulfillmentStatus(po: any): FulfillmentStatus {
       ? "Processing"
       : (po?.status || "Processing") as FulfillmentStatus;
   }
-  return deriveFulfillmentStatus(
-    lines.map(line => lineStatus(line, po)),
-    "Processing",
-  );
+  const statuses = lines.map(line => lineStatus(line, po));
+  const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
+  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDelivered(status));
+  return hasPendingShipping && !hasShipmentProgress
+    ? "Pending Shipping"
+    : deriveFulfillmentStatus(statuses, "Processing");
 }

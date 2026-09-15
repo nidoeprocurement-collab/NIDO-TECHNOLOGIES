@@ -61,6 +61,12 @@ When a customer-facing sub-order is `Pending Shipping`, the master order also be
 
 **How to apply:** Keep the special case in the master-order sync path; leave the general fulfillment reducer and all other status precedence unchanged.
 
+The Vendor Order Details header also shows Pending Shipping when any active PO line is waiting for shipment and no line has shipment or delivery progress.
+
+**Why:** Vendor users need the header status to reflect the item-level Pending Shipping selection immediately, without replacing the persisted Draft/Confirmed PO lifecycle.
+
+**How to apply:** Derive the vendor PO display status from line statuses with Pending Shipping precedence only before shipped/delivered progress.
+
 Vendor-entered Reference No and Serial No are stored on each PO line and mirrored into the order’s sub-order state so Order Details can display them under the product name.
 
 **Why:** Vendor Order Details and Order Details use separate local persistence areas; updating only the PO leaves the customer-facing item details stale.
