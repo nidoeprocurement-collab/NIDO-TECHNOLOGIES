@@ -128,4 +128,83 @@ describe("local approval engine", () => {
     expect(history).toHaveLength(2);
     expect(history.map(item => item.version)).toEqual([2, 1]);
   });
+
+  it("scopes client workflows, prevents duplicate requests, and supports multi-approver levels", async () => {
+    const workflow = await saveApprovalWorkflow({
+      name: "Client Order Approval",
+      module: "Order",
+      trigger: "Order created",
+      status: "Active",
+      clientId: "client-1",
+      clientName: "Client One",
+      conditions: [],
+      levels: [{
+        levelNumber: 1,
+        approverType: "Role",
+        approverRole: "Approver",
+        minimumApprovers: 2,
+        approvalMode: "All Required",
+        slaHours: 24,
+        escalationEnabled: false,
+      }],
+      updatedBy: "System Owner",
+    });
+
+    const wrongClient = await createApprovalRequest({
+      module: "Order",
+      trigger: "Order created",
+      reference: "ORD-WRONG",
+      clientId: "client-2",
+      requestedBy: "portal-user",
+      requestedByName: "Portal User",
+      userType: "client_user",
+    });
+    expect(wrongClient).toHaveLength(0);
+
+    const created = await createApprovalRequest({
+      module: "Order",
+      trigger: "Order created",
+      reference: "ORD-CLIENT-1",
+      clientId: "client-1",
+      requestedBy: "portal-user",
+      requestedByName: "Portal User",
+      requestedByRole: "Employee",
+      userType: "client_user",
+    });
+    expect(created).toHaveLength(1);
+
+    const duplicate = await createApprovalRequest({
+      module: "Order",
+      trigger: "Order created",
+      reference: "ORD-CLIENT-1",
+      clientId: "client-1",
+      requestedBy: "portal-user",
+      requestedByName: "Portal User",
+    });
+    expect(duplicate).toHaveLength(1);
+    expect(duplicate[0].id).toBe(created[0].id);
+
+    const firstApproval = await actOnApprovalRequest(created[0].id, {
+      action: "approve",
+      userId: "approver-1",
+      userName: "Approver One",
+      userRole: "Approver",
+      userType: "client_user",
+      clientId: "client-1",
+    });
+    expect(firstApproval.status).toBe("Pending");
+    expect(firstApproval.currentLevel).toBe(1);
+
+    const completed = await actOnApprovalRequest(created[0].id, {
+      action: "approve",
+      userId: "approver-2",
+      userName: "Approver Two",
+      userRole: "Approver",
+      userType: "client_user",
+      clientId: "client-1",
+    });
+    expect(completed.status).toBe("Approved");
+    expect(completed.currentLevel).toBe(1);
+    expect(workflow.clientId).toBe("client-1");
+  });
 });

@@ -80,12 +80,18 @@ function workflowResponse(row, version) {
     trigger: row.trigger,
     workflowType: row.workflow_type, status: row.status, currentVersion: row.current_version,
     createdAt: row.created_at, updatedAt: row.updated_at, createdBy: row.created_by, updatedBy: row.updated_by,
+    clientId: row.client_id || undefined, clientName: row.client_name || undefined,
     conditions: version?.conditions || [], levels: version?.levels || [],
   };
 }
 
-export async function listWorkflows() {
-  const { rows } = await pool.query("SELECT * FROM approval_workflows ORDER BY updated_at DESC");
+export async function listWorkflows(clientId) {
+  const { rows } = await pool.query(
+    clientId
+      ? "SELECT * FROM approval_workflows WHERE client_id=$1 ORDER BY updated_at DESC"
+      : "SELECT * FROM approval_workflows ORDER BY updated_at DESC",
+    clientId ? [clientId] : [],
+  );
   return Promise.all(rows.map(async row => workflowResponse(row, await getLatestVersion(row.id))));
 }
 
@@ -134,10 +140,11 @@ export async function createWorkflow(body) {
     await client.query("BEGIN");
     await client.query(
       `INSERT INTO approval_workflows
-       (id,name,description,module,trigger,workflow_type,status,created_by,updated_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)`,
+        (id,name,description,module,trigger,workflow_type,status,created_by,updated_by,client_id,client_name)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10)`,
       [workflowId, name, body.description || "", body.module, body.trigger || "Manual submission",
-        body.workflowType || "Standard", body.status || "Draft", actor],
+        body.workflowType || "Standard", body.status || "Draft", actor,
+        body.clientId || null, body.clientName || null],
     );
     await writeVersion(client, workflowId, 1, snapshot, actor);
     await client.query(
@@ -165,11 +172,12 @@ export async function updateWorkflow(workflowId, body) {
   try {
     await client.query("BEGIN");
     await client.query(
-      `UPDATE approval_workflows SET name=$2, description=$3, module=$4, trigger=$5, workflow_type=$6,
-       status=$7, current_version=$8, updated_at=now(), updated_by=$9 WHERE id=$1`,
+        `UPDATE approval_workflows SET name=$2, description=$3, module=$4, trigger=$5, workflow_type=$6,
+        status=$7, current_version=$8, updated_at=now(), updated_by=$9, client_id=$10, client_name=$11 WHERE id=$1`,
       [workflowId, body.name ?? existing.name, body.description ?? existing.description,
         body.module ?? existing.module, body.trigger ?? existing.trigger, body.workflowType ?? existing.workflowType,
-        body.status ?? existing.status, version, actor],
+        body.status ?? existing.status, version, actor,
+        body.clientId ?? existing.clientId ?? null, body.clientName ?? existing.clientName ?? null],
     );
     await writeVersion(client, workflowId, version, snapshot, actor);
     await client.query(
@@ -220,14 +228,23 @@ export async function duplicateWorkflow(workflowId, actor = "system") {
   return createWorkflow({
     name: `${existing.name} (Copy)`, description: existing.description, module: existing.module,
     trigger: existing.trigger, workflowType: existing.workflowType, status: "Draft", conditions: existing.conditions,
-    levels: existing.levels, createdBy: actor,
+    levels: existing.levels, clientId: existing.clientId, clientName: existing.clientName, createdBy: actor,
   });
 }
 
 export async function evaluateAndCreate(payload) {
+  const isClientPortalPayload = ["client_admin", "client_user"].includes(String(payload.userType || ""));
   const { rows: candidates } = await pool.query(
-    "SELECT * FROM approval_workflows WHERE module=$1 AND status='Active' ORDER BY updated_at DESC",
-    [payload.module],
+    `SELECT * FROM approval_workflows
+     WHERE module=$1
+       AND status='Active'
+       AND trigger=$2
+       AND (
+         ($4::boolean = true AND $3::text IS NOT NULL AND client_id=$3)
+         OR ($4::boolean = false AND COALESCE(client_id,'')='')
+       )
+     ORDER BY updated_at DESC`,
+    [payload.module, payload.trigger || "Manual submission", payload.clientId || null, isClientPortalPayload],
   );
   const created = [];
   for (const workflow of candidates) {
@@ -242,13 +259,26 @@ export async function evaluateAndCreate(payload) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const existing = await client.query(
+        `SELECT id FROM approval_requests
+         WHERE workflow_id=$1 AND reference=$2
+           AND status IN ('Pending','In Progress','Sent Back','Escalated')
+         LIMIT 1`,
+        [workflow.id, payload.reference || ""],
+      );
+      if (existing.rows.length) {
+        const existingRequest = await getRequest(existing.rows[0].id);
+        if (existingRequest) created.push(existingRequest);
+        await client.query("ROLLBACK");
+        continue;
+      }
       await client.query(
         `INSERT INTO approval_requests
-         (id,workflow_id,workflow_version,module,trigger,reference,requested_by,requested_by_name,current_level,status,amount,context,due_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,'Pending',$9,$10,$11)`,
+         (id,workflow_id,workflow_version,module,trigger,reference,requested_by,requested_by_name,current_level,status,amount,context,client_id,client_name,due_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1,'Pending',$9,$10,$11,$12,$13)`,
         [requestId, workflow.id, version.version, payload.module, payload.trigger || "", payload.reference || "",
           payload.requestedBy || "system", payload.requestedByName || "System", payload.amount ?? null,
-          JSON.stringify(context), dueAt],
+          JSON.stringify(context), payload.clientId || null, payload.clientName || null, dueAt],
       );
       for (const level of levels) {
         await client.query(
@@ -297,9 +327,18 @@ function requestSelect() {
     LEFT JOIN approval_request_steps s ON s.request_id=r.id AND s.level_number=r.current_level`;
 }
 
-export async function listRequests(status) {
-  const params = status ? [status] : [];
-  const where = status ? "WHERE r.status=$1" : "";
+export async function listRequests(status, clientId) {
+  const params = [];
+  const clauses = [];
+  if (status) {
+    params.push(status);
+    clauses.push(`r.status=$${params.length}`);
+  }
+  if (clientId) {
+    params.push(clientId);
+    clauses.push(`r.client_id=$${params.length}`);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   const { rows } = await pool.query(`${requestSelect()} ${where} ORDER BY r.created_at DESC`, params);
   return rows.map(mapRequest);
 }
@@ -311,6 +350,7 @@ function mapRequest(row) {
     requestedByName: row.requested_by_name, currentApprover: row.specific_user_id || row.approver_role || "—",
     approverType: row.approver_type, currentLevel: row.current_level, status: row.status,
     amount: row.amount == null ? null : Number(row.amount), context: row.context || {},
+    clientId: row.client_id || undefined, clientName: row.client_name || undefined,
     createdAt: row.created_at, dueAt: row.step_due_at || row.due_at,
   };
 }
@@ -325,6 +365,13 @@ export async function getRequest(requestId) {
     "SELECT * FROM approval_request_steps WHERE request_id=$1 ORDER BY level_number ASC", [requestId],
   );
   return { ...mapRequest(rows[0]), timeline, steps };
+}
+
+function requiredApprovals(step) {
+  const minimum = Math.max(1, Number(step?.minimum_approvers) || 1);
+  if (step?.approval_mode === "Any One") return 1;
+  if (step?.approval_mode === "Majority") return Math.max(1, Math.ceil(minimum / 2));
+  return minimum;
 }
 
 export async function takeAction(requestId, body) {
@@ -342,14 +389,32 @@ export async function takeAction(requestId, body) {
   const step = request.steps.find(s => Number(s.level_number) === Number(request.currentLevel));
   const actorRole = body.userRole || "";
   const actorId = body.userId || "system";
+  const sameClient = Boolean(request.clientId && body.clientId && request.clientId === String(body.clientId));
+  const clientAdmin = ["client_admin", "client_user"].includes(String(body.userType || ""))
+    && sameClient
+    && String(body.userType || "") === "client_admin";
   const authorized = actorRole === "System Owner" ||
+    clientAdmin ||
     (step?.approver_type === "Role" && step.approver_role === actorRole) ||
-    (step?.approver_type === "Specific User" && step.specific_user_id === actorId);
+    (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
+    (step?.approver_type === "Department" && step.approver_role === body.userDepartment) ||
+    (["Manager", "Reporting Manager"].includes(step?.approver_type) && String(request.requestedBy) === String(actorId));
   if (!authorized) throw new Error("You are not an eligible approver for the current level.");
+
+  const priorApproverIds = new Set(
+    (request.timeline || [])
+      .filter(entry => entry.action === "approve" && String(entry.step_id) === String(step?.id))
+      .map(entry => String(entry.user_id || entry.user_name)),
+  );
+  if (action === "approve" && priorApproverIds.has(String(actorId))) {
+    throw new Error("You have already approved this approval level.");
+  }
+  const approvalCount = priorApproverIds.size + (action === "approve" ? 1 : 0);
+  const stepApprovalComplete = action === "approve" && approvalCount >= requiredApprovals(step);
 
   let newStatus = request.status;
   let nextLevel = request.currentLevel;
-  if (action === "approve") {
+  if (action === "approve" && stepApprovalComplete) {
     if (request.currentLevel >= request.steps.length) newStatus = "Approved";
     else { nextLevel += 1; newStatus = "In Progress"; }
   } else if (action === "reject") newStatus = "Rejected";
@@ -359,10 +424,17 @@ export async function takeAction(requestId, body) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query(
-      `UPDATE approval_request_steps SET status=$2, decided_by=$3, decided_at=now() WHERE id=$1`,
-      [step.id, action === "approve" ? "Approved" : action === "reject" ? "Rejected" : "Actioned", actorId],
-    );
+    if (action === "approve" && !stepApprovalComplete) {
+      await client.query(
+        "UPDATE approval_request_steps SET status='Pending', decided_by=NULL, decided_at=NULL WHERE id=$1",
+        [step.id],
+      );
+    } else {
+      await client.query(
+        `UPDATE approval_request_steps SET status=$2, decided_by=$3, decided_at=now() WHERE id=$1`,
+        [step.id, action === "approve" ? "Approved" : action === "reject" ? "Rejected" : "Actioned", actorId],
+      );
+    }
     if (["delegate", "reassign"].includes(action)) {
       await client.query(
         `INSERT INTO approval_delegations
@@ -377,7 +449,7 @@ export async function takeAction(requestId, body) {
         [step.id, body.targetUserId],
       );
     }
-    if (action === "approve" && newStatus === "In Progress") {
+    if (action === "approve" && stepApprovalComplete && newStatus === "In Progress") {
       const next = request.steps.find(s => Number(s.level_number) === nextLevel);
       const due = new Date(Date.now() + (Number(next.sla_hours) || 24) * 3600000);
       await client.query(

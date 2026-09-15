@@ -67,18 +67,22 @@ export default function ClientPortalApprovalsPage() {
     };
   }, [user?.clientId]);
 
-  const assignedRequests = useMemo(() => requests.filter(request => {
-    if (!PENDING_STATUSES.includes(request.status)) return false;
-    const currentApprover = String(request.currentApprover || "");
-    return user?.userType === "client_admin"
-      || currentApprover === user?.id
-      || currentApprover === user?.name
-      || currentApprover === user?.role;
-  }), [requests, user]);
-
   const portalProfile = user?.clientId
     ? getPortalUsersByClient(user.clientId).find(portalUser => portalUser.id === user.id)
     : undefined;
+
+  const assignedRequests = useMemo(() => requests.filter(request => {
+    if (!PENDING_STATUSES.includes(request.status)) return false;
+    const currentApprover = String(request.currentApprover || "");
+    const currentStep = request.steps?.find(step => Number(step.level_number) === Number(request.currentLevel));
+    return user?.userType === "client_admin"
+      || currentApprover === user?.id
+      || currentApprover === user?.name
+      || currentApprover === user?.role
+      || currentApprover === user?.clientId
+      || currentStep?.approver_role === user?.role
+      || currentStep?.approver_role === portalProfile?.department;
+  }), [requests, user]);
 
   const act = async (request: ApprovalRequest, action: "approve" | "reject") => {
     if (!user || busyId) return;
@@ -96,6 +100,8 @@ export default function ClientPortalApprovalsPage() {
         userName: user.name,
         userRole: user.role,
         userDepartment: portalProfile?.department || "",
+        userType: user.userType,
+        clientId: user.clientId,
       });
       await refresh();
     } catch (actionError) {

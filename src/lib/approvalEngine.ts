@@ -66,16 +66,19 @@ export interface ApprovalRequest {
 }
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  let role = "";
+  let session: Record<string, any> = {};
   try {
-    role = JSON.parse(localStorage.getItem("nido_user") || "null")?.role || "";
+    session = JSON.parse(localStorage.getItem("nido_user") || "{}") || {};
   } catch {
     // The backend will reject protected operations when no role is available.
   }
   const response = await fetch(`/api/approvals${path}`, {
     headers: {
       "Content-Type": "application/json",
-      ...(role ? { "x-nido-role": role } : {}),
+      ...(session.role ? { "x-nido-role": session.role } : {}),
+      ...(session.id ? { "x-nido-user-id": session.id } : {}),
+      ...(session.clientId ? { "x-nido-client-id": session.clientId } : {}),
+      ...(session.userType ? { "x-nido-user-type": session.userType } : {}),
       ...(options?.headers || {}),
     },
     ...options,
@@ -249,6 +252,13 @@ function localRequestSteps(requestId: string, levels: ApprovalLevel[], dueAt: st
   }));
 }
 
+function requiredLocalApprovals(step: any) {
+  const minimum = Math.max(1, Number(step?.minimum_approvers) || 1);
+  if (step?.approval_mode === "Any One") return 1;
+  if (step?.approval_mode === "Majority") return Math.max(1, Math.ceil(minimum / 2));
+  return minimum;
+}
+
 async function localLoadApprovalBootstrap() {
   const store = localStore();
   return {
@@ -330,18 +340,29 @@ async function localCreateApprovalRequest(payload: Record<string, unknown>) {
     module: payload.module,
     trigger: payload.trigger,
   } as Record<string, unknown>;
+  const isClientPortalPayload = ["client_admin", "client_user"].includes(String(payload.userType || ""));
   const candidates = store.workflows.filter(workflow =>
     workflow.module === payload.module &&
+    workflow.trigger === payload.trigger &&
     workflow.status === "Active" &&
     (
       workflow.clientId
-        ? workflow.clientId === String(payload.clientId || "")
-        : !payload.clientId
+        ? isClientPortalPayload && workflow.clientId === String(payload.clientId || "")
+        : !isClientPortalPayload
     ) &&
     localConditionsMatch(workflow.conditions, context),
   );
   const created: ApprovalRequest[] = [];
   for (const workflow of candidates) {
+    const duplicate = store.requests.find(request =>
+      request.workflowId === workflow.id &&
+      request.reference === String(payload.reference || "") &&
+      ["Pending", "In Progress", "Sent Back", "Escalated"].includes(request.status),
+    );
+    if (duplicate) {
+      created.push(structuredClone(duplicate));
+      continue;
+    }
     const levels = workflow.levels?.length ? workflow.levels : fallbackLevels();
     const first = levels[0];
     const requestId = localId("apr");
@@ -405,7 +426,12 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
   const actorId = String(payload.userId || "system");
   const actorRole = String(payload.userRole || "");
   const actorDepartment = String(payload.userDepartment || "");
+  const sameClient = Boolean(request.clientId && payload.clientId && request.clientId === String(payload.clientId));
+  const clientAdmin = ["client_admin", "client_user"].includes(String(payload.userType || ""))
+    && String(payload.userType || "") === "client_admin"
+    && sameClient;
   const authorized = actorRole === "System Owner" ||
+    clientAdmin ||
     (step?.approver_type === "Role" && step.approver_role === actorRole) ||
     (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
     (step?.approver_type === "Department" && step.approver_role === actorDepartment) ||
@@ -413,9 +439,20 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
     (step?.approver_type === "Reporting Manager" && actorId === String(request.requestedBy));
   if (!authorized) throw new Error("You are not an eligible approver for the current level.");
 
+  const priorApproverIds = new Set(
+    (request.timeline || [])
+      .filter((entry: any) => entry.action === "approve" && String(entry.step_id) === String(step?.id))
+      .map((entry: any) => String(entry.user_id || entry.user_name)),
+  );
+  if (action === "approve" && priorApproverIds.has(actorId)) {
+    throw new Error("You have already approved this approval level.");
+  }
+  const stepApprovalComplete = action !== "approve"
+    || priorApproverIds.size + 1 >= requiredLocalApprovals(step);
+
   const previousStatus = request.status;
   let newStatus: ApprovalStatus = request.status;
-  if (action === "approve") {
+  if (action === "approve" && stepApprovalComplete) {
     if (request.currentLevel >= (request.steps?.length || 1)) {
       newStatus = "Approved";
     } else {
@@ -433,7 +470,7 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
     newStatus = "Rejected";
   } else if (action === "send_back" || action === "request_changes") {
     newStatus = "Sent Back";
-  } else {
+  } else if (action === "delegate" || action === "reassign") {
     newStatus = "In Progress";
     if (step) {
       step.approver_type = "Specific User";
@@ -444,12 +481,16 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
     }
   }
   if (step && action !== "delegate" && action !== "reassign") {
-    step.status = action === "approve" ? "Approved" : action === "reject" ? "Rejected" : "Actioned";
+    step.status = action === "approve"
+      ? (stepApprovalComplete ? "Approved" : "Pending")
+      : action === "reject" ? "Rejected" : "Actioned";
   }
   request.status = newStatus;
   request.timeline = [...(request.timeline || []), {
     id: `${id}_${Date.now().toString(36)}`,
     action,
+    step_id: step?.id,
+    user_id: actorId,
     user_name: String(payload.userName || actorId),
     user_role: actorRole,
     comment,

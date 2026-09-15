@@ -289,6 +289,7 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
         requestedBy: user?.id || "system",
         requestedByName: orderedBy,
         requestedByRole: user?.role || "",
+        userType: user?.userType || "nido_admin",
         clientId: selectedClientId,
         clientName,
         context: {

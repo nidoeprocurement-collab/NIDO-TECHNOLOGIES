@@ -107,6 +107,8 @@ export async function migrate() {
       updated_by TEXT NOT NULL DEFAULT 'system'
     );
     ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS trigger TEXT NOT NULL DEFAULT 'Manual submission';
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS client_id TEXT;
+    ALTER TABLE approval_workflows ADD COLUMN IF NOT EXISTS client_name TEXT;
 
     CREATE TABLE IF NOT EXISTS approval_workflow_versions (
       id BIGSERIAL PRIMARY KEY,
@@ -160,6 +162,8 @@ export async function migrate() {
         CHECK (status IN ('Pending','In Progress','Approved','Rejected','Sent Back','Cancelled','Escalated')),
       amount NUMERIC,
       context JSONB NOT NULL DEFAULT '{}',
+      client_id TEXT,
+      client_name TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       due_at TIMESTAMPTZ,
       completed_at TIMESTAMPTZ

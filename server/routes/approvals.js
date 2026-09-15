@@ -18,8 +18,18 @@ function requestRole(req) {
   return String(req.get("x-nido-role") || req.body?.actorRole || req.body?.updatedByRole || req.body?.userRole || "");
 }
 
-function requireRole(req, res, roles) {
-  if (!roles.has(requestRole(req))) {
+function portalClientId(req) {
+  return String(req.get("x-nido-client-id") || req.body?.clientId || "");
+}
+
+function isClientPortalRequest(req) {
+  return ["client_admin", "client_user"].includes(String(req.get("x-nido-user-type") || req.body?.userType || ""))
+    && Boolean(portalClientId(req));
+}
+
+function requireRole(req, res, roles, { allowClientPortal = false, allowAnyRole = false } = {}) {
+  const role = requestRole(req);
+  if (!roles.has(role) && !(allowClientPortal && isClientPortalRequest(req)) && !(allowAnyRole && role)) {
     res.status(403).json({ success: false, error: "You do not have permission to use approval workflows." });
     return false;
   }
@@ -43,8 +53,13 @@ router.use(async (_req, res, next) => {
 });
 
 router.get("/bootstrap", ah(async (req, res) => {
-  if (!requireRole(req, res, VIEW_ROLES)) return;
-  const [workflows, requests, stats] = await Promise.all([listWorkflows(), listRequests(), dashboard()]);
+  if (!requireRole(req, res, VIEW_ROLES, { allowClientPortal: true, allowAnyRole: true })) return;
+  const clientId = isClientPortalRequest(req) ? portalClientId(req) : "";
+  const [workflows, requests, stats] = await Promise.all([
+    listWorkflows(clientId),
+    listRequests(undefined, clientId),
+    dashboard(),
+  ]);
   res.json({ success: true, data: { workflows, requests, stats } });
 }));
 
@@ -90,18 +105,29 @@ router.get("/workflows/:id/history", ah(async (req, res) => {
 }));
 
 router.get("/requests", ah(async (req, res) => {
-  if (!requireRole(req, res, VIEW_ROLES)) return;
-  res.json({ success: true, data: await listRequests(req.query.status) });
+  if (!requireRole(req, res, VIEW_ROLES, { allowClientPortal: true, allowAnyRole: true })) return;
+  const clientId = isClientPortalRequest(req) ? portalClientId(req) : "";
+  res.json({ success: true, data: await listRequests(req.query.status, clientId) });
 }));
 router.get("/requests/:id", ah(async (req, res) => {
-  if (!requireRole(req, res, VIEW_ROLES)) return;
+  if (!requireRole(req, res, VIEW_ROLES, { allowClientPortal: true, allowAnyRole: true })) return;
   const data = await getRequest(req.params.id);
   if (!data) return res.status(404).json({ success: false, error: "Approval request not found." });
+  if (isClientPortalRequest(req) && data.clientId !== portalClientId(req)) {
+    return res.status(404).json({ success: false, error: "Approval request not found." });
+  }
   return res.json({ success: true, data });
 }));
-router.post("/requests/evaluate", ah(async (req, res) => res.json({ success: true, data: await evaluateAndCreate(req.body || {}) })));
+router.post("/requests/evaluate", ah(async (req, res) => {
+  if (!requireRole(req, res, MANAGEMENT_ROLES, { allowClientPortal: true, allowAnyRole: true })) return;
+  return res.json({ success: true, data: await evaluateAndCreate(req.body || {}) });
+}));
 router.post("/requests/:id/action", ah(async (req, res) => {
-  if (!requireRole(req, res, MANAGEMENT_ROLES)) return;
+  if (!requireRole(req, res, MANAGEMENT_ROLES, { allowClientPortal: true, allowAnyRole: true })) return;
+  const existing = await getRequest(req.params.id);
+  if (isClientPortalRequest(req) && (!existing || existing.clientId !== portalClientId(req))) {
+    return res.status(404).json({ success: false, error: "Approval request not found." });
+  }
   const data = await takeAction(req.params.id, req.body || {});
   if (!data) return res.status(404).json({ success: false, error: "Approval request not found." });
   return res.json({ success: true, data });
