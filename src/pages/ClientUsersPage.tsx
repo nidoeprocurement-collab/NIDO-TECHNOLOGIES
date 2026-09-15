@@ -869,7 +869,15 @@ const archivedUsersData = [
   { id: "arc-003", name: "Tom Baker", role: "Support Lead", email: "tom.baker@apex.com", phone: "+1-555-1203", lastActive: "2025-09-05T14:30:00.000Z", status: "Archived", archivedOn: "2025-10-01", reason: "Role restructured", initials: "TB", color: "bg-amber-500" },
 ];
 
-function ResetPasswordModal({ userName, onClose }: { userName: string; onClose: () => void }) {
+function ResetPasswordModal({
+  userId,
+  userName,
+  onClose,
+}: {
+  userId: string;
+  userName: string;
+  onClose: () => void;
+}) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -882,6 +890,7 @@ function ResetPasswordModal({ userName, onClose }: { userName: string; onClose: 
     if (newPassword.length < 8) { setError("Password must be at least 8 characters."); return; }
     if (newPassword !== confirmPassword) { setError("Passwords do not match."); return; }
     setError("");
+    updatePortalUser(userId, { password: newPassword });
     setDone(true);
   };
 
@@ -3251,7 +3260,13 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         />
       )}
       {showImportUsers && <ImportUsersModal onClose={() => setShowImportUsers(false)} />}
-      {resetPasswordUser && <ResetPasswordModal userName={resetPasswordUser.name} onClose={() => setResetPasswordUser(null)} />}
+      {resetPasswordUser && (
+        <ResetPasswordModal
+          userId={resetPasswordUser.id}
+          userName={resetPasswordUser.name}
+          onClose={() => setResetPasswordUser(null)}
+        />
+      )}
       {archiveTarget && (
         <ArchiveConfirmModal
           user={archiveTarget}
