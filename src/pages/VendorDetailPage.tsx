@@ -17,7 +17,7 @@ import VendorNewsActivityPage from "./VendorNewsActivityPage";
 import VendorPerformancePage from "./VendorPerformancePage";
 import VendorConfigurationTab from "./VendorConfigurationTab";
 import { getVendorById, type StoredVendor } from "@/lib/vendorDataStore";
-import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPODisplayStatus, type StoredPO } from "@/lib/purchaseOrderStore";
 
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN");
@@ -139,7 +139,7 @@ function getRecentActivities(vendor: StoredVendor, purchaseOrders: StoredPO[], c
     icon: po.status === "Delivered"
       ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
       : <ShoppingCart className="w-4 h-4 text-blue-500" />,
-    text: `Purchase order ${po.poNumber} is ${String(po.status).toLowerCase()}`,
+    text: `Purchase order ${po.poNumber} is ${getPODisplayStatus(po.status).toLowerCase()}`,
     time: formatRelativeTime(po.createdOn || po.createdOnDisplay),
     color: po.status === "Delivered" ? "bg-emerald-50" : "bg-blue-50",
     sortDate: parseDate(po.createdOn || po.createdOnDisplay)?.getTime() || 0,

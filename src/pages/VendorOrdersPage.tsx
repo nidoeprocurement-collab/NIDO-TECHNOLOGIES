@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
-import { getAllPOs, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPODisplayStatus, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
 import { getProcurementSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
@@ -52,12 +52,13 @@ const INITIAL_ORDERS: Order[] = [
   { id: "PO-10009", orderId: "ORD-8796", vendor: "Office Supplies Co.", date: "2026-03-28", dateStr: "Mar 28, 2026", status: "Processing", amount: 720.0, amountStr: "$720.00", delivery: "Apr 5, 2026", by: "Pavan (System Owner)" },
 ];
 
-const LEGACY_PO_STATUSES: OrderStatus[] = ["Draft", "Processing", "Confirmed", "Shipped", "Delivered", "Closed", "Cancelled"];
+const LEGACY_PO_STATUSES: OrderStatus[] = ["Pending", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
 const VENDORS = ["All Vendors", "TechHub Solutions", "Office Supplies Co.", "Global Industrial", "Furniture Mart", "Printer World"];
 const PER_PAGE = 10;
 
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
   Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
+  Pending:    { bg: "#fafafa", color: "#777",    border: "#ddd" },
   Confirmed:  { bg: "#eaf3de", color: "#3b6d11", border: "#c0dd97" },
   Shipped:    { bg: "#f3f4f6", color: "#555",    border: "#d1d5db" },
   Delivered:  { bg: "#e1f5ee", color: "#0f6e56", border: "#9fe1cb" },
@@ -229,7 +230,7 @@ function storedPOToOrder(po: StoredPO): Order {
     vendor:    po.vendorName,
     date:      createdDate.toISOString().split("T")[0],
     dateStr:   createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-    status:    po.status as OrderStatus,
+    status:    getPODisplayStatus(po.status),
     amount:    po.grandTotal,
     amountStr: fmtINR(po.grandTotal),
     delivery:  po.requestedDelivery || "Within 30 days",
@@ -374,7 +375,11 @@ export default function VendorOrderList() {
 
   // Remap static "PO-" IDs to the configured prefix reactively
   const displayedOrders = useMemo(
-    () => orders.map(o => ({ ...o, id: o.id.replace(/^PO-/, poPrefix) })),
+    () => orders.map(o => ({
+      ...o,
+      id: o.id.replace(/^PO-/, poPrefix),
+      status: getPODisplayStatus(o.status),
+    })),
     [orders, poPrefix]
   );
 
@@ -403,7 +408,8 @@ export default function VendorOrderList() {
   const page = Math.min(currentPage, totalPages);
   const pageRows = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
-  const tabCount = (t: OrderStatus | "All") => t === "All" ? orders.length : orders.filter(r => r.status === t).length;
+  const tabCount = (t: OrderStatus | "All") =>
+    t === "All" ? displayedOrders.length : displayedOrders.filter(r => r.status === t).length;
 
   const handleSort = (col: keyof Order) => {
     if (sortCol === col) setSortDir(d => (d === 1 ? -1 : 1));

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
+import { getPODisplayStatus, getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
@@ -705,7 +705,13 @@ function storedPOToDetail(po: StoredPO) {
             qty: li.qty,
             unitPrice: fmtINR(li.unitPrice),
             total: fmtINR(li.lineSubtotal),
-            status: po.status === "Cancelled" ? "Cancelled" : (li.status || (po.status === "Draft" ? "Pending" : "Processing")),
+            status: po.status === "Cancelled"
+              ? "Cancelled"
+              : (po.status === "Draft"
+                ? "Pending"
+                : (po.status === "Confirmed" && (!li.status || li.status === "Pending" || li.status === "Confirmed")
+                  ? "Processing"
+                  : (li.status || getPODisplayStatus(po.status)))),
             expectedDelivery: po.requestedDelivery || "Within 30 days",
             tracking: li.tracking || null,
             cancelReason: li.cancelReason,
@@ -723,7 +729,7 @@ function storedPOToDetail(po: StoredPO) {
               qty: po.qty,
               unitPrice: fmtINR(po.unitPrice),
               total: fmtINR(po.subtotal),
-              status: po.status === "Cancelled" ? "Cancelled" : "Processing",
+              status: po.status === "Cancelled" ? "Cancelled" : getPODisplayStatus(po.status),
               expectedDelivery: po.requestedDelivery || "Within 30 days",
               tracking: null,
             },
@@ -1016,7 +1022,7 @@ export default function VendorOrderDetailPage() {
 
   // ── Inline-edit qty / unit price on Draft items ───────────────────────────────
   const handleDraftItemQtyChange = (itemId: string, newQty: number) => {
-    if (orderStatus !== "Draft" || isCancelled) return;
+    if (!isDraft || isCancelled) return;
     setItems(prev => {
       const updated = prev.map(it => {
         if (it.id !== itemId) return it;
@@ -1042,7 +1048,7 @@ export default function VendorOrderDetailPage() {
   };
 
   const handleDraftItemPriceChange = (itemId: string, newPrice: number) => {
-    if (orderStatus !== "Draft" || isCancelled) return;
+    if (!isDraft || isCancelled) return;
     setItems(prev => {
       const updated = prev.map(it => {
         if (it.id !== itemId) return it;

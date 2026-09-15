@@ -36,6 +36,19 @@ export type POStatus =
   | "Completed"
   | "Cancelled";
 
+/**
+ * Status labels shown to vendors and on vendor-facing PO pages.
+ * Draft/Confirmed remain the persisted lifecycle values because they control
+ * editability and confirmation, but the UI should expose the procurement state
+ * as Pending/Processing.
+ */
+export function getPODisplayStatus(status: unknown): string {
+  const normalized = String(status || "").trim().toLowerCase();
+  if (normalized === "draft") return "Pending";
+  if (normalized === "confirmed") return "Processing";
+  return String(status || "Pending");
+}
+
 /** One line-item inside a multi-item PO */
 export interface POLineItem {
   subOrderId: string;

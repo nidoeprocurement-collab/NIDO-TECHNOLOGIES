@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getAllPOs, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPODisplayStatus, type StoredPO, type POStatus } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getVendorProducts, type VendorProduct } from "@/lib/vendorStore";
 import { loadConfig } from "@/lib/configService";
@@ -249,8 +249,9 @@ const MANUAL_STATUS_STYLE: Record<PurchaseOrderStatus, string> = {
   CANCELLED: "bg-red-100 text-red-700 border-red-200",
 };
 
-const SYS_STATUS_STYLE: Record<POStatus, string> = {
+const SYS_STATUS_STYLE: Record<string, string> = {
   Draft: "bg-gray-100 text-gray-600 border-gray-200",
+  Pending: "bg-gray-100 text-gray-600 border-gray-200",
   Processing: "bg-purple-100 text-purple-700 border-purple-200",
   Confirmed: "bg-amber-100 text-amber-700 border-amber-200",
   Shipped: "bg-blue-100 text-blue-700 border-blue-200",
@@ -1075,8 +1076,8 @@ export default function PurchaseOrdersPage() {
       sourceOrderNumber: o.orderId || "—",
       referenceNumber: o.referenceNumber || o.subOrderId || "—",
       vendorName: o.vendorName,
-      statusLabel: o.status,
-      statusClass: SYS_STATUS_STYLE[o.status] || SYS_STATUS_STYLE.Draft,
+      statusLabel: getPODisplayStatus(o.status),
+      statusClass: SYS_STATUS_STYLE[getPODisplayStatus(o.status)] || SYS_STATUS_STYLE.Pending,
       billedStatus: o.status === "Delivered" || o.status === "Closed" ? "BILLED" : o.status === "Cancelled" ? "VOID" : "YET TO BE BILLED",
       amount: o.grandTotal,
       deliveryDate: o.requestedDelivery ? fmtDate(o.requestedDelivery) : "—",

@@ -1,4 +1,5 @@
 export type FulfillmentStatus =
+  | "Pending"
   | "Processing"
   | "Partially Shipped"
   | "Shipped"
@@ -110,6 +111,7 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
  */
 export function derivePOFulfillmentStatus(po: any): FulfillmentStatus {
   if (isCancelled(po?.status)) return "Cancelled";
+  if (normalize(po?.status) === "draft") return "Pending";
   const lines = Array.isArray(po?.items) ? po.items : [];
   if (!lines.length) {
     return normalize(po?.status) === "draft" || normalize(po?.status) === "confirmed"

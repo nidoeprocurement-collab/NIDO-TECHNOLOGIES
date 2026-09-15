@@ -49,6 +49,12 @@ New PO numbers are derived from the highest currently stored PO number rather th
 
 **How to apply:** Resynchronise the counter whenever a new PO is generated, while continuing to avoid reuse of numbers already present in stored PO records.
 
+Persist Draft and Confirmed as lifecycle states, but display them as Pending and Processing respectively on vendor-facing PO screens and activity feeds.
+
+**Why:** Draft/Confirmed are needed internally for editability and confirmation gates, while vendors and procurement users need the operational state.
+
+**How to apply:** Use the shared PO display-status mapping for list/detail/activity views; do not replace the persisted lifecycle values.
+
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
 when a Draft vendor change is saved.
