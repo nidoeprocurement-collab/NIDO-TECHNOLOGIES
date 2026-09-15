@@ -31,8 +31,18 @@ export function createDraftPOsForOrder(
       .flatMap(po => po.subOrderIds?.length ? po.subOrderIds : [po.subOrderId]),
   );
 
+  // Normalize legacy items before grouping. The old implementation generated
+  // fallback sub-order IDs using the index inside each vendor group, so the
+  // second vendor's first line could be linked to the first item's sub-order.
+  // Order Details then could not find a PO for that item.
+  const normalizedCartItems = cartItems.map((item, index) => ({
+    ...item,
+    subOrderId: item.subOrderId
+      || `SO-${orderId}-${String(index + 1).padStart(3, "0")}`,
+  }));
+
   const vendorGroups = new Map<string, OrderCartItem[]>();
-  for (const item of cartItems) {
+  for (const item of normalizedCartItems) {
     if (!item.selectedVendorId) continue;
     const subOrderId = item.subOrderId;
     // Idempotency is per item, not per order. A partially-created order must
@@ -51,8 +61,7 @@ export function createDraftPOsForOrder(
     const vendor = getVendorById(vendorId);
     const poNumber = generatePoNumber();
     const lineItems: POLineItem[] = items.map((item, index) => {
-      const subOrderId = item.subOrderId
-        || `${getPrefix("salesOrder") || "SO-"}${orderId}-${String(index + 1).padStart(3, "0")}`;
+      const subOrderId = item.subOrderId!;
       const unitPrice = item.landedCost || item.vendorPrice || item.priceNum || 0;
       const qty = item.quantity;
       const gstPct = item.gstSnapshot ?? getEffectiveTaxPctForCategory(item.category);

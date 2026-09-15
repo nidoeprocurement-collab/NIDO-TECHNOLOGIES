@@ -2322,11 +2322,36 @@ function isReturnAllowed(sub: any): boolean {
 // A grouped PO keeps its first sub-order in `subOrderId`, while all covered
 // sub-orders are also stored in `subOrderIds` and on each line item. Check all
 // three shapes so every item in the group shows the same PO.
-function poCoversSubOrder(po: any, subOrderId: string): boolean {
+function poLineMatchesSubOrder(line: any, subOrderId: string, subOrder?: any): boolean {
+  if (line?.subOrderId === subOrderId) return true;
+  // Legacy POs may have a missing/wrong subOrderId while retaining the
+  // product identity. Use product code/SKU only when an item object is
+  // available, so current orders still prefer their stable subOrderId.
+  if (!subOrder) return false;
+  const productCode = String(subOrder.productCode || "").trim();
+  const sku = String(subOrder.sku || "").trim();
+  const itemName = String(subOrder.itemName || "").trim().toLowerCase();
+  if (productCode && String(line?.productCode || "").trim() === productCode) return true;
+  if (sku && String(line?.sku || "").trim() === sku) return true;
+  return Boolean(itemName && String(line?.item || "").trim().toLowerCase() === itemName);
+}
+
+function findPOLineForSubOrder(po: any, subOrderId: string, subOrder?: any): any | undefined {
+  const direct = Array.isArray(po?.items)
+    ? po.items.find((line: any) => poLineMatchesSubOrder(line, subOrderId, subOrder))
+    : undefined;
+  if (direct) return direct;
+  // Repair an older grouped PO whose subOrderIds are correct but whose line
+  // itself has no usable subOrderId.
+  const groupedIndex = Array.isArray(po?.subOrderIds) ? po.subOrderIds.indexOf(subOrderId) : -1;
+  return groupedIndex >= 0 ? po.items?.[groupedIndex] : undefined;
+}
+
+function poCoversSubOrder(po: any, subOrderId: string, subOrder?: any): boolean {
   if (String(po?.status || "").toLowerCase() === "cancelled") return false;
   if (po?.subOrderId === subOrderId) return true;
   if (Array.isArray(po?.subOrderIds) && po.subOrderIds.includes(subOrderId)) return true;
-  return Array.isArray(po?.items) && po.items.some((item: any) => item?.subOrderId === subOrderId);
+  return Array.isArray(po?.items) && po.items.some((item: any) => poLineMatchesSubOrder(item, subOrderId, subOrder));
 }
 
 function poStatusRank(po: any): number {
@@ -2342,9 +2367,11 @@ function poStatusRank(po: any): number {
  * the old multi-vendor flow ran. The item view must never show both records:
  * confirmed procurement wins over draft, then the newest record wins.
  */
-function getCanonicalPOForSubOrder(pos: any[], subOrderId: string): any | null {
+function getCanonicalPOForSubOrder(pos: any[], subOrderOrId: string | any): any | null {
+  const subOrderId = typeof subOrderOrId === "string" ? subOrderOrId : subOrderOrId?.id;
+  const subOrder = typeof subOrderOrId === "string" ? undefined : subOrderOrId;
   return pos
-    .filter(po => poCoversSubOrder(po, subOrderId))
+    .filter(po => poCoversSubOrder(po, subOrderId, subOrder))
     .sort((a, b) => {
       const rank = poStatusRank(b) - poStatusRank(a);
       if (rank !== 0) return rank;
@@ -2352,14 +2379,14 @@ function getCanonicalPOForSubOrder(pos: any[], subOrderId: string): any | null {
     })[0] || null;
 }
 
-function getCancelledPOForSubOrder(pos: any[], subOrderId: string): any | null {
+function getCancelledPOForSubOrder(pos: any[], subOrderId: string, subOrder?: any): any | null {
   return pos
     .filter(po =>
       String(po?.status || "").toLowerCase() === "cancelled" &&
       (
         po?.subOrderId === subOrderId ||
         po?.subOrderIds?.includes?.(subOrderId) ||
-        po?.items?.some?.((item: any) => item?.subOrderId === subOrderId)
+        po?.items?.some?.((item: any) => poLineMatchesSubOrder(item, subOrderId, subOrder))
       ),
     )
     .sort((a, b) => String(b.createdOn || "").localeCompare(String(a.createdOn || "")))[0] || null;
@@ -2744,8 +2771,8 @@ export default function MyOrderPage() {
     // guard protects against a stale modal submitting after the row changed.
     if (
       currentSubOrder?.itemStatus === "Cancelled" ||
-      getCancelledPOForSubOrder(currentPOs, subId) ||
-      isConfirmedPO(getCanonicalPOForSubOrder(currentPOs, subId))
+      getCancelledPOForSubOrder(currentPOs, subId, currentSubOrder) ||
+      isConfirmedPO(getCanonicalPOForSubOrder(currentPOs, currentSubOrder || subId))
     ) return;
 
     const primary = allocations[0];
@@ -2796,7 +2823,7 @@ export default function MyOrderPage() {
     // line into a new PO so the other lines keep their original vendor.
     const draftPO = getCanonicalPOForSubOrder(
       currentPOs.filter(po => po.status === "Draft"),
-      subId,
+      currentSubOrder || subId,
     );
     const vendorAddressLine1 = vendor?.addressLine1 || meta.addressLine1 || vendor?.address || "";
     const vendorAddressLine2 = vendor?.addressLine2 || meta.addressLine2 || "";
@@ -2847,10 +2874,16 @@ export default function MyOrderPage() {
     };
 
     if (draftPO) {
-      const line = draftPO.items.find(item => item.subOrderId === subId)!;
+      const line = findPOLineForSubOrder(draftPO, subId, currentSubOrder);
+      if (!line) {
+        console.warn(`[Order Details] Draft PO ${draftPO.poNumber} is missing a line for ${subId}; vendor change was not persisted.`);
+        setVendorTarget(null);
+        return;
+      }
       const updatedUnitPrice = Number(meta.unitPrice ?? line.unitPrice ?? 0);
       const movedLine = {
         ...line,
+        subOrderId: subId,
         unitPrice: updatedUnitPrice,
         lineSubtotal: updatedUnitPrice * line.qty,
         status: wasCancelled ? "Pending" : line.status,
@@ -2895,7 +2928,7 @@ export default function MyOrderPage() {
           }],
         });
       } else {
-        const remainingLines = draftPO.items.filter(item => item.subOrderId !== subId);
+        const remainingLines = draftPO.items.filter(item => item !== line);
         const remainingSubtotal = remainingLines.reduce((sum, item) => sum + item.lineSubtotal, 0);
         const remainingSgst = Math.round(
           remainingLines.reduce((sum, item) => sum + item.lineSubtotal * ((item.gstPct ?? 18) / 2) / 100, 0) * 100,
@@ -3613,8 +3646,8 @@ export default function MyOrderPage() {
                   // A cancelled sub-order is fully inactive in this view. Do
                   // not expose stale PO/vendor projections or action handlers.
                     const allOrderPOs = Object.values(createdPOs) as any[];
-                    const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id);
-                    const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub.id);
+                    const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id, sub);
+                    const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub);
                     const cancelledLine = allOrderPOs.some((po: any) =>
                       po.items?.some((line: any) =>
                         line.subOrderId === sub.id &&

@@ -35,6 +35,13 @@ the primary sub-order makes later items lose their PO number and vendor state.
 projects PO data into per-item or per-sub-order UI, and derive its label from
 the persisted PO status.
 
+For legacy orders whose PO line has a missing or incorrect sub-order ID, use
+the item's product code/SKU as a compatibility lookup and repair the line ID
+when a Draft vendor change is saved.
+
+**Why:** Older grouped PO records can otherwise lose the PO number in the
+sub-order table and silently skip the corresponding Draft PO update.
+
 ## Cancellation boundary
 
 Cancelling a PO is terminal for every covered order item. The cancellation must
