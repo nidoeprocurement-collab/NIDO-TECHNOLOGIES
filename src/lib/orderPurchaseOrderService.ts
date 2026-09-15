@@ -147,7 +147,9 @@ export function createDraftPOsForStoredOrder(orderId: string): number {
   try {
     const orders = JSON.parse(localStorage.getItem(ORDERS_KEY) || "[]") as MyOrder[];
     const order = orders.find(item => item.id === orderId);
-    if (!order?.cartItems?.length) return 0;
+    // Approval completion can be delivered late (another tab or a queued
+    // backend response). Never release procurement work for a cancelled order.
+    if (!order?.cartItems?.length || order.status === "Cancelled" || order.status === "Draft") return 0;
     const created = createDraftPOsForOrder(order.id, order.cartItems, order.paymentTerms || "");
     if (created > 0) {
       window.dispatchEvent(new CustomEvent("orderApprovalProcessed", { detail: { orderId, poCount: created } }));

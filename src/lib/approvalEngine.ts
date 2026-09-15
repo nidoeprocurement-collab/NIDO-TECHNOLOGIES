@@ -53,6 +53,7 @@ export interface ApprovalRequest {
   requestedBy: string;
   requestedByName: string;
   currentApprover: string;
+  approverType?: string;
   currentLevel: number;
   status: ApprovalStatus;
   amount?: number | null;
@@ -209,7 +210,7 @@ function localConditionsMatch(conditions: ApprovalCondition[] = [], context: Rec
   let result = compareLocal(context[conditions[0].field], conditions[0].operator, conditions[0].value);
   for (let i = 1; i < conditions.length; i += 1) {
     const next = compareLocal(context[conditions[i].field], conditions[i].operator, conditions[i].value);
-    result = conditions[i - 1].joinOperator === "OR" ? result || next : result && next;
+    result = conditions[i].joinOperator === "OR" ? result || next : result && next;
   }
   return result;
 }
@@ -378,6 +379,7 @@ async function localCreateApprovalRequest(payload: Record<string, unknown>) {
       requestedBy: String(payload.requestedBy || "system"),
       requestedByName: String(payload.requestedByName || "System"),
       currentApprover: localApprover(first),
+      approverType: first.approverType,
       currentLevel: 1,
       status: "Pending" as const,
       amount: payload.amount == null ? null : Number(payload.amount),
@@ -407,7 +409,7 @@ async function localCreateApprovalRequest(payload: Record<string, unknown>) {
 
 async function localActOnApprovalRequest(id: string, payload: Record<string, unknown>) {
   const action = String(payload.action || "");
-  const validActions = ["approve", "reject", "send_back", "request_changes", "delegate", "reassign"];
+  const validActions = ["approve", "reject", "send_back", "request_changes", "delegate", "reassign", "cancel"];
   if (!validActions.includes(action)) throw new Error("Unsupported approval action.");
   const store = localStore();
   const request = store.requests.find(item => item.id === id);
@@ -432,11 +434,12 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
     && sameClient;
   const authorized = actorRole === "System Owner" ||
     clientAdmin ||
+    (action === "cancel" && (actorId === String(request.requestedBy) || actorRole === "System Admin")) ||
     (step?.approver_type === "Role" && step.approver_role === actorRole) ||
     (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
     (step?.approver_type === "Department" && step.approver_role === actorDepartment) ||
-    (step?.approver_type === "Manager" && actorId === String(request.requestedBy)) ||
-    (step?.approver_type === "Reporting Manager" && actorId === String(request.requestedBy));
+    (["Manager", "Reporting Manager"].includes(step?.approver_type)
+      && actorId === String(request.context?.managerId || request.context?.reportingManagerId || ""));
   if (!authorized) throw new Error("You are not an eligible approver for the current level.");
 
   const priorApproverIds = new Set(
@@ -479,11 +482,14 @@ async function localActOnApprovalRequest(id: string, payload: Record<string, unk
       step.status = "Pending";
       request.currentApprover = String(payload.targetUserId);
     }
+  } else if (action === "cancel") {
+    newStatus = "Cancelled";
   }
   if (step && action !== "delegate" && action !== "reassign") {
     step.status = action === "approve"
       ? (stepApprovalComplete ? "Approved" : "Pending")
       : action === "reject" ? "Rejected" : "Actioned";
+    if (action === "cancel") step.status = "Cancelled";
   }
   request.status = newStatus;
   request.timeline = [...(request.timeline || []), {
@@ -563,6 +569,31 @@ export async function actOnApprovalRequest(id: string, payload: Record<string, u
     createDraftPOsForStoredOrder(request.reference);
   }
   return request;
+}
+
+/**
+ * Cancels any open approval requests for a reference before the related
+ * business record is cancelled. This prevents a late approval from releasing
+ * work for an order that no longer exists in an active state.
+ */
+export async function cancelApprovalRequestsForReference(
+  reference: string,
+  actor: { userId?: string; userName?: string; userRole?: string; userType?: string; clientId?: string } = {},
+) {
+  if (!reference) return [];
+  const bootstrap = await loadApprovalBootstrap();
+  const open = bootstrap.requests.filter(request =>
+    request.reference === reference &&
+    ["Pending", "In Progress", "Sent Back", "Escalated"].includes(request.status),
+  );
+  return Promise.all(open.map(request => actOnApprovalRequest(request.id, {
+    action: "cancel",
+    userId: actor.userId || "system",
+    userName: actor.userName || "System",
+    userRole: actor.userRole || "",
+    userType: actor.userType || "",
+    clientId: actor.clientId,
+  })));
 }
 
 export async function getApprovalRequest(id: string) {

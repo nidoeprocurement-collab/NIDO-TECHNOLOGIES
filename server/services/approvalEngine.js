@@ -1,7 +1,7 @@
 import { pool } from "../db.js";
 import { sendEmail } from "./emailService.js";
 
-const ACTIONS = new Set(["approve", "reject", "send_back", "request_changes", "delegate", "reassign"]);
+const ACTIONS = new Set(["approve", "reject", "send_back", "request_changes", "delegate", "reassign", "cancel"]);
 const TERMINAL = new Set(["Approved", "Rejected", "Cancelled"]);
 
 function id(prefix) {
@@ -46,7 +46,7 @@ export function conditionsMatch(conditions, context = {}) {
   let result = compare(context[conditions[0].field], conditions[0].operator, conditions[0].value);
   for (let i = 1; i < conditions.length; i += 1) {
     const next = compare(context[conditions[i].field], conditions[i].operator, conditions[i].value);
-    result = conditions[i - 1].joinOperator === "OR" ? result || next : result && next;
+    result = conditions[i].joinOperator === "OR" ? result || next : result && next;
   }
   return result;
 }
@@ -395,10 +395,12 @@ export async function takeAction(requestId, body) {
     && String(body.userType || "") === "client_admin";
   const authorized = actorRole === "System Owner" ||
     clientAdmin ||
+    (action === "cancel" && (String(actorId) === String(request.requestedBy) || actorRole === "System Admin")) ||
     (step?.approver_type === "Role" && step.approver_role === actorRole) ||
     (step?.approver_type === "Specific User" && step.specific_user_id === actorId) ||
     (step?.approver_type === "Department" && step.approver_role === body.userDepartment) ||
-    (["Manager", "Reporting Manager"].includes(step?.approver_type) && String(request.requestedBy) === String(actorId));
+    (["Manager", "Reporting Manager"].includes(step?.approver_type)
+      && String(request.context?.managerId || request.context?.reportingManagerId || "") === String(actorId));
   if (!authorized) throw new Error("You are not an eligible approver for the current level.");
 
   const priorApproverIds = new Set(
@@ -420,6 +422,7 @@ export async function takeAction(requestId, body) {
   } else if (action === "reject") newStatus = "Rejected";
   else if (action === "send_back" || action === "request_changes") newStatus = "Sent Back";
   else if (action === "delegate" || action === "reassign") newStatus = "In Progress";
+  else if (action === "cancel") newStatus = "Cancelled";
 
   const client = await pool.connect();
   try {
@@ -432,7 +435,7 @@ export async function takeAction(requestId, body) {
     } else {
       await client.query(
         `UPDATE approval_request_steps SET status=$2, decided_by=$3, decided_at=now() WHERE id=$1`,
-        [step.id, action === "approve" ? "Approved" : action === "reject" ? "Rejected" : "Actioned", actorId],
+        [step.id, action === "approve" ? "Approved" : action === "reject" ? "Rejected" : action === "cancel" ? "Cancelled" : "Actioned", actorId],
       );
     }
     if (["delegate", "reassign"].includes(action)) {

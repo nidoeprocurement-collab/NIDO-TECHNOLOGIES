@@ -81,7 +81,8 @@ export default function ClientPortalApprovalsPage() {
       || currentApprover === user?.role
       || currentApprover === user?.clientId
       || currentStep?.approver_role === user?.role
-      || currentStep?.approver_role === portalProfile?.department;
+      || currentStep?.approver_role === portalProfile?.department
+      || (request.approverType === "Department" && currentApprover === portalProfile?.department);
   }), [requests, user]);
 
   const act = async (request: ApprovalRequest, action: "approve" | "reject") => {

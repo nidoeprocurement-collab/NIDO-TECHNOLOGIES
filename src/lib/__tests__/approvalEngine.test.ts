@@ -129,6 +129,54 @@ describe("local approval engine", () => {
     expect(history.map(item => item.version)).toEqual([2, 1]);
   });
 
+  it("uses each condition's join operator and lets the requester cancel an open request", async () => {
+    const workflow = await saveApprovalWorkflow({
+      name: "Conditional Order Approval",
+      module: "Order",
+      trigger: "Order created",
+      status: "Active",
+      clientId: "client-1",
+      clientName: "Client One",
+      conditions: [
+        { joinOperator: "AND", field: "client", operator: "equals", value: "client-1" },
+        { joinOperator: "OR", field: "amount", operator: "greater_than", value: 100000 },
+      ],
+      levels: [{
+        levelNumber: 1,
+        approverType: "Role",
+        approverRole: "Approver",
+        minimumApprovers: 1,
+        approvalMode: "Sequential",
+        slaHours: 24,
+        escalationEnabled: false,
+      }],
+      updatedBy: "System Owner",
+    });
+
+    const created = await createApprovalRequest({
+      module: "Order",
+      trigger: "Order created",
+      reference: "ORD-CANCEL",
+      amount: 50000,
+      requestedBy: "requester-1",
+      requestedByName: "Requester",
+      userType: "client_user",
+      clientId: "client-1",
+      context: { client: "client-1", amount: 50000 },
+    });
+    expect(created).toHaveLength(1);
+    const cancelled = await actOnApprovalRequest(created[0].id, {
+      action: "cancel",
+      userId: "requester-1",
+      userName: "Requester",
+      userType: "client_user",
+      clientId: "client-1",
+    });
+    expect(cancelled.status).toBe("Cancelled");
+    expect((await loadApprovalBootstrap()).requests[0].status).toBe("Cancelled");
+    expect(workflow.status).toBe("Active");
+  });
+
   it("scopes client workflows, prevents duplicate requests, and supports multi-approver levels", async () => {
     const workflow = await saveApprovalWorkflow({
       name: "Client Order Approval",

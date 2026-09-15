@@ -9,6 +9,14 @@ The approval workflow service defaults to browser-local persistence so the compl
 
 **How to apply:** Keep workflow configuration, requests, version history, condition evaluation, sequential approvals, and action timelines behind the shared approval service. Do not add separate module-specific approval stores; switch the adapter flag when persistent backend testing begins.
 
+## Request lifecycle safeguards
+
+Condition joins belong to the condition they join to (the second row's `OR` joins it to the first row), and an open request must be cancelled when its order is cancelled. PO release must also re-check the stored order status because approval responses can arrive late.
+
+**Why:** Approval requests can be evaluated in another tab or backend response, so a cancelled order must not be revived by a delayed approval. Misreading the join row changes which workflows match.
+
+**How to apply:** Keep local and backend condition evaluation identical, allow only the requester or an authorized administrator to cancel an open request, and make release idempotent and status-aware.
+
 ## Client order PO gate
 
 Orders created from either the NIDO platform or the client portal that match an active approval workflow must not create vendor purchase orders while the request is pending. The shared approval action completes the workflow first, then releases the order's Draft POs idempotently after the final `Approved` status. Orders with no matching workflow continue directly to Draft PO creation.

@@ -18,7 +18,7 @@ import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
 import { getPrefix } from "@/lib/configService";
-import { createApprovalRequest } from "@/lib/approvalEngine";
+import { createApprovalRequest, cancelApprovalRequestsForReference, loadApprovalBootstrap } from "@/lib/approvalEngine";
 import { syncMasterOrderFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import {
   getAvailabilityLabel,
@@ -2530,7 +2530,25 @@ export default function MyOrderPage() {
   );
   const hasConfirmedOrderPO = orderPOs.some(isConfirmedPO);
   const canCancelOrderByPO = !hasConfirmedOrderPO;
-  const awaitingApproval = Boolean(order?.deferPurchaseOrders && orderPOs.length === 0);
+  const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
+  const refreshApprovalStatus = async () => {
+    if (!orderId) {
+      setApprovalStatus(null);
+      return;
+    }
+    try {
+      const data = await loadApprovalBootstrap();
+      const matching = data.requests
+        .filter(request => request.reference === orderId && request.module === "Order")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      setApprovalStatus(matching?.status || null);
+    } catch {
+      // The local order page remains usable if the optional approval backend
+      // is unavailable; the server still enforces approval actions.
+    }
+  };
+  const approvalPending = ["Pending", "In Progress", "Sent Back", "Escalated"].includes(approvalStatus || "");
+  const awaitingApproval = Boolean(order?.deferPurchaseOrders && orderPOs.length === 0 && (approvalStatus == null || approvalPending));
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
@@ -2569,8 +2587,20 @@ export default function MyOrderPage() {
     sub => sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered",
   );
   const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
-  const handleCancelOrder = (reason: string) => {
+  const handleCancelOrder = async (reason: string) => {
     if (isOrderCancelled || !canCancelOrder) return;
+    try {
+      await cancelApprovalRequestsForReference(orderId, {
+        userId: user?.id,
+        userName: user?.name,
+        userRole: user?.role,
+        userType: user?.userType,
+        clientId: user?.clientId,
+      });
+    } catch {
+      // Cancellation remains safe because PO release also checks the stored
+      // order status before creating any procurement records.
+    }
     updateOrderStatus(orderId, "Cancelled" as any, reason);
   };
   const [subSearch, setSubSearch] = useState("");
@@ -2995,6 +3025,19 @@ export default function MyOrderPage() {
     };
   }, []);
 
+  useEffect(() => {
+    void refreshApprovalStatus();
+    const refresh = () => void refreshApprovalStatus();
+    window.addEventListener("approvalStoreUpdated", refresh);
+    window.addEventListener("orderApprovalProcessed", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("approvalStoreUpdated", refresh);
+      window.removeEventListener("orderApprovalProcessed", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [orderId, poRefreshKey]);
+
 
   // One PO per unique vendor across all selected sub-orders (handles multi-vendor splits).
   const handleCreatePurchaseOrders = (subIds: string[]) => {
@@ -3300,6 +3343,11 @@ export default function MyOrderPage() {
         {awaitingApproval && (
           <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#92400e", fontSize: 13 }}>
             <b>Approval required:</b> This order is waiting for its approval workflow to complete. Purchase orders will be created after final approval.
+          </div>
+        )}
+        {approvalStatus === "Rejected" && orderPOs.length === 0 && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#991b1b", fontSize: 13 }}>
+            <b>Approval rejected:</b> This order did not pass its approval workflow. No purchase orders were created.
           </div>
         )}
         {(() => {
@@ -3795,25 +3843,35 @@ export default function MyOrderPage() {
                                 onClick={async () => {
                                   setApprovalError("");
                                   try {
+                                    const existingApproval = (await loadApprovalBootstrap()).requests
+                                      .filter(request =>
+                                        request.module === "Purchase Order" &&
+                                        request.reference === po.poNumber,
+                                      )
+                                      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
                                     // The central engine decides whether this PO
                                     // needs approval. With no matching active
                                     // workflow, the existing confirmation flow
                                     // continues unchanged.
-                                    const requests = await createApprovalRequest({
-                                      module: "Purchase Order",
-                                      trigger: "PO created",
-                                      reference: po.poNumber,
-                                      amount: po.grandTotal,
-                                      requestedBy: user?.id || "system",
-                                      requestedByName: user?.name || "System",
-                                      requestedByRole: user?.role || "",
-                                      context: {
-                                        amount: po.grandTotal,
-                                        poNumber: po.poNumber,
-                                        vendor: po.vendorName,
-                                        orderId: po.orderId,
-                                      },
-                                    });
+                                    const requests = existingApproval?.status === "Approved"
+                                      ? []
+                                      : existingApproval && ["Pending", "In Progress", "Sent Back", "Escalated"].includes(existingApproval.status)
+                                        ? [existingApproval]
+                                        : await createApprovalRequest({
+                                            module: "Purchase Order",
+                                            trigger: "PO created",
+                                            reference: po.poNumber,
+                                            amount: po.grandTotal,
+                                            requestedBy: user?.id || "system",
+                                            requestedByName: user?.name || "System",
+                                            requestedByRole: user?.role || "",
+                                            context: {
+                                              amount: po.grandTotal,
+                                              poNumber: po.poNumber,
+                                              vendor: po.vendorName,
+                                              orderId: po.orderId,
+                                            },
+                                          });
                                     if (requests.length) {
                                       setApprovalError(`${po.poNumber} is pending approval. Review it from Configuration → Approval Workflow.`);
                                       setPoRefreshKey(k => k + 1);
