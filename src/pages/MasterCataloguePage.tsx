@@ -12,13 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 import {
-  Plus, Search, Upload, FileDown, FileText, Pencil, Eye, Archive,
+  Plus, Search, Upload, FileDown, Pencil, Eye, Archive,
   Settings, ShoppingCart, X, Star, Image as ImageIcon, Download, MoreVertical,
   LayoutGrid, LayoutList, CheckCircle, Clock, FileEdit, ArchiveRestore
 } from 'lucide-react';
@@ -1266,55 +1265,14 @@ export default function CatalogUpdatesTab() {
         </div>
       )}
 
-      {/* Import/Export + Audit Logs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border-gray-200">
-          <CardHeader className="border-b border-gray-200">
-            <CardTitle className="text-base font-semibold pl-3">   Import / Export Products</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="upload" className="w-full">
-              <TabsList className="bg-gray-100 grid w-full grid-cols-3 mb-4">
-                <TabsTrigger value="upload" className="text-xs">Bulk Upload Items</TabsTrigger>
-                <TabsTrigger value="excel" className="text-xs">Export Catalog (Excel)</TabsTrigger>
-                <TabsTrigger value="pdf" className="text-xs">Export Catalog (PDF)</TabsTrigger>
-              </TabsList>
-              <TabsContent value="upload" className="mt-4">
-                <div className="text-center p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <Upload size={32} className="mx-auto text-blue-500 mb-3" />
-                  <p className="text-sm font-medium text-gray-800">Upload</p>
-                  <p className="text-xs text-gray-600 mt-1">Bulk upload new products or catalog using CSV template.</p>
-                  <input ref={bulkFileRef} type="file" accept=".csv" className="hidden" onChange={handleBulkImport} />
-                  <Button className="mt-4 bg-blue-600 hover:bg-blue-700" size="sm" onClick={() => bulkFileRef.current?.click()}>Upload</Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="excel" className="mt-4">
-                <div className="text-center p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <FileDown size={32} className="mx-auto text-green-500 mb-3" />
-                  <p className="text-sm font-medium text-gray-800">Export</p>
-                  <p className="text-xs text-gray-600 mt-1">Export the entire product catalog as Excel file.</p>
-                  <Button variant="outline" className="mt-4 border-gray-300" size="sm" onClick={exportCatalogExcel}>Export Excel</Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="pdf" className="mt-4">
-                <div className="text-center p-2 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <FileText size={32} className="mx-auto text-red-500 mb-3" />
-                  <p className="text-sm font-medium text-gray-800">Export Catalog</p>
-                  <p className="text-xs text-gray-600 mt-1">Export as PDF file.</p>
-                  <Button variant="outline" className="mt-4 border-gray-300" size="sm" onClick={exportCatalogPDF}>Export PDF</Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        <Card className="border-gray-200">
-          <CardHeader className="border-b border-gray-200 flex items-center justify-between">
-            <CardTitle className="text-base font-semibold pl-3">   Approval & Audit Logs</CardTitle>
-            <Button variant="outline" size="sm" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={exportAuditLogs}><Download size={14} /> Export</Button>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Table>
+      {/* Approval & Audit Logs */}
+      <Card className="w-full min-w-0 border-gray-200">
+        <CardHeader className="flex flex-col items-start gap-3 border-b border-gray-200 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base font-semibold">Approval &amp; Audit Logs</CardTitle>
+          <Button variant="outline" size="sm" className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-100" onClick={exportAuditLogs}><Download size={14} /> Export</Button>
+        </CardHeader>
+        <CardContent className="min-w-0 overflow-x-auto pt-6">
+          <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow className="border-gray-200 bg-gray-50">
                   <TableHead className="text-gray-700 font-semibold uppercase text-xs">Event</TableHead>
@@ -1336,10 +1294,9 @@ export default function CatalogUpdatesTab() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Single Archive Confirmation Dialog */}
       <Dialog open={!!archiveConfirmItem} onOpenChange={(open) => { if (!open) setArchiveConfirmItem(null); }}>
