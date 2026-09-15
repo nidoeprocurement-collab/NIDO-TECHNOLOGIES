@@ -61,6 +61,12 @@ When a customer-facing sub-order is `Pending Shipping`, the master order also be
 
 **How to apply:** Keep the special case in the master-order sync path; leave the general fulfillment reducer and all other status precedence unchanged.
 
+Vendor-entered Reference No and Serial No are stored on each PO line and mirrored into the order’s sub-order state so Order Details can display them under the product name.
+
+**Why:** Vendor Order Details and Order Details use separate local persistence areas; updating only the PO leaves the customer-facing item details stale.
+
+**How to apply:** When adding vendor-entered item identifiers, update both the shared PO line and `nido_subitems_<orderId>`, then emit the existing sub-order refresh event.
+
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
 when a Draft vendor change is saved.

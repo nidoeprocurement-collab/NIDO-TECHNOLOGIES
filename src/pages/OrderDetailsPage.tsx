@@ -678,6 +678,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{sub.itemName}</div>
                   {sub.referenceNumber && <div style={{ fontSize: 11, color: "#6b7280" }}>Ref: {sub.referenceNumber}</div>}
+                  {sub.serialNumber && <div style={{ fontSize: 11, color: "#6b7280" }}>Serial No: {sub.serialNumber}</div>}
                 </div>
               </div>
 
@@ -782,6 +783,7 @@ function ViewItemsModal({ group, onClose }) {
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
                   {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                  {sub.serialNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Serial No: {sub.serialNumber}</div>}
                   {sub.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
                   {sub.commercialTerms && (
                     <div style={{ marginTop: 7, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 12px", fontSize: 10.5, color: "#6b7280" }}>
@@ -2287,6 +2289,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     specs: Array.isArray(item.specs) ? item.specs : (item.specs ? [item.specs] : []),
     productCode: item.productCode || "",
     referenceNumber: "",
+    serialNumber: "",
     // Vendor snapshot — set at add-to-cart time by the client's vendor selection.
     selectedVendorId: item.selectedVendorId || null,
     selectedVendorName: item.selectedVendorName || null,
@@ -2422,6 +2425,7 @@ function getDraftPOAggregate(items: POLineItem[]): Partial<StoredPO> {
     hsnCode: primary?.hsnCode || "",
     specs: primary?.specs || [],
     referenceNumber: primary?.referenceNumber || "",
+    serialNumber: primary?.serialNumber || "",
     qty: primary?.qty || 0,
     unitPrice: primary?.unitPrice || 0,
     subtotal,
@@ -3749,6 +3753,7 @@ export default function MyOrderPage() {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
                             {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                            {sub.serialNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Serial No: {sub.serialNumber}</div>}
                           </div>
                         </div>
                       </div>

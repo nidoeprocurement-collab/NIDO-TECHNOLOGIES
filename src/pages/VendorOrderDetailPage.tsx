@@ -700,6 +700,7 @@ function storedPOToDetail(po: StoredPO) {
             name: li.item,
             image: "📦",
             referenceNumber: li.referenceNumber || "",
+            serialNumber: li.serialNumber || "",
             specs: li.specs || [],
              commercialTerms: li.commercialTerms,
             qty: li.qty,
@@ -724,6 +725,7 @@ function storedPOToDetail(po: StoredPO) {
               name: po.item,
               image: "📦",
               referenceNumber: po.referenceNumber || "",
+              serialNumber: po.serialNumber || "",
               specs: po.specs || [],
               commercialTerms: undefined,
               qty: po.qty,
@@ -886,23 +888,42 @@ export default function VendorOrderDetailPage() {
       }
     }
   };
-  const handleReferenceNumberChange = (id: string, referenceNumber: string) => {
+  const handleItemFieldChange = (id: string, field: "referenceNumber" | "serialNumber", value: string) => {
     if (isCancelled) return;
-    setItems(prev => {
-      const updated = prev.map(it => it.id === id ? { ...it, referenceNumber } : it);
-      const currentRealPO = getPOByNumber(poKey);
-      if (currentRealPO) {
-        const updatedItems = currentRealPO.items.map((li, i) =>
-          updated[i]?.id === id || li.subOrderId === id ? { ...li, referenceNumber } : li
-        );
-        const changes: Partial<StoredPO> = { items: updatedItems };
-        if (currentRealPO.subOrderId === id || (!currentRealPO.items.length && currentRealPO.item)) {
-          changes.referenceNumber = referenceNumber;
-        }
-        updatePO(poKey, changes);
-      }
-      return updated;
-    });
+    setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
+
+    const currentRealPO = getPOByNumber(poKey);
+    if (!currentRealPO) return;
+    const itemIndex = items.findIndex(it => it.id === id);
+    if (itemIndex < 0) return;
+
+    const updatedItems = currentRealPO.items.map((li, index) =>
+      index === itemIndex ? { ...li, [field]: value } : li
+    );
+    const changes: Partial<StoredPO> = { items: updatedItems };
+    const updatedLine = updatedItems[itemIndex];
+    if (
+      currentRealPO.subOrderId === updatedLine?.subOrderId ||
+      (!currentRealPO.items.length && currentRealPO.item)
+    ) {
+      changes[field] = value;
+    }
+    updatePO(poKey, changes);
+
+    // Project vendor-entered item identifiers into Order Details immediately.
+    const subOrderId = updatedLine?.subOrderId || currentRealPO.subOrderId;
+    if (!subOrderId || !currentRealPO.orderId) return;
+    try {
+      const itemStateKey = `nido_subitems_${currentRealPO.orderId}`;
+      const saved = JSON.parse(localStorage.getItem(itemStateKey) || "{}");
+      saved[subOrderId] = { ...(saved[subOrderId] || {}), [field]: value };
+      localStorage.setItem(itemStateKey, JSON.stringify(saved));
+      window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", {
+        detail: { orderId: currentRealPO.orderId, subOrderIds: [subOrderId] },
+      }));
+    } catch {
+      /* storage unavailable */
+    }
   };
   const handleDeleteItem = (id: string) => {
     if (isCancelled) return;
@@ -1254,14 +1275,27 @@ export default function VendorOrderDetailPage() {
                          <span>Availability: <strong style={{ color: item.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
                        </div>
                      )}
-                    <div style={{ marginTop: 4 }}>
-                      <input
-                        value={item.referenceNumber || ""}
-                        onChange={e => handleReferenceNumberChange(item.id, e.target.value)}
-                        disabled={isCancelled}
-                        placeholder="Enter reference/model number"
-                        style={{ width: "100%", maxWidth: 200, padding: "5px 8px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: isCancelled ? "#f9fafb" : "#fff" }}
-                      />
+                     <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxWidth: 240 }}>
+                       <label style={{ display: "block", fontSize: 10.5, color: "#6b7280" }}>
+                         Reference No
+                         <input
+                           value={item.referenceNumber || ""}
+                           onChange={e => handleItemFieldChange(item.id, "referenceNumber", e.target.value)}
+                           disabled={isCancelled}
+                           placeholder="Reference No"
+                           style={{ width: "100%", marginTop: 2, padding: "5px 7px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 11.5, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: isCancelled ? "#f9fafb" : "#fff" }}
+                         />
+                       </label>
+                       <label style={{ display: "block", fontSize: 10.5, color: "#6b7280" }}>
+                         Serial No
+                         <input
+                           value={item.serialNumber || ""}
+                           onChange={e => handleItemFieldChange(item.id, "serialNumber", e.target.value)}
+                           disabled={isCancelled}
+                           placeholder="Serial No"
+                           style={{ width: "100%", marginTop: 2, padding: "5px 7px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 11.5, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: isCancelled ? "#f9fafb" : "#fff" }}
+                         />
+                       </label>
                     </div>
                     <button style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0, fontFamily: "inherit", marginTop: 4 }}>View more</button>
                   </div>

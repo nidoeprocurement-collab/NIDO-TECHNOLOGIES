@@ -60,6 +60,7 @@ export interface POLineItem {
   hsnCode: string;
   specs: string[];
   referenceNumber: string;
+  serialNumber?: string;
   qty: number;
   unitPrice: number;
   lineSubtotal: number;
@@ -102,6 +103,7 @@ export interface StoredPO {
   hsnCode: string;
   specs: string[];
   referenceNumber: string;
+  serialNumber?: string;
   qty: number;
   unitPrice: number;
   subtotal: number;
