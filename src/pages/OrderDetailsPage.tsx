@@ -2365,6 +2365,19 @@ function getCancelledPOForSubOrder(pos: any[], subOrderId: string): any | null {
     .sort((a, b) => String(b.createdOn || "").localeCompare(String(a.createdOn || "")))[0] || null;
 }
 
+function getUniqueDraftPOs(pos: any[]): any[] {
+  const seenSubOrders = new Set<string>();
+  return pos.filter(po => {
+    if (String(po?.status || "").toLowerCase() !== "draft") return false;
+    const ids = po.subOrderIds?.length
+      ? po.subOrderIds
+      : [po.subOrderId].filter(Boolean);
+    if (ids.some((id: string) => seenSubOrders.has(id))) return false;
+    ids.forEach((id: string) => seenSubOrders.add(id));
+    return true;
+  });
+}
+
 function isPOItemShipped(po: any, subOrderId: string): boolean {
   if (!poCoversSubOrder(po, subOrderId)) return false;
   const matchingLine = (po.items || []).find((line: any) => line.subOrderId === subOrderId);
@@ -3837,7 +3850,9 @@ export default function MyOrderPage() {
 
           {/* Draft Purchase Orders tab */}
           {activeTab === "Draft Purchase Orders" && (() => {
-            const draftPOs = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft");
+            const draftPOs = getUniqueDraftPOs(
+              getAllPOs().filter(po => po.orderId === orderId),
+            );
             return (
               <div style={{ padding: 20 }}>
                 {draftPOs.length === 0 ? (

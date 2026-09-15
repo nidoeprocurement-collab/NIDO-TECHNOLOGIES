@@ -1505,7 +1505,9 @@ export default function VendorOrderDetailPage() {
                   updateVendorProduct(po.vendorId, match.id, { stock: String(current + li.qty) });
                 }
               }
-              updatePO(poKey, { cancelReason: reason });
+              // Persist the terminal status so the master order can mark every
+              // covered item inactive and prevent vendor re-selection.
+              updatePO(poKey, { status: "Cancelled", cancelReason: reason });
             }
             setCancelled(true);
             setOrderStatus("Cancelled");

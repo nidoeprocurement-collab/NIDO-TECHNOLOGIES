@@ -35,6 +35,19 @@ the primary sub-order makes later items lose their PO number and vendor state.
 projects PO data into per-item or per-sub-order UI, and derive its label from
 the persisted PO status.
 
+## Cancellation boundary
+
+Cancelling a PO is terminal for every covered order item. The cancellation must
+persist both the PO status and the order-item projection, so Order Details can
+show the cancelled PO state and must not offer vendor reselection.
+
+**Why:** A vendor detail page can be open separately from Order Details; changing
+only that page's local state leaves the master order editable after cancellation.
+
+**How to apply:** Any Draft or confirmed PO cancellation must update the shared
+PO store, project `itemStatus: "Cancelled"` for all covered sub-orders, and
+dispatch the order-item refresh event.
+
 ## Vendor shipment vs. customer-facing status
 
 Vendor Order Details owns PO-line fulfillment and tracking. It must not write a
