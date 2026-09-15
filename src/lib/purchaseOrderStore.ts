@@ -229,6 +229,27 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
 }
 
 /**
+ * Permanently removes a Draft PO.
+ *
+ * Draft POs are editable working records. This is intentionally restricted to
+ * Draft status so confirmed/cancelled procurement history cannot be erased.
+ */
+export function deleteDraftPO(poNumber: string): void {
+  const all = getAllPOs();
+  const po = all.find((candidate) => candidate.poNumber === poNumber);
+  if (!po || po.status !== "Draft") return;
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all.filter((candidate) => candidate.poNumber !== poNumber)));
+  try {
+    window.dispatchEvent(new CustomEvent("poCreated", {
+      detail: { poNumber, action: "deleted" },
+    }));
+  } catch {
+    /* SSR safe */
+  }
+}
+
+/**
  * Remove one cancelled sub-order from any Draft PO for its master order.
  * If it was the only line, the Draft PO is removed. Multi-line POs keep their
  * remaining products and have their totals/primary line metadata recalculated.

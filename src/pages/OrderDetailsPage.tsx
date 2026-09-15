@@ -7,7 +7,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, updatePO, getAllPOs, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -2405,6 +2405,34 @@ function getUniqueDraftPOs(pos: any[]): any[] {
   });
 }
 
+function getDraftPOAggregate(items: POLineItem[]): Partial<StoredPO> {
+  const primary = items[0];
+  const subtotal = items.reduce((sum, item) => sum + item.lineSubtotal, 0);
+  const sgstAmt = Math.round(
+    items.reduce((sum, item) => sum + item.lineSubtotal * ((item.gstPct ?? 18) / 2) / 100, 0) * 100,
+  ) / 100;
+
+  return {
+    items,
+    subOrderId: primary?.subOrderId || "",
+    subOrderIds: items.map(item => item.subOrderId),
+    item: primary?.item || "",
+    sku: primary?.sku || "",
+    category: primary?.category || "",
+    hsnCode: primary?.hsnCode || "",
+    specs: primary?.specs || [],
+    referenceNumber: primary?.referenceNumber || "",
+    qty: primary?.qty || 0,
+    unitPrice: primary?.unitPrice || 0,
+    subtotal,
+    sgstPct: (primary?.gstPct ?? 18) / 2,
+    cgstPct: (primary?.gstPct ?? 18) / 2,
+    sgstAmt,
+    cgstAmt: sgstAmt,
+    grandTotal: subtotal + sgstAmt + sgstAmt,
+  };
+}
+
 function isPOItemShipped(po: any, subOrderId: string): boolean {
   if (!poCoversSubOrder(po, subOrderId)) return false;
   const matchingLine = (po.items || []).find((line: any) => line.subOrderId === subOrderId);
@@ -2819,8 +2847,9 @@ export default function MyOrderPage() {
     ));
 
     // A draft PO may already have been created automatically. A single-line
-    // draft can be re-pointed in place. For a grouped draft, split only this
-    // line into a new PO so the other lines keep their original vendor.
+    // draft can be re-pointed in place. When the new vendor already has a
+    // Draft PO for this order, merge the moved line into that PO and retain
+    // its PO number instead of creating a second PO for the same vendor.
     const draftPO = getCanonicalPOForSubOrder(
       currentPOs.filter(po => po.status === "Draft"),
       currentSubOrder || subId,
@@ -2891,7 +2920,43 @@ export default function MyOrderPage() {
         tracking: wasCancelled ? null : line.tracking,
       };
 
-      if (draftPO.items.length === 1) {
+      const mergeTargetPO = currentPOs.find(po =>
+        po.status === "Draft" &&
+        po.poNumber !== draftPO.poNumber &&
+        po.vendorId === primary.vendorId &&
+        po.orderId === orderId,
+      );
+
+      if (mergeTargetPO) {
+        const remainingLines = draftPO.items.filter(item => item.subOrderId !== subId);
+        const mergedItems = [
+          ...mergeTargetPO.items.filter(item => item.subOrderId !== subId),
+          movedLine,
+        ];
+
+        updateDraftPO(mergeTargetPO, {
+          ...vendorFields,
+          paymentTerms: vendor?.paymentTerms || mergeTargetPO.paymentTerms,
+          ...getDraftPOAggregate(mergedItems),
+          notes: [...(mergeTargetPO.notes || []), {
+            id: `vendor_merge_${Date.now()}`,
+            author: "System",
+            initials: "SY",
+            color: "#6b7280",
+            date: mergeTargetPO.createdOnDisplay,
+            text: `Draft PO ${draftPO.poNumber} merged into ${mergeTargetPO.poNumber} after ${movedLine.item} was assigned to ${vendorName}.`,
+            visibility: "Internal Note",
+          }],
+        });
+
+        if (remainingLines.length === 0) {
+          deleteDraftPO(draftPO.poNumber);
+        } else {
+          updateDraftPO(draftPO, getDraftPOAggregate(remainingLines));
+        }
+
+        setPoRefreshKey(k => k + 1);
+      } else if (draftPO.items.length === 1) {
         const lineGstPct = movedLine.gstPct ?? 18;
         const lineGstHalfPct = lineGstPct / 2;
         const lineGstAmount = Math.round(

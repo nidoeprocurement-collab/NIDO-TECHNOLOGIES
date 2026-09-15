@@ -35,6 +35,14 @@ the primary sub-order makes later items lose their PO number and vendor state.
 projects PO data into per-item or per-sub-order UI, and derive its label from
 the persisted PO status.
 
+## Draft vendor reassignment merge
+
+When a sub-order is reassigned while its PO is still Draft, and the destination vendor already has another Draft PO for the same master order, merge the line into that destination PO and retain its PO number. Remove the source PO only when it has no lines left.
+
+**Why:** A vendor should receive one consolidated Draft PO for all items in the same order. Creating a new PO during reassignment leaves duplicate PO numbers and splits items that belong together.
+
+**How to apply:** Recalculate `items`, `subOrderIds`, primary-line metadata, subtotal, GST amounts, and grand total for both the destination and any remaining source Draft PO. Never merge into a confirmed PO.
+
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
 when a Draft vendor change is saved.
