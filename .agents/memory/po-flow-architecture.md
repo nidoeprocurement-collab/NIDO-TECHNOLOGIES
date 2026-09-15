@@ -55,6 +55,12 @@ Persist Draft and Confirmed as lifecycle states, but display them as Pending and
 
 **How to apply:** Use the shared PO display-status mapping for list/detail/activity views; do not replace the persisted lifecycle values.
 
+When a customer-facing sub-order is `Pending Shipping`, the master order also becomes `Pending Shipping` unless another item has already reached shipment or delivery progress.
+
+**Why:** The master order should reflect the current waiting-for-shipment stage without overriding existing partial shipment or delivery aggregation.
+
+**How to apply:** Keep the special case in the master-order sync path; leave the general fulfillment reducer and all other status precedence unchanged.
+
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
 when a Draft vendor change is saved.

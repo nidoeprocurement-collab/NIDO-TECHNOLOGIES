@@ -1,6 +1,7 @@
 export type FulfillmentStatus =
   | "Pending"
   | "Processing"
+  | "Pending Shipping"
   | "Partially Shipped"
   | "Shipped"
   | "Partially Delivered"
@@ -89,10 +90,16 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
     return storedStatus || "Processing";
   });
 
-  const nextStatus = deriveFulfillmentStatus(
-    statuses,
-    (order.status as FulfillmentStatus) || "Processing",
-  );
+  // Pending Shipping is the master status while items are waiting for
+  // shipment. Existing shipment and delivery precedence remains unchanged.
+  const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
+  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDelivered(status));
+  const nextStatus = hasPendingShipping && !hasShipmentProgress
+    ? "Pending Shipping"
+    : deriveFulfillmentStatus(
+        statuses,
+        (order.status as FulfillmentStatus) || "Processing",
+      );
   if (order.status !== nextStatus) {
     const updatedOrders = orders.map(candidate =>
       candidate?.id === orderId ? { ...candidate, status: nextStatus } : candidate,
