@@ -2704,7 +2704,8 @@ export default function MyOrderPage() {
     if (!allocations.length) return;
     const primary = allocations[0];
     const meta = primary.meta || {};
-    const vendorName = meta.vendorName || primary.vendorId;
+    const vendor = getVendorById(primary.vendorId);
+    const vendorName = vendor?.name || meta.vendorName || primary.vendorId;
     const previousSubOrder = subOrders.find(sub => sub.id === subId);
     const wasCancelled = previousSubOrder?.itemStatus === "Cancelled";
     setSubOrders(prev => prev.map(sub => sub.id === subId
@@ -2752,23 +2753,57 @@ export default function MyOrderPage() {
       po.status === "Draft" &&
       po.items?.some(line => line.subOrderId === subId)
     );
+    const vendorAddressLine1 = vendor?.addressLine1 || meta.addressLine1 || vendor?.address || "";
+    const vendorAddressLine2 = vendor?.addressLine2 || meta.addressLine2 || "";
+    const vendorCity = vendor?.city || meta.city || "";
+    const vendorState = vendor?.state || meta.state || "";
+    const vendorPincode = vendor?.zipCode || meta.pincode || "";
     const vendorFields = {
       vendorId: primary.vendorId,
       vendorName,
-      vendorContact: meta.contact || "",
-      vendorEmail: meta.email || "",
-      vendorPhone: meta.phone || "",
-      vendorGstin: meta.gstin || "",
-      vendorAddress: [meta.addressLine1, meta.addressLine2, meta.city, meta.state, meta.pincode].filter(Boolean).join(", "),
-      vendorAddressLine1: meta.addressLine1 || "",
-      vendorAddressLine2: meta.addressLine2 || "",
-      vendorCity: meta.city || "",
-      vendorState: meta.state || "",
-      vendorPincode: meta.pincode || "",
+      vendorContact: vendor?.primaryContact || meta.contact || "",
+      vendorEmail: vendor?.email || meta.email || "",
+      vendorPhone: vendor?.phone || meta.phone || "",
+      vendorGstin: vendor?.taxId || vendor?.pan || meta.gstin || "",
+      vendorAddress: [vendorAddressLine1, vendorAddressLine2, vendorCity, vendorState, vendorPincode].filter(Boolean).join(", "),
+      vendorAddressLine1,
+      vendorAddressLine2,
+      vendorCity,
+      vendorState,
+      vendorPincode,
     };
+
+    // A vendor change must update the in-app PO as well as the PDF stored on
+    // that PO. Keep this async because the PDF generator may load the org logo.
+    const refreshDraftPOPdf = (po: StoredPO) => {
+      void getPODataUri(po)
+        .then(dataUrl => {
+          const latest = getAllPOs().find(current => current.poNumber === po.poNumber);
+          if (!latest || latest.status !== "Draft") return;
+          updatePO(po.poNumber, {
+            documents: [{
+              id: `doc-${po.poNumber}-pdf`,
+              name: `${po.poNumber}.pdf`,
+              ext: "pdf",
+              type: "Purchase Order",
+              uploadedBy: "System",
+              uploadedOn: po.createdOnDisplay,
+              dataUrl,
+            }],
+          });
+        })
+        .catch(error => console.warn("Updated PO PDF generation failed:", error));
+    };
+
+    const updateDraftPO = (po: StoredPO, changes: Partial<StoredPO>) => {
+      const updatedPO = { ...po, ...changes };
+      updatePO(po.poNumber, changes);
+      refreshDraftPOPdf(updatedPO);
+    };
+
     if (draftPO) {
       const line = draftPO.items.find(item => item.subOrderId === subId)!;
-      const updatedUnitPrice = Number(meta.unitPrice || line.unitPrice || 0);
+      const updatedUnitPrice = Number(meta.unitPrice ?? line.unitPrice ?? 0);
       const movedLine = {
         ...line,
         unitPrice: updatedUnitPrice,
@@ -2779,18 +2814,40 @@ export default function MyOrderPage() {
       };
 
       if (draftPO.items.length === 1) {
-        updatePO(draftPO.poNumber, {
+        const lineGstPct = movedLine.gstPct ?? 18;
+        const lineGstHalfPct = lineGstPct / 2;
+        const lineGstAmount = Math.round(
+          movedLine.lineSubtotal * lineGstHalfPct / 100 * 100,
+        ) / 100;
+        updateDraftPO(draftPO, {
           ...vendorFields,
+          paymentTerms: vendor?.paymentTerms || draftPO.paymentTerms,
+          subOrderId: movedLine.subOrderId,
+          subOrderIds: [movedLine.subOrderId],
           item: movedLine.item,
           sku: movedLine.sku,
           category: movedLine.category,
           hsnCode: movedLine.hsnCode,
           specs: movedLine.specs,
+          referenceNumber: movedLine.referenceNumber,
           qty: movedLine.qty,
           unitPrice: movedLine.unitPrice,
           subtotal: movedLine.lineSubtotal,
-          grandTotal: movedLine.lineSubtotal + draftPO.sgstAmt + draftPO.cgstAmt,
+          sgstPct: lineGstHalfPct,
+          cgstPct: lineGstHalfPct,
+          sgstAmt: lineGstAmount,
+          cgstAmt: lineGstAmount,
+          grandTotal: movedLine.lineSubtotal + lineGstAmount + lineGstAmount,
           items: [movedLine],
+          notes: [...(draftPO.notes || []), {
+            id: `vendor_change_${Date.now()}`,
+            author: "System",
+            initials: "SY",
+            color: "#6b7280",
+            date: draftPO.createdOnDisplay,
+            text: `Draft PO vendor changed to ${vendorName} for ${movedLine.item}.`,
+            visibility: "Internal Note",
+          }],
         });
       } else {
         const remainingLines = draftPO.items.filter(item => item.subOrderId !== subId);
@@ -2799,7 +2856,7 @@ export default function MyOrderPage() {
           remainingLines.reduce((sum, item) => sum + item.lineSubtotal * ((item.gstPct ?? 18) / 2) / 100, 0) * 100,
         ) / 100;
         const remainingPrimary = remainingLines[0];
-        updatePO(draftPO.poNumber, {
+        updateDraftPO(draftPO, {
           items: remainingLines,
           subOrderId: remainingPrimary.subOrderId,
           subOrderIds: remainingLines.map(item => item.subOrderId),
@@ -2820,7 +2877,7 @@ export default function MyOrderPage() {
         const movedGst = Math.round(movedSubtotal * ((movedLine.gstPct ?? 18) / 2) / 100 * 100) / 100;
         const now = new Date();
         const displayDate = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
-        savePO({
+        const replacementPO: StoredPO = {
           ...draftPO,
           ...vendorFields,
           poNumber: generatePoNumber(),
@@ -2840,9 +2897,11 @@ export default function MyOrderPage() {
           sgstAmt: movedGst,
           cgstAmt: movedGst,
           grandTotal: movedSubtotal + movedGst + movedGst,
+          paymentTerms: vendor?.paymentTerms || draftPO.paymentTerms,
           status: "Draft",
           createdOn: now.toISOString(),
           createdOnDisplay: displayDate,
+          documents: [],
           notes: [...(draftPO.notes || []), {
             id: `vendor_change_${Date.now()}`,
             author: "System",
@@ -2852,7 +2911,9 @@ export default function MyOrderPage() {
             text: `Draft PO recreated after vendor change for ${movedLine.item}.`,
             visibility: "Internal Note",
           }],
-        });
+        };
+        savePO(replacementPO);
+        refreshDraftPOPdf(replacementPO);
       }
     } else if (wasCancelled && previousSubOrder) {
       // A cancelled line may belong to a confirmed PO, so it cannot be
