@@ -1996,7 +1996,21 @@ function PickupDoneModal({
   onClose: () => void;
 }) {
   const [form, setForm] = useState({ pickupDoneDate: "", pickupDoneTime: "" });
-  const valid = form.pickupDoneDate.trim().length > 0 && form.pickupDoneTime.trim().length > 0;
+  const today = (() => {
+    const now = new Date();
+    return [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+    ].join("-");
+  })();
+  const valid = form.pickupDoneDate >= today && form.pickupDoneTime.trim().length > 0;
+  const formatTimeForDisplay = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return time;
+    const hour12 = hours % 12 || 12;
+    return `${String(hour12).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${hours >= 12 ? "PM" : "AM"}`;
+  };
   return (
     <Overlay onClose={onClose}>
       <ModalBox title="Confirm Pickup Done" onClose={onClose}>
@@ -2010,17 +2024,32 @@ function PickupDoneModal({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
               <label style={lbSt}>Pickup Date <span style={{ color: "#dc2626" }}>*</span></label>
-              <input type="date" value={form.pickupDoneDate} onChange={e => setForm({ ...form, pickupDoneDate: e.target.value })} style={inSt} />
+              <input
+                type="date"
+                min={today}
+                value={form.pickupDoneDate}
+                onChange={e => {
+                  const value = e.target.value;
+                  if (!value || value >= today) setForm({ ...form, pickupDoneDate: value });
+                }}
+                style={inSt}
+              />
             </div>
             <div>
               <label style={lbSt}>Pickup Time <span style={{ color: "#dc2626" }}>*</span></label>
-              <input type="time" value={form.pickupDoneTime} onChange={e => setForm({ ...form, pickupDoneTime: e.target.value })} style={inSt} />
+              <input
+                type="time"
+                lang="en-US"
+                value={form.pickupDoneTime}
+                onChange={e => setForm({ ...form, pickupDoneTime: e.target.value })}
+                style={inSt}
+              />
             </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
           <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Scheduled</button>
-          <button data-confirmation-skip onClick={() => { if (valid) { onSubmit(form); onClose(); } }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: valid ? "#16a34a" : "#d1d5db", color: "#fff", cursor: valid ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Confirm Pickup Done</button>
+          <button data-confirmation-skip onClick={() => { if (valid) { onSubmit({ ...form, pickupDoneTime: formatTimeForDisplay(form.pickupDoneTime) }); onClose(); } }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: valid ? "#16a34a" : "#d1d5db", color: "#fff", cursor: valid ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Confirm Pickup Done</button>
         </div>
       </ModalBox>
     </Overlay>
