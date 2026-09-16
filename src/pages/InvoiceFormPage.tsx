@@ -266,7 +266,7 @@ export default function InvoiceFormPage() {
   const refOptions = useMemo(() => {
     if (importSource === 'order') {
       return myOrders
-        .filter((o) => o.status !== 'Cancelled')
+        .filter((o) => o.status === 'Delivered')
         .map((o) => ({
           id:    o.id,
           label: `${o.id} — ${o.client} (${o.totalAmount})`,
