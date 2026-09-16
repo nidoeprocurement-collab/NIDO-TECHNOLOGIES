@@ -1275,12 +1275,6 @@ export default function VendorOrderDetailPage() {
                          <span>Availability: <strong style={{ color: item.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
                        </div>
                      )}
-                      {(item.referenceNumber || item.serialNumber) && (
-                        <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 1, fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
-                          {item.referenceNumber && <div>Reference No: <strong style={{ color: "#374151", fontWeight: 600 }}>{item.referenceNumber}</strong></div>}
-                          {item.serialNumber && <div>Serial No: <strong style={{ color: "#374151", fontWeight: 600 }}>{item.serialNumber}</strong></div>}
-                        </div>
-                      )}
                      <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxWidth: 240 }}>
                        <label style={{ display: "block", fontSize: 10.5, color: "#6b7280" }}>
                          Reference No
