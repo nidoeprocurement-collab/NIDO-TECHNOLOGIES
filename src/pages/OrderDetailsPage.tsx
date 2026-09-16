@@ -2863,7 +2863,10 @@ export default function MyOrderPage() {
           itemStatus: status,
           statusOwner: "order-details",
           updatedOn: now.toLocaleDateString("en-IN"),
-          ...(status === "Delivered" && !s.deliveredAt ? { deliveredAt: now } : {}),
+          // The return window starts when Delivered is selected in Order Details.
+          // Always refresh this timestamp when the item is marked Delivered so
+          // stale/legacy timestamps cannot shorten the 72-hour window.
+          ...(status === "Delivered" ? { deliveredAt: now } : {}),
           ...metadata,
         }
       : s
