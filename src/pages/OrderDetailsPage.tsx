@@ -3892,11 +3892,14 @@ export default function MyOrderPage() {
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "visible", marginBottom: 20 }}>
           {/* Tab bar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f3f4f6", padding: "0 20px" }}>
-            <div style={{ display: "flex" }}>
+          <div style={{ display: "flex" }}>
               {TABS.map(tab => {
                 let label = tab;
                 if (tab === "Sub Orders / Items") label = `Sub Orders / Items (${subOrders.length})`;
-                if (tab === "Draft Purchase Orders") label = draftPOCount > 0 ? `Draft Purchase Orders (${draftPOCount})` : "Draft Purchase Orders";
+                if (tab === "Draft Purchase Orders") {
+                  const purchaseOrderCount = draftPOCount + orderPOs.filter(po => po.status === "Cancelled").length;
+                  label = purchaseOrderCount > 0 ? `Purchase Orders (${purchaseOrderCount})` : "Draft Purchase Orders";
+                }
                 return (
                   <button key={tab} onClick={() => setActiveTab(tab)}
                     style={{ padding: "14px 0", marginRight: 28, border: "none", background: "none", cursor: "pointer", fontSize: 14, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))", borderBottom: activeTab === tab ? "2px solid hsl(var(--primary))" : "2px solid transparent", marginBottom: -1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
@@ -4194,12 +4197,16 @@ export default function MyOrderPage() {
 
           {/* Draft Purchase Orders tab */}
           {activeTab === "Draft Purchase Orders" && (() => {
-            const draftPOs = getUniqueDraftPOs(
-              getAllPOs().filter(po => po.orderId === orderId),
-            );
+            const orderPurchaseOrders = getAllPOs().filter(po => po.orderId === orderId);
+            const draftPOs = getUniqueDraftPOs(orderPurchaseOrders);
+            const cancelledPOs = orderPurchaseOrders.filter(po => po.status === "Cancelled");
+            const visiblePOs = [
+              ...draftPOs,
+              ...cancelledPOs.filter(po => !draftPOs.some(draft => draft.poNumber === po.poNumber)),
+            ];
             return (
               <div style={{ padding: 20 }}>
-                {draftPOs.length === 0 ? (
+                {visiblePOs.length === 0 ? (
                   <div style={{ padding: "40px 20px", textAlign: "center", color: "#9ca3af" }}>
                     <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
                     <p style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>No Draft Purchase Orders</p>
@@ -4212,18 +4219,21 @@ export default function MyOrderPage() {
                 ) : (
                   <>
                     <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 16 }}>
-                      {draftPOs.length} Draft PO{draftPOs.length !== 1 ? "s" : ""} pending your confirmation.
-                      Confirm to lock the vendor and send; Reject to cancel this PO.
+                      {draftPOs.length > 0
+                        ? `${draftPOs.length} Draft PO${draftPOs.length !== 1 ? "s" : ""} pending your confirmation. Confirm to lock the vendor and send; Reject to cancel this PO.`
+                        : "The order was cancelled. The associated Draft PO records are preserved as cancelled history."}
                     </p>
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                      {draftPOs.map(po => (
+                      {visiblePOs.map(po => {
+                        const isCancelledPO = po.status === "Cancelled";
+                        return (
                         <div key={po.poNumber} style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
                           {/* PO header */}
                           <div style={{ padding: "12px 18px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
                             <div>
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <span style={{ fontWeight: 700, fontSize: 14 }}>{po.poNumber}</span>
-                                <span style={{ fontSize: 10, background: "#fef9c3", color: "#92400e", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>Draft</span>
+                                <span style={{ fontSize: 10, background: isCancelledPO ? "#fef2f2" : "#fef9c3", color: isCancelledPO ? "#991b1b" : "#92400e", padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>{isCancelledPO ? "Cancelled" : "Draft"}</span>
                               </div>
                               <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>
                                 <span style={{ fontWeight: 600 }}>Vendor:</span> {po.vendorName}
@@ -4279,7 +4289,7 @@ export default function MyOrderPage() {
                           </div>
 
                           {/* Actions */}
-                          {!isOrderInactive && (
+                          {!isOrderInactive && !isCancelledPO && (
                             <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
                               <button
                                 onClick={() => { updatePO(po.poNumber, { status: "Cancelled", cancelReason: "Rejected by admin" }); setCreatedPOs(p => ({ ...p })); }}
@@ -4359,8 +4369,15 @@ export default function MyOrderPage() {
                               </button>
                             </div>
                           )}
+                          {isCancelledPO && (
+                            <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", color: "#991b1b", fontSize: 12.5, fontStyle: "italic" }}>
+                              This purchase order is cancelled and can no longer be edited or confirmed.
+                              {po.cancelReason ? ` Reason: ${po.cancelReason}` : ""}
+                            </div>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}

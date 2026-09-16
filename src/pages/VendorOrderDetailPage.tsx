@@ -6,6 +6,7 @@ import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated }
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
 import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
+import { useMyOrders } from "@/contexts/MyOrdersContext";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -752,6 +753,7 @@ function storedPOToDetail(po: StoredPO) {
 export default function VendorOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { orders: masterOrders } = useMyOrders();
 
   const poKey = id || "PO-10034";
 
@@ -760,6 +762,10 @@ export default function VendorOrderDetailPage() {
   const initialData = realPO
     ? storedPOToDetail(realPO)
     : (PO_DATA[poKey] || { ...PO_DATA.default, poNumber: poKey });
+  const linkedMasterOrder = masterOrders.find(order =>
+    order.id === (realPO?.orderId || initialData.linkedMasterOrder),
+  );
+  const isMasterOrderCancelled = linkedMasterOrder?.status === "Cancelled";
 
   const [orderStatus, setOrderStatus] = useState(initialData.status);
   const [items, setItems] = useState(initialData.items);
@@ -784,7 +790,8 @@ export default function VendorOrderDetailPage() {
   // on the orders list) is also locked here.
   const lifecycleStatus = realPO?.status || initialData.lifecycleStatus || initialData.status;
   const isDraft = lifecycleStatus === "Draft";
-  const isCancelled = lifecycleStatus === "Cancelled" || orderStatus === "Cancelled" || cancelled;
+  const isPOCancelled = lifecycleStatus === "Cancelled" || orderStatus === "Cancelled" || cancelled;
+  const isCancelled = isPOCancelled || isMasterOrderCancelled;
   const isDelivered = orderStatus === "Delivered";
 
   // Reset all state when navigating between different PO detail pages
@@ -1108,7 +1115,8 @@ export default function VendorOrderDetailPage() {
                 Vendor Order Details / <span style={{ color: "#374151" }}>{initialData.poNumber}</span>
               </h1>
               <StatusPill status={orderStatus} />
-              {isCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>PO Cancelled</span>}
+              {isPOCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>PO Cancelled</span>}
+              {isMasterOrderCancelled && <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 600, background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5" }}>Order Cancelled</span>}
             </div>
             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               <span>Vendor Order</span>
@@ -1139,7 +1147,19 @@ export default function VendorOrderDetailPage() {
         </div>
 
         {/* Cancellation Reason Banner */}
-        {isCancelled && poCancelReason && (
+        {isMasterOrderCancelled && (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 9, padding: "12px 18px", marginTop: 14, marginBottom: 4, display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <span style={{ color: "#dc2626", fontSize: 16, flexShrink: 0, marginTop: 1 }}>ℹ</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#991b1b", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 }}>Master Order Cancelled</div>
+              <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.5 }}>
+                The linked order was cancelled, so this purchase order is also cancelled and cannot be edited or updated.
+                {linkedMasterOrder?.cancelReason ? ` Reason: ${linkedMasterOrder.cancelReason}` : ""}
+              </div>
+            </div>
+          </div>
+        )}
+        {isPOCancelled && !isMasterOrderCancelled && poCancelReason && (
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 9, padding: "12px 18px", marginTop: 14, marginBottom: 4, display: "flex", alignItems: "flex-start", gap: 10 }}>
             <span style={{ color: "#dc2626", fontSize: 16, flexShrink: 0, marginTop: 1 }}>ℹ</span>
             <div>
@@ -1171,13 +1191,14 @@ export default function VendorOrderDetailPage() {
             {[
               ["PO Number", initialData.poNumber],
               ["Linked Master Order", initialData.linkedMasterOrder],
+              ["Order Status", isMasterOrderCancelled ? "Cancelled" : "Active"],
               ["Total Items", initialData.totalItems],
               ["Total Amount", initialData.totalAmount],
               ["Order Date", initialData.orderDate],
             ].map(([l, v]) => (
               <div key={l as string} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                 <span style={{ fontSize: 12.5, color: "#6b7280" }}>{l as string}</span>
-                <span style={{ fontSize: 13, fontWeight: l === "Linked Master Order" ? 600 : 500, color: l === "Linked Master Order" ? "#2563eb" : "#111827", cursor: l === "Linked Master Order" ? "pointer" : "default" }}
+                <span style={{ fontSize: 13, fontWeight: l === "Linked Master Order" || l === "Order Status" ? 600 : 500, color: l === "Linked Master Order" ? "#2563eb" : l === "Order Status" && isMasterOrderCancelled ? "#991b1b" : "#111827", cursor: l === "Linked Master Order" ? "pointer" : "default" }}
                   onClick={() => l === "Linked Master Order" && navigate(`/orders/${v}`)}
                 >{v as string}</span>
               </div>
@@ -1225,7 +1246,9 @@ export default function VendorOrderDetailPage() {
           <div style={card}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <span style={{ fontWeight: 700, fontSize: 13.5 }}>Assignment</span>
-              <button onClick={() => setShowEditAssignment(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>Edit</button>
+              {!isCancelled && (
+                <button onClick={() => setShowEditAssignment(true)} style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>Edit</button>
+              )}
             </div>
             <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>Assigned To</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -1394,7 +1417,13 @@ export default function VendorOrderDetailPage() {
           </div>
         </div>
 
-        {isDelivered ? (
+        {isCancelled ? (
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280", marginBottom: 16 }}>
+            <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#991b1b" }}>Purchase Order is Cancelled</div>
+            <div style={{ fontSize: 12.5, marginTop: 4 }}>This purchase order and its linked order are inactive and can no longer be edited or updated.</div>
+          </div>
+        ) : isDelivered ? (
           <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280", marginBottom: 16 }}>
             <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>Documents & Notes are locked</div>

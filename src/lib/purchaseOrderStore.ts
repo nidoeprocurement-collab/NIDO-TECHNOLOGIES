@@ -244,6 +244,19 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
 }
 
 /**
+ * Mark every still-editable PO for a cancelled master order as Cancelled.
+ * Draft POs remain in the store for audit/history, but updatePO's cancellation
+ * projection makes their covered order items inactive and removes vendor
+ * selection/action mappings.
+ */
+export function cancelDraftPOsForOrder(orderId: string, cancelReason?: string): string[] {
+  const reason = cancelReason?.trim() || "Master order cancelled";
+  const draftPOs = getAllPOs().filter(po => po.orderId === orderId && po.status === "Draft");
+  draftPOs.forEach(po => updatePO(po.poNumber, { status: "Cancelled", cancelReason: reason }));
+  return draftPOs.map(po => po.poNumber);
+}
+
+/**
  * Permanently removes a Draft PO.
  *
  * Draft POs are editable working records. This is intentionally restricted to

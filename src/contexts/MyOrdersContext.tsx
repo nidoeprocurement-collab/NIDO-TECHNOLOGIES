@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { getPrefix } from "../lib/configService";
 import { releaseStock, type StockAllocation } from "../lib/stockEngine";
 import { releaseVendorReservation } from "../lib/vendorStore";
-import { getAllPOs, isPOConfirmed } from "../lib/purchaseOrderStore";
+import { cancelDraftPOsForOrder, getAllPOs, isPOConfirmed } from "../lib/purchaseOrderStore";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
 import { createDraftPOsForOrder } from "../lib/orderPurchaseOrderService";
 
@@ -268,6 +268,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       // already cleared at PO-creation time, so the Math.max(0, ...) floor in
       // releaseVendorReservation makes this safe to call unconditionally.
       if (status === "Cancelled") {
+        cancelDraftPOsForOrder(orderId, cancelReason);
         for (const item of (target.cartItems || [])) {
           if (!item.productCode) continue;
           for (const alloc of (item.vendorAllocations || [])) {
@@ -291,7 +292,10 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
           idSet.has(o.id) &&
           o.status !== "Cancelled" &&
           !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
-        ) cascadeStatusToSubOrders(o, status);
+        ) {
+          if (status === "Cancelled") cancelDraftPOsForOrder(o.id, cancelReason);
+          cascadeStatusToSubOrders(o, status);
+        }
       });
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return prev.map((o) => (
