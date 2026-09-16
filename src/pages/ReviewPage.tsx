@@ -186,6 +186,7 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
       const now = new Date();
       const today = now.toISOString().split("T")[0];
       const itemsSnapshot = cart.map((i) => ({ ...i }));
+      const orderNotes = limitCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "").trim();
       const totalAmount = subtotal + totalGst;
       const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
       const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -239,6 +240,7 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
         paymentTerms: paymentTermsLabel,
+        orderNotes,
         deliveryAddress: selectedAddr
           ? [selectedAddr.line1, selectedAddr.line2, selectedAddr.city, selectedAddr.state, selectedAddr.zip]
               .filter(Boolean).join(", ")

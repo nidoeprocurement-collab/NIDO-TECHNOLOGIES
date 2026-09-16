@@ -85,6 +85,8 @@ export interface MyOrder {
   paymentMethod?: string;
   paymentDetail?: string;
   paymentTerms?: string;
+  /** Optional customer-facing note entered during checkout. */
+  orderNotes?: string;
   deliveryAddress?: string;
   /** Snapshot of the selected checkout delivery address for the order detail view. */
   deliveryDetails?: {

@@ -3824,13 +3824,29 @@ export default function MyOrderPage() {
             <Field label="Ordered For" value={orderedFor} />
             <Field label="Role" value={requesterRole} />
           </div>
-          <div style={topInfoCard}><div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>{[
-            ["Master Order ID", orderId],
-            ["Sub Orders", String(subOrders.length)],
-            ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
-            ["Total Amount", order?.totalAmount || "—"],
-            ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
-          ].map(([l, v]) => (<div key={l} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}><span style={{ fontSize: 12.5, color: "#6b7280" }}>{l}</span><span style={{ fontSize: 13, fontWeight: l === "Total Amount" ? 700 : 500 }}>{v}</span></div>))}</div>
+          <div style={topInfoCard}>
+            <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 14 }}>Order Summary</div>
+            {[
+              ["Master Order ID", orderId],
+              ["Sub Orders", String(subOrders.length)],
+              ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
+              ["Total Amount", order?.totalAmount || "—"],
+              ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
+              ["Order Note", order?.orderNotes || "No order note provided"],
+            ].map(([l, v]) => (
+              <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 }}>
+                <span style={{ fontSize: 12.5, color: "#6b7280", flexShrink: 0 }}>{l}</span>
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: l === "Total Amount" ? 700 : 500,
+                  textAlign: "right",
+                  whiteSpace: l === "Order Note" ? "pre-wrap" : "normal",
+                  overflowWrap: "anywhere",
+                  color: l === "Order Note" && !order?.orderNotes ? "#9ca3af" : undefined,
+                }}>{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Stepper + Assignment */}
