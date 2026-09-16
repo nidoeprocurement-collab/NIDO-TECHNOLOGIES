@@ -152,6 +152,24 @@ function drawSummary(
   const rowHeight = 20;
   const totalHeight = 27;
   const height = rows.length * rowHeight + totalHeight;
+  const valueRight = x + width - 14;
+  const valueLeft = x + width * 0.49;
+  const valueWidth = valueRight - valueLeft;
+
+  const drawSummaryValue = (value: string, yPosition: number, bold = false) => {
+    const size = 7.5;
+    doc.setFont('helvetica', bold ? 'bold' : 'normal').setFontSize(size);
+    const textWidth = doc.getTextWidth(value);
+    const fittedSize = textWidth > valueWidth
+      ? Math.max(6.5, size * valueWidth / textWidth)
+      : size;
+    drawText(doc, value, valueRight, yPosition, {
+      size: fittedSize,
+      color: DARK,
+      bold,
+      align: 'right',
+    });
+  };
 
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.setFillColor(255, 255, 255);
@@ -164,7 +182,7 @@ function drawSummary(
       doc.line(x, rowY, x + width, rowY);
     }
     drawText(doc, label, x + 10, rowY + 13, { size: 7.7, color: bold ? DARK : TEXT, bold: !!bold });
-    drawText(doc, value, x + width - 10, rowY + 13, { size: 7.7, color: DARK, align: 'right' });
+    drawSummaryValue(value, rowY + 13, !!bold);
   });
 
   const totalY = y + rows.length * rowHeight;
@@ -172,13 +190,8 @@ function drawSummary(
   doc.rect(x + 0.5, totalY, width - 1, totalHeight - 0.5, 'F');
   doc.setDrawColor(...BORDER).setLineWidth(0.5);
   doc.line(x, totalY, x + width, totalY);
-  drawText(doc, 'Total Payable', x + 10, totalY + 17, { size: 8.5, color: DARK, bold: true });
-  drawText(doc, money(invoice.grandTotal), x + width - 10, totalY + 17, {
-    size: 8.5,
-    color: DARK,
-    bold: true,
-    align: 'right',
-  });
+  drawText(doc, 'Total Payable', x + 10, totalY + 17, { size: 7.5, color: DARK, bold: true });
+  drawSummaryValue(money(invoice.grandTotal), totalY + 17, true);
   return height;
 }
 

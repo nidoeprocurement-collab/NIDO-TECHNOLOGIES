@@ -230,8 +230,8 @@ export default function InvoiceFormPage() {
       (order as any).clientContactEmail,
     ].map(String).map((email) => email.trim()).filter(Boolean);
     const uniqueEmails = Array.from(new Set(clientEmails));
-    const contact = order.orderedFor || order.requester || client?.contact_person || client?.rep
-      || (order as any).contactPerson || '';
+    const contact = client?.rep || client?.contact_person || client?.representative
+      || order.orderedFor || order.requester || (order as any).contactPerson || '';
     const billingAttention = client?.billingAttention || client?.billing_attention || '';
     const shippingAttention = client?.shippingAttention || client?.shipping_attention
       || order.deliveryDetails?.attentionName || billingAttention;
