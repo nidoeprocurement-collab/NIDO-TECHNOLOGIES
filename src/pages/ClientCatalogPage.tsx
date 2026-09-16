@@ -11,7 +11,19 @@ import {
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
 import { syncClientPrices } from "@/lib/priceEngineStore";
-const catalogRoleOptions = ["Admin", "IT Manager", "Finance", "IT Staff", "Support", "Procurement Manager", "Employee"];
+import { getRoles, NIDO_ROLES_EVENT } from "@/lib/nidoUsersStore";
+
+function getAssignableCatalogRoles(): string[] {
+  const seen = new Set<string>();
+  return getRoles()
+    .filter(role => role.status === "Active")
+    .map(role => role.name.trim())
+    .filter(name => {
+      if (!name || seen.has(name.toLowerCase())) return false;
+      seen.add(name.toLowerCase());
+      return true;
+    });
+}
 
 /** Returns a numeric sort key for a preference string.
  *  "Preference 1" → 1, "Preference 2" → 2, custom names → large number (alphabetical tiebreak),
@@ -168,27 +180,14 @@ function RoleDropdown({
   values,
   roles,
   onToggle,
-  onAddNew,
 }: {
   values: string[];
   roles: string[];
   onToggle: (r: string) => void;
-  onAddNew: (name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 180 });
-
-  const commit = () => {
-    const name = newName.trim();
-    if (!name) return;
-    onAddNew(name);
-    onToggle(name);
-    setNewName("");
-    setAdding(false);
-  };
 
   const label = values.length === 0
     ? "Select roles…"
@@ -229,7 +228,7 @@ function RoleDropdown({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => { setOpen((v) => !v); setAdding(false); }}
+        onClick={() => setOpen((v) => !v)}
         className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 min-w-[140px] w-full"
       >
         <span className={values.length > 0 ? "text-gray-700 truncate" : "text-gray-400"}>{label}</span>
@@ -274,30 +273,6 @@ function RoleDropdown({
                 </button>
               );
             })}
-            <div className="border-t border-gray-100 mt-1 pt-1">
-              {adding ? (
-                <div className="px-2 py-1.5 flex items-center gap-1.5">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && commit()}
-                    placeholder="Role name…"
-                    className="flex-1 px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  />
-                  <button onClick={commit} className="px-1.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Add</button>
-                  <button onClick={() => { setAdding(false); setNewName(""); }} className="px-1.5 py-1 text-xs border border-gray-200 text-gray-500 rounded hover:bg-gray-50">✕</button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setAdding(true)}
-                  className="w-full text-left px-2 py-1.5 text-xs text-blue-500 hover:bg-blue-50 transition-colors font-medium flex items-center gap-1"
-                >
-                  <span className="text-sm leading-none">+</span> Add new
-                </button>
-              )}
-            </div>
           </div>
         </>,
         document.body
@@ -528,12 +503,19 @@ function EditProductScreen({
   onClose: () => void;
   onSave: (updated: Partial<CatalogEntry>) => void;
 }) {
-  const [roles, setRoles] = useState<string[]>([...product.roles]);
+  const [availableRoles, setAvailableRoles] = useState<string[]>(() => getAssignableCatalogRoles());
+  const [roles, setRoles] = useState<string[]>(() =>
+    product.roles.filter(role => getAssignableCatalogRoles().some(available => available === role)),
+  );
   const [preference, setPreference] = useState(product.preference || "");
-  const [availableRoles, setAvailableRoles] = useState([...catalogRoleOptions]);
   const [availablePreferences, setAvailablePreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
 
-  const addRole = (name: string) => setAvailableRoles((prev) => prev.includes(name) ? prev : [...prev, name]);
+  useEffect(() => {
+    const refreshRoles = () => setAvailableRoles(getAssignableCatalogRoles());
+    window.addEventListener(NIDO_ROLES_EVENT, refreshRoles);
+    return () => window.removeEventListener(NIDO_ROLES_EVENT, refreshRoles);
+  }, []);
+
   const addPreference = (name: string) => setAvailablePreferences((prev) => prev.includes(name) ? prev : [...prev, name]);
 
   const toggleRole = (r: string) => setRoles((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);
@@ -659,7 +641,6 @@ function EditProductScreen({
                   values={roles}
                   roles={availableRoles}
                   onToggle={toggleRole}
-                  onAddNew={addRole}
                 />
                 {roles.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
@@ -728,7 +709,7 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<SelectedRow[]>([]);
   const [preferences, setPreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
-  const [roles, setRoles] = useState([...catalogRoleOptions]);
+  const [roles, setRoles] = useState<string[]>(() => getAssignableCatalogRoles());
 
   useEffect(() => {
     // Only products that at least one vendor has actually added (and marked
@@ -755,9 +736,12 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
     loadAssignable();
     window.addEventListener("catalogUpdated", loadAssignable);
     window.addEventListener("vendorProductsUpdated", loadAssignable);
+    const refreshRoles = () => setRoles(getAssignableCatalogRoles());
+    window.addEventListener(NIDO_ROLES_EVENT, refreshRoles);
     return () => {
       window.removeEventListener("catalogUpdated", loadAssignable);
       window.removeEventListener("vendorProductsUpdated", loadAssignable);
+      window.removeEventListener(NIDO_ROLES_EVENT, refreshRoles);
     };
   }, []);
 
@@ -815,10 +799,6 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
 
   const addPreference = (name: string) => {
     setPreferences((prev) => prev.includes(name) ? prev : [...prev, name]);
-  };
-
-  const addRole = (name: string) => {
-    setRoles((prev) => prev.includes(name) ? prev : [...prev, name]);
   };
 
   // Sort rows by preference index, then by insertion order within same preference
@@ -1076,7 +1056,6 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
                             values={row.roles}
                             roles={roles}
                             onToggle={(r) => toggleRowRole(row.product.id, r)}
-                            onAddNew={addRole}
                           />
                         </td>
                         <td className="px-4 py-3.5">
