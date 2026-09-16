@@ -217,7 +217,13 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
   drawText(doc, brandHeader.subtitle, margin + 60, 64, { size: 7, color: MUTED });
 
   // ── INVOICE label + number box (right) ────────────────────────────────────
-  drawText(doc, 'INVOICE', pageWidth - margin, 48, { size: 22, color: DARK, bold: true, align: 'right' });
+  drawText(
+    doc,
+    invoice.status === 'Proforma Invoice' ? 'PROFORMA INVOICE' : 'INVOICE',
+    pageWidth - margin,
+    48,
+    { size: invoice.status === 'Proforma Invoice' ? 17 : 22, color: DARK, bold: true, align: 'right' },
+  );
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
   doc.roundedRect(pageWidth - margin - 102, 61, 102, 28, 4, 4, 'S');
   drawText(doc, '#', pageWidth - margin - 91, 79, { size: 11, color: BLUE });

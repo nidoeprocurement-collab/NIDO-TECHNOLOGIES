@@ -1,7 +1,7 @@
 import { getPrefix } from './configService';
 import type { ProductCommercialTerms } from './productCommercialTerms';
 
-export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
+export type InvoiceStatus = 'Draft' | 'Proforma Invoice' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
 
 export interface InvoiceLineItem {
   id: string;
@@ -43,6 +43,8 @@ export interface StoredInvoice {
   contactPerson: string;
   clientGstin?: string;
   clientContact?: string;
+  /** All recipients for invoice delivery; clientContact remains the primary/backward-compatible value. */
+  clientContacts?: string[];
   // addresses
   billingAddress: string;
   shippingAddress: string;

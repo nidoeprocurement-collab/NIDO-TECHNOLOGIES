@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, ClipboardList, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Plus, Save, Trash2, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   generateInvoiceNumber,
@@ -12,7 +12,8 @@ import {
 import { getActiveQuotes } from '@/lib/quoteStore';
 import { getActiveOrders } from '@/lib/salesOrderStore';
 import { useMyOrders } from '@/contexts/MyOrdersContext';
-import { getEffectiveTaxPctForCategory } from '@/lib/taxEngine';
+import { getClients } from '@/lib/clientStore';
+import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap, getSacCodes } from '@/lib/taxEngine';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
@@ -50,6 +51,64 @@ const textareaCls = `${inputCls} resize-none`;
 
 type ImportSource = 'order' | 'quotation' | 'salesorder';
 
+const RETURNED_ORDER_ITEM_STATUSES = new Set([
+  'return request raised',
+  'pickup scheduled',
+  'pickup done',
+  'returned',
+]);
+
+const STATE_CODES: Record<string, string> = {
+  andhra: '37', 'andhra pradesh': '37', arunachal: '12', 'arunachal pradesh': '12',
+  assam: '18', bihar: '10', chhattisgarh: '22', goa: '30', gujarat: '24',
+  haryana: '06', himachal: '02', 'himachal pradesh': '02', jharkhand: '20',
+  karnataka: '29', kerala: '32', madhya: '23', 'madhya pradesh': '23',
+  maharashtra: '27', manipur: '14', meghalaya: '17', mizoram: '15',
+  nagaland: '13', odisha: '21', punjab: '03', rajasthan: '08',
+  sikkim: '11', tamilnadu: '33', 'tamil nadu': '33', telangana: '36',
+  tripura: '16', uttarpradesh: '09', 'uttar pradesh': '09', uttarakhand: '05',
+  westbengal: '19', 'west bengal': '19', delhi: '07',
+};
+
+function normalizeText(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getCategoryCode(category: string, productType?: string): string {
+  const normalizedCategory = normalizeText(category);
+  const isService = normalizeText(productType).includes('service');
+  const serviceCode = getSacCodes().find((entry) =>
+    entry.status === 'Active' && normalizeText(entry.serviceCategory) === normalizedCategory,
+  )?.code;
+  if (isService && serviceCode) return serviceCode;
+
+  const hsnCode = getHsnCodes().find((entry) =>
+    entry.status === 'Active' && normalizeText(entry.productCategory) === normalizedCategory,
+  )?.code;
+  return hsnCode
+    || getProductCategoryTaxMap().find((entry) =>
+      normalizeText(entry.productCategory) === normalizedCategory,
+    )?.defaultHsnCode
+    || '';
+}
+
+function getStateCode(state: string, gstin: string): string {
+  const gstStateCode = gstin.trim().slice(0, 2);
+  return /^\d{2}$/.test(gstStateCode)
+    ? gstStateCode
+    : STATE_CODES[normalizeText(state).replace(/\s+/g, ' ')] || '';
+}
+
+function getOrderSubItemStatus(orderId: string, subOrderId: string | undefined, index: number): string {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`nido_subitems_${orderId}`) || '{}');
+    const derivedId = subOrderId || `SO-${orderId}-${String(index + 1).padStart(3, '0')}`;
+    return normalizeText(saved?.[derivedId]?.itemStatus);
+  } catch {
+    return '';
+  }
+}
+
 const SOURCE_TABS: { key: ImportSource; label: string }[] = [
   { key: 'order',      label: 'Order'        },
   { key: 'quotation',  label: 'Quotation'    },
@@ -85,6 +144,15 @@ export default function InvoiceFormPage() {
   const [contactPerson,    setContactPerson]    = useState(existing?.contactPerson    || '');
   const [clientGstin,      setClientGstin]      = useState(existing?.clientGstin      || '');
   const [clientContact,    setClientContact]    = useState(existing?.clientContact    || '');
+  const [clientContacts,   setClientContacts]  = useState<string[]>(() => {
+    const stored = existing?.clientContacts?.filter(Boolean);
+    if (stored?.length) return stored;
+    return existing?.clientContact
+      ? existing.clientContact.split(',').map((email) => email.trim()).filter(Boolean)
+      : [];
+  });
+  const [additionalEmail,  setAdditionalEmail] = useState('');
+  const [returnedItemCount, setReturnedItemCount] = useState(0);
   const [billingAddress,   setBillingAddress]   = useState(existing?.billingAddress   || '');
   const [shippingAddress,  setShippingAddress]  = useState(existing?.shippingAddress  || '');
   const [shippingStateCode,setShippingStateCode]= useState(existing?.shippingStateCode|| '');
@@ -133,6 +201,7 @@ export default function InvoiceFormPage() {
   function clearImport() {
     setSelectedRef('');
     setImportedRefLabel('');
+    setReturnedItemCount(0);
   }
 
   // ── Switch source tab (also resets selection) ────────────────────────────
@@ -146,17 +215,59 @@ export default function InvoiceFormPage() {
     const order = myOrders.find((o) => o.id === refId);
     if (!order) return;
 
-    setClientName(order.client || '');
-    setContactPerson(order.requester || '');
+    const client = getClients().find((candidate) =>
+      candidate.id === order.clientId || normalizeText(candidate.name) === normalizeText(order.client),
+    );
+    const gstin = String(client?.gstin || client?.gstNumber || (order as any).clientGstin || '');
+    const clientState = String(
+      client?.billingState || client?.billing_state || order.deliveryDetails?.state
+        || (order as any).placeOfSupply || '',
+    );
+    const clientEmails = [
+      ...(Array.isArray((client as any)?.emails) ? (client as any).emails : []),
+      client?.email,
+      ...((order as any).emails || []),
+      (order as any).clientContactEmail,
+    ].map(String).map((email) => email.trim()).filter(Boolean);
+    const uniqueEmails = Array.from(new Set(clientEmails));
+    const contact = order.orderedFor || order.requester || client?.contact_person || client?.rep
+      || (order as any).contactPerson || '';
+    const billingAttention = client?.billingAttention || client?.billing_attention || '';
+    const shippingAttention = client?.shippingAttention || client?.shipping_attention
+      || order.deliveryDetails?.attentionName || billingAttention;
+    const stateCode = getStateCode(clientState, gstin);
+    const placeOfSupply = String(
+      client?.source_of_supply || client?.sourceOfSupply || (order as any).placeOfSupply || clientState,
+    );
+
+    setClientName(order.client || client?.name || '');
+    setContactPerson(contact);
+    setClientGstin(gstin);
+    setClientContact(uniqueEmails[0] || '');
+    setClientContacts(uniqueEmails);
+    setPlaceOfSupply(placeOfSupply ? (stateCode && !placeOfSupply.includes(stateCode) ? `${placeOfSupply} (${stateCode})` : placeOfSupply) : '');
+    setShippingStateCode(stateCode);
+    setShippingAttn(shippingAttention);
     setPoReference(order.id);          // use the Order ID (ORD-000001) as reference
-    if (order.deliveryAddress) {
-      setBillingAddress(order.deliveryAddress);
-      setShippingAddress(order.deliveryAddress);
+    const clientAddress = [
+      client?.billingAddress || client?.billing_address,
+      client?.billingCity || client?.billing_city,
+      client?.billingState || client?.billing_state,
+      client?.billingPincode || client?.billing_pincode,
+    ].filter(Boolean).join(', ');
+    const orderAddress = order.deliveryAddress || clientAddress;
+    if (orderAddress) {
+      setBillingAddress(orderAddress);
+      setShippingAddress(orderAddress);
     }
 
     if (order.cartItems && order.cartItems.length > 0) {
+      const invoiceableItems = order.cartItems.filter((ci, index) =>
+        !RETURNED_ORDER_ITEM_STATUSES.has(getOrderSubItemStatus(order.id, ci.subOrderId, index)),
+      );
+      setReturnedItemCount(order.cartItems.length - invoiceableItems.length);
       setLineItems(
-        order.cartItems.map((ci) => {
+        invoiceableItems.map((ci) => {
           // Selected vendor tax is snapshotted on the order. Legacy orders
           // continue to resolve their rate from the current tax settings.
           const gstRate    = typeof ci.gstSnapshot === 'number'
@@ -178,7 +289,7 @@ export default function InvoiceFormPage() {
             id:          `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             description: ci.name         || '',
             itemDetails: ci.specs?.join(', ') || '',
-            hsnSac:      '',
+            hsnSac:      ci.hsnSnapshot || getCategoryCode(ci.category, ci.productType || ci.physicalType),
             quantity:    ci.quantity     || 1,
             rate:        preTaxRate,
             discount:    0,
@@ -189,6 +300,9 @@ export default function InvoiceFormPage() {
           };
         })
       );
+    } else {
+      setReturnedItemCount(0);
+      setLineItems([]);
     }
 
     setImportedRefLabel(order.id);
@@ -201,7 +315,9 @@ export default function InvoiceFormPage() {
 
     setClientName(quote.clientName       || '');
     setContactPerson(quote.contactPerson || '');
-    setClientGstin(quote.clientGstin     || '');
+      setClientGstin(quote.clientGstin     || '');
+      setClientContact((quote as any).emails?.[0] || '');
+      setClientContacts(Array.from(new Set(((quote as any).emails || []).filter(Boolean))));
     setBillingAddress(quote.billingAddress  || '');
     setShippingAddress(quote.shippingAddress || quote.billingAddress || '');
     setPlaceOfSupply(quote.placeOfSupply   || '');
@@ -235,7 +351,9 @@ export default function InvoiceFormPage() {
 
     setClientName(order.clientName       || '');
     setContactPerson(order.contactPerson || '');
-    setClientGstin(order.clientGstin     || '');
+      setClientGstin(order.clientGstin     || '');
+      setClientContact(order.emails?.[0] || '');
+      setClientContacts(Array.from(new Set((order.emails || []).filter(Boolean))));
     setBillingAddress(order.billingAddress  || '');
     setShippingAddress(order.shippingAddress || order.billingAddress || '');
     setPlaceOfSupply(order.placeOfSupply   || '');
@@ -336,7 +454,8 @@ export default function InvoiceFormPage() {
       clientName: clientName.trim(),
       contactPerson,
       clientGstin:      clientGstin      || undefined,
-      clientContact:    clientContact     || undefined,
+      clientContact:    (clientContacts.join(', ') || clientContact).trim() || undefined,
+      clientContacts:   clientContacts.filter(Boolean).length ? clientContacts.filter(Boolean) : undefined,
       billingAddress,
       shippingAddress:  shippingAddress   || billingAddress,
       shippingStateCode:shippingStateCode || undefined,
@@ -519,7 +638,7 @@ export default function InvoiceFormPage() {
                 onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
                 className={inputCls}
               >
-                <option>Draft</option><option>Sent</option><option>Pending</option>
+                <option>Draft</option><option>Proforma Invoice</option><option>Sent</option><option>Pending</option>
                 <option>Paid</option><option>Overdue</option><option>Cancelled</option>
               </select>
             </Label>
@@ -575,10 +694,65 @@ export default function InvoiceFormPage() {
             <Label text="Client Contact Email">
               <input
                 value={clientContact}
-                onChange={(e) => setClientContact(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setClientContact(value);
+                  setClientContacts((current) => {
+                    const next = current.length ? [value, ...current.slice(1)] : value ? [value] : [];
+                    return next.filter(Boolean);
+                  });
+                }}
                 placeholder="e.g. accounts@client.com"
                 className={inputCls}
               />
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="email"
+                  value={additionalEmail}
+                  onChange={(e) => setAdditionalEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const email = additionalEmail.trim();
+                    if (email && !clientContacts.includes(email)) {
+                      setClientContacts((current) => [...current, email]);
+                      setAdditionalEmail('');
+                    }
+                  }}
+                  placeholder="Add another email address"
+                  className={`${inputCls} flex-1`}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const email = additionalEmail.trim();
+                    if (email && !clientContacts.includes(email)) {
+                      setClientContacts((current) => [...current, email]);
+                      setAdditionalEmail('');
+                    }
+                  }}
+                  className="shrink-0 rounded-lg border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Add
+                </button>
+              </div>
+              {clientContacts.length > 1 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {clientContacts.slice(1).map((email) => (
+                    <span key={email} className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700">
+                      {email}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${email}`}
+                        onClick={() => setClientContacts((current) => current.filter((value) => value !== email))}
+                        className="text-blue-400 hover:text-blue-700"
+                      >
+                        <X size={13} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </Label>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -742,6 +916,11 @@ export default function InvoiceFormPage() {
               </tbody>
             </table>
           </div>
+          {returnedItemCount > 0 && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {returnedItemCount} returned sub-order item{returnedItemCount === 1 ? '' : 's'} excluded from this invoice.
+            </p>
+          )}
         </section>
 
         {/* ── Summary ── */}

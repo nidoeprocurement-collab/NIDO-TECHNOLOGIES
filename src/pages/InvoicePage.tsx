@@ -16,6 +16,7 @@ import { downloadInvoicePdf } from '@/lib/invoicePdf';
 
 const statusStyles: Record<InvoiceStatus, string> = {
   Draft: 'bg-gray-100 text-gray-600',
+  'Proforma Invoice': 'bg-purple-100 text-purple-700',
   Sent: 'bg-blue-100 text-blue-700',
   Pending: 'bg-yellow-100 text-yellow-700',
   Paid: 'bg-green-100 text-green-700',
@@ -420,6 +421,7 @@ export default function InvoicePage() {
         >
           <option value="all">All statuses</option>
           <option value="Draft">Draft</option>
+          <option value="Proforma Invoice">Proforma Invoice</option>
           <option value="Sent">Sent</option>
           <option value="Pending">Pending</option>
           <option value="Paid">Paid</option>

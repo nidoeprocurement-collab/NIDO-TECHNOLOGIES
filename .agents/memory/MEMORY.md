@@ -15,3 +15,4 @@
 - [Catalog bulk-import classification](catalog-bulk-import.md) — classify duplicates against both stored products and earlier rows before reporting mixed import results.
 - [Confirmation guard dialogs](confirmation-guard.md) — confirmation dialog action buttons must bypass the global guard or confirmed mutations can be intercepted again.
 - [Catalog edit identity](catalog-edit-identity.md) — edit and duplicate checks must compare catalog IDs safely across legacy string/number records.
+- [Invoice import behavior](invoice-import-behavior.md) — order imports must exclude return-workflow items, resolve category codes, and preserve all invoice email recipients.

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Download, Edit, Plus, Receipt, Send } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceStore';
-import { downloadInvoicePdf } from '@/lib/invoicePdf';
+import { downloadInvoicePdf, generateInvoicePdfBase64 } from '@/lib/invoicePdf';
+import { sendEmail } from '@/lib/emailApi';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
@@ -15,6 +16,7 @@ const statusStyles: Record<string, string> = {
   Draft: 'bg-gray-100 text-gray-600',
   Sent: 'bg-blue-100 text-blue-700',
   Pending: 'bg-yellow-100 text-yellow-700',
+  'Proforma Invoice': 'bg-purple-100 text-purple-700',
   Paid: 'bg-green-100 text-green-700',
   Overdue: 'bg-red-100 text-red-700',
   Cancelled: 'bg-gray-100 text-gray-500',
@@ -39,6 +41,8 @@ export default function InvoiceDetails() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
   const [paymentReference, setPaymentReference] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState('');
 
   useEffect(() => {
     if (id) setInvoice(getInvoiceById(id) || null);
@@ -80,6 +84,73 @@ export default function InvoiceDetails() {
     ['activity', 'Activity'],
   ] as const;
 
+  const markSentAndEmail = async () => {
+    if (sending) return;
+    setSending(true);
+    setSendMessage('');
+    const recipients = Array.from(new Set(
+      (invoice.clientContacts?.length
+        ? invoice.clientContacts
+        : (invoice.clientContact || '').split(','))
+        .map((email) => email.trim())
+        .filter(Boolean),
+    ));
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      let sentCount = 0;
+      if (recipients.length > 0) {
+        const pdfDataUri = await generateInvoicePdfBase64(invoice);
+        const pdfBase64 = pdfDataUri.includes(',')
+          ? pdfDataUri.slice(pdfDataUri.indexOf(',') + 1)
+          : pdfDataUri;
+        const results = await Promise.all(recipients.map((to) => sendEmail({
+          templateKey: 'invoice_generated',
+          to,
+          variables: {
+            client_name: invoice.clientName,
+            invoice_number: invoice.invoiceNumber,
+            amount: invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
+            due_date: invoice.dueDate,
+            portal_url: `${window.location.origin}/sales/invoices/${invoice.id}`,
+          },
+          attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdfBase64 }],
+          triggerModule: 'invoice_details',
+        })));
+        sentCount = results.filter((result) => result.success && result.data?.success !== false).length;
+      }
+
+      const updated: StoredInvoice = {
+        ...invoice,
+        status: 'Sent',
+        activity: [
+          ...invoice.activity,
+          {
+            id: `${Date.now()}-activity`,
+            date: today,
+            title: recipients.length > 0 ? 'Invoice sent' : 'Invoice marked sent',
+            description: recipients.length > 0
+              ? `Invoice emailed to ${recipients.join(', ')}.`
+              : 'Invoice was marked as sent; no recipient email was configured.',
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+      saveInvoice(updated);
+      setInvoice(updated);
+      setSendMessage(
+        recipients.length === 0
+          ? 'Invoice marked as sent. Add a recipient email to send it by email.'
+          : sentCount === recipients.length
+            ? `Invoice sent to ${recipients.join(', ')}.`
+            : `Invoice saved as sent, but only ${sentCount} of ${recipients.length} email(s) were accepted.`,
+      );
+    } catch {
+      setSendMessage('Invoice was not emailed. Check the email service and try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
   const grossSubtotal = invoice.grossSubtotal ?? invoice.subtotal;
   const totalDiscount = invoice.totalDiscount ?? 0;
   const shippingCharges = invoice.shippingCharges ?? 0;
@@ -117,21 +188,19 @@ export default function InvoiceDetails() {
             <Download size={16} /> Download PDF
           </button>
           <button
-            onClick={() => {
-              const updated = {
-                ...invoice,
-                status: 'Sent' as const,
-                activity: [...invoice.activity, { id: `${Date.now()}-activity`, date: new Date().toISOString().split('T')[0], title: 'Invoice sent', description: 'Invoice marked as sent to the client.' }],
-              };
-              saveInvoice(updated);
-              setInvoice(updated);
-            }}
+            onClick={markSentAndEmail}
+            disabled={sending}
             className="inline-flex items-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"
           >
-            <Send size={16} /> Mark Sent
+            <Send size={16} /> {sending ? 'Sending…' : 'Send Invoice'}
           </button>
         </div>
       </div>
+      {sendMessage && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {sendMessage}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-5 border-b border-gray-200 overflow-x-auto">
