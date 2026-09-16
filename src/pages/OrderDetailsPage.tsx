@@ -56,6 +56,9 @@ const ALL_STATUS_MAP = {
   "Pending Shipping": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
   Shipped: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   Delivered: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  "Return Request Raised": { bg: "#f5f3ff", color: "#6d28d9", border: "#ddd6fe" },
+  "Pickup Scheduled": { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "Pickup Done": { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
   "Partially Shipped": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   "Partially Delivered": { bg: "#ecfdf5", color: "#065f46", border: "#6ee7b7" },
 };
@@ -1889,7 +1892,7 @@ function AddTrackingModal({ current, onSave, onClose }) {
   );
 }
 
-function RaiseReturnModal({ itemName, onClose }) {
+function RaiseReturnModal({ itemName, onSubmit, onClose }) {
   const [reason, setReason] = useState(""), [details, setDetails] = useState(""), [submitted, setSubmitted] = useState(false);
   if (submitted) return (
     <Overlay onClose={onClose}>
@@ -1921,7 +1924,104 @@ function RaiseReturnModal({ itemName, onClose }) {
           </div>
           <div style={{ fontSize: 12, color: "#9ca3af", marginBottom: 8 }}>⚠️ Return requests can only be raised within 3 days of delivery.</div>
         </div>
-        <ModalFooter onCancel={onClose} onSave={() => { if (reason) setSubmitted(true); }} saveLabel="Submit Return Request" />
+        <ModalFooter onCancel={onClose} onSave={() => {
+          if (!reason) return;
+          onSubmit(reason, details.trim());
+          setSubmitted(true);
+        }} saveLabel="Submit Return Request" />
+      </ModalBox>
+    </Overlay>
+  );
+}
+
+function PickupScheduledModal({
+  itemName,
+  onSubmit,
+  onClose,
+}: {
+  itemName: string;
+  onSubmit: (details: { pickupPersonName: string; pickupContactNumber: string; pickupDate: string; pickupTimeWindow: string }) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({
+    pickupPersonName: "",
+    pickupContactNumber: "",
+    pickupDate: "",
+    pickupTimeWindow: "",
+  });
+  const valid = Object.values(form).every(value => value.trim().length > 0);
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title="Schedule Return Pickup" onClose={onClose}>
+        <div style={{ padding: "20px 22px 8px" }}>
+          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#1e40af" }}>
+            Item: <b>{itemName}</b>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbSt}>Pickup Person Name <span style={{ color: "#dc2626" }}>*</span></label>
+            <input value={form.pickupPersonName} onChange={e => setForm({ ...form, pickupPersonName: e.target.value })} placeholder="Enter pickup person name" style={inSt} />
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={lbSt}>Contact Number <span style={{ color: "#dc2626" }}>*</span></label>
+            <input value={form.pickupContactNumber} onChange={e => setForm({ ...form, pickupContactNumber: e.target.value })} placeholder="Enter contact number" style={inSt} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            <div>
+              <label style={lbSt}>Pickup Date <span style={{ color: "#dc2626" }}>*</span></label>
+              <input type="date" value={form.pickupDate} onChange={e => setForm({ ...form, pickupDate: e.target.value })} style={inSt} />
+            </div>
+            <div>
+              <label style={lbSt}>Pickup Time / Window <span style={{ color: "#dc2626" }}>*</span></label>
+              <input value={form.pickupTimeWindow} onChange={e => setForm({ ...form, pickupTimeWindow: e.target.value })} placeholder="within 2–4 PM" style={inSt} />
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Enter the time as a window, for example: “within 2–4 PM”.</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Cancel</button>
+          <button data-confirmation-skip onClick={() => { if (valid) { onSubmit(form); onClose(); } }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: valid ? "hsl(var(--primary))" : "#d1d5db", color: "#fff", cursor: valid ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Schedule Pickup</button>
+        </div>
+      </ModalBox>
+    </Overlay>
+  );
+}
+
+function PickupDoneModal({
+  itemName,
+  onSubmit,
+  onClose,
+}: {
+  itemName: string;
+  onSubmit: (details: { pickupDoneDate: string; pickupDoneTime: string }) => void;
+  onClose: () => void;
+}) {
+  const [form, setForm] = useState({ pickupDoneDate: "", pickupDoneTime: "" });
+  const valid = form.pickupDoneDate.trim().length > 0 && form.pickupDoneTime.trim().length > 0;
+  return (
+    <Overlay onClose={onClose}>
+      <ModalBox title="Confirm Pickup Done" onClose={onClose}>
+        <div style={{ padding: "20px 22px 8px" }}>
+          <div style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
+            Confirm that the return pickup for <b>{itemName}</b> has been completed.
+          </div>
+          <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#9a3412" }}>
+            Pickup Done is a final return status. Earlier item statuses and Documents & Notes will be locked again.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={lbSt}>Pickup Date <span style={{ color: "#dc2626" }}>*</span></label>
+              <input type="date" value={form.pickupDoneDate} onChange={e => setForm({ ...form, pickupDoneDate: e.target.value })} style={inSt} />
+            </div>
+            <div>
+              <label style={lbSt}>Pickup Time <span style={{ color: "#dc2626" }}>*</span></label>
+              <input type="time" value={form.pickupDoneTime} onChange={e => setForm({ ...form, pickupDoneTime: e.target.value })} style={inSt} />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, padding: "12px 22px 20px" }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "9px 0", border: "1px solid hsl(var(--border))", borderRadius: 7, background: "hsl(var(--card))", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", color: "hsl(var(--foreground))" }}>Keep Scheduled</button>
+          <button data-confirmation-skip onClick={() => { if (valid) { onSubmit(form); onClose(); } }} style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 7, background: valid ? "#16a34a" : "#d1d5db", color: "#fff", cursor: valid ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>Confirm Pickup Done</button>
+        </div>
       </ModalBox>
     </Overlay>
   );
@@ -2045,8 +2145,17 @@ function Stepper({ currentStatus, orderDate }: { currentStatus: string; orderDat
 }
 
 const menuItemSt: any = { display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#374151" };
-const STATUS_STYLE: any = { Pending: { color: "#6b7280" }, Confirmed: { color: "#92400e" }, Processing: { color: "#6b21a8" }, Shipped: { color: "#1e40af" }, Delivered: { color: "#166534" } };
-const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered"];
+const STATUS_STYLE: any = {
+  Pending: { color: "#6b7280" },
+  Confirmed: { color: "#92400e" },
+  Processing: { color: "#6b21a8" },
+  Shipped: { color: "#1e40af" },
+  Delivered: { color: "#166534" },
+  "Return Request Raised": { color: "#6d28d9" },
+  "Pickup Scheduled": { color: "#1d4ed8" },
+  "Pickup Done": { color: "#047857" },
+};
+const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Return Request Raised", "Pickup Scheduled", "Pickup Done"];
 
 function ThreeDotMenu({
   sub,
@@ -2059,6 +2168,8 @@ function ThreeDotMenu({
   cancelEnabled,
   onRaiseReturn,
   returnAllowed,
+  onRequestPickupScheduled,
+  onRequestPickupDone,
   statusUpdatesEnabled,
 }) {
   const [open, setOpen] = useState(false), [statusSub, setStatusSub] = useState(false);
@@ -2091,16 +2202,24 @@ function ThreeDotMenu({
       window.removeEventListener("resize", closeMenu);
     };
   }, [open]);
-  const statuses = [
-    "Pending",
-    "Processing",
-    "Pending Shipping",
-    ...(canMarkShipped ? ["Shipped"] : []),
-    "Delivered",
-  ];
+  const statuses = sub.itemStatus === "Return Request Raised"
+    ? ["Pickup Scheduled"]
+    : sub.itemStatus === "Pickup Scheduled"
+      ? ["Pickup Done"]
+      : sub.itemStatus === "Pickup Done"
+        ? []
+        : [
+            "Pending",
+            "Processing",
+            "Pending Shipping",
+            ...(canMarkShipped ? ["Shipped"] : []),
+            "Delivered",
+            ...(sub.itemStatus === "Delivered" && returnAllowed ? ["Return Request Raised"] : []),
+          ];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
     if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
+    if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
     const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
     const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
     if (currentIndex >= 0 && nextIndex >= 0 && nextIndex <= currentIndex) {
@@ -2182,6 +2301,12 @@ function ThreeDotMenu({
                       onRequestShipped();
                     } else if (s === "Delivered" && onRequestDelivered) {
                       onRequestDelivered();
+                    } else if (s === "Return Request Raised" && onRaiseReturn) {
+                      onRaiseReturn();
+                    } else if (s === "Pickup Scheduled" && onRequestPickupScheduled) {
+                      onRequestPickupScheduled();
+                    } else if (s === "Pickup Done" && onRequestPickupDone) {
+                      onRequestPickupDone();
                     } else {
                       onUpdateStatus(s);
                     }
@@ -2213,8 +2338,8 @@ function ThreeDotMenu({
           </button>
           <button style={{ ...menuItemSt, color: returnAllowed ? "#7c3aed" : "#d1d5db", cursor: returnAllowed ? "pointer" : "not-allowed" }}
             onClick={() => { if (returnAllowed) { onRaiseReturn(); setOpen(false); } }}>
-            <span>↩</span> Raise Return Request
-            {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>Expired</span>}
+            <span>↩</span> {sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Return Request Raised" : "Raise Return Request"}
+            {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>{sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Locked" : "Expired"}</span>}
           </button>
         </div>,
         document.body,
@@ -2286,13 +2411,15 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
   }));
 }
 
-// Returns are allowed for Delivered items within a 7-day window
+// Returns are allowed for Delivered items within a strict 72-hour window.
 function isReturnAllowed(sub: any): boolean {
   if (sub.itemStatus !== "Delivered") return false;
-  if (!sub.deliveredAt) return true; // deliveredAt not set yet — allow
+  if (!sub.deliveredAt) return false;
   const deliveredMs = sub.deliveredAt instanceof Date ? sub.deliveredAt.getTime() : new Date(sub.deliveredAt).getTime();
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-  return Date.now() - deliveredMs <= sevenDaysMs;
+  if (!Number.isFinite(deliveredMs)) return false;
+  const ageMs = Date.now() - deliveredMs;
+  const seventyTwoHoursMs = 72 * 60 * 60 * 1000;
+  return ageMs >= 0 && ageMs <= seventyTwoHoursMs;
 }
 
 // A grouped PO keeps its first sub-order in `subOrderId`, while all covered
@@ -2653,9 +2780,22 @@ export default function MyOrderPage() {
       ? reconcileSubOrderStatuses(applyItemState(cartItemsToSubOrders(order.cartItems, orderId, order.orderDate, order.poNumber), loadItemState()), orderId)
       : []
   );
+  // Keep the 72-hour return action current even if the page stays open past
+  // the deadline without another order/status update.
+  const [, setReturnWindowTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setReturnWindowTick(value => value + 1), 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   const hasShippedCustomerItem = subOrders.some(
     sub => sub.itemStatus === "Shipped" || sub.itemStatus === "Delivered",
   );
+  // Delivered orders normally lock Documents & Notes. A live return request
+  // reopens the section for the client/owner conversation until pickup is done.
+  const hasActiveReturnWorkflow = subOrders.some(
+    sub => sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled",
+  );
+  const documentsLocked = isOrderDelivered && !hasActiveReturnWorkflow;
   const canCancelOrder = canCancelOrderByPO && !hasShippedCustomerItem;
   const handleCancelOrder = async (reason: string) => {
     if (isOrderCancelled || !canCancelOrder) return;
@@ -2704,13 +2844,54 @@ export default function MyOrderPage() {
     () => Object.fromEntries(subOrders.filter(s => s.stockAllocations?.length).map(s => [s.id, s.stockAllocations])),
     [subOrders]
   );
-  const updateStatus = (subId: string, status: string) => {
+  const updateStatus = (subId: string, status: string, metadata: Record<string, any> = {}) => {
     if (!hasConfirmedOrderPO || isOrderInactive) return;
     if (status === "Shipped" && !getAllPOs().some(po => po.orderId === orderId && isPOItemShipped(po, subId))) return;
+    const target = subOrders.find(s => s.id === subId);
+    if (!target) return;
+    const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
+    const currentReturnIndex = returnStatuses.indexOf(target.itemStatus);
+    const nextReturnIndex = returnStatuses.indexOf(status);
+    const validReturnTransition =
+      (target.itemStatus === "Delivered" && status === "Return Request Raised")
+      || (currentReturnIndex >= 0 && nextReturnIndex === currentReturnIndex + 1);
+    if (nextReturnIndex >= 0 && (!validReturnTransition || (status === "Return Request Raised" && !isReturnAllowed(target)))) return;
+    const now = new Date();
     setSubOrders(prev => prev.map(s => s.id === subId
-      ? { ...s, itemStatus: status, statusOwner: "order-details", updatedOn: new Date().toLocaleDateString("en-IN") }
+      ? {
+          ...s,
+          itemStatus: status,
+          statusOwner: "order-details",
+          updatedOn: now.toLocaleDateString("en-IN"),
+          ...(status === "Delivered" && !s.deliveredAt ? { deliveredAt: now } : {}),
+          ...metadata,
+        }
       : s
     ));
+  };
+
+  const handleRaiseReturn = (subId: string, reason: string, details: string) => {
+    const target = subOrders.find(s => s.id === subId);
+    if (!target || !isReturnAllowed(target)) return;
+    updateStatus(subId, "Return Request Raised", {
+      returnRequestedAt: new Date().toISOString(),
+      returnReason: reason,
+      returnDetails: details,
+    });
+  };
+
+  const handlePickupScheduled = (subId: string, details: { pickupPersonName: string; pickupContactNumber: string; pickupDate: string; pickupTimeWindow: string }) => {
+    updateStatus(subId, "Pickup Scheduled", {
+      ...details,
+      pickupScheduledAt: new Date().toISOString(),
+    });
+  };
+
+  const handlePickupDone = (subId: string, details: { pickupDoneDate: string; pickupDoneTime: string }) => {
+    updateStatus(subId, "Pickup Done", {
+      ...details,
+      pickupDoneAt: new Date().toISOString(),
+    });
   };
 
   const requestShipped = (subId: string) => {
@@ -3114,7 +3295,9 @@ export default function MyOrderPage() {
   const [pendingShippedTarget, setPendingShippedTarget] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [vendorTarget, setVendorTarget] = useState<any>(null);
-  const [returnTarget, setReturnTarget] = useState(null);
+  const [returnTarget, setReturnTarget] = useState<string | null>(null);
+  const [pickupScheduledTarget, setPickupScheduledTarget] = useState<string | null>(null);
+  const [pickupDoneTarget, setPickupDoneTarget] = useState<string | null>(null);
   const [assignment, setAssignment] = useState({
     assignedTo: order?.assigned || "Admin",
     role: order?.assignedRole || "Admin",
@@ -3154,6 +3337,17 @@ export default function MyOrderPage() {
         trackingOwner: s.tracking ? "order-details" : undefined,
         updatedOn: s.updatedOn,
         deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null,
+        returnRequestedAt: s.returnRequestedAt || null,
+        returnReason: s.returnReason || "",
+        returnDetails: s.returnDetails || "",
+        pickupPersonName: s.pickupPersonName || "",
+        pickupContactNumber: s.pickupContactNumber || "",
+        pickupDate: s.pickupDate || "",
+        pickupTimeWindow: s.pickupTimeWindow || "",
+        pickupScheduledAt: s.pickupScheduledAt || null,
+        pickupDoneDate: s.pickupDoneDate || "",
+        pickupDoneTime: s.pickupDoneTime || "",
+        pickupDoneAt: s.pickupDoneAt || null,
         referenceNumber: s.referenceNumber,
         serialNumber: s.serialNumber,
       };
@@ -3775,6 +3969,19 @@ export default function MyOrderPage() {
                         {(sub as any).cancelReason && (
                           <div style={{ fontSize: 10.5, color: "#991b1b", marginTop: 3, fontStyle: "italic", lineHeight: 1.4 }}>Reason: {(sub as any).cancelReason}</div>
                         )}
+                        {sub.returnReason && (
+                          <div style={{ marginTop: 7, padding: "7px 8px", borderRadius: 6, background: "#faf5ff", border: "1px solid #e9d5ff", fontSize: 10.5, color: "#5b21b6", lineHeight: 1.45 }}>
+                            <div><b>Return reason:</b> {sub.returnReason}</div>
+                            {sub.returnDetails && <div><b>Details:</b> {sub.returnDetails}</div>}
+                          </div>
+                        )}
+                        {sub.pickupPersonName && (
+                          <div style={{ marginTop: 7, padding: "7px 8px", borderRadius: 6, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 10.5, color: "#1e40af", lineHeight: 1.45 }}>
+                            <div><b>Pickup person:</b> {sub.pickupPersonName} · {sub.pickupContactNumber}</div>
+                            <div><b>Scheduled:</b> {sub.pickupDate} · {sub.pickupTimeWindow}</div>
+                            {sub.pickupDoneDate && <div><b>Completed:</b> {sub.pickupDoneDate} · {sub.pickupDoneTime}</div>}
+                          </div>
+                        )}
                       </div>
                       <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
                         {sub.tracking ? (
@@ -3848,9 +4055,16 @@ export default function MyOrderPage() {
                       )}
                        {isOrderInactive || itemCancelled ? (
                         <span style={{ fontSize: 12, color: "#d1d5db", minWidth: 0 }}>—</span>
-                      ) : isClientPortalUser ? (
+                       ) : isClientPortalUser ? (
                         <div style={{ minWidth: 0 }}>
-                           {sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" ? (
+                           {returnOk ? (
+                             <button
+                               onClick={() => setReturnTarget(sub.id)}
+                               style={{ padding: "5px 10px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 600, fontSize: 11.5, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                             >
+                               Raise Return Request
+                             </button>
+                           ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" ? (
                             <button
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
@@ -3859,6 +4073,8 @@ export default function MyOrderPage() {
                             >
                                 Cancel Item
                             </button>
+                           ) : sub.itemStatus === "Delivered" ? (
+                             <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>Return window expired</span>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                           )}
@@ -3876,6 +4092,8 @@ export default function MyOrderPage() {
                              cancelEnabled={!isOrderInactive && !itemCancelled && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
+                             onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
+                             onRequestPickupDone={() => setPickupDoneTarget(sub.id)}
                             statusUpdatesEnabled={hasConfirmedOrderPO && !isOrderInactive}
                           />
                         </div>
@@ -4112,7 +4330,7 @@ export default function MyOrderPage() {
             are visible to the client but only the owner platform can upload
             or remove them. */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
-          <DocumentsNotesTab orderId={orderId} locked={isOrderDelivered} />
+          <DocumentsNotesTab orderId={orderId} locked={documentsLocked} />
         </div>
       </div>
 
@@ -4140,7 +4358,29 @@ export default function MyOrderPage() {
           onClose={() => setPendingItemDelivered(null)}
         />
       )}
-      {returnTarget && <RaiseReturnModal itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""} onClose={() => setReturnTarget(null)} />}
+      {returnTarget && (
+        <RaiseReturnModal
+          itemName={subOrders.find(s => s.id === returnTarget)?.itemName || ""}
+          onSubmit={(reason, details) => {
+            handleRaiseReturn(returnTarget, reason, details);
+          }}
+          onClose={() => setReturnTarget(null)}
+        />
+      )}
+      {pickupScheduledTarget && (
+        <PickupScheduledModal
+          itemName={subOrders.find(s => s.id === pickupScheduledTarget)?.itemName || ""}
+          onSubmit={details => handlePickupScheduled(pickupScheduledTarget, details)}
+          onClose={() => setPickupScheduledTarget(null)}
+        />
+      )}
+      {pickupDoneTarget && (
+        <PickupDoneModal
+          itemName={subOrders.find(s => s.id === pickupDoneTarget)?.itemName || ""}
+          onSubmit={details => handlePickupDone(pickupDoneTarget, details)}
+          onClose={() => setPickupDoneTarget(null)}
+        />
+      )}
     </div>
   );
 }
