@@ -16,6 +16,18 @@ function isDelivered(status: unknown): boolean {
   return normalize(status) === "delivered";
 }
 
+function isReturnWorkflow(status: unknown): boolean {
+  return [
+    "return request raised",
+    "pickup scheduled",
+    "pickup done",
+  ].includes(normalize(status));
+}
+
+function isDeliveryComplete(status: unknown): boolean {
+  return isDelivered(status) || isReturnWorkflow(status);
+}
+
 function isShipped(status: unknown): boolean {
   const value = normalize(status);
   return value === "shipped" || value === "partially shipped" || value === "dispatched";
@@ -41,8 +53,11 @@ export function deriveFulfillmentStatus(
   if (values.length > 0 && active.length === 0) return "Cancelled";
   if (active.length === 0) return fallback;
 
-  if (active.every(isDelivered)) return "Delivered";
-  if (active.some(isDelivered)) return "Partially Delivered";
+  // A return can only be raised after delivery. Keep the master order at
+  // Delivered while the item moves through its return workflow instead of
+  // regressing it to Processing.
+  if (active.every(isDeliveryComplete)) return "Delivered";
+  if (active.some(isDeliveryComplete)) return "Partially Delivered";
   if (active.every(isShipped)) return "Shipped";
   if (active.some(isShipped)) return "Partially Shipped";
   return "Processing";
@@ -93,7 +108,7 @@ export function syncMasterOrderFulfillmentStatus(orderId: string): FulfillmentSt
   // Pending Shipping is the master status while items are waiting for
   // shipment. Existing shipment and delivery precedence remains unchanged.
   const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
-  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDelivered(status));
+  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDeliveryComplete(status));
   const nextStatus = hasPendingShipping && !hasShipmentProgress
     ? "Pending Shipping"
     : deriveFulfillmentStatus(
@@ -127,7 +142,7 @@ export function derivePOFulfillmentStatus(po: any): FulfillmentStatus {
   }
   const statuses = lines.map(line => lineStatus(line, po));
   const hasPendingShipping = statuses.some(status => normalize(status) === "pending shipping");
-  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDelivered(status));
+  const hasShipmentProgress = statuses.some(status => isShipped(status) || isDeliveryComplete(status));
   return hasPendingShipping && !hasShipmentProgress
     ? "Pending Shipping"
     : deriveFulfillmentStatus(statuses, "Processing");

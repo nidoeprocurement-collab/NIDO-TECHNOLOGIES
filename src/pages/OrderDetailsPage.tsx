@@ -2185,6 +2185,7 @@ const STATUS_STYLE: any = {
   "Pickup Done": { color: "#047857" },
 };
 const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Return Request Raised", "Pickup Scheduled", "Pickup Done"];
+const RETURN_WORKFLOW_STATUSES = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
 
 function ThreeDotMenu({
   sub,
@@ -2957,7 +2958,8 @@ export default function MyOrderPage() {
       !target ||
       target.itemStatus === "Cancelled" ||
       target.itemStatus === "Shipped" ||
-      target.itemStatus === "Delivered"
+      target.itemStatus === "Delivered" ||
+      RETURN_WORKFLOW_STATUSES.includes(target.itemStatus)
     ) return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
@@ -4096,7 +4098,7 @@ export default function MyOrderPage() {
                              >
                                Raise Return Request
                              </button>
-                           ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" ? (
+                           ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) ? (
                             <button
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
@@ -4121,7 +4123,7 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
-                             cancelEnabled={!isOrderInactive && !itemCancelled && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered"}
+                             cancelEnabled={!isOrderInactive && !itemCancelled && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
