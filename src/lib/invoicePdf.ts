@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
-import { formatCurrency, getCurrencySymbol } from './formatters';
+import { formatCurrency } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredInvoice } from './invoiceStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
@@ -149,50 +149,50 @@ function drawSummary(
     [`Round Off Adjustment`, `${adjustment < 0 ? '-' : ''}${money(Math.abs(adjustment))}`],
   ];
 
-  const rowHeight = 20;
-  const totalHeight = 27;
-  const height = rows.length * rowHeight + totalHeight;
-  const valueRight = x + width - 14;
-  const valueLeft = x + width * 0.49;
-  const valueWidth = valueRight - valueLeft;
+  const body = [
+    ...rows.map(([label, value, bold]) => [label, value, Boolean(bold)]),
+    ['Total Payable', money(invoice.grandTotal), true],
+  ];
 
-  const drawSummaryValue = (value: string, yPosition: number, bold = false) => {
-    const size = 7.5;
-    doc.setFont('helvetica', bold ? 'bold' : 'normal').setFontSize(size);
-    const textWidth = doc.getTextWidth(value);
-    const fittedSize = textWidth > valueWidth
-      ? Math.max(6.5, size * valueWidth / textWidth)
-      : size;
-    drawText(doc, value, valueRight, yPosition, {
-      size: fittedSize,
-      color: DARK,
-      bold,
-      align: 'right',
-    });
-  };
-
-  doc.setDrawColor(...BORDER).setLineWidth(0.6);
-  doc.setFillColor(255, 255, 255);
-  doc.roundedRect(x, y, width, height, 5, 5, 'FD');
-
-  rows.forEach(([label, value, bold], index) => {
-    const rowY = y + index * rowHeight;
-    if (index > 0) {
-      doc.setDrawColor(...BORDER).setLineWidth(0.3);
-      doc.line(x, rowY, x + width, rowY);
-    }
-    drawText(doc, label, x + 10, rowY + 13, { size: 7.7, color: bold ? DARK : TEXT, bold: !!bold });
-    drawSummaryValue(value, rowY + 13, !!bold);
+  autoTable(doc, {
+    startY: y,
+    margin: {
+      left: x,
+      right: doc.internal.pageSize.getWidth() - x - width,
+    },
+    tableWidth: width,
+    body: body.map(([label, value]) => [label, value]),
+    theme: 'grid',
+    styles: {
+      font: 'helvetica',
+      fontSize: 7.5,
+      textColor: TEXT,
+      lineColor: BORDER,
+      lineWidth: 0.35,
+      cellPadding: { top: 5, bottom: 5, left: 10, right: 10 },
+      minCellHeight: 20,
+      valign: 'middle',
+      overflow: 'linebreak',
+    },
+    columnStyles: {
+      0: { cellWidth: 155, halign: 'left' },
+      1: { cellWidth: 100, halign: 'right' },
+    },
+    didParseCell(data) {
+      if (data.section !== 'body') return;
+      const isTotal = data.row.index === body.length - 1;
+      const isEmphasized = isTotal || data.row.index === 1 || data.row.index === 2;
+      if (isEmphasized) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.textColor = DARK;
+      }
+      if (isTotal) {
+        data.cell.styles.fillColor = LIGHT_BLUE;
+      }
+    },
   });
 
-  const totalY = y + rows.length * rowHeight;
-  doc.setFillColor(...LIGHT_BLUE);
-  doc.rect(x + 0.5, totalY, width - 1, totalHeight - 0.5, 'F');
-  doc.setDrawColor(...BORDER).setLineWidth(0.5);
-  doc.line(x, totalY, x + width, totalY);
-  drawText(doc, 'Total Payable', x + 10, totalY + 17, { size: 7.5, color: DARK, bold: true });
-  drawSummaryValue(money(invoice.grandTotal), totalY + 17, true);
-  return height;
+  return ((doc as any).lastAutoTable?.finalY ?? y) - y;
 }
 
 // ── Main generator ─────────────────────────────────────────────────────────────
