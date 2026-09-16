@@ -162,9 +162,18 @@ export default function InvoiceFormPage() {
           const gstRate    = typeof ci.gstSnapshot === 'number'
             ? ci.gstSnapshot
             : getEffectiveTaxPctForCategory(ci.category || '');
-          const preTaxRate = gstRate > 0
-            ? Math.round((ci.priceNum * 100 / (100 + gstRate)) * 100) / 100
-            : (ci.priceNum || 0);
+          // Cart prices are GST-inclusive for display, but vendor-selected
+          // orders also carry the exact client selling price before GST.
+          // Use that pre-tax snapshot so the invoice adds GST exactly once.
+          // Legacy orders without the snapshot still recover their pre-tax
+          // rate from the stored GST-inclusive price.
+          const hasClientSellingPrice = typeof ci.clientSellingPriceExclGst === 'number'
+            && Number.isFinite(ci.clientSellingPriceExclGst);
+          const preTaxRate = hasClientSellingPrice
+            ? Math.max(0, ci.clientSellingPriceExclGst as number)
+            : gstRate > 0
+              ? Math.round((ci.priceNum * 100 / (100 + gstRate)) * 100) / 100
+              : (ci.priceNum || 0);
           return {
             id:          `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             description: ci.name         || '',
