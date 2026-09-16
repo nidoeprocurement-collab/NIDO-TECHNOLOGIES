@@ -102,11 +102,12 @@ dispatch the order-item refresh event.
 ## Vendor shipment vs. customer-facing status
 
 Vendor Order Details owns PO-line fulfillment and tracking. It must not write a
-customer-facing sub-order `itemStatus` when a vendor marks a line as shipped.
-Order Details may expose its own Shipped action only after the matching PO line
-is shipped with saved tracking, and the customer-facing status changes only
-when that action is selected there. Tracking is projected only after that same
-vendor shipment-save event.
+customer-facing sub-order `itemStatus` when a vendor marks a line as shipped or
+delivered. Order Details may expose its own Shipped or Delivered action only
+after the matching PO line has the corresponding vendor fulfillment progress;
+Shipped still requires saved tracking, and the customer-facing status changes
+only when that action is selected there. Tracking is projected only after that
+same vendor shipment-save event.
 
 **Why:** Vendor shipment confirmation is a prerequisite for the customer/order
 status transition, not the transition itself. Sharing the vendor status directly

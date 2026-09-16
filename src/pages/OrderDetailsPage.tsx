@@ -2419,12 +2419,14 @@ function isPOItemShipped(po: any, subOrderId: string): boolean {
       matchingLine.tracking?.trackingNumber ||
       matchingLine.tracking?.carrier,
     );
-    return matchingLine.status === "Shipped" && trackingSaved;
+    return matchingLine.status === "Delivered" || (matchingLine.status === "Shipped" && trackingSaved);
   }
-  return po.status === "Shipped" && Boolean(
-    po.tracking?.number ||
-    po.tracking?.trackingNumber ||
-    po.tracking?.carrier,
+  return po.status === "Delivered" || (
+    po.status === "Shipped" && Boolean(
+      po.tracking?.number ||
+      po.tracking?.trackingNumber ||
+      po.tracking?.carrier,
+    )
   );
 }
 
