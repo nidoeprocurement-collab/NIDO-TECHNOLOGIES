@@ -73,6 +73,12 @@ Vendor-entered Reference No and Serial No are stored on each PO line and mirrore
 
 **How to apply:** When adding vendor-entered item identifiers, update both the shared PO line and `nido_subitems_<orderId>`, then emit the existing sub-order refresh event.
 
+Vendor Order Details owns editing Reference No and Serial No; Order Details renders both as separate read-only rows below the item name.
+
+**Why:** Identifier changes belong to the vendor PO workflow, while the order view should present the saved values consistently without allowing a second edit path.
+
+**How to apply:** Keep the edit controls on the vendor detail page only and preserve both fields when Order Details persists sub-order state.
+
 For legacy orders whose PO line has a missing or incorrect sub-order ID, use
 the item's product code/SKU as a compatibility lookup and repair the line ID
 when a Draft vendor change is saved.

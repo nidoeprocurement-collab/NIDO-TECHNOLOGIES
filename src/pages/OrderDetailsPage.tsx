@@ -677,7 +677,7 @@ function VendorSelectionTab({ subOrders, selectedVendors, selectedVendorMeta, on
                 <div style={{ width: 36, height: 36, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>📦</div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13, color: "#111827" }}>{sub.itemName}</div>
-                  {sub.referenceNumber && <div style={{ fontSize: 11, color: "#6b7280" }}>Ref: {sub.referenceNumber}</div>}
+                  {sub.referenceNumber && <div style={{ fontSize: 11, color: "#6b7280" }}>Reference No: {sub.referenceNumber}</div>}
                   {sub.serialNumber && <div style={{ fontSize: 11, color: "#6b7280" }}>Serial No: {sub.serialNumber}</div>}
                 </div>
               </div>
@@ -782,7 +782,7 @@ function ViewItemsModal({ group, onClose }) {
                 <div style={{ width: 40, height: 40, background: "#f3f4f6", borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>📦</div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#111827" }}>{sub.itemName}</div>
-                  {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                  {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Reference No: {sub.referenceNumber}</div>}
                   {sub.serialNumber && <div style={{ fontSize: 11.5, color: "#6b7280" }}>Serial No: {sub.serialNumber}</div>}
                   {sub.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
                   {sub.commercialTerms && (
@@ -1889,24 +1889,6 @@ function AddTrackingModal({ current, onSave, onClose }) {
   );
 }
 
-function ReferenceNumberModal({ itemName, current, onSave, onClose }) {
-  const [value, setValue] = useState(current || "");
-  return (
-    <Overlay onClose={onClose}>
-      <ModalBox title="Reference/Model No." onClose={onClose}>
-        <div style={{ padding: "20px 22px 8px" }}>
-          <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14 }}>{itemName}</div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={lbSt}>Reference/Model Number</label>
-            <input value={value} onChange={e => setValue(e.target.value)} placeholder="Enter reference/model number" style={inSt} autoFocus />
-          </div>
-        </div>
-        <ModalFooter onCancel={onClose} onSave={() => { onSave(value.trim()); onClose(); }} saveLabel="Save" skipConfirmation />
-      </ModalBox>
-    </Overlay>
-  );
-}
-
 function RaiseReturnModal({ itemName, onClose }) {
   const [reason, setReason] = useState(""), [details, setDetails] = useState(""), [submitted, setSubmitted] = useState(false);
   if (submitted) return (
@@ -2073,8 +2055,6 @@ function ThreeDotMenu({
   canMarkShipped,
   onRequestDelivered,
   onAddTracking,
-  onSetReference,
-  referenceLocked,
   onCancel,
   cancelEnabled,
   onRaiseReturn,
@@ -2217,13 +2197,6 @@ function ThreeDotMenu({
               </div>
             )}
           </div>
-          <button
-            style={{ ...menuItemSt, color: referenceLocked ? "#d1d5db" : "#374151", cursor: referenceLocked ? "not-allowed" : "pointer" }}
-            onClick={() => { if (!referenceLocked) { onSetReference(); setOpen(false); } }}
-          >
-            <span>🏷️</span> {sub.referenceNumber ? "Edit Reference/Model No." : "Reference/Model No."}
-            {referenceLocked && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>Locked</span>}
-          </button>
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button
             disabled={!cancelEnabled}
@@ -3137,7 +3110,6 @@ export default function MyOrderPage() {
   const [showEditAssignment, setShowEditAssignment] = useState(false);
   const [trackingTarget, setTrackingTarget] = useState(null);
   const [pendingShippedTarget, setPendingShippedTarget] = useState<string | null>(null);
-  const [referenceTarget, setReferenceTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [vendorTarget, setVendorTarget] = useState<any>(null);
   const [returnTarget, setReturnTarget] = useState(null);
@@ -3181,6 +3153,7 @@ export default function MyOrderPage() {
         updatedOn: s.updatedOn,
         deliveredAt: s.deliveredAt ? s.deliveredAt.toISOString() : null,
         referenceNumber: s.referenceNumber,
+        serialNumber: s.serialNumber,
       };
     });
     localStorage.setItem(itemStateKey, JSON.stringify(state));
@@ -3752,7 +3725,7 @@ export default function MyOrderPage() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>{sub.itemName}</div>
-                            {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Ref/Model No: {sub.referenceNumber}</div>}
+                            {sub.referenceNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Reference No: {sub.referenceNumber}</div>}
                             {sub.serialNumber && <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, whiteSpace: "normal", overflowWrap: "break-word", wordBreak: "break-word" }}>Serial No: {sub.serialNumber}</div>}
                           </div>
                         </div>
@@ -3897,8 +3870,6 @@ export default function MyOrderPage() {
                             canMarkShipped={canMarkShipped}
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
-                            onSetReference={() => setReferenceTarget(sub.id)}
-                            referenceLocked={hasPO && sub.itemStatus !== "Shipped"}
                             onCancel={() => setCancelTarget(sub.id)}
                              cancelEnabled={!isOrderInactive && !itemCancelled && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered"}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
@@ -4103,6 +4074,7 @@ export default function MyOrderPage() {
                                          updatedOn: sub.updatedOn,
                                          deliveredAt: sub.deliveredAt ? sub.deliveredAt.toISOString() : null,
                                          referenceNumber: sub.referenceNumber,
+                                         serialNumber: sub.serialNumber,
                                        };
                                      });
                                      localStorage.setItem(itemStateKey, JSON.stringify(persistedState));
@@ -4145,7 +4117,6 @@ export default function MyOrderPage() {
 
       {showEditAssignment && <EditAssignmentModal data={assignment} onSave={setAssignment} onClose={() => setShowEditAssignment(false)} />}
       {trackingTarget && <AddTrackingModal current={subOrders.find(s => s.id === trackingTarget)?.tracking || null} onSave={saveTrackingForSubOrder} onClose={() => setTrackingTarget(null)} />}
-      {referenceTarget && <ReferenceNumberModal itemName={subOrders.find(s => s.id === referenceTarget)?.itemName || ""} current={subOrders.find(s => s.id === referenceTarget)?.referenceNumber || ""} onSave={v => setSubOrders(prev => prev.map(s => s.id === referenceTarget ? { ...s, referenceNumber: v } : s))} onClose={() => setReferenceTarget(null)} />}
       {cancelTarget && <CancelItemModal itemName={subOrders.find(s => s.id === cancelTarget)?.itemName || ""} onConfirm={(reason) => handleCancelItem(cancelTarget, reason)} onClose={() => setCancelTarget(null)} />}
       {vendorTarget && (
         <VendorSelectionModal
