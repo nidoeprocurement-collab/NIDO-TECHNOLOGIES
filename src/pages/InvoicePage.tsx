@@ -39,6 +39,7 @@ function fmtDate(iso?: string) {
 }
 
 interface RowMenuState { top: number; right: number; invoice: StoredInvoice }
+type InvoiceDocumentTab = 'invoice' | 'proforma';
 
 /* ─────────────────────────────────────────────────────────────────
    Archive Confirmation Dialog
@@ -294,6 +295,7 @@ export default function InvoicePage() {
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
+  const [documentTab, setDocumentTab] = useState<InvoiceDocumentTab>('invoice');
   const [showArchived, setShowArchived] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<StoredInvoice | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
@@ -329,13 +331,24 @@ export default function InvoicePage() {
     );
   }, [invoices, isClientPortalUser, user?.clientId, user?.clientName]);
 
-  const filteredInvoices = useMemo(() => clientInvoices.filter((invoice) => {
+  const tabInvoices = useMemo(() => clientInvoices.filter((invoice) =>
+    documentTab === 'proforma'
+      ? invoice.status === 'Proforma Invoice'
+      : invoice.status !== 'Proforma Invoice'
+  ), [clientInvoices, documentTab]);
+
+  const filteredInvoices = useMemo(() => tabInvoices.filter((invoice) => {
     const query = search.toLowerCase();
     const matchesSearch =
       displayNumber(invoice.invoiceNumber, prefix).toLowerCase().includes(query) ||
       invoice.clientName.toLowerCase().includes(query);
     return matchesSearch && (statusFilter === 'all' || invoice.status === statusFilter);
-  }), [clientInvoices, prefix, search, statusFilter]);
+  }), [tabInvoices, prefix, search, statusFilter]);
+
+  const switchDocumentTab = (tab: InvoiceDocumentTab) => {
+    setDocumentTab(tab);
+    setStatusFilter('all');
+  };
 
   const exportCsv = () => {
     const rows = [
@@ -407,6 +420,30 @@ export default function InvoicePage() {
         </div>
       </div>
 
+      <div className="border-b border-gray-200">
+        <div className="flex items-center gap-1" role="tablist" aria-label="Invoice document type">
+          {([
+            { id: 'invoice', label: 'Invoice' },
+            { id: 'proforma', label: 'Proforma Invoice' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={documentTab === tab.id}
+              onClick={() => switchDocumentTab(tab.id)}
+              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                documentTab === tab.id
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3">
         <input
           value={search}
@@ -420,20 +457,27 @@ export default function InvoicePage() {
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
         >
           <option value="all">All statuses</option>
-          <option value="Draft">Draft</option>
-          <option value="Proforma Invoice">Proforma Invoice</option>
-          <option value="Sent">Sent</option>
-          <option value="Pending">Pending</option>
-          <option value="Paid">Paid</option>
-          <option value="Overdue">Overdue</option>
-          <option value="Cancelled">Cancelled</option>
+          {documentTab === 'proforma' ? (
+            <option value="Proforma Invoice">Proforma Invoice</option>
+          ) : (
+            <>
+              <option value="Draft">Draft</option>
+              <option value="Sent">Sent</option>
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+              <option value="Overdue">Overdue</option>
+              <option value="Cancelled">Cancelled</option>
+            </>
+          )}
         </select>
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {filteredInvoices.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="text-gray-400 mb-4">No invoices found</p>
+            <p className="text-gray-400 mb-4">
+              No {documentTab === 'proforma' ? 'proforma invoices' : 'invoices'} found
+            </p>
             <button
               onClick={() => navigate('/sales/invoices/new')}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm"
