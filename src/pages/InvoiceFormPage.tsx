@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ClipboardList, Plus, Save, Trash2, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   generateInvoiceNumber,
+  generateProformaInvoiceNumber,
   getInvoiceById,
   saveInvoice,
   type InvoiceLineItem,
@@ -132,12 +133,23 @@ export default function InvoiceFormPage() {
   const [importedRefLabel, setImportedRefLabel] = useState('');
 
   // ── Header fields ────────────────────────────────────────────────────────
-  const [invoiceNumber] = useState(existing?.invoiceNumber || generateInvoiceNumber());
+  const [invoiceNumber, setInvoiceNumber] = useState(existing?.invoiceNumber || generateInvoiceNumber());
   const [invoiceDate,   setInvoiceDate]   = useState(existing?.invoiceDate   || today());
   const [dueDate,       setDueDate]       = useState(existing?.dueDate       || today());
   const [poReference,   setPoReference]   = useState(existing?.poReference   || '');
   const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply || '');
   const [status,        setStatus]        = useState<InvoiceStatus>(existing?.status || 'Draft');
+
+  useEffect(() => {
+    // Existing documents retain their original number. New documents switch
+    // number formats when the user changes between invoice and proforma.
+    if (existing) return;
+    setInvoiceNumber(
+      status === 'Proforma Invoice'
+        ? generateProformaInvoiceNumber()
+        : generateInvoiceNumber(),
+    );
+  }, [existing, status]);
 
   // ── Client fields ────────────────────────────────────────────────────────
   const [clientName,       setClientName]       = useState(existing?.clientName       || '');

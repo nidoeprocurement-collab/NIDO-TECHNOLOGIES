@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X } from 'lucide-react';
+import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -7,6 +7,7 @@ import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
 import {
   archiveInvoice,
+  convertProformaToInvoice,
   getArchivedInvoices,
   getInvoices,
   type InvoiceStatus,
@@ -383,6 +384,14 @@ export default function InvoicePage() {
     setRowMenu({ top: rect.bottom + 4, right: window.innerWidth - rect.right, invoice });
   };
 
+  const handleConvertProforma = (proforma: StoredInvoice) => {
+    const converted = convertProformaToInvoice(proforma.id);
+    setRowMenu(null);
+    if (!converted) return;
+    setDocumentTab('invoice');
+    setStatusFilter('all');
+  };
+
   return (
     <div className="space-y-6" onClick={() => { setHeaderMenuOpen(false); setRowMenu(null); }}>
       <div className="flex items-start justify-between gap-4">
@@ -558,6 +567,14 @@ export default function InvoicePage() {
           >
             <FileText size={15} /> Download PDF
           </button>
+          {rowMenu.invoice.status === 'Proforma Invoice' && (
+            <button
+              onClick={() => handleConvertProforma(rowMenu.invoice)}
+              className="w-full px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+            >
+              <ArrowRight size={15} /> Convert to Invoice
+            </button>
+          )}
           <div className="my-1 border-t border-gray-100" />
           <button
             onClick={() => { setArchiveTarget(rowMenu.invoice); setRowMenu(null); }}

@@ -35,6 +35,8 @@ export interface InvoiceActivity {
 export interface StoredInvoice {
   id: string;
   invoiceNumber: string;
+  /** Set only on a regular invoice created from a proforma invoice. */
+  sourceProformaId?: string;
   archived?: boolean;
   archiveReason?: string;
   archivedAt?: string;
@@ -303,4 +305,68 @@ export function generateInvoiceNumber(): string {
     .filter((n) => n > 0);
   const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
   return `${prefix}${year}${String(next).padStart(5, '0')}`;
+}
+
+/**
+ * Proforma numbers use their own visible prefix so they can never be
+ * confused with regular invoice numbers. The sequence is intentionally
+ * separate from the configurable invoice prefix.
+ */
+export function generateProformaInvoiceNumber(): string {
+  const year = new Date().getFullYear();
+  const prefix = 'PRO INV - ';
+  const regex = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}${year}(\\d+)$`);
+  const serials = seedInvoices()
+    .map((invoice) => {
+      const match = invoice.invoiceNumber.match(regex);
+      return match ? parseInt(match[1], 10) : 0;
+    })
+    .filter((serial) => serial > 0);
+  const next = serials.length > 0 ? Math.max(...serials) + 1 : 1;
+  return `${prefix}${year}${String(next).padStart(6, '0')}`;
+}
+
+/**
+ * Create a regular invoice from a proforma without changing the original
+ * proforma record. Repeated conversion attempts return the existing invoice.
+ */
+export function convertProformaToInvoice(proformaId: string): StoredInvoice | null {
+  const proforma = getInvoiceById(proformaId);
+  if (!proforma || proforma.status !== 'Proforma Invoice') return null;
+
+  const existingConversion = getInvoices().find(
+    (invoice) => invoice.sourceProformaId === proformaId,
+  );
+  if (existingConversion) return existingConversion;
+
+  const now = new Date().toISOString();
+  const {
+    archived: _archived,
+    archiveReason: _archiveReason,
+    archivedAt: _archivedAt,
+    ...proformaDetails
+  } = proforma;
+
+  const invoice: StoredInvoice = {
+    ...proformaDetails,
+    id: `invoice-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    invoiceNumber: generateInvoiceNumber(),
+    sourceProformaId: proformaId,
+    status: 'Draft',
+    payments: [],
+    activity: [
+      ...proforma.activity,
+      {
+        id: `${Date.now()}-conversion`,
+        date: new Date().toISOString().split('T')[0],
+        title: 'Invoice created from proforma invoice',
+        description: `Regular invoice created from proforma invoice ${proforma.invoiceNumber}.`,
+      },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  saveInvoice(invoice);
+  return invoice;
 }
