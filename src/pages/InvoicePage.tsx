@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight } from 'lucide-react';
+import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -10,10 +10,13 @@ import {
   convertProformaToInvoice,
   getArchivedInvoices,
   getInvoices,
+  saveInvoice,
   type InvoiceStatus,
   type StoredInvoice,
 } from '@/lib/invoiceStore';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
+import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
+import { toast } from 'sonner';
 
 const statusStyles: Record<InvoiceStatus, string> = {
   Draft: 'bg-gray-100 text-gray-600',
@@ -31,6 +34,12 @@ function fmt(value: number) {
 
 function displayNumber(invoiceNumber: string, prefix: string) {
   return invoiceNumber.replace(/^INV-/, prefix);
+}
+
+function invoiceStatusLabel(invoice: StoredInvoice) {
+  if (invoice.status === 'Proforma Invoice' && invoice.sentAt) return 'Sent Proforma Invoice';
+  if (invoice.status === 'Sent') return 'Sent Invoice';
+  return invoice.status;
 }
 
 function fmtDate(iso?: string) {
@@ -292,6 +301,7 @@ export default function InvoicePage() {
   const [documentTab, setDocumentTab] = useState<InvoiceDocumentTab>('invoice');
   const [showArchived, setShowArchived] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<StoredInvoice | null>(null);
+  const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
 
   const refresh = () => setInvoices(getInvoices());
@@ -383,6 +393,60 @@ export default function InvoicePage() {
     if (!converted) return;
     setDocumentTab('invoice');
     setStatusFilter('all');
+  };
+
+  const sendDocumentEmail = async (invoice: StoredInvoice, kind: 'invoice' | 'reminder') => {
+    if (sendingInvoiceId) return;
+    setSendingInvoiceId(`${invoice.id}:${kind}`);
+    const result = await sendInvoiceEmail(invoice, kind);
+    if (result.sentCount === 0) {
+      toast.error(result.error || 'The email could not be sent.');
+      setSendingInvoiceId(null);
+      return;
+    }
+
+    const documentLabel = invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice';
+    const today = new Date().toISOString().split('T')[0];
+    const updated: StoredInvoice = kind === 'invoice'
+      ? {
+          ...invoice,
+          status: invoice.status === 'Proforma Invoice' ? 'Proforma Invoice' : 'Sent',
+          sentAt: new Date().toISOString(),
+          activity: [
+            ...invoice.activity,
+            {
+              id: `${Date.now()}-activity`,
+              date: today,
+              title: `${documentLabel} sent`,
+              description: `${documentLabel} emailed to ${result.recipients.join(', ')}.`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        }
+      : {
+          ...invoice,
+          lastReminderAt: new Date().toISOString(),
+          activity: [
+            ...invoice.activity,
+            {
+              id: `${Date.now()}-activity`,
+              date: today,
+              title: `${documentLabel} reminder sent`,
+              description: `Reminder emailed to ${result.recipients.join(', ')}.`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+    saveInvoice(updated);
+    const partial = result.sentCount < result.recipients.length;
+    (partial ? toast.warning : toast.success)(
+      kind === 'reminder'
+        ? `Reminder mail sent to ${result.recipients.join(', ')}${partial ? ` (${result.sentCount}/${result.recipients.length} accepted)` : ''}.`
+        : `${documentLabel} sent to ${result.recipients.join(', ')}${partial ? ` (${result.sentCount}/${result.recipients.length} accepted)` : ''}.`,
+    );
+    setRowMenu(null);
+    setSendingInvoiceId(null);
   };
 
   return (
@@ -517,7 +581,7 @@ export default function InvoicePage() {
                     <td className="px-4 py-3 text-sm text-gray-900">{invoice.clientName}</td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusStyles[invoice.status]}`}>
-                        {invoice.status}
+                         {invoiceStatusLabel(invoice)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{invoice.dueDate}</td>
@@ -560,6 +624,22 @@ export default function InvoicePage() {
           >
             <FileText size={15} /> Download PDF
           </button>
+           <button
+             onClick={() => sendDocumentEmail(rowMenu.invoice, 'invoice')}
+             disabled={sendingInvoiceId === `${rowMenu.invoice.id}:invoice`}
+             className="w-full px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+           >
+             <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:invoice`
+               ? 'Sending…'
+               : rowMenu.invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
+           </button>
+           <button
+             onClick={() => sendDocumentEmail(rowMenu.invoice, 'reminder')}
+             disabled={sendingInvoiceId === `${rowMenu.invoice.id}:reminder`}
+             className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+           >
+             <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:reminder` ? 'Sending…' : 'Send Reminder'}
+           </button>
           {rowMenu.invoice.status === 'Proforma Invoice' && (
             <button
               onClick={() => handleConvertProforma(rowMenu.invoice)}

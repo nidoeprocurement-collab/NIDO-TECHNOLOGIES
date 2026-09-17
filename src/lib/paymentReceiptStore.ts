@@ -53,6 +53,7 @@ export function saveReceipt(receipt: PaymentReceipt): void {
   if (idx >= 0) all[idx] = receipt;
   else all.unshift(receipt);
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event("nidoPaymentReceiptsUpdated"));
 }
 
 export function archiveReceipt(id: string): void {

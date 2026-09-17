@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Download, Edit, MoreVertical, Plus, Receipt, Send, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Download, Edit, MoreVertical, Receipt, Send, ArrowRight } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { convertProformaToInvoice, getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceStore';
-import { downloadInvoicePdf, generateInvoicePdfBase64 } from '@/lib/invoicePdf';
-import { sendEmail } from '@/lib/emailApi';
+import { downloadInvoicePdf } from '@/lib/invoicePdf';
+import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
+import { getActiveReceipts, type PaymentReceipt } from '@/lib/paymentReceiptStore';
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
+import { toast } from 'sonner';
 
 function fmt(value: number) {
   return formatCurrency(value);
@@ -31,23 +33,41 @@ function InfoCard({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
+function isProformaInvoice(invoice: StoredInvoice) {
+  return invoice.status === 'Proforma Invoice';
+}
+
+function invoiceStatusLabel(invoice: StoredInvoice) {
+  if (invoice.status === 'Proforma Invoice' && invoice.sentAt) return 'Sent Proforma Invoice';
+  if (invoice.status === 'Sent') return 'Sent Invoice';
+  return invoice.status;
+}
+
 export default function InvoiceDetails() {
   const { currencySymbol } = useI18n();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [invoice, setInvoice] = useState<StoredInvoice | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'items' | 'payments' | 'activity'>('overview');
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Bank Transfer');
-  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentReceipts, setPaymentReceipts] = useState<PaymentReceipt[]>([]);
   const [sending, setSending] = useState(false);
-  const [sendMessage, setSendMessage] = useState('');
   const [actionsOpen, setActionsOpen] = useState(false);
 
   useEffect(() => {
     if (id) setInvoice(getInvoiceById(id) || null);
   }, [id]);
+
+  useEffect(() => {
+    if (!invoice) return;
+    const refresh = () => {
+      setPaymentReceipts(
+        getActiveReceipts().filter((receipt) => receipt.invoiceNumber === invoice.invoiceNumber),
+      );
+    };
+    refresh();
+    window.addEventListener('nidoPaymentReceiptsUpdated', refresh);
+    return () => window.removeEventListener('nidoPaymentReceiptsUpdated', refresh);
+  }, [invoice?.invoiceNumber]);
 
   if (!invoice) return (
     <div className="space-y-6">
@@ -58,100 +78,82 @@ export default function InvoiceDetails() {
     </div>
   );
 
-  const recordPayment = () => {
-    const amount = Number(paymentAmount);
-    if (!amount || amount <= 0) return;
-    const paymentDate = new Date().toISOString().split('T')[0];
-    const nextPaid = [...invoice.payments, { id: `${Date.now()}-payment`, date: paymentDate, amount, method: paymentMethod, reference: paymentReference || '—' }];
-    const paidTotal = nextPaid.reduce((sum, p) => sum + p.amount, 0);
-    const updated: StoredInvoice = {
-      ...invoice,
-      payments: nextPaid,
-      status: paidTotal >= invoice.grandTotal ? 'Paid' : 'Pending',
-      activity: [...invoice.activity, { id: `${Date.now()}-activity`, date: paymentDate, title: 'Payment received', description: `${fmt(amount)} received by ${paymentMethod}.` }],
-      updatedAt: new Date().toISOString(),
-    };
-    saveInvoice(updated);
-    setInvoice(updated);
-    setPaymentAmount('');
-    setPaymentReference('');
-    setShowPaymentForm(false);
-  };
-
   const tabs = [
     ['overview', 'Overview'],
     ['items', `Line Items (${invoice.lineItems.length})`],
-    ['payments', `Payments (${invoice.payments.length})`],
+    ...(!isProformaInvoice(invoice) ? [['payments', `Payments (${invoice.payments.length + paymentReceipts.length})`]] : []),
     ['activity', 'Activity'],
-  ] as const;
+  ] as ['overview' | 'items' | 'payments' | 'activity', string][];
 
   const markSentAndEmail = async () => {
     if (sending) return;
     setSending(true);
-    setSendMessage('');
-    const recipients = Array.from(new Set(
-      (invoice.clientContacts?.length
-        ? invoice.clientContacts
-        : (invoice.clientContact || '').split(','))
-        .map((email) => email.trim())
-        .filter(Boolean),
-    ));
     const today = new Date().toISOString().split('T')[0];
     try {
-      let sentCount = 0;
-      if (recipients.length > 0) {
-        const pdfDataUri = await generateInvoicePdfBase64(invoice);
-        const pdfBase64 = pdfDataUri.includes(',')
-          ? pdfDataUri.slice(pdfDataUri.indexOf(',') + 1)
-          : pdfDataUri;
-        const results = await Promise.all(recipients.map((to) => sendEmail({
-          templateKey: 'invoice_generated',
-          to,
-          variables: {
-            client_name: invoice.clientName,
-            invoice_number: invoice.invoiceNumber,
-            amount: invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-            due_date: invoice.dueDate,
-            portal_url: `${window.location.origin}/sales/invoices/${invoice.id}`,
-          },
-          attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdfBase64 }],
-          triggerModule: 'invoice_details',
-        })));
-        sentCount = results.filter((result) => result.success && result.data?.success !== false).length;
+      const result = await sendInvoiceEmail(invoice, 'invoice');
+      if (result.sentCount === 0) {
+        toast.error(result.error || 'The invoice could not be sent.');
+        return;
       }
+      const documentLabel = isProformaInvoice(invoice) ? 'Proforma invoice' : 'Invoice';
 
       const updated: StoredInvoice = {
         ...invoice,
-        status: 'Sent',
+        status: isProformaInvoice(invoice) ? 'Proforma Invoice' : 'Sent',
+        sentAt: new Date().toISOString(),
         activity: [
           ...invoice.activity,
           {
             id: `${Date.now()}-activity`,
             date: today,
-            title: recipients.length > 0
-              ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} sent`
-              : `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} marked sent`,
-            description: recipients.length > 0
-              ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} emailed to ${recipients.join(', ')}.`
-              : `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} was marked as sent; no recipient email was configured.`,
+            title: `${documentLabel} sent`,
+            description: `${documentLabel} emailed to ${result.recipients.join(', ')}.`,
           },
         ],
         updatedAt: new Date().toISOString(),
       };
       saveInvoice(updated);
       setInvoice(updated);
-      setSendMessage(
-        recipients.length === 0
-          ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} marked as sent. Add a recipient email to send it by email.`
-          : sentCount === recipients.length
-            ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} sent to ${recipients.join(', ')}.`
-            : `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} saved as sent, but only ${sentCount} of ${recipients.length} email(s) were accepted.`,
+      const partial = result.sentCount < result.recipients.length;
+      (partial ? toast.warning : toast.success)(
+        `${documentLabel} sent to ${result.recipients.join(', ')}${partial ? ` (${result.sentCount}/${result.recipients.length} accepted)` : ''}.`,
       );
     } catch {
-      setSendMessage('Invoice was not emailed. Check the email service and try again.');
+      toast.error('The invoice was not emailed. Check the email service and try again.');
     } finally {
       setSending(false);
     }
+  };
+
+  const sendReminder = async () => {
+    if (sending) return;
+    setSending(true);
+    const result = await sendInvoiceEmail(invoice, 'reminder');
+    if (result.sentCount === 0) {
+      toast.error(result.error || 'The reminder could not be sent.');
+      setSending(false);
+      return;
+    }
+    const documentLabel = isProformaInvoice(invoice) ? 'Proforma invoice' : 'Invoice';
+    const today = new Date().toISOString().split('T')[0];
+    const updated = {
+      ...invoice,
+      lastReminderAt: new Date().toISOString(),
+      activity: [
+        ...invoice.activity,
+        {
+          id: `${Date.now()}-activity`,
+          date: today,
+          title: `${documentLabel} reminder sent`,
+          description: `Reminder emailed to ${result.recipients.join(', ')}.`,
+        },
+      ],
+      updatedAt: new Date().toISOString(),
+    };
+    saveInvoice(updated);
+    setInvoice(updated);
+    toast.success(`Reminder mail sent to ${result.recipients.join(', ')}.`);
+    setSending(false);
   };
 
   const closeActions = () => setActionsOpen(false);
@@ -177,7 +179,7 @@ export default function InvoiceDetails() {
           <div>
             <div className="flex items-center gap-3 mb-1.5">
               <h1 className="text-xl font-bold text-gray-900">{invoice.invoiceNumber}</h1>
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusStyles[invoice.status]}`}>{invoice.status}</span>
+               <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusStyles[invoice.status]}`}>{invoiceStatusLabel(invoice)}</span>
             </div>
             <p className="text-sm text-gray-600">Customer: <span className="font-medium text-gray-900">{invoice.clientName}</span></p>
             {invoice.poReference && <p className="text-sm text-gray-500">PO Reference: {invoice.poReference}</p>}
@@ -213,7 +215,7 @@ export default function InvoiceDetails() {
               >
                 <Download size={15} /> Download PDF
               </button>
-              <button
+               <button
                 type="button"
                 onClick={() => { closeActions(); markSentAndEmail(); }}
                 disabled={sending}
@@ -221,6 +223,14 @@ export default function InvoiceDetails() {
               >
                 <Send size={15} /> {sending ? 'Sending…' : invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
               </button>
+               <button
+                 type="button"
+                 onClick={() => { closeActions(); sendReminder(); }}
+                 disabled={sending}
+                 className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+               >
+                 <Send size={15} /> Send Reminder
+               </button>
               {invoice.status === 'Proforma Invoice' && (
                 <button
                   type="button"
@@ -234,12 +244,6 @@ export default function InvoiceDetails() {
           )}
         </div>
       </div>
-      {sendMessage && (
-        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          {sendMessage}
-        </div>
-      )}
-
       {/* Tabs */}
       <div className="flex gap-5 border-b border-gray-200 overflow-x-auto">
         {tabs.map(([value, label]) => (
@@ -428,38 +432,26 @@ export default function InvoiceDetails() {
         </div>
       )}
 
-      {/* Payments Tab */}
-      {activeTab === 'payments' && (
+       {/* Payments Tab: payment receipts for this invoice only */}
+       {activeTab === 'payments' && !isProformaInvoice(invoice) && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Payment history</h2>
-              <p className="text-sm text-gray-500">Track payments received against this invoice.</p>
+               <p className="text-sm text-gray-500">Payment receipts recorded against this invoice.</p>
             </div>
-            <button onClick={() => setShowPaymentForm((v) => !v)} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium">
-              <Plus size={16} /> Record Payment
-            </button>
           </div>
-          {showPaymentForm && (
-            <div className="bg-white rounded-lg border border-gray-200 p-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="Amount" className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
-                <option>Bank Transfer</option><option>UPI</option><option>Cash</option><option>Card</option><option>Cheque</option>
-              </select>
-              <input value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder="Reference" className="rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-              <button onClick={recordPayment} className="rounded-lg bg-green-600 text-white px-3 py-2 text-sm font-medium">Save Payment</button>
-            </div>
-          )}
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            {invoice.payments.length === 0 ? (
+             {invoice.payments.length === 0 && paymentReceipts.length === 0 ? (
               <div className="py-14 text-center text-gray-500">
                 <Receipt size={28} className="mx-auto mb-2 text-gray-300" />
-                No payments recorded yet.
+                 No payment receipts recorded yet.
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
+                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">RECEIPT</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">DATE</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">METHOD</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">REFERENCE</th>
@@ -467,14 +459,24 @@ export default function InvoiceDetails() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.payments.map((p) => (
-                    <tr key={p.id} className="border-b border-gray-100">
-                      <td className="px-4 py-3 text-gray-600">{p.date}</td>
-                      <td className="px-4 py-3 text-gray-900">{p.method}</td>
-                      <td className="px-4 py-3 text-gray-600">{p.reference}</td>
-                      <td className="px-4 py-3 text-right font-medium">{fmt(p.amount)}</td>
-                    </tr>
-                  ))}
+                   {invoice.payments.map((p) => (
+                     <tr key={p.id} className="border-b border-gray-100">
+                       <td className="px-4 py-3 text-gray-500">Payment</td>
+                       <td className="px-4 py-3 text-gray-600">{p.date}</td>
+                       <td className="px-4 py-3 text-gray-900">{p.method}</td>
+                       <td className="px-4 py-3 text-gray-600">{p.reference}</td>
+                       <td className="px-4 py-3 text-right font-medium">{fmt(p.amount)}</td>
+                     </tr>
+                   ))}
+                   {paymentReceipts.map((receipt) => (
+                     <tr key={receipt.id} className="border-b border-gray-100">
+                       <td className="px-4 py-3 font-medium text-blue-700">{receipt.paymentNumber}</td>
+                       <td className="px-4 py-3 text-gray-600">{receipt.paymentDate}</td>
+                       <td className="px-4 py-3 text-gray-900">{receipt.paymentMode}</td>
+                       <td className="px-4 py-3 text-gray-600">{receipt.reference || '—'}</td>
+                       <td className="px-4 py-3 text-right font-medium">{fmt(receipt.amountReceived)}</td>
+                     </tr>
+                   ))}
                 </tbody>
               </table>
             )}

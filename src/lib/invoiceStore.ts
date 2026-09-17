@@ -59,6 +59,9 @@ export interface StoredInvoice {
   placeOfSupply?: string;
   // status
   status: InvoiceStatus;
+  /** Set when a document has been sent; proformas retain their document status. */
+  sentAt?: string;
+  lastReminderAt?: string;
   // line items
   lineItems: InvoiceLineItem[];
   // totals
