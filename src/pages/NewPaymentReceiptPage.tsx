@@ -161,11 +161,11 @@ export default function NewPaymentReceiptPage() {
   const amountValue = Number(form.amountReceived) || 0;
 
   // Filter invoices for selected customer
-  const customerInvoices = form.customerName
-    ? invoices.filter((inv) =>
-        inv.clientName.toLowerCase().includes(form.customerName.toLowerCase())
-      )
-    : invoices;
+  const customerInvoices = invoices.filter((inv) =>
+    inv.status === "Sent" &&
+    (!form.customerName ||
+      inv.clientName.toLowerCase().includes(form.customerName.toLowerCase()))
+  );
 
   const handleAttachmentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
