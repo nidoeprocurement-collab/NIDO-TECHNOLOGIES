@@ -126,7 +126,12 @@ export default function InvoiceDetails() {
   };
 
   const sendReminder = async () => {
-    if (sending) return;
+    if (sending || invoice.status !== 'Sent') {
+      if (invoice.status !== 'Sent') {
+        toast.error('Reminders can only be sent for sent invoices.');
+      }
+      return;
+    }
     setSending(true);
     const result = await sendInvoiceEmail(invoice, 'reminder');
     if (result.sentCount === 0) {
@@ -223,14 +228,16 @@ export default function InvoiceDetails() {
               >
                 <Send size={15} /> {sending ? 'Sending…' : invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
               </button>
-               <button
-                 type="button"
-                 onClick={() => { closeActions(); sendReminder(); }}
-                 disabled={sending}
-                 className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
-               >
-                 <Send size={15} /> Send Reminder
-               </button>
+               {invoice.status === 'Sent' && (
+                 <button
+                   type="button"
+                   onClick={() => { closeActions(); sendReminder(); }}
+                   disabled={sending}
+                   className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                 >
+                   <Send size={15} /> Send Reminder
+                 </button>
+               )}
               {invoice.status === 'Proforma Invoice' && (
                 <button
                   type="button"

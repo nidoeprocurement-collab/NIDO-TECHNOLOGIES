@@ -397,6 +397,10 @@ export default function InvoicePage() {
 
   const sendDocumentEmail = async (invoice: StoredInvoice, kind: 'invoice' | 'reminder') => {
     if (sendingInvoiceId) return;
+    if (kind === 'reminder' && invoice.status !== 'Sent') {
+      toast.error('Reminders can only be sent for sent invoices.');
+      return;
+    }
     setSendingInvoiceId(`${invoice.id}:${kind}`);
     const result = await sendInvoiceEmail(invoice, kind);
     if (result.sentCount === 0) {
@@ -633,13 +637,15 @@ export default function InvoicePage() {
                ? 'Sending…'
                : rowMenu.invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
            </button>
-           <button
-             onClick={() => sendDocumentEmail(rowMenu.invoice, 'reminder')}
-             disabled={sendingInvoiceId === `${rowMenu.invoice.id}:reminder`}
-             className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-           >
-             <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:reminder` ? 'Sending…' : 'Send Reminder'}
-           </button>
+           {rowMenu.invoice.status === 'Sent' && (
+             <button
+               onClick={() => sendDocumentEmail(rowMenu.invoice, 'reminder')}
+               disabled={sendingInvoiceId === `${rowMenu.invoice.id}:reminder`}
+               className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+             >
+               <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:reminder` ? 'Sending…' : 'Send Reminder'}
+             </button>
+           )}
           {rowMenu.invoice.status === 'Proforma Invoice' && (
             <button
               onClick={() => handleConvertProforma(rowMenu.invoice)}
