@@ -242,10 +242,18 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
     48,
     { size: invoice.status === 'Proforma Invoice' ? 17 : 22, color: DARK, bold: true, align: 'right' },
   );
+
+  // Keep the complete number together in the box. Proforma numbers are longer
+  // (`#PRO INV - 2026000001`) than regular invoice numbers, so a fixed-width
+  // box can clip or push the number outside its border.
+  const visibleInvoiceNumber = `#${invoice.invoiceNumber.replace(/^#\s*/, '')}`;
+  doc.setFont('helvetica', 'bold').setFontSize(10);
+  const numberWidth = doc.getTextWidth(visibleInvoiceNumber);
+  const numberBoxWidth = Math.max(102, numberWidth + 20);
+  const numberBoxRight = pageWidth - margin;
   doc.setDrawColor(...BORDER).setLineWidth(0.6);
-  doc.roundedRect(pageWidth - margin - 102, 61, 102, 28, 4, 4, 'S');
-  drawText(doc, '#', pageWidth - margin - 91, 79, { size: 11, color: BLUE });
-  drawText(doc, invoice.invoiceNumber, pageWidth - margin - 10, 79, { size: 10, color: DARK, bold: true, align: 'right' });
+  doc.roundedRect(numberBoxRight - numberBoxWidth, 61, numberBoxWidth, 28, 4, 4, 'S');
+  drawText(doc, visibleInvoiceNumber, numberBoxRight - 10, 79, { size: 10, color: DARK, bold: true, align: 'right' });
 
   // ── Company address block (left, below logo) ──────────────────────────────
   const companyLines = [
