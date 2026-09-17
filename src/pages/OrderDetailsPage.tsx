@@ -47,7 +47,8 @@ const INITIAL_DOCS: {
   dataUrl?: string;
   passwordHash?: string;
 }[] = [];
-const INITIAL_NOTES: { id: string; author: string; date: string; text: string; visibility: string }[] = [];
+type OrderNote = { id: string; author: string; date: string; text: string; visibility: string };
+const INITIAL_NOTES: OrderNote[] = [];
 
 const ALL_STATUS_MAP = {
   Pending: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
@@ -1398,7 +1399,7 @@ function DocRowMenu({ onDownload, onRemove }) {
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
     const menuWidth = 170;
-    const menuHeight = 88;
+     const menuHeight = onRemove ? 88 : 48;
     const gap = 6;
     const top = rect.bottom + gap + menuHeight <= window.innerHeight - 8
       ? rect.bottom + gap
@@ -1466,11 +1467,15 @@ function DocRowMenu({ onDownload, onRemove }) {
             onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
             <span>⬇</span> Download Document
           </button>
-          <div style={{ height: 1, background: "#f3f4f6" }} />
-          <button onClick={() => { onRemove(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
-            <span>🗑</span> Remove
-          </button>
+          {onRemove && (
+            <>
+              <div style={{ height: 1, background: "#f3f4f6" }} />
+              <button onClick={() => { onRemove(); setOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: 13.5, fontFamily: "inherit", color: "#dc2626" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#fef2f2")} onMouseLeave={e => (e.currentTarget.style.background = "none")}>
+                <span>🗑</span> Remove
+              </button>
+            </>
+          )}
         </div>,
         document.body,
       )}
@@ -1478,7 +1483,7 @@ function DocRowMenu({ onDownload, onRemove }) {
   );
 }
 
-function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locked?: boolean }) {
+function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: string; locked?: boolean; auditNote?: OrderNote | null }) {
   const { user, isClientPortalUser } = useAuth();
   const { orders } = useMyOrders();
   const notesKey = `nido_notes_${orderId}`;
@@ -1542,6 +1547,18 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
     }
   }, [docs, docsKey]);
 
+  useEffect(() => {
+    if (!auditNote) return;
+    setNotes(prev => prev.some(note => note.id === auditNote.id) ? prev : [auditNote, ...prev]);
+  }, [auditNote]);
+
+  useEffect(() => {
+    if (locked) {
+      setShowUpload(false);
+      setNoteText("");
+    }
+  }, [locked]);
+
   // Cross-tab sync: pick up notes/documents added from another open tab
   // (e.g. the owner platform and the client portal open side by side)
   // immediately, without needing a reload.
@@ -1563,18 +1580,8 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
   // Internal Notes are staff-only and never leave the owner platform.
   const visibleNotes = isClientPortalUser ? notes.filter(n => n.visibility !== "Internal Note") : notes;
 
-  if (locked) {
-    return (
-      <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10, padding: "28px 24px", textAlign: "center", color: "#6b7280" }}>
-        <div style={{ fontSize: 26, marginBottom: 8 }}>🔒</div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#374151" }}>Documents & Notes are locked</div>
-        <div style={{ fontSize: 12.5, marginTop: 4 }}>This order is Delivered and can no longer be edited.</div>
-      </div>
-    );
-  }
-
   const handleAddNote = () => {
-    if (!noteText.trim()) return;
+    if (locked || !noteText.trim()) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const author = user?.name || (isClientPortalUser ? "Client" : "System Owner");
@@ -1589,6 +1596,7 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
     doc: any,
     protectedDetails?: { password: string; recipientEmail: string },
   ): Promise<boolean> => {
+    if (locked) return false;
     const nextDocs = [...docs, doc];
     try {
       // Persist before closing the modal so a successful confirmation always
@@ -1669,6 +1677,7 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
   };
 
   const handleRemoveDocument = (docId: string) => {
+    if (locked) return;
     const nextDocs = docs.filter(d => d.id !== docId);
     try {
       localStorage.setItem(docsKey, JSON.stringify(nextDocs));
@@ -1710,6 +1719,17 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
         document.body,
       )}
       <div style={{ padding: "20px 24px 28px" }}>
+      {locked && (
+        <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 9, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 10 }}>
+          <span style={{ fontSize: 17, lineHeight: 1.2 }}>🔒</span>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#374151" }}>Documents & Notes are read-only</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 3 }}>
+              Existing notes and documents remain available for review and download. New uploads and notes are disabled until a return request is raised.
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <div>
@@ -1722,7 +1742,7 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
               <input value={docSearch} onChange={e => setDocSearch(e.target.value)} placeholder="Search documents..."
                 style={{ padding: "7px 12px 7px 28px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
-            {!isClientPortalUser && (
+            {!isClientPortalUser && !locked && (
               <button onClick={() => { setDocFeedback(null); setShowUpload(true); }}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", border: "none", borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit" }}>
                 ⬆ Upload Document
@@ -1755,7 +1775,7 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
               {isClientPortalUser ? (
                 <button onClick={() => handleDownloadDocument(doc)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
               ) : (
-                <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={() => handleRemoveDocument(doc.id)} />
+                <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={locked ? undefined : () => handleRemoveDocument(doc.id)} />
               )}
             </div>
           ))}
@@ -1784,6 +1804,11 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
             </div>
           </div>
         ))}
+        {locked ? (
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: "16px", marginTop: 8, background: "#f9fafb", color: "#6b7280", fontSize: 13 }}>
+            🔒 Notes are read-only while this order is delivered or pickup is complete. Existing conversation history is preserved.
+          </div>
+        ) : (
         <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: isClientPortalUser ? "1fr" : "1fr 220px" }}>
             <div style={{ padding: "14px 16px", borderRight: isClientPortalUser ? "none" : "1px solid #e5e7eb" }}>
@@ -1826,8 +1851,9 @@ function DocumentsNotesTab({ orderId, locked = false }: { orderId: string; locke
             )}
           </div>
         </div>
+        )}
       </div>
-       {showUpload && <UploadDocModal onSave={handleSaveDocument} recipientOptions={recipientOptions} onClose={() => setShowUpload(false)} />}
+       {!locked && showUpload && <UploadDocModal onSave={handleSaveDocument} recipientOptions={recipientOptions} onClose={() => setShowUpload(false)} />}
       {protectedDocument && (
         <PasswordDialog
           title="Password required"
@@ -2779,6 +2805,21 @@ export default function MyOrderPage() {
   const [approvalError, setApprovalError] = useState("");
   const [pendingCancelStatus, setPendingCancelStatus] = useState(false);
   const [pendingItemDelivered, setPendingItemDelivered] = useState<string | null>(null);
+  const [documentsAuditNote, setDocumentsAuditNote] = useState<OrderNote | null>(null);
+
+  const queueDocumentsAuditNote = (text: string) => {
+    const now = new Date();
+    const date = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const actor = user?.name || user?.email || (isClientPortalUser ? "Client" : "System Owner");
+    setDocumentsAuditNote({
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      author: actor,
+      date,
+      text: `${text}\n\nActioned by: ${actor}\nActioned on: ${date}`,
+      visibility: "External Note",
+    });
+  };
 
   // Cancels the order and marks it as Cancelled (cascades to all sub-orders via context).
   // Stock is no longer reserved at cart time, so no stock release is needed here.
@@ -2911,6 +2952,9 @@ export default function MyOrderPage() {
       returnReason: reason,
       returnDetails: details,
     });
+    queueDocumentsAuditNote(
+      `Return Request Raised\nItem: ${target.itemName}\nReason: ${reason}\nDetails: ${details || "No additional details provided."}`,
+    );
   };
 
   const handlePickupScheduled = (subId: string, details: { pickupPersonName: string; pickupContactNumber: string; pickupDate: string; pickupTimeWindow: string }) => {
@@ -2918,6 +2962,10 @@ export default function MyOrderPage() {
       ...details,
       pickupScheduledAt: new Date().toISOString(),
     });
+    const target = subOrders.find(s => s.id === subId);
+    queueDocumentsAuditNote(
+      `Pickup Scheduled\nItem: ${target?.itemName || subId}\nPickup person: ${details.pickupPersonName}\nContact number: ${details.pickupContactNumber || "Not provided"}\nPickup date: ${details.pickupDate}\nPickup time/window: ${details.pickupTimeWindow}`,
+    );
   };
 
   const handlePickupDone = (subId: string, details: { pickupDoneDate: string; pickupDoneTime: string }) => {
@@ -2925,6 +2973,10 @@ export default function MyOrderPage() {
       ...details,
       pickupDoneAt: new Date().toISOString(),
     });
+    const target = subOrders.find(s => s.id === subId);
+    queueDocumentsAuditNote(
+      `Pickup Done\nItem: ${target?.itemName || subId}\nPickup done date: ${details.pickupDoneDate}\nPickup done time: ${details.pickupDoneTime}`,
+    );
   };
 
   const requestShipped = (subId: string) => {
@@ -4397,7 +4449,7 @@ export default function MyOrderPage() {
             are visible to the client but only the owner platform can upload
             or remove them. */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: 20 }}>
-          <DocumentsNotesTab orderId={orderId} locked={documentsLocked} />
+            <DocumentsNotesTab orderId={orderId} locked={documentsLocked} auditNote={documentsAuditNote} />
         </div>
       </div>
 
