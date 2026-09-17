@@ -1,6 +1,4 @@
 import type { StoredInvoice } from './invoiceStore';
-import { generateInvoicePdfBase64 } from './invoicePdf';
-import { sendEmail } from './emailApi';
 
 export type InvoiceEmailKind = 'invoice' | 'reminder';
 
@@ -10,6 +8,21 @@ export interface InvoiceEmailResult {
   success: boolean;
   error?: string;
 }
+
+export interface InvoiceEmailOutboxItem {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  kind: InvoiceEmailKind;
+  recipients: string[];
+  subject: string;
+  amount: number;
+  dueDate: string;
+  attachmentName: string;
+  createdAt: string;
+}
+
+const OUTBOX_KEY = 'nido_invoice_email_outbox';
 
 export function getInvoiceRecipients(invoice: StoredInvoice): string[] {
   return Array.from(new Set(
@@ -22,8 +35,10 @@ export function getInvoiceRecipients(invoice: StoredInvoice): string[] {
 }
 
 /**
- * Sends the same invoice PDF and invoice details for both initial delivery
- * and reminders. The template changes only for the reminder subject/body.
+ * Frontend-only invoice delivery. Since this workspace is intentionally not
+ * connected to a backend email provider, delivery is recorded in a local
+ * outbox so the invoice pages can complete the full send/reminder flow
+ * without making a network request.
  */
 export async function sendInvoiceEmail(
   invoice: StoredInvoice,
@@ -39,45 +54,39 @@ export async function sendInvoiceEmail(
     };
   }
 
+  const raw = localStorage.getItem(OUTBOX_KEY);
+  let outbox: InvoiceEmailOutboxItem[] = [];
   try {
-    const pdfDataUri = await generateInvoicePdfBase64(invoice);
-    const pdfBase64 = pdfDataUri.includes(',')
-      ? pdfDataUri.slice(pdfDataUri.indexOf(',') + 1)
-      : pdfDataUri;
-    const templateKey = kind === 'reminder' ? 'payment_reminder' : 'invoice_generated';
-
-    const results = await Promise.allSettled(recipients.map((to) => sendEmail({
-      templateKey,
-      to,
-      variables: {
-        client_name: invoice.clientName,
-        invoice_number: invoice.invoiceNumber,
-        amount: invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-        due_date: invoice.dueDate,
-        portal_url: `${window.location.origin}/sales/invoices/${invoice.id}`,
-      },
-      attachments: [{ filename: `${invoice.invoiceNumber}.pdf`, content: pdfBase64 }],
-      triggerModule: kind === 'reminder' ? 'invoice_reminder' : 'invoice_details',
-    })));
-
-    const sentCount = results.filter((result) =>
-      result.status === 'fulfilled' &&
-      result.value.success &&
-      result.value.data?.success !== false,
-    ).length;
-
-    return {
-      recipients,
-      sentCount,
-      success: sentCount === recipients.length,
-      error: sentCount === 0 ? 'The email service did not accept the message.' : undefined,
-    };
+    outbox = raw ? JSON.parse(raw) as InvoiceEmailOutboxItem[] : [];
   } catch {
-    return {
-      recipients,
-      sentCount: 0,
-      success: false,
-      error: 'The email service could not process the message.',
-    };
+    outbox = [];
+  }
+
+  const documentLabel = invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice';
+  const subject = kind === 'reminder'
+    ? `Payment reminder — ${invoice.invoiceNumber}`
+    : `${documentLabel} ${invoice.invoiceNumber}`;
+  const item: InvoiceEmailOutboxItem = {
+    id: `${invoice.id}-${kind}-${Date.now()}`,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    kind,
+    recipients,
+    subject,
+    amount: invoice.grandTotal,
+    dueDate: invoice.dueDate,
+    attachmentName: `${invoice.invoiceNumber}.pdf`,
+    createdAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(OUTBOX_KEY, JSON.stringify([item, ...outbox].slice(0, 100)));
+  return { recipients, sentCount: recipients.length, success: true };
+}
+
+export function getInvoiceEmailOutbox(): InvoiceEmailOutboxItem[] {
+  try {
+    return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]') as InvoiceEmailOutboxItem[];
+  } catch {
+    return [];
   }
 }
