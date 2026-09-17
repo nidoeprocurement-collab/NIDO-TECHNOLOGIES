@@ -11,18 +11,10 @@ import {
   type ClientCatalogEntry,
 } from "@/lib/clientCatalogStore";
 import { syncClientPrices } from "@/lib/priceEngineStore";
-import { getRoles, NIDO_ROLES_EVENT } from "@/lib/nidoUsersStore";
+import { getPortalRoleNames } from "@/lib/portalUserStore";
 
-function getAssignableCatalogRoles(): string[] {
-  const seen = new Set<string>();
-  return getRoles()
-    .filter(role => role.status === "Active")
-    .map(role => role.name.trim())
-    .filter(name => {
-      if (!name || seen.has(name.toLowerCase())) return false;
-      seen.add(name.toLowerCase());
-      return true;
-    });
+function getAssignableCatalogRoles(clientId: string): string[] {
+  return getPortalRoleNames(clientId);
 }
 
 /** Returns a numeric sort key for a preference string.
@@ -496,25 +488,36 @@ function ProductViewScreen({ product, onClose }: { product: CatalogEntry; onClos
 
 function EditProductScreen({
   product,
+  clientId,
   onClose,
   onSave,
 }: {
   product: CatalogEntry;
+  clientId: string;
   onClose: () => void;
   onSave: (updated: Partial<CatalogEntry>) => void;
 }) {
-  const [availableRoles, setAvailableRoles] = useState<string[]>(() => getAssignableCatalogRoles());
+  const [availableRoles, setAvailableRoles] = useState<string[]>(() => getAssignableCatalogRoles(clientId));
   const [roles, setRoles] = useState<string[]>(() =>
-    product.roles.filter(role => getAssignableCatalogRoles().some(available => available === role)),
+    product.roles.filter(role =>
+      getAssignableCatalogRoles(clientId).some(available => available.toLowerCase() === role.trim().toLowerCase())
+    ),
   );
   const [preference, setPreference] = useState(product.preference || "");
   const [availablePreferences, setAvailablePreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
 
   useEffect(() => {
-    const refreshRoles = () => setAvailableRoles(getAssignableCatalogRoles());
-    window.addEventListener(NIDO_ROLES_EVENT, refreshRoles);
-    return () => window.removeEventListener(NIDO_ROLES_EVENT, refreshRoles);
-  }, []);
+    const refreshRoles = () => {
+      const next = getAssignableCatalogRoles(clientId);
+      setAvailableRoles(next);
+      setRoles(current => current.filter(role =>
+        next.some(available => available.toLowerCase() === role.trim().toLowerCase())
+      ));
+    };
+    refreshRoles();
+    window.addEventListener("nidoPortalRolesUpdated", refreshRoles);
+    return () => window.removeEventListener("nidoPortalRolesUpdated", refreshRoles);
+  }, [clientId]);
 
   const addPreference = (name: string) => setAvailablePreferences((prev) => prev.includes(name) ? prev : [...prev, name]);
 
@@ -703,13 +706,21 @@ function EditProductScreen({
   );
 }
 
-function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (entries: CatalogEntry[]) => void }) {
+function AddNewProductModal({
+  clientId,
+  onClose,
+  onAdd,
+}: {
+  clientId: string;
+  onClose: () => void;
+  onAdd: (entries: CatalogEntry[]) => void;
+}) {
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<SelectedRow[]>([]);
   const [preferences, setPreferences] = useState(["Preference 1", "Preference 2", "Preference 3"]);
-  const [roles, setRoles] = useState<string[]>(() => getAssignableCatalogRoles());
+  const [roles, setRoles] = useState<string[]>(() => getAssignableCatalogRoles(clientId));
 
   useEffect(() => {
     // Only products that at least one vendor has actually added (and marked
@@ -736,14 +747,14 @@ function AddNewProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (e
     loadAssignable();
     window.addEventListener("catalogUpdated", loadAssignable);
     window.addEventListener("vendorProductsUpdated", loadAssignable);
-    const refreshRoles = () => setRoles(getAssignableCatalogRoles());
-    window.addEventListener(NIDO_ROLES_EVENT, refreshRoles);
+    const refreshRoles = () => setRoles(getAssignableCatalogRoles(clientId));
+    window.addEventListener("nidoPortalRolesUpdated", refreshRoles);
     return () => {
       window.removeEventListener("catalogUpdated", loadAssignable);
       window.removeEventListener("vendorProductsUpdated", loadAssignable);
-      window.removeEventListener(NIDO_ROLES_EVENT, refreshRoles);
+      window.removeEventListener("nidoPortalRolesUpdated", refreshRoles);
     };
-  }, []);
+  }, [clientId]);
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -1240,6 +1251,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
       <>
       {showAddProduct && (
         <AddNewProductModal
+          clientId={clientId}
           onClose={() => setShowAddProduct(false)}
           onAdd={handleAddProducts}
         />
@@ -1250,6 +1262,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
       {editProduct && (
         <EditProductScreen
           product={editProduct}
+          clientId={clientId}
           onClose={() => setEditProduct(null)}
           onSave={(updated) => handleSaveEdit(editProduct.sku, updated)}
         />
