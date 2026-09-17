@@ -16,6 +16,8 @@ import {
   getActiveReceipts,
   getArchivedReceipts,
   archiveReceipt,
+  downloadReceiptAttachment,
+  formatAttachmentSize,
   type PaymentReceipt,
 } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
@@ -161,6 +163,37 @@ function ReceiptPreviewDrawer({
             <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-3">
               <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-widest mb-1">Notes</p>
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{receipt.note}</p>
+            </div>
+          )}
+
+          {/* Attachments */}
+          {receipt.attachments && receipt.attachments.length > 0 && (
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Attachments ({receipt.attachments.length})
+                </p>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {receipt.attachments.map((attachment) => (
+                  <div key={attachment.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText size={14} className="shrink-0 text-blue-600" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-gray-700">{attachment.name}</p>
+                        <p className="text-xs text-gray-400">{formatAttachmentSize(attachment.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => downloadReceiptAttachment(attachment)}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      <Download size={12} /> Download
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

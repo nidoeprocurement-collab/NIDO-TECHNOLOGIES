@@ -1,11 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, Save, CreditCard, FileText, StickyNote, Paperclip, Heart, X, Download } from "lucide-react";
 import { toast } from "sonner";
 import { getClients } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
-import { saveReceipt, getReceiptById, getNextReceiptNumber } from "@/lib/paymentReceiptStore";
-import type { PaymentReceipt } from "@/lib/paymentReceiptStore";
+import {
+  saveReceipt,
+  getReceiptById,
+  getNextReceiptNumber,
+  downloadReceiptAttachment,
+  formatAttachmentSize,
+} from "@/lib/paymentReceiptStore";
+import type { PaymentReceipt, PaymentReceiptAttachment } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
@@ -103,8 +109,8 @@ export default function NewPaymentReceiptPage() {
   const [tab, setTab] = useState<"invoice" | "advance">("invoice");
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [attachmentDraft, setAttachmentDraft] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<PaymentReceiptAttachment[]>([]);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [editingReceipt, setEditingReceipt] = useState<PaymentReceipt | null>(null);
 
   const [form, setForm] = useState<FormState>(() =>
@@ -128,6 +134,7 @@ export default function NewPaymentReceiptPage() {
       return;
     }
     setEditingReceipt(existing);
+    setAttachments(existing.attachments || []);
     setForm(makeDefaultForm({
       customerName: existing.customerName,
       amountReceived: String(existing.amountReceived),
@@ -160,11 +167,35 @@ export default function NewPaymentReceiptPage() {
       )
     : invoices;
 
-  const addAttachment = () => {
-    const v = attachmentDraft.trim();
-    if (!v) return;
-    setAttachments((a) => [...a, v]);
-    setAttachmentDraft("");
+  const handleAttachmentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    files.forEach((file) => {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} is larger than 5 MB.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result !== "string") return;
+        setAttachments((current) => [
+          ...current,
+          {
+            id: `${file.name}-${file.lastModified}-${Date.now()}`,
+            name: file.name,
+            type: file.type || "application/octet-stream",
+            size: file.size,
+            dataUrl: reader.result,
+          },
+        ]);
+      };
+      reader.onerror = () => toast.error(`Could not upload ${file.name}.`);
+      reader.readAsDataURL(file);
+    });
+
+    event.target.value = "";
   };
 
   const buildReceipt = (): PaymentReceipt => ({
@@ -184,6 +215,7 @@ export default function NewPaymentReceiptPage() {
     placeOfSupply: form.placeOfSupply,
     descriptionOfSupply: form.descriptionOfSupply,
     taxCode: form.taxCode,
+    attachments,
     archived: isEditMode && editingReceipt ? editingReceipt.archived : false,
   });
 
@@ -633,38 +665,59 @@ export default function NewPaymentReceiptPage() {
 
         {/* ── Attachments ── */}
         <Section title="Attachments" icon={Paperclip}>
-          <div className="flex gap-2 mb-3">
-            <input
-              className={inp}
-              placeholder="Filename or URL"
-              value={attachmentDraft}
-              onChange={(e) => setAttachmentDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAttachment(); } }}
-            />
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.txt"
+            onChange={handleAttachmentUpload}
+          />
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-sm text-gray-500">Upload supporting documents for this payment receipt.</p>
             <button
               type="button"
-              onClick={addAttachment}
+              onClick={() => attachmentInputRef.current?.click()}
               className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors shrink-0"
             >
-              Add
+              Add Document
             </button>
           </div>
           {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {attachments.map((a) => (
-                <span
-                  key={a}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full"
+            <div className="space-y-2">
+              {attachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
                 >
-                  {a}
-                  <button
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FileText size={15} className="shrink-0 text-blue-600" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-700">{attachment.name}</p>
+                      <p className="text-xs text-gray-400">{formatAttachmentSize(attachment.size)}</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => downloadReceiptAttachment(attachment)}
+                      className="rounded-md p-1.5 text-blue-600 hover:bg-blue-100"
+                      title={`Download ${attachment.name}`}
+                      aria-label={`Download ${attachment.name}`}
+                    >
+                      <Download size={15} />
+                    </button>
+                    <button
                     type="button"
-                    onClick={() => setAttachments((prev) => prev.filter((x) => x !== a))}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
-                </span>
+                      onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
+                      className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
+                      title={`Remove ${attachment.name}`}
+                      aria-label={`Remove ${attachment.name}`}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}

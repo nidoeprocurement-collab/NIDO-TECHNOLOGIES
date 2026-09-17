@@ -416,6 +416,14 @@ export default function InvoicePage() {
   };
 
   const handleConvertProforma = (proforma: StoredInvoice) => {
+    const hasActiveConversion = invoices.some(
+      (invoice) => invoice.sourceProformaId === proforma.id,
+    );
+    if (hasActiveConversion) {
+      setRowMenu(null);
+      toast.info('This proforma invoice has already been converted.');
+      return;
+    }
     const converted = convertProformaToInvoice(proforma.id);
     setRowMenu(null);
     if (!converted) return;
@@ -674,7 +682,8 @@ export default function InvoicePage() {
                <Send size={15} /> {sendingInvoiceId === `${rowMenu.invoice.id}:reminder` ? 'Sending…' : 'Send Reminder'}
              </button>
            )}
-          {rowMenu.invoice.status === 'Proforma Invoice' && (
+           {rowMenu.invoice.status === 'Proforma Invoice' &&
+             !invoices.some((invoice) => invoice.sourceProformaId === rowMenu.invoice.id) && (
             <button
               onClick={() => handleConvertProforma(rowMenu.invoice)}
               className="w-full px-3 py-2 text-left text-sm text-blue-700 hover:bg-blue-50 flex items-center gap-2"

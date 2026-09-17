@@ -29,6 +29,30 @@ export interface PaymentReceipt {
   placeOfSupply?: string;
   descriptionOfSupply?: string;
   taxCode?: string;
+  attachments?: PaymentReceiptAttachment[];
+}
+
+export interface PaymentReceiptAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+}
+
+export function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function downloadReceiptAttachment(attachment: PaymentReceiptAttachment): void {
+  const link = document.createElement("a");
+  link.href = attachment.dataUrl;
+  link.download = attachment.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 export function getReceipts(): PaymentReceipt[] {
