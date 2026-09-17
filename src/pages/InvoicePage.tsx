@@ -241,13 +241,6 @@ function ArchivedModal({
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <button
-                            title="View details"
-                            onClick={() => { onClose(); navigate(`/sales/invoices/${inv.id}`); }}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          >
-                            <Eye size={15} />
-                          </button>
-                          <button
                             title="Download PDF"
                             onClick={() => downloadInvoicePdf(inv)}
                             className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
