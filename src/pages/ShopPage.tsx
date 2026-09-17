@@ -71,6 +71,8 @@ type Product = {
   videoUrl?: string;
   warranty?: string;
   preference?: string;
+  /** Active client-catalog roles allowed to order this product. */
+  roles?: string[];
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -258,6 +260,7 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     videoUrl: master?.videoUrl || e.videoUrl,
     warranty: master?.warranty || e.warranty,
     preference: e.preference,
+    roles: e.roles || [],
   };
 }
 
@@ -1297,6 +1300,7 @@ export default function ShopPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
+  const [, setPortalUsersRevision] = useState(0);
 
   // Load clients on mount and re-load when the shared store updates
   useEffect(() => {
@@ -1304,6 +1308,12 @@ export default function ShopPage() {
     const onUpdate = () => setClients(loadClients());
     window.addEventListener('nidoClientsUpdated', onUpdate);
     return () => window.removeEventListener('nidoClientsUpdated', onUpdate);
+  }, []);
+
+  useEffect(() => {
+    const refreshUsers = () => setPortalUsersRevision(value => value + 1);
+    window.addEventListener("nidoPortalUsersUpdated", refreshUsers);
+    return () => window.removeEventListener("nidoPortalUsersUpdated", refreshUsers);
   }, []);
 
   // Load client catalog whenever selectedClientId changes, merging in the
@@ -1335,8 +1345,21 @@ export default function ShopPage() {
     ? getPortalUsersByClient(selectedClientId).filter(user => user.status === "active")
     : [];
   const orderRequesterOptions = getOrderRequesterOptions(selectedClientUsers);
-  const allCats = ["All Categories", ...Array.from(new Set(catalogProducts.map(p => p.category)))];
-  const allBrands = ["All Brands", ...Array.from(new Set(catalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
+  const selectedRequesterId = orderedBy.startsWith("client-user:")
+    ? orderedBy.slice("client-user:".length)
+    : "";
+  const selectedRequester = selectedClientUsers.find(portalUser => portalUser.id === selectedRequesterId);
+  const visibleCatalogProducts = orderedBy.startsWith("client-user:")
+    ? selectedRequester
+      ? catalogProducts.filter(product =>
+        (product.roles || []).some(role =>
+          role.trim().toLowerCase() === selectedRequester.role.trim().toLowerCase()
+        )
+        )
+      : []
+    : catalogProducts;
+  const allCats = ["All Categories", ...Array.from(new Set(visibleCatalogProducts.map(p => p.category)))];
+  const allBrands = ["All Brands", ...Array.from(new Set(visibleCatalogProducts.map(p => p.brand).filter(Boolean) as string[])).sort()];
 
   const closeFilterMenus = () => {
     setClientOpen(false);
@@ -1348,9 +1371,10 @@ export default function ShopPage() {
     const normalized = normalizeOrderRequester(value);
     setOrderedBy(normalized);
     localStorage.setItem(requesterStorageKey, normalized);
+    setCurrentPage(1);
   };
 
-  const filtered = catalogProducts
+  const filtered = visibleCatalogProducts
     .filter(p => {
       if (search && !p.name.toLowerCase().includes(search.toLowerCase()) && !p.category.toLowerCase().includes(search.toLowerCase())) return false;
       if (shopTab !== "all" && getShopProductKind(p) !== shopTab) return false;
@@ -1509,8 +1533,8 @@ export default function ShopPage() {
                     const Icon = tab.icon;
                     const active = shopTab === tab.id;
                     const count = tab.id === "all"
-                      ? catalogProducts.length
-                      : catalogProducts.filter(product => getShopProductKind(product) === tab.id).length;
+                      ? visibleCatalogProducts.length
+                      : visibleCatalogProducts.filter(product => getShopProductKind(product) === tab.id).length;
                     return (
                       <button
                         key={tab.id}
@@ -1653,11 +1677,15 @@ export default function ShopPage() {
           <p className="font-medium text-gray-500">
             {catalogProducts.length === 0
               ? `No products have been added to ${selectedClient?.name}'s catalog yet`
+              : selectedRequester
+                ? `No products are assigned to ${selectedRequester.name}`
               : "No products match your filters"}
           </p>
           <p className="text-sm mt-1">
             {catalogProducts.length === 0
               ? "Go to the client's Catalog tab to add products from the master catalog."
+              : selectedRequester
+                ? `This user has the ${selectedRequester.role} role. Assign products to this role in the client's Catalog tab.`
               : "Try adjusting your search or filters."}
           </p>
         </div>
