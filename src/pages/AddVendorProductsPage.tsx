@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle, Check } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import { getPrefix } from "@/lib/configService";
 import {
@@ -162,8 +162,52 @@ export default function AddVendorProductsPage() {
   // ── Validation modal ─────────────────────────────────────────────────────
   type MissingField = { productName: string; missing: string[] };
   const [validationErrors, setValidationErrors] = useState<MissingField[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   // ── Submit ───────────────────────────────────────────────────────────────
+  const commitProducts = () => {
+    const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+
+    if (isEditMode && editProductId) {
+      // In edit mode the product already has a VPC — keep it as-is.
+      const row = selectedRows[0];
+      updateVendorProduct(vendorId, editProductId, {
+        price: row.price,
+        moq: row.moq,
+        leadTime: row.leadTime,
+        stock: row.stock,
+        vendorProductCode: row.vendorProductCode,
+      });
+    } else {
+      // Reserve sequential VPC codes only after the user confirms the review.
+      const vpcs = reserveVendorProductCodes(selectedRows.length);
+      const products: VendorProduct[] = selectedRows.map((r, i) => ({
+        id: r.catalogProduct.id,
+        vendorId,
+        masterProductCode: r.catalogProduct.masterProductCode,
+        skuCode: r.catalogProduct.skuCode,
+        productName: r.catalogProduct.productName,
+        category: r.catalogProduct.category,
+        brand: r.catalogProduct.brand,
+        physicalType: r.catalogProduct.physicalType,
+        images: r.catalogProduct.images,
+        price: r.price,
+        moq: r.moq,
+        leadTime: r.leadTime,
+        stock: r.stock,
+        reservedStock: "0",
+        incomingStock: "0",
+        lastStockUpdate: new Date().toISOString(),
+        vendorProductCode: vpcs[i],
+        addedAt: now,
+        status: "Active",
+      }));
+      addVendorProducts(vendorId, products);
+    }
+    setShowConfirmation(false);
+    navigate(`/vendors/${vendorId}`, { state: { tab: "products" } });
+  };
+
   const handleSubmit = () => {
     if (selectedRows.length === 0) return;
 
@@ -182,46 +226,12 @@ export default function AddVendorProductsPage() {
       return;
     }
 
-    const now = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-
-    if (isEditMode && editProductId) {
-      // In edit mode the product already has a VPC — keep it as-is.
-      const row = selectedRows[0];
-      updateVendorProduct(vendorId, editProductId, {
-        price: row.price,
-        moq: row.moq,
-        leadTime: row.leadTime,
-        stock: row.stock,
-        vendorProductCode: row.vendorProductCode,
-      });
-    } else {
-      // Reserve sequential VPC codes for every product being added RIGHT NOW,
-      // only at the moment the user confirms. Cancelling the page wastes nothing.
-      const vpcs = reserveVendorProductCodes(selectedRows.length);
-      const products: VendorProduct[] = selectedRows.map((r, i) => ({
-        id: r.catalogProduct.id,
-        vendorId,
-        masterProductCode: r.catalogProduct.masterProductCode,
-        skuCode: r.catalogProduct.skuCode,
-        productName: r.catalogProduct.productName,
-        category: r.catalogProduct.category,
-        brand: r.catalogProduct.brand,
-         physicalType: r.catalogProduct.physicalType,
-        images: r.catalogProduct.images,
-        price: r.price,
-        moq: r.moq,
-        leadTime: r.leadTime,
-        stock: r.stock,
-        reservedStock: "0",
-        incomingStock: "0",
-        lastStockUpdate: new Date().toISOString(),
-        vendorProductCode: vpcs[i],
-        addedAt: now,
-        status: "Active",
-      }));
-      addVendorProducts(vendorId, products);
+    if (!isEditMode) {
+      setShowConfirmation(true);
+      return;
     }
-    navigate(`/vendors/${vendorId}`, { state: { tab: "products" } });
+
+    commitProducts();
   };
 
   const goBack = () => navigate(`/vendors/${vendorId}`, { state: { tab: "products" } });
@@ -513,6 +523,103 @@ export default function AddVendorProductsPage() {
           )}
         </div>
       </div>
+
+      {/* ── Review confirmation modal ── */}
+      {showConfirmation && !isEditMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-products-title"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col"
+          >
+            <div className="flex items-start gap-3 px-6 py-5 border-b border-gray-100">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Check className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 id="review-products-title" className="text-base font-semibold text-gray-900">
+                  Review Products Before Adding
+                </h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Check the product and vendor details below. Products will be added only after you confirm.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {selectedRows.map((row) => (
+                <div key={row.catalogProduct.id} className="rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                    <ProductThumb images={row.catalogProduct.images} name={row.catalogProduct.productName} />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-gray-900 truncate">{row.catalogProduct.productName}</p>
+                      <p className="text-xs text-gray-500 font-mono mt-0.5">
+                        {row.catalogProduct.masterProductCode || "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 px-4 py-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">SKU</p>
+                      <p className="text-sm text-gray-800 mt-0.5 break-words">{row.catalogProduct.skuCode || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Category</p>
+                      <p className="text-sm text-gray-800 mt-0.5 break-words">{row.catalogProduct.category || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Brand</p>
+                      <p className="text-sm text-gray-800 mt-0.5 break-words">{row.catalogProduct.brand || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Vendor Product Code</p>
+                      <p className="text-sm font-mono text-gray-800 mt-0.5 break-words">{row.vendorProductCode}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Purchase Price</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.price}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">MOQ</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.moq}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Lead Time</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.leadTime}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Stock</p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.stock}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+              <p className="text-xs text-gray-500">
+                {selectedRows.length} product{selectedRows.length === 1 ? "" : "s"} ready to add
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowConfirmation(false)}
+                  className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel &amp; Modify
+                </button>
+                <button
+                  onClick={commitProducts}
+                  className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  Confirm &amp; Add Products
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Validation warning modal ── */}
       {validationErrors.length > 0 && (
