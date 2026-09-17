@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Archive, AlertTriangle, FileDown, MoreVertical, Plus, Edit, Eye, FileText, X, ArrowRight, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -327,6 +327,25 @@ export default function InvoicePage() {
     };
   }, [rowMenu]);
 
+  // Keep the fixed menu inside the viewport. This matters for the last row,
+  // where opening downward would make the menu appear clipped or add page
+  // scrolling in the preview frame.
+  useLayoutEffect(() => {
+    if (!rowMenu || !rowMenuRef.current) return;
+    const menuRect = rowMenuRef.current.getBoundingClientRect();
+    const padding = 8;
+    let top = rowMenu.top;
+
+    if (menuRect.bottom > window.innerHeight - padding) {
+      top -= menuRect.bottom - (window.innerHeight - padding);
+    }
+    if (top < padding) top = padding;
+
+    if (top !== rowMenu.top) {
+      setRowMenu((current) => current ? { ...current, top } : null);
+    }
+  }, [rowMenu]);
+
   const clientInvoices = useMemo(() => {
     if (!isClientPortalUser || !user?.clientName) return invoices;
     return invoices.filter(invoice =>
@@ -384,7 +403,16 @@ export default function InvoicePage() {
   const openRowMenu = (e: React.MouseEvent<HTMLButtonElement>, invoice: StoredInvoice) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setRowMenu({ top: rect.bottom + 4, right: window.innerWidth - rect.right, invoice });
+    const menuHeight = invoice.status === 'Proforma Invoice'
+      ? 292
+      : invoice.status === 'Sent'
+        ? 252
+        : 212;
+    const preferredTop = rect.bottom + 4;
+    const top = preferredTop + menuHeight > window.innerHeight - 8
+      ? Math.max(8, rect.top - menuHeight - 4)
+      : preferredTop;
+    setRowMenu({ top, right: Math.max(8, window.innerWidth - rect.right), invoice });
   };
 
   const handleConvertProforma = (proforma: StoredInvoice) => {
