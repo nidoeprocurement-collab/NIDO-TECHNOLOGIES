@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Download, Edit, Plus, Receipt, Send } from 'lucide-react';
+import { ArrowLeft, Download, Edit, MoreVertical, Plus, Receipt, Send, ArrowRight } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceStore';
+import { convertProformaToInvoice, getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceStore';
 import { downloadInvoicePdf, generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendEmail } from '@/lib/emailApi';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -43,6 +43,7 @@ export default function InvoiceDetails() {
   const [paymentReference, setPaymentReference] = useState('');
   const [sending, setSending] = useState(false);
   const [sendMessage, setSendMessage] = useState('');
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   useEffect(() => {
     if (id) setInvoice(getInvoiceById(id) || null);
@@ -127,10 +128,12 @@ export default function InvoiceDetails() {
           {
             id: `${Date.now()}-activity`,
             date: today,
-            title: recipients.length > 0 ? 'Invoice sent' : 'Invoice marked sent',
+            title: recipients.length > 0
+              ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} sent`
+              : `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} marked sent`,
             description: recipients.length > 0
-              ? `Invoice emailed to ${recipients.join(', ')}.`
-              : 'Invoice was marked as sent; no recipient email was configured.',
+              ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} emailed to ${recipients.join(', ')}.`
+              : `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} was marked as sent; no recipient email was configured.`,
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -139,16 +142,23 @@ export default function InvoiceDetails() {
       setInvoice(updated);
       setSendMessage(
         recipients.length === 0
-          ? 'Invoice marked as sent. Add a recipient email to send it by email.'
+          ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} marked as sent. Add a recipient email to send it by email.`
           : sentCount === recipients.length
-            ? `Invoice sent to ${recipients.join(', ')}.`
-            : `Invoice saved as sent, but only ${sentCount} of ${recipients.length} email(s) were accepted.`,
+            ? `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} sent to ${recipients.join(', ')}.`
+            : `${invoice.status === 'Proforma Invoice' ? 'Proforma invoice' : 'Invoice'} saved as sent, but only ${sentCount} of ${recipients.length} email(s) were accepted.`,
       );
     } catch {
       setSendMessage('Invoice was not emailed. Check the email service and try again.');
     } finally {
       setSending(false);
     }
+  };
+
+  const closeActions = () => setActionsOpen(false);
+  const handleConvertToInvoice = () => {
+    const converted = convertProformaToInvoice(invoice.id);
+    closeActions();
+    if (converted) navigate(`/sales/invoices/${converted.id}`);
   };
 
   const grossSubtotal = invoice.grossSubtotal ?? invoice.subtotal;
@@ -174,26 +184,54 @@ export default function InvoiceDetails() {
             <p className="text-sm text-gray-600 mt-0.5">Total: <span className="font-semibold text-gray-900">{fmt(invoice.grandTotal)}</span></p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
+        <div className="relative">
           <button
-            onClick={() => navigate(`/sales/invoices/${invoice.id}/edit`)}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+            type="button"
+            onClick={() => setActionsOpen((open) => !open)}
+            aria-label="Invoice actions"
+            aria-expanded={actionsOpen}
+            className="p-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
           >
-            <Edit size={16} /> Edit
+            <MoreVertical size={20} />
           </button>
-          <button
-            onClick={() => { downloadInvoicePdf(invoice); }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
-          >
-            <Download size={16} /> Download PDF
-          </button>
-          <button
-            onClick={markSentAndEmail}
-            disabled={sending}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 text-sm font-medium"
-          >
-            <Send size={16} /> {sending ? 'Sending…' : 'Send Invoice'}
-          </button>
+          {actionsOpen && (
+            <div
+              className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => { closeActions(); navigate(`/sales/invoices/${invoice.id}/edit`); }}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Edit size={15} /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => { closeActions(); downloadInvoicePdf(invoice); }}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Download size={15} /> Download PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => { closeActions(); markSentAndEmail(); }}
+                disabled={sending}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Send size={15} /> {sending ? 'Sending…' : invoice.status === 'Proforma Invoice' ? 'Send Proforma Invoice' : 'Send Invoice'}
+              </button>
+              {invoice.status === 'Proforma Invoice' && (
+                <button
+                  type="button"
+                  onClick={handleConvertToInvoice}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-blue-700 hover:bg-blue-50"
+                >
+                  <ArrowRight size={15} /> Convert to Invoice
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {sendMessage && (
