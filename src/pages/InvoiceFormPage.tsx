@@ -650,7 +650,7 @@ export default function InvoiceFormPage() {
                 onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
                 className={inputCls}
               >
-                <option>Draft</option><option>Proforma Invoice</option><option>Sent</option><option>Pending</option>
+                <option>Draft</option><option>Proforma Invoice</option>
                 <option>Paid</option><option>Overdue</option><option>Cancelled</option>
               </select>
             </Label>
