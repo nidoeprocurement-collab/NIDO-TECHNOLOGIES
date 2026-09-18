@@ -18,6 +18,7 @@ export interface InvoiceLineItem {
   productType?: string;
   physicalType?: string;
   fulfillmentType?: string;
+  category?: string;
   commercialTerms?: ProductCommercialTerms;
 }
 
@@ -104,6 +105,7 @@ export function isProformaInvoiceEligible(invoice: Pick<StoredInvoice, 'lineItem
       productType: item.productType,
       physicalType: item.physicalType,
       fulfillmentType: item.fulfillmentType,
+      category: item.category,
       commercialTerms: item.commercialTerms,
     }));
 }

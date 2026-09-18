@@ -25,6 +25,7 @@ import {
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
 import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
+import { toast } from "sonner";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -2487,6 +2488,7 @@ function isPhysicalProduct(sub: any): boolean {
     productType: sub?.productType,
     physicalType: sub?.physicalType,
     fulfillmentType: sub?.fulfillmentType,
+    category: sub?.category,
     commercialTerms: sub?.commercialTerms,
   });
 }
@@ -3013,7 +3015,12 @@ export default function MyOrderPage() {
 
   const generateProformaForSubOrder = (subId: string) => {
     const target = subOrders.find((sub) => sub.id === subId);
-    if (!target || !isPhysicalProduct(target) || target.itemStatus !== "Shipped" || isOrderInactive) return;
+    if (!target) return;
+    if (!isPhysicalProduct(target)) {
+      toast.error("Proforma invoices can be generated only for physical and hybrid products.");
+      return;
+    }
+    if (target.itemStatus !== "Shipped" || isOrderInactive) return;
     navigate(
       `/sales/invoices/new?proforma=1&orderId=${encodeURIComponent(orderId)}&subOrderId=${encodeURIComponent(subId)}`,
     );

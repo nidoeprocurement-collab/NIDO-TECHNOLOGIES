@@ -255,6 +255,7 @@ export default function InvoiceFormPage() {
       productType?: string;
       physicalType?: string;
       fulfillmentType?: string;
+      category?: string;
       commercialTerms?: InvoiceLineItem['commercialTerms'];
     }>
   ) {
@@ -273,6 +274,7 @@ export default function InvoiceFormPage() {
         productType: li.productType,
          physicalType: li.physicalType,
          fulfillmentType: li.fulfillmentType,
+         category: li.category,
         commercialTerms: li.commercialTerms,
       }))
     );
@@ -388,6 +390,7 @@ export default function InvoiceFormPage() {
             productType: ci.productType || ci.physicalType,
              physicalType: ci.physicalType,
              fulfillmentType: ci.fulfillmentType,
+            category: ci.category,
             commercialTerms: ci.commercialTerms,
           };
         })
@@ -809,6 +812,13 @@ export default function InvoiceFormPage() {
                     )}
               </select>
             </Label>
+            {populatedLineItems.length > 0 && !canCreateProforma && (
+              <p className="col-span-2 md:col-span-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                Proforma invoice cannot be generated because this document contains
+                a non-physical product. Proforma invoices are available only for
+                physical and hybrid products.
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Label text="Order / Quote Reference">

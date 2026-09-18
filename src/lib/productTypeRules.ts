@@ -30,6 +30,7 @@ export interface ProductTypeMetadata {
   productType?: string;
   physicalType?: string;
   fulfillmentType?: string;
+  category?: string;
   commercialTerms?: { productType?: string } | null;
 }
 
@@ -40,7 +41,21 @@ function isExplicitlyNonPhysicalType(type: string): boolean {
     || normalized.includes("software")
     || normalized.includes("consulting")
     || normalized.includes("implementation")
-    || normalized.includes("maintenance");
+    || normalized.includes("maintenance")
+    || normalized.includes("hosting")
+    || normalized.includes("support")
+    || normalized.includes("training")
+    || normalized.includes("virtual");
+}
+
+function isGenericProductType(type: string): boolean {
+  return [
+    "product",
+    "item",
+    "goods",
+    "catalog product",
+    "product type",
+  ].includes(type.trim().toLowerCase());
 }
 
 /**
@@ -60,9 +75,25 @@ export function isPhysicalOrHybridProduct(metadata: ProductTypeMetadata): boolea
     metadata.commercialTerms?.productType,
     metadata.productType,
   ].map((value) => String(value || "").trim()).filter(Boolean);
+  const classificationValues = [
+    ...typeValues,
+    metadata.category,
+  ].map((value) => String(value || "").trim()).filter(Boolean);
 
   if (typeValues.length === 0) return false;
-  if (typeValues.some(isExplicitlyNonPhysicalType)) return false;
+  if (classificationValues.some(isExplicitlyNonPhysicalType)) return false;
+
+  const hasHybridClassification = classificationValues.some((value) => isHybridType(value));
+  if (hasHybridClassification) return true;
+
+  // A meaningful productType that is neither physical nor hybrid is not
+  // allowed to inherit a default physicalType from legacy catalog records.
+  const productType = String(metadata.productType || "").trim();
+  if (
+    productType
+    && !isGenericProductType(productType)
+    && !isPhysicalOrHybridType(productType)
+  ) return false;
 
   const primaryType = typeValues[0];
   return isPhysicalOrHybridType(primaryType);
