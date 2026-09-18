@@ -50,6 +50,7 @@ const INITIAL_DOCS: {
 }[] = [];
 type OrderNote = { id: string; author: string; date: string; text: string; visibility: string };
 const INITIAL_NOTES: OrderNote[] = [];
+const DOCUMENT_GRID_COLUMNS = "minmax(220px, 1.5fr) minmax(110px, 0.8fr) minmax(160px, 1fr) minmax(120px, 0.9fr) minmax(220px, 2fr) 64px";
 
 const ALL_STATUS_MAP = {
   Pending: { bg: "#f9fafb", color: "#6b7280", border: "#e5e7eb" },
@@ -1751,32 +1752,34 @@ function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: st
             )}
           </div>
         </div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflow: "hidden", marginTop: 14 }}>
-           <div style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 52px", gap: "2px", padding: "10px 22px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+           <div style={{ border: "1px solid #e5e7eb", borderRadius: 9, overflowX: "auto", overflowY: "hidden", marginTop: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: DOCUMENT_GRID_COLUMNS, minWidth: 980, gap: 12, padding: "10px 22px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4, whiteSpace: "nowrap" }}>
             {["DOCUMENT NAME", "TYPE", "UPLOADED BY", "UPLOADED ON", "DESCRIPTION", "ACTIONS"].map(h => <div key={h}>{h}</div>)}
           </div>
           {filteredDocs.length === 0 ? (
             <div style={{ padding: "32px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13.5 }}>No documents found.</div>
           ) : filteredDocs.map((doc, i) => (
-             <div key={doc.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 100px 90px 1fr 52px", gap: "2px", padding: "12px 22px", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+             <div key={doc.id} style={{ display: "grid", gridTemplateColumns: DOCUMENT_GRID_COLUMNS, minWidth: 980, gap: 12, padding: "12px 22px", boxSizing: "border-box", alignItems: "center", borderBottom: i < filteredDocs.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 10 }}>
                 <DocTypeIcon ext={doc.ext} />
-                <div>
-                  <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 13.5, fontWeight: 600 }}>{doc.name}</a>
+                <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                  <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 13.5, fontWeight: 600, overflowWrap: "anywhere" }}>{doc.name}</a>
                   <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1 }}>{doc.size}</div>
                 </div>
               </div>
-              <div><DocTypeTag type={doc.type} /></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ minWidth: 0 }}><DocTypeTag type={doc.type} /></div>
+              <div style={{ minWidth: 0, display: "flex", alignItems: "center", gap: 8 }}>
                 <Avatar initial="S" color="#2563eb" size={28} />
-                <span style={{ fontSize: 13, color: "#374151" }}>{doc.uploadedBy}</span>
+                <span style={{ minWidth: 0, fontSize: 13, color: "#374151", overflowWrap: "anywhere" }}>{doc.uploadedBy}</span>
               </div>
-              <div style={{ fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5 }}>{doc.uploadedOn}</div>
-              <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.45 }}>{doc.description}</div>
+              <div style={{ minWidth: 0, fontSize: 12.5, color: "#374151", whiteSpace: "pre-line", lineHeight: 1.5, overflowWrap: "anywhere" }}>{doc.uploadedOn}</div>
+              <div style={{ minWidth: 0, fontSize: 13, color: "#6b7280", lineHeight: 1.45, overflowWrap: "anywhere" }}>{doc.description}</div>
               {isClientPortalUser ? (
-                <button onClick={() => handleDownloadDocument(doc)} style={{ background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
+                <button onClick={() => handleDownloadDocument(doc)} style={{ justifySelf: "center", background: "none", border: "none", cursor: "pointer", color: "#2563eb", fontSize: 16 }} title="Download">⬇</button>
               ) : (
-                <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={locked ? undefined : () => handleRemoveDocument(doc.id)} />
+                <div style={{ justifySelf: "center" }}>
+                  <DocRowMenu onDownload={() => handleDownloadDocument(doc)} onRemove={locked ? undefined : () => handleRemoveDocument(doc.id)} />
+                </div>
               )}
             </div>
           ))}
