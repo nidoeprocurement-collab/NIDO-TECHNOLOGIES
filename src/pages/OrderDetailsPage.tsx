@@ -2223,6 +2223,7 @@ function ThreeDotMenu({
   onCancel,
   cancelEnabled,
   onRaiseReturn,
+  canRaiseReturn,
   returnAllowed,
   onRequestPickupScheduled,
   onRequestPickupDone,
@@ -2270,12 +2271,13 @@ function ThreeDotMenu({
             "Pending Shipping",
             ...(canMarkShipped ? ["Shipped"] : []),
             "Delivered",
-            ...(sub.itemStatus === "Delivered" && returnAllowed ? ["Return Request Raised"] : []),
+            ...(sub.itemStatus === "Delivered" && canRaiseReturn && returnAllowed ? ["Return Request Raised"] : []),
           ];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
     if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
-    if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
+     if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
+     if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
     const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
     const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
     if (currentIndex >= 0 && nextIndex >= 0 && nextIndex <= currentIndex) {
@@ -2392,11 +2394,13 @@ function ThreeDotMenu({
             <span>✕</span> Cancel Item
             {!cancelEnabled && <span style={{ marginLeft: "auto", fontSize: 10 }}>Locked</span>}
           </button>
-          <button style={{ ...menuItemSt, color: returnAllowed ? "#7c3aed" : "#d1d5db", cursor: returnAllowed ? "pointer" : "not-allowed" }}
-            onClick={() => { if (returnAllowed) { onRaiseReturn(); setOpen(false); } }}>
-            <span>↩</span> {sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Return Request Raised" : "Raise Return Request"}
-            {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>{sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Locked" : "Expired"}</span>}
-          </button>
+          {canRaiseReturn && (
+            <button style={{ ...menuItemSt, color: returnAllowed ? "#7c3aed" : "#d1d5db", cursor: returnAllowed ? "pointer" : "not-allowed" }}
+              onClick={() => { if (returnAllowed) { onRaiseReturn(); setOpen(false); } }}>
+              <span>↩</span> {sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Return Request Raised" : "Raise Return Request"}
+              {!returnAllowed && <span style={{ marginLeft: "auto", fontSize: 10, color: "#d1d5db", background: "#f9fafb", padding: "2px 5px", borderRadius: 4 }}>{sub.itemStatus === "Return Request Raised" || sub.itemStatus === "Pickup Scheduled" || sub.itemStatus === "Pickup Done" ? "Locked" : "Expired"}</span>}
+            </button>
+          )}
         </div>,
         document.body,
       )}
@@ -2467,8 +2471,16 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
   }));
 }
 
+function isPhysicalProduct(sub: any): boolean {
+  const productType = String(
+    sub?.commercialTerms?.productType || sub?.productType || "",
+  ).trim().toLowerCase();
+  return productType === "physical product" || productType === "physical";
+}
+
 // Returns are allowed for Delivered items within a strict 72-hour window.
 function isReturnAllowed(sub: any): boolean {
+  if (!isPhysicalProduct(sub)) return false;
   if (sub.itemStatus !== "Delivered") return false;
   if (!sub.deliveredAt) return false;
   const deliveredMs = sub.deliveredAt instanceof Date ? sub.deliveredAt.getTime() : new Date(sub.deliveredAt).getTime();
@@ -2946,7 +2958,7 @@ export default function MyOrderPage() {
 
   const handleRaiseReturn = (subId: string, reason: string, details: string) => {
     const target = subOrders.find(s => s.id === subId);
-    if (!target || !isReturnAllowed(target)) return;
+    if (!target || !isPhysicalProduct(target) || !isReturnAllowed(target)) return;
     updateStatus(subId, "Return Request Raised", {
       returnRequestedAt: new Date().toISOString(),
       returnReason: reason,
@@ -4194,6 +4206,7 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onAddTracking={() => setTrackingTarget(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
+                             canRaiseReturn={isPhysicalProduct(sub)}
                              cancelEnabled={!isOrderInactive && !itemCancelled && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
