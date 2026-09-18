@@ -25,6 +25,7 @@ import {
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
 import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
+import { getOrderProductTypeMetadata } from "@/lib/orderProductType";
 import { toast } from "sonner";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -2484,13 +2485,7 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
 }
 
 function isPhysicalProduct(sub: any): boolean {
-  return isPhysicalOrHybridProduct({
-    productType: sub?.productType,
-    physicalType: sub?.physicalType,
-    fulfillmentType: sub?.fulfillmentType,
-    category: sub?.category,
-    commercialTerms: sub?.commercialTerms,
-  });
+  return isPhysicalOrHybridProduct(getOrderProductTypeMetadata(sub));
 }
 
 // Returns are allowed for Delivered items within a strict 72-hour window.

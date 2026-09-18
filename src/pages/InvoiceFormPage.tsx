@@ -21,6 +21,7 @@ import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
 import { isPhysicalOrHybridProduct } from '@/lib/productTypeRules';
+import { getOrderProductTypeMetadata } from '@/lib/orderProductType';
 import { toast } from 'sonner';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -210,13 +211,9 @@ export default function InvoiceFormPage() {
 
   const populatedLineItems = lineItems.filter((item) => item.description.trim());
   const canCreateProforma = populatedLineItems.length > 0
-    && populatedLineItems.every((item) => isPhysicalOrHybridProduct({
-      productType: item.productType,
-      physicalType: item.physicalType,
-      fulfillmentType: item.fulfillmentType,
-      category: item.category,
-      commercialTerms: item.commercialTerms,
-    }));
+    && populatedLineItems.every((item) =>
+      isPhysicalOrHybridProduct(getOrderProductTypeMetadata(item)),
+    );
   const isProformaMode = status === 'Proforma Invoice' || isOrderProformaFlow;
 
   const restrictedOrder = isOrderProformaFlow
@@ -227,7 +224,10 @@ export default function InvoiceFormPage() {
   );
   useEffect(() => {
     if (!isOrderProformaFlow || !restrictedOrder) return;
-    if (!restrictedProformaItem || !isPhysicalOrHybridProduct(restrictedProformaItem)) {
+    if (
+      !restrictedProformaItem
+      || !isPhysicalOrHybridProduct(getOrderProductTypeMetadata(restrictedProformaItem))
+    ) {
       toast.error('Proforma invoices are available only for physical and hybrid products.');
       navigate('/sales/invoices');
     }
@@ -252,13 +252,7 @@ export default function InvoiceFormPage() {
     if (!isProformaMode || importSource !== 'order' || !selectedRef) return;
     const eligibleItems = lineItems.filter((item) =>
       !item.description.trim()
-      || isPhysicalOrHybridProduct({
-        productType: item.productType,
-        physicalType: item.physicalType,
-        fulfillmentType: item.fulfillmentType,
-        category: item.category,
-        commercialTerms: item.commercialTerms,
-      }),
+      || isPhysicalOrHybridProduct(getOrderProductTypeMetadata(item)),
     );
     if (eligibleItems.length === lineItems.length) return;
     setLineItems(eligibleItems);
@@ -382,13 +376,9 @@ export default function InvoiceFormPage() {
         )),
       );
       const eligibleItems = isProformaMode
-        ? invoiceableItems.filter((ci) => isPhysicalOrHybridProduct({
-            productType: ci.productType,
-            physicalType: ci.physicalType,
-            fulfillmentType: ci.fulfillmentType,
-            category: ci.category,
-            commercialTerms: ci.commercialTerms,
-          }))
+        ? invoiceableItems.filter((ci) =>
+            isPhysicalOrHybridProduct(getOrderProductTypeMetadata(ci)),
+          )
         : invoiceableItems;
       if (isProformaMode && eligibleItems.length < invoiceableItems.length) {
         toast.warning(
@@ -398,6 +388,7 @@ export default function InvoiceFormPage() {
       setReturnedItemCount(scopedItems.length - invoiceableItems.length);
       setLineItems(
         eligibleItems.map((ci) => {
+          const productMetadata = getOrderProductTypeMetadata(ci);
           // Selected vendor tax is snapshotted on the order. Legacy orders
           // continue to resolve their rate from the current tax settings.
           const gstRate    = typeof ci.gstSnapshot === 'number'
@@ -426,10 +417,10 @@ export default function InvoiceFormPage() {
             discount:    0,
             taxPercent:  gstRate,
             taxType:     'IGST' as const,
-            productType: ci.productType || ci.physicalType,
-             physicalType: ci.physicalType,
-             fulfillmentType: ci.fulfillmentType,
-            category: ci.category,
+            productType: productMetadata.productType || productMetadata.physicalType,
+            physicalType: productMetadata.physicalType,
+            fulfillmentType: productMetadata.fulfillmentType,
+            category: productMetadata.category,
             commercialTerms: ci.commercialTerms,
           };
         })
@@ -848,7 +839,7 @@ export default function InvoiceFormPage() {
                     ) : (
                       <>
                         <option>Draft</option>
-                        {canCreateProforma && <option>Proforma Invoice</option>}
+                        <option>Proforma Invoice</option>
                         <option>Paid</option><option>Overdue</option><option>Cancelled</option>
                       </>
                     )}

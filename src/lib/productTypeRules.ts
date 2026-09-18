@@ -80,7 +80,10 @@ export function isPhysicalOrHybridProduct(metadata: ProductTypeMetadata): boolea
     metadata.category,
   ].map((value) => String(value || "").trim()).filter(Boolean);
 
-  if (typeValues.length === 0) return false;
+  // Some legacy orders preserve only the fulfillment classification. An
+  // explicit physical/hybrid fulfillment value is authoritative when no
+  // conflicting product-type metadata is present.
+  if (typeValues.length === 0) return fulfillmentType === "physical" || fulfillmentType === "hybrid";
   if (classificationValues.some(isExplicitlyNonPhysicalType)) return false;
 
   const hasHybridClassification = classificationValues.some((value) => isHybridType(value));
