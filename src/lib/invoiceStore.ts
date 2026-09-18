@@ -1,5 +1,6 @@
 import { getPrefix } from './configService';
 import type { ProductCommercialTerms } from './productCommercialTerms';
+import { isPhysicalOrHybridType } from './productTypeRules';
 
 export type InvoiceStatus = 'Draft' | 'Proforma Invoice' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
 
@@ -87,6 +88,19 @@ export interface StoredInvoice {
   activity: InvoiceActivity[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Proforma invoices are valid only when every populated line item is a
+ * physical or hybrid product. Empty invoice rows are ignored while editing,
+ * but at least one populated line item is required.
+ */
+export function isProformaInvoiceEligible(invoice: Pick<StoredInvoice, 'lineItems'>): boolean {
+  const populatedItems = invoice.lineItems.filter((item) => item.description.trim());
+  return populatedItems.length > 0
+    && populatedItems.every((item) => isPhysicalOrHybridType(
+      item.productType || item.commercialTerms?.productType,
+    ));
 }
 
 const STORE_KEY = 'nido_sales_invoices';
@@ -268,7 +282,11 @@ export function getInvoiceById(id: string): StoredInvoice | undefined {
   return getInvoices().find((invoice) => invoice.id === id);
 }
 
-export function saveInvoice(invoice: StoredInvoice): void {
+export function saveInvoice(invoice: StoredInvoice): boolean {
+  if (invoice.status === 'Proforma Invoice' && !isProformaInvoiceEligible(invoice)) {
+    return false;
+  }
+
   // Save against the full collection so updating an active invoice never
   // drops invoices that were intentionally archived.
   const invoices = seedInvoices();
@@ -277,6 +295,7 @@ export function saveInvoice(invoice: StoredInvoice): void {
   else invoices.unshift(invoice);
   localStorage.setItem(STORE_KEY, JSON.stringify(invoices));
   window.dispatchEvent(new Event('nidoInvoicesUpdated'));
+  return true;
 }
 
 export function archiveInvoice(id: string, reason: string): void {
@@ -336,7 +355,11 @@ export function generateProformaInvoiceNumber(): string {
  */
 export function convertProformaToInvoice(proformaId: string): StoredInvoice | null {
   const proforma = getInvoiceById(proformaId);
-  if (!proforma || proforma.status !== 'Proforma Invoice') return null;
+  if (
+    !proforma
+    || proforma.status !== 'Proforma Invoice'
+    || !isProformaInvoiceEligible(proforma)
+  ) return null;
 
   const existingConversion = getInvoices().find(
     (invoice) => invoice.sourceProformaId === proformaId,

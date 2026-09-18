@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Download, Edit, MoreVertical, Receipt, Send, ArrowRight } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { convertProformaToInvoice, getInvoiceById, saveInvoice, type StoredInvoice } from '@/lib/invoiceStore';
+import {
+  convertProformaToInvoice,
+  getInvoiceById,
+  isProformaInvoiceEligible,
+  saveInvoice,
+  type StoredInvoice,
+} from '@/lib/invoiceStore';
 import { downloadInvoicePdf } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
 import { getActiveReceipts, type PaymentReceipt } from '@/lib/paymentReceiptStore';
@@ -54,8 +60,18 @@ export default function InvoiceDetails() {
   const [actionsOpen, setActionsOpen] = useState(false);
 
   useEffect(() => {
-    if (id) setInvoice(getInvoiceById(id) || null);
-  }, [id]);
+    if (!id) return;
+    const storedInvoice = getInvoiceById(id);
+    if (
+      storedInvoice?.status === 'Proforma Invoice'
+      && !isProformaInvoiceEligible(storedInvoice)
+    ) {
+      toast.error('This proforma invoice is not available because it contains non-physical products.');
+      navigate('/sales/invoices');
+      return;
+    }
+    setInvoice(storedInvoice || null);
+  }, [id, navigate]);
 
   useEffect(() => {
     if (!invoice) return;

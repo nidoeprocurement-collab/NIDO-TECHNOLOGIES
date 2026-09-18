@@ -241,6 +241,12 @@ export default function InvoiceFormPage() {
     navigate,
   ]);
 
+  useEffect(() => {
+    if (!existing || existing.status !== 'Proforma Invoice' || canCreateProforma) return;
+    toast.error('Proforma invoices are available only for physical and hybrid products.');
+    navigate('/sales/invoices');
+  }, [existing, canCreateProforma, navigate]);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applyLineItems(
     items: Array<{ name: string; description?: string; hsnSac?: string; qty: number; rate: number; discount?: number; taxPercent?: number; productType?: string; commercialTerms?: InvoiceLineItem['commercialTerms'] }>

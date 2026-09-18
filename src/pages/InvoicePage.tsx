@@ -10,6 +10,7 @@ import {
   convertProformaToInvoice,
   getArchivedInvoices,
   getInvoices,
+  isProformaInvoiceEligible,
   saveInvoice,
   type InvoiceStatus,
   type StoredInvoice,
@@ -356,8 +357,8 @@ export default function InvoicePage() {
 
   const tabInvoices = useMemo(() => clientInvoices.filter((invoice) =>
     documentTab === 'proforma'
-      ? invoice.status === 'Proforma Invoice'
-      : invoice.status !== 'Proforma Invoice'
+      ? invoice.status === 'Proforma Invoice' && isProformaInvoiceEligible(invoice)
+      : invoice.status !== 'Proforma Invoice',
   ), [clientInvoices, documentTab]);
 
   const filteredInvoices = useMemo(() => tabInvoices.filter((invoice) => {
