@@ -55,7 +55,7 @@ const inputCls =
   'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500';
 const textareaCls = `${inputCls} resize-none`;
 
-type ImportSource = 'order' | 'quotation' | 'salesorder';
+type ImportSource = 'order' | 'quotation' | 'salesorder' | 'shippedproduct';
 
 const RETURNED_ORDER_ITEM_STATUSES = new Set([
   'return request raised',
@@ -123,6 +123,7 @@ const SOURCE_TABS: { key: ImportSource; label: string }[] = [
   { key: 'order',      label: 'Order'        },
   { key: 'quotation',  label: 'Quotation'    },
   { key: 'salesorder', label: 'Sales Order'  },
+  { key: 'shippedproduct', label: 'Shipped Products' },
 ];
 
 export default function InvoiceFormPage() {
@@ -261,6 +262,12 @@ export default function InvoiceFormPage() {
     );
   }, [isProformaMode, importSource, selectedRef, lineItems]);
 
+  useEffect(() => {
+    if (isProformaMode || importSource !== 'shippedproduct') return;
+    setImportSource('order');
+    clearImport();
+  }, [isProformaMode, importSource]);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applyLineItems(
     items: Array<{
@@ -312,7 +319,7 @@ export default function InvoiceFormPage() {
   }
 
   // ── Import from Order ────────────────────────────────────────────────────
-  function importFromOrder(refId: string) {
+  function importFromOrder(refId: string, shippedSubOrderId?: string) {
     const order = myOrders.find((o) => o.id === refId);
     if (!order) return;
 
@@ -363,9 +370,12 @@ export default function InvoiceFormPage() {
     }
 
     if (order.cartItems && order.cartItems.length > 0) {
-      const scopedItems = isOrderProformaFlow && restrictedSubOrderId
+      const selectedSubOrderId = isOrderProformaFlow
+        ? restrictedSubOrderId
+        : shippedSubOrderId;
+      const scopedItems = selectedSubOrderId
         ? order.cartItems.filter((ci, index) =>
-            getOrderSubOrderId(order.id, ci.subOrderId, index) === restrictedSubOrderId,
+            getOrderSubOrderId(order.id, ci.subOrderId, index) === selectedSubOrderId,
           )
         : order.cartItems;
       const invoiceableItems = scopedItems.filter((ci, index) =>
@@ -510,6 +520,14 @@ export default function InvoiceFormPage() {
     setSelectedRef(refId);
     if (!refId) { setImportedRefLabel(''); return; }
     if (importSource === 'order')      importFromOrder(refId);
+    if (importSource === 'shippedproduct') {
+      try {
+        const [orderId, shippedSubOrderId] = JSON.parse(refId) as [string, string];
+        importFromOrder(orderId, shippedSubOrderId);
+      } catch {
+        setImportedRefLabel('');
+      }
+    }
     if (importSource === 'quotation')  importFromQuotation(refId);
     if (importSource === 'salesorder') importFromSalesOrder(refId);
   }
@@ -541,12 +559,30 @@ export default function InvoiceFormPage() {
         label: `${q.quoteNumber} — ${q.clientName} (${fmt(q.grandTotal)})`,
       }));
     }
+    if (importSource === 'shippedproduct') {
+      return myOrders.flatMap((order) =>
+        (order.cartItems || []).flatMap((item, index) => {
+          const subOrderId = getOrderSubOrderId(order.id, item.subOrderId, index);
+          const itemStatus = getOrderSubItemStatus(order.id, item.subOrderId, index);
+          if (
+            itemStatus !== 'shipped'
+            || !isPhysicalOrHybridProduct(getOrderProductTypeMetadata(item))
+          ) {
+            return [];
+          }
+          return [{
+            id: JSON.stringify([order.id, subOrderId]),
+            label: `${order.id} — ${item.name || item.itemName || 'Product'} (${order.client})`,
+          }];
+        }),
+      );
+    }
     // salesorder
     return salesOrders.map((o) => ({
       id:    o.id,
       label: `${o.orderNumber} — ${o.clientName} (${fmt(o.grandTotal)})`,
     }));
-  }, [importSource, myOrders, quotations, salesOrders]);
+  }, [importSource, myOrders, quotations, salesOrders, isOrderProformaFlow, restrictedOrderId]);
 
   // ── Computed totals ───────────────────────────────────────────────────────
   const grossSubtotal     = lineItems.reduce((sum, item) => sum + item.quantity * item.rate, 0);
@@ -726,7 +762,10 @@ export default function InvoiceFormPage() {
 
               {/* ── Source type tabs ── */}
               <div className="flex gap-2 mb-4 flex-wrap">
-                {(isOrderProformaFlow ? SOURCE_TABS.filter(({ key }) => key === 'order') : SOURCE_TABS).map(({ key, label }) => (
+                {(isOrderProformaFlow
+                  ? SOURCE_TABS.filter(({ key }) => key === 'order')
+                  : SOURCE_TABS.filter(({ key }) => key !== 'shippedproduct' || isProformaMode)
+                ).map(({ key, label }) => (
                   <button
                     key={key}
                     type="button"
