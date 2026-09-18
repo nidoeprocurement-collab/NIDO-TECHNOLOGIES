@@ -24,7 +24,7 @@ import {
   getAvailabilityLabel,
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
-import { isPhysicalOrHybridType } from "@/lib/productTypeRules";
+import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -2468,18 +2468,27 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     deliveredAt: null,
     tracking: null,
     stockAllocations: item.vendorAllocations || [],
-     commercialTerms: item.commercialTerms || getProductCommercialTerms(
-       item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : "Physical Product"),
-       { moq: item.moq, leadTime: item.leadTime, stock: item.totalStock },
-     ),
+    productType: item.productType,
+    physicalType: item.physicalType,
+    fulfillmentType: item.fulfillmentType,
+    commercialTerms: item.commercialTerms || (
+      item.productType || item.physicalType || item.fulfillmentType
+        ? getProductCommercialTerms(
+            item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : ""),
+            { moq: item.moq, leadTime: item.leadTime, stock: item.totalStock },
+          )
+        : undefined
+    ),
   }));
 }
 
 function isPhysicalProduct(sub: any): boolean {
-  const productType = String(
-    sub?.commercialTerms?.productType || sub?.productType || "",
-  ).trim().toLowerCase();
-  return isPhysicalOrHybridType(productType);
+  return isPhysicalOrHybridProduct({
+    productType: sub?.productType,
+    physicalType: sub?.physicalType,
+    fulfillmentType: sub?.fulfillmentType,
+    commercialTerms: sub?.commercialTerms,
+  });
 }
 
 // Returns are allowed for Delivered items within a strict 72-hour window.

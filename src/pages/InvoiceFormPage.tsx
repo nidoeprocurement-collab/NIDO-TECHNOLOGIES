@@ -20,7 +20,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
-import { isPhysicalOrHybridType } from '@/lib/productTypeRules';
+import { isPhysicalOrHybridProduct } from '@/lib/productTypeRules';
 import { toast } from 'sonner';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -210,9 +210,12 @@ export default function InvoiceFormPage() {
 
   const populatedLineItems = lineItems.filter((item) => item.description.trim());
   const canCreateProforma = populatedLineItems.length > 0
-    && populatedLineItems.every((item) => isPhysicalOrHybridType(
-      item.productType || item.commercialTerms?.productType,
-    ));
+    && populatedLineItems.every((item) => isPhysicalOrHybridProduct({
+      productType: item.productType,
+      physicalType: item.physicalType,
+      fulfillmentType: item.fulfillmentType,
+      commercialTerms: item.commercialTerms,
+    }));
 
   const restrictedOrder = isOrderProformaFlow
     ? myOrders.find((order) => order.id === restrictedOrderId)
@@ -220,16 +223,9 @@ export default function InvoiceFormPage() {
   const restrictedProformaItem = restrictedOrder?.cartItems?.find((item, index) =>
     getOrderSubOrderId(restrictedOrder.id, item.subOrderId, index) === restrictedSubOrderId,
   );
-  const restrictedProformaType = restrictedProformaItem
-    ? restrictedProformaItem.commercialTerms?.productType
-      || restrictedProformaItem.productType
-      || restrictedProformaItem.physicalType
-      || (restrictedProformaItem.fulfillmentType === 'digital' ? 'Digital License' : 'Physical Product')
-    : '';
-
   useEffect(() => {
     if (!isOrderProformaFlow || !restrictedOrder) return;
-    if (!restrictedProformaItem || !isPhysicalOrHybridType(restrictedProformaType)) {
+    if (!restrictedProformaItem || !isPhysicalOrHybridProduct(restrictedProformaItem)) {
       toast.error('Proforma invoices are available only for physical and hybrid products.');
       navigate('/sales/invoices');
     }
@@ -237,7 +233,6 @@ export default function InvoiceFormPage() {
     isOrderProformaFlow,
     restrictedOrder,
     restrictedProformaItem,
-    restrictedProformaType,
     navigate,
   ]);
 
@@ -249,7 +244,19 @@ export default function InvoiceFormPage() {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applyLineItems(
-    items: Array<{ name: string; description?: string; hsnSac?: string; qty: number; rate: number; discount?: number; taxPercent?: number; productType?: string; commercialTerms?: InvoiceLineItem['commercialTerms'] }>
+    items: Array<{
+      name: string;
+      description?: string;
+      hsnSac?: string;
+      qty: number;
+      rate: number;
+      discount?: number;
+      taxPercent?: number;
+      productType?: string;
+      physicalType?: string;
+      fulfillmentType?: string;
+      commercialTerms?: InvoiceLineItem['commercialTerms'];
+    }>
   ) {
     if (!items || items.length === 0) return;
     setLineItems(
@@ -264,6 +271,8 @@ export default function InvoiceFormPage() {
         taxPercent:  li.taxPercent   ?? 18,
         taxType:     'IGST' as const,
         productType: li.productType,
+         physicalType: li.physicalType,
+         fulfillmentType: li.fulfillmentType,
         commercialTerms: li.commercialTerms,
       }))
     );
@@ -377,6 +386,8 @@ export default function InvoiceFormPage() {
             taxPercent:  gstRate,
             taxType:     'IGST' as const,
             productType: ci.productType || ci.physicalType,
+             physicalType: ci.physicalType,
+             fulfillmentType: ci.fulfillmentType,
             commercialTerms: ci.commercialTerms,
           };
         })

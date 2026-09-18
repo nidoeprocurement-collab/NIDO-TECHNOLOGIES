@@ -25,7 +25,7 @@ export type CartItem = {
   productType?: string;
   physicalType?: string;
   commercialTerms?: ProductCommercialTerms;
-  fulfillmentType?: "physical" | "digital";
+  fulfillmentType?: "physical" | "digital" | "hybrid";
   leadTime?: string;
   // ── Vendor snapshot — locked at add-to-cart time by client selection ──────
   selectedVendorId?: string;

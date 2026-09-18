@@ -1,6 +1,6 @@
 import { getPrefix } from './configService';
 import type { ProductCommercialTerms } from './productCommercialTerms';
-import { isPhysicalOrHybridType } from './productTypeRules';
+import { isPhysicalOrHybridProduct } from './productTypeRules';
 
 export type InvoiceStatus = 'Draft' | 'Proforma Invoice' | 'Sent' | 'Paid' | 'Pending' | 'Overdue' | 'Cancelled';
 
@@ -16,6 +16,8 @@ export interface InvoiceLineItem {
   taxPercent: number;
   taxType?: string;         // e.g. 'IGST' or 'CGST+SGST'
   productType?: string;
+  physicalType?: string;
+  fulfillmentType?: string;
   commercialTerms?: ProductCommercialTerms;
 }
 
@@ -98,9 +100,12 @@ export interface StoredInvoice {
 export function isProformaInvoiceEligible(invoice: Pick<StoredInvoice, 'lineItems'>): boolean {
   const populatedItems = invoice.lineItems.filter((item) => item.description.trim());
   return populatedItems.length > 0
-    && populatedItems.every((item) => isPhysicalOrHybridType(
-      item.productType || item.commercialTerms?.productType,
-    ));
+    && populatedItems.every((item) => isPhysicalOrHybridProduct({
+      productType: item.productType,
+      physicalType: item.physicalType,
+      fulfillmentType: item.fulfillmentType,
+      commercialTerms: item.commercialTerms,
+    }));
 }
 
 const STORE_KEY = 'nido_sales_invoices';

@@ -23,6 +23,7 @@ import FloatingCartButton from "@/components/FloatingCartButton";
 import {
   formatLeadTimeByType,
   getAvailabilityByType,
+  getProductCommercialTerms,
   getPricingModel,
   getProductType,
   getQuantityLabel,
@@ -41,6 +42,7 @@ type Product = {
   tags?: string[];
   productType?: string;
   physicalType?: string;
+  fulfillmentType?: "physical" | "digital" | "hybrid";
   image: string;
   images?: string[];
   specs: string[];
@@ -314,6 +316,12 @@ export default function ProductDetailPage() {
         clientId,
         category: product.category,
         productCode: product.productCode,
+         productType: product.productType,
+         physicalType: product.physicalType,
+         commercialTerms: getProductCommercialTerms(productType, {
+           moq: selectedVendor.moq,
+           leadTime: selectedVendor.leadTime,
+         }),
         fulfillmentType: product.fulfillmentType,
         leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
         selectedVendorId: selectedVendor.vendorId,

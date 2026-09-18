@@ -32,7 +32,7 @@ export interface OrderCartItem {
   productType?: string;
   physicalType?: string;
   commercialTerms?: ProductCommercialTerms;
-  fulfillmentType?: "physical" | "digital";
+  fulfillmentType?: "physical" | "digital" | "hybrid";
   /** Vendor allocation snapshot — used to restore stock if the order is cancelled. */
   vendorAllocations?: StockAllocation[];
   // ── Vendor snapshot — locked at add-to-cart time ──────────────────────────

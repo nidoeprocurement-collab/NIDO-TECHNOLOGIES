@@ -26,6 +26,48 @@ export function isPhysicalOrHybridType(type?: string): boolean {
     || normalized.includes("hybrid");
 }
 
+export interface ProductTypeMetadata {
+  productType?: string;
+  physicalType?: string;
+  fulfillmentType?: string;
+  commercialTerms?: { productType?: string } | null;
+}
+
+function isExplicitlyNonPhysicalType(type: string): boolean {
+  const normalized = type.trim().toLowerCase();
+  return isDigitalType(normalized)
+    || normalized.includes("license")
+    || normalized.includes("software")
+    || normalized.includes("consulting")
+    || normalized.includes("implementation")
+    || normalized.includes("maintenance");
+}
+
+/**
+ * Resolve proforma eligibility from the original product metadata rather than
+ * from a display-only commercial-terms fallback. Missing or conflicting
+ * metadata is rejected so non-physical items cannot become eligible by
+ * defaulting to "Physical Product".
+ */
+export function isPhysicalOrHybridProduct(metadata: ProductTypeMetadata): boolean {
+  const fulfillmentType = String(metadata.fulfillmentType || "").trim().toLowerCase();
+  if (fulfillmentType) {
+    if (fulfillmentType !== "physical" && fulfillmentType !== "hybrid") return false;
+  }
+
+  const typeValues = [
+    metadata.physicalType,
+    metadata.commercialTerms?.productType,
+    metadata.productType,
+  ].map((value) => String(value || "").trim()).filter(Boolean);
+
+  if (typeValues.length === 0) return false;
+  if (typeValues.some(isExplicitlyNonPhysicalType)) return false;
+
+  const primaryType = typeValues[0];
+  return isPhysicalOrHybridType(primaryType);
+}
+
 export function isDigitalOnlyType(type: string): boolean {
   return isDigitalType(type) && !isHybridType(type);
 }
