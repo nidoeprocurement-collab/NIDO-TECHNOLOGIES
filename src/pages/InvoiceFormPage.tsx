@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ClipboardList, Plus, Save, Trash2, X } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   generateInvoiceNumber,
   generateProformaInvoiceNumber,
@@ -18,6 +18,8 @@ import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap, g
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
+import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
+import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -110,6 +112,10 @@ function getOrderSubItemStatus(orderId: string, subOrderId: string | undefined, 
   }
 }
 
+function getOrderSubOrderId(orderId: string, subOrderId: string | undefined, index: number): string {
+  return subOrderId || `SO-${orderId}-${String(index + 1).padStart(3, '0')}`;
+}
+
 const SOURCE_TABS: { key: ImportSource; label: string }[] = [
   { key: 'order',      label: 'Order'        },
   { key: 'quotation',  label: 'Quotation'    },
@@ -118,9 +124,16 @@ const SOURCE_TABS: { key: ImportSource; label: string }[] = [
 
 export default function InvoiceFormPage() {
   const { currencySymbol } = useI18n();
+  const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const existing = useMemo(() => (id ? getInvoiceById(id) : undefined), [id]);
+  const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const restrictedOrderId = queryParams.get('orderId') || '';
+  const restrictedSubOrderId = queryParams.get('subOrderId') || '';
+  const isOrderProformaFlow = !existing
+    && queryParams.get('proforma') === '1'
+    && Boolean(restrictedOrderId);
 
   // ── Data sources ─────────────────────────────────────────────────────────
   const { orders: myOrders } = useMyOrders();
@@ -131,14 +144,19 @@ export default function InvoiceFormPage() {
   const [importSource,    setImportSource]    = useState<ImportSource>('order');
   const [selectedRef,     setSelectedRef]     = useState('');
   const [importedRefLabel, setImportedRefLabel] = useState('');
+  const didAutoImport = useRef(false);
 
   // ── Header fields ────────────────────────────────────────────────────────
-  const [invoiceNumber, setInvoiceNumber] = useState(existing?.invoiceNumber || generateInvoiceNumber());
+  const [invoiceNumber, setInvoiceNumber] = useState(
+    existing?.invoiceNumber || (isOrderProformaFlow ? generateProformaInvoiceNumber() : generateInvoiceNumber()),
+  );
   const [invoiceDate,   setInvoiceDate]   = useState(existing?.invoiceDate   || today());
   const [dueDate,       setDueDate]       = useState(existing?.dueDate       || today());
   const [poReference,   setPoReference]   = useState(existing?.poReference   || '');
   const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply || '');
-  const [status,        setStatus]        = useState<InvoiceStatus>(existing?.status || 'Draft');
+  const [status,        setStatus]        = useState<InvoiceStatus>(
+    existing?.status || (isOrderProformaFlow ? 'Proforma Invoice' : 'Draft'),
+  );
 
   useEffect(() => {
     // Existing documents retain their original number. New documents switch
@@ -274,10 +292,19 @@ export default function InvoiceFormPage() {
     }
 
     if (order.cartItems && order.cartItems.length > 0) {
-      const invoiceableItems = order.cartItems.filter((ci, index) =>
-        !RETURNED_ORDER_ITEM_STATUSES.has(getOrderSubItemStatus(order.id, ci.subOrderId, index)),
+      const scopedItems = isOrderProformaFlow && restrictedSubOrderId
+        ? order.cartItems.filter((ci, index) =>
+            getOrderSubOrderId(order.id, ci.subOrderId, index) === restrictedSubOrderId,
+          )
+        : order.cartItems;
+      const invoiceableItems = scopedItems.filter((ci, index) =>
+        !RETURNED_ORDER_ITEM_STATUSES.has(getOrderSubItemStatus(
+          order.id,
+          ci.subOrderId,
+          order.cartItems?.indexOf(ci) ?? index,
+        )),
       );
-      setReturnedItemCount(order.cartItems.length - invoiceableItems.length);
+      setReturnedItemCount(scopedItems.length - invoiceableItems.length);
       setLineItems(
         invoiceableItems.map((ci) => {
           // Selected vendor tax is snapshotted on the order. Legacy orders
@@ -401,11 +428,22 @@ export default function InvoiceFormPage() {
     if (importSource === 'salesorder') importFromSalesOrder(refId);
   }
 
+  useEffect(() => {
+    if (!isOrderProformaFlow || didAutoImport.current || !restrictedOrderId) return;
+    if (!myOrders.some((order) => order.id === restrictedOrderId)) return;
+    didAutoImport.current = true;
+    setImportSource('order');
+    setSelectedRef(restrictedOrderId);
+    importFromOrder(restrictedOrderId);
+  }, [isOrderProformaFlow, myOrders, restrictedOrderId]);
+
   // ── Dropdown options per source ──────────────────────────────────────────
   const refOptions = useMemo(() => {
     if (importSource === 'order') {
       return myOrders
-        .filter((o) => o.status === 'Delivered')
+        .filter((o) => isOrderProformaFlow
+          ? o.id === restrictedOrderId
+          : o.status === 'Delivered')
         .map((o) => ({
           id:    o.id,
           label: `${o.id} — ${o.client} (${o.totalAmount})`,
@@ -457,10 +495,10 @@ export default function InvoiceFormPage() {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!clientName.trim() || lineItems.every((item) => !item.description.trim())) return;
     const now = new Date().toISOString();
-    const invoice: StoredInvoice = {
+    let invoice: StoredInvoice = {
       id: existing?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       invoiceNumber,
       clientName: clientName.trim(),
@@ -506,6 +544,58 @@ export default function InvoiceFormPage() {
       updatedAt: now,
     };
     saveInvoice(invoice);
+
+    if (isOrderProformaFlow) {
+      try {
+        const dataUrl = await generateInvoicePdfBase64(invoice);
+        const docsKey = `nido_docs_${restrictedOrderId}`;
+        let existingDocs: any[] = [];
+        try {
+          const stored = JSON.parse(localStorage.getItem(docsKey) || '[]');
+          existingDocs = Array.isArray(stored) ? stored : [];
+        } catch {
+          existingDocs = [];
+        }
+        const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : '';
+        const proformaDocument = {
+          id: `doc-${invoice.id}-proforma`,
+          name: `${invoice.invoiceNumber}.pdf`,
+          ext: 'pdf',
+          size: `${Math.max(1, Math.round((base64.length * 0.75) / 1024))} KB`,
+          type: 'Proforma Invoice',
+          uploadedBy: 'System',
+          uploadedOn: new Date().toLocaleDateString('en-IN'),
+          description: `Generated from order ${restrictedOrderId}.`,
+          dataUrl,
+        };
+        localStorage.setItem(docsKey, JSON.stringify([
+          ...existingDocs.filter((doc) => doc.id !== proformaDocument.id),
+          proformaDocument,
+        ]));
+      } catch {
+        // The invoice remains saved even if browser document storage is unavailable.
+      }
+
+      const mailResult = await sendInvoiceEmail(invoice, 'invoice');
+      if (mailResult.sentCount > 0) {
+        invoice = {
+          ...invoice,
+          sentAt: new Date().toISOString(),
+          activity: [
+            ...invoice.activity,
+            {
+              id: `${Date.now()}-activity`,
+              date: today(),
+              title: 'Proforma invoice sent',
+              description: `Proforma invoice emailed to ${mailResult.recipients.join(', ')}.`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+        saveInvoice(invoice);
+      }
+    }
+
     navigate(`/sales/invoices/${invoice.id}`);
   };
 
@@ -543,7 +633,7 @@ export default function InvoiceFormPage() {
 
               {/* ── Source type tabs ── */}
               <div className="flex gap-2 mb-4 flex-wrap">
-                {SOURCE_TABS.map(({ key, label }) => (
+                {(isOrderProformaFlow ? SOURCE_TABS.filter(({ key }) => key === 'order') : SOURCE_TABS).map(({ key, label }) => (
                   <button
                     key={key}
                     type="button"
@@ -648,10 +738,17 @@ export default function InvoiceFormPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
+                    disabled={isOrderProformaFlow}
                 className={inputCls}
               >
-                <option>Draft</option><option>Proforma Invoice</option>
-                <option>Paid</option><option>Overdue</option><option>Cancelled</option>
+                    {isOrderProformaFlow ? (
+                      <option>Proforma Invoice</option>
+                    ) : (
+                      <>
+                        <option>Draft</option><option>Proforma Invoice</option>
+                        <option>Paid</option><option>Overdue</option><option>Cancelled</option>
+                      </>
+                    )}
               </select>
             </Label>
           </div>
@@ -1088,7 +1185,7 @@ export default function InvoiceFormPage() {
             disabled={!clientName.trim() || lineItems.every((item) => !item.description.trim())}
             className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 disabled:opacity-50"
           >
-            <Save size={16} /> Save Invoice
+            <Save size={16} /> {status === 'Proforma Invoice' ? 'Save Proforma Invoice' : 'Save Invoice'}
           </button>
         </div>
       </div>

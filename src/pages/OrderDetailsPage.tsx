@@ -2999,6 +2999,14 @@ export default function MyOrderPage() {
     setTrackingTarget(subId);
   };
 
+  const generateProformaForSubOrder = (subId: string) => {
+    const target = subOrders.find((sub) => sub.id === subId);
+    if (!target || target.itemStatus !== "Shipped" || isOrderInactive) return;
+    navigate(
+      `/sales/invoices/new?proforma=1&orderId=${encodeURIComponent(orderId)}&subOrderId=${encodeURIComponent(subId)}`,
+    );
+  };
+
   const saveTrackingForSubOrder = (tracking: any) => {
     if (!trackingTarget) return;
     const updatedOn = new Date().toLocaleDateString("en-IN");
@@ -3698,12 +3706,12 @@ export default function MyOrderPage() {
   // monitors) while still guaranteeing a readable minimum per column.
   const subOrdersColTemplate = isClientPortalUser
     ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
-    : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) 100px";
+    : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(180px,0.8fr)";
   const subOrdersColGap = 6;
   // Sum of the column minimums above (plus gaps) — the smallest width the
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
   // instead of clipping; above it the fr tracks grow to fill the tab.
-  const subOrdersMinWidth = isClientPortalUser ? 1056 : 1320;
+  const subOrdersMinWidth = isClientPortalUser ? 1056 : 1400;
 
   const billingAddress = [
     clientInfo?.billing_address || clientInfo?.billingAddress,
@@ -4199,7 +4207,15 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       ) : (
-                        <div style={{ minWidth: 0 }}>
+                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+                          {sub.itemStatus === "Shipped" && (
+                            <button
+                              onClick={() => generateProformaForSubOrder(sub.id)}
+                              style={{ padding: "6px 8px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                            >
+                              Generate Proforma Invoice
+                            </button>
+                          )}
                           <ThreeDotMenu
                             sub={sub}
                             onUpdateStatus={s => updateStatus(sub.id, s)}
