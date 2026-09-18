@@ -89,6 +89,12 @@ export function isPhysicalOrHybridProduct(metadata: ProductTypeMetadata): boolea
   const hasHybridClassification = classificationValues.some((value) => isHybridType(value));
   if (hasHybridClassification) return true;
 
+  // Older order snapshots may retain the generic "Product" label while
+  // preserving the explicit fulfillment classification. Treat that
+  // classification as authoritative after the non-physical conflict check
+  // above, so physical products are not hidden from proforma actions.
+  if (fulfillmentType === "physical" || fulfillmentType === "hybrid") return true;
+
   // A meaningful productType that is neither physical nor hybrid is not
   // allowed to inherit a default physicalType from legacy catalog records.
   const productType = String(metadata.productType || "").trim();
