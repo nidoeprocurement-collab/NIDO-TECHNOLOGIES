@@ -2270,7 +2270,7 @@ function ThreeDotMenu({
             "Processing",
             "Pending Shipping",
             ...(canMarkShipped ? ["Shipped"] : []),
-            "Delivered",
+            ...(sub.itemStatus === "Shipped" ? ["Delivered"] : []),
             ...(sub.itemStatus === "Delivered" && canRaiseReturn && returnAllowed ? ["Return Request Raised"] : []),
           ];
   const getStatusLockReason = (status: string): string | null => {
@@ -2934,6 +2934,7 @@ export default function MyOrderPage() {
     if (status === "Shipped" && !getAllPOs().some(po => po.orderId === orderId && isPOItemShipped(po, subId))) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target) return;
+    if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
     const currentReturnIndex = returnStatuses.indexOf(target.itemStatus);
     const nextReturnIndex = returnStatuses.indexOf(status);
