@@ -561,6 +561,13 @@ export default function InvoiceFormPage() {
     );
   }
 
+  function handleShippedProductToggle(refId: string) {
+    const nextRefs = selectedShippedRefs.includes(refId)
+      ? selectedShippedRefs.filter((selectedRefId) => selectedRefId !== refId)
+      : [...selectedShippedRefs, refId];
+    handleShippedProductSelect(nextRefs);
+  }
+
   useEffect(() => {
     if (!isOrderProformaFlow || didAutoImport.current || !restrictedOrderId) return;
     if (!myOrders.some((order) => order.id === restrictedOrderId)) return;
@@ -814,25 +821,30 @@ export default function InvoiceFormPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-[260px]">
                    {importSource === 'shippedproduct' ? (
-                     <select
-                       multiple
-                       size={Math.min(Math.max(refOptions.length, 3), 6)}
-                       value={selectedShippedRefs}
-                       onChange={(e) => handleShippedProductSelect(
-                         Array.from(e.target.selectedOptions, (option) => option.value),
-                       )}
-                       className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     <div
+                       role="group"
+                       aria-label="Shipped products"
+                       className="max-h-52 w-full overflow-y-auto rounded-lg border border-blue-300 bg-white p-1"
                      >
                        {refOptions.length === 0 ? (
-                         <option disabled>No shipped products found</option>
+                         <p className="px-3 py-2 text-sm text-gray-500">No shipped products found</p>
                        ) : (
                          refOptions.map((opt) => (
-                           <option key={opt.id} value={opt.id}>
-                             {opt.label}
-                           </option>
+                           <label
+                             key={opt.id}
+                             className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-900 hover:bg-blue-50"
+                           >
+                             <input
+                               type="checkbox"
+                               checked={selectedShippedRefs.includes(opt.id)}
+                               onChange={() => handleShippedProductToggle(opt.id)}
+                               className="h-4 w-4 accent-blue-600"
+                             />
+                             <span>{opt.label}</span>
+                           </label>
                          ))
                        )}
-                     </select>
+                     </div>
                    ) : (
                      <select
                        value={selectedRef}
