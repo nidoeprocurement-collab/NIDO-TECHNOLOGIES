@@ -7,6 +7,7 @@ export interface InvoiceLineItem {
   id: string;
   description: string;      // item name (bold in PDF)
   itemDetails?: string;     // sub-description (lighter text below name)
+  subOrderId?: string;      // originating order sub-order identifier
   hsnSac?: string;
   quantity: number;
   rate: number;

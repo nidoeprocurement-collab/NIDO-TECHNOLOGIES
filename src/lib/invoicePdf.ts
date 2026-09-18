@@ -313,6 +313,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
     const taxRateLabel = item.taxType ? `${item.taxPercent}%\n${item.taxType}` : `${item.taxPercent}%`;
     return [
       String(index + 1),
+       (item.subOrderId ? `Sub Order ID: ${item.subOrderId}\n` : '') +
        item.description + (item.itemDetails ? `\n${item.itemDetails}` : '') +
          (item.commercialTerms ? `\n${getCommercialTermsLines(item.commercialTerms).join('\n')}` : ''),
       item.hsnSac || '',

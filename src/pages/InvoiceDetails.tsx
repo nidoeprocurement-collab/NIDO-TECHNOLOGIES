@@ -366,6 +366,9 @@ export default function InvoiceDetails() {
                         <td className="px-3 py-3 text-gray-400 text-center">{index + 1}</td>
                         <td className="px-3 py-3">
                           <p className="font-semibold text-gray-900">{item.description}</p>
+                          {item.subOrderId && (
+                            <p className="text-xs font-medium text-blue-700 mt-0.5">Sub Order ID: {item.subOrderId}</p>
+                          )}
                           {item.itemDetails && <p className="text-xs text-gray-500 mt-0.5">{item.itemDetails}</p>}
                           {item.commercialTerms && (
                             <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 leading-tight">

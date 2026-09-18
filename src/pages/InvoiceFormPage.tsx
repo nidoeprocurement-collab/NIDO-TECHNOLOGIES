@@ -328,6 +328,7 @@ export default function InvoiceFormPage() {
             id:          `${Date.now()}-${Math.random().toString(36).slice(2)}`,
             description: ci.name         || '',
             itemDetails: ci.specs?.join(', ') || '',
+            subOrderId:  getOrderSubOrderId(order.id, ci.subOrderId, order.cartItems?.indexOf(ci) ?? 0),
             hsnSac:      ci.hsnSnapshot || getCategoryCode(ci.category, ci.productType || ci.physicalType),
             quantity:    ci.quantity     || 1,
             rate:        preTaxRate,
@@ -950,6 +951,11 @@ export default function InvoiceFormPage() {
                           placeholder="Description (optional)"
                           className="w-full rounded border border-gray-200 px-2 py-1 text-xs text-gray-500"
                         />
+                        {item.subOrderId && (
+                          <p className="mt-1 text-[11px] font-medium text-blue-700">
+                            Sub Order ID: {item.subOrderId}
+                          </p>
+                        )}
                         {item.commercialTerms && (
                           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-gray-500 leading-tight">
                             <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
