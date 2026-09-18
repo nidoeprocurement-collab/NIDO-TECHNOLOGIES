@@ -214,8 +214,10 @@ export default function InvoiceFormPage() {
       productType: item.productType,
       physicalType: item.physicalType,
       fulfillmentType: item.fulfillmentType,
+      category: item.category,
       commercialTerms: item.commercialTerms,
     }));
+  const isProformaMode = status === 'Proforma Invoice' || isOrderProformaFlow;
 
   const restrictedOrder = isOrderProformaFlow
     ? myOrders.find((order) => order.id === restrictedOrderId)
@@ -241,6 +243,29 @@ export default function InvoiceFormPage() {
     toast.error('Proforma invoices are available only for physical and hybrid products.');
     navigate('/sales/invoices');
   }, [existing, canCreateProforma, navigate]);
+
+  // If an order is selected before the user switches the document type to
+  // Proforma Invoice, apply the same product filter as the proforma import
+  // flow. Empty rows remain available for manual editing, while every
+  // populated non-physical row is removed.
+  useEffect(() => {
+    if (!isProformaMode || importSource !== 'order' || !selectedRef) return;
+    const eligibleItems = lineItems.filter((item) =>
+      !item.description.trim()
+      || isPhysicalOrHybridProduct({
+        productType: item.productType,
+        physicalType: item.physicalType,
+        fulfillmentType: item.fulfillmentType,
+        category: item.category,
+        commercialTerms: item.commercialTerms,
+      }),
+    );
+    if (eligibleItems.length === lineItems.length) return;
+    setLineItems(eligibleItems);
+    toast.warning(
+      'Proforma invoices can include only physical and hybrid products. Other products were excluded.',
+    );
+  }, [isProformaMode, importSource, selectedRef, lineItems]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applyLineItems(
@@ -356,9 +381,23 @@ export default function InvoiceFormPage() {
           order.cartItems?.indexOf(ci) ?? index,
         )),
       );
+      const eligibleItems = isProformaMode
+        ? invoiceableItems.filter((ci) => isPhysicalOrHybridProduct({
+            productType: ci.productType,
+            physicalType: ci.physicalType,
+            fulfillmentType: ci.fulfillmentType,
+            category: ci.category,
+            commercialTerms: ci.commercialTerms,
+          }))
+        : invoiceableItems;
+      if (isProformaMode && eligibleItems.length < invoiceableItems.length) {
+        toast.warning(
+          'Proforma invoices can include only physical and hybrid products. Other products were excluded.',
+        );
+      }
       setReturnedItemCount(scopedItems.length - invoiceableItems.length);
       setLineItems(
-        invoiceableItems.map((ci) => {
+        eligibleItems.map((ci) => {
           // Selected vendor tax is snapshotted on the order. Legacy orders
           // continue to resolve their rate from the current tax settings.
           const gstRate    = typeof ci.gstSnapshot === 'number'
@@ -603,7 +642,10 @@ export default function InvoiceFormPage() {
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     };
-    saveInvoice(invoice);
+    if (!saveInvoice(invoice)) {
+      toast.error('Proforma invoices can be created only for physical and hybrid products.');
+      return;
+    }
 
     if (isOrderProformaFlow) {
       try {
