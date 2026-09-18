@@ -147,6 +147,7 @@ export default function InvoiceFormPage() {
   // ── Import-panel state ───────────────────────────────────────────────────
   const [importSource,    setImportSource]    = useState<ImportSource>('order');
   const [selectedRef,     setSelectedRef]     = useState('');
+  const [selectedShippedRefs, setSelectedShippedRefs] = useState<string[]>([]);
   const [importedRefLabel, setImportedRefLabel] = useState('');
   const didAutoImport = useRef(false);
 
@@ -308,6 +309,7 @@ export default function InvoiceFormPage() {
 
   function clearImport() {
     setSelectedRef('');
+    setSelectedShippedRefs([]);
     setImportedRefLabel('');
     setReturnedItemCount(0);
   }
@@ -319,7 +321,7 @@ export default function InvoiceFormPage() {
   }
 
   // ── Import from Order ────────────────────────────────────────────────────
-  function importFromOrder(refId: string, shippedSubOrderId?: string) {
+  function importFromOrder(refId: string, shippedSubOrderIds?: string[]) {
     const order = myOrders.find((o) => o.id === refId);
     if (!order) return;
 
@@ -370,12 +372,12 @@ export default function InvoiceFormPage() {
     }
 
     if (order.cartItems && order.cartItems.length > 0) {
-      const selectedSubOrderId = isOrderProformaFlow
-        ? restrictedSubOrderId
-        : shippedSubOrderId;
-      const scopedItems = selectedSubOrderId
+      const selectedSubOrderIds = isOrderProformaFlow
+        ? (restrictedSubOrderId ? [restrictedSubOrderId] : [])
+        : (shippedSubOrderIds || []);
+      const scopedItems = selectedSubOrderIds.length > 0
         ? order.cartItems.filter((ci, index) =>
-            getOrderSubOrderId(order.id, ci.subOrderId, index) === selectedSubOrderId,
+            selectedSubOrderIds.includes(getOrderSubOrderId(order.id, ci.subOrderId, index)),
           )
         : order.cartItems;
       const invoiceableItems = scopedItems.filter((ci, index) =>
@@ -440,7 +442,11 @@ export default function InvoiceFormPage() {
       setLineItems([]);
     }
 
-    setImportedRefLabel(order.id);
+    setImportedRefLabel(
+      shippedSubOrderIds && shippedSubOrderIds.length > 0
+        ? `${order.id} (${shippedSubOrderIds.length} shipped product${shippedSubOrderIds.length === 1 ? '' : 's'})`
+        : order.id,
+    );
   }
 
   // ── Import from Quotation ────────────────────────────────────────────────
@@ -520,16 +526,39 @@ export default function InvoiceFormPage() {
     setSelectedRef(refId);
     if (!refId) { setImportedRefLabel(''); return; }
     if (importSource === 'order')      importFromOrder(refId);
-    if (importSource === 'shippedproduct') {
-      try {
-        const [orderId, shippedSubOrderId] = JSON.parse(refId) as [string, string];
-        importFromOrder(orderId, shippedSubOrderId);
-      } catch {
-        setImportedRefLabel('');
-      }
-    }
     if (importSource === 'quotation')  importFromQuotation(refId);
     if (importSource === 'salesorder') importFromSalesOrder(refId);
+  }
+
+  function handleShippedProductSelect(refIds: string[]) {
+    const selected = refIds.flatMap((refId) => {
+      try {
+        const parsed = JSON.parse(refId);
+        return Array.isArray(parsed) && parsed.length === 2
+          ? [{ refId, orderId: String(parsed[0]), subOrderId: String(parsed[1]) }]
+          : [];
+      } catch {
+        return [];
+      }
+    });
+    const orderIds = new Set(selected.map((item) => item.orderId));
+
+    if (orderIds.size > 1) {
+      toast.error('Select shipped products from one main order at a time. Create a separate proforma invoice for another order.');
+      return;
+    }
+
+    setSelectedShippedRefs(refIds);
+    setSelectedRef(refIds[0] || '');
+    if (selected.length === 0) {
+      setImportedRefLabel('');
+      return;
+    }
+
+    importFromOrder(
+      selected[0].orderId,
+      selected.map((item) => item.subOrderId),
+    );
   }
 
   useEffect(() => {
@@ -784,30 +813,57 @@ export default function InvoiceFormPage() {
               {/* ── Reference number dropdown ── */}
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-[260px]">
-                  <select
-                    value={selectedRef}
-                    onChange={(e) => handleRefSelect(e.target.value)}
-                    className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">
-                      {importSource === 'order'
-                        ? '— Select an Order —'
-                        : importSource === 'quotation'
-                        ? '— Select a Quotation —'
-                        : '— Select a Sales Order —'}
-                    </option>
-                    {refOptions.length === 0 ? (
-                      <option disabled>No records found</option>
-                    ) : (
-                      refOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>
-                          {opt.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                   {importSource === 'shippedproduct' ? (
+                     <select
+                       multiple
+                       size={Math.min(Math.max(refOptions.length, 3), 6)}
+                       value={selectedShippedRefs}
+                       onChange={(e) => handleShippedProductSelect(
+                         Array.from(e.target.selectedOptions, (option) => option.value),
+                       )}
+                       className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     >
+                       {refOptions.length === 0 ? (
+                         <option disabled>No shipped products found</option>
+                       ) : (
+                         refOptions.map((opt) => (
+                           <option key={opt.id} value={opt.id}>
+                             {opt.label}
+                           </option>
+                         ))
+                       )}
+                     </select>
+                   ) : (
+                     <select
+                       value={selectedRef}
+                       onChange={(e) => handleRefSelect(e.target.value)}
+                       className="w-full rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                     >
+                       <option value="">
+                         {importSource === 'order'
+                           ? '— Select an Order —'
+                           : importSource === 'quotation'
+                           ? '— Select a Quotation —'
+                           : '— Select a Sales Order —'}
+                       </option>
+                       {refOptions.length === 0 ? (
+                         <option disabled>No records found</option>
+                       ) : (
+                         refOptions.map((opt) => (
+                           <option key={opt.id} value={opt.id}>
+                             {opt.label}
+                           </option>
+                         ))
+                       )}
+                     </select>
+                   )}
+                   {importSource === 'shippedproduct' && (
+                     <p className="mt-1 text-xs text-blue-700">
+                       Select multiple shipped products from the same main order.
+                     </p>
+                   )}
                 </div>
-                {selectedRef && (
+                 {(selectedRef || selectedShippedRefs.length > 0) && (
                   <button
                     type="button"
                     onClick={() => { clearImport(); }}
