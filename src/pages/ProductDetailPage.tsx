@@ -20,10 +20,10 @@ import {
 } from "@/lib/priceEngineStore";
 import { getEffectiveTaxPctForCategory, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
 import FloatingCartButton from "@/components/FloatingCartButton";
+import { getProductCommercialTerms } from "@/lib/productCommercialTerms";
 import {
   formatLeadTimeByType,
   getAvailabilityByType,
-  getProductCommercialTerms,
   getPricingModel,
   getProductType,
   getQuantityLabel,
