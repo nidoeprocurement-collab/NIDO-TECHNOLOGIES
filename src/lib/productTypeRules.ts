@@ -18,6 +18,14 @@ export function isHybridType(type: string): boolean {
   return type.toLowerCase().includes("hybrid");
 }
 
+/** Proforma invoices are supported only for physical goods and hybrid products. */
+export function isPhysicalOrHybridType(type?: string): boolean {
+  const normalized = String(type || "").trim().toLowerCase();
+  return normalized === "physical product"
+    || normalized === "physical"
+    || normalized.includes("hybrid");
+}
+
 export function isDigitalOnlyType(type: string): boolean {
   return isDigitalType(type) && !isHybridType(type);
 }

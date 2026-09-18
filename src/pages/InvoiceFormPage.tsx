@@ -20,6 +20,8 @@ import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
 import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
+import { isPhysicalOrHybridType } from '@/lib/productTypeRules';
+import { toast } from 'sonner';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -205,6 +207,39 @@ export default function InvoiceFormPage() {
   const [bankAccountNo,   setBankAccountNo]   = useState(existing?.bankAccountNo   || '');
   const [bankIfsc,        setBankIfsc]        = useState(existing?.bankIfsc        || '');
   const [bankBranch,      setBankBranch]      = useState(existing?.bankBranch      || '');
+
+  const populatedLineItems = lineItems.filter((item) => item.description.trim());
+  const canCreateProforma = populatedLineItems.length > 0
+    && populatedLineItems.every((item) => isPhysicalOrHybridType(
+      item.productType || item.commercialTerms?.productType,
+    ));
+
+  const restrictedOrder = isOrderProformaFlow
+    ? myOrders.find((order) => order.id === restrictedOrderId)
+    : undefined;
+  const restrictedProformaItem = restrictedOrder?.cartItems?.find((item, index) =>
+    getOrderSubOrderId(restrictedOrder.id, item.subOrderId, index) === restrictedSubOrderId,
+  );
+  const restrictedProformaType = restrictedProformaItem
+    ? restrictedProformaItem.commercialTerms?.productType
+      || restrictedProformaItem.productType
+      || restrictedProformaItem.physicalType
+      || (restrictedProformaItem.fulfillmentType === 'digital' ? 'Digital License' : 'Physical Product')
+    : '';
+
+  useEffect(() => {
+    if (!isOrderProformaFlow || !restrictedOrder) return;
+    if (!restrictedProformaItem || !isPhysicalOrHybridType(restrictedProformaType)) {
+      toast.error('Proforma invoices are available only for physical and hybrid products.');
+      navigate('/sales/invoices');
+    }
+  }, [
+    isOrderProformaFlow,
+    restrictedOrder,
+    restrictedProformaItem,
+    restrictedProformaType,
+    navigate,
+  ]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function applyLineItems(
@@ -498,6 +533,10 @@ export default function InvoiceFormPage() {
 
   const handleSave = async () => {
     if (!clientName.trim() || lineItems.every((item) => !item.description.trim())) return;
+    if (status === 'Proforma Invoice' && !canCreateProforma) {
+      toast.error('Proforma invoices are available only for physical and hybrid products.');
+      return;
+    }
     const now = new Date().toISOString();
     let invoice: StoredInvoice = {
       id: existing?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -746,7 +785,8 @@ export default function InvoiceFormPage() {
                       <option>Proforma Invoice</option>
                     ) : (
                       <>
-                        <option>Draft</option><option>Proforma Invoice</option>
+                        <option>Draft</option>
+                        {canCreateProforma && <option>Proforma Invoice</option>}
                         <option>Paid</option><option>Overdue</option><option>Cancelled</option>
                       </>
                     )}

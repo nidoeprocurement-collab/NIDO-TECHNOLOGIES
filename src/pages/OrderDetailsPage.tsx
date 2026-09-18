@@ -24,6 +24,7 @@ import {
   getAvailabilityLabel,
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
+import { isPhysicalOrHybridType } from "@/lib/productTypeRules";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -2475,9 +2476,7 @@ function isPhysicalProduct(sub: any): boolean {
   const productType = String(
     sub?.commercialTerms?.productType || sub?.productType || "",
   ).trim().toLowerCase();
-  return productType === "physical product"
-    || productType === "physical"
-    || productType.includes("hybrid");
+  return isPhysicalOrHybridType(productType);
 }
 
 // Returns are allowed for Delivered items within a strict 72-hour window.
@@ -3002,7 +3001,7 @@ export default function MyOrderPage() {
 
   const generateProformaForSubOrder = (subId: string) => {
     const target = subOrders.find((sub) => sub.id === subId);
-    if (!target || target.itemStatus !== "Shipped" || isOrderInactive) return;
+    if (!target || !isPhysicalProduct(target) || target.itemStatus !== "Shipped" || isOrderInactive) return;
     navigate(
       `/sales/invoices/new?proforma=1&orderId=${encodeURIComponent(orderId)}&subOrderId=${encodeURIComponent(subId)}`,
     );
@@ -4209,7 +4208,7 @@ export default function MyOrderPage() {
                         </div>
                       ) : (
                         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
-                          {sub.itemStatus === "Shipped" && (
+                          {sub.itemStatus === "Shipped" && isPhysicalProduct(sub) && (
                             <button
                               onClick={() => generateProformaForSubOrder(sub.id)}
                               style={{ padding: "6px 8px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", whiteSpace: "nowrap" }}
