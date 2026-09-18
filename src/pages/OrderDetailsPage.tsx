@@ -2475,7 +2475,9 @@ function isPhysicalProduct(sub: any): boolean {
   const productType = String(
     sub?.commercialTerms?.productType || sub?.productType || "",
   ).trim().toLowerCase();
-  return productType === "physical product" || productType === "physical";
+  return productType === "physical product"
+    || productType === "physical"
+    || productType.includes("hybrid");
 }
 
 // Returns are allowed for Delivered items within a strict 72-hour window.
