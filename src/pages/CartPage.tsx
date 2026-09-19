@@ -70,9 +70,9 @@ function getSuggested(cartItems: CartItem[]): ClientCatalogEntry[] {
 }
 
 function QtyInput({
-  value, moq, max, onChange,
+  value, moq, max, onChange, compact = false,
 }: {
-  value: number; moq: number; max?: number; onChange: (qty: number) => void;
+  value: number; moq: number; max?: number; onChange: (qty: number) => void; compact?: boolean;
 }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => { setDraft(String(value)); }, [value]);
@@ -90,7 +90,7 @@ function QtyInput({
       <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
         <button
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="w-8 h-8 flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors border-r border-gray-300"
+          className={`${compact ? "w-6 h-7" : "w-8 h-8"} flex items-center justify-center bg-gray-50 hover:bg-gray-100 text-gray-600 transition-colors border-r border-gray-300`}
         >
           <Minus size={12} />
         </button>
@@ -102,12 +102,12 @@ function QtyInput({
           onChange={e => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={e => e.key === "Enter" && commit()}
-          className="w-14 text-center text-sm font-semibold text-gray-900 py-1.5 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className={`${compact ? "w-9 text-xs py-1" : "w-14 text-sm py-1.5"} text-center font-semibold text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
         />
         <button
           onClick={() => { if (!atMax) onChange(value + 1); }}
           disabled={atMax}
-          className={`w-8 h-8 flex items-center justify-center transition-colors border-l border-gray-300 ${atMax ? "bg-gray-50 text-gray-300 cursor-not-allowed" : "bg-gray-50 hover:bg-gray-100 text-gray-600"}`}
+          className={`${compact ? "w-6 h-7" : "w-8 h-8"} flex items-center justify-center transition-colors border-l border-gray-300 ${atMax ? "bg-gray-50 text-gray-300 cursor-not-allowed" : "bg-gray-50 hover:bg-gray-100 text-gray-600"}`}
         >
           <Plus size={12} />
         </button>
@@ -319,10 +319,10 @@ export default function CartPage() {
         <p className="text-sm text-gray-500">Review your items before checkout</p>
       </div>
 
-      <div className="flex gap-0 min-h-[calc(100vh-49px)]">
+      <div className="flex flex-col lg:flex-row gap-0 min-h-[calc(100vh-49px)]">
 
         {/* ── Left: Products + Trust badges + Suggestions ─ */}
-        <div className="flex-1 min-w-0 p-5 space-y-4">
+        <div className="flex-1 min-w-0 p-3 sm:p-5 space-y-4">
 
           {/* ── Table ─────────────────────────────────────────────────── */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -362,29 +362,29 @@ export default function CartPage() {
                     No {productTab} products in your cart.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <div className={productTab === "digital" ? "min-w-[1170px]" : "min-w-[1040px]"}>
+                  <div className={productTab === "digital" ? "overflow-x-hidden" : "overflow-x-auto"}>
+                    <div className={productTab === "digital" ? "w-full min-w-0" : "min-w-[1040px]"}>
                       {/* Header mirrors Vendor Products for each product type. */}
                       <div
-                        className="grid border-b border-gray-200 bg-gray-50 px-5 py-3 gap-3"
+                        className={`grid border-b border-gray-200 bg-gray-50 py-3 ${productTab === "digital" ? "px-2 gap-1" : "px-5 gap-3"}`}
                         style={{
                           gridTemplateColumns: productTab === "digital"
-                            ? "minmax(300px,1fr) 115px 125px 145px 135px 80px 120px 72px"
+                            ? "minmax(0, 2.55fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, .5fr) minmax(0, .9fr) minmax(0, .65fr)"
                             : "minmax(300px,1fr) 115px 125px 145px 80px 120px 72px",
                         }}
                       >
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Product</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Type</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Price / Unit</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider leading-tight">Product</span>
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider leading-tight">Type</span>
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">Price / Unit</span>
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">
                           {productTab === "digital" ? "Users / Licenses" : "Units / MOQ"}
                         </span>
                         {productTab === "digital" && (
-                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Tenure / Billing</span>
+                          <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">Tenure / Billing</span>
                         )}
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">GST</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Total</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Actions</span>
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">GST</span>
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right leading-tight">Total</span>
+                        <span className="min-w-0 break-words text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center leading-tight">Actions</span>
                       </div>
 
                       {visibleCart.map((item, idx) => {
@@ -428,10 +428,10 @@ export default function CartPage() {
                    return (
                      <div key={item.id} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? "bg-white" : "bg-white"}`}>
                        <div
-                         className="grid px-5 py-5 items-start gap-3"
+                          className={`grid py-5 items-start ${isDigital ? "px-2 gap-1" : "px-5 gap-3"}`}
                           style={{
                             gridTemplateColumns: isDigital
-                              ? "minmax(300px,1fr) 115px 125px 145px 135px 80px 120px 72px"
+                              ? "minmax(0, 2.55fr) minmax(0, .7fr) minmax(0, .9fr) minmax(0, 1.15fr) minmax(0, 1.1fr) minmax(0, .5fr) minmax(0, .9fr) minmax(0, .65fr)"
                               : "minmax(300px,1fr) 115px 125px 145px 80px 120px 72px",
                           }}
                        >
@@ -530,6 +530,7 @@ export default function CartPage() {
                             value={item.quantity}
                             moq={itemMoq}
                             max={maxQty}
+                             compact={isDigital}
                             onChange={qty => onUpdateQuantity(item.id, qty)}
                           />
                         </div>
@@ -640,7 +641,7 @@ export default function CartPage() {
         </div>
 
         {/* ── Right: Order Summary ──────────────────────────────────────── */}
-        <div className="w-80 shrink-0 border-l border-gray-200 bg-white p-5 space-y-5 sticky top-0 h-fit min-h-screen">
+        <div className="w-full lg:w-80 lg:shrink-0 border-t lg:border-t-0 lg:border-l border-gray-200 bg-white p-5 space-y-5 lg:sticky lg:top-0 lg:h-fit min-h-0 lg:min-h-screen">
 
           {/* Order Summary */}
           <div>
