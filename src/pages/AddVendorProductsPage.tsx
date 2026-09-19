@@ -12,6 +12,7 @@ import {
   reserveVendorProductCodes,
   VendorProduct,
 } from "@/lib/vendorStore";
+import { getProductType, isDigitalOnlyType } from "@/lib/productTypeRules";
 
 // ─── Thumb ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,12 @@ interface SelectedRow {
   leadTime: string;
   stock: string;
   vendorProductCode: string;
+}
+
+type SelectedProductTab = "physical" | "digital";
+
+function isDigitalCatalogProduct(product: CatalogProduct): boolean {
+  return isDigitalOnlyType(getProductType(product.physicalType || product.productType));
 }
 
 const PAGE_SIZE = 20;
@@ -104,6 +111,7 @@ export default function AddVendorProductsPage() {
   // ── Selection ────────────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedRows, setSelectedRows] = useState<SelectedRow[]>([]);
+  const [selectedProductTab, setSelectedProductTab] = useState<SelectedProductTab>("physical");
 
   // In edit mode: pre-populate with the existing product
   useEffect(() => {
@@ -113,6 +121,7 @@ export default function AddVendorProductsPage() {
     const catalogProduct = getCatalogProducts().find((p) => p.id === editProductId);
     if (!catalogProduct) return;
     setSelectedIds(new Set([editProductId]));
+    setSelectedProductTab(isDigitalCatalogProduct(catalogProduct) ? "digital" : "physical");
     setSelectedRows([{
       catalogProduct,
       price: existing.price,
@@ -131,6 +140,7 @@ export default function AddVendorProductsPage() {
         setSelectedRows((rows) => rows.filter((r) => r.catalogProduct.id !== product.id));
       } else {
         next.add(product.id);
+        setSelectedProductTab(isDigitalCatalogProduct(product) ? "digital" : "physical");
         // Compute a *preview* VPC for display — peekVpcCounter() is a pure
         // localStorage read with no side-effects, so it is safe to call inside
         // a React state updater (even under Strict Mode's double-invocation).
@@ -235,6 +245,13 @@ export default function AddVendorProductsPage() {
   };
 
   const goBack = () => navigate(`/vendors/${vendorId}`, { state: { tab: "products" } });
+  const physicalSelectedCount = selectedRows.filter((row) => !isDigitalCatalogProduct(row.catalogProduct)).length;
+  const digitalSelectedCount = selectedRows.length - physicalSelectedCount;
+  const visibleSelectedRows = selectedRows.filter((row) =>
+    selectedProductTab === "digital"
+      ? isDigitalCatalogProduct(row.catalogProduct)
+      : !isDigitalCatalogProduct(row.catalogProduct)
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
@@ -407,15 +424,41 @@ export default function AddVendorProductsPage() {
             </h2>
           </div>
 
+          {!isEditMode && (
+            <div className="flex items-end gap-5 px-4 pt-2 border-b border-gray-100">
+              {([
+                ["physical", "Physical Selected Products", physicalSelectedCount],
+                ["digital", "Digital Selected Products", digitalSelectedCount],
+              ] as const).map(([tab, label, count]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setSelectedProductTab(tab)}
+                  className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${
+                    selectedProductTab === tab
+                      ? "border-blue-600 text-blue-700"
+                      : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {label} <span className="ml-1 text-[10px] font-medium text-gray-400">({count})</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {selectedRows.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-              No products selected yet — check items in the list above.
+              {isEditMode ? "Product details are shown here." : `No ${selectedProductTab} products selected yet — check items in the list above.`}
             </div>
           ) : (
             <>
-              {/* Table */}
-              <div className="w-full overflow-x-visible">
-                <table className="w-full text-sm" style={{ minWidth: "900px" }}>
+              {visibleSelectedRows.length === 0 && !isEditMode ? (
+                <div className="flex min-h-32 items-center justify-center text-gray-400 text-sm">
+                  No {selectedProductTab} products selected yet.
+                </div>
+              ) : (
+                <div className="w-full overflow-x-visible">
+                  <table className="w-full text-sm" style={{ minWidth: "900px" }}>
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-50 border-b border-gray-100">
                       {!isEditMode && <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>}
@@ -438,7 +481,7 @@ export default function AddVendorProductsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {selectedRows.map((row, idx) => (
+                    {(isEditMode ? selectedRows : visibleSelectedRows).map((row, idx) => (
                       <tr key={row.catalogProduct.id} className="hover:bg-gray-50/40 transition-colors">
                         {!isEditMode && (
                           <td className="px-3 py-2 text-gray-500 text-sm font-medium">{idx + 1}</td>
@@ -509,8 +552,9 @@ export default function AddVendorProductsPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </div>
+              )}
 
               {!isEditMode && (
                 <div className="flex-shrink-0 px-2 py-2 border-t border-gray-100 bg-white">
