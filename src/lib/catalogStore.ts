@@ -13,6 +13,18 @@ export interface GeneralSpec {
   attributeValue: string;
 }
 
+export interface CatalogVariationOption {
+  id: string;
+  label: string;
+  priceAdjustment: number;
+}
+
+export interface CatalogVariation {
+  id: string;
+  name: string;
+  options: CatalogVariationOption[];
+}
+
 export interface CatalogProduct {
   id: string;
   masterProductCode: string;
@@ -27,6 +39,8 @@ export interface CatalogProduct {
   description: string;
   specifications: CatalogSpec[];
   generalSpecs: GeneralSpec[];
+  /** Cloud/service variation fields configured by an administrator. */
+  variations?: CatalogVariation[];
   productNotes: string;
   videoUrl: string;
   images: string[];
@@ -77,6 +91,7 @@ export function getCatalogProducts(): CatalogProduct[] {
     return products.map(product => ({
       ...product,
       physicalType: product.physicalType?.trim() || 'Physical Product',
+      variations: Array.isArray(product.variations) ? product.variations : [],
     }));
   } catch {
     return [];
@@ -189,6 +204,7 @@ export function saveCatalogProduct(
           productNotes: product.productNotes,
           videoUrl:     product.videoUrl,
           warranty:     product.warranty,
+          variations:   product.variations ?? [],
         };
       });
     }

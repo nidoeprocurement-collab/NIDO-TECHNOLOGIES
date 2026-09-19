@@ -15,7 +15,7 @@ import {
 import { toast } from 'sonner';
 import {
   generateMasterProductCode, saveCatalogProduct, getCatalogProducts, findCatalogProductByName,
-  type CatalogSpec, type GeneralSpec
+  type CatalogSpec, type GeneralSpec, type CatalogVariation, type CatalogVariationOption
 } from '@/lib/catalogStore';
 
 export default function AddMasterCatalogueItemWrapper() {
@@ -46,6 +46,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const [description, setDescription] = useState(draft?.description ?? '');
   const [specifications, setSpecifications] = useState<CatalogSpec[]>(draft?.specifications ?? []);
   const [generalSpecs, setGeneralSpecs] = useState<GeneralSpec[]>(draft?.generalSpecs ?? []);
+  const [variations, setVariations] = useState<CatalogVariation[]>(draft?.variations ?? []);
   const [productNotes, setProductNotes] = useState(draft?.productNotes ?? '');
   const [videoUrl, setVideoUrl] = useState(draft?.videoUrl ?? '');
   const [images, setImages] = useState<string[]>(draft?.images ?? []);
@@ -68,6 +69,7 @@ export default function AddMasterCatalogueItemWrapper() {
     setDescription(product.description || '');
     setSpecifications(product.specifications || []);
     setGeneralSpecs(product.generalSpecs || []);
+    setVariations(product.variations || []);
     setProductNotes(product.productNotes || '');
     setVideoUrl(product.videoUrl || '');
     setImages(product.images || []);
@@ -145,6 +147,71 @@ export default function AddMasterCatalogueItemWrapper() {
   const removeGeneralSpec = (id: string) =>
     setGeneralSpecs(s => s.filter(x => x.id !== id));
 
+  const addVariation = () => {
+    setVariations(current => [
+      ...current,
+      {
+        id: `variation-${Date.now()}`,
+        name: '',
+        options: [{ id: `variation-option-${Date.now()}`, label: '', priceAdjustment: 0 }],
+      },
+    ]);
+  };
+
+  const updateVariation = (id: string, field: 'name', value: string) => {
+    setVariations(current => current.map(variation =>
+      variation.id === id ? { ...variation, [field]: value } : variation,
+    ));
+  };
+
+  const removeVariation = (id: string) => {
+    setVariations(current => current.filter(variation => variation.id !== id));
+  };
+
+  const addVariationOption = (variationId: string) => {
+    setVariations(current => current.map(variation =>
+      variation.id === variationId
+        ? {
+            ...variation,
+            options: [
+              ...variation.options,
+              { id: `variation-option-${Date.now()}-${variation.options.length}`, label: '', priceAdjustment: 0 },
+            ],
+          }
+        : variation,
+    ));
+  };
+
+  const updateVariationOption = (
+    variationId: string,
+    optionId: string,
+    field: keyof CatalogVariationOption,
+    value: string,
+  ) => {
+    setVariations(current => current.map(variation =>
+      variation.id !== variationId
+        ? variation
+        : {
+            ...variation,
+            options: variation.options.map(option => {
+              if (option.id !== optionId) return option;
+              return {
+                ...option,
+                [field]: field === 'priceAdjustment' ? (Number(value) || 0) : value,
+              };
+            }),
+          },
+    ));
+  };
+
+  const removeVariationOption = (variationId: string, optionId: string) => {
+    setVariations(current => current.map(variation =>
+      variation.id === variationId
+        ? { ...variation, options: variation.options.filter(option => option.id !== optionId) }
+        : variation,
+    ));
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -220,7 +287,22 @@ export default function AddMasterCatalogueItemWrapper() {
     existingProduct = isEditMode
       ? getCatalogProducts().find(p => String(p.id) === String(currentEditProductId))
       : undefined,
-  ) => ({
+  ) => {
+    const savedVariations = variations
+      .map(variation => ({
+        ...variation,
+        name: variation.name.trim(),
+        options: variation.options
+          .map(option => ({
+            ...option,
+            label: option.label.trim(),
+            priceAdjustment: Number(option.priceAdjustment) || 0,
+          }))
+          .filter(option => option.label),
+      }))
+      .filter(variation => variation.name && variation.options.length > 0);
+
+    return {
     ...(isEditMode ? existingProduct : undefined),
     // In edit mode, preserve the exact ID from storage. The route ID is only
     // used to locate the record and must never turn an update into an insert.
@@ -238,6 +320,7 @@ export default function AddMasterCatalogueItemWrapper() {
     description,
     specifications,
     generalSpecs,
+    variations: savedVariations,
     productNotes,
     videoUrl,
     images,
@@ -246,7 +329,8 @@ export default function AddMasterCatalogueItemWrapper() {
     moq: 0,
     leadTime: '',
     warranty: '',
-  });
+    };
+  };
 
   const handlePreview = () => {
     if (!productName.trim()) { toast.error('Enter a product name first'); return; }
@@ -255,7 +339,7 @@ export default function AddMasterCatalogueItemWrapper() {
       skuCode,
       productName: productName || 'Untitled Product',
       physicalType, category, subcategory, brand, tags,
-      description, specifications, generalSpecs, productNotes, videoUrl, images,
+      description, specifications, generalSpecs, variations, productNotes, videoUrl, images,
       createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
     };
     sessionStorage.setItem('nido_preview_draft', JSON.stringify(previewData));
@@ -580,9 +664,109 @@ export default function AddMasterCatalogueItemWrapper() {
           </div>
         </div>
 
+        {physicalType === 'Cloud Service' && (
+          <div className="border border-blue-200 rounded-lg bg-blue-50/40 p-2 sm:p-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">5. Cloud Service Variations</h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                  Add the dropdown fields that clients can configure in Shop. Enter a positive or negative price adjustment for each option.
+                </p>
+              </div>
+              <span className="text-[11px] font-semibold text-blue-700">Used by Shop → Configure</span>
+            </div>
+
+            {variations.length === 0 ? (
+              <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-white p-4 text-center text-xs text-gray-500">
+                No cloud variations yet. Add fields such as Region, Plan, CPU, Storage, or Billing Cycle.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {variations.map((variation, variationIndex) => (
+                  <div key={variation.id} className="rounded-lg border border-blue-100 bg-white p-3 sm:p-4">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <Label className="text-xs font-semibold text-gray-700">Variation field {variationIndex + 1}</Label>
+                        <Input
+                          value={variation.name}
+                          onChange={event => updateVariation(variation.id, 'name', event.target.value)}
+                          placeholder="e.g., Region, Instance Type, Storage, Plan"
+                          className="mt-1 h-9 text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeVariation(variation.id)}
+                        className="mt-5 rounded-md p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                        aria-label={`Remove variation ${variation.name || variationIndex + 1}`}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <div className="grid grid-cols-[minmax(0,1fr)_120px_32px] gap-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                        <span>Dropdown option</span>
+                        <span>Price adjustment</span>
+                        <span />
+                      </div>
+                      {variation.options.map(option => (
+                        <div key={option.id} className="grid grid-cols-[minmax(0,1fr)_120px_32px] items-center gap-2">
+                          <Input
+                            value={option.label}
+                            onChange={event => updateVariationOption(variation.id, option.id, 'label', event.target.value)}
+                            placeholder="e.g., Mumbai"
+                            className="h-8 text-xs"
+                          />
+                          <Input
+                            type="number"
+                            value={option.priceAdjustment}
+                            onChange={event => updateVariationOption(variation.id, option.id, 'priceAdjustment', event.target.value)}
+                            placeholder="0"
+                            className="h-8 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeVariationOption(variation.id, option.id)}
+                            className="rounded-md p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                            aria-label={`Remove option ${option.label || "option"}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-1 h-8 gap-1.5 text-xs"
+                        onClick={() => addVariationOption(variation.id)}
+                      >
+                        <Plus size={13} /> Add option
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4 gap-2 border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+              onClick={addVariation}
+            >
+              <Plus size={16} /> Add variation field
+            </Button>
+            <p className="mt-2 text-[11px] text-gray-500">
+              Example: Region → Mumbai ₹0, Singapore ₹2,500. The base product/vendor price is used first, then the selected adjustments are added together.
+            </p>
+          </div>
+        )}
+
         {/* Section 5: Product Images & Media */}
         <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
-          <h2 className="text-base sm:text-lg font-bold text-gray-900">5. Product Images & Media</h2>
+          <h2 className="text-base sm:text-lg font-bold text-gray-900">{physicalType === 'Cloud Service' ? '6' : '5'}. Product Images & Media</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Upload product images for display in the catalog and shop.</p>
 
           <div className="mt-4 space-y-4">

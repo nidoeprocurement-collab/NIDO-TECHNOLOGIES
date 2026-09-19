@@ -1,6 +1,8 @@
 // Client Catalog Store — persists each client's catalog products to localStorage
 // keyed by clientId so ShopPage can read them per-client.
 
+import type { CatalogVariation } from './catalogStore';
+
 export interface ClientCatalogEntry {
   productCode: string;
   sku: string;
@@ -25,6 +27,7 @@ export interface ClientCatalogEntry {
   moq?: number;
   priceNum?: number;
   generalSpecs?: { label: string; value: string }[];
+  variations?: CatalogVariation[];
   productNotes?: string;
   videoUrl?: string;
   warranty?: string;

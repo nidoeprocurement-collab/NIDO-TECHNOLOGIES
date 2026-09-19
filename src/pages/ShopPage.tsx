@@ -5,7 +5,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import FloatingCartButton from "@/components/FloatingCartButton";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
-import { getCatalogProducts } from "@/lib/catalogStore";
+import { getCatalogProducts, type CatalogVariation } from "@/lib/catalogStore";
 import { getClients as getStoredClients } from "@/lib/clientStore";
 import {
   getAllProductPricing,
@@ -75,6 +75,7 @@ type Product = {
   preference?: string;
   /** Active client-catalog roles allowed to order this product. */
   roles?: string[];
+  variations?: CatalogVariation[];
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -238,6 +239,21 @@ function getCloudDataFields(product: Product): CloudDataField[] {
     fields.push({ label: cleanLabel, value: cleanValue, options });
   };
 
+  (product.variations || []).forEach(variation => {
+    const options = (variation.options || []).map(option => ({
+      label: option.label.trim(),
+      priceAdjustment: Number(option.priceAdjustment) || 0,
+    })).filter(option => option.label);
+    const label = variation.name.trim();
+    if (!label || !options.length || seen.has(label.toLowerCase())) return;
+    seen.add(label.toLowerCase());
+    fields.push({
+      label,
+      value: options[0].label,
+      options,
+    });
+  });
+
   (product.generalSpecs || []).forEach(spec => addField(spec.label, spec.value));
   (product.specs || []).forEach(spec => {
     const separator = spec.indexOf(":");
@@ -386,6 +402,7 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     warranty: master?.warranty || e.warranty,
     preference: e.preference,
     roles: e.roles || [],
+    variations: master?.variations || e.variations || [],
   };
 }
 

@@ -908,6 +908,7 @@ function AddNewProductModal({
       generalSpecs: row.product.generalSpecs
         .filter(g => g.category || g.attributeValue)
         .map(g => ({ label: g.category, value: g.attributeValue })),
+      variations: row.product.variations || [],
       productNotes: row.product.productNotes,
       videoUrl: row.product.videoUrl,
       warranty: row.product.warranty,
