@@ -4,6 +4,8 @@ import { usePageMeta } from "@/contexts/PageMetaContext";
 import { toast } from "@/hooks/use-toast";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
+import { getAllPOs } from "@/lib/purchaseOrderStore";
+import { getPrefix } from "@/lib/configService";
 import { safeReadJson } from "@/lib/utils";
 import { generateBillPdf } from "@/lib/billPdf";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -80,6 +82,7 @@ interface BillForm {
   vendorAddress: string;
   billNumber: string;
   orderNumber: string;
+  sourcePurchaseOrderId?: string;
   referenceNumber: string;
   billDate: string;
   dueDate: string;
@@ -103,6 +106,7 @@ const STATUS_STYLE: Record<BillStatus, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const toNumber = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
+const normalizeLookup = (v: unknown) => String(v || "").trim().toLowerCase();
 
 const money = (v: number) => formatCurrency(v);
 
@@ -177,12 +181,23 @@ const getBillTotals = (entry: Pick<BillEntry, "items" | "adjustment">) => {
   };
 };
 
+const getBillPrefix = () => {
+  const configured = getPrefix("bill");
+  // BL- was the legacy built-in default; new bills use the requested
+  // human-readable Bill- prefix while still respecting custom settings.
+  return configured === "BL-" || configured === "BILL-" || !configured ? "Bill-" : configured;
+};
+
 const nextBillNumber = (entries: BillEntry[]) => {
+  const prefix = getBillPrefix();
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escapedPrefix}(\\d+)$`, "i");
   const max = entries.reduce((current, entry) => {
-    const parsed = Number(entry.billNumber.replace(/\D/g, ""));
+    const match = entry.billNumber.trim().match(pattern);
+    const parsed = match ? Number(match[1]) : 0;
     return Number.isFinite(parsed) ? Math.max(current, parsed) : current;
   }, 0);
-  return `BILL-${String(max + 1).padStart(5, "0")}`;
+  return `${prefix}${String(max + 1).padStart(5, "0")}`;
 };
 
 const newItem = (id: string): BillItem => ({
@@ -477,6 +492,21 @@ export default function BillsPage() {
     () => (params.id ? bills.find((b) => b.id === params.id) || null : null),
     [bills, params.id],
   );
+  const selectedVendor = useMemo(
+    () => vendors.find((vendor) => vendor.name === form.vendorName),
+    [vendors, form.vendorName],
+  );
+  const deliveredPurchaseOrders = useMemo(() => {
+    const vendorName = normalizeLookup(form.vendorName);
+    const vendorId = selectedVendor?.id;
+    return getAllPOs().filter((po) =>
+      String(po.status).trim().toLowerCase() === "delivered"
+      && (
+        (vendorId && po.vendorId === vendorId)
+        || normalizeLookup(po.vendorName) === vendorName
+      ),
+    );
+  }, [form.vendorName, selectedVendor?.id]);
 
   useEffect(() => {
     setMeta({ title: selectedBill?.billNumber || "Bills" });
@@ -492,6 +522,7 @@ export default function BillsPage() {
         vendorAddress: selectedBill.vendorAddress,
         billNumber: selectedBill.billNumber,
         orderNumber: selectedBill.orderNumber,
+        sourcePurchaseOrderId: selectedBill.sourcePurchaseOrderId,
         referenceNumber: selectedBill.referenceNumber,
         billDate: indianToIso(selectedBill.billDate),
         dueDate: indianToIso(selectedBill.dueDate),
@@ -549,6 +580,7 @@ export default function BillsPage() {
                 ...entry,
                 vendorName: form.vendorName, vendorAddress: form.vendorAddress,
                 billNumber: form.billNumber, orderNumber: form.orderNumber,
+                sourcePurchaseOrderId: form.sourcePurchaseOrderId,
                 referenceNumber: form.referenceNumber,
                 billDate: isoToIndian(form.billDate), dueDate: isoToIndian(form.dueDate),
                 paymentTerms: form.paymentTerms, reverseCharge: form.reverseCharge,
@@ -566,6 +598,7 @@ export default function BillsPage() {
           id,
           billNumber: form.billNumber || nextBillNumber(bills),
           orderNumber: form.orderNumber,
+          sourcePurchaseOrderId: form.sourcePurchaseOrderId,
           referenceNumber: form.referenceNumber,
           vendorName: form.vendorName,
           vendorAddress: form.vendorAddress,
@@ -694,8 +727,13 @@ export default function BillsPage() {
                     const v = e.target.value;
                     const vendor = vendors.find((vd) => vd.name === v);
                     const address = vendor?.address || "No. 6, 4th Main Road\nGKW Layout, Peenya 2nd Stage\nBangalore Karnataka\nIndia";
-                    setF("vendorName", v);
-                    setF("vendorAddress", address);
+                    setForm((current) => ({
+                      ...current,
+                      vendorName: v,
+                      vendorAddress: address,
+                      orderNumber: "",
+                      sourcePurchaseOrderId: undefined,
+                    }));
                   }}
                 >
                   <option value="">Select a Vendor</option>
@@ -721,8 +759,27 @@ export default function BillsPage() {
                 </div>
               </div>
               <div>
-                <FieldLabel>Order Number</FieldLabel>
-                <input type="text" className={inp} value={form.orderNumber} onChange={(e) => setF("orderNumber", e.target.value)} placeholder="e.g. PO-00001" />
+                <FieldLabel>PO Number</FieldLabel>
+                <select
+                  className={sel}
+                  value={form.orderNumber}
+                  onChange={(e) => {
+                    const po = deliveredPurchaseOrders.find((candidate) => candidate.poNumber === e.target.value);
+                    setForm((current) => ({
+                      ...current,
+                      orderNumber: po?.poNumber || "",
+                      sourcePurchaseOrderId: po?.poNumber,
+                    }));
+                  }}
+                  disabled={!form.vendorName}
+                >
+                  <option value="">
+                    {form.vendorName ? "Select a delivered PO" : "Select a vendor first"}
+                  </option>
+                  {deliveredPurchaseOrders.map((po) => (
+                    <option key={po.poNumber} value={po.poNumber}>{po.poNumber}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <FieldLabel>Reference Number</FieldLabel>
