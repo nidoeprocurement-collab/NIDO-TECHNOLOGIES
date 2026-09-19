@@ -24,12 +24,42 @@ import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import {
-  getAvailabilityLabel,
   getProductCommercialTerms,
 } from "@/lib/productCommercialTerms";
+import {
+  formatLeadTimeByType,
+  getAvailabilityByType,
+  getPricingModel,
+  getProductType,
+  getTenureBilling,
+  isDigitalOnlyType,
+  isHybridType,
+} from "@/lib/productTypeRules";
 
 function formatPrice(n: number) {
   return formatCurrency(n);
+}
+
+type CartProductTab = "physical" | "digital";
+
+function getCartProductType(item: Pick<CartItem, "physicalType" | "productType" | "fulfillmentType">): string {
+  return getProductType(
+    item.physicalType
+      || item.productType
+      || (
+        item.fulfillmentType === "digital"
+          ? "Digital License"
+          : item.fulfillmentType === "hybrid"
+            ? "Hybrid Product"
+            : "Physical Product"
+      ),
+  );
+}
+
+function cartTypeBadgeClasses(type: string): string {
+  if (isDigitalOnlyType(type)) return "bg-violet-50 text-violet-700";
+  if (isHybridType(type)) return "bg-amber-50 text-amber-700";
+  return "bg-emerald-50 text-emerald-700";
 }
 
 /** Pick up to 6 client-catalog products relevant to what's in the cart. */
@@ -228,6 +258,25 @@ export default function CartPage() {
   }, []);
 
   const totalItems = cart.length;
+  const physicalCartItems = useMemo(
+    () => cart.filter((item) => !isDigitalOnlyType(getCartProductType(item))),
+    [cart],
+  );
+  const digitalCartItems = useMemo(
+    () => cart.filter((item) => isDigitalOnlyType(getCartProductType(item))),
+    [cart],
+  );
+  const [productTab, setProductTab] = useState<CartProductTab>("physical");
+  const visibleCart = productTab === "digital" ? digitalCartItems : physicalCartItems;
+
+  useEffect(() => {
+    if (productTab === "physical" && physicalCartItems.length === 0 && digitalCartItems.length > 0) {
+      setProductTab("digital");
+    } else if (productTab === "digital" && digitalCartItems.length === 0 && physicalCartItems.length > 0) {
+      setProductTab("physical");
+    }
+  }, [digitalCartItems.length, physicalCartItems.length, productTab]);
+
   const primaryClientId = cart.find((item) => item.clientId)?.clientId;
   const primaryClientPricing = primaryClientId
     ? getClientCartPricingSettings(primaryClientId)
@@ -293,17 +342,59 @@ export default function CartPage() {
               </div>
             ) : (
               <>
-                {/* Table header */}
-                <div className="grid border-b border-gray-200 bg-gray-50 px-5 py-3" style={{ gridTemplateColumns: "1fr 160px 160px 80px 140px" }}>
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Product</span>
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Unit Price</span>
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Quantity</span>
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">GST</span>
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Total</span>
+                {/* Product type tabs */}
+                <div className="flex items-end gap-5 border-b border-gray-200 bg-white px-5 pt-3">
+                  {([
+                    ["physical", "Physical Products", physicalCartItems.length],
+                    ["digital", "Digital Products", digitalCartItems.length],
+                  ] as const).map(([tab, label, count]) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setProductTab(tab)}
+                      className={`border-b-2 pb-2.5 text-xs font-semibold transition-colors ${
+                        productTab === tab
+                          ? "border-blue-600 text-blue-700"
+                          : "border-transparent text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {label} <span className="ml-1 text-[10px] font-medium text-gray-400">({count})</span>
+                    </button>
+                  ))}
                 </div>
 
-                {/* Rows */}
-                {cart.map((item, idx) => {
+                {visibleCart.length === 0 ? (
+                  <div className="py-16 text-center text-gray-400 text-sm">
+                    No {productTab} products in your cart.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[1480px]">
+                      {/* Header mirrors Vendor Products for each product type. */}
+                      <div
+                        className="grid border-b border-gray-200 bg-gray-50 px-5 py-3 gap-3"
+                        style={{ gridTemplateColumns: "minmax(300px,1fr) 115px 130px 140px 125px 145px 135px 125px 80px 120px 72px" }}
+                      >
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Product</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Type</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">VPC / MPI</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pricing Model</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Price / Unit</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
+                          {productTab === "digital" ? "Users / Licenses" : "Units / MOQ"}
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
+                          {productTab === "digital" ? "Tenure / Billing" : "Stock"}
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
+                          {productTab === "digital" ? "Provisioning Time" : "Lead Time"}
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">GST</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Total</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Actions</span>
+                      </div>
+
+                      {visibleCart.map((item, idx) => {
                   const discountPct    = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
                   const clientDiscountPct = item.clientId ? getClientCartPricingSettings(item.clientId).discountPct : 0;
                   const taxRate        = getCartTaxRate(item) ?? getEffectiveTaxPctForCategory(item.category || "");
@@ -320,6 +411,8 @@ export default function CartPage() {
                    // discounted unit price is calculated separately below.
                    const originalUnit   = unitPriceExcl;
                   const catalog        = catalogMap.get(item.productCode || "");
+                   const productType    = getCartProductType(item);
+                   const isDigital      = isDigitalOnlyType(productType);
                    const stockInfo      = vendorMatchMap.get(item.productCode || "");
                    const selectedAllocation = item.selectedVendorId
                      ? stockInfo?.allocations.find(a => a.vendorId === item.selectedVendorId)
@@ -337,19 +430,22 @@ export default function CartPage() {
                      : (item.moq > 0 ? item.moq : 1);
                    const itemLeadTime = item.leadTime || (item.selectedVendorId ? "" : stockInfo?.leadTime || "");
                    const itemStock = item.selectedVendorId ? (item.totalStock ?? selectedAllocation?.stock ?? 0) : (stockInfo?.totalStock ?? item.totalStock ?? 0);
-                   const itemTerms = item.commercialTerms || getProductCommercialTerms(
-                     item.productType || item.physicalType || (item.fulfillmentType === "digital" ? "Digital License" : "Physical Product"),
+                    const itemTerms = item.commercialTerms || getProductCommercialTerms(
+                      productType,
                      { moq: itemMoq, leadTime: itemLeadTime, stock: itemStock },
                    );
+                   const availability = getAvailabilityByType(itemStock, productType);
+                   const leadTime = formatLeadTimeByType(itemLeadTime, productType);
+                   const tenureBilling = getTenureBilling(productType);
 
                   const specChips = item.specs.slice(0, 5).map(parseSpec);
 
-                  return (
-                    <div
-                      key={item.id}
-                      className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? "bg-white" : "bg-white"}`}
-                    >
-                      <div className="grid px-5 py-5 items-start gap-3" style={{ gridTemplateColumns: "1fr 160px 160px 80px 140px" }}>
+                   return (
+                     <div key={item.id} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? "bg-white" : "bg-white"}`}>
+                       <div
+                         className="grid px-5 py-5 items-start gap-3"
+                         style={{ gridTemplateColumns: "minmax(300px,1fr) 115px 130px 140px 125px 145px 135px 125px 80px 120px 72px" }}
+                       >
 
                         {/* ── Product info ────────────────────────────── */}
                         <div className="flex gap-4 min-w-0 pr-2">
@@ -366,20 +462,9 @@ export default function CartPage() {
 
                           {/* Details */}
                           <div className="min-w-0 flex-1">
-                            {/* Name + remove button */}
-                            <div className="flex items-start justify-between gap-2 mb-1">
+                             {/* Name */}
+                             <div className="flex items-start gap-2 mb-1">
                               <p className="font-bold text-gray-900 text-sm leading-snug">{item.name}</p>
-                              <button
-                                onClick={() => {
-                                  if (item.selectedVendorId && item.productCode) {
-                                    releaseVendorReservation(item.selectedVendorId, item.productCode, item.quantity);
-                                  }
-                                  onRemove(item.id);
-                                }}
-                                className="shrink-0 w-6 h-6 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors mt-0.5"
-                              >
-                                <X size={12} />
-                              </button>
                             </div>
 
                             {/* Vendor row */}
@@ -423,24 +508,6 @@ export default function CartPage() {
                               </div>
                             )}
 
-                            {/* Commercial terms — the same type-aware format used by
-                                Vendor Products and Shop. Values are snapshots for
-                                the selected vendor when available. */}
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] text-gray-500">
-                              <span>
-                                Pricing Model: <strong className="font-semibold text-gray-700">{itemTerms.pricingModel}</strong>
-                              </span>
-                              <span>
-                                MOQ / Min Qty: <strong className="font-semibold text-gray-700">{itemTerms.moqLabel}</strong>
-                              </span>
-                              <span>
-                                Lead Time / SLA: <strong className="font-semibold text-gray-700">{itemTerms.leadTimePrimary}{itemTerms.leadTimeSecondary ? ` · ${itemTerms.leadTimeSecondary}` : ""}</strong>
-                              </span>
-                              <span>
-                                Availability: <strong className={`font-semibold ${itemTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}`}>{getAvailabilityLabel(itemTerms)}</strong>
-                              </span>
-                            </div>
-
                             {/* Slab discount badge */}
                             {(discountPct > 0 || clientDiscountPct > 0) && (
                               <div className="mt-1.5">
@@ -452,6 +519,22 @@ export default function CartPage() {
                           </div>
                         </div>
 
+                         {/* ── Product type ────────────────────────────── */}
+                         <div className="pt-1">
+                           <span className={`inline-flex max-w-[105px] rounded-md px-2 py-1.5 text-[10px] font-semibold leading-snug ${cartTypeBadgeClasses(productType)}`}>
+                             {productType}
+                           </span>
+                         </div>
+
+                         {/* ── VPC / MPI ───────────────────────────────── */}
+                         <div className="space-y-1 pt-1 break-words">
+                           <div className="font-mono text-[10px] text-gray-700 break-all">{item.vendorProductCode || "—"}</div>
+                           <div className="font-mono text-[10px] text-gray-500 break-all">{item.productCode || "—"}</div>
+                         </div>
+
+                         {/* ── Pricing model ───────────────────────────── */}
+                         <div className="pt-1 break-words text-xs text-gray-700">{itemTerms.pricingModel || getPricingModel(productType)}</div>
+
                         {/* ── Unit Price ──────────────────────────────── */}
                         <div className="flex flex-col items-center justify-start pt-1">
                             {hasDiscount && (
@@ -461,7 +544,7 @@ export default function CartPage() {
                           <p className="text-[10px] text-gray-400">/ Unit</p>
                         </div>
 
-                        {/* ── Quantity ────────────────────────────────── */}
+                         {/* ── Quantity / MOQ ──────────────────────────── */}
                         <div className="flex flex-col items-center justify-start pt-1">
                           <QtyInput
                             value={item.quantity}
@@ -470,6 +553,38 @@ export default function CartPage() {
                             onChange={qty => onUpdateQuantity(item.id, qty)}
                           />
                         </div>
+
+                         {/* ── Tenure / Billing or Stock ──────────────── */}
+                         <div className="pt-1">
+                           {isDigital ? (
+                             <div className="space-y-1 text-xs">
+                               <div className="font-semibold text-gray-800">{tenureBilling.tenure}</div>
+                               <div className="text-gray-500">{tenureBilling.billing}</div>
+                             </div>
+                           ) : availability.isUnlimited ? (
+                             <div className="space-y-1">
+                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
+                               <div className="text-xs font-medium text-emerald-600">Instant</div>
+                             </div>
+                           ) : (
+                             <div className="space-y-1">
+                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
+                               <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
+                                 availability.status === "In Stock" ? "bg-emerald-50 text-emerald-700" :
+                                 availability.status === "Low Stock" ? "bg-amber-50 text-amber-700" :
+                                 "bg-red-50 text-red-600"
+                               }`}>
+                                 {availability.status}
+                               </span>
+                             </div>
+                           )}
+                         </div>
+
+                         {/* ── Provisioning / Lead Time ──────────────── */}
+                         <div className="space-y-1 pt-1 text-gray-700 text-xs">
+                           <div>{leadTime.primary}{!isDigital && isHybridType(productType) ? " *" : ""}</div>
+                           {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
+                         </div>
 
                         {/* ── GST % ───────────────────────────────────── */}
                         <div className="flex items-start justify-center pt-2">
@@ -483,10 +598,29 @@ export default function CartPage() {
                         <div className="flex items-start justify-end pt-2">
                           <span className="text-sm font-bold text-gray-900">{formatPrice(inclusiveTotal)}</span>
                         </div>
+
+                         {/* ── Actions ────────────────────────────────── */}
+                         <div className="flex items-start justify-center pt-1">
+                           <button
+                             onClick={() => {
+                               if (item.selectedVendorId && item.productCode) {
+                                 releaseVendorReservation(item.selectedVendorId, item.productCode, item.quantity);
+                               }
+                               onRemove(item.id);
+                             }}
+                             aria-label={`Remove ${item.name}`}
+                             className="shrink-0 w-7 h-7 rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
+                           >
+                             <X size={12} />
+                           </button>
+                         </div>
                       </div>
                     </div>
                   );
-                })}
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
