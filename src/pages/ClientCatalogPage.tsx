@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Download, Filter, MoreVertical, Search, X, ZoomIn, Package, Clock, Shield, Cpu, HardDrive, Monitor, Printer, Wifi, FileText, Settings2, Timer, ChevronLeft, Eye, Pencil, AlertTriangle } from "lucide-react";
 import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
 import { getAllVendorProducts } from "@/lib/vendorStore";
+import { getVendorById } from "@/lib/vendorDataStore";
 import {
   getClientCatalog,
   saveClientCatalog,
@@ -12,6 +13,13 @@ import {
 } from "@/lib/clientCatalogStore";
 import { syncClientPrices } from "@/lib/priceEngineStore";
 import { getPortalRoleNames } from "@/lib/portalUserStore";
+import {
+  formatLeadTimeByType,
+  getProductType,
+  getQuantityLabel,
+  getTenureBilling,
+  isDigitalOnlyType,
+} from "@/lib/productTypeRules";
 
 function getAssignableCatalogRoles(clientId: string): string[] {
   return getPortalRoleNames(clientId);
@@ -275,6 +283,32 @@ function RoleDropdown({
 
 // Use the shared interface from the store (aliased for local use)
 type CatalogEntry = ClientCatalogEntry;
+type CatalogProductTab = "physical" | "digital";
+
+function isDigitalCatalogEntry(product: CatalogEntry): boolean {
+  return isDigitalOnlyType(getProductType(product.physicalType || product.productType));
+}
+
+function getCatalogVendorSummary(productCode: string): { names: string[]; price: string; stock: number } {
+  const matches = Object.values(getAllVendorProducts())
+    .flat()
+    .filter((product) => product.masterProductCode === productCode && product.status === "Active");
+  const names = Array.from(new Set(matches.map((product) => getVendorById(product.vendorId)?.name || product.vendorId)));
+  const prices = matches
+    .map((product) => Number.parseFloat(product.price))
+    .filter((price) => Number.isFinite(price) && price > 0);
+  const stock = matches.reduce((total, product) => {
+    const physical = Number.parseInt(product.physicalStock ?? product.stock ?? "0", 10) || 0;
+    const reserved = Number.parseInt(product.reservedStock ?? "0", 10) || 0;
+    return total + Math.max(0, physical - reserved);
+  }, 0);
+  const lowestPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  return {
+    names,
+    price: lowestPrice > 0 ? `₹${lowestPrice.toLocaleString("en-IN")}` : "—",
+    stock,
+  };
+}
 
 // ── Helpers shared by view/edit screens ───────────────────────────────────────
 
@@ -1161,6 +1195,7 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [headerMenu, setHeaderMenu] = useState(false);
   const [page, setPage] = useState(1);
+  const [productTab, setProductTab] = useState<CatalogProductTab>("physical");
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [viewProduct, setViewProduct] = useState<CatalogEntry | null>(null);
   const [editProduct, setEditProduct] = useState<CatalogEntry | null>(null);
@@ -1211,7 +1246,10 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
     saveClientCatalog(clientId, products);
   }, [products, clientId]);
 
-  const filtered = products
+  const tabProducts = products.filter((product) =>
+    productTab === "digital" ? isDigitalCatalogEntry(product) : !isDigitalCatalogEntry(product)
+  );
+  const filtered = tabProducts
     .filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.sku || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -1313,6 +1351,24 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
           </div>
         </div>
 
+        <div className="flex items-end gap-5 px-4 pt-2 border-b border-gray-100">
+          {([
+            ["physical", "Physical Products", products.filter((product) => !isDigitalCatalogEntry(product)).length],
+            ["digital", "Digital Products", products.filter((product) => isDigitalCatalogEntry(product)).length],
+          ] as const).map(([tab, label, count]) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => { setProductTab(tab); setPage(1); }}
+              className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${
+                productTab === tab ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {label} <span className="ml-1 text-[10px] font-medium text-gray-400">({count})</span>
+            </button>
+          ))}
+        </div>
+
         {/* Search */}
         <div className="px-4 py-2 border-b border-gray-100">
           <div className="relative">
@@ -1339,8 +1395,10 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                 <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Product</th>
                 <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Category <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
                 <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Roles <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Selling Price (INR) <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
-                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">Availability <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-36">Vendor Mapping / Price <Filter size={9} className="inline ml-0.5 text-gray-400" /></th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">{productTab === "digital" ? "Users / Licenses" : "Units / MOQ"}</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">{productTab === "digital" ? "Tenure / Billing" : "Stock"}</th>
+                <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-28">{productTab === "digital" ? "Provisioning" : "Lead Time"}</th>
                 <th className="text-left px-2 py-2.5 font-semibold text-gray-500 uppercase tracking-wide text-[10px] w-16">Action</th>
               </tr>
             </thead>
@@ -1370,16 +1428,50 @@ export default function ClientCatalogPage({ clientId = "CLI-DEFAULT" }: { client
                       ))}
                     </div>
                   </td>
-                  <td className="px-4 py-2 font-semibold text-gray-900">{product.price}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full border ${
-                      product.availability === "In Stock" ? "bg-green-50 text-green-700 border-green-200"
-                      : product.availability === "Low Stock" ? "bg-orange-50 text-orange-600 border-orange-200"
-                      : "bg-red-50 text-red-500 border-red-200"
-                    }`}>
-                      {product.availability}
-                    </span>
-                  </td>
+                  {(() => {
+                    const digital = isDigitalCatalogEntry(product);
+                    const type = getProductType(product.physicalType || product.productType);
+                    const terms = getTenureBilling(type);
+                    const quantityLabel = getQuantityLabel(type);
+                    const leadTime = formatLeadTimeByType(product.leadTime, type);
+                    const vendorSummary = getCatalogVendorSummary(product.productCode);
+                    return (
+                      <>
+                        <td className="px-4 py-2">
+                          <div className="font-semibold text-gray-900">{product.price}</div>
+                          <div className="text-[10px] text-gray-500">
+                            {vendorSummary.names.length > 0
+                              ? `${vendorSummary.names.join(", ")} · ${vendorSummary.price}`
+                              : "No active vendor mapping"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2 text-gray-700">{product.moq || "—"} <span className="text-[10px] text-gray-500">{quantityLabel}</span></td>
+                        <td className="px-4 py-3">
+                          {digital ? (
+                            <div className="text-[10px] text-gray-700">
+                              <div className="font-semibold">{terms.tenure}</div>
+                              <div className="text-gray-500">{terms.billing}</div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="font-semibold text-gray-800">{vendorSummary.stock.toLocaleString("en-IN")} Units</div>
+                              <span className={`mt-1 inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                                vendorSummary.stock > 10 ? "bg-green-50 text-green-700 border-green-200"
+                                : vendorSummary.stock > 0 ? "bg-orange-50 text-orange-600 border-orange-200"
+                                : "bg-red-50 text-red-500 border-red-200"
+                              }`}>
+                                {vendorSummary.stock > 10 ? "In Stock" : vendorSummary.stock > 0 ? "Low Stock" : "Out of Stock"}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-gray-600">
+                          <div>{leadTime.primary}</div>
+                          {leadTime.secondary && <div className="text-[10px] text-gray-400">{leadTime.secondary}</div>}
+                        </td>
+                      </>
+                    );
+                  })()}
                   <td className="px-4 py-2 relative">
                     <button
                       onClick={(e) => { e.stopPropagation(); setRowMenu(rowMenu === product.sku ? null : product.sku); }}

@@ -129,6 +129,13 @@ export function getQuantityLabel(type: string): string {
   return "Units";
 }
 
+export function getTenureBilling(type: string): { tenure: string; billing: string } {
+  const normalized = type.toLowerCase();
+  if (normalized.includes("cloud")) return { tenure: "—", billing: "Consumption" };
+  if (isDigitalOnlyType(type)) return { tenure: "1 Year", billing: "Annual" };
+  return { tenure: "—", billing: "—" };
+}
+
 export function formatLeadTimeByType(
   leadTime: string | number | undefined,
   type: string,

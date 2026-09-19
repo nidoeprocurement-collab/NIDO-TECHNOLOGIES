@@ -45,7 +45,9 @@ import {
   getPricingModel,
   getProductType,
   getQuantityLabel,
+  getTenureBilling,
   isHybridType,
+  isDigitalOnlyType,
 } from "@/lib/productTypeRules";
 
 const STATS = [
@@ -129,6 +131,7 @@ const MENU_ITEMS = [
 
 type ToolDialog = "bulkPrice" | "assign" | null;
 type BulkPriceMode = "increase" | "decrease";
+type VendorProductTab = "physical" | "digital";
 
 function csvEscape(value: unknown): string {
   const text = String(value ?? "");
@@ -699,6 +702,7 @@ export default function VendorProductsPage() {
   const [editProduct, setEditProduct] = useState<VendorProduct | null>(null);
   const [removeProduct, setRemoveProduct] = useState<VendorProduct | null>(null);
   const [toolDialog, setToolDialog] = useState<ToolDialog>(null);
+  const [productTab, setProductTab] = useState<VendorProductTab>("physical");
   const [importing, setImporting] = useState(false);
   const perPage = 10;
   const menuRef = useRef<HTMLDivElement>(null);
@@ -937,6 +941,12 @@ export default function VendorProductsPage() {
     return !matchesId && !matchesCode;
   });
 
+  const visibleProducts = vendorProducts.filter((product) => {
+    const type = getProductType(product.physicalType);
+    return productTab === "digital" ? isDigitalOnlyType(type) : !isDigitalOnlyType(type);
+  });
+  const isDigitalTab = productTab === "digital";
+
   const handleMenuAction = (label: string) => {
     setMenuOpen(false);
     if (label === "Add Product") navigate(`/vendors/${vendorId}/add-products`);
@@ -1004,8 +1014,25 @@ export default function VendorProductsPage() {
 
         {/* Table Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          {/* Actions Bar */}
-          <div className="px-4 py-2 flex items-center justify-end border-b border-gray-100">
+          {/* Tabs and actions */}
+          <div className="px-4 pt-2 flex items-end justify-between border-b border-gray-100">
+            <div className="flex items-end gap-5">
+              {([
+                ["physical", "Physical Products", vendorProducts.filter((product) => !isDigitalOnlyType(getProductType(product.physicalType))).length],
+                ["digital", "Digital Products", vendorProducts.filter((product) => isDigitalOnlyType(getProductType(product.physicalType))).length],
+              ] as const).map(([tab, label, count]) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => { setProductTab(tab); setCurrentPage(1); }}
+                  className={`border-b-2 pb-2 text-xs font-semibold transition-colors ${
+                    productTab === tab ? "border-blue-600 text-blue-700" : "border-transparent text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {label} <span className="ml-1 text-[10px] font-medium text-gray-400">({count})</span>
+                </button>
+              ))}
+            </div>
             <div className="relative" ref={menuRef}>
               <button onClick={() => setMenuOpen((o) => !o)} className="p-2 border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 transition-colors">
                 <MoreVertical className="w-4 h-4" />
@@ -1040,7 +1067,11 @@ export default function VendorProductsPage() {
                 Add products from master catalog
               </button>
             </div>
-           ) : (
+            ) : visibleProducts.length === 0 ? (
+              <div className="px-4 py-16 text-center text-gray-400 text-sm">
+                No {isDigitalTab ? "digital" : "physical"} products are assigned to this vendor yet.
+              </div>
+            ) : (
             <div className="w-full overflow-hidden">
                <table className="w-full table-fixed text-sm">
                <colgroup>
@@ -1061,14 +1092,14 @@ export default function VendorProductsPage() {
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">VPC / MPI</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Price / Unit</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">MOQ / Min Qty</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Availability</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Lead Time / SLA</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Users / Licenses" : "Units / MOQ"}</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Tenure / Billing" : "Stock"}</th>
+                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Provisioning Time" : "Lead Time"}</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
                <tbody className="divide-y divide-gray-100">
-                 {vendorProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
+                  {visibleProducts.slice((currentPage - 1) * perPage, currentPage * perPage).map((product) => {
                    const initials = product.productName.slice(0, 2).toUpperCase();
                     const type = getProductType(product.physicalType);
                     const hybrid = isHybridType(type);
@@ -1077,6 +1108,7 @@ export default function VendorProductsPage() {
                    const available = Math.max(0, current - reserved);
                     const availability = getAvailabilityByType(available, type);
                     const leadTime = formatLeadTimeByType(product.leadTime, type);
+                    const tenureBilling = getTenureBilling(type);
                    return (
                      <tr key={product.id} className="hover:bg-gray-50/70 transition-colors group">
                        <td className="px-2 py-4">
@@ -1107,11 +1139,16 @@ export default function VendorProductsPage() {
                            {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
                          </div>
                        </td>
-                        <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
-                          {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
+                         <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
+                           {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
                        </td>
-                        <td className="px-2 py-4 align-middle break-words">
-                          {availability.isUnlimited ? (
+                         <td className="px-2 py-4 align-middle break-words">
+                          {isDigitalTab ? (
+                            <div className="space-y-1 text-xs">
+                              <div className="font-semibold text-gray-800">{tenureBilling.tenure}</div>
+                              <div className="text-gray-500">{tenureBilling.billing}</div>
+                            </div>
+                          ) : availability.isUnlimited ? (
                            <div className="space-y-1">
                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
                              <div className="text-xs font-medium text-emerald-600">Instant</div>
@@ -1129,9 +1166,9 @@ export default function VendorProductsPage() {
                            </div>
                          )}
                        </td>
-                        <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
+                         <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
                          <div className="space-y-1">
-                           <div>{leadTime.primary}{hybrid ? " *" : ""}</div>
+                            <div>{leadTime.primary}{!isDigitalTab && hybrid ? " *" : ""}</div>
                            {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
                          </div>
                        </td>
@@ -1165,10 +1202,10 @@ export default function VendorProductsPage() {
           )}
 
           {/* Pagination */}
-          {vendorProducts.length > 0 && (
+          {visibleProducts.length > 0 && (
           <div className="px-4 py-3.5 flex items-center justify-between border-t border-gray-100">
             <span className="text-sm text-gray-500">
-              Showing {Math.min((currentPage - 1) * perPage + 1, vendorProducts.length)}–{Math.min(currentPage * perPage, vendorProducts.length)} of {vendorProducts.length} product{vendorProducts.length !== 1 ? "s" : ""}
+               Showing {Math.min((currentPage - 1) * perPage + 1, visibleProducts.length)}–{Math.min(currentPage * perPage, visibleProducts.length)} of {visibleProducts.length} product{visibleProducts.length !== 1 ? "s" : ""}
             </span>
             <div className="flex items-center gap-1.5">
               <button

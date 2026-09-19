@@ -29,6 +29,7 @@ import {
   getPricingModel,
   getProductType,
   getQuantityLabel,
+  getTenureBilling,
 } from "@/lib/productTypeRules";
 import {
   getAvailabilityLabel,
@@ -657,9 +658,10 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   const isDigital = isDigitalProduct(product);
   // Keep these labels in lockstep with Vendor Products so every product type
   // presents its commercial terms in the same way across the app.
-  const productType = getProductType(product.physicalType);
+  const productType = getProductType(product.physicalType || product.productType);
   const productPricingModel = getPricingModel(productType);
   const productQuantityLabel = getQuantityLabel(productType);
+  const tenureBilling = getTenureBilling(productType);
   const canUseVendor = (vendor: VendorComparisonRow) => isDigital || canVendorFulfillMoq(vendor);
   const isInCart = !!selectedVendor && items.some(item =>
     item.productCode === product.productCode &&
@@ -901,9 +903,9 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Vendor</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Pricing Model</span>
               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Price</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Availability</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">Lead Time / SLA</span>
-              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">MOQ / Min Qty</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{isDigital ? "Provisioning" : "Stock"}</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{isDigital ? "Tenure / Billing" : "Lead Time"}</span>
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wide">{isDigital ? "Users / Licenses" : "Units / MOQ"}</span>
             </div>
             {/* Vendor rows */}
             <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
@@ -967,21 +969,35 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
                     <span className="text-[10px] font-semibold text-gray-800">
                       {!isOOS && price > 0 ? formatCurrency(price, undefined, { decimals: 0 }) : '--'}
                     </span>
-                     {/* Availability */}
-                     <span className={`text-[10px] leading-tight font-semibold ${
-                       availability.status === 'Out of Stock' ? 'text-red-500' :
-                       availability.status === 'Low Stock' ? 'text-amber-600' : 'text-emerald-600'
-                     }`}>
-                       {availability.primary}
-                       <span className="block text-[9px] font-medium text-gray-400">
-                         {availability.isUnlimited ? 'Instant' : availability.status}
-                       </span>
-                     </span>
-                     {/* Lead time / SLA */}
-                     <span className="text-[10px] leading-tight text-gray-700">
-                       {leadTime.primary}
-                       {leadTime.secondary && <span className="block text-[9px] text-gray-400">{leadTime.secondary}</span>}
-                     </span>
+                      {/* Stock / provisioning */}
+                      {isDigital ? (
+                        <span className="text-[10px] leading-tight font-semibold text-emerald-600">
+                          {leadTime.primary}
+                          {leadTime.secondary && <span className="block text-[9px] font-medium text-gray-400">{leadTime.secondary}</span>}
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] leading-tight font-semibold ${
+                          availability.status === 'Out of Stock' ? 'text-red-500' :
+                          availability.status === 'Low Stock' ? 'text-amber-600' : 'text-emerald-600'
+                        }`}>
+                          {availability.primary}
+                          <span className="block text-[9px] font-medium text-gray-400">
+                            {availability.isUnlimited ? 'Instant' : availability.status}
+                          </span>
+                        </span>
+                      )}
+                      {/* Lead time / tenure */}
+                      {isDigital ? (
+                        <span className="text-[10px] leading-tight text-gray-700">
+                          {tenureBilling.tenure}
+                          <span className="block text-[9px] text-gray-400">{tenureBilling.billing}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] leading-tight text-gray-700">
+                          {leadTime.primary}
+                          {leadTime.secondary && <span className="block text-[9px] text-gray-400">{leadTime.secondary}</span>}
+                        </span>
+                      )}
                      {/* MOQ */}
                      <span className="text-[10px] text-gray-700">{comp.moq > 0 ? `${comp.moq} ${productQuantityLabel}` : '--'}</span>
                   </button>
@@ -1037,32 +1053,41 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
           <div>
             <div className="flex items-center gap-1 text-[9px] text-gray-500">
               <Package size={10} className="text-gray-400 shrink-0" />
-              <span className="font-medium">MOQ / Min Qty</span>
+               <span className="font-medium">{isDigital ? "Users / Licenses" : "Units / MOQ"}</span>
             </div>
              <p className="text-[11px] font-semibold text-gray-800 mt-0.5">{displayMoq}</p>
           </div>
            <div>
              <div className="flex items-center gap-1 text-[9px] text-gray-500">
                <Clock size={10} className="text-gray-400 shrink-0" />
-               <span className="font-medium">Lead Time / SLA</span>
+               <span className="font-medium">{isDigital ? "Provisioning Time" : "Lead Time"}</span>
              </div>
              <p className="text-[10px] font-semibold text-gray-800 mt-0.5 leading-tight">{displayLeadTime}</p>
            </div>
-          <div>
-            <div className="flex items-center gap-1 text-[9px] text-gray-500">
-              <Package size={10} className="text-gray-400 shrink-0" />
-              <span className="font-medium">Availability</span>
-            </div>
-             <p className={`text-[11px] font-semibold mt-0.5 ${commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}`}>
-               {commercialTerms.availabilityPrimary}
-            </p>
-             <p className="text-[9px] font-medium leading-tight text-gray-400">
-               {commercialTerms.availabilityIsUnlimited ? "Instant" : commercialTerms.availabilityStatus}
-             </p>
-             {termsVendor && termsVendor.stock > 0 && firstSlabHint && (
-              <p className="text-[9px] text-emerald-600 font-medium leading-tight">{firstSlabHint.discountPct}% off on {firstSlabHint.minQty}+ Units</p>
-            )}
-          </div>
+             <div>
+               <div className="flex items-center gap-1 text-[9px] text-gray-500">
+                 <Package size={10} className="text-gray-400 shrink-0" />
+                 <span className="font-medium">{isDigital ? "Tenure / Billing" : "Stock"}</span>
+               </div>
+               {isDigital ? (
+                 <>
+                   <p className="text-[11px] font-semibold mt-0.5 text-gray-800">{tenureBilling.tenure}</p>
+                   <p className="text-[9px] font-medium leading-tight text-gray-400">{tenureBilling.billing}</p>
+                 </>
+               ) : (
+                 <>
+                   <p className={`text-[11px] font-semibold mt-0.5 ${commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}`}>
+                     {commercialTerms.availabilityPrimary}
+                   </p>
+                   <p className="text-[9px] font-medium leading-tight text-gray-400">
+                     {commercialTerms.availabilityIsUnlimited ? "Instant" : commercialTerms.availabilityStatus}
+                   </p>
+                   {termsVendor && termsVendor.stock > 0 && firstSlabHint && (
+                     <p className="text-[9px] text-emerald-600 font-medium leading-tight">{firstSlabHint.discountPct}% off on {firstSlabHint.minQty}+ Units</p>
+                   )}
+                 </>
+               )}
+             </div>
         </div>
 
         {/* Quantity row */}
