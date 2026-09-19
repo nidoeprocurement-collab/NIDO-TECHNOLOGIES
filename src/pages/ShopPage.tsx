@@ -66,6 +66,7 @@ type Product = {
   totalStock: number;
   priceNum: number;
   inStock: boolean;
+  fulfillmentType?: "physical" | "digital" | "hybrid";
   description?: string;
   generalSpecs?: { label: string; value: string }[];
   productNotes?: string;
@@ -152,6 +153,11 @@ function getShopProductKind(product: Pick<Product, "productType" | "physicalType
   return "physical";
 }
 
+function isCloudServiceProduct(product: Pick<Product, "productType" | "physicalType">): boolean {
+  return [product.productType, product.physicalType]
+    .some(value => value?.trim().toLowerCase() === "cloud service");
+}
+
 function isDigitalProduct(product: Pick<Product, "productType" | "physicalType" | "category" | "name">): boolean {
   const kind = getShopProductKind(product);
   return kind === "digital" || kind === "subscription" || kind === "cloud";
@@ -171,6 +177,49 @@ function getShopProductLabel(kind: Exclude<ShopTab, "all">): string {
 function getShopProductIcon(kind: Exclude<ShopTab, "all">) {
   const Icon = SHOP_TABS.find(tab => tab.id === kind)?.icon || Package;
   return <Icon size={12} />;
+}
+
+type CloudDataField = {
+  label: string;
+  value: string;
+  options: string[];
+};
+
+function getCloudDataFields(product: Product): CloudDataField[] {
+  const fields: CloudDataField[] = [];
+  const seen = new Set<string>();
+
+  const addField = (label: string, value: string) => {
+    const cleanLabel = label.trim();
+    const cleanValue = value.trim();
+    if (!cleanLabel || !cleanValue) return;
+    const key = cleanLabel.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    const options = cleanValue
+      .split(/\s*[|;]\s*/)
+      .map(option => option.trim())
+      .filter(Boolean);
+    fields.push({ label: cleanLabel, value: cleanValue, options: options.length > 1 ? options : [] });
+  };
+
+  (product.generalSpecs || []).forEach(spec => addField(spec.label, spec.value));
+  (product.specs || []).forEach(spec => {
+    const separator = spec.indexOf(":");
+    if (separator > -1) {
+      addField(spec.slice(0, separator), spec.slice(separator + 1));
+    }
+  });
+
+  return fields;
+}
+
+function findCloudField(fields: CloudDataField[], terms: string[]): string {
+  return fields.find(field => terms.some(term => field.label.toLowerCase().includes(term)))?.value || "";
+}
+
+function cloudFieldKey(field: CloudDataField, index: number): string {
+  return `${field.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${index}`;
 }
 
 // getClientOrderedQtyMap and getPOdQtyMap removed — available stock is now
@@ -637,6 +686,324 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
 
         </div>
       </div>
+    </div>
+  );
+}
+
+function CloudServiceProductCard({
+  product,
+  onPreview,
+  clientId,
+  isGrid,
+}: {
+  product: Product;
+  onPreview: (p: Product) => void;
+  clientId?: string;
+  isGrid: boolean;
+}) {
+  const { addItem, items } = useCart();
+  const { isImpersonating } = useAuth();
+  const [vendorComps, setVendorComps] = useState<VendorComparisonRow[]>([]);
+  const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
+  const [qty, setQty] = useState(1);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [configuration, setConfiguration] = useState<Record<string, string>>({});
+  const [draftConfiguration, setDraftConfiguration] = useState<Record<string, string>>({});
+  const dataFields = getCloudDataFields(product);
+  const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
+  const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
+  const region = findCloudField(dataFields, ["region", "location"]);
+  const deploymentModel = findCloudField(dataFields, ["deployment"]);
+  const billingModel = findCloudField(dataFields, ["billing", "pricing model"]) || getPricingModel("Cloud Service");
+  const pricingUnit = findCloudField(dataFields, ["pricing unit", "unit"]);
+  const serviceStatus = findCloudField(dataFields, ["service status", "availability", "status"])
+    || (product.inStock ? "Available" : "Unavailable");
+  const configurationCount = dataFields.length;
+  const productType = getProductType(product.physicalType || product.productType);
+  const gstRate = getEffectiveTaxPctForCategory(product.category);
+  const hsnForCategory = (() => {
+    const map = new Map<string, string>();
+    getHsnCodes().forEach(h => {
+      if (h.status === "Active" && h.productCategory) map.set(h.productCategory.toLowerCase(), h.code);
+    });
+    getProductCategoryTaxMap().forEach(m => {
+      if (m.defaultHsnCode && m.productCategory) map.set(m.productCategory.toLowerCase(), m.defaultHsnCode);
+    });
+    return map.get((product.category || "").toLowerCase()) || "";
+  })();
+
+  useEffect(() => {
+    const refreshVendors = () => {
+      if (product.productCode) setVendorComps(computeVendorComparisons(product.productCode, product.category));
+    };
+    refreshVendors();
+    window.addEventListener("vendorProductsUpdated", refreshVendors);
+    return () => window.removeEventListener("vendorProductsUpdated", refreshVendors);
+  }, [product.productCode, product.category]);
+
+  useEffect(() => {
+    setSelectedVendor(current => {
+      if (!current) return current;
+      return vendorComps.find(comp => comp.vendorId === current.vendorId) || null;
+    });
+  }, [vendorComps]);
+
+  useEffect(() => {
+    const initial = Object.fromEntries(
+      dataFields.map((field, index) => [cloudFieldKey(field, index), field.value]),
+    );
+    setConfiguration(initial);
+    setDraftConfiguration(initial);
+  }, [product.productCode]);
+
+  const isInCart = !!selectedVendor && items.some(item =>
+    item.productCode === product.productCode
+    && item.clientId === clientId
+    && item.selectedVendorId === selectedVendor.vendorId,
+  );
+  const clientSellingPriceExclGst = selectedVendor && clientId
+    ? computeClientSellingPriceExclGst(
+        clientId,
+        product.productCode,
+        product.category,
+        selectedVendor.landedCostPerUnit,
+      )
+    : 0;
+  const canUseVendor = (vendor: VendorComparisonRow) =>
+    isDigitalProduct(product) || canVendorFulfillMoq(vendor);
+  const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor) && !isInCart;
+  const selectedConfigurationSummary = Object.entries(configuration)
+    .map(([key, value]) => {
+      const index = Number(key.split("-").pop());
+      const field = dataFields[index];
+      return field && value.trim() ? `${field.label}: ${value.trim()}` : "";
+    })
+    .filter(Boolean);
+
+  const handleAdd = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!canAdd || !selectedVendor) return;
+    addItem(
+      {
+        id: Math.random() * 10000,
+        name: product.name,
+        image: product.image,
+        specs: [
+          ...product.specs,
+          ...selectedConfigurationSummary.map(value => `Configuration: ${value}`),
+        ],
+        moq: selectedVendor.moq,
+        totalStock: selectedVendor.stock,
+        priceNum: product.priceNum,
+        clientId,
+        category: product.category,
+        productCode: product.productCode,
+        productType: product.productType,
+        physicalType: product.physicalType,
+        commercialTerms: getProductCommercialTerms(productType, {
+          moq: selectedVendor.moq,
+          leadTime: selectedVendor.leadTime,
+          stock: selectedVendor.stock,
+        }),
+        fulfillmentType: product.fulfillmentType,
+        leadTime: formatLeadTimeByType(selectedVendor.leadTime, productType).primary,
+        selectedVendorId: selectedVendor.vendorId,
+        selectedVendorName: selectedVendor.vendorName,
+        vendorProductCode: selectedVendor.vendorProductCode,
+        vendorPrice: selectedVendor.basePrice,
+        clientSellingPriceExclGst,
+        landedCost: selectedVendor.landedCostPerUnit,
+        gstSnapshot: gstRate,
+        hsnSnapshot: hsnForCategory,
+        vendorRating: selectedVendor.rating,
+      },
+      Math.max(1, selectedVendor.moq, qty),
+    );
+  };
+
+  const infoFields = [
+    ["Cloud Provider", provider],
+    ["Service Category", product.category],
+    ["Service Type", serviceType],
+    ["Region Availability", region],
+    ["Deployment Model", deploymentModel],
+    ["Billing Model", billingModel],
+    ["Pricing Unit", pricingUnit],
+    ["Service Status", serviceStatus],
+    ["Configurations", configurationCount > 0 ? `${configurationCount} available` : ""],
+  ].filter(([, value]) => Boolean(value));
+
+  return (
+    <div
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm transition-shadow hover:shadow-md ${isGrid ? "min-h-[520px]" : "h-full"}`}
+      onClick={() => onPreview(product)}
+    >
+      <div className="flex items-start justify-between gap-3 px-3 pt-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <Cloud size={18} />
+          </div>
+          <div className="min-w-0">
+            {provider && <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider}</p>}
+            <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-gray-900">{product.name}</h3>
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
+          <Cloud size={12} />
+          Cloud Service
+        </span>
+      </div>
+
+      <div className="mx-3 mt-3 flex h-[86px] items-center justify-center overflow-hidden rounded-xl border border-blue-50 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        {product.image ? (
+          <img src={product.image} alt={`${provider || "Cloud"} ${product.name}`} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
+        ) : (
+          <Cloud size={38} className="text-blue-300" />
+        )}
+      </div>
+
+      <div className="px-3 pt-3">
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] font-semibold ${getCategoryColor(product.category)}`}>{product.category}</span>
+          {serviceType && <span className="text-[10px] text-gray-400">· {serviceType}</span>}
+        </div>
+        {product.description && <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-gray-500">{product.description}</p>}
+      </div>
+
+      <div className="mx-3 mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-gray-100 pt-3">
+        {infoFields.slice(0, 8).map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <p className="truncate text-[9px] font-medium uppercase tracking-wide text-gray-400">{label}</p>
+            <p className={`mt-0.5 truncate text-[10px] font-semibold ${label === "Service Status" && value === "Unavailable" ? "text-red-600" : "text-gray-700"}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
+        <label className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">Service Provider / Vendor</label>
+        <select
+          value={selectedVendor?.vendorId || ""}
+          onChange={event => {
+            const vendor = vendorComps.find(comp => comp.vendorId === event.target.value) || null;
+            setSelectedVendor(vendor && canUseVendor(vendor) ? vendor : null);
+            if (vendor) setQty(Math.max(1, vendor.moq));
+          }}
+          className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] text-gray-700 outline-none transition-colors focus:border-blue-400"
+        >
+          <option value="">Select provider / vendor</option>
+          {vendorComps.map(vendor => (
+            <option key={vendor.vendorId} value={vendor.vendorId} disabled={!canUseVendor(vendor)}>
+              {vendor.vendorName}{!canUseVendor(vendor) ? " — unavailable" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Estimated Price</p>
+            <p className="mt-0.5 text-[16px] font-bold text-gray-900">
+              {selectedVendor && clientSellingPriceExclGst > 0 ? formatCurrency(clientSellingPriceExclGst) : selectedVendor ? "Custom Quote" : "Select a vendor"}
+            </p>
+            <p className="text-[9px] text-gray-400">{billingModel}{selectedVendor && clientSellingPriceExclGst > 0 ? ` · GST ${gstRate}% added in cart` : ""}</p>
+          </div>
+          {selectedVendor && (
+            <div className="flex items-center rounded-lg border border-gray-200">
+              <button type="button" onClick={() => setQty(current => Math.max(1, selectedVendor.moq, current - 1))} className="px-2 py-1 text-gray-600 hover:bg-gray-50">−</button>
+              <span className="min-w-7 text-center text-[11px] font-semibold text-gray-700">{qty}</span>
+              <button type="button" onClick={() => setQty(current => current + 1)} className="px-2 py-1 text-gray-600 hover:bg-gray-50">+</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-auto grid grid-cols-2 gap-2 px-3 pb-3 pt-3" onClick={event => event.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onPreview(product)}
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white py-2 text-[11px] font-semibold text-blue-600 transition-colors hover:bg-blue-50"
+        >
+          View Services
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setDraftConfiguration({ ...configuration });
+            setConfigOpen(true);
+          }}
+          className="flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 py-2 text-[11px] font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+        >
+          <Settings2 size={12} />
+          Configure
+        </button>
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!canAdd}
+          className={`col-span-2 flex items-center justify-center gap-2 rounded-lg py-2.5 text-[12px] font-semibold transition-colors ${
+            !canAdd
+              ? "cursor-not-allowed border border-gray-200 bg-gray-50 text-gray-400"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
+        >
+          {isInCart ? <Check size={13} /> : <ShoppingCart size={13} />}
+          {isInCart ? "Added to Cart" : "Add to Cart"}
+        </button>
+      </div>
+
+      {configOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4" onClick={() => setConfigOpen(false)}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider || "Cloud Service"}</p>
+                <h2 className="mt-0.5 text-base font-bold text-gray-900">Configure {product.name}</h2>
+                <p className="mt-1 text-xs text-gray-500">Choose from the configuration data available for this service.</p>
+              </div>
+              <button type="button" aria-label="Close configuration" onClick={() => setConfigOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+                <X size={16} />
+              </button>
+            </div>
+
+            {dataFields.length > 0 ? (
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {dataFields.map((field, index) => {
+                  const key = cloudFieldKey(field, index);
+                  const value = draftConfiguration[key] ?? field.value;
+                  return (
+                    <label key={key} className="text-xs font-semibold text-gray-600">
+                      {field.label}
+                      {field.options.length > 1 ? (
+                        <select
+                          value={value}
+                          onChange={event => setDraftConfiguration(current => ({ ...current, [key]: event.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-normal text-gray-700 outline-none focus:border-blue-400"
+                        >
+                          {field.options.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      ) : (
+                        <input
+                          value={value}
+                          onChange={event => setDraftConfiguration(current => ({ ...current, [key]: event.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs font-normal text-gray-700 outline-none focus:border-blue-400"
+                        />
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-5 rounded-lg bg-gray-50 px-3 py-4 text-xs text-gray-500">This service has no additional configuration fields in the catalogue.</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-4">
+              <button type="button" onClick={() => setConfigOpen(false)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button type="button" onClick={() => { setConfiguration({ ...draftConfiguration }); setConfigOpen(false); }} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">Save Configuration</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1723,13 +2090,23 @@ export default function ShopPage() {
                 { state: { product: p, clientId: selectedClientId } },
               );
               return (
-                 <ProductCard
-                   key={product.id}
-                   product={product}
-                   onPreview={preview}
-                   clientId={selectedClientId}
-                   isGrid={viewMode === "grid"}
-                 />
+                isCloudServiceProduct(product) ? (
+                  <CloudServiceProductCard
+                    key={product.id}
+                    product={product}
+                    onPreview={preview}
+                    clientId={selectedClientId}
+                    isGrid={viewMode === "grid"}
+                  />
+                ) : (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onPreview={preview}
+                    clientId={selectedClientId}
+                    isGrid={viewMode === "grid"}
+                  />
+                )
               );
             })}
           </div>
