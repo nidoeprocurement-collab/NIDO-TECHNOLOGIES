@@ -12,7 +12,15 @@ import {
   reserveVendorProductCodes,
   VendorProduct,
 } from "@/lib/vendorStore";
-import { getProductType, isDigitalOnlyType } from "@/lib/productTypeRules";
+import {
+  formatLeadTimeByType,
+  getPricingModel,
+  getProductType,
+  getQuantityLabel,
+  getTenureBilling,
+  isDigitalOnlyType,
+  isHybridType,
+} from "@/lib/productTypeRules";
 
 // ─── Thumb ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +57,173 @@ type SelectedProductTab = "physical" | "digital";
 
 function isDigitalCatalogProduct(product: CatalogProduct): boolean {
   return isDigitalOnlyType(getProductType(product.physicalType || product.productType));
+}
+
+function selectedProductType(product: CatalogProduct): string {
+  return getProductType(product.physicalType || product.productType);
+}
+
+function selectedProductTypeClasses(type: string): string {
+  if (isDigitalOnlyType(type)) return "bg-violet-50 text-violet-700";
+  if (isHybridType(type)) return "bg-amber-50 text-amber-700";
+  return "bg-emerald-50 text-emerald-700";
+}
+
+type UpdateSelectedRow = (
+  id: string,
+  field: keyof Omit<SelectedRow, "catalogProduct">,
+  value: string,
+) => void;
+
+function SelectedProductsTable({
+  rows,
+  isEditMode,
+  selectedTab,
+  updateRow,
+  removeSelected,
+}: {
+  rows: SelectedRow[];
+  isEditMode: boolean;
+  selectedTab: SelectedProductTab;
+  updateRow: UpdateSelectedRow;
+  removeSelected: (id: string) => void;
+}) {
+  const isDigitalTab = selectedTab === "digital";
+
+  return (
+    <div className="w-full overflow-x-visible">
+      <table className="w-full text-sm" style={{ minWidth: "980px" }}>
+        <thead className="sticky top-0 z-10">
+          <tr className="bg-gray-50 border-b border-gray-100">
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">VPC / MPI</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pricing Model</th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <span className="flex items-center gap-1">{isDigitalTab ? "Users / Licenses" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              <span className="flex items-center gap-1">{isDigitalTab ? "Tenure / Billing" : "Stock"} <Info className="w-3 h-3 text-gray-400" /></span>
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+              {isDigitalTab ? "Provisioning Time" : "Lead Time"}
+            </th>
+            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-16">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {rows.map((row) => {
+            const type = selectedProductType(row.catalogProduct);
+            const digital = isDigitalOnlyType(type);
+            const tenureBilling = getTenureBilling(type);
+            const formattedLeadTime = formatLeadTimeByType(row.leadTime, type);
+
+            return (
+              <tr key={row.catalogProduct.id} className="hover:bg-gray-50/40 transition-colors">
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <ProductThumb images={row.catalogProduct.images} name={row.catalogProduct.productName} />
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-800 text-sm leading-tight truncate max-w-[180px]">{row.catalogProduct.productName}</div>
+                      <div className="text-xs text-gray-400 font-mono mt-0.5">{row.catalogProduct.masterProductCode}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-3 py-2 align-middle">
+                  <span className={`inline-flex max-w-[120px] rounded-md px-2 py-1.5 text-[10px] font-semibold leading-snug ${selectedProductTypeClasses(type)}`}>
+                    {type}
+                  </span>
+                </td>
+                <td className="px-3 py-2 align-middle">
+                  <div className="space-y-1">
+                    <div className="font-mono text-[10px] text-gray-700 break-all">{row.vendorProductCode || "—"}</div>
+                    <div className="font-mono text-[10px] text-gray-500 break-all">{row.catalogProduct.masterProductCode || "—"}</div>
+                  </div>
+                </td>
+                <td className="px-3 py-2 align-middle text-xs text-gray-700 break-words">{getPricingModel(type)}</td>
+                <td className="px-3 py-3">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={row.price}
+                    onChange={(e) => updateRow(row.catalogProduct.id, "price", e.target.value)}
+                    placeholder="0.00"
+                    className="w-full min-w-[90px] max-w-[110px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={row.moq}
+                      onChange={(e) => updateRow(row.catalogProduct.id, "moq", e.target.value)}
+                      placeholder="0"
+                      className="w-full min-w-[56px] max-w-[76px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-[10px] text-gray-500">{getQuantityLabel(type)}</span>
+                  </div>
+                </td>
+                <td className="px-3 py-3">
+                  {digital ? (
+                    <div className="space-y-1 text-[10px] text-gray-700">
+                      <div className="font-semibold">{tenureBilling.tenure}</div>
+                      <div className="text-gray-500">{tenureBilling.billing}</div>
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={row.stock}
+                      onChange={(e) => updateRow(row.catalogProduct.id, "stock", e.target.value)}
+                      placeholder="0"
+                      className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  )}
+                </td>
+                <td className="px-3 py-3">
+                  <div className="space-y-1">
+                    <input
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={row.leadTime}
+                      onChange={(e) => updateRow(row.catalogProduct.id, "leadTime", e.target.value)}
+                      placeholder="0"
+                      className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-[10px] text-gray-500">
+                      {formattedLeadTime.primary}{formattedLeadTime.secondary ? ` · ${formattedLeadTime.secondary}` : ""}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-3 py-3">
+                  {!isEditMode ? (
+                    <button
+                      type="button"
+                      onClick={() => removeSelected(row.catalogProduct.id)}
+                      className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      aria-label={`Remove ${row.catalogProduct.productName}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-400">—</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 const PAGE_SIZE = 20;
@@ -185,7 +360,7 @@ export default function AddVendorProductsPage() {
         price: row.price,
         moq: row.moq,
         leadTime: row.leadTime,
-        stock: row.stock,
+        stock: isDigitalCatalogProduct(row.catalogProduct) ? row.stock || "0" : row.stock,
         vendorProductCode: row.vendorProductCode,
       });
     } else {
@@ -204,7 +379,7 @@ export default function AddVendorProductsPage() {
         price: r.price,
         moq: r.moq,
         leadTime: r.leadTime,
-        stock: r.stock,
+        stock: isDigitalCatalogProduct(r.catalogProduct) ? r.stock || "0" : r.stock,
         reservedStock: "0",
         incomingStock: "0",
         lastStockUpdate: new Date().toISOString(),
@@ -228,7 +403,9 @@ export default function AddVendorProductsPage() {
       if (!row.price || row.price.trim() === "" || Number(row.price) <= 0) missing.push("Purchase Price");
       if (!row.moq   || row.moq.trim()   === "") missing.push("MOQ");
       if (!row.leadTime || row.leadTime.trim() === "") missing.push("Lead Time");
-      if (!row.stock || row.stock.trim() === "") missing.push("Stock");
+      if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.stock || row.stock.trim() === "")) {
+        missing.push("Stock");
+      }
       if (missing.length > 0) errors.push({ productName: row.catalogProduct.productName, missing });
     }
     if (errors.length > 0) {
@@ -457,103 +634,15 @@ export default function AddVendorProductsPage() {
                   No {selectedProductTab} products selected yet.
                 </div>
               ) : (
-                <div className="w-full overflow-x-visible">
-                  <table className="w-full text-sm" style={{ minWidth: "900px" }}>
-                  <thead className="sticky top-0 z-10">
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      {!isEditMode && <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">#</th>}
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Master Product Code</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                        <span className="flex items-center gap-1">Price (₹) <Info className="w-3 h-3 text-gray-400" /></span>
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        <span className="flex items-center gap-1">MOQ <Info className="w-3 h-3 text-gray-400" /></span>
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                        <span className="flex items-center gap-1">Lead Time (Days) <Info className="w-3 h-3 text-gray-400" /></span>
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        <span className="flex items-center gap-1">Stock <Info className="w-3 h-3 text-gray-400" /></span>
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Vendor Product Code</th>
-                      {!isEditMode && <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">Remove</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {(isEditMode ? selectedRows : visibleSelectedRows).map((row, idx) => (
-                      <tr key={row.catalogProduct.id} className="hover:bg-gray-50/40 transition-colors">
-                        {!isEditMode && (
-                          <td className="px-3 py-2 text-gray-500 text-sm font-medium">{idx + 1}</td>
-                        )}
-                        <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
-                            <ProductThumb images={row.catalogProduct.images} name={row.catalogProduct.productName} />
-                            <div className="min-w-0">
-                              <div className="font-medium text-gray-800 text-sm leading-tight truncate max-w-[180px]">{row.catalogProduct.productName}</div>
-                              <div className="text-xs text-gray-400 font-mono mt-0.5">{row.catalogProduct.masterProductCode}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{row.catalogProduct.masterProductCode || "—"}</span>
-                        </td>
-                        <td className="px-3 py-3">
-                          <input
-                            type="number" min={0} step="0.01"
-                            value={row.price}
-                            onChange={(e) => updateRow(row.catalogProduct.id, "price", e.target.value)}
-                            placeholder="0.00"
-                            className="w-full min-w-[90px] max-w-[110px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <input
-                            type="number" min={0} step="1"
-                            value={row.moq}
-                            onChange={(e) => updateRow(row.catalogProduct.id, "moq", e.target.value)}
-                            placeholder="0"
-                            className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <input
-                            type="number" min={0} step="1"
-                            value={row.leadTime}
-                            onChange={(e) => updateRow(row.catalogProduct.id, "leadTime", e.target.value)}
-                            placeholder="0"
-                            className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <input
-                            type="number" min={0} step="1"
-                            value={row.stock}
-                            onChange={(e) => updateRow(row.catalogProduct.id, "stock", e.target.value)}
-                            placeholder="0"
-                            className="w-full min-w-[64px] max-w-[80px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <span className="inline-block min-w-[110px] px-2 py-1.5 text-sm font-mono text-gray-700 bg-gray-50 border border-gray-200 rounded-md">
-                            {row.vendorProductCode}
-                          </span>
-                        </td>
-                        {!isEditMode && (
-                          <td className="px-3 py-3">
-                            <button
-                              onClick={() => removeSelected(row.catalogProduct.id)}
-                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                  </table>
-                </div>
+                <>
+                <SelectedProductsTable
+                  rows={isEditMode ? selectedRows : visibleSelectedRows}
+                  isEditMode={isEditMode}
+                  selectedTab={selectedProductTab}
+                  updateRow={updateRow}
+                  removeSelected={removeSelected}
+                />
+                </>
               )}
 
               {!isEditMode && (
@@ -621,21 +710,39 @@ export default function AddVendorProductsPage() {
                       <p className="text-sm font-mono text-gray-800 mt-0.5 break-words">{row.vendorProductCode}</p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Purchase Price</p>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Price / Unit</p>
                       <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.price}</p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">MOQ</p>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                        {isDigitalCatalogProduct(row.catalogProduct) ? "Users / Licenses" : "Units / MOQ"}
+                      </p>
                       <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.moq}</p>
                     </div>
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Lead Time</p>
-                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.leadTime}</p>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                        {isDigitalCatalogProduct(row.catalogProduct) ? "Provisioning Time" : "Lead Time"}
+                      </p>
+                      <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                        {formatLeadTimeByType(row.leadTime, selectedProductType(row.catalogProduct)).primary}
+                      </p>
                     </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Stock</p>
-                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.stock}</p>
-                    </div>
+                    {isDigitalCatalogProduct(row.catalogProduct) ? (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Tenure / Billing</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                          {(() => {
+                            const terms = getTenureBilling(selectedProductType(row.catalogProduct));
+                            return `${terms.tenure} · ${terms.billing}`;
+                          })()}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Stock</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.stock}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

@@ -369,6 +369,9 @@ function EditProductScreen({
   const [stock, setStock] = useState(product.stock || "");
   const [incomingStock, setIncomingStock] = useState(product.incomingStock || "0");
 
+  const productType = getProductType(product.physicalType);
+  const isDigitalProduct = isDigitalOnlyType(productType);
+  const tenureBilling = getTenureBilling(productType);
   const reservedStock = parseInt(product.reservedStock || "0") || 0;
   const currentStockNum = parseInt(stock) || 0;
   const availableStock = Math.max(0, currentStockNum - reservedStock);
@@ -376,7 +379,13 @@ function EditProductScreen({
   const initials = product.productName.slice(0, 2).toUpperCase();
 
   const handleSave = () => {
-    onSave({ price: price.trim(), moq: moq.trim(), leadTime: leadTime.trim(), stock: stock.trim(), incomingStock: incomingStock.trim() });
+    onSave({
+      price: price.trim(),
+      moq: moq.trim(),
+      leadTime: leadTime.trim(),
+      stock: isDigitalProduct ? product.stock || "0" : stock.trim(),
+      incomingStock: isDigitalProduct ? product.incomingStock || "0" : incomingStock.trim(),
+    });
     onClose();
   };
 
@@ -424,6 +433,14 @@ function EditProductScreen({
                 <h3 className="font-semibold text-gray-900 text-sm leading-snug">{product.productName}</h3>
                 <p className="text-xs text-gray-500">{product.category}</p>
                 <div className="space-y-1.5 text-xs text-gray-600 pt-1">
+                   <div className="flex justify-between gap-3">
+                     <span className="text-gray-400">Product Type</span>
+                     <span className="text-right">{productType}</span>
+                   </div>
+                   <div className="flex justify-between gap-3">
+                     <span className="text-gray-400">Pricing Model</span>
+                     <span className="text-right">{getPricingModel(productType)}</span>
+                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">MPI Code</span>
                     <span className="font-mono">{product.masterProductCode}</span>
@@ -448,14 +465,20 @@ function EditProductScreen({
           {/* Right: Editable fields */}
           <div className="flex-1 min-w-0">
             <div className="border border-gray-200 rounded-2xl p-6">
-              <h3 className="text-base font-semibold text-gray-900 mb-1">Pricing &amp; Inventory</h3>
-              <p className="text-sm text-gray-400 mb-6">Update the purchase price, minimum order quantity, lead time, and current stock for this product.</p>
+               <h3 className="text-base font-semibold text-gray-900 mb-1">
+                 {isDigitalProduct ? "Digital Commercial Terms" : "Pricing & Inventory"}
+               </h3>
+               <p className="text-sm text-gray-400 mb-6">
+                 {isDigitalProduct
+                   ? "Update the price, users/licenses, tenure/billing, and provisioning time for this product."
+                   : "Update the price, units/MOQ, lead time, and current stock for this product."}
+               </p>
 
               <div className="grid grid-cols-2 gap-6">
                 {/* Purchase Price */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Purchase Price
+                    Price / Unit
                   </label>
                   <p className="text-xs text-gray-400 mb-2">Vendor purchase price (excl. GST)</p>
                   <div className="relative">
@@ -477,9 +500,11 @@ function EditProductScreen({
                 {/* MOQ */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Minimum Order Quantity (MOQ)
+                    {isDigitalProduct ? "Users / Licenses" : "Units / MOQ"}
                   </label>
-                  <p className="text-xs text-gray-400 mb-2">Minimum units per order</p>
+                  <p className="text-xs text-gray-400 mb-2">
+                    {isDigitalProduct ? "Number of users or licenses included" : `Minimum ${getQuantityLabel(productType).toLowerCase()} per order`}
+                  </p>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <Layers className="w-4 h-4" />
@@ -498,9 +523,11 @@ function EditProductScreen({
                 {/* Lead Time */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Lead Time (days)
+                    {isDigitalProduct ? "Provisioning Time (hours)" : "Lead Time (days)"}
                   </label>
-                  <p className="text-xs text-gray-400 mb-2">Days from order to delivery</p>
+                  <p className="text-xs text-gray-400 mb-2">
+                    {isDigitalProduct ? "Time from order to service provisioning" : "Days from order to delivery"}
+                  </p>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <Timer className="w-4 h-4" />
@@ -516,27 +543,37 @@ function EditProductScreen({
                   </div>
                 </div>
 
-                {/* Current Stock */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    Current Stock (Physical)
-                  </label>
-                  <p className="text-xs text-gray-400 mb-2">Total units physically held by vendor</p>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Warehouse className="w-4 h-4" />
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={stock}
-                      onChange={(e) => setStock(e.target.value)}
-                      placeholder="e.g. 120"
-                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
-                    />
+                {isDigitalProduct ? (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tenure / Billing</label>
+                    <p className="text-xs text-gray-400 mb-2">Commercial terms derived from the digital product type</p>
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5">
+                      <p className="text-sm font-semibold text-gray-900">{tenureBilling.tenure}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{tenureBilling.billing}</p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Stock</label>
+                    <p className="text-xs text-gray-400 mb-2">Total units physically held by vendor</p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <Warehouse className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={stock}
+                        onChange={(e) => setStock(e.target.value)}
+                        placeholder="e.g. 120"
+                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                      />
+                    </div>
+                  </div>
+                )}
 
+                {!isDigitalProduct && (
+                  <>
                 {/* Reserved Stock — read-only */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -596,6 +633,8 @@ function EditProductScreen({
                     />
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
