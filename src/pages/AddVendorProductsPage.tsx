@@ -441,7 +441,7 @@ export default function AddVendorProductsPage() {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <h1 className="text-lg font-bold text-gray-900">
-            {isEditMode ? "Edit Vendor Product" : "Add Products to Vendor"}
+            {isEditMode ? "Edit Product" : "Add Products to Vendor"}
           </h1>
         </div>
         <p className="text-sm text-gray-500 ml-7">

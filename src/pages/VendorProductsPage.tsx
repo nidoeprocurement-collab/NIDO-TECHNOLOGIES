@@ -1213,9 +1213,9 @@ export default function VendorProductsPage() {
                        </td>
                          <td className="px-2 py-4 align-middle">
                            <div className="flex flex-wrap items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setEditProduct(product)}
+                             <button
+                               type="button"
+                               onClick={() => navigate(`/vendors/${vendorId}/add-products?edit=${encodeURIComponent(product.id)}`)}
                               aria-label={`Edit ${product.productName}`}
                                className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-1.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors"
                             >
