@@ -24,12 +24,6 @@ import { useOrgConfig } from "@/contexts/ConfigContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import {
-  getProductCommercialTerms,
-} from "@/lib/productCommercialTerms";
-import {
-  formatLeadTimeByType,
-  getAvailabilityByType,
-  getPricingModel,
   getProductType,
   getTenureBilling,
   isDigitalOnlyType,
@@ -369,26 +363,25 @@ export default function CartPage() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <div className="min-w-[1480px]">
+                    <div className={productTab === "digital" ? "min-w-[1170px]" : "min-w-[1040px]"}>
                       {/* Header mirrors Vendor Products for each product type. */}
                       <div
                         className="grid border-b border-gray-200 bg-gray-50 px-5 py-3 gap-3"
-                        style={{ gridTemplateColumns: "minmax(300px,1fr) 115px 130px 140px 125px 145px 135px 125px 80px 120px 72px" }}
+                        style={{
+                          gridTemplateColumns: productTab === "digital"
+                            ? "minmax(300px,1fr) 115px 125px 145px 135px 80px 120px 72px"
+                            : "minmax(300px,1fr) 115px 125px 145px 80px 120px 72px",
+                        }}
                       >
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Product</span>
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Type</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">VPC / MPI</span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Pricing Model</span>
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Price / Unit</span>
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
                           {productTab === "digital" ? "Users / Licenses" : "Units / MOQ"}
                         </span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
-                          {productTab === "digital" ? "Tenure / Billing" : "Stock"}
-                        </span>
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">
-                          {productTab === "digital" ? "Provisioning Time" : "Lead Time"}
-                        </span>
+                        {productTab === "digital" && (
+                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Tenure / Billing</span>
+                        )}
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">GST</span>
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-right">Total</span>
                         <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider text-center">Actions</span>
@@ -428,14 +421,6 @@ export default function CartPage() {
                    const itemMoq = selectedAllocation?.moq && selectedAllocation.moq > 0
                      ? selectedAllocation.moq
                      : (item.moq > 0 ? item.moq : 1);
-                   const itemLeadTime = item.leadTime || (item.selectedVendorId ? "" : stockInfo?.leadTime || "");
-                   const itemStock = item.selectedVendorId ? (item.totalStock ?? selectedAllocation?.stock ?? 0) : (stockInfo?.totalStock ?? item.totalStock ?? 0);
-                    const itemTerms = item.commercialTerms || getProductCommercialTerms(
-                      productType,
-                     { moq: itemMoq, leadTime: itemLeadTime, stock: itemStock },
-                   );
-                   const availability = getAvailabilityByType(itemStock, productType);
-                   const leadTime = formatLeadTimeByType(itemLeadTime, productType);
                    const tenureBilling = getTenureBilling(productType);
 
                   const specChips = item.specs.slice(0, 5).map(parseSpec);
@@ -444,7 +429,11 @@ export default function CartPage() {
                      <div key={item.id} className={`border-b border-gray-100 last:border-0 ${idx % 2 === 0 ? "bg-white" : "bg-white"}`}>
                        <div
                          className="grid px-5 py-5 items-start gap-3"
-                         style={{ gridTemplateColumns: "minmax(300px,1fr) 115px 130px 140px 125px 145px 135px 125px 80px 120px 72px" }}
+                          style={{
+                            gridTemplateColumns: isDigital
+                              ? "minmax(300px,1fr) 115px 125px 145px 135px 80px 120px 72px"
+                              : "minmax(300px,1fr) 115px 125px 145px 80px 120px 72px",
+                          }}
                        >
 
                         {/* ── Product info ────────────────────────────── */}
@@ -526,15 +515,6 @@ export default function CartPage() {
                            </span>
                          </div>
 
-                         {/* ── VPC / MPI ───────────────────────────────── */}
-                         <div className="space-y-1 pt-1 break-words">
-                           <div className="font-mono text-[10px] text-gray-700 break-all">{item.vendorProductCode || "—"}</div>
-                           <div className="font-mono text-[10px] text-gray-500 break-all">{item.productCode || "—"}</div>
-                         </div>
-
-                         {/* ── Pricing model ───────────────────────────── */}
-                         <div className="pt-1 break-words text-xs text-gray-700">{itemTerms.pricingModel || getPricingModel(productType)}</div>
-
                         {/* ── Unit Price ──────────────────────────────── */}
                         <div className="flex flex-col items-center justify-start pt-1">
                             {hasDiscount && (
@@ -554,37 +534,13 @@ export default function CartPage() {
                           />
                         </div>
 
-                         {/* ── Tenure / Billing or Stock ──────────────── */}
-                         <div className="pt-1">
-                           {isDigital ? (
-                             <div className="space-y-1 text-xs">
-                               <div className="font-semibold text-gray-800">{tenureBilling.tenure}</div>
-                               <div className="text-gray-500">{tenureBilling.billing}</div>
-                             </div>
-                           ) : availability.isUnlimited ? (
-                             <div className="space-y-1">
-                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
-                               <div className="text-xs font-medium text-emerald-600">Instant</div>
-                             </div>
-                           ) : (
-                             <div className="space-y-1">
-                               <div className="font-semibold text-sm text-gray-800">{availability.primary}</div>
-                               <span className={`inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${
-                                 availability.status === "In Stock" ? "bg-emerald-50 text-emerald-700" :
-                                 availability.status === "Low Stock" ? "bg-amber-50 text-amber-700" :
-                                 "bg-red-50 text-red-600"
-                               }`}>
-                                 {availability.status}
-                               </span>
-                             </div>
-                           )}
-                         </div>
-
-                         {/* ── Provisioning / Lead Time ──────────────── */}
-                         <div className="space-y-1 pt-1 text-gray-700 text-xs">
-                           <div>{leadTime.primary}{!isDigital && isHybridType(productType) ? " *" : ""}</div>
-                           {leadTime.secondary && <div className="text-xs text-gray-500">{leadTime.secondary}</div>}
-                         </div>
+                         {/* ── Tenure / Billing ───────────────────────── */}
+                         {isDigital && (
+                           <div className="pt-1 space-y-1 text-xs">
+                             <div className="font-semibold text-gray-800">{tenureBilling.tenure}</div>
+                             <div className="text-gray-500">{tenureBilling.billing}</div>
+                           </div>
+                         )}
 
                         {/* ── GST % ───────────────────────────────────── */}
                         <div className="flex items-start justify-center pt-2">
