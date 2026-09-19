@@ -280,6 +280,8 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
           gstSnapshot: i.gstSnapshot,
           hsnSnapshot: i.hsnSnapshot,
           vendorRating: i.vendorRating,
+          configuration: i.configuration,
+          configurationPriceAdjustment: i.configurationPriceAdjustment,
           stockReservationId: `res_${i.productCode || i.id}_${i.selectedVendorId || "none"}_${Date.now()}`,
         })) satisfies OrderCartItem[],
       });

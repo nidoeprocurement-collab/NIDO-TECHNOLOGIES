@@ -483,6 +483,14 @@ export default function CartPage() {
                                   <span className="font-medium text-gray-600">Category:</span> {item.category}
                                 </span>
                               )}
+                            {item.configuration && Object.keys(item.configuration).length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-500">
+                                <span className="font-medium text-gray-600">Configuration:</span>
+                                {Object.entries(item.configuration).map(([label, value]) => (
+                                  <span key={label}>{label.replace(/-\d+$/, "")}: <strong className="font-semibold text-gray-700">{value}</strong></span>
+                                ))}
+                              </div>
+                            )}
                             </div>
 
                             {/* Spec chips */}

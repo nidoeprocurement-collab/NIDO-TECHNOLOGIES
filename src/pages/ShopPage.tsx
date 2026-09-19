@@ -182,8 +182,41 @@ function getShopProductIcon(kind: Exclude<ShopTab, "all">) {
 type CloudDataField = {
   label: string;
   value: string;
-  options: string[];
+  options: CloudOption[];
 };
+
+type CloudOption = {
+  label: string;
+  priceAdjustment: number;
+};
+
+function parseCloudOption(rawOption: string): CloudOption {
+  const raw = rawOption.trim();
+  if (!raw) return { label: "", priceAdjustment: 0 };
+
+  // Catalogue variation prices are optional. Support common catalogue formats
+  // such as "Mumbai (+₹500)", "Premium +500", and "Standard (₹0)".
+  const pricedSuffix = raw.match(
+    /(?:\(\s*)?([+-])?\s*(?:₹|INR|Rs\.?|USD|\$)\s*([\d,]+(?:\.\d+)?)\s*(?:\))?\s*$/i,
+  ) || raw.match(
+    /(?:\(\s*|\s+)([+-])\s*(?:₹|INR|Rs\.?|USD|\$)?\s*([\d,]+(?:\.\d+)?)\s*(?:\))?\s*$/i,
+  );
+
+  if (!pricedSuffix) return { label: raw, priceAdjustment: 0 };
+
+  const amount = Number(pricedSuffix[2].replace(/,/g, ""));
+  if (!Number.isFinite(amount)) return { label: raw, priceAdjustment: 0 };
+
+  const label = raw
+    .slice(0, pricedSuffix.index)
+    .replace(/[\s([{:|–—-]+$/, "")
+    .trim();
+
+  return {
+    label: label || raw,
+    priceAdjustment: pricedSuffix[1] === "-" ? -amount : amount,
+  };
+}
 
 function getCloudDataFields(product: Product): CloudDataField[] {
   const fields: CloudDataField[] = [];
@@ -199,8 +232,10 @@ function getCloudDataFields(product: Product): CloudDataField[] {
     const options = cleanValue
       .split(/\s*[|;]\s*/)
       .map(option => option.trim())
-      .filter(Boolean);
-    fields.push({ label: cleanLabel, value: cleanValue, options: options.length > 1 ? options : [] });
+      .filter(Boolean)
+      .map(parseCloudOption)
+      .filter(option => option.label);
+    fields.push({ label: cleanLabel, value: cleanValue, options });
   };
 
   (product.generalSpecs || []).forEach(spec => addField(spec.label, spec.value));
@@ -214,12 +249,52 @@ function getCloudDataFields(product: Product): CloudDataField[] {
   return fields;
 }
 
+function isCloudConfigurationField(field: CloudDataField): boolean {
+  const label = field.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const serviceMetadata = [
+    "cloud provider",
+    "provider",
+    "service category",
+    "category",
+    "service type",
+    "billing model",
+    "pricing model",
+    "pricing unit",
+    "service status",
+    "availability",
+    "status",
+    "description",
+    "product type",
+  ];
+  return !serviceMetadata.some(metadata => label === metadata || label.startsWith(`${metadata} `));
+}
+
 function findCloudField(fields: CloudDataField[], terms: string[]): string {
   return fields.find(field => terms.some(term => field.label.toLowerCase().includes(term)))?.value || "";
 }
 
 function cloudFieldKey(field: CloudDataField, index: number): string {
   return `${field.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${index}`;
+}
+
+function getCloudConfigurationPriceAdjustment(
+  fields: CloudDataField[],
+  values: Record<string, string>,
+): number {
+  return fields.reduce((total, field, index) => {
+    const selectedValue = values[cloudFieldKey(field, index)] ?? field.value;
+    const selectedOption = field.options.find(option => option.label === selectedValue);
+    return total + (selectedOption?.priceAdjustment || 0);
+  }, 0);
+}
+
+function haveSameCloudConfiguration(
+  left: Record<string, string> | undefined,
+  right: Record<string, string>,
+): boolean {
+  const leftEntries = Object.entries(left || {}).sort(([a], [b]) => a.localeCompare(b));
+  const rightEntries = Object.entries(right).sort(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify(leftEntries) === JSON.stringify(rightEntries);
 }
 
 // getClientOrderedQtyMap and getPOdQtyMap removed — available stock is now
@@ -710,6 +785,7 @@ function CloudServiceProductCard({
   const [configuration, setConfiguration] = useState<Record<string, string>>({});
   const [draftConfiguration, setDraftConfiguration] = useState<Record<string, string>>({});
   const dataFields = getCloudDataFields(product);
+  const configurationFields = dataFields.filter(isCloudConfigurationField);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
   const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
   const region = findCloudField(dataFields, ["region", "location"]);
@@ -718,7 +794,7 @@ function CloudServiceProductCard({
   const pricingUnit = findCloudField(dataFields, ["pricing unit", "unit"]);
   const serviceStatus = findCloudField(dataFields, ["service status", "availability", "status"])
     || (product.inStock ? "Available" : "Unavailable");
-  const configurationCount = dataFields.length;
+  const configurationCount = configurationFields.length;
   const productType = getProductType(product.physicalType || product.productType);
   const gstRate = getEffectiveTaxPctForCategory(product.category);
   const hsnForCategory = (() => {
@@ -750,7 +826,10 @@ function CloudServiceProductCard({
 
   useEffect(() => {
     const initial = Object.fromEntries(
-      dataFields.map((field, index) => [cloudFieldKey(field, index), field.value]),
+      configurationFields.map((field, index) => [
+        cloudFieldKey(field, index),
+        field.options[0]?.label || field.value,
+      ]),
     );
     setConfiguration(initial);
     setDraftConfiguration(initial);
@@ -759,9 +838,10 @@ function CloudServiceProductCard({
   const isInCart = !!selectedVendor && items.some(item =>
     item.productCode === product.productCode
     && item.clientId === clientId
-    && item.selectedVendorId === selectedVendor.vendorId,
+    && item.selectedVendorId === selectedVendor.vendorId
+    && haveSameCloudConfiguration(item.configuration, configuration),
   );
-  const clientSellingPriceExclGst = selectedVendor && clientId
+  const baseClientSellingPriceExclGst = selectedVendor && clientId
     ? computeClientSellingPriceExclGst(
         clientId,
         product.productCode,
@@ -769,13 +849,17 @@ function CloudServiceProductCard({
         selectedVendor.landedCostPerUnit,
       )
     : 0;
+  const configurationPriceAdjustment = getCloudConfigurationPriceAdjustment(configurationFields, configuration);
+  const clientSellingPriceExclGst = Math.max(0, baseClientSellingPriceExclGst + configurationPriceAdjustment);
+  const draftConfigurationPriceAdjustment = getCloudConfigurationPriceAdjustment(configurationFields, draftConfiguration);
+  const draftEstimatedPrice = Math.max(0, baseClientSellingPriceExclGst + draftConfigurationPriceAdjustment);
   const canUseVendor = (vendor: VendorComparisonRow) =>
     isDigitalProduct(product) || canVendorFulfillMoq(vendor);
   const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor) && !isInCart;
   const selectedConfigurationSummary = Object.entries(configuration)
     .map(([key, value]) => {
       const index = Number(key.split("-").pop());
-      const field = dataFields[index];
+      const field = configurationFields[index];
       return field && value.trim() ? `${field.label}: ${value.trim()}` : "";
     })
     .filter(Boolean);
@@ -816,6 +900,8 @@ function CloudServiceProductCard({
         gstSnapshot: gstRate,
         hsnSnapshot: hsnForCategory,
         vendorRating: selectedVendor.rating,
+        configuration,
+        configurationPriceAdjustment,
       },
       Math.max(1, selectedVendor.moq, qty),
     );
@@ -959,36 +1045,41 @@ function CloudServiceProductCard({
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider || "Cloud Service"}</p>
                 <h2 className="mt-0.5 text-base font-bold text-gray-900">Configure {product.name}</h2>
-                <p className="mt-1 text-xs text-gray-500">Choose from the configuration data available for this service.</p>
+                <p className="mt-1 text-xs text-gray-500">Choose one option from each dropdown for this service.</p>
               </div>
               <button type="button" aria-label="Close configuration" onClick={() => setConfigOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                 <X size={16} />
               </button>
             </div>
 
-            {dataFields.length > 0 ? (
+            {configurationFields.length > 0 ? (
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {dataFields.map((field, index) => {
+                {configurationFields.map((field, index) => {
                   const key = cloudFieldKey(field, index);
-                  const value = draftConfiguration[key] ?? field.value;
+                  const value = draftConfiguration[key] ?? field.options[0]?.label ?? field.value;
                   return (
                     <label key={key} className="text-xs font-semibold text-gray-600">
-                      {field.label}
-                      {field.options.length > 1 ? (
-                        <select
-                          value={value}
-                          onChange={event => setDraftConfiguration(current => ({ ...current, [key]: event.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-normal text-gray-700 outline-none focus:border-blue-400"
-                        >
-                          {field.options.map(option => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                      ) : (
-                        <input
-                          value={value}
-                          onChange={event => setDraftConfiguration(current => ({ ...current, [key]: event.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-gray-200 px-2.5 py-2 text-xs font-normal text-gray-700 outline-none focus:border-blue-400"
-                        />
-                      )}
+                      <span className="flex items-center justify-between">
+                        {field.label}
+                        {field.options.some(option => option.priceAdjustment !== 0) && (
+                          <span className="text-[10px] font-normal text-gray-400">price varies by option</span>
+                        )}
+                      </span>
+                      <select
+                        value={value}
+                        onChange={event => setDraftConfiguration(current => ({ ...current, [key]: event.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-normal text-gray-700 outline-none focus:border-blue-400"
+                      >
+                        {field.options.length > 0 ? (
+                          field.options.map(option => (
+                            <option key={option.label} value={option.label}>
+                              {option.label}{option.priceAdjustment > 0 ? ` (+${formatCurrency(option.priceAdjustment)})` : option.priceAdjustment < 0 ? ` (${formatCurrency(option.priceAdjustment)})` : ""}
+                            </option>
+                          ))
+                        ) : (
+                          <option value={field.value}>{field.value}</option>
+                        )}
+                      </select>
                     </label>
                   );
                 })}
@@ -997,9 +1088,22 @@ function CloudServiceProductCard({
               <p className="mt-5 rounded-lg bg-gray-50 px-3 py-4 text-xs text-gray-500">This service has no additional configuration fields in the catalogue.</p>
             )}
 
-            <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-4">
+            <div className="mt-5 flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
+              <div>
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Estimated Price</p>
+                <p className="text-base font-bold text-gray-900">
+                  {selectedVendor && draftEstimatedPrice > 0 ? formatCurrency(draftEstimatedPrice) : selectedVendor ? "Custom Quote" : "Select a vendor"}
+                </p>
+                {selectedVendor && draftConfigurationPriceAdjustment !== 0 && (
+                  <p className={`text-[10px] ${draftConfigurationPriceAdjustment > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                    {draftConfigurationPriceAdjustment > 0 ? "+" : ""}{formatCurrency(draftConfigurationPriceAdjustment)} from configuration
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
               <button type="button" onClick={() => setConfigOpen(false)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
               <button type="button" onClick={() => { setConfiguration({ ...draftConfiguration }); setConfigOpen(false); }} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">Save Configuration</button>
+              </div>
             </div>
           </div>
         </div>

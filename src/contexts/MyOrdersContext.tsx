@@ -45,6 +45,9 @@ export interface OrderCartItem {
   gstSnapshot?: number;
   hsnSnapshot?: string;
   vendorRating?: number;
+  /** Cloud/service configuration selected before the item was added to cart. */
+  configuration?: Record<string, string>;
+  configurationPriceAdjustment?: number;
   /** Unique ID for the stock reservation placed at checkout — used for auditing and release on cancellation */
   stockReservationId?: string;
   /** Stable generated sub-order identifier assigned when the master order is created. */

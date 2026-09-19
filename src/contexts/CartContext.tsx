@@ -44,6 +44,10 @@ export type CartItem = {
   hsnSnapshot?: string;
   /** Vendor rating (0-5) captured at time of add. */
   vendorRating?: number;
+  /** Cloud/service configuration selected on the Shop card. */
+  configuration?: Record<string, string>;
+  /** Configuration surcharge/discount captured at time of add. */
+  configurationPriceAdjustment?: number;
   /** Single-entry allocation record — kept for order-cancellation stock-release path. */
   vendorAllocations: StockAllocation[];
 };
@@ -61,6 +65,14 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = 'nido_cart_v1';
+
+function getConfigurationKey(configuration?: Record<string, string>): string {
+  if (!configuration) return '';
+  return Object.keys(configuration)
+    .sort()
+    .map(key => `${key}=${configuration[key]}`)
+    .join('&');
+}
 
 function getCartStorageKey(user: { id?: string } | null): string {
   return `${CART_STORAGE_KEY}:${encodeURIComponent(user?.id || 'guest')}`;
@@ -123,9 +135,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   ) => {
     setItems((prev) => {
       // Match by productCode + vendorId so the same product from different vendors is a separate line.
-      const lineKey = `${product.productCode || product.id}__${product.selectedVendorId || ''}`;
+      const lineKey = `${product.productCode || product.id}__${product.selectedVendorId || ''}__${getConfigurationKey(product.configuration)}`;
       const existing = prev.find(
-        (i) => `${i.productCode || i.id}__${i.selectedVendorId || ''}` === lineKey,
+        (i) => `${i.productCode || i.id}__${i.selectedVendorId || ''}__${getConfigurationKey(i.configuration)}` === lineKey,
       );
 
       if (existing) {
@@ -134,7 +146,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           ? [{ vendorId: product.selectedVendorId, vendorProductId: '', vendorName: product.selectedVendorName || '', allocated: newQty }]
           : existing.vendorAllocations;
         return prev.map((i) =>
-          `${i.productCode || i.id}__${i.selectedVendorId || ''}` === lineKey
+          `${i.productCode || i.id}__${i.selectedVendorId || ''}__${getConfigurationKey(i.configuration)}` === lineKey
             ? { ...i, quantity: newQty, vendorAllocations: newAlloc }
             : i,
         );
