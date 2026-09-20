@@ -62,8 +62,14 @@ function generateBreadcrumbs(pathname: string) {
 
   // Build breadcrumb trail
   let cumulativePath = '';
+  const isShopProductPath = segments[0] === 'shop' && segments[1] === 'product';
   segments.forEach((segment, index) => {
     cumulativePath += `/${segment}`;
+    // Shop product detail pages already identify the item with its product
+    // code. Omit the generic "Product" segment so the breadcrumb reads
+    // Shop → product code instead of linking to the non-existent /shop/product
+    // page.
+    if (isShopProductPath && index === 1) return;
     const isActive = index === segments.length - 1;
     const label = routeLabels[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
 

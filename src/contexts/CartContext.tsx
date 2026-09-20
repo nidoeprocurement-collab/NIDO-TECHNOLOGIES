@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import type { ProductCommercialTerms } from '@/lib/productCommercialTerms';
 import { useAuth } from './AuthContext';
+import { toast } from 'sonner';
 
 export interface StockAllocation {
   vendorId: string;
@@ -78,6 +79,20 @@ function getCartStorageKey(user: { id?: string } | null): string {
   return `${CART_STORAGE_KEY}:${encodeURIComponent(user?.id || 'guest')}`;
 }
 
+function isDigitalCartItem(item: Pick<CartItem, 'fulfillmentType' | 'physicalType' | 'productType'>): boolean {
+  const fulfillmentType = item.fulfillmentType?.trim().toLowerCase();
+  if (fulfillmentType === 'digital') return true;
+  if (fulfillmentType === 'physical' || fulfillmentType === 'hybrid') return false;
+
+  const productType = `${item.physicalType || ''} ${item.productType || ''}`.toLowerCase();
+  return productType.includes('digital')
+    || productType.includes('license')
+    || productType.includes('licence')
+    || productType.includes('subscription')
+    || productType.includes('saas')
+    || productType.includes('cloud');
+}
+
 function loadCart(storageKey: string): CartItem[] {
   try {
     const raw = localStorage.getItem(storageKey);
@@ -133,6 +148,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     product: Omit<CartItem, 'quantity' | 'vendorAllocations'>,
     quantity: number = Math.max(1, product.moq),
   ) => {
+    const productIsDigital = isDigitalCartItem(product);
+    const cartHasPhysical = items.some(item => !isDigitalCartItem(item));
+    const cartHasDigital = items.some(item => isDigitalCartItem(item));
+
+    if ((productIsDigital && cartHasPhysical) || (!productIsDigital && cartHasDigital)) {
+      if (productIsDigital) {
+        toast.warning(
+          'Digital products cannot be added to a cart with physical products.',
+          { description: 'Please add only physical products to this cart.' },
+        );
+      } else {
+        toast.warning(
+          'Physical products cannot be added to a cart with digital products.',
+          { description: 'Please add only digital products to this cart.' },
+        );
+      }
+      return;
+    }
+
     setItems((prev) => {
       // Match by productCode + vendorId so the same product from different vendors is a separate line.
       const lineKey = `${product.productCode || product.id}__${product.selectedVendorId || ''}__${getConfigurationKey(product.configuration)}`;
