@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '@/components/ui/badge';
 import {
   Plus, X, Bold, Italic, Underline, List, AlignLeft, AlignCenter, AlignRight,
-  Link2, Image, Upload, GripVertical, ChevronLeft
+  Link2, Image, Upload, GripVertical, ChevronLeft, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -211,6 +211,19 @@ export default function AddMasterCatalogueItemWrapper() {
         ? { ...variation, options: variation.options.filter(option => option.id !== optionId) }
         : variation,
     ));
+  };
+
+  const moveVariationOption = (variationId: string, optionId: string, direction: -1 | 1) => {
+    setVariations(current => current.map(variation => {
+      if (variation.id !== variationId) return variation;
+      const currentIndex = variation.options.findIndex(option => option.id === optionId);
+      const targetIndex = currentIndex + direction;
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= variation.options.length) return variation;
+
+      const options = [...variation.options];
+      [options[currentIndex], options[targetIndex]] = [options[targetIndex], options[currentIndex]];
+      return { ...variation, options };
+    }));
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -706,13 +719,13 @@ export default function AddMasterCatalogueItemWrapper() {
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      <div className="grid grid-cols-[minmax(0,1fr)_120px_32px] gap-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                      <div className="grid grid-cols-[minmax(0,1fr)_120px_74px] gap-2 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
                         <span>Dropdown option</span>
                         <span>Price adjustment</span>
                         <span />
                       </div>
-                      {variation.options.map(option => (
-                        <div key={option.id} className="grid grid-cols-[minmax(0,1fr)_120px_32px] items-center gap-2">
+                      {variation.options.map((option, optionIndex) => (
+                        <div key={option.id} className="grid grid-cols-[minmax(0,1fr)_120px_74px] items-center gap-2">
                           <Input
                             value={option.label}
                             onChange={event => updateVariationOption(variation.id, option.id, 'label', event.target.value)}
@@ -726,14 +739,34 @@ export default function AddMasterCatalogueItemWrapper() {
                             placeholder="0"
                             className="h-8 text-xs"
                           />
-                          <button
-                            type="button"
-                            onClick={() => removeVariationOption(variation.id, option.id)}
-                            className="rounded-md p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
-                            aria-label={`Remove option ${option.label || "option"}`}
-                          >
-                            <X size={14} />
-                          </button>
+                          <div className="flex items-center justify-end gap-0.5">
+                            <button
+                              type="button"
+                              onClick={() => moveVariationOption(variation.id, option.id, -1)}
+                              disabled={optionIndex === 0}
+                              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
+                              aria-label={`Move option ${option.label || "option"} up`}
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveVariationOption(variation.id, option.id, 1)}
+                              disabled={optionIndex === variation.options.length - 1}
+                              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
+                              aria-label={`Move option ${option.label || "option"} down`}
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeVariationOption(variation.id, option.id)}
+                              className="rounded-md p-1 text-red-400 hover:bg-red-50 hover:text-red-600"
+                              aria-label={`Remove option ${option.label || "option"}`}
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
                         </div>
                       ))}
                       <Button
