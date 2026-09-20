@@ -229,9 +229,27 @@ function parseCloudOption(rawOption: string): CloudOption {
   };
 }
 
-function getCloudDataFields(product: Product): CloudDataField[] {
-  const fields: CloudDataField[] = [];
+function getCatalogVariationFields(product: Product): CloudDataField[] {
   const seen = new Set<string>();
+  return (product.variations || []).flatMap(variation => {
+    const options = (variation.options || []).map(option => ({
+      label: option.label.trim(),
+      priceAdjustment: Number(option.priceAdjustment) || 0,
+    })).filter(option => option.label);
+    const label = variation.name.trim();
+    if (!label || !options.length || seen.has(label.toLowerCase())) return [];
+    seen.add(label.toLowerCase());
+    return [{
+      label,
+      value: options[0].label,
+      options,
+    }];
+  });
+}
+
+function getCloudDataFields(product: Product): CloudDataField[] {
+  const fields = getCatalogVariationFields(product);
+  const seen = new Set(fields.map(field => field.label.toLowerCase()));
 
   const addField = (label: string, value: string) => {
     const cleanLabel = label.trim();
@@ -249,21 +267,6 @@ function getCloudDataFields(product: Product): CloudDataField[] {
     fields.push({ label: cleanLabel, value: cleanValue, options });
   };
 
-  (product.variations || []).forEach(variation => {
-    const options = (variation.options || []).map(option => ({
-      label: option.label.trim(),
-      priceAdjustment: Number(option.priceAdjustment) || 0,
-    })).filter(option => option.label);
-    const label = variation.name.trim();
-    if (!label || !options.length || seen.has(label.toLowerCase())) return;
-    seen.add(label.toLowerCase());
-    fields.push({
-      label,
-      value: options[0].label,
-      options,
-    });
-  });
-
   (product.generalSpecs || []).forEach(spec => addField(spec.label, spec.value));
   (product.specs || []).forEach(spec => {
     const separator = spec.indexOf(":");
@@ -273,26 +276,6 @@ function getCloudDataFields(product: Product): CloudDataField[] {
   });
 
   return fields;
-}
-
-function isCloudConfigurationField(field: CloudDataField): boolean {
-  const label = field.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  const serviceMetadata = [
-    "cloud provider",
-    "provider",
-    "service category",
-    "category",
-    "service type",
-    "billing model",
-    "pricing model",
-    "pricing unit",
-    "service status",
-    "availability",
-    "status",
-    "description",
-    "product type",
-  ];
-  return !serviceMetadata.some(metadata => label === metadata || label.startsWith(`${metadata} `));
 }
 
 function findCloudField(fields: CloudDataField[], terms: string[]): string {
@@ -820,7 +803,7 @@ function ConfiguredServiceProductCard({
       ? "License Provider"
       : "Subscription Provider";
   const dataFields = getCloudDataFields(product);
-  const configurationFields = dataFields.filter(isCloudConfigurationField);
+  const configurationFields = getCatalogVariationFields(product);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
   const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
   const region = findCloudField(dataFields, ["region", "location"]);
