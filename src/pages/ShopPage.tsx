@@ -159,6 +159,16 @@ function isCloudServiceProduct(product: Pick<Product, "productType" | "physicalT
     .some(value => value?.trim().toLowerCase() === "cloud service");
 }
 
+function isConfigurableServiceProduct(product: Pick<Product, "productType" | "physicalType">): boolean {
+  return [product.productType, product.physicalType].some(value => {
+    const normalized = value?.trim().toLowerCase();
+    return normalized === "cloud service"
+      || normalized === "digital licence"
+      || normalized === "digital license"
+      || normalized === "subscription";
+  });
+}
+
 function isDigitalProduct(product: Pick<Product, "productType" | "physicalType" | "category" | "name">): boolean {
   const kind = getShopProductKind(product);
   return kind === "digital" || kind === "subscription" || kind === "cloud";
@@ -782,7 +792,7 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   );
 }
 
-function CloudServiceProductCard({
+function ConfiguredServiceProductCard({
   product,
   onPreview,
   clientId,
@@ -801,13 +811,21 @@ function CloudServiceProductCard({
   const [configOpen, setConfigOpen] = useState(false);
   const [configuration, setConfiguration] = useState<Record<string, string>>({});
   const [draftConfiguration, setDraftConfiguration] = useState<Record<string, string>>({});
+  const serviceKind = getShopProductKind(product);
+  const serviceLabel = getShopProductLabel(serviceKind);
+  const ServiceIcon = serviceKind === "digital" ? KeyRound : serviceKind === "subscription" ? Repeat2 : Cloud;
+  const providerLabel = serviceKind === "cloud"
+    ? "Cloud Provider"
+    : serviceKind === "digital"
+      ? "License Provider"
+      : "Subscription Provider";
   const dataFields = getCloudDataFields(product);
   const configurationFields = dataFields.filter(isCloudConfigurationField);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
   const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
   const region = findCloudField(dataFields, ["region", "location"]);
   const deploymentModel = findCloudField(dataFields, ["deployment"]);
-  const billingModel = findCloudField(dataFields, ["billing", "pricing model"]) || getPricingModel("Cloud Service");
+  const billingModel = findCloudField(dataFields, ["billing", "pricing model"]) || getPricingModel(product.physicalType || product.productType || serviceLabel);
   const pricingUnit = findCloudField(dataFields, ["pricing unit", "unit"]);
   const serviceStatus = findCloudField(dataFields, ["service status", "availability", "status"])
     || (product.inStock ? "Available" : "Unavailable");
@@ -925,8 +943,8 @@ function CloudServiceProductCard({
   };
 
   const infoFields = [
-    ["Cloud Provider", provider],
-    ["Service Category", product.category],
+    [providerLabel, provider],
+    ["Product Category", product.category],
     ["Service Type", serviceType],
     ["Region Availability", region],
     ["Deployment Model", deploymentModel],
@@ -944,7 +962,7 @@ function CloudServiceProductCard({
       <div className="flex items-start justify-between gap-3 px-3 pt-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-            <Cloud size={18} />
+            <ServiceIcon size={18} />
           </div>
           <div className="min-w-0">
             {provider && <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider}</p>}
@@ -952,16 +970,16 @@ function CloudServiceProductCard({
           </div>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-700">
-          <Cloud size={12} />
-          Cloud Service
+          <ServiceIcon size={12} />
+          {serviceLabel}
         </span>
       </div>
 
       <div className="mx-3 mt-3 flex h-[86px] items-center justify-center overflow-hidden rounded-xl border border-blue-50 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         {product.image ? (
-          <img src={product.image} alt={`${provider || "Cloud"} ${product.name}`} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
+          <img src={product.image} alt={`${provider || serviceLabel} ${product.name}`} loading="lazy" decoding="async" className="max-h-full max-w-full object-contain" />
         ) : (
-          <Cloud size={38} className="text-blue-300" />
+          <ServiceIcon size={38} className="text-blue-300" />
         )}
       </div>
 
@@ -983,7 +1001,7 @@ function CloudServiceProductCard({
       </div>
 
       <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
-        <label className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">Service Provider / Vendor</label>
+        <label className="mb-1 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">{providerLabel} / Vendor</label>
         <select
           value={selectedVendor?.vendorId || ""}
           onChange={event => {
@@ -993,7 +1011,7 @@ function CloudServiceProductCard({
           }}
           className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-[11px] text-gray-700 outline-none transition-colors focus:border-blue-400"
         >
-          <option value="">Select provider / vendor</option>
+          <option value="">Select {providerLabel.toLowerCase()} / vendor</option>
           {vendorComps.map(vendor => (
             <option key={vendor.vendorId} value={vendor.vendorId} disabled={!canUseVendor(vendor)}>
               {vendor.vendorName}{!canUseVendor(vendor) ? " — unavailable" : ""}
@@ -1060,9 +1078,9 @@ function CloudServiceProductCard({
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider || "Cloud Service"}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-600">{provider || serviceLabel}</p>
                 <h2 className="mt-0.5 text-base font-bold text-gray-900">Configure {product.name}</h2>
-                <p className="mt-1 text-xs text-gray-500">Choose one option from each dropdown for this service.</p>
+                <p className="mt-1 text-xs text-gray-500">Choose one option from each dropdown for this {serviceLabel.toLowerCase()}.</p>
               </div>
               <button type="button" aria-label="Close configuration" onClick={() => setConfigOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
                 <X size={16} />
@@ -2211,8 +2229,8 @@ export default function ShopPage() {
                 { state: { product: p, clientId: selectedClientId } },
               );
               return (
-                isCloudServiceProduct(product) ? (
-                  <CloudServiceProductCard
+                isConfigurableServiceProduct(product) ? (
+                  <ConfiguredServiceProductCard
                     key={product.id}
                     product={product}
                     onPreview={preview}

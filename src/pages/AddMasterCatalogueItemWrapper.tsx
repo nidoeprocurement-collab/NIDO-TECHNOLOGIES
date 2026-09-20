@@ -77,6 +77,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const currentMasterProductCode = isEditMode ? editMasterCode : masterProductCode;
   const currentEditProductId = itemId || editProductId;
+  const supportsVariations = ['Cloud Service', 'Digital Licence', 'Digital License', 'Subscription'].includes(physicalType);
 
   const [newSpecName, setNewSpecName] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
@@ -664,11 +665,11 @@ export default function AddMasterCatalogueItemWrapper() {
           </div>
         </div>
 
-        {physicalType === 'Cloud Service' && (
+        {supportsVariations && (
           <div className="border border-blue-200 rounded-lg bg-blue-50/40 p-2 sm:p-6">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-gray-900">5. Cloud Service Variations</h2>
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">5. {physicalType} Variations</h2>
                 <p className="text-xs sm:text-sm text-gray-600 mt-1">
                   Add the dropdown fields that clients can configure in Shop. Enter a positive or negative price adjustment for each option.
                 </p>
@@ -678,7 +679,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
             {variations.length === 0 ? (
               <div className="mt-4 rounded-lg border border-dashed border-blue-200 bg-white p-4 text-center text-xs text-gray-500">
-                No cloud variations yet. Add fields such as Region, Plan, CPU, Storage, or Billing Cycle.
+                No variations yet. Add fields such as License Edition, Plan, Users, Storage, Support, or Billing Cycle.
               </div>
             ) : (
               <div className="mt-4 space-y-4">
@@ -766,7 +767,7 @@ export default function AddMasterCatalogueItemWrapper() {
 
         {/* Section 5: Product Images & Media */}
         <div className="border border-gray-300 rounded-lg p-2 sm:p-6">
-          <h2 className="text-base sm:text-lg font-bold text-gray-900">{physicalType === 'Cloud Service' ? '6' : '5'}. Product Images & Media</h2>
+          <h2 className="text-base sm:text-lg font-bold text-gray-900">{supportsVariations ? '6' : '5'}. Product Images & Media</h2>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Upload product images for display in the catalog and shop.</p>
 
           <div className="mt-4 space-y-4">
