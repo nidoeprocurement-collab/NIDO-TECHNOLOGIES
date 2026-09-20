@@ -375,8 +375,6 @@ export default function ProductDetailPage() {
             </svg>
             Products
           </button>
-          <ChevronRight size={14} className="text-gray-300" />
-          <span className="text-gray-800 font-medium truncate">{product.name}</span>
         </div>
       </div>
 
