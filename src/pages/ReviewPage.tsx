@@ -100,7 +100,12 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 
     // Read saved payment terms (selected on the checkout page)
     const selectedPaymentTerms = localStorage.getItem("nido_payment_terms") || "Net 30";
+    const selectedPaymentTermMode = localStorage.getItem("nido_payment_term_mode")
+      || (selectedPaymentTerms === "Prepaid" ? "prepaid" : "postpaid");
     const paymentTermsLabel = (() => {
+      if (selectedPaymentTermMode === "prepaid") {
+        return "Prepaid (Payment before order processing)";
+      }
       const map: Record<string, string> = {
         "Net 30": "Net 30 (Payment due in 30 days)",
         "Net 45": "Net 45 (Payment due in 45 days)",

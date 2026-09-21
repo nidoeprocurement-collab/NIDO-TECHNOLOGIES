@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
-  Banknote, Building2, Info, Smartphone, QrCode, AlertCircle, CheckCircle2
+  Banknote, Building2, Info, Smartphone, QrCode, AlertCircle, CheckCircle2, Check
 } from "lucide-react";
 import { toast } from "sonner";
 import CheckoutStepper from "./CheckoutStepper";
@@ -73,6 +73,7 @@ type PaymentState = {
 
 const PAYMENT_SELECTION_KEY = "nido_payment_selection";
 const PAYMENT_TERMS_KEY = "nido_payment_terms";
+const PAYMENT_TERM_MODE_KEY = "nido_payment_term_mode";
 
 const PAYMENT_TERMS_OPTIONS = [
   { value: "Net 30", label: "Net 30 – Payment due in 30 days" },
@@ -306,8 +307,16 @@ export default function PaymentPage() {
   const reviewPath = isPortalFlow ? "/portal/shop/checkout/review" : "/shop/checkout/review";
   const [state, setState] = useState<PaymentState>(loadPaymentState);
   const { items: cart } = useCart();
+  const [paymentTermMode, setPaymentTermMode] = useState<"postpaid" | "prepaid">(() => {
+    const savedMode = localStorage.getItem(PAYMENT_TERM_MODE_KEY);
+    const savedTerms = localStorage.getItem(PAYMENT_TERMS_KEY);
+    return savedMode === "prepaid" || savedTerms === "Prepaid" ? "prepaid" : "postpaid";
+  });
   const [paymentTerms, setPaymentTerms] = useState(() =>
-    localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30",
+    (() => {
+      const savedTerms = localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
+      return savedTerms === "Prepaid" ? "Net 30" : savedTerms;
+    })(),
   );
 
   const onChange = (d: Partial<PaymentState>) => {
@@ -317,8 +326,17 @@ export default function PaymentPage() {
       return next;
     });
   };
+  const visiblePaymentMethods = paymentTermMode === "postpaid"
+    ? PAYMENT_METHODS.filter((method) => method.id === "ban")
+    : PAYMENT_METHODS.filter((method) => method.id !== "ban");
+  const activePaymentMethod = paymentTermMode === "postpaid"
+    ? "ban"
+    : state.paymentMethod === "ban"
+      ? "card"
+      : state.paymentMethod;
+
   function renderDetailsPanel() {
-    switch (state.paymentMethod) {
+    switch (activePaymentMethod) {
       case "card":       return <CardPanel state={state} onChange={onChange} />;
       case "netbanking": return <NetBankingPanel state={state} onChange={onChange} />;
       case "upi":        return <UpiPanel state={state} onChange={onChange} />;
@@ -370,34 +388,87 @@ export default function PaymentPage() {
             {/* Payment terms */}
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <h2 className="font-semibold text-gray-900 text-base mb-1">Payment Terms</h2>
-              <p className="text-xs text-gray-500 mb-3">Select the payment terms that apply to this order.</p>
+              <p className="text-xs text-gray-500 mb-3">Choose how this order will be settled.</p>
+
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {PAYMENT_TERMS_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
-                      paymentTerms === opt.value
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentTerms"
-                      className="accent-blue-600"
-                      checked={paymentTerms === opt.value}
-                      onChange={() => {
-                        setPaymentTerms(opt.value);
-                        localStorage.setItem(PAYMENT_TERMS_KEY, opt.value);
-                      }}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{opt.value}</p>
-                      <p className="text-xs text-gray-500">{opt.label.split("–")[1]?.trim()}</p>
-                    </div>
-                  </label>
-                ))}
+                {([
+                  {
+                    value: "postpaid" as const,
+                    label: "Postpaid",
+                    description: "Use the payment terms agreed in the client contract.",
+                    icon: Building2,
+                  },
+                  {
+                    value: "prepaid" as const,
+                    label: "Prepaid",
+                    description: "Pay securely now before the order is processed.",
+                    icon: Check,
+                  },
+                ]).map((option) => {
+                  const selected = paymentTermMode === option.value;
+                  const Icon = option.icon;
+                  return (
+                    <label
+                      key={option.value}
+                      className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                        selected
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentTermMode"
+                        className="accent-blue-600 shrink-0"
+                        checked={selected}
+                        onChange={() => {
+                          setPaymentTermMode(option.value);
+                          localStorage.setItem(PAYMENT_TERM_MODE_KEY, option.value);
+                          if (option.value === "prepaid") {
+                            localStorage.setItem(PAYMENT_TERMS_KEY, "Prepaid");
+                             onChange({ paymentMethod: state.paymentMethod === "ban" ? "card" : state.paymentMethod });
+                          } else {
+                            localStorage.setItem(PAYMENT_TERMS_KEY, paymentTerms);
+                             onChange({ paymentMethod: "ban" });
+                          }
+                        }}
+                      />
+                      <Icon size={16} className={selected ? "text-blue-600 shrink-0" : "text-gray-400 shrink-0"} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{option.label}</p>
+                        <p className="text-xs text-gray-500">{option.description}</p>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
+
+              {paymentTermMode === "postpaid" ? (
+                <div className="mt-3">
+                  <label className="block text-[11px] font-medium text-gray-700 mb-1">Contract payment term</label>
+                  <select
+                    value={paymentTerms}
+                    onChange={(event) => {
+                      setPaymentTerms(event.target.value);
+                      localStorage.setItem(PAYMENT_TERMS_KEY, event.target.value);
+                      localStorage.setItem(PAYMENT_TERM_MODE_KEY, "postpaid");
+                    }}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-800 outline-none focus:border-blue-400"
+                  >
+                    {PAYMENT_TERMS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-[11px] text-gray-500">
+                    This order will be billed to the company account and follow the signed client contract.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
+                  <Check size={13} className="shrink-0" />
+                  Pay by card, UPI / QR code, net banking, NEFT / RTGS, or wallets on the next step.
+                </div>
+              )}
             </div>
 
             {/* Payment methods + details */}
@@ -406,11 +477,11 @@ export default function PaymentPage() {
               <div className="flex gap-4">
                 {/* Methods list */}
                 <div className="space-y-2.5 w-60 shrink-0">
-                  {PAYMENT_METHODS.map((m) => (
+                   {visiblePaymentMethods.map((m) => (
                     <label key={m.id}
-                      className={`flex items-center gap-3 p-2 border rounded-xl cursor-pointer transition-colors ${state.paymentMethod === m.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                       className={`flex items-center gap-3 p-2 border rounded-xl cursor-pointer transition-colors ${activePaymentMethod === m.id ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
                       <input type="radio" name="payment" className="accent-blue-600 shrink-0"
-                        checked={state.paymentMethod === m.id}
+                         checked={activePaymentMethod === m.id}
                         onChange={() => onChange({ paymentMethod: m.id })} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{m.label}</p>
@@ -423,7 +494,7 @@ export default function PaymentPage() {
                 </div>
                 {/* Details panel */}
                 <div className="flex-1 border border-gray-200 rounded-xl p-5">
-                  <h3 className="font-semibold text-gray-900 text-sm mb-4">{panelTitle[state.paymentMethod] ?? "Payment Details"}</h3>
+                   <h3 className="font-semibold text-gray-900 text-sm mb-4">{panelTitle[activePaymentMethod] ?? "Payment Details"}</h3>
                   {renderDetailsPanel()}
                 </div>
               </div>
@@ -437,11 +508,14 @@ export default function PaymentPage() {
                 Back to Delivery
               </button>
               <button onClick={() => {
-                  if (state.paymentMethod === "wallets" && !isValidPhoneNumber(state.walletMobile)) {
+                   if (activePaymentMethod === "wallets" && !isValidPhoneNumber(state.walletMobile)) {
                     toast.error("Registered mobile number must contain exactly 10 digits.");
                     return;
                   }
-                  localStorage.setItem(PAYMENT_SELECTION_KEY, JSON.stringify(state));
+                   localStorage.setItem(PAYMENT_SELECTION_KEY, JSON.stringify({
+                     ...state,
+                     paymentMethod: activePaymentMethod,
+                   }));
                   navigate(reviewPath);
                 }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg px-2 py-2 text-sm transition-colors">
