@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight, ArrowLeft, Lock, CreditCard, Landmark, Wallet,
   Banknote, Building2, Info, Smartphone, QrCode, AlertCircle, CheckCircle2
@@ -72,6 +72,16 @@ type PaymentState = {
 };
 
 const PAYMENT_SELECTION_KEY = "nido_payment_selection";
+const PAYMENT_TERMS_KEY = "nido_payment_terms";
+
+const PAYMENT_TERMS_OPTIONS = [
+  { value: "Net 30", label: "Net 30 – Payment due in 30 days" },
+  { value: "Net 45", label: "Net 45 – Payment due in 45 days" },
+  { value: "Net 60", label: "Net 60 – Payment due in 60 days" },
+  { value: "Net 90", label: "Net 90 – Payment due in 90 days" },
+  { value: "Immediate", label: "Immediate – Payment on delivery" },
+  { value: "Advance", label: "Advance – Payment before dispatch" },
+];
 
 const DEFAULT_PAYMENT_STATE: PaymentState = {
   paymentMethod: "card",
@@ -295,6 +305,10 @@ export default function PaymentPage() {
   const checkoutPath = isPortalFlow ? "/portal/shop/checkout" : "/shop/checkout";
   const reviewPath = isPortalFlow ? "/portal/shop/checkout/review" : "/shop/checkout/review";
   const [state, setState] = useState<PaymentState>(loadPaymentState);
+  const { items: cart } = useCart();
+  const [paymentTerms, setPaymentTerms] = useState(() =>
+    localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30",
+  );
 
   const onChange = (d: Partial<PaymentState>) => {
     setState((prev) => {
@@ -325,6 +339,10 @@ export default function PaymentPage() {
     wallets: "Wallet Payment", neft: "NEFT / RTGS Details", ban: "Company BAN",
   };
 
+  if (cart.length === 0) {
+    return <Navigate to={cartPath} replace />;
+  }
+
   return (
     <div className="min-h-screen bg-white px-2 py-6">
       <div className="max-w-6xl mx-auto">
@@ -349,6 +367,39 @@ export default function PaymentPage() {
         <div className="flex gap-2 items-start">
           {/* Left */}
           <div className="flex-1 min-w-0 space-y-4">
+            {/* Payment terms */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6">
+              <h2 className="font-semibold text-gray-900 text-base mb-1">Payment Terms</h2>
+              <p className="text-xs text-gray-500 mb-3">Select the payment terms that apply to this order.</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {PAYMENT_TERMS_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
+                      paymentTerms === opt.value
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentTerms"
+                      className="accent-blue-600"
+                      checked={paymentTerms === opt.value}
+                      onChange={() => {
+                        setPaymentTerms(opt.value);
+                        localStorage.setItem(PAYMENT_TERMS_KEY, opt.value);
+                      }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{opt.value}</p>
+                      <p className="text-xs text-gray-500">{opt.label.split("–")[1]?.trim()}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {/* Payment methods + details */}
             <div className="bg-white border border-gray-200 rounded-xl p-6">
               <h2 className="font-semibold text-gray-900 text-base mb-4">Select Payment Method</h2>

@@ -1,5 +1,5 @@
                       import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
                       import {
                         ChevronRight, MapPin, Building2, Home, Pencil, Plus,
                         ChevronDown, X, Check,
@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from "react-router-dom";
                       import OrderSummaryPanel from "./OrderSummaryPanel";
 import { getClientForPortal } from "@/lib/clientStore";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
                       import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation";
 import {
   CHECKOUT_NOTE_MAX_LENGTH,
@@ -248,21 +249,11 @@ import {
 
                       // ── Page ───────────────────────────────────────────────────────────────────────
 
-                      const PAYMENT_TERMS_OPTIONS = [
-                        { value: "Net 30", label: "Net 30 – Payment due in 30 days" },
-                        { value: "Net 45", label: "Net 45 – Payment due in 45 days" },
-                        { value: "Net 60", label: "Net 60 – Payment due in 60 days" },
-                        { value: "Net 90", label: "Net 90 – Payment due in 90 days" },
-                        { value: "Immediate", label: "Immediate – Payment on delivery" },
-                        { value: "Advance", label: "Advance – Payment before dispatch" },
-                      ];
-
-                      const PAYMENT_TERMS_KEY = "nido_payment_terms";
-
                       export default function CheckoutPage() {
                          const navigate = useNavigate();
                          const location = useLocation();
                          const { user, isClientPortalUser } = useAuth();
+                         const { items: cart } = useCart();
                          const isPortalFlow = location.pathname.startsWith("/portal/");
                          const catalogPath = isPortalFlow ? "/portal/catalog" : "/shop";
                          const cartPath = isPortalFlow ? "/portal/shop/cart" : "/shop/cart";
@@ -275,10 +266,6 @@ import {
                         const [orderNotes, setOrderNotes] = useState(() =>
                           limitCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "")
                         );
-                        const [paymentTerms, setPaymentTerms] = useState<string>(() => {
-                          return localStorage.getItem(PAYMENT_TERMS_KEY) || "Net 30";
-                        });
-
                         const [addresses, setAddresses] = useState<DeliveryAddress[]>([]);
                         const [editingId, setEditingId] = useState<number | null>(null);
                         const [addingNew, setAddingNew] = useState(false);
@@ -344,6 +331,10 @@ import {
                         };
 
                         const canAddMore = addresses.length < 2;
+
+                        if (cart.length === 0) {
+                          return <Navigate to={cartPath} replace />;
+                        }
 
                         return (
                           <div className="min-h-screen bg-white px-2 py-6">
@@ -518,39 +509,6 @@ import {
                                         <div className="mt-1 text-right text-xs text-gray-400">{orderNotes.length}/{CHECKOUT_NOTE_MAX_LENGTH}</div>
                                       </div>
                                     )}
-                                  </div>
-
-                                  {/* Payment Terms */}
-                                  <div className="bg-white border border-gray-200 rounded-xl p-5">
-                                    <h2 className="font-semibold text-gray-900 text-base mb-1">Payment Terms</h2>
-                                    <p className="text-xs text-gray-500 mb-3">Select the payment terms that apply to this order.</p>
-                                    <div className="space-y-2">
-                                      {PAYMENT_TERMS_OPTIONS.map((opt) => (
-                                        <label
-                                          key={opt.value}
-                                          className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
-                                            paymentTerms === opt.value
-                                              ? "border-blue-500 bg-blue-50"
-                                              : "border-gray-200 hover:border-gray-300"
-                                          }`}
-                                        >
-                                          <input
-                                            type="radio"
-                                            name="paymentTerms"
-                                            className="accent-blue-600"
-                                            checked={paymentTerms === opt.value}
-                                            onChange={() => {
-                                              setPaymentTerms(opt.value);
-                                              localStorage.setItem(PAYMENT_TERMS_KEY, opt.value);
-                                            }}
-                                          />
-                                          <div>
-                                            <p className="text-sm font-medium text-gray-900">{opt.value}</p>
-                                            <p className="text-xs text-gray-500">{opt.label.split("–")[1]?.trim()}</p>
-                                          </div>
-                                        </label>
-                                      ))}
-                                    </div>
                                   </div>
 
                                   {/* Actions */}

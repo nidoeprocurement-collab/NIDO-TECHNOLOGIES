@@ -1,6 +1,6 @@
   import { useState, useEffect } from "react";
   import { getPrefix } from "@/lib/configService";
-  import { useLocation, useNavigate } from "react-router-dom";
+  import { Navigate, useLocation, useNavigate } from "react-router-dom";
   import { ChevronRight, ArrowLeft, Pencil, MapPin, CreditCard, Landmark, Wallet, Banknote, Building2, Lock } from "lucide-react";
   import CheckoutStepper from "./CheckoutStepper";
   import OrderSummaryPanel from "./OrderSummaryPanel";
@@ -353,6 +353,10 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
         },
       });
     };
+
+    if (cart.length === 0) {
+      return <Navigate to={cartPath} replace />;
+    }
 
     return (
       <div className="min-h-screen bg-white px-2 py-6">

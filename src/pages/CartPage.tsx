@@ -694,8 +694,11 @@ export default function CartPage() {
 
           {/* Proceed to Checkout */}
           <button
-            onClick={() => navigate(checkoutPath)}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl py-3 text-sm transition-colors"
+            onClick={() => {
+              if (totalItems > 0) navigate(checkoutPath);
+            }}
+            disabled={totalItems === 0}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:hover:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-3 text-sm transition-colors"
           >
             <Lock size={14} />
             Proceed to Checkout
