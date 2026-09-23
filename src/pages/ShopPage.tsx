@@ -775,6 +775,105 @@ function ProductDetailDialog({ product, open, onClose, onMoqChange, clientId, al
   );
 }
 
+function ServiceDetailsDialog({
+  product,
+  fields,
+  configuration,
+  open,
+  onClose,
+}: {
+  product: Product;
+  fields: CloudDataField[];
+  configuration: Record<string, string>;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const images = product.images?.length ? product.images : product.image ? [product.image] : [];
+  const [selectedImage, setSelectedImage] = useState(images[0] || "");
+
+  useEffect(() => {
+    if (open) setSelectedImage(images[0] || "");
+  }, [open, product.productCode]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-end border-b border-gray-100 px-4 py-3">
+          <button
+            type="button"
+            aria-label="Close service details"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={17} />
+          </button>
+        </div>
+
+        <div className="grid max-h-[78vh] grid-cols-1 gap-5 overflow-y-auto p-5 sm:grid-cols-[1.05fr_0.95fr]">
+          <div className="min-w-0">
+            <div className="flex h-[300px] items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+              {selectedImage ? (
+                <img
+                  src={selectedImage}
+                  alt={product.name}
+                  className="max-h-full max-w-full object-contain"
+                />
+              ) : (
+                getProductIcon(product.name, product.category)
+              )}
+            </div>
+
+            {images.length > 1 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto">
+                {images.map((image, index) => (
+                  <button
+                    key={`${image}-${index}`}
+                    type="button"
+                    aria-label={`View product image ${index + 1}`}
+                    onClick={() => setSelectedImage(image)}
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border-2 bg-white ${
+                      selectedImage === image ? "border-blue-500" : "border-gray-200"
+                    }`}
+                  >
+                    <img src={image} alt="" className="max-h-full max-w-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-gray-900">{product.name}</h2>
+            {fields.length > 0 && (
+              <div className="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-100">
+                {fields.map((field, index) => {
+                  const value = configuration[cloudFieldKey(field, index)] ?? field.value;
+                  return (
+                    <div key={`${field.label}-${index}`} className="px-3 py-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        {field.label}
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-gray-800">{value || "—"}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConfiguredServiceProductCard({
   product,
   onPreview,
@@ -792,6 +891,7 @@ function ConfiguredServiceProductCard({
   const [selectedVendor, setSelectedVendor] = useState<VendorComparisonRow | null>(null);
   const [qty, setQty] = useState(1);
   const [configOpen, setConfigOpen] = useState(false);
+  const [serviceDetailsOpen, setServiceDetailsOpen] = useState(false);
   const [configuration, setConfiguration] = useState<Record<string, string>>({});
   const [draftConfiguration, setDraftConfiguration] = useState<Record<string, string>>({});
   const serviceKind = getShopProductKind(product);
@@ -1025,7 +1125,7 @@ function ConfiguredServiceProductCard({
       <div className="mt-auto grid grid-cols-2 gap-2 px-3 pb-3 pt-3" onClick={event => event.stopPropagation()}>
         <button
           type="button"
-          onClick={() => onPreview(product)}
+          onClick={() => setServiceDetailsOpen(true)}
           className="flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-white py-2 text-[11px] font-semibold text-blue-600 transition-colors hover:bg-blue-50"
         >
           View Services
@@ -1126,6 +1226,14 @@ function ConfiguredServiceProductCard({
           </div>
         </div>
       )}
+
+      <ServiceDetailsDialog
+        product={product}
+        fields={configurationFields}
+        configuration={configuration}
+        open={serviceDetailsOpen}
+        onClose={() => setServiceDetailsOpen(false)}
+      />
     </div>
   );
 }
