@@ -77,7 +77,10 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const currentMasterProductCode = isEditMode ? editMasterCode : masterProductCode;
   const currentEditProductId = itemId || editProductId;
-  const supportsVariations = ['Cloud Service', 'Digital Licence', 'Digital License', 'Subscription'].includes(physicalType);
+  // Digital variations belong to each vendor product now, because option
+  // prices can differ by vendor. Keep legacy variation data readable but do
+  // not expose or persist it from the master-catalogue form.
+  const supportsVariations = false;
 
   const [newSpecName, setNewSpecName] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
@@ -302,19 +305,7 @@ export default function AddMasterCatalogueItemWrapper() {
       ? getCatalogProducts().find(p => String(p.id) === String(currentEditProductId))
       : undefined,
   ) => {
-    const savedVariations = variations
-      .map(variation => ({
-        ...variation,
-        name: variation.name.trim(),
-        options: variation.options
-          .map(option => ({
-            ...option,
-            label: option.label.trim(),
-            priceAdjustment: Number(option.priceAdjustment) || 0,
-          }))
-          .filter(option => option.label),
-      }))
-      .filter(variation => variation.name && variation.options.length > 0);
+    const savedVariations: CatalogVariation[] = [];
 
     return {
     ...(isEditMode ? existingProduct : undefined),
@@ -353,7 +344,7 @@ export default function AddMasterCatalogueItemWrapper() {
       skuCode,
       productName: productName || 'Untitled Product',
       physicalType, category, subcategory, brand, tags,
-      description, specifications, generalSpecs, variations, productNotes, videoUrl, images,
+      description, specifications, generalSpecs, variations: [], productNotes, videoUrl, images,
       createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
     };
     sessionStorage.setItem('nido_preview_draft', JSON.stringify(previewData));

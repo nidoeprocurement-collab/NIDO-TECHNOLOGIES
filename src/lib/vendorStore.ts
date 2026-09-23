@@ -1,5 +1,6 @@
 import { recordStockEvent } from './stockHistoryStore';
 import { getVendorById } from './vendorDataStore';
+import type { CatalogVariation } from './catalogStore';
 
 const STORE_KEY = 'nido_vendor_products';
 
@@ -14,6 +15,8 @@ export interface VendorProduct {
   /** Snapshot of the master catalog fulfillment type at assignment time. */
   physicalType?: string;
   images: string[];
+  /** Vendor-specific digital product variations and option price adjustments. */
+  variations?: CatalogVariation[];
   price: string;
   moq: string;
   leadTime: string;

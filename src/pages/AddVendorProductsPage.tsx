@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Search, X, ChevronLeft, ChevronRight, Plus, Trash2, Info, Save, AlertTriangle, Check } from "lucide-react";
-import { getCatalogProducts, CatalogProduct } from "@/lib/catalogStore";
+import { getCatalogProducts, CatalogProduct, CatalogVariation, CatalogVariationOption } from "@/lib/catalogStore";
 import { getPrefix } from "@/lib/configService";
 import {
   addVendorProducts,
@@ -51,6 +51,7 @@ interface SelectedRow {
   leadTime: string;
   stock: string;
   vendorProductCode: string;
+  variations: CatalogVariation[];
 }
 
 type SelectedProductTab = "physical" | "digital";
@@ -69,10 +70,223 @@ function selectedProductTypeClasses(type: string): string {
   return "bg-emerald-50 text-emerald-700";
 }
 
+function createVariationId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function VendorVariationsDialog({
+  productName,
+  initialVariations,
+  onCancel,
+  onSave,
+}: {
+  productName: string;
+  initialVariations: CatalogVariation[];
+  onCancel: () => void;
+  onSave: (variations: CatalogVariation[]) => void;
+}) {
+  const [variations, setVariations] = useState<CatalogVariation[]>(
+    () => initialVariations.map(variation => ({
+      ...variation,
+      options: variation.options.map(option => ({ ...option })),
+    })),
+  );
+
+  const addVariation = () => {
+    setVariations(current => [
+      ...current,
+      {
+        id: createVariationId("vendor-variation"),
+        name: "",
+        options: [{
+          id: createVariationId("vendor-option"),
+          label: "",
+          priceAdjustment: 0,
+        }],
+      },
+    ]);
+  };
+
+  const updateVariation = (id: string, name: string) => {
+    setVariations(current => current.map(variation =>
+      variation.id === id ? { ...variation, name } : variation,
+    ));
+  };
+
+  const removeVariation = (id: string) => {
+    setVariations(current => current.filter(variation => variation.id !== id));
+  };
+
+  const addOption = (variationId: string) => {
+    setVariations(current => current.map(variation =>
+      variation.id === variationId
+        ? {
+            ...variation,
+            options: [
+              ...variation.options,
+              { id: createVariationId("vendor-option"), label: "", priceAdjustment: 0 },
+            ],
+          }
+        : variation,
+    ));
+  };
+
+  const updateOption = (
+    variationId: string,
+    optionId: string,
+    field: keyof CatalogVariationOption,
+    value: string,
+  ) => {
+    setVariations(current => current.map(variation =>
+      variation.id !== variationId
+        ? variation
+        : {
+            ...variation,
+            options: variation.options.map(option =>
+              option.id !== optionId
+                ? option
+                : {
+                    ...option,
+                    [field]: field === "priceAdjustment" ? (Number(value) || 0) : value,
+                  },
+            ),
+          },
+    ));
+  };
+
+  const removeOption = (variationId: string, optionId: string) => {
+    setVariations(current => current.map(variation =>
+      variation.id === variationId
+        ? { ...variation, options: variation.options.filter(option => option.id !== optionId) }
+        : variation,
+    ));
+  };
+
+  const save = () => {
+    const cleaned = variations
+      .map(variation => ({
+        ...variation,
+        name: variation.name.trim(),
+        options: variation.options
+          .map(option => ({
+            ...option,
+            label: option.label.trim(),
+            priceAdjustment: Number(option.priceAdjustment) || 0,
+          }))
+          .filter(option => option.label),
+      }))
+      .filter(variation => variation.name && variation.options.length > 0);
+    onSave(cleaned);
+  };
+
+  return (
+    <div data-confirmation-skip className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Add Variations</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Configure vendor-specific options and prices for {productName}.
+            </p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {variations.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/40 px-4 py-8 text-center text-xs text-gray-500">
+              No variations yet. Add fields such as Users, Plan, Storage, Region, Support, or Billing Cycle.
+            </div>
+          ) : (
+            variations.map((variation, variationIndex) => (
+              <div key={variation.id} className="rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+                <div className="flex items-start gap-3">
+                  <label className="flex-1">
+                    <span className="text-xs font-semibold text-gray-700">Variation field {variationIndex + 1}</span>
+                    <input
+                      value={variation.name}
+                      onChange={event => updateVariation(variation.id, event.target.value)}
+                      placeholder="e.g. Users, Plan, Storage, Region"
+                      className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeVariation(variation.id)}
+                    className="mt-5 rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
+                    aria-label={`Remove variation ${variationIndex + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Options and price adjustments</p>
+                  {variation.options.map((option, optionIndex) => (
+                    <div key={option.id} className="grid grid-cols-[minmax(0,1fr)_150px_auto] items-center gap-2">
+                      <input
+                        value={option.label}
+                        onChange={event => updateOption(variation.id, option.id, "label", event.target.value)}
+                        placeholder={`Option ${optionIndex + 1}`}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-800 outline-none focus:border-blue-400"
+                      />
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={option.priceAdjustment}
+                          onChange={event => updateOption(variation.id, option.id, "priceAdjustment", event.target.value)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 pr-14 text-xs text-gray-800 outline-none focus:border-blue-400"
+                        />
+                        <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">₹ adj.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeOption(variation.id, option.id)}
+                        disabled={variation.options.length === 1}
+                        className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label={`Remove option ${optionIndex + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addOption(variation.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add option
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+
+          <button
+            type="button"
+            onClick={addVariation}
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+          >
+            <Plus className="h-4 w-4" /> Add variation field
+          </button>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button type="button" onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Save Variations</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type UpdateSelectedRow = (
   id: string,
   field: keyof Omit<SelectedRow, "catalogProduct">,
-  value: string,
+  value: string | CatalogVariation[],
 ) => void;
 
 function SelectedProductsTable({
@@ -80,12 +294,14 @@ function SelectedProductsTable({
   isEditMode,
   selectedTab,
   updateRow,
+  editVariations,
   removeSelected,
 }: {
   rows: SelectedRow[];
   isEditMode: boolean;
   selectedTab: SelectedProductTab;
   updateRow: UpdateSelectedRow;
+  editVariations: (row: SelectedRow) => void;
   removeSelected: (id: string) => void;
 }) {
   const isDigitalTab = selectedTab === "digital";
@@ -103,7 +319,7 @@ function SelectedProductsTable({
               <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              <span className="flex items-center gap-1">{isDigitalTab ? "Users / Licenses" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
+              <span className="flex items-center gap-1">{isDigitalTab ? "Variations" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
             </th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
               <span className="flex items-center gap-1">{isDigitalTab ? "Tenure / Billing" : "Stock"} <Info className="w-3 h-3 text-gray-400" /></span>
@@ -156,18 +372,29 @@ function SelectedProductsTable({
                   />
                 </td>
                 <td className="px-3 py-3">
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={0}
-                      step="1"
-                      value={row.moq}
-                      onChange={(e) => updateRow(row.catalogProduct.id, "moq", e.target.value)}
-                      placeholder="0"
-                      className="w-full min-w-[56px] max-w-[76px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-[10px] text-gray-500">{getQuantityLabel(type)}</span>
-                  </div>
+                  {digital ? (
+                    <button
+                      type="button"
+                      onClick={() => editVariations(row)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {row.variations.length > 0 ? `Edit (${row.variations.length})` : "Add Variations"}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={row.moq}
+                        onChange={(e) => updateRow(row.catalogProduct.id, "moq", e.target.value)}
+                        placeholder="0"
+                        className="w-full min-w-[56px] max-w-[76px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-[10px] text-gray-500">{getQuantityLabel(type)}</span>
+                    </div>
+                  )}
                 </td>
                 <td className="px-3 py-3">
                   {digital ? (
@@ -287,6 +514,7 @@ export default function AddVendorProductsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedRows, setSelectedRows] = useState<SelectedRow[]>([]);
   const [selectedProductTab, setSelectedProductTab] = useState<SelectedProductTab>("physical");
+  const [variationRow, setVariationRow] = useState<SelectedRow | null>(null);
 
   // In edit mode: pre-populate with the existing product
   useEffect(() => {
@@ -304,6 +532,7 @@ export default function AddVendorProductsPage() {
       leadTime: existing.leadTime,
       stock: existing.stock,
       vendorProductCode: existing.vendorProductCode,
+      variations: Array.isArray(existing.variations) ? existing.variations : [],
     }]);
   }, [editProductId, isEditMode, vendorId]);
 
@@ -325,7 +554,15 @@ export default function AddVendorProductsPage() {
         setSelectedRows((rows) => {
           const vpcPrefix = getPrefix('vendorProductCode') || 'VPC-';
           const preview = `${vpcPrefix}${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
-          return [...rows, { catalogProduct: product, price: "", moq: "", leadTime: "", stock: "", vendorProductCode: preview }];
+          return [...rows, {
+            catalogProduct: product,
+            price: "",
+            moq: isDigitalCatalogProduct(product) ? "1" : "",
+            leadTime: "",
+            stock: "",
+            vendorProductCode: preview,
+            variations: [],
+          }];
         });
       }
       return next;
@@ -338,11 +575,17 @@ export default function AddVendorProductsPage() {
   }, []);
 
   const updateRow = useCallback(
-    (id: string, field: keyof Omit<SelectedRow, "catalogProduct">, value: string) => {
+    (id: string, field: keyof Omit<SelectedRow, "catalogProduct">, value: string | CatalogVariation[]) => {
       setSelectedRows((rows) => rows.map((r) => r.catalogProduct.id === id ? { ...r, [field]: value } : r));
     },
     []
   );
+
+  const saveRowVariations = (variations: CatalogVariation[]) => {
+    if (!variationRow) return;
+    updateRow(variationRow.catalogProduct.id, "variations", variations);
+    setVariationRow(null);
+  };
 
   // ── Validation modal ─────────────────────────────────────────────────────
   type MissingField = { productName: string; missing: string[] };
@@ -358,10 +601,11 @@ export default function AddVendorProductsPage() {
       const row = selectedRows[0];
       updateVendorProduct(vendorId, editProductId, {
         price: row.price,
-        moq: row.moq,
+        moq: isDigitalCatalogProduct(row.catalogProduct) ? row.moq || "1" : row.moq,
         leadTime: row.leadTime,
         stock: isDigitalCatalogProduct(row.catalogProduct) ? row.stock || "0" : row.stock,
         vendorProductCode: row.vendorProductCode,
+        variations: isDigitalCatalogProduct(row.catalogProduct) ? row.variations : [],
       });
     } else {
       // Reserve sequential VPC codes only after the user confirms the review.
@@ -377,9 +621,10 @@ export default function AddVendorProductsPage() {
         physicalType: r.catalogProduct.physicalType,
         images: r.catalogProduct.images,
         price: r.price,
-        moq: r.moq,
+        moq: isDigitalCatalogProduct(r.catalogProduct) ? r.moq || "1" : r.moq,
         leadTime: r.leadTime,
         stock: isDigitalCatalogProduct(r.catalogProduct) ? r.stock || "0" : r.stock,
+        variations: isDigitalCatalogProduct(r.catalogProduct) ? r.variations : [],
         reservedStock: "0",
         incomingStock: "0",
         lastStockUpdate: new Date().toISOString(),
@@ -401,7 +646,9 @@ export default function AddVendorProductsPage() {
     for (const row of selectedRows) {
       const missing: string[] = [];
       if (!row.price || row.price.trim() === "" || Number(row.price) <= 0) missing.push("Purchase Price");
-      if (!row.moq   || row.moq.trim()   === "") missing.push("MOQ");
+      if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.moq || row.moq.trim() === "")) {
+        missing.push("MOQ");
+      }
       if (!row.leadTime || row.leadTime.trim() === "") missing.push("Lead Time");
       if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.stock || row.stock.trim() === "")) {
         missing.push("Stock");
@@ -640,6 +887,7 @@ export default function AddVendorProductsPage() {
                   isEditMode={isEditMode}
                   selectedTab={selectedProductTab}
                   updateRow={updateRow}
+                  editVariations={setVariationRow}
                   removeSelected={removeSelected}
                 />
                 </>
@@ -656,6 +904,15 @@ export default function AddVendorProductsPage() {
           )}
         </div>
       </div>
+
+      {variationRow && (
+        <VendorVariationsDialog
+          productName={variationRow.catalogProduct.productName}
+          initialVariations={variationRow.variations}
+          onCancel={() => setVariationRow(null)}
+          onSave={saveRowVariations}
+        />
+      )}
 
       {/* ── Review confirmation modal ── */}
       {showConfirmation && !isEditMode && (

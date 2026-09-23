@@ -395,7 +395,9 @@ function entryToProduct(e: ClientCatalogEntry, vendorMatches: Map<string, Vendor
     warranty: master?.warranty || e.warranty,
     preference: e.preference,
     roles: e.roles || [],
-    variations: master?.variations || e.variations || [],
+    // Digital variations are configured per vendor. Master-catalog variations
+    // are intentionally not copied into Shop.
+    variations: [],
   };
 }
 
@@ -902,8 +904,11 @@ function ConfiguredServiceProductCard({
     : serviceKind === "digital"
       ? "License Provider"
       : "Subscription Provider";
-  const dataFields = getCloudDataFields(product);
-  const configurationFields = getCatalogVariationFields(product);
+  const vendorConfiguredProduct = selectedVendor
+    ? { ...product, variations: selectedVendor.variations || [] }
+    : { ...product, variations: [] };
+  const dataFields = getCloudDataFields(vendorConfiguredProduct);
+  const configurationFields = getCatalogVariationFields(vendorConfiguredProduct);
   const provider = product.brand || findCloudField(dataFields, ["cloud provider", "provider"]);
   const serviceType = product.subcategory || findCloudField(dataFields, ["service type", "service"]);
   const region = findCloudField(dataFields, ["region", "location"]);
@@ -951,7 +956,7 @@ function ConfiguredServiceProductCard({
     );
     setConfiguration(initial);
     setDraftConfiguration(initial);
-  }, [product.productCode]);
+  }, [product.productCode, selectedVendor?.vendorId]);
 
   const isInCart = !!selectedVendor && items.some(item =>
     item.productCode === product.productCode

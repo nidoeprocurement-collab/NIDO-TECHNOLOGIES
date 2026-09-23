@@ -9,6 +9,7 @@
 // changes in Tax Settings flow through immediately to all price calculations.
 
 import { getCatalogProducts } from './catalogStore';
+import type { CatalogVariation } from './catalogStore';
 import { getAllVendorProducts, updateVendorProduct, getAvailableStock } from './vendorStore';
 import { getVendors } from './vendorDataStore';
 import { getClients } from './clientStore';
@@ -342,6 +343,8 @@ export interface VendorComparisonRow {
   vendorName: string;
   primaryContact: string;
   vendorProductCode: string;
+  /** Variations configured by this vendor for digital products. */
+  variations?: CatalogVariation[];
   basePrice: number;
   moq: number;
   leadTime: number;
@@ -436,6 +439,7 @@ export function computeVendorComparisons(
       vendorName: info?.name || vendorId,
       primaryContact: info?.primaryContact || info?.name || vendorId,
       vendorProductCode: match.vendorProductCode || '—',
+      variations: Array.isArray(match.variations) ? match.variations : [],
       basePrice,
       moq: parseInt(match.moq) || 0,
       leadTime: parseInt(match.leadTime) || 0,
