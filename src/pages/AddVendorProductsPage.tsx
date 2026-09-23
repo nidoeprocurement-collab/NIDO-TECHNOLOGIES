@@ -308,16 +308,18 @@ function SelectedProductsTable({
 
   return (
     <div className="w-full overflow-x-visible">
-      <table className="w-full text-sm" style={{ minWidth: "980px" }}>
+      <table className="w-full text-sm" style={{ minWidth: isDigitalTab ? "860px" : "980px" }}>
         <thead className="sticky top-0 z-10">
           <tr className="bg-gray-50 border-b border-gray-100">
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">VPC / MPI</th>
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pricing Model</th>
-            <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-              <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
-            </th>
+            {!isDigitalTab && (
+              <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                <span className="flex items-center gap-1">Price / Unit <Info className="w-3 h-3 text-gray-400" /></span>
+              </th>
+            )}
             <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
               <span className="flex items-center gap-1">{isDigitalTab ? "Variations" : "Units / MOQ"} <Info className="w-3 h-3 text-gray-400" /></span>
             </th>
@@ -360,17 +362,19 @@ function SelectedProductsTable({
                   </div>
                 </td>
                 <td className="px-3 py-2 align-middle text-xs text-gray-700 break-words">{getPricingModel(type)}</td>
-                <td className="px-3 py-3">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={row.price}
-                    readOnly
-                    aria-label={`${row.catalogProduct.productName} price per unit`}
-                    className="w-full min-w-[90px] max-w-[110px] cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-600 outline-none"
-                  />
-                </td>
+                {!digital && (
+                  <td className="px-3 py-3">
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={row.price}
+                      readOnly
+                      aria-label={`${row.catalogProduct.productName} price per unit`}
+                      className="w-full min-w-[90px] max-w-[110px] cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-600 outline-none"
+                    />
+                  </td>
+                )}
                 <td className="px-3 py-3">
                   {digital ? (
                     <button
@@ -645,10 +649,12 @@ export default function AddVendorProductsPage() {
     const errors: MissingField[] = [];
     for (const row of selectedRows) {
       const missing: string[] = [];
-       const basePrice = Number(row.price);
-       if (!row.price || row.price.trim() === "" || !Number.isFinite(basePrice) || basePrice < 0) {
-         missing.push("Price / Unit");
-       }
+        if (!isDigitalCatalogProduct(row.catalogProduct)) {
+          const basePrice = Number(row.price);
+          if (!row.price || row.price.trim() === "" || !Number.isFinite(basePrice) || basePrice < 0) {
+            missing.push("Price / Unit");
+          }
+        }
       if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.moq || row.moq.trim() === "")) {
         missing.push("MOQ");
       }
@@ -969,10 +975,12 @@ export default function AddVendorProductsPage() {
                       <p className="text-[11px] uppercase tracking-wide text-gray-400">Vendor Product Code</p>
                       <p className="text-sm font-mono text-gray-800 mt-0.5 break-words">{row.vendorProductCode}</p>
                     </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Price / Unit</p>
-                      <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.price}</p>
-                    </div>
+                    {!isDigitalCatalogProduct(row.catalogProduct) && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-gray-400">Price / Unit</p>
+                        <p className="text-sm font-semibold text-gray-900 mt-0.5">{row.price}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-gray-400">
                         {isDigitalCatalogProduct(row.catalogProduct) ? "Users / Licenses" : "Units / MOQ"}

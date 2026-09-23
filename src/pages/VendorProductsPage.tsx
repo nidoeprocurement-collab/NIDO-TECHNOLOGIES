@@ -468,14 +468,15 @@ function EditProductScreen({
                <h3 className="text-base font-semibold text-gray-900 mb-1">
                  {isDigitalProduct ? "Digital Commercial Terms" : "Pricing & Inventory"}
                </h3>
-               <p className="text-sm text-gray-400 mb-6">
-                 {isDigitalProduct
-                    ? "Price is read-only. Update users/licenses, tenure/billing, and provisioning time for this product."
-                    : "Price is read-only. Update units/MOQ, lead time, and current stock for this product."}
-               </p>
+                <p className="text-sm text-gray-400 mb-6">
+                  {isDigitalProduct
+                     ? "Update users/licenses, tenure/billing, and provisioning time for this product."
+                     : "Price is read-only. Update units/MOQ, lead time, and current stock for this product."}
+                </p>
 
               <div className="grid grid-cols-2 gap-6">
                 {/* Purchase Price */}
+                {!isDigitalProduct && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                     Price / Unit
@@ -496,6 +497,7 @@ function EditProductScreen({
                     />
                   </div>
                 </div>
+                )}
 
                 {/* MOQ */}
                 <div>
@@ -1112,13 +1114,13 @@ export default function VendorProductsPage() {
               </div>
             ) : (
             <div className="w-full overflow-hidden">
-               <table className="w-full table-fixed text-sm">
+                <table className="w-full table-fixed text-sm">
                <colgroup>
                  <col style={{ width: "21%" }} />
                  <col style={{ width: "9%" }} />
                  <col style={{ width: "12%" }} />
                  <col style={{ width: "11%" }} />
-                 <col style={{ width: "9%" }} />
+                  {!isDigitalTab && <col style={{ width: "9%" }} />}
                  <col style={{ width: "8%" }} />
                  <col style={{ width: "10%" }} />
                  <col style={{ width: "8%" }} />
@@ -1130,7 +1132,9 @@ export default function VendorProductsPage() {
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Type</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">VPC / MPI</th>
                    <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Pricing Model</th>
-                   <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Price / Unit</th>
+                    {!isDigitalTab && (
+                      <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">Price / Unit</th>
+                    )}
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Users / Licenses" : "Units / MOQ"}</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Tenure / Billing" : "Stock"}</th>
                     <th className="text-left px-2 py-3 text-[11px] font-bold text-gray-600 uppercase tracking-wide">{isDigitalTab ? "Provisioning Time" : "Lead Time"}</th>
@@ -1173,11 +1177,13 @@ export default function VendorProductsPage() {
                          </div>
                        </td>
                          <td className="px-2 py-4 align-middle break-words text-xs text-gray-700">{getPricingModel(type)}</td>
-                        <td className="px-2 py-4 align-middle break-words">
-                         <div className="font-semibold text-gray-800 text-sm">
-                           {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
-                         </div>
-                       </td>
+                        {!isDigitalTab && (
+                          <td className="px-2 py-4 align-middle break-words">
+                            <div className="font-semibold text-gray-800 text-sm">
+                              {product.price ? `₹${parseFloat(product.price).toLocaleString("en-IN")}` : "—"}
+                            </div>
+                          </td>
+                        )}
                          <td className="px-2 py-4 align-middle break-words text-gray-700 text-sm">
                            {product.moq || "—"} <span className="text-xs text-gray-500">{getQuantityLabel(type)}</span>
                        </td>
