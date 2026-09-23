@@ -63,7 +63,7 @@ The vendor product table and Shop vendor selectors use one shared rule set for p
 **How to apply:** Reuse the shared product-type rule helpers whenever adding another product comparison, catalog card, or vendor-selection surface.
 
 ## Digital variation pricing
-Digital product variation fields and option price adjustments are owned by each `VendorProduct`, then carried through vendor comparisons to Shop after the client selects a vendor. Master-catalog variation data is legacy-only and must not drive digital configuration.
+Digital product variation fields and option price adjustments are owned by each `VendorProduct`, then carried through vendor comparisons to Shop after the client selects a vendor. Shop adds the selected total to the vendor base price before landed-cost and client-price calculations. Master-catalog variation data is legacy-only and must not drive digital configuration.
 
 **Why:** The same digital service can expose different options and prices from different vendors, so a master-level variation list cannot represent the commercial offer accurately.
 

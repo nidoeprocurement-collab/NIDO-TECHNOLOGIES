@@ -366,9 +366,9 @@ function SelectedProductsTable({
                     min={0}
                     step="0.01"
                     value={row.price}
-                    onChange={(e) => updateRow(row.catalogProduct.id, "price", e.target.value)}
-                    placeholder="0.00"
-                    className="w-full min-w-[90px] max-w-[110px] px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    readOnly
+                    aria-label={`${row.catalogProduct.productName} price per unit`}
+                    className="w-full min-w-[90px] max-w-[110px] cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-600 outline-none"
                   />
                 </td>
                 <td className="px-3 py-3">
@@ -556,7 +556,7 @@ export default function AddVendorProductsPage() {
           const preview = `${vpcPrefix}${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
           return [...rows, {
             catalogProduct: product,
-            price: "",
+             price: String(Number.isFinite(product.price) ? product.price : 0),
             moq: isDigitalCatalogProduct(product) ? "1" : "",
             leadTime: "",
             stock: "",
@@ -645,7 +645,10 @@ export default function AddVendorProductsPage() {
     const errors: MissingField[] = [];
     for (const row of selectedRows) {
       const missing: string[] = [];
-      if (!row.price || row.price.trim() === "" || Number(row.price) <= 0) missing.push("Purchase Price");
+       const basePrice = Number(row.price);
+       if (!row.price || row.price.trim() === "" || !Number.isFinite(basePrice) || basePrice < 0) {
+         missing.push("Price / Unit");
+       }
       if (!isDigitalCatalogProduct(row.catalogProduct) && (!row.moq || row.moq.trim() === "")) {
         missing.push("MOQ");
       }

@@ -14,6 +14,8 @@ import {
   getClientPriceSlabs,
   computeVendorComparisons,
   computeClientSellingPriceExclGst,
+  getLandedCost,
+  getVendorCommonSettings,
   canVendorFulfillMoq,
   getRecommendedVendor,
   getVendorComparisonBadge,
@@ -964,18 +966,45 @@ function ConfiguredServiceProductCard({
     && item.selectedVendorId === selectedVendor.vendorId
     && haveSameCloudConfiguration(item.configuration, configuration),
   );
-  const baseClientSellingPriceExclGst = selectedVendor && clientId
+  const configurationPriceAdjustment = getCloudConfigurationPriceAdjustment(configurationFields, configuration);
+  const effectiveVendorPrice = selectedVendor
+    ? Math.max(0, selectedVendor.basePrice + configurationPriceAdjustment)
+    : 0;
+  const effectiveVendorLandedCost = selectedVendor
+    ? getLandedCost(
+        effectiveVendorPrice,
+        getVendorCommonSettings(selectedVendor.vendorId),
+        product.category,
+      )
+    : 0;
+  const effectiveBaseClientSellingPriceExclGst = selectedVendor && clientId
     ? computeClientSellingPriceExclGst(
         clientId,
         product.productCode,
         product.category,
-        selectedVendor.landedCostPerUnit,
+        effectiveVendorLandedCost,
       )
     : 0;
-  const configurationPriceAdjustment = getCloudConfigurationPriceAdjustment(configurationFields, configuration);
-  const clientSellingPriceExclGst = Math.max(0, baseClientSellingPriceExclGst + configurationPriceAdjustment);
+  const clientSellingPriceExclGst = effectiveBaseClientSellingPriceExclGst;
   const draftConfigurationPriceAdjustment = getCloudConfigurationPriceAdjustment(configurationFields, draftConfiguration);
-  const draftEstimatedPrice = Math.max(0, baseClientSellingPriceExclGst + draftConfigurationPriceAdjustment);
+  const draftEffectiveVendorPrice = selectedVendor
+    ? Math.max(0, selectedVendor.basePrice + draftConfigurationPriceAdjustment)
+    : 0;
+  const draftEffectiveVendorLandedCost = selectedVendor
+    ? getLandedCost(
+        draftEffectiveVendorPrice,
+        getVendorCommonSettings(selectedVendor.vendorId),
+        product.category,
+      )
+    : 0;
+  const draftEstimatedPrice = selectedVendor && clientId
+    ? computeClientSellingPriceExclGst(
+        clientId,
+        product.productCode,
+        product.category,
+        draftEffectiveVendorLandedCost,
+      )
+    : 0;
   const canUseVendor = (vendor: VendorComparisonRow) =>
     isDigitalProduct(product) || canVendorFulfillMoq(vendor);
   const canAdd = !isImpersonating && product.inStock && !!selectedVendor && canUseVendor(selectedVendor) && !isInCart;
@@ -1017,9 +1046,9 @@ function ConfiguredServiceProductCard({
         selectedVendorId: selectedVendor.vendorId,
         selectedVendorName: selectedVendor.vendorName,
         vendorProductCode: selectedVendor.vendorProductCode,
-        vendorPrice: selectedVendor.basePrice,
+        vendorPrice: effectiveVendorPrice,
         clientSellingPriceExclGst,
-        landedCost: selectedVendor.landedCostPerUnit,
+        landedCost: effectiveVendorLandedCost,
         gstSnapshot: gstRate,
         hsnSnapshot: hsnForCategory,
         vendorRating: selectedVendor.rating,
@@ -1111,7 +1140,7 @@ function ConfiguredServiceProductCard({
       <div className="mt-3 border-t border-gray-100 px-3 pt-3" onClick={event => event.stopPropagation()}>
         <div className="flex items-end justify-between gap-2">
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Estimated Price</p>
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Price / Unit</p>
             <p className="mt-0.5 text-[16px] font-bold text-gray-900">
               {selectedVendor && clientSellingPriceExclGst > 0 ? formatCurrency(clientSellingPriceExclGst) : selectedVendor ? "Custom Quote" : "Select a vendor"}
             </p>
@@ -1213,7 +1242,7 @@ function ConfiguredServiceProductCard({
 
             <div className="mt-5 flex items-end justify-between gap-3 border-t border-gray-100 pt-4">
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Estimated Price</p>
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">Price / Unit</p>
                 <p className="text-base font-bold text-gray-900">
                   {selectedVendor && draftEstimatedPrice > 0 ? formatCurrency(draftEstimatedPrice) : selectedVendor ? "Custom Quote" : "Select a vendor"}
                 </p>

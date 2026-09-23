@@ -363,7 +363,7 @@ function EditProductScreen({
   onClose: () => void;
   onSave: (updates: Pick<VendorProduct, "price" | "moq" | "leadTime" | "stock" | "incomingStock">) => void;
 }) {
-  const [price, setPrice] = useState(product.price || "");
+  const price = product.price || "0";
   const [moq, setMoq] = useState(product.moq || "");
   const [leadTime, setLeadTime] = useState(product.leadTime || "");
   const [stock, setStock] = useState(product.stock || "");
@@ -470,8 +470,8 @@ function EditProductScreen({
                </h3>
                <p className="text-sm text-gray-400 mb-6">
                  {isDigitalProduct
-                   ? "Update the price, users/licenses, tenure/billing, and provisioning time for this product."
-                   : "Update the price, units/MOQ, lead time, and current stock for this product."}
+                    ? "Price is read-only. Update users/licenses, tenure/billing, and provisioning time for this product."
+                    : "Price is read-only. Update units/MOQ, lead time, and current stock for this product."}
                </p>
 
               <div className="grid grid-cols-2 gap-6">
@@ -490,9 +490,9 @@ function EditProductScreen({
                       min="0"
                       step="0.01"
                       value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="e.g. 52000"
-                      className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-900"
+                      readOnly
+                      aria-label="Vendor purchase price per unit"
+                      className="w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-4 text-sm text-gray-600 outline-none"
                     />
                   </div>
                 </div>
