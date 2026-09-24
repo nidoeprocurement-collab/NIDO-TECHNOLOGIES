@@ -27,6 +27,7 @@ import {
 import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
 import { getOrderProductTypeMetadata } from "@/lib/orderProductType";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
+import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence } from "@/lib/digitalFulfillmentStatuses";
 import { toast } from "sonner";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -67,6 +68,11 @@ const ALL_STATUS_MAP = {
   "Pickup Done": { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
   "Partially Shipped": { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   "Partially Delivered": { bg: "#ecfdf5", color: "#065f46", border: "#6ee7b7" },
+  Provisioning: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Provisioned: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Activated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Completed: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
 };
 
 const DOC_ICON = {
@@ -97,7 +103,8 @@ function Avatar({ initial, color, size = 28 }) {
 }
 
 function StatusPill({ status }) {
-  const s = ALL_STATUS_MAP[status] || { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" };
+  const baseStatus = String(status || "").replace(/\s+\([^)]*\)$/, "");
+  const s = ALL_STATUS_MAP[status] || ALL_STATUS_MAP[baseStatus] || { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" };
   return <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap", display: "inline-block" }}>{status}</span>;
 }
 
@@ -2216,6 +2223,11 @@ const STATUS_STYLE: any = {
   "Return Request Raised": { color: "#6d28d9" },
   "Pickup Scheduled": { color: "#1d4ed8" },
   "Pickup Done": { color: "#047857" },
+  Provisioning: { color: "#1d4ed8" },
+  "Partially Provisioned": { color: "#92400e" },
+  Provisioned: { color: "#047857" },
+  Activated: { color: "#166534" },
+  Completed: { color: "#166534" },
 };
 const ITEM_STATUS_SEQUENCE = ["Pending", "Confirmed", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered", "Delivered", "Return Request Raised", "Pickup Scheduled", "Pickup Done"];
 const RETURN_WORKFLOW_STATUSES = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
@@ -2266,27 +2278,35 @@ function ThreeDotMenu({
       window.removeEventListener("resize", closeMenu);
     };
   }, [open]);
-  const statuses = sub.itemStatus === "Return Request Raised"
-    ? ["Pickup Scheduled"]
-    : sub.itemStatus === "Pickup Scheduled"
-      ? ["Pickup Done"]
-      : sub.itemStatus === "Pickup Done"
-        ? []
-        : [
-            "Pending",
-            "Processing",
-            "Pending Shipping",
-            ...(canMarkShipped ? ["Shipped"] : []),
-            ...(sub.itemStatus === "Shipped" ? ["Delivered"] : []),
-            ...(sub.itemStatus === "Delivered" && canRaiseReturn && returnAllowed ? ["Return Request Raised"] : []),
-          ];
+  const isDigitalItem = isDigitalDocumentProduct(sub);
+  const digitalStatuses = getDigitalFulfillmentStatusSequence(sub.qty);
+  const statuses = isDigitalItem
+    ? digitalStatuses
+    : sub.itemStatus === "Return Request Raised"
+      ? ["Pickup Scheduled"]
+      : sub.itemStatus === "Pickup Scheduled"
+        ? ["Pickup Done"]
+        : sub.itemStatus === "Pickup Done"
+          ? []
+          : [
+              "Pending",
+              "Processing",
+              "Pending Shipping",
+              ...(canMarkShipped ? ["Shipped"] : []),
+              ...(sub.itemStatus === "Shipped" ? ["Delivered"] : []),
+              ...(sub.itemStatus === "Delivered" && canRaiseReturn && returnAllowed ? ["Return Request Raised"] : []),
+            ];
   const getStatusLockReason = (status: string): string | null => {
     if (status === sub.itemStatus) return "This item is already at this status.";
     if (!statusUpdatesEnabled) return "Confirm the purchase order first to enable item status updates.";
      if (status === "Return Request Raised" && !canRaiseReturn) return "Return requests are available only for physical products.";
      if (status === "Return Request Raised" && !returnAllowed) return "The 72-hour return window has expired.";
-    const currentIndex = ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
-    const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
+    const currentIndex = isDigitalItem
+      ? getDigitalFulfillmentStatusIndex(sub.itemStatus, sub.qty)
+      : ITEM_STATUS_SEQUENCE.indexOf(sub.itemStatus);
+    const nextIndex = isDigitalItem
+      ? getDigitalFulfillmentStatusIndex(status, sub.qty)
+      : ITEM_STATUS_SEQUENCE.indexOf(status);
     if (currentIndex >= 0 && nextIndex >= 0 && nextIndex <= currentIndex) {
       return "Item statuses can only move forward. Complete the previous status first.";
     }
@@ -2379,7 +2399,7 @@ function ThreeDotMenu({
                     setStatusSub(false);
                   }}
                     style={{ ...menuItemSt, background: sub.itemStatus === s ? "#f0f7ff" : "none", color: isLocked ? "#9ca3af" : sub.itemStatus === s ? "#2563eb" : "#374151", fontWeight: sub.itemStatus === s ? 600 : 400, cursor: isLocked ? "not-allowed" : "pointer", opacity: isLocked ? 0.72 : 1 }}>
-                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: STATUS_STYLE[s]?.color || "#6b7280", marginRight: 8, flexShrink: 0 }} />
+                    <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: STATUS_STYLE[s]?.color || STATUS_STYLE[String(s).replace(/\s+\([^)]*\)$/, "")]?.color || "#6b7280", marginRight: 8, flexShrink: 0 }} />
                     {s} {sub.itemStatus === s && "✓"} {isLocked && <span style={{ marginLeft: "auto", fontSize: 10 }}>Locked</span>}
                   </button>
                   );
@@ -2943,6 +2963,11 @@ export default function MyOrderPage() {
     if (status === "Shipped" && !getAllPOs().some(po => po.orderId === orderId && isPOItemShipped(po, subId))) return;
     const target = subOrders.find(s => s.id === subId);
     if (!target) return;
+    if (isDigitalDocumentProduct(target)) {
+      const currentIndex = getDigitalFulfillmentStatusIndex(target.itemStatus, target.qty);
+      const nextIndex = getDigitalFulfillmentStatusIndex(status, target.qty);
+      if (nextIndex < 0 || (currentIndex >= 0 && nextIndex <= currentIndex)) return;
+    }
     if (status === "Delivered" && target.itemStatus !== "Shipped") return;
     const returnStatuses = ["Return Request Raised", "Pickup Scheduled", "Pickup Done"];
     const currentReturnIndex = returnStatuses.indexOf(target.itemStatus);

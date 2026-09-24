@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { getPODisplayStatus, getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
+import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence } from "@/lib/digitalFulfillmentStatuses";
 import { getAllVendorProducts, updateVendorProduct, convertReservedToAllocated } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
@@ -93,6 +94,11 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }
   Shipped:    { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe" },
   "Partially Delivered": { bg: "#f0fdfa", color: "#0f766e", border: "#99f6e4" },
   Delivered:  { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Provisioning: { bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+  "Partially Provisioned": { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
+  Provisioned: { bg: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
+  Activated: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
+  Completed: { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0" },
   Cancelled:  { bg: "#fef2f2", color: "#991b1b", border: "#fca5a5" },
 };
 
@@ -100,7 +106,8 @@ const STEPPER_STEPS = ORDER_FULFILLMENT_STATUSES;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function StatusPill({ status }: { status: string }) {
-  const s = STATUS_STYLE[status] || STATUS_STYLE["Pending"];
+  const baseStatus = String(status || "").replace(/\s+\([^)]*\)$/, "");
+  const s = STATUS_STYLE[status] || STATUS_STYLE[baseStatus] || STATUS_STYLE["Pending"];
   return (
     <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap", display: "inline-block" }}>
       {status}
@@ -382,22 +389,26 @@ function UploadDocumentModal({ onSave, onClose }: { onSave: (doc: any) => void; 
 }
 
 // ── Status Dropdown ───────────────────────────────────────────────────────────
-function StatusDropdown({ status, onChange, disabled, allowCancel = true }: { status: string; onChange: (s: string) => void; disabled?: boolean; allowCancel?: boolean }) {
+function StatusDropdown({ status, onChange, disabled, allowCancel = true, digital = false, quantity }: { status: string; onChange: (s: string) => void; disabled?: boolean; allowCancel?: boolean; digital?: boolean; quantity?: number | string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const s = STATUS_STYLE[status] || STATUS_STYLE["Pending"];
+  const baseStatus = String(status || "").replace(/\s+\([^)]*\)$/, "");
+  const s = STATUS_STYLE[status] || STATUS_STYLE[baseStatus] || STATUS_STYLE["Pending"];
+  const statusSequence = digital
+    ? getDigitalFulfillmentStatusSequence(quantity)
+    : ITEM_STATUS_SEQUENCE;
   const itemStatuses = Array.from(new Set([
-    ...ORDER_FULFILLMENT_STATUSES,
+    ...(digital ? statusSequence : ORDER_FULFILLMENT_STATUSES),
     status,
     ...(allowCancel ? ["Cancelled"] : []),
   ])).filter(option =>
-    option !== "Partially Shipped" &&
-    option !== "Partially Delivered" &&
+    (digital || (option !== "Partially Shipped" && option !== "Partially Delivered")) &&
     (option !== "Cancelled" || allowCancel) &&
     (option === "Cancelled" ||
-      ITEM_STATUS_SEQUENCE.indexOf(status) < 0 ||
-      ITEM_STATUS_SEQUENCE.indexOf(option) < 0 ||
-      ITEM_STATUS_SEQUENCE.indexOf(option) > ITEM_STATUS_SEQUENCE.indexOf(status))
+      (digital ? getDigitalFulfillmentStatusIndex(status, quantity) : ITEM_STATUS_SEQUENCE.indexOf(status)) < 0 ||
+      (digital ? getDigitalFulfillmentStatusIndex(option, quantity) : ITEM_STATUS_SEQUENCE.indexOf(option)) < 0 ||
+      (digital ? getDigitalFulfillmentStatusIndex(option, quantity) : ITEM_STATUS_SEQUENCE.indexOf(option)) >
+        (digital ? getDigitalFulfillmentStatusIndex(status, quantity) : ITEM_STATUS_SEQUENCE.indexOf(status)))
   );
 
   useEffect(() => {
@@ -851,8 +862,15 @@ export default function VendorOrderDetailPage() {
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
     const currentItem = items.find(item => item.id === id);
-    const currentIndex = currentItem ? ITEM_STATUS_SEQUENCE.indexOf(currentItem.status) : -1;
-    const nextIndex = ITEM_STATUS_SEQUENCE.indexOf(status);
+    const digital = Boolean(currentItem && isDigitalDocumentProduct(currentItem));
+    const currentIndex = currentItem
+      ? digital
+        ? getDigitalFulfillmentStatusIndex(currentItem.status, currentItem.qty)
+        : ITEM_STATUS_SEQUENCE.indexOf(currentItem.status)
+      : -1;
+    const nextIndex = digital
+      ? getDigitalFulfillmentStatusIndex(status, currentItem?.qty)
+      : ITEM_STATUS_SEQUENCE.indexOf(status);
     if (
       currentIndex >= 0 &&
       nextIndex >= 0 &&
@@ -1352,6 +1370,8 @@ export default function VendorOrderDetailPage() {
                   onChange={s => handleItemStatusChange(item.id, s)}
                   disabled={isCancelled || item.status === "Cancelled"}
                   allowCancel={false}
+                  digital={isDigitalDocumentProduct(item)}
+                  quantity={item.qty}
                 />
                 {item.status === "Cancelled" && (item as any).cancelReason && (
                   <div style={{ fontSize: 11, color: "#991b1b", marginTop: 5, lineHeight: 1.4, fontStyle: "italic" }}>
