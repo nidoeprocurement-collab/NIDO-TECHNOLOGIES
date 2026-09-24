@@ -3709,13 +3709,30 @@ export default function MyOrderPage() {
   const subOrdersColumns = isClientPortalUser
     ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
     : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"];
-  const isDigitalOrder = subOrders.length > 0 && subOrders.every((sub) => isDigitalDocumentProduct({
+  const hasDigitalSubOrders = subOrders.some((sub) => isDigitalDocumentProduct({
     productType: sub.commercialTerms?.productType,
     itemName: sub.itemName,
   }));
+  const hasPhysicalSubOrders = subOrders.some((sub) => !isDigitalDocumentProduct({
+    productType: sub.commercialTerms?.productType,
+    itemName: sub.itemName,
+  }));
+  const isDigitalOrder = hasDigitalSubOrders && !hasPhysicalSubOrders;
+  const isMixedOrder = hasDigitalSubOrders && hasPhysicalSubOrders;
   if (isDigitalOrder) {
-    subOrdersColumns[isClientPortalUser ? 3 : 4] = DIGITAL_PRODUCT_HEADERS.quantity;
-    subOrdersColumns[isClientPortalUser ? 4 : 5] = DIGITAL_PRODUCT_HEADERS.tenure;
+    const quantityIndex = isClientPortalUser ? 3 : 4;
+    subOrdersColumns[quantityIndex] = DIGITAL_PRODUCT_HEADERS.quantity;
+    subOrdersColumns[quantityIndex + 1] = DIGITAL_PRODUCT_HEADERS.tenure;
+    subOrdersColumns.splice(quantityIndex + 2, 0, DIGITAL_PRODUCT_HEADERS.provisioning);
+  } else if (isMixedOrder) {
+    const insertAt = (isClientPortalUser ? 3 : 4) + 2;
+    subOrdersColumns.splice(
+      insertAt,
+      0,
+      DIGITAL_PRODUCT_HEADERS.quantity,
+      DIGITAL_PRODUCT_HEADERS.tenure,
+      DIGITAL_PRODUCT_HEADERS.provisioning,
+    );
   }
   // Explicit min widths (via minmax) on every column plus a real column gap
   // prevent long values (prices, badges, buttons) from visually overlapping
@@ -3728,13 +3745,23 @@ export default function MyOrderPage() {
   // to fill whatever width the tab actually has (no dead space on wide
   // monitors) while still guaranteeing a readable minimum per column.
   const subOrdersColTemplate = isClientPortalUser
-    ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
-    : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(180px,0.8fr)";
+    ? (isDigitalOrder
+      ? "36px 130px minmax(220px,2fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
+      : isMixedOrder
+        ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
+        : "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px")
+    : (isDigitalOrder
+      ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
+      : isMixedOrder
+        ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
+        : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(180px,0.8fr)");
   const subOrdersColGap = 6;
   // Sum of the column minimums above (plus gaps) — the smallest width the
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
   // instead of clipping; above it the fr tracks grow to fill the tab.
-  const subOrdersMinWidth = isClientPortalUser ? 1056 : 1400;
+  const subOrdersMinWidth = isClientPortalUser
+    ? (isDigitalOrder ? 1190 : isMixedOrder ? 1510 : 1056)
+    : (isDigitalOrder ? 1570 : isMixedOrder ? 1870 : 1400);
 
   const billingAddress = [
     clientInfo?.billing_address || clientInfo?.billingAddress,
@@ -4030,6 +4057,11 @@ export default function MyOrderPage() {
                 </div>
                 {filtered.map((sub, idx) => {
                   const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub);
+                  const subIsDigital = isDigitalDocumentProduct({
+                    productType: sub.commercialTerms?.productType,
+                    itemName: sub.itemName,
+                  });
+                  const subPresentation = getDocumentProductPresentation(sub, { quantity: sub.qty });
                   const isSubOrderCancelled = sub.itemStatus === "Cancelled";
                   // A cancelled sub-order is fully inactive in this view. Do
                   // not expose stale PO/vendor projections or action handlers.
@@ -4110,12 +4142,34 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       )}
-                       <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
-                       <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
-                         {isDigitalOrder
-                           ? getDocumentProductPresentation(sub, { quantity: sub.qty }).tenureBilling
-                           : sub.unitPrice}
+                       <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>
+                         {isMixedOrder && subIsDigital ? "—" : sub.qty}
                        </div>
+                       <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
+                          {isMixedOrder && subIsDigital
+                            ? "—"
+                            : isDigitalOrder
+                            ? subPresentation.tenureBilling
+                            : sub.unitPrice}
+                       </div>
+                       {isMixedOrder && (
+                         <>
+                           <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>
+                             {subIsDigital ? subPresentation.quantity : "—"}
+                           </div>
+                           <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
+                             {subIsDigital ? subPresentation.tenureBilling : "—"}
+                           </div>
+                           <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
+                             {subIsDigital ? subPresentation.provisioningTime : "—"}
+                           </div>
+                         </>
+                       )}
+                       {isDigitalOrder && (
+                         <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
+                           {subPresentation.provisioningTime}
+                         </div>
+                       )}
                       <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
                       <div style={{ minWidth: 0 }}>
                         <StatusPill status={sub.itemStatus} />

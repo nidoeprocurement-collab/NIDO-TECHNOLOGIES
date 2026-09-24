@@ -374,6 +374,8 @@ function FieldLabel({ children, required }: { children: React.ReactNode; require
 function BillPdfView({ bill }: { bill: BillEntry }) {
   const totals = getBillTotals(bill);
   const balanceDue = Math.max(totals.total - bill.paymentMade, 0);
+  const hasDigitalItems = bill.items.some(isDigitalDocumentProduct);
+  const hasPhysicalItems = bill.items.some((item) => !isDigitalDocumentProduct(item));
 
   return (
     <div className="mx-auto max-w-[900px] border border-gray-200 bg-white rounded-xl p-8 shadow-sm text-gray-900">
@@ -424,13 +426,22 @@ function BillPdfView({ bill }: { bill: BillEntry }) {
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">#</th>
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Account</th>
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Qty</th>
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>
+            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">
+              {hasDigitalItems ? hasPhysicalItems ? `QTY / ${DIGITAL_PRODUCT_HEADERS.quantity}` : DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}
+            </th>
+            {hasPhysicalItems && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>}
+            {hasDigitalItems && (
+              <>
+                <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.tenure}</th>
+                <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
+              </>
+            )}
             <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Amount</th>
           </tr>
         </thead>
         <tbody>
           {bill.items.map((item, i) => {
+            const digital = isDigitalDocumentProduct(item);
             const base = item.quantity * item.rate;
             const discountAmount = (base * item.discount) / 100;
             const taxable = base - discountAmount;
@@ -440,7 +451,13 @@ function BillPdfView({ bill }: { bill: BillEntry }) {
                 <td className="px-3 py-2.5 whitespace-pre-wrap"><p className="font-medium">{item.itemDetails || "—"}</p></td>
                 <td className="px-3 py-2.5 text-gray-500">{item.account || "—"}</td>
                 <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
-                <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>
+                {hasPhysicalItems && <td className="px-3 py-2.5 text-right">{digital ? "—" : item.rate.toFixed(2)}</td>}
+                {hasDigitalItems && (
+                  <>
+                    <td className="px-3 py-2.5 text-right">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : "—"}</td>
+                    <td className="px-3 py-2.5 text-right">{digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}</td>
+                  </>
+                )}
                 <td className="px-3 py-2.5 text-right font-medium">{taxable.toFixed(2)}</td>
               </tr>
             );
@@ -690,6 +707,8 @@ export default function BillsPage() {
   };
 
   const formTotals = getBillTotals({ items: form.items, adjustment: form.adjustment });
+  const hasDigitalFormItems = form.items.some(isDigitalDocumentProduct);
+  const hasPhysicalFormItems = form.items.some((item) => !isDigitalDocumentProduct(item));
 
   // ── FORM PAGE ──────────────────────────────────────────────────────────────
   if (isFormMode) {
@@ -833,9 +852,21 @@ export default function BillsPage() {
                     <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-10">#</th>
                     <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item / Specification</th>
                     <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">HSN/SAC</th>
-                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-20">Qty</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Unit Rate</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">Disc</th>
+                    <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-20">
+                      {hasDigitalFormItems ? hasPhysicalFormItems ? `QTY / ${DIGITAL_PRODUCT_HEADERS.quantity}` : DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}
+                    </th>
+                    {hasPhysicalFormItems && (
+                      <>
+                        <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Unit Rate</th>
+                        <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">Disc</th>
+                      </>
+                    )}
+                    {hasDigitalFormItems && (
+                      <>
+                        <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.tenure}</th>
+                        <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
+                      </>
+                    )}
                     <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-28">Taxable</th>
                     <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">GST Rate</th>
                     <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide w-24">GST</th>
@@ -845,6 +876,7 @@ export default function BillsPage() {
                 </thead>
                 <tbody>
                   {form.items.map((item, rowIdx) => {
+                    const digital = isDigitalDocumentProduct(item);
                     const base = item.quantity * item.rate;
                     const discountAmount = (base * item.discount) / 100;
                     const taxable = base - discountAmount;
@@ -862,12 +894,31 @@ export default function BillsPage() {
                         <td className="px-2 py-2">
                           <input className={inp + " text-center"} value={String(item.quantity)} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} />
                         </td>
-                        <td className="px-2 py-2">
-                          <input className={inp + " text-right"} value={String(item.rate)} onChange={(e) => handleItemChange(item.id, "rate", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <input className={inp + " text-right"} value={String(item.discount)} onChange={(e) => handleItemChange(item.id, "discount", e.target.value)} placeholder="0" />
-                        </td>
+                        {hasPhysicalFormItems && (digital ? (
+                          <>
+                            <td className="px-2 py-2 text-center text-gray-400">—</td>
+                            <td className="px-2 py-2 text-center text-gray-400">—</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-2 py-2">
+                              <input className={inp + " text-right"} value={String(item.rate)} onChange={(e) => handleItemChange(item.id, "rate", e.target.value)} />
+                            </td>
+                            <td className="px-2 py-2">
+                              <input className={inp + " text-right"} value={String(item.discount)} onChange={(e) => handleItemChange(item.id, "discount", e.target.value)} placeholder="0" />
+                            </td>
+                          </>
+                        ))}
+                        {hasDigitalFormItems && (
+                          <>
+                            <td className="px-2 py-2 text-center text-xs text-gray-600">
+                              {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : "—"}
+                            </td>
+                            <td className="px-2 py-2 text-center text-xs text-gray-600">
+                              {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}
+                            </td>
+                          </>
+                        )}
                         <td className="px-2 py-2 text-right text-gray-700 font-medium">{taxable.toFixed(2)}</td>
                         <td className="px-2 py-2">
                           <select className={sel + " text-center"} value={String(item.taxPercent)} onChange={(e) => handleItemChange(item.id, "taxPercent", e.target.value)}>
@@ -966,6 +1017,8 @@ export default function BillsPage() {
   if (detailId && selectedBill) {
     const totals = getBillTotals(selectedBill);
     const balanceDue = Math.max(totals.total - selectedBill.paymentMade, 0);
+    const hasDigitalBillItems = selectedBill.items.some(isDigitalDocumentProduct);
+    const hasPhysicalBillItems = selectedBill.items.some((item) => !isDigitalDocumentProduct(item));
     const tabs = [
       ["overview", "Overview"],
       ["items", `Line Items (${selectedBill.items.length})`],
@@ -1117,13 +1170,25 @@ export default function BillsPage() {
                 <table className="w-full text-sm min-w-[700px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {["#", "ITEM / DESCRIPTION", "ACCOUNT", "QTY", `RATE (${currencySymbol})`, "DISC %", `TAXABLE (${currencySymbol})`, "GST RATE", `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map((h) => (
+                      {[
+                        "#",
+                        "ITEM / DESCRIPTION",
+                        "ACCOUNT",
+                        hasDigitalBillItems ? hasPhysicalBillItems ? `QTY / ${DIGITAL_PRODUCT_HEADERS.quantity}` : DIGITAL_PRODUCT_HEADERS.quantity : "QTY",
+                        ...(hasPhysicalBillItems ? [`RATE (${currencySymbol})`, "DISC %"] : []),
+                        ...(hasDigitalBillItems ? [DIGITAL_PRODUCT_HEADERS.tenure, DIGITAL_PRODUCT_HEADERS.provisioning] : []),
+                        `TAXABLE (${currencySymbol})`,
+                        "GST RATE",
+                        `GST (${currencySymbol})`,
+                        `AMOUNT (${currencySymbol})`,
+                      ].map((h) => (
                         <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {selectedBill.items.map((item, index) => {
+                      const digital = isDigitalDocumentProduct(item);
                       const base = item.quantity * item.rate;
                       const discountAmount = (base * item.discount) / 100;
                       const taxable = base - discountAmount;
@@ -1136,8 +1201,27 @@ export default function BillsPage() {
                           </td>
                           <td className="px-3 py-3 text-gray-600">{item.account || "—"}</td>
                           <td className="px-3 py-3 text-center">{item.quantity}</td>
-                          <td className="px-3 py-3 text-right">{item.rate.toFixed(2)}</td>
-                          <td className="px-3 py-3 text-center text-gray-500">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                          {hasPhysicalBillItems && (digital ? (
+                            <>
+                              <td className="px-3 py-3 text-center text-gray-400">—</td>
+                              <td className="px-3 py-3 text-center text-gray-400">—</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-3 text-right">{item.rate.toFixed(2)}</td>
+                              <td className="px-3 py-3 text-center text-gray-500">{item.discount > 0 ? `${item.discount}%` : "—"}</td>
+                            </>
+                          ))}
+                          {hasDigitalBillItems && (
+                            <>
+                              <td className="px-3 py-3 text-center text-gray-600">
+                                {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : "—"}
+                              </td>
+                              <td className="px-3 py-3 text-center text-gray-600">
+                                {digital ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : "—"}
+                              </td>
+                            </>
+                          )}
                           <td className="px-3 py-3 text-right">{taxable.toFixed(2)}</td>
                           <td className="px-3 py-3 text-center">{item.taxPercent}%</td>
                           <td className="px-3 py-3 text-right">{gst.toFixed(2)}</td>

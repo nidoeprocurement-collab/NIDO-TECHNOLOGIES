@@ -15,6 +15,7 @@ type ProductDocumentItem = ProductTypeMetadata & {
   productType?: string;
   name?: string;
   itemName?: string;
+  itemDetails?: string;
   description?: string;
 };
 
@@ -30,7 +31,9 @@ export function getDocumentProductMetadata(item: ProductDocumentItem): ProductTy
 
 export function getDocumentProductType(item: ProductDocumentItem): string {
   const metadata = getDocumentProductMetadata(item);
-  return getProductType(metadata.physicalType || metadata.productType);
+  return getProductType(
+    metadata.commercialTerms?.productType || metadata.physicalType || metadata.productType,
+  );
 }
 
 export function isDigitalDocumentProduct(item: ProductDocumentItem): boolean {
@@ -42,7 +45,9 @@ export function getDocumentProductPresentation(
   values: { quantity?: number | string; leadTime?: number | string } = {},
 ) {
   const metadata = getDocumentProductMetadata(item);
-  const type = getProductType(metadata.physicalType || metadata.productType);
+  const type = getProductType(
+    metadata.commercialTerms?.productType || metadata.physicalType || metadata.productType,
+  );
   const digital = isDigitalOnlyType(type);
   const commercialTerms = metadata.commercialTerms;
   const tenureBilling = getTenureBilling(type);

@@ -5,6 +5,7 @@ type OrderProductSnapshot = ProductTypeMetadata & {
   productCode?: string;
   name?: string;
   itemName?: string;
+  itemDetails?: string;
 };
 
 /**
@@ -20,8 +21,8 @@ export function getOrderProductTypeMetadata(item: OrderProductSnapshot): Product
       )
     : undefined;
   const matchedProduct = catalogProduct
-    || (item.name || item.itemName
-      ? findCatalogProductByName(item.name || item.itemName || "")
+    || (item.name || item.itemName || item.itemDetails
+      ? findCatalogProductByName(item.name || item.itemName || item.itemDetails || "")
       : undefined);
 
   return {

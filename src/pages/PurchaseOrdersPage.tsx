@@ -1211,11 +1211,14 @@ export default function PurchaseOrdersPage() {
 function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
   const totals = getTotals(order);
   const org = loadConfig().organization;
-  const isDigitalOrder = order.items.length > 0 && order.items.every((item) => isDigitalDocumentProduct({
+  const isDigitalPOItem = (item: PurchaseOrderItem) => isDigitalDocumentProduct({
     productType: item.productType,
     physicalType: item.physicalType,
+    fulfillmentType: item.fulfillmentType,
     itemName: item.itemName,
-  }));
+  });
+  const physicalItems = order.items.filter((item) => !isDigitalPOItem(item));
+  const digitalItems = order.items.filter(isDigitalPOItem);
 
   return (
     <div className="mx-auto max-w-[900px] border border-gray-200 bg-white rounded-xl p-8 shadow-sm text-gray-900">
@@ -1258,31 +1261,53 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
         <p className="text-sm text-gray-600 whitespace-pre-line">{order.deliveryAddress}</p>
       </div>
 
-      {/* Items table */}
-      <table className="w-full text-sm mb-4">
-        <thead>
-          <tr className="bg-gray-50 border border-gray-200">
-            <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">#</th>
-            <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
-            <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">HSN/SAC</th>
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{isDigitalOrder ? DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}</th>
-            {!isDigitalOrder && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>}
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.map((item, i) => (
-            <tr key={item.id} className="border-b border-gray-100">
-              <td className="px-3 py-2.5 text-gray-500">{i + 1}</td>
-              <td className="px-3 py-2.5"><p className="font-medium">{item.itemName || "—"}</p><p className="text-xs text-gray-400">{item.description}</p></td>
-              <td className="px-3 py-2.5 text-gray-500">{item.hsnSac || "—"}</td>
-              <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
-              {!isDigitalOrder && <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>}
-              <td className="px-3 py-2.5 text-right font-medium">{(item.quantity * item.rate).toFixed(2)}</td>
+      {/* Keep physical and digital rows under their own commercial headers. */}
+      {[
+        { label: "Physical Products", items: physicalItems, digital: false },
+        { label: "Digital Products", items: digitalItems, digital: true },
+      ].filter((group) => group.items.length > 0).map((group) => (
+        <table key={group.label} className="w-full text-sm mb-4">
+          <thead>
+            <tr className="bg-gray-50 border border-gray-200">
+              <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">#</th>
+              <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
+              <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">HSN/SAC</th>
+              <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{group.digital ? DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}</th>
+              {group.digital ? (
+                <>
+                  <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.tenure}</th>
+                  <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{DIGITAL_PRODUCT_HEADERS.provisioning}</th>
+                </>
+              ) : (
+                <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>
+              )}
+              <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Amount</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {group.items.map((item, i) => {
+              const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
+              return (
+                <tr key={item.id} className="border-b border-gray-100">
+                  <td className="px-3 py-2.5 text-gray-500">{i + 1}</td>
+                  <td className="px-3 py-2.5"><p className="font-medium">{item.itemName || "—"}</p><p className="text-xs text-gray-400">{item.description}</p></td>
+                  <td className="px-3 py-2.5 text-gray-500">{item.hsnSac || "—"}</td>
+                  <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
+                  {group.digital ? (
+                    <>
+                      <td className="px-3 py-2.5 text-right">{presentation.tenureBilling}</td>
+                      <td className="px-3 py-2.5 text-right">{presentation.provisioningTime}</td>
+                    </>
+                  ) : (
+                    <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>
+                  )}
+                  <td className="px-3 py-2.5 text-right font-medium">{(item.quantity * item.rate).toFixed(2)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      ))}
 
       {/* Totals — invoice PDF format */}
       <div className="flex justify-end mb-6">

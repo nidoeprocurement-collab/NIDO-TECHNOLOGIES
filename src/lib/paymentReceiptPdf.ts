@@ -4,6 +4,7 @@ import { loadConfig } from './configService';
 import { formatCurrency } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { PaymentReceipt } from './paymentReceiptStore';
+import { isDigitalOnlyType } from './productTypeRules';
 
 // ── Colour palette (identical to invoicePdf) ─────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -272,7 +273,7 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
 
   // ── Receipt details table ─────────────────────────────────────────────────
   const bankCharges = Number(receipt.bankCharges ?? 0);
-  const isDigitalReceipt = Boolean(receipt.productType && receipt.productType !== 'Mixed Products');
+  const isDigitalReceipt = isDigitalOnlyType(receipt.productType || '');
   const tableBody: string[][] = [
     isDigitalReceipt
       ? [
@@ -342,6 +343,73 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
       }
     },
   });
+
+  const physicalProducts = (receipt.productDetails || []).filter((item) => !item.digital);
+  const digitalProducts = (receipt.productDetails || []).filter((item) => item.digital);
+  if (physicalProducts.length > 0 && digitalProducts.length > 0) {
+    let productsY = ((doc as any).lastAutoTable?.finalY ?? y) + 10;
+    const productTableStyles = {
+      theme: 'grid' as const,
+      tableWidth: contentWidth,
+      styles: {
+        font: 'helvetica',
+        fontSize: 7.5,
+        textColor: TEXT,
+        lineColor: BORDER,
+        lineWidth: 0.35,
+        cellPadding: { top: 6, bottom: 6, left: 4, right: 4 },
+        valign: 'middle' as const,
+      },
+      headStyles: {
+        fillColor: [248, 250, 252] as [number, number, number],
+        textColor: DARK,
+        fontStyle: 'bold' as const,
+        fontSize: 6.3,
+        halign: 'center' as const,
+      },
+    };
+
+    drawText(doc, 'PHYSICAL PRODUCTS', margin, productsY + 8, { size: 8, color: BLUE, bold: true });
+    productsY += 13;
+    autoTable(doc, {
+      ...productTableStyles,
+      startY: productsY,
+      margin: { left: margin, right: margin },
+      head: [['#', 'ITEM / DESCRIPTION', 'QTY', 'RATE', 'INVOICE VALUE']],
+      body: physicalProducts.map((item, index) => [
+        String(index + 1), item.description, String(item.quantity), money(item.unitPrice), money(item.invoiceValue),
+      ]),
+      columnStyles: {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 235 },
+        2: { cellWidth: 55, halign: 'center' },
+        3: { cellWidth: 75, halign: 'right' },
+        4: { cellWidth: 90, halign: 'right' },
+      },
+    });
+
+    productsY = ((doc as any).lastAutoTable?.finalY ?? productsY) + 10;
+    drawText(doc, 'DIGITAL PRODUCTS', margin, productsY + 8, { size: 8, color: BLUE, bold: true });
+    productsY += 13;
+    autoTable(doc, {
+      ...productTableStyles,
+      startY: productsY,
+      margin: { left: margin, right: margin },
+      head: [['#', 'ITEM / DESCRIPTION', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'INVOICE VALUE']],
+      body: digitalProducts.map((item, index) => [
+        String(index + 1), item.description, String(item.quantity), item.tenureBilling || '—',
+        item.provisioningTime || '—', money(item.invoiceValue),
+      ]),
+      columnStyles: {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 130 },
+        2: { cellWidth: 70, halign: 'center' },
+        3: { cellWidth: 78, halign: 'center' },
+        4: { cellWidth: 88, halign: 'center' },
+        5: { cellWidth: 88, halign: 'right' },
+      },
+    });
+  }
 
   // ── Summary box (right) + Notes (left) ───────────────────────────────────
   y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;

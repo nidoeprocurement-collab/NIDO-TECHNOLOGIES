@@ -837,10 +837,16 @@ export default function VendorOrderDetailPage() {
     it.name.toLowerCase().includes(search.toLowerCase()) ||
     (it.referenceNumber || "").toLowerCase().includes(search.toLowerCase())
   );
-  const isDigitalOrder = items.length > 0 && items.every((item) => isDigitalDocumentProduct({
+  const hasDigitalItems = items.some((item) => isDigitalDocumentProduct({
     productType: item.commercialTerms?.productType,
     itemName: item.name,
   }));
+  const hasPhysicalItems = items.some((item) => !isDigitalDocumentProduct({
+    productType: item.commercialTerms?.productType,
+    itemName: item.name,
+  }));
+  const isDigitalOrder = hasDigitalItems && !hasPhysicalItems;
+  const isMixedOrder = hasDigitalItems && hasPhysicalItems;
 
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
@@ -1284,7 +1290,9 @@ export default function VendorOrderDetailPage() {
           <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
             {(isDigitalOrder
               ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "TRACKING INFO", "ACTIONS"]
-              : ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", "ACTIONS"]
+              : isMixedOrder
+                ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY / USERS / LICENSES", "UNIT PRICE / TENURE", "TOTAL", "STATUS", "DELIVERY / PROVISIONING", "TRACKING INFO", "ACTIONS"]
+                : ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", "ACTIONS"]
             ).map(h => <div key={h}>{h}</div>)}
           </div>
           {filteredItems.length === 0 && (
@@ -1301,8 +1309,8 @@ export default function VendorOrderDetailPage() {
                      {item.commercialTerms && (
                        <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 14px", fontSize: 10.5, color: "#6b7280", lineHeight: 1.4 }}>
                          <span>Pricing Model: <strong style={{ color: "#374151" }}>{item.commercialTerms.pricingModel}</strong></span>
-                         <span>{isDigitalOrder ? `${DIGITAL_PRODUCT_HEADERS.tenure}:` : "MOQ / Min Qty:"} <strong style={{ color: "#374151" }}>{isDigitalOrder ? getDocumentProductPresentation(item, { quantity: item.qty }).tenureBilling : item.commercialTerms.moqLabel}</strong></span>
-                         <span>{isDigitalOrder ? `${DIGITAL_PRODUCT_HEADERS.provisioning}:` : "Lead Time / SLA:"} <strong style={{ color: "#374151" }}>{isDigitalOrder ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : `${item.commercialTerms.leadTimePrimary}${item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}`}</strong></span>
+                          <span>{isDigitalDocumentProduct(item) ? `${DIGITAL_PRODUCT_HEADERS.tenure}:` : "MOQ / Min Qty:"} <strong style={{ color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).tenureBilling : item.commercialTerms.moqLabel}</strong></span>
+                          <span>{isDigitalDocumentProduct(item) ? `${DIGITAL_PRODUCT_HEADERS.provisioning}:` : "Lead Time / SLA:"} <strong style={{ color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : `${item.commercialTerms.leadTimePrimary}${item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}`}</strong></span>
                          <span>Availability: <strong style={{ color: item.commercialTerms.availabilityStatus === "Out of Stock" ? "#dc2626" : "#059669" }}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
                        </div>
                      )}
@@ -1336,7 +1344,7 @@ export default function VendorOrderDetailPage() {
                 {item.specs.map(s => <div key={s} style={{ fontSize: 11.5, color: "#6b7280" }}>• {s}</div>)}
               </div>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{item.qty}</div>
-               <div style={{ fontSize: 13 }}>{isDigitalOrder ? getDocumentProductPresentation(item, { quantity: item.qty }).tenureBilling : item.unitPrice}</div>
+               <div style={{ fontSize: 13 }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).tenureBilling : item.unitPrice}</div>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{item.total}</div>
               <div>
                 <StatusDropdown
@@ -1351,7 +1359,7 @@ export default function VendorOrderDetailPage() {
                   </div>
                 )}
               </div>
-               <div style={{ fontSize: 12.5, color: "#374151" }}>{isDigitalOrder ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : item.expectedDelivery}</div>
+                <div style={{ fontSize: 12.5, color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : item.expectedDelivery}</div>
               <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
                 {item.tracking ? (
                   <>

@@ -342,7 +342,8 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
       const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
       return [
         String(index + 1), description, item.hsnSac || '', String(item.quantity),
-        presentation.tenureBilling, fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(taxable + gst),
+        presentation.tenureBilling, presentation.provisioningTime, fmt2(taxable),
+        taxRateLabel, fmt2(gst), fmt2(taxable + gst),
       ];
     });
 
@@ -350,7 +351,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
       startY,
       margin: { left: margin, right: margin },
       head: [digital
-        ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'USERS / LICENSES', 'TENURE / BILLING', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+        ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
         : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
       body,
       theme: 'grid',
@@ -373,11 +374,11 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
       },
       columnStyles: digital
         ? {
-            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 112 },
-            2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 45, halign: 'center' },
-            4: { cellWidth: 58, halign: 'center' }, 5: { cellWidth: 58, halign: 'right' },
-            6: { cellWidth: 40, halign: 'center' }, 7: { cellWidth: 52, halign: 'right' },
-            8: { cellWidth: 68, halign: 'right' },
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 98 },
+            2: { cellWidth: 38, halign: 'center' }, 3: { cellWidth: 42, halign: 'center' },
+            4: { cellWidth: 52, halign: 'center' }, 5: { cellWidth: 48, halign: 'center' },
+            6: { cellWidth: 52, halign: 'right' }, 7: { cellWidth: 38, halign: 'center' },
+            8: { cellWidth: 48, halign: 'right' }, 9: { cellWidth: 62, halign: 'right' },
           }
         : {
             0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 105 },
@@ -391,7 +392,7 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.textColor = DARK;
         }
-        if (data.section === 'body' && data.column.index === (digital ? 8 : 9)) {
+        if (data.section === 'body' && data.column.index === (digital ? 9 : 9)) {
           data.cell.styles.fontStyle = 'bold';
         }
       },

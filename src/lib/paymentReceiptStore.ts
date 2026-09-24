@@ -33,6 +33,15 @@ export interface PaymentReceipt {
   usersLicenses?: number;
   tenureBilling?: string;
   provisioningTime?: string;
+  productDetails?: {
+    description: string;
+    digital: boolean;
+    quantity: number;
+    unitPrice: number;
+    invoiceValue: number;
+    tenureBilling?: string;
+    provisioningTime?: string;
+  }[];
   attachments?: PaymentReceiptAttachment[];
 }
 

@@ -13,7 +13,7 @@ import {
 } from "@/lib/paymentReceiptStore";
 import type { PaymentReceipt, PaymentReceiptAttachment } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
-import { getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
+import { getDocumentProductPresentation, getDocumentProductType, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 const inp =
@@ -207,6 +207,20 @@ export default function NewPaymentReceiptPage() {
     const presentation = allDigital && digitalItems[0]
       ? getDocumentProductPresentation(digitalItems[0], { quantity: digitalItems.reduce((sum, item) => sum + item.quantity, 0) })
       : null;
+    const productDetails = linkedItems.map((item) => {
+      const digital = isDigitalDocumentProduct(item);
+      const itemPresentation = getDocumentProductPresentation(item, { quantity: item.quantity });
+      const taxable = Math.max(0, item.quantity * item.rate - (item.discount ?? 0));
+      return {
+        description: [item.description, item.itemDetails].filter(Boolean).join(" — "),
+        digital,
+        quantity: item.quantity,
+        unitPrice: item.rate,
+        invoiceValue: taxable * (1 + item.taxPercent / 100),
+        tenureBilling: digital ? itemPresentation.tenureBilling : undefined,
+        provisioningTime: digital ? itemPresentation.provisioningTime : undefined,
+      };
+    });
 
     return {
     id: isEditMode && editingReceipt ? editingReceipt.id : `pr-${Date.now()}`,
@@ -225,10 +239,17 @@ export default function NewPaymentReceiptPage() {
     placeOfSupply: form.placeOfSupply,
     descriptionOfSupply: form.descriptionOfSupply,
     taxCode: form.taxCode,
-    productType: linkedItems.length === 0 ? undefined : allDigital ? presentation?.type : "Mixed Products",
+    productType: linkedItems.length === 0
+      ? undefined
+      : allDigital
+        ? presentation?.type
+        : digitalItems.length === 0
+          ? getDocumentProductType(linkedItems[0])
+          : "Mixed Products",
     usersLicenses: presentation?.quantity as number | undefined,
     tenureBilling: presentation?.tenureBilling,
     provisioningTime: presentation?.provisioningTime,
+    productDetails: productDetails.length > 0 ? productDetails : undefined,
     attachments,
     archived: isEditMode && editingReceipt ? editingReceipt.archived : false,
     };

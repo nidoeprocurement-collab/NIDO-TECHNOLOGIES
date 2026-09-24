@@ -276,7 +276,7 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
       const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
       return [
         String(index + 1), item.itemDetails || '—', item.account || '—',
-        item.quantity.toFixed(2), presentation.tenureBilling,
+        item.quantity.toFixed(2), presentation.tenureBilling, presentation.provisioningTime,
         fmt2(taxable), `${item.taxPercent}%`, fmt2(gst), fmt2(taxable + gst),
       ];
     });
@@ -285,7 +285,7 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
       startY,
       margin: { left: margin, right: margin },
       head: [digital
-        ? ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'USERS / LICENSES', 'TENURE / BILLING', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+        ? ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
         : ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
       body: tableBody,
       theme: 'grid',
@@ -308,11 +308,11 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
       },
       columnStyles: digital
         ? {
-            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 118 },
-            2: { cellWidth: 65 }, 3: { cellWidth: 45, halign: 'center' },
-            4: { cellWidth: 64, halign: 'center' }, 5: { cellWidth: 55, halign: 'right' },
-            6: { cellWidth: 38, halign: 'center' }, 7: { cellWidth: 48, halign: 'right' },
-            8: { cellWidth: 62, halign: 'right' },
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 104 },
+            2: { cellWidth: 58 }, 3: { cellWidth: 42, halign: 'center' },
+            4: { cellWidth: 56, halign: 'center' }, 5: { cellWidth: 45, halign: 'center' },
+            6: { cellWidth: 48, halign: 'right' }, 7: { cellWidth: 36, halign: 'center' },
+            8: { cellWidth: 45, halign: 'right' }, 9: { cellWidth: 58, halign: 'right' },
           }
         : {
             0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 110 },
@@ -326,7 +326,7 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.textColor = DARK;
         }
-        if (data.section === 'body' && data.column.index === (digital ? 8 : 9)) {
+        if (data.section === 'body' && data.column.index === 9) {
           data.cell.styles.fontStyle = 'bold';
         }
       },

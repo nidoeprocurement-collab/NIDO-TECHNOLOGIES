@@ -107,11 +107,11 @@ export default function InvoiceDetails() {
   const renderLineItemsTable = (items: StoredInvoice['lineItems'], digital: boolean) => (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[800px]">
+        <table className="w-full text-sm min-w-[860px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               {(digital
-                ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+                ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, DIGITAL_PRODUCT_HEADERS.provisioning, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
                 : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
               ).map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
@@ -143,7 +143,10 @@ export default function InvoiceDetails() {
                   <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
                   <td className="px-3 py-3 text-center">{item.quantity}</td>
                   {digital ? (
-                    <td className="px-3 py-3 text-center text-gray-600">{presentation.tenureBilling}</td>
+                    <>
+                      <td className="px-3 py-3 text-center text-gray-600">{presentation.tenureBilling}</td>
+                      <td className="px-3 py-3 text-center text-gray-600">{presentation.provisioningTime}</td>
+                    </>
                   ) : (
                     <>
                       <td className="px-3 py-3 text-right">{fmt(item.rate)}</td>
