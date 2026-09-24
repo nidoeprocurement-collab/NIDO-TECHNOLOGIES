@@ -29,6 +29,7 @@ import { loadConfig } from "@/lib/configService";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
 import { getEffectiveVendorTaxPct, getHsnCodes, getProductCategoryTaxMap } from "@/lib/taxEngine";
+import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import { generateManualPOPdf, downloadPOPdf } from "@/lib/generatePO";
 import { createApprovalRequest, getApprovalRequest } from "@/lib/approvalEngine";
 import { getUsers } from "@/lib/nidoUsersStore";
@@ -64,6 +65,9 @@ export interface PurchaseOrderItem {
   quantity: number;
   rate: number;
   taxPercent: number;
+  productType?: string;
+  physicalType?: string;
+  fulfillmentType?: string;
 }
 
 export interface PurchaseOrderEntry {
@@ -640,6 +644,8 @@ export default function PurchaseOrdersPage() {
             rate: parseFloat(product.price) || 0,
             quantity: parseFloat(product.moq) || 1,
             taxPercent: taxPercent || 18,
+            productType: product.productType,
+            physicalType: product.physicalType,
           }
         : item
     ));
@@ -1205,6 +1211,11 @@ export default function PurchaseOrdersPage() {
 function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
   const totals = getTotals(order);
   const org = loadConfig().organization;
+  const isDigitalOrder = order.items.length > 0 && order.items.every((item) => isDigitalDocumentProduct({
+    productType: item.productType,
+    physicalType: item.physicalType,
+    itemName: item.itemName,
+  }));
 
   return (
     <div className="mx-auto max-w-[900px] border border-gray-200 bg-white rounded-xl p-8 shadow-sm text-gray-900">
@@ -1254,8 +1265,8 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">#</th>
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Item & Description</th>
             <th className="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">HSN/SAC</th>
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Qty</th>
-            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>
+            <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">{isDigitalOrder ? DIGITAL_PRODUCT_HEADERS.quantity : "Qty"}</th>
+            {!isDigitalOrder && <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Rate</th>}
             <th className="text-right px-3 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Amount</th>
           </tr>
         </thead>
@@ -1266,7 +1277,7 @@ function PurchaseOrderPdfView({ order }: { order: PurchaseOrderEntry }) {
               <td className="px-3 py-2.5"><p className="font-medium">{item.itemName || "—"}</p><p className="text-xs text-gray-400">{item.description}</p></td>
               <td className="px-3 py-2.5 text-gray-500">{item.hsnSac || "—"}</td>
               <td className="px-3 py-2.5 text-right">{item.quantity.toFixed(2)}</td>
-              <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>
+              {!isDigitalOrder && <td className="px-3 py-2.5 text-right">{item.rate.toFixed(2)}</td>}
               <td className="px-3 py-2.5 text-right font-medium">{(item.quantity * item.rate).toFixed(2)}</td>
             </tr>
           ))}

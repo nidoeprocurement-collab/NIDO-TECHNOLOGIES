@@ -22,6 +22,7 @@ import { generateInvoicePdfBase64 } from '@/lib/invoicePdf';
 import { sendInvoiceEmail } from '@/lib/invoiceEmailService';
 import { isPhysicalOrHybridProduct } from '@/lib/productTypeRules';
 import { getOrderProductTypeMetadata } from '@/lib/orderProductType';
+import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from '@/lib/productDocumentRules';
 import { toast } from 'sonner';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -195,6 +196,7 @@ export default function InvoiceFormPage() {
 
   // ── Line items ───────────────────────────────────────────────────────────
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(existing?.lineItems || [blankItem()]);
+  const isDigitalInvoice = lineItems.length > 0 && lineItems.every((item) => isDigitalDocumentProduct(item));
 
   // ── Totals & charges ─────────────────────────────────────────────────────
   const [shippingCharges, setShippingCharges] = useState(existing?.shippingCharges ?? 0);
@@ -1129,7 +1131,10 @@ export default function InvoiceFormPage() {
             <table className="w-full text-sm min-w-[1040px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`, ''].map((h) => (
+                  {(isDigitalInvoice
+                    ? ['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`, '']
+                    : ['Sl.No', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`, '']
+                  ).map((h) => (
                     <th key={h} className="px-3 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -1166,8 +1171,8 @@ export default function InvoiceFormPage() {
                         {item.commercialTerms && (
                           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-gray-500 leading-tight">
                             <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
-                            <span>MOQ / Min Qty: <strong className="text-gray-700">{item.commercialTerms.moqLabel}</strong></span>
-                            <span>Lead Time / SLA: <strong className="text-gray-700">{item.commercialTerms.leadTimePrimary}{item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
+                            <span>{isDigitalInvoice ? `${DIGITAL_PRODUCT_HEADERS.tenure}:` : "MOQ / Min Qty:"} <strong className="text-gray-700">{isDigitalInvoice ? getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling : item.commercialTerms.moqLabel}</strong></span>
+                            <span>{isDigitalInvoice ? `${DIGITAL_PRODUCT_HEADERS.provisioning}:` : "Lead Time / SLA:"} <strong className="text-gray-700">{isDigitalInvoice ? getDocumentProductPresentation(item, { quantity: item.quantity }).provisioningTime : `${item.commercialTerms.leadTimePrimary}${item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}`}</strong></span>
                             <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
                           </div>
                         )}
@@ -1189,22 +1194,31 @@ export default function InvoiceFormPage() {
                           className="w-14 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
                         />
                       </td>
-                      {/* Rate (₹) */}
-                      <td className="px-3 py-2">
-                        <input
-                          type="number" min={0} value={item.rate}
-                          onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value) || 0)}
-                          className="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
-                        />
-                      </td>
-                      {/* Disc (₹) */}
-                      <td className="px-3 py-2">
-                        <input
-                          type="number" min={0} value={item.discount ?? 0}
-                          onChange={(e) => updateItem(item.id, 'discount', Number(e.target.value) || 0)}
-                          className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
-                        />
-                      </td>
+                      {!isDigitalInvoice && (
+                        <>
+                          {/* Rate (₹) */}
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} value={item.rate}
+                              onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value) || 0)}
+                              className="w-24 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
+                            />
+                          </td>
+                          {/* Disc (₹) */}
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} value={item.discount ?? 0}
+                              onChange={(e) => updateItem(item.id, 'discount', Number(e.target.value) || 0)}
+                              className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm text-center"
+                            />
+                          </td>
+                        </>
+                      )}
+                      {isDigitalInvoice && (
+                        <td className="px-3 py-2 text-center text-sm text-gray-600">
+                          {getDocumentProductPresentation(item, { quantity: item.quantity }).tenureBilling}
+                        </td>
+                      )}
                       {/* Taxable (₹) — computed */}
                       <td className="px-3 py-2 text-sm text-gray-700 text-right whitespace-nowrap pt-3">{fmt(taxable)}</td>
                       {/* GST Rate */}

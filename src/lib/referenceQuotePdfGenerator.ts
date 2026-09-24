@@ -5,6 +5,7 @@ import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredQuote } from './quoteStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
+import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
 
 export interface ReferenceDocumentOptions {
   title?: string;
@@ -254,9 +255,26 @@ export async function generateReferenceQuotePdfBase64(
   );
   y += cardHeight + 16;
 
+  const isDigitalQuote = quote.lineItems.length > 0 && quote.lineItems.every((item) => isDigitalDocumentProduct(item));
   const tableBody = quote.lineItems.map((item, index) => {
     const taxable = Math.max(0, item.qty * item.rate - item.discount);
     const gst = taxable * (item.taxPercent / 100);
+    if (isDigitalQuote) {
+      const presentation = getDocumentProductPresentation(item, { quantity: item.qty });
+      return [
+        String(index + 1),
+        item.name,
+        (item.description || '') +
+          (item.commercialTerms ? `\nPricing Model: ${presentation.pricingModel}\n${DIGITAL_PRODUCT_HEADERS.tenure}: ${presentation.tenureBilling}\n${DIGITAL_PRODUCT_HEADERS.provisioning}: ${presentation.provisioningTime}` : ''),
+        item.hsnSac || '',
+        String(item.qty),
+        presentation.tenureBilling,
+        fmt2(taxable),
+        `${item.taxPercent}%`,
+        fmt2(gst),
+        fmt2(taxable + gst),
+      ];
+    }
     return [
       String(index + 1),
       item.name,
@@ -280,26 +298,17 @@ export async function generateReferenceQuotePdfBase64(
       'SL.NO',
       'ITEM / DESCRIPTION',
       'HSN/SAC',
-      'QTY',
-      `RATE (${getCurrencySymbol(loadConfig())})`,
-      `DISC (${getCurrencySymbol(loadConfig())})`,
+      ...(isDigitalQuote
+        ? ['USERS / LICENSES', 'TENURE / BILLING']
+        : ['QTY', `RATE (${getCurrencySymbol(loadConfig())})`, `DISC (${getCurrencySymbol(loadConfig())})`]),
       `TAXABLE (${getCurrencySymbol(loadConfig())})`,
       'GST RATE',
       `GST (${getCurrencySymbol(loadConfig())})`,
       `AMOUNT (${getCurrencySymbol(loadConfig())})`,
     ]],
-    body: tableBody.map((row) => [
-      row[0],
-      `${row[1]}${row[2] ? `\n${row[2]}` : ''}`,
-      row[3],
-      row[4],
-      row[5],
-      row[6],
-      row[7],
-      row[8],
-      row[9],
-      row[10],
-    ]),
+    body: tableBody.map((row) => isDigitalQuote
+      ? [row[0], `${row[1]}${row[2] ? `\n${row[2]}` : ''}`, row[3], row[4], row[5], row[6], row[7], row[8], row[9]]
+      : [row[0], `${row[1]}${row[2] ? `\n${row[2]}` : ''}`, row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]]),
     theme: 'grid',
     tableWidth: contentWidth,
     styles: {
@@ -318,18 +327,21 @@ export async function generateReferenceQuotePdfBase64(
       fontSize: 6.3,
       halign: 'center',
     },
-    columnStyles: {
-      0: { cellWidth: 28, halign: 'center' },
-      1: { cellWidth: 90, fontStyle: 'bold' },
-      2: { cellWidth: 40, halign: 'center' },
-      3: { cellWidth: 27, halign: 'center' },
-      4: { cellWidth: 53, halign: 'right' },
-      5: { cellWidth: 50, halign: 'right' },
-      6: { cellWidth: 61, halign: 'right' },
-      7: { cellWidth: 42, halign: 'center' },
-      8: { cellWidth: 53, halign: 'right' },
-      9: { cellWidth: 67, halign: 'right', fontStyle: 'bold' },
-    },
+    columnStyles: isDigitalQuote
+      ? {
+          0: { cellWidth: 28, halign: 'center' }, 1: { cellWidth: 110, fontStyle: 'bold' },
+          2: { cellWidth: 40, halign: 'center' }, 3: { cellWidth: 27, halign: 'center' },
+          4: { cellWidth: 55, halign: 'center' }, 5: { cellWidth: 62, halign: 'center' },
+          6: { cellWidth: 61, halign: 'right' }, 7: { cellWidth: 42, halign: 'center' },
+          8: { cellWidth: 67, halign: 'right', fontStyle: 'bold' },
+        }
+      : {
+          0: { cellWidth: 28, halign: 'center' }, 1: { cellWidth: 90, fontStyle: 'bold' },
+          2: { cellWidth: 40, halign: 'center' }, 3: { cellWidth: 27, halign: 'center' },
+          4: { cellWidth: 53, halign: 'right' }, 5: { cellWidth: 50, halign: 'right' },
+          6: { cellWidth: 61, halign: 'right' }, 7: { cellWidth: 42, halign: 'center' },
+          8: { cellWidth: 53, halign: 'right' }, 9: { cellWidth: 67, halign: 'right', fontStyle: 'bold' },
+        },
     didParseCell(data) {
       if (data.section === 'body' && data.column.index === 1) {
         data.cell.styles.fontStyle = 'bold';

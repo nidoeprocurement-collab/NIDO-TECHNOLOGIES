@@ -17,3 +17,4 @@
 - [Catalog edit identity](catalog-edit-identity.md) — edit and duplicate checks must compare catalog IDs safely across legacy string/number records.
 - [Invoice import behavior](invoice-import-behavior.md) — order imports must exclude return-workflow items, resolve category codes, and preserve all invoice email recipients.
 - [Proforma eligibility source](proforma-eligibility-source.md) — eligibility must use original product metadata; missing or conflicting type data must fail closed, never default to physical.
+- [Digital document headers](digital-document-headers.md) — digital-only documents use Users / Licenses, Tenure / Billing, and Provisioning Time while physical layouts remain unchanged.

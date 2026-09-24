@@ -4,6 +4,7 @@
 const STORE_KEY = 'nido_sales_quotes';
 const COUNTER_KEY = 'nido_quote_counter';
 import { getPrefix } from './configService';
+import type { ProductCommercialTerms } from './productCommercialTerms';
 
 export interface QuoteLineItem {
   id: string;
@@ -15,6 +16,10 @@ export interface QuoteLineItem {
   rate: number;
   discount: number;
   taxPercent: number;
+  productType?: string;
+  physicalType?: string;
+  fulfillmentType?: string;
+  commercialTerms?: ProductCommercialTerms;
 }
 
 export interface QuoteGstSlab {

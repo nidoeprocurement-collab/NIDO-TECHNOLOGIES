@@ -26,6 +26,7 @@ import {
 } from "@/lib/productCommercialTerms";
 import { isPhysicalOrHybridProduct } from "@/lib/productTypeRules";
 import { getOrderProductTypeMetadata } from "@/lib/orderProductType";
+import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import { toast } from "sonner";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
@@ -3708,6 +3709,14 @@ export default function MyOrderPage() {
   const subOrdersColumns = isClientPortalUser
     ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
     : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"];
+  const isDigitalOrder = subOrders.length > 0 && subOrders.every((sub) => isDigitalDocumentProduct({
+    productType: sub.commercialTerms?.productType,
+    itemName: sub.itemName,
+  }));
+  if (isDigitalOrder) {
+    subOrdersColumns[isClientPortalUser ? 3 : 4] = DIGITAL_PRODUCT_HEADERS.quantity;
+    subOrdersColumns[isClientPortalUser ? 4 : 5] = DIGITAL_PRODUCT_HEADERS.tenure;
+  }
   // Explicit min widths (via minmax) on every column plus a real column gap
   // prevent long values (prices, badges, buttons) from visually overlapping
   // into the neighboring column — a plain "1fr"/px template with no gap lets
@@ -4101,8 +4110,12 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       )}
-                      <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
-                      <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>{sub.unitPrice}</div>
+                       <div style={{ fontSize: 12.5, fontWeight: 500, minWidth: 0 }}>{sub.qty}</div>
+                       <div style={{ fontSize: 12.5, minWidth: 0, overflowWrap: "break-word" }}>
+                         {isDigitalOrder
+                           ? getDocumentProductPresentation(sub, { quantity: sub.qty }).tenureBilling
+                           : sub.unitPrice}
+                       </div>
                       <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
                       <div style={{ minWidth: 0 }}>
                         <StatusPill status={sub.itemStatus} />

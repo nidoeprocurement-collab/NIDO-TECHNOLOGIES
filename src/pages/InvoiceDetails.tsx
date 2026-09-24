@@ -14,6 +14,7 @@ import { getActiveReceipts, type PaymentReceipt } from '@/lib/paymentReceiptStor
 import { useI18n } from '@/i18n/I18nProvider';
 import { formatCurrency } from '@/lib/formatters';
 import { getAvailabilityLabel } from '@/lib/productCommercialTerms';
+import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from '@/lib/productDocumentRules';
 import { toast } from 'sonner';
 
 function fmt(value: number) {
@@ -100,6 +101,67 @@ export default function InvoiceDetails() {
     ...(!isProformaInvoice(invoice) ? [['payments', `Payments (${invoice.payments.length + paymentReceipts.length})`]] : []),
     ['activity', 'Activity'],
   ] as ['overview' | 'items' | 'payments' | 'activity', string][];
+
+  const physicalLineItems = invoice.lineItems.filter((item) => !isDigitalDocumentProduct(item));
+  const digitalLineItems = invoice.lineItems.filter((item) => isDigitalDocumentProduct(item));
+  const renderLineItemsTable = (items: StoredInvoice['lineItems'], digital: boolean) => (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[800px]">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              {(digital
+                ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+                : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`]
+              ).map((h) => (
+                <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => {
+              const disc = item.discount ?? 0;
+              const taxable = Math.max(0, item.quantity * item.rate - disc);
+              const tax = taxable * (item.taxPercent / 100);
+              const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
+              return (
+                <tr key={item.id} className="border-b border-gray-100">
+                  <td className="px-3 py-3 text-gray-400 text-center">{index + 1}</td>
+                  <td className="px-3 py-3">
+                    <p className="font-semibold text-gray-900">{item.description}</p>
+                    {item.subOrderId && <p className="text-xs font-medium text-blue-700 mt-0.5">Sub Order ID: {item.subOrderId}</p>}
+                    {item.itemDetails && <p className="text-xs text-gray-500 mt-0.5">{item.itemDetails}</p>}
+                    {item.commercialTerms && (
+                      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 leading-tight">
+                        <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
+                        <span>{digital ? `${DIGITAL_PRODUCT_HEADERS.tenure}:` : 'MOQ / Min Qty:'} <strong className="text-gray-700">{digital ? presentation.tenureBilling : item.commercialTerms.moqLabel}</strong></span>
+                        <span>{digital ? `${DIGITAL_PRODUCT_HEADERS.provisioning}:` : 'Lead Time / SLA:'} <strong className="text-gray-700">{digital ? presentation.provisioningTime : `${item.commercialTerms.leadTimePrimary}${item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}`}</strong></span>
+                        <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
+                  <td className="px-3 py-3 text-center">{item.quantity}</td>
+                  {digital ? (
+                    <td className="px-3 py-3 text-center text-gray-600">{presentation.tenureBilling}</td>
+                  ) : (
+                    <>
+                      <td className="px-3 py-3 text-right">{fmt(item.rate)}</td>
+                      <td className="px-3 py-3 text-right text-gray-500">{fmt(disc)}</td>
+                    </>
+                  )}
+                  <td className="px-3 py-3 text-right">{fmt(taxable)}</td>
+                  <td className="px-3 py-3 text-center"><span className="text-gray-900">{item.taxPercent}%</span>{item.taxType && <span className="block text-xs text-gray-400">{item.taxType}</span>}</td>
+                  <td className="px-3 py-3 text-right">{fmt(tax)}</td>
+                  <td className="px-3 py-3 text-right font-semibold text-gray-900">{fmt(taxable + tax)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   const markSentAndEmail = async () => {
     if (sending) return;
@@ -363,55 +425,12 @@ export default function InvoiceDetails() {
       {activeTab === 'items' && (
         <div className="space-y-5">
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[800px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    {['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', `RATE (${currencySymbol})`, `DISC (${currencySymbol})`, `TAXABLE (${currencySymbol})`, 'GST RATE', `GST (${currencySymbol})`, `AMOUNT (${currencySymbol})`].map((h) => (
-                      <th key={h} className="px-3 py-3 text-left text-xs font-semibold text-gray-600 whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoice.lineItems.map((item, index) => {
-                    const disc = item.discount ?? 0;
-                    const taxable = Math.max(0, item.quantity * item.rate - disc);
-                    const tax = taxable * (item.taxPercent / 100);
-                    return (
-                      <tr key={item.id} className="border-b border-gray-100">
-                        <td className="px-3 py-3 text-gray-400 text-center">{index + 1}</td>
-                        <td className="px-3 py-3">
-                          <p className="font-semibold text-gray-900">{item.description}</p>
-                          {item.subOrderId && (
-                            <p className="text-xs font-medium text-blue-700 mt-0.5">Sub Order ID: {item.subOrderId}</p>
-                          )}
-                          {item.itemDetails && <p className="text-xs text-gray-500 mt-0.5">{item.itemDetails}</p>}
-                          {item.commercialTerms && (
-                            <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 leading-tight">
-                              <span>Pricing Model: <strong className="text-gray-700">{item.commercialTerms.pricingModel}</strong></span>
-                              <span>MOQ / Min Qty: <strong className="text-gray-700">{item.commercialTerms.moqLabel}</strong></span>
-                              <span>Lead Time / SLA: <strong className="text-gray-700">{item.commercialTerms.leadTimePrimary}{item.commercialTerms.leadTimeSecondary ? ` · ${item.commercialTerms.leadTimeSecondary}` : ""}</strong></span>
-                              <span>Availability: <strong className={item.commercialTerms.availabilityStatus === "Out of Stock" ? "text-red-600" : "text-emerald-600"}>{getAvailabilityLabel(item.commercialTerms)}</strong></span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-3 text-center text-gray-600">{item.hsnSac || '—'}</td>
-                        <td className="px-3 py-3 text-center">{item.quantity}</td>
-                        <td className="px-3 py-3 text-right">{fmt(item.rate)}</td>
-                        <td className="px-3 py-3 text-right text-gray-500">{fmt(disc)}</td>
-                        <td className="px-3 py-3 text-right">{fmt(taxable)}</td>
-                        <td className="px-3 py-3 text-center">
-                          <span className="text-gray-900">{item.taxPercent}%</span>
-                          {item.taxType && <span className="block text-xs text-gray-400">{item.taxType}</span>}
-                        </td>
-                        <td className="px-3 py-3 text-right">{fmt(tax)}</td>
-                        <td className="px-3 py-3 text-right font-semibold text-gray-900">{fmt(taxable + tax)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {physicalLineItems.length > 0 && renderLineItemsTable(physicalLineItems, false)}
+            {digitalLineItems.length > 0 && (
+              <div className={physicalLineItems.length > 0 ? "border-t border-gray-200" : ""}>
+                {renderLineItemsTable(digitalLineItems, true)}
+              </div>
+            )}
           </div>
 
           {/* Summary */}

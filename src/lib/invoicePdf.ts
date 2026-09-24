@@ -5,6 +5,7 @@ import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredInvoice } from './invoiceStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
+import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
 
 // ── Colour palette (identical to referenceQuotePdfGenerator) ─────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -305,87 +306,109 @@ export async function generateInvoicePdfBase64(invoice: StoredInvoice): Promise<
   );
   y += cardHeight + 16;
 
-  // ── Line items table ──────────────────────────────────────────────────────
-  const tableBody = invoice.lineItems.map((item, index) => {
-    const disc = item.discount ?? 0;
-    const taxable = Math.max(0, item.quantity * item.rate - disc);
-    const gst = taxable * (item.taxPercent / 100);
-    const taxRateLabel = item.taxType ? `${item.taxPercent}%\n${item.taxType}` : `${item.taxPercent}%`;
-    return [
-      String(index + 1),
-       (item.subOrderId ? `Sub Order ID: ${item.subOrderId}\n` : '') +
-       item.description + (item.itemDetails ? `\n${item.itemDetails}` : '') +
-         (item.commercialTerms ? `\n${getCommercialTermsLines(item.commercialTerms).join('\n')}` : ''),
-      item.hsnSac || '',
-      String(item.quantity),
-      fmt2(item.rate),
-      fmt2(disc),
-      fmt2(taxable),
-      taxRateLabel,
-      fmt2(gst),
-      fmt2(taxable + gst),
-    ];
-  });
+  // ── Line items tables ─────────────────────────────────────────────────────
+  // Physical rows retain the established financial-document layout. Digital
+  // rows use the same commercial terminology as Vendor Products and do not
+  // expose the physical unit-rate column.
+  const physicalItems = invoice.lineItems
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !isDigitalDocumentProduct(item));
+  const digitalItems = invoice.lineItems
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => isDigitalDocumentProduct(item));
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [[
-      '#',
-      'ITEM / DESCRIPTION',
-      'HSN/SAC',
-      'QTY',
-      'RATE',
-      'DISC',
-      'TAXABLE',
-      'GST RATE',
-      'GST',
-      'AMOUNT',
-    ]],
-    body: tableBody,
-    theme: 'grid',
-    tableWidth: contentWidth,
-    styles: {
-      font: 'helvetica',
-      fontSize: 7.5,
-      textColor: TEXT,
-      lineColor: BORDER,
-      lineWidth: 0.35,
-      cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
-      valign: 'middle',
-    },
-    headStyles: {
-      fillColor: [248, 250, 252],
-      textColor: DARK,
-      fontStyle: 'bold',
-      fontSize: 6.3,
-      halign: 'center',
-    },
-    columnStyles: {
-      0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 105 },
-      2: { cellWidth: 42, halign: 'center' },
-      3: { cellWidth: 24, halign: 'center' },
-      4: { cellWidth: 55, halign: 'right' },
-      5: { cellWidth: 47, halign: 'right' },
-      6: { cellWidth: 58, halign: 'right' },
-      7: { cellWidth: 40, halign: 'center' },
-      8: { cellWidth: 52, halign: 'right' },
-      9: { cellWidth: 68, halign: 'right' },
-    },
-    didParseCell(data) {
-      if (data.section === 'body' && data.column.index === 1) {
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.textColor = DARK;
+  const renderLineTable = (
+    rows: { item: StoredInvoice['lineItems'][number]; index: number }[],
+    digital: boolean,
+    startY: number,
+  ) => {
+    const body = rows.map(({ item, index }) => {
+      const disc = item.discount ?? 0;
+      const taxable = Math.max(0, item.quantity * item.rate - disc);
+      const gst = taxable * (item.taxPercent / 100);
+      const taxRateLabel = item.taxType ? `${item.taxPercent}%\n${item.taxType}` : `${item.taxPercent}%`;
+      const description =
+        (item.subOrderId ? `Sub Order ID: ${item.subOrderId}\n` : '') +
+        item.description + (item.itemDetails ? `\n${item.itemDetails}` : '') +
+        (item.commercialTerms ? `\n${getCommercialTermsLines(item.commercialTerms).join('\n')}` : '');
+
+      if (!digital) {
+        return [
+          String(index + 1), description, item.hsnSac || '', String(item.quantity),
+          fmt2(item.rate), fmt2(disc), fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(taxable + gst),
+        ];
       }
-      if (data.section === 'body' && data.column.index === 9) {
-        data.cell.styles.fontStyle = 'bold';
-      }
-    },
-  });
+
+      const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
+      return [
+        String(index + 1), description, item.hsnSac || '', String(item.quantity),
+        presentation.tenureBilling, fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(taxable + gst),
+      ];
+    });
+
+    autoTable(doc, {
+      startY,
+      margin: { left: margin, right: margin },
+      head: [digital
+        ? ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'USERS / LICENSES', 'TENURE / BILLING', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+        : ['#', 'ITEM / DESCRIPTION', 'HSN/SAC', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
+      body,
+      theme: 'grid',
+      tableWidth: contentWidth,
+      styles: {
+        font: 'helvetica',
+        fontSize: 7.5,
+        textColor: TEXT,
+        lineColor: BORDER,
+        lineWidth: 0.35,
+        cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: DARK,
+        fontStyle: 'bold',
+        fontSize: 6.3,
+        halign: 'center',
+      },
+      columnStyles: digital
+        ? {
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 112 },
+            2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 45, halign: 'center' },
+            4: { cellWidth: 58, halign: 'center' }, 5: { cellWidth: 58, halign: 'right' },
+            6: { cellWidth: 40, halign: 'center' }, 7: { cellWidth: 52, halign: 'right' },
+            8: { cellWidth: 68, halign: 'right' },
+          }
+        : {
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 105 },
+            2: { cellWidth: 42, halign: 'center' }, 3: { cellWidth: 24, halign: 'center' },
+            4: { cellWidth: 55, halign: 'right' }, 5: { cellWidth: 47, halign: 'right' },
+            6: { cellWidth: 58, halign: 'right' }, 7: { cellWidth: 40, halign: 'center' },
+            8: { cellWidth: 52, halign: 'right' }, 9: { cellWidth: 68, halign: 'right' },
+          },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = DARK;
+        }
+        if (data.section === 'body' && data.column.index === (digital ? 8 : 9)) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+    });
+    return (doc as any).lastAutoTable?.finalY ?? startY;
+  };
+
+  let lastTableY = y;
+  if (physicalItems.length > 0) {
+    lastTableY = renderLineTable(physicalItems, false, lastTableY);
+  }
+  if (digitalItems.length > 0) {
+    lastTableY = renderLineTable(digitalItems, true, lastTableY + (physicalItems.length > 0 ? 10 : 0));
+  }
 
   // ── Summary box (right) + Left text blocks ────────────────────────────────
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
+  y = lastTableY + 15;
   const summaryWidth = 255;
   const summaryX = pageWidth - margin - summaryWidth;
   const summaryHeight = drawSummary(doc, invoice, summaryX, y, summaryWidth);

@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { loadConfig } from './configService';
 import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
+import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
 
 // ── Colour palette (identical to invoicePdf) ──────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -33,6 +34,15 @@ export interface BillForPdf {
     rate: number;
     discount: number;
     taxPercent: number;
+    productType?: string;
+    physicalType?: string;
+    fulfillmentType?: string;
+    commercialTerms?: {
+      productType?: string;
+      pricingModel?: string;
+      leadTimePrimary?: string;
+      leadTimeSecondary?: string;
+    };
   }[];
 }
 
@@ -246,74 +256,90 @@ export async function generateBillPdf(bill: BillForPdf): Promise<void> {
 
   y += cardHeight + 16;
 
-  // ── Line items table ──────────────────────────────────────────────────────
-  const tableBody = bill.items.map((item, index) => {
-    const base = item.quantity * item.rate;
-    const discountAmount = (base * item.discount) / 100;
-    const taxable = base - discountAmount;
-    const gst = (taxable * item.taxPercent) / 100;
-    return [
-      String(index + 1),
-      item.itemDetails || '—',
-      item.account || '—',
-      item.quantity.toFixed(2),
-      fmt2(item.rate),
-      item.discount > 0 ? `${item.discount}%` : '—',
-      fmt2(taxable),
-      `${item.taxPercent}%`,
-      fmt2(gst),
-      fmt2(taxable + gst),
-    ];
-  });
+  // ── Line items tables ─────────────────────────────────────────────────────
+  const physicalItems = bill.items.filter((item) => !isDigitalDocumentProduct(item));
+  const digitalItems = bill.items.filter((item) => isDigitalDocumentProduct(item));
+  const renderItemsTable = (items: typeof bill.items, digital: boolean, startY: number) => {
+    const tableBody = items.map((item, index) => {
+      const base = item.quantity * item.rate;
+      const discountAmount = (base * item.discount) / 100;
+      const taxable = base - discountAmount;
+      const gst = (taxable * item.taxPercent) / 100;
+      if (!digital) {
+        return [
+          String(index + 1), item.itemDetails || '—', item.account || '—',
+          item.quantity.toFixed(2), fmt2(item.rate),
+          item.discount > 0 ? `${item.discount}%` : '—',
+          fmt2(taxable), `${item.taxPercent}%`, fmt2(gst), fmt2(taxable + gst),
+        ];
+      }
+      const presentation = getDocumentProductPresentation(item, { quantity: item.quantity });
+      return [
+        String(index + 1), item.itemDetails || '—', item.account || '—',
+        item.quantity.toFixed(2), presentation.tenureBilling,
+        fmt2(taxable), `${item.taxPercent}%`, fmt2(gst), fmt2(taxable + gst),
+      ];
+    });
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
-    body: tableBody,
-    theme: 'grid',
-    tableWidth: contentWidth,
-    styles: {
-      font: 'helvetica',
-      fontSize: 7.5,
-      textColor: TEXT,
-      lineColor: BORDER,
-      lineWidth: 0.35,
-      cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
-      valign: 'middle',
-    },
-    headStyles: {
-      fillColor: [248, 250, 252],
-      textColor: DARK,
-      fontStyle: 'bold',
-      fontSize: 6.3,
-      halign: 'center',
-    },
-    columnStyles: {
-      0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 110 },
-      2: { cellWidth: 65 },
-      3: { cellWidth: 28, halign: 'center' },
-      4: { cellWidth: 50, halign: 'right' },
-      5: { cellWidth: 35, halign: 'center' },
-      6: { cellWidth: 55, halign: 'right' },
-      7: { cellWidth: 38, halign: 'center' },
-      8: { cellWidth: 48, halign: 'right' },
-      9: { cellWidth: 62, halign: 'right' },
-    },
-    didParseCell(data) {
-      if (data.section === 'body' && data.column.index === 1) {
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.textColor = DARK;
-      }
-      if (data.section === 'body' && data.column.index === 9) {
-        data.cell.styles.fontStyle = 'bold';
-      }
-    },
-  });
+    autoTable(doc, {
+      startY,
+      margin: { left: margin, right: margin },
+      head: [digital
+        ? ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'USERS / LICENSES', 'TENURE / BILLING', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']
+        : ['#', 'ITEM / DESCRIPTION', 'ACCOUNT', 'QTY', 'RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'AMOUNT']],
+      body: tableBody,
+      theme: 'grid',
+      tableWidth: contentWidth,
+      styles: {
+        font: 'helvetica',
+        fontSize: 7.5,
+        textColor: TEXT,
+        lineColor: BORDER,
+        lineWidth: 0.35,
+        cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: DARK,
+        fontStyle: 'bold',
+        fontSize: 6.3,
+        halign: 'center',
+      },
+      columnStyles: digital
+        ? {
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 118 },
+            2: { cellWidth: 65 }, 3: { cellWidth: 45, halign: 'center' },
+            4: { cellWidth: 64, halign: 'center' }, 5: { cellWidth: 55, halign: 'right' },
+            6: { cellWidth: 38, halign: 'center' }, 7: { cellWidth: 48, halign: 'right' },
+            8: { cellWidth: 62, halign: 'right' },
+          }
+        : {
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 110 },
+            2: { cellWidth: 65 }, 3: { cellWidth: 28, halign: 'center' },
+            4: { cellWidth: 50, halign: 'right' }, 5: { cellWidth: 35, halign: 'center' },
+            6: { cellWidth: 55, halign: 'right' }, 7: { cellWidth: 38, halign: 'center' },
+            8: { cellWidth: 48, halign: 'right' }, 9: { cellWidth: 62, halign: 'right' },
+          },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = DARK;
+        }
+        if (data.section === 'body' && data.column.index === (digital ? 8 : 9)) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+    });
+    return (doc as any).lastAutoTable?.finalY ?? startY;
+  };
+
+  let lastTableY = y;
+  if (physicalItems.length > 0) lastTableY = renderItemsTable(physicalItems, false, lastTableY);
+  if (digitalItems.length > 0) lastTableY = renderItemsTable(digitalItems, true, lastTableY + (physicalItems.length > 0 ? 10 : 0));
 
   // ── Final summary (right-aligned) ─────────────────────────────────────────
-  y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;
+  y = lastTableY + 15;
   const boxWidth = 220;
   const boxX = pageWidth - margin - boxWidth;
   const finalRows: [string, string, boolean?][] = [

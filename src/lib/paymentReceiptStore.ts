@@ -29,6 +29,10 @@ export interface PaymentReceipt {
   placeOfSupply?: string;
   descriptionOfSupply?: string;
   taxCode?: string;
+  productType?: string;
+  usersLicenses?: number;
+  tenureBilling?: string;
+  provisioningTime?: string;
   attachments?: PaymentReceiptAttachment[];
 }
 

@@ -258,6 +258,10 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
     `Deposit To: ${receipt.depositTo || '—'}`,
     receipt.reference ? `Ref / Txn ID: ${receipt.reference}` : '',
     receipt.taxDeducted === 'tds' ? 'Tax Deducted: TDS (Income Tax)' : 'Tax Deducted: None',
+    receipt.productType && receipt.productType !== 'Mixed Products' ? `Product Type: ${receipt.productType}` : '',
+    receipt.usersLicenses !== undefined ? `Users / Licenses: ${receipt.usersLicenses}` : '',
+    receipt.tenureBilling ? `Tenure / Billing: ${receipt.tenureBilling}` : '',
+    receipt.provisioningTime ? `Provisioning Time: ${receipt.provisioningTime}` : '',
   ].filter(Boolean);
 
   const cardHeight = Math.max(
@@ -268,31 +272,39 @@ export async function generateReceiptPdfBase64(receipt: PaymentReceipt): Promise
 
   // ── Receipt details table ─────────────────────────────────────────────────
   const bankCharges = Number(receipt.bankCharges ?? 0);
+  const isDigitalReceipt = Boolean(receipt.productType && receipt.productType !== 'Mixed Products');
   const tableBody: string[][] = [
-    [
-      '1',
-      receipt.descriptionOfSupply || 'Payment received against invoice',
-      receipt.invoiceNumber || '—',
-      receipt.paymentMode,
-      receipt.taxDeducted === 'tds' ? 'TDS (Income Tax)' : 'No Tax',
-      money(receipt.amountReceived),
-    ],
+    isDigitalReceipt
+      ? [
+          '1',
+          receipt.descriptionOfSupply || 'Payment received against invoice',
+          receipt.invoiceNumber || '—',
+          String(receipt.usersLicenses ?? '—'),
+          receipt.tenureBilling || '—',
+          receipt.provisioningTime || '—',
+          money(receipt.amountReceived),
+        ]
+      : [
+          '1',
+          receipt.descriptionOfSupply || 'Payment received against invoice',
+          receipt.invoiceNumber || '—',
+          receipt.paymentMode,
+          receipt.taxDeducted === 'tds' ? 'TDS (Income Tax)' : 'No Tax',
+          money(receipt.amountReceived),
+        ],
   ];
   if (bankCharges > 0) {
-    tableBody.push(['2', 'Bank Charges', '—', '—', '—', money(bankCharges)]);
+    tableBody.push(isDigitalReceipt
+      ? ['2', 'Bank Charges', '—', '—', '—', '—', money(bankCharges)]
+      : ['2', 'Bank Charges', '—', '—', '—', money(bankCharges)]);
   }
 
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [[
-      '#',
-      'DESCRIPTION',
-      'INVOICE REF',
-      'PAYMENT MODE',
-      'TAX',
-      'AMOUNT',
-    ]],
+    head: [isDigitalReceipt
+      ? ['#', 'DESCRIPTION', 'INVOICE REF', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'AMOUNT']
+      : ['#', 'DESCRIPTION', 'INVOICE REF', 'PAYMENT MODE', 'TAX', 'AMOUNT']],
     body: tableBody,
     theme: 'grid',
     tableWidth: contentWidth,

@@ -10,6 +10,7 @@ import { safeReadJson } from "@/lib/utils";
 import { generateBillPdf } from "@/lib/billPdf";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
+import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -54,6 +55,15 @@ interface BillItem {
   discount: number;
   taxPercent: number;
   customerName: string;
+  productType?: string;
+  physicalType?: string;
+  fulfillmentType?: string;
+  commercialTerms?: {
+    productType?: string;
+    pricingModel?: string;
+    leadTimePrimary?: string;
+    leadTimeSecondary?: string;
+  };
 }
 
 interface BillEntry {
@@ -765,10 +775,22 @@ export default function BillsPage() {
                   value={form.orderNumber}
                   onChange={(e) => {
                     const po = deliveredPurchaseOrders.find((candidate) => candidate.poNumber === e.target.value);
+                    const poItems = po?.items?.map((line) => ({
+                      ...newItem(`bill-item-${Date.now()}-${line.subOrderId}`),
+                      itemDetails: line.item,
+                      account: line.category || "",
+                      hsnSac: line.hsnCode || "",
+                      quantity: line.qty,
+                      rate: line.unitPrice,
+                      taxPercent: line.gstPct ?? ((po.sgstPct || 0) + (po.cgstPct || 18)),
+                      productType: line.productType,
+                      commercialTerms: line.commercialTerms,
+                    }));
                     setForm((current) => ({
                       ...current,
                       orderNumber: po?.poNumber || "",
                       sourcePurchaseOrderId: po?.poNumber,
+                      items: poItems?.length ? poItems : current.items,
                     }));
                   }}
                   disabled={!form.vendorName}

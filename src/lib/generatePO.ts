@@ -9,6 +9,7 @@ import { formatCurrency, getCurrencySymbol } from './formatters';
 import { numberToWords } from './quotePdfGenerator';
 import type { StoredPO } from './purchaseOrderStore';
 import { getCommercialTermsLines } from './productCommercialTerms';
+import { getDocumentProductPresentation, isDigitalDocumentProduct } from './productDocumentRules';
 
 // ── Colour palette (identical to invoicePdf) ─────────────────────────────────
 const BLUE: [number, number, number] = [31, 95, 190];
@@ -304,89 +305,91 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
 
   const gstRate = po.sgstPct + po.cgstPct; // combined GST % for all PO items
 
-  const tableBody = tableItems.map((li, index) => {
-    // Use per-item rate if stored; fall back to PO-level combined rate
-    const itemGstRate = li.gstPct ?? gstRate;
-    const taxable = li.lineSubtotal;
-    const gst = taxable * (itemGstRate / 100);
-    const amount = taxable + gst;
-    const taxRateLabel = `${itemGstRate}%\nIGST`;
-    // Build item cell: name, optional description from specs, optional ref number
-    const specLine = li.specs && li.specs.length > 0 ? li.specs[0] : '';
-    let itemCell = li.item;
-    if (specLine) itemCell += `\n${specLine}`;
-    if (li.referenceNumber) itemCell += `\nRef/Model No: ${li.referenceNumber}`;
-    if (li.commercialTerms) itemCell += `\n${getCommercialTermsLines(li.commercialTerms).join('\n')}`;
-    return [
-      String(index + 1),
-      itemCell,
-      li.hsnCode || '',
-      String(li.qty),
-      fmt2(li.unitPrice),
-      fmt2(0),           // DISC — POs don't carry line-level discounts
-      fmt2(taxable),     // TAXABLE
-      taxRateLabel,      // GST RATE
-      fmt2(gst),         // GST
-      fmt2(amount),      // NET AMOUNT
-    ];
-  });
+  const renderTable = (items: typeof tableItems, digital: boolean, startY: number, indexOffset: number) => {
+    const body = items.map((li, index) => {
+      const itemGstRate = li.gstPct ?? gstRate;
+      const taxable = li.lineSubtotal;
+      const gst = taxable * (itemGstRate / 100);
+      const amount = taxable + gst;
+      const taxRateLabel = `${itemGstRate}%\nIGST`;
+      const specLine = li.specs && li.specs.length > 0 ? li.specs[0] : '';
+      let itemCell = li.item;
+      if (specLine) itemCell += `\n${specLine}`;
+      if (li.referenceNumber) itemCell += `\nRef/Model No: ${li.referenceNumber}`;
+      if (li.commercialTerms) itemCell += `\n${getCommercialTermsLines(li.commercialTerms).join('\n')}`;
+      if (!digital) {
+        return [
+          String(indexOffset + index + 1), itemCell, li.hsnCode || '', String(li.qty),
+          fmt2(li.unitPrice), fmt2(0), fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(amount),
+        ];
+      }
+      const presentation = getDocumentProductPresentation(li, { quantity: li.qty });
+      return [
+        String(indexOffset + index + 1), itemCell, presentation.type, presentation.pricingModel,
+        String(li.qty), presentation.tenureBilling, presentation.provisioningTime,
+        li.hsnCode || '', fmt2(taxable), taxRateLabel, fmt2(gst), fmt2(amount),
+      ];
+    });
+    autoTable(doc, {
+      startY,
+      margin: { left: margin, right: margin },
+      head: [digital
+        ? ['#', 'ITEM / SPECIFICATION', 'TYPE', 'PRICING MODEL', 'USERS / LICENSES', 'TENURE / BILLING', 'PROVISIONING TIME', 'HSN/SAC', 'TAXABLE', 'GST RATE', 'GST', 'NET AMOUNT']
+        : ['#', 'ITEM / SPECIFICATION', 'HSN/SAC', 'QTY', 'UNIT RATE', 'DISC', 'TAXABLE', 'GST RATE', 'GST', 'NET AMOUNT']],
+      body,
+      theme: 'grid',
+      tableWidth: contentWidth,
+      styles: {
+        font: 'helvetica',
+        fontSize: 7.5,
+        textColor: TEXT,
+        lineColor: BORDER,
+        lineWidth: 0.35,
+        cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: DARK,
+        fontStyle: 'bold',
+        fontSize: 6.3,
+        halign: 'center',
+      },
+      columnStyles: digital
+        ? {
+            0: { cellWidth: 18, halign: 'center' }, 1: { cellWidth: 74 }, 2: { cellWidth: 38 },
+            3: { cellWidth: 54 }, 4: { cellWidth: 34, halign: 'center' }, 5: { cellWidth: 48 },
+            6: { cellWidth: 52 }, 7: { cellWidth: 34, halign: 'center' }, 8: { cellWidth: 47, halign: 'right' },
+            9: { cellWidth: 38, halign: 'center' }, 10: { cellWidth: 42, halign: 'right' }, 11: { cellWidth: 52, halign: 'right' },
+          }
+        : {
+            0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 104 }, 2: { cellWidth: 42, halign: 'center' },
+            3: { cellWidth: 24, halign: 'center' }, 4: { cellWidth: 55, halign: 'right' }, 5: { cellWidth: 47, halign: 'right' },
+            6: { cellWidth: 58, halign: 'right' }, 7: { cellWidth: 40, halign: 'center' }, 8: { cellWidth: 52, halign: 'right' },
+            9: { cellWidth: 69, halign: 'right' },
+          },
+      didParseCell(data) {
+        if (data.section === 'body' && data.column.index === 1) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = DARK;
+        }
+        if (data.section === 'body' && data.column.index === (digital ? 11 : 9)) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      },
+    });
+    return (doc as any).lastAutoTable?.finalY ?? startY;
+  };
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [[
-      '#',
-      'ITEM / SPECIFICATION',
-      'HSN/SAC',
-      'QTY',
-      'UNIT RATE',
-      'DISC',
-      'TAXABLE',
-      'GST RATE',
-      'GST',
-      'NET AMOUNT',
-    ]],
-    body: tableBody,
-    theme: 'grid',
-    tableWidth: contentWidth,
-    styles: {
-      font: 'helvetica',
-      fontSize: 7.5,
-      textColor: TEXT,
-      lineColor: BORDER,
-      lineWidth: 0.35,
-      cellPadding: { top: 7, bottom: 7, left: 4, right: 4 },
-      valign: 'middle',
-    },
-    headStyles: {
-      fillColor: [248, 250, 252],
-      textColor: DARK,
-      fontStyle: 'bold',
-      fontSize: 6.3,
-      halign: 'center',
-    },
-    columnStyles: {
-      0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 104 },
-      2: { cellWidth: 42, halign: 'center' },
-      3: { cellWidth: 24, halign: 'center' },
-      4: { cellWidth: 55, halign: 'right' },
-      5: { cellWidth: 47, halign: 'right' },
-      6: { cellWidth: 58, halign: 'right' },
-      7: { cellWidth: 40, halign: 'center' },
-      8: { cellWidth: 52, halign: 'right' },
-      9: { cellWidth: 69, halign: 'right' },
-    },
-    didParseCell(data) {
-      if (data.section === 'body' && data.column.index === 1) {
-        data.cell.styles.fontStyle = 'bold';
-        data.cell.styles.textColor = DARK;
-      }
-      if (data.section === 'body' && data.column.index === 9) {
-        data.cell.styles.fontStyle = 'bold';
-      }
-    },
-  });
+  const physicalItems = tableItems.filter((li) => !isDigitalDocumentProduct(li));
+  const digitalItems = tableItems.filter((li) => isDigitalDocumentProduct(li));
+  let tableY = y;
+  if (physicalItems.length > 0) {
+    tableY = renderTable(physicalItems, false, tableY, 0) + (digitalItems.length > 0 ? 10 : 0);
+  }
+  if (digitalItems.length > 0) {
+    renderTable(digitalItems, true, tableY, physicalItems.length);
+  }
 
   // ── Summary box (right) + Left text blocks ────────────────────────────────
   y = ((doc as any).lastAutoTable?.finalY ?? y) + 15;

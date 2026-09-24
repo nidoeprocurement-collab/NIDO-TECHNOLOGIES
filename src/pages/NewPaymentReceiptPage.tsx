@@ -13,6 +13,7 @@ import {
 } from "@/lib/paymentReceiptStore";
 import type { PaymentReceipt, PaymentReceiptAttachment } from "@/lib/paymentReceiptStore";
 import { downloadReceiptPdf } from "@/lib/paymentReceiptPdf";
+import { getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 
 // ── Shared style tokens ───────────────────────────────────────────────────────
 const inp =
@@ -198,7 +199,16 @@ export default function NewPaymentReceiptPage() {
     event.target.value = "";
   };
 
-  const buildReceipt = (): PaymentReceipt => ({
+  const buildReceipt = (): PaymentReceipt => {
+    const linkedInvoice = invoices.find((invoice) => invoice.invoiceNumber === form.invoiceNumber.trim());
+    const linkedItems = linkedInvoice?.lineItems || [];
+    const digitalItems = linkedItems.filter((item) => isDigitalDocumentProduct(item));
+    const allDigital = linkedItems.length > 0 && digitalItems.length === linkedItems.length;
+    const presentation = allDigital && digitalItems[0]
+      ? getDocumentProductPresentation(digitalItems[0], { quantity: digitalItems.reduce((sum, item) => sum + item.quantity, 0) })
+      : null;
+
+    return {
     id: isEditMode && editingReceipt ? editingReceipt.id : `pr-${Date.now()}`,
     paymentNumber: form.paymentNumber.trim() || `PR-${Date.now().toString().slice(-5)}`,
     customerName: form.customerName.trim(),
@@ -215,9 +225,14 @@ export default function NewPaymentReceiptPage() {
     placeOfSupply: form.placeOfSupply,
     descriptionOfSupply: form.descriptionOfSupply,
     taxCode: form.taxCode,
+    productType: linkedItems.length === 0 ? undefined : allDigital ? presentation?.type : "Mixed Products",
+    usersLicenses: presentation?.quantity as number | undefined,
+    tenureBilling: presentation?.tenureBilling,
+    provisioningTime: presentation?.provisioningTime,
     attachments,
     archived: isEditMode && editingReceipt ? editingReceipt.archived : false,
-  });
+    };
+  };
 
   const handleSave = () => {
     if (!form.customerName.trim()) {
