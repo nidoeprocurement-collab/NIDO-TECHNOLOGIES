@@ -402,8 +402,7 @@ export default function AutoAssignmentTab() {
     );
   };
 
-  const handleAddRole = () => {
-    const department = departmentOptions[0] || "Unassigned Department";
+  const handleAddRole = (department: string) => {
     const role = roleOptions[0] || "Analyst";
     const availableUsers = users.filter(
       (user) => user.status === "Active" && user.department === department,
@@ -473,20 +472,7 @@ export default function AutoAssignmentTab() {
                   <thead className="bg-muted/50">
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Department</th>
-                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                         <div className="flex items-center justify-between gap-2">
-                           <span>Role</span>
-                           <Button
-                             type="button"
-                             variant="ghost"
-                             size="sm"
-                             className="h-7 px-2 text-xs normal-case text-primary hover:text-primary"
-                             onClick={handleAddRole}
-                           >
-                             <Plus className="mr-1 h-3.5 w-3.5" /> Add Role
-                           </Button>
-                         </div>
-                       </th>
+                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assigned User(s)</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clients</th>
                       <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
@@ -520,14 +506,27 @@ export default function AutoAssignmentTab() {
                                   </td>
                                 )}
                                 <td className={tableCellClass}>
-                                  <select
-                                    value={rule.role}
-                                    onChange={(event) => updateRule(rule.id, { role: event.target.value })}
-                                    className="h-9 min-w-[150px] rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                                  >
-                                    {!roleOptions.includes(rule.role) && <option value={rule.role}>{rule.role}</option>}
-                                    {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                                  </select>
+                                   <div className="flex flex-wrap items-center gap-2">
+                                     <select
+                                       value={rule.role}
+                                       onChange={(event) => updateRule(rule.id, { role: event.target.value })}
+                                       className="h-9 min-w-[150px] rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                                     >
+                                       {!roleOptions.includes(rule.role) && <option value={rule.role}>{rule.role}</option>}
+                                       {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                                     </select>
+                                     {ruleIndex === 0 && (
+                                       <Button
+                                         type="button"
+                                         variant="ghost"
+                                         size="sm"
+                                         className="h-8 px-2 text-xs normal-case text-primary hover:text-primary"
+                                         onClick={() => handleAddRole(group.department)}
+                                       >
+                                         <Plus className="mr-1 h-3.5 w-3.5" /> Add Role
+                                       </Button>
+                                     )}
+                                   </div>
                                 </td>
                                 <td className={tableCellClass}>
                                    <UserMultiSelect
