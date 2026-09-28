@@ -76,7 +76,7 @@ const menuItems = [
     title: "Auto Assignment",
     description: "Smart analyst auto-routing rules",
     icon: Zap,
-    href: "/configuration",
+    href: "/configuration/auto-assignment",
   },
   {
     title: "Price Engine",

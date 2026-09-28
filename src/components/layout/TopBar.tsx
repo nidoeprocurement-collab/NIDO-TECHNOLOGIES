@@ -37,6 +37,7 @@ const routeLabels: Record<string, string> = {
   'audit-logs': 'Audit Logs',
   'my-renewals': 'My Renewals',
   'configuration': 'Configuration',
+  'auto-assignment': 'Auto Assignment',
   'categories': 'Categories',
   'onboarding': 'Onboarding',
   'add': 'Add New',
