@@ -103,6 +103,8 @@ export default function NidoUsersPage() {
   const [permRole, setPermRole]                 = useState<NidoRole | null>(null)
   const [showRoleActionsMenu, setShowRoleActionsMenu] = useState(false)
   const [, forceRefresh]                        = useState(0)
+  const [currentRolePage, setCurrentRolePage]   = useState(1)
+  const rolePageSize = 10
 
   const refreshRoles = () => { setRoles(getRoles()); forceRefresh(n => n + 1); }
 
@@ -125,6 +127,19 @@ export default function NidoUsersPage() {
   const filteredRoles = roles.filter(r =>
     r.name.toLowerCase().includes(searchRole.toLowerCase())
   )
+  const totalRolePages = Math.max(1, Math.ceil(filteredRoles.length / rolePageSize))
+  const paginatedRoles = filteredRoles.slice(
+    (currentRolePage - 1) * rolePageSize,
+    currentRolePage * rolePageSize,
+  )
+
+  useEffect(() => {
+    setCurrentRolePage(1)
+  }, [searchRole])
+
+  useEffect(() => {
+    setCurrentRolePage(page => Math.min(page, totalRolePages))
+  }, [totalRolePages])
 
   const handleAddRole = () => { setEditingRole(null); setRoleDialogOpen(true); }
   const handleEditRole = (role: NidoRole) => { setEditingRole(role); setRoleDialogOpen(true); }
@@ -425,7 +440,7 @@ export default function NidoUsersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRoles.map(role => (
+                    {paginatedRoles.map(role => (
                       <tr key={role.id} className="border-b border-border hover:bg-muted/30">
                         <td className="px-6 py-4">
                           <button className="font-medium text-blue-600 hover:underline" onClick={() => handleEditRole(role)}>
@@ -476,8 +491,31 @@ export default function NidoUsersPage() {
                     )}
                   </tbody>
                 </table>
-                <div className="border-t px-4 py-2 text-sm text-muted-foreground">
-                  Showing {filteredRoles.length} of {roles.length} roles
+                <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <span>
+                    {filteredRoles.length === 0
+                      ? "Showing 0 roles"
+                      : `Showing ${(currentRolePage - 1) * rolePageSize + 1}–${Math.min(currentRolePage * rolePageSize, filteredRoles.length)} of ${filteredRoles.length} matching roles (${roles.length} total)`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentRolePage === 1}
+                      onClick={() => setCurrentRolePage(page => Math.max(1, page - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="min-w-20 text-center">Page {currentRolePage} of {totalRolePages}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentRolePage >= totalRolePages}
+                      onClick={() => setCurrentRolePage(page => Math.min(totalRolePages, page + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
