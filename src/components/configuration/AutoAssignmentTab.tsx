@@ -27,8 +27,10 @@ import {
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import {
   getUsers,
+  getRoles,
   NIDO_ROLES_EVENT,
   NIDO_USERS_EVENT,
+  type NidoRole,
   type NidoUser,
 } from "@/lib/nidoUsersStore";
 
@@ -44,32 +46,57 @@ function ruleKey(department: string, role: string): string {
   return `${department.trim().toLowerCase()}::${role.trim().toLowerCase()}`;
 }
 
-function buildLiveRules(users: NidoUser[]): AutoAssignmentRule[] {
-  const groups = new Map<string, NidoUser[]>();
+function buildLiveRules(users: NidoUser[], roles: NidoRole[]): AutoAssignmentRule[] {
+  const activeUsers = users.filter((user) => user.status === "Active");
+  const configuredRoles = roles.filter((role) => role.status === "Active" && role.name.trim());
+  const liveRoleKeys = new Set<string>();
+  const liveRules: AutoAssignmentRule[] = [];
 
-  users
-    .filter((user) => user.status === "Active")
-    .forEach((user) => {
-      const department = user.department.trim() || "Unassigned Department";
-      const role = user.role.trim() || "Unassigned Role";
-      const key = ruleKey(department, role);
-      groups.set(key, [...(groups.get(key) ?? []), user]);
-    });
+  configuredRoles.forEach((role) => {
+    const department = role.department.trim() || "Unassigned Department";
+    const roleName = role.name.trim();
+    const key = ruleKey(department, roleName);
+    if (liveRoleKeys.has(key)) return;
+    liveRoleKeys.add(key);
 
-  return Array.from(groups.entries())
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([, group], index) => ({
-      id: `live-rule-${index}-${group[0].id}`,
-      department: group[0].department.trim() || "Unassigned Department",
-      role: group[0].role.trim() || "Unassigned Role",
-      assignedUserIds: [group[0].id],
+    const matchingUsers = activeUsers.filter(
+      (user) => user.department.trim() === department && user.role.trim() === roleName,
+    );
+    liveRules.push({
+      id: `live-rule-${key.replace(/[^a-z0-9]+/gi, "-")}`,
+      department,
+      role: roleName,
+      assignedUserIds: matchingUsers.length > 0 ? [matchingUsers[0].id] : [],
       clientIds: [],
-    }));
+    });
+  });
+
+  // Keep users with a custom role/department visible until an administrator
+  // adds that role to User Roles, rather than silently dropping live data.
+  activeUsers.forEach((user) => {
+    const department = user.department.trim() || "Unassigned Department";
+    const role = user.role.trim() || "Unassigned Role";
+    const key = ruleKey(department, role);
+    if (liveRoleKeys.has(key)) return;
+    liveRoleKeys.add(key);
+    liveRules.push({
+      id: `live-user-rule-${user.id}`,
+      department,
+      role,
+      assignedUserIds: [user.id],
+      clientIds: [],
+    });
+  });
+
+  return liveRules.sort((left, right) =>
+    ruleKey(left.department, left.role).localeCompare(ruleKey(right.department, right.role)),
+  );
 }
 
 function reconcileRules(
   savedRules: AutoAssignmentRule[],
   users: NidoUser[],
+  roles: NidoRole[],
   clients: StoredClient[],
 ): AutoAssignmentRule[] {
   const availableUserIds = new Set(users.map((user) => user.id));
@@ -83,7 +110,7 @@ function reconcileRules(
 
   return [
     ...cleanedRules,
-    ...buildLiveRules(users).filter((rule) => !existingKeys.has(ruleKey(rule.department, rule.role))),
+    ...buildLiveRules(users, roles).filter((rule) => !existingKeys.has(ruleKey(rule.department, rule.role))),
   ];
 }
 
@@ -194,18 +221,21 @@ function ClientMultiSelect({
 export default function AutoAssignmentTab() {
   const [enabled, setEnabled] = useState(true);
   const [users, setUsers] = useState<NidoUser[]>([]);
+  const [roles, setRoles] = useState<NidoRole[]>([]);
   const [clients, setClients] = useState<StoredClient[]>([]);
   const [rules, setRules] = useState<AutoAssignmentRule[]>([]);
   const [openClientRuleId, setOpenClientRuleId] = useState<string | null>(null);
 
   const loadLiveSettings = () => {
     const nextUsers = getUsers();
+    const nextRoles = getRoles();
     const nextClients = getClients();
     const settings = getAutoAssignmentSettings();
     setUsers(nextUsers);
+    setRoles(nextRoles);
     setClients(nextClients);
     setEnabled(settings.enabled);
-    setRules(reconcileRules(settings.rules, nextUsers, nextClients));
+    setRules(reconcileRules(settings.rules, nextUsers, nextRoles, nextClients));
   };
 
   useEffect(() => {
@@ -226,16 +256,22 @@ export default function AutoAssignmentTab() {
   }, []);
 
   const roleOptions = useMemo(() => {
-    const names = users.map((user) => user.role.trim()).filter(Boolean);
+    const names = [
+      ...roles.filter((role) => role.status === "Active").map((role) => role.name.trim()),
+      ...users.map((user) => user.role.trim()),
+    ].filter(Boolean);
     return Array.from(new Set([...FALLBACK_ROLES, ...names]));
-  }, [users]);
+  }, [roles, users]);
 
   const departmentOptions = useMemo(
     () =>
       Array.from(
         new Set(users.map((user) => user.department.trim()).filter(Boolean)),
-      ).sort((left, right) => left.localeCompare(right)),
-    [users],
+      ).concat(
+        roles.map((role) => role.department.trim()).filter(Boolean),
+      ).filter((department, index, departments) => departments.indexOf(department) === index)
+        .sort((left, right) => left.localeCompare(right)),
+    [roles, users],
   );
 
   const groupedRules = useMemo<RuleGroup[]>(() => {
@@ -254,7 +290,8 @@ export default function AutoAssignmentTab() {
       (user) => user.status === "Active" && user.department === rule.department,
     );
     const roleUsers = departmentUsers.filter((user) => user.role === rule.role);
-    return roleUsers.length > 0 ? roleUsers : departmentUsers.length > 0 ? departmentUsers : users;
+    const activeUsers = users.filter((user) => user.status === "Active");
+    return roleUsers.length > 0 ? roleUsers : departmentUsers.length > 0 ? departmentUsers : activeUsers;
   };
 
   const updateRule = (ruleId: string, updates: Partial<AutoAssignmentRule>) => {
@@ -291,7 +328,7 @@ export default function AutoAssignmentTab() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Auto Assignment</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configure automatic assignment rules for orders, tickets and requests to analysts based on department, role and clients.
+            Configure automatic assignment rules for orders, tickets and requests using live departments and roles from User Roles and live users from Add / Manage Users.
           </p>
         </div>
 
@@ -324,7 +361,7 @@ export default function AutoAssignmentTab() {
                 <div>
                   <h2 className="text-base font-semibold">Department-wise Auto Assignment Rules</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Assign orders and tickets to the right analyst based on department, role and selected clients.
+                    Assign orders and tickets to the right user based on the live department, role and selected client rules.
                   </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleAddRule}>
