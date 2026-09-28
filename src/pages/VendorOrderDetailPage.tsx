@@ -858,11 +858,15 @@ export default function VendorOrderDetailPage() {
   }));
   const isDigitalOrder = hasDigitalItems && !hasPhysicalItems;
   const isMixedOrder = hasDigitalItems && hasPhysicalItems;
+  const itemTableGridTemplate = isDigitalOrder
+    ? "40px 1fr 160px 60px 110px 110px 140px 160px 100px"
+    : "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px";
 
   const handleItemStatusChange = (id: string, status: string) => {
     if (isCancelled) return; // PO is cancelled — no further status changes allowed
     const currentItem = items.find(item => item.id === id);
     const digital = Boolean(currentItem && isDigitalDocumentProduct(currentItem));
+    if (digital && (status === "Shipped" || status === "Delivered")) return;
     const currentIndex = currentItem
       ? digital
         ? getDigitalFulfillmentStatusIndex(currentItem.status, currentItem.qty)
@@ -967,6 +971,8 @@ export default function VendorOrderDetailPage() {
   };
   const handleUpdateTracking = (id: string, tracking: any) => {
     if (isCancelled) return;
+    const currentItem = items.find(item => item.id === id);
+    if (!currentItem || isDigitalDocumentProduct(currentItem)) return;
     const normalizedTracking = tracking?.number?.trim() || tracking?.carrier?.trim() ? tracking : null;
     const itemIndex = items.findIndex(it => it.id === id);
     const updatedItems = items.map(it => it.id === id
@@ -1305,9 +1311,9 @@ export default function VendorOrderDetailPage() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items..." style={{ padding: "7px 12px 7px 30px", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontFamily: "inherit", outline: "none", width: 200 }} />
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px", padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
+          <div style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.5 }}>
             {(isDigitalOrder
-              ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "TRACKING INFO", "ACTIONS"]
+              ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", DIGITAL_PRODUCT_HEADERS.quantity, DIGITAL_PRODUCT_HEADERS.tenure, "TOTAL", "STATUS", DIGITAL_PRODUCT_HEADERS.provisioning, "ACTIONS"]
               : isMixedOrder
                 ? ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY / USERS / LICENSES", "UNIT PRICE / TENURE", "TOTAL", "STATUS", "DELIVERY / PROVISIONING", "TRACKING INFO", "ACTIONS"]
                 : ["#", "ITEM DETAILS", "SKU / DESCRIPTION", "QTY", "UNIT PRICE", "TOTAL", "STATUS", "EXPECTED DELIVERY", "TRACKING INFO", "ACTIONS"]
@@ -1317,7 +1323,7 @@ export default function VendorOrderDetailPage() {
             <div style={{ padding: "40px", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No items found.</div>
           )}
           {filteredItems.map((item, idx) => (
-            <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 1fr 160px 60px 110px 110px 140px 160px 180px 100px", padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+            <div key={item.id} style={{ display: "grid", gridTemplateColumns: itemTableGridTemplate, padding: "16px 20px", alignItems: "start", borderBottom: idx < filteredItems.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
               <div style={{ color: "#6b7280", fontSize: 13, paddingTop: 3 }}>{item.num}</div>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1380,26 +1386,30 @@ export default function VendorOrderDetailPage() {
                 )}
               </div>
                 <div style={{ fontSize: 12.5, color: "#374151" }}>{isDigitalDocumentProduct(item) ? getDocumentProductPresentation(item, { quantity: item.qty }).provisioningTime : item.expectedDelivery}</div>
-              <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
-                {item.tracking ? (
-                  <>
-                    <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
-                    <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
-                    <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
-                    <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
-                  </>
-                ) : <span style={{ color: "#d1d5db" }}>—</span>}
-                {!isCancelled && item.status === "Shipped" && (
-                  <div style={{ marginTop: 7 }}>
-                    <button
-                      onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
-                      style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
-                    >
-                      Update
-                    </button>
-                  </div>
-                )}
-              </div>
+              {!isDigitalOrder && (
+                <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.65 }}>
+                  {isDigitalDocumentProduct(item) ? (
+                    <span style={{ color: "#d1d5db" }}>—</span>
+                  ) : item.tracking ? (
+                    <>
+                      <div style={{ fontWeight: 600, fontSize: 12.5 }}>{item.tracking.number}</div>
+                      <div style={{ color: "#6b7280" }}>{item.tracking.carrier}</div>
+                      <div style={{ color: "#6b7280" }}>{item.tracking.note}</div>
+                      <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 12 }}>{item.tracking.link}</a>
+                    </>
+                  ) : <span style={{ color: "#d1d5db" }}>—</span>}
+                  {!isDigitalDocumentProduct(item) && !isCancelled && item.status === "Shipped" && (
+                    <div style={{ marginTop: 7 }}>
+                      <button
+                        onClick={() => setUpdateTrackingItem({ id: item.id, name: item.name, tracking: item.tracking })}
+                        style={{ padding: "3px 10px", border: "1px solid #d1d5db", borderRadius: 5, background: "#f9fafb", color: "#374151", cursor: "pointer", fontSize: 11.5, fontWeight: 600, fontFamily: "inherit" }}
+                      >
+                        Update
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={{ minWidth: 0 }}>
                 {item.status === "Cancelled" ? (
                   <span style={{ fontSize: 12, color: "#991b1b", fontWeight: 600 }}>Cancelled</span>

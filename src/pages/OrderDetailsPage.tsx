@@ -2238,7 +2238,6 @@ function ThreeDotMenu({
   onRequestShipped,
   canMarkShipped,
   onRequestDelivered,
-  onAddTracking,
   onCancel,
   cancelEnabled,
   onRaiseReturn,
@@ -3030,6 +3029,8 @@ export default function MyOrderPage() {
 
   const requestShipped = (subId: string) => {
     if (!hasConfirmedOrderPO || isOrderInactive) return;
+    const target = subOrders.find(sub => sub.id === subId);
+    if (!target || isDigitalDocumentProduct(target)) return;
     setPendingShippedTarget(subId);
     setTrackingTarget(subId);
   };
@@ -3049,6 +3050,12 @@ export default function MyOrderPage() {
 
   const saveTrackingForSubOrder = (tracking: any) => {
     if (!trackingTarget) return;
+    const target = subOrders.find(sub => sub.id === trackingTarget);
+    if (!target || isDigitalDocumentProduct(target)) {
+      setPendingShippedTarget(null);
+      setTrackingTarget(null);
+      return;
+    }
     const updatedOn = new Date().toLocaleDateString("en-IN");
     const shouldMarkShipped = pendingShippedTarget === trackingTarget;
     setSubOrders(prev => prev.map(s => s.id === trackingTarget
@@ -3731,9 +3738,6 @@ export default function MyOrderPage() {
 
   // Client portal: no PO number or vendor-selection columns — it's a
   // read-only, vendor-agnostic view of the sub-orders.
-  const subOrdersColumns = isClientPortalUser
-    ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"]
-    : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"];
   const hasDigitalSubOrders = subOrders.some((sub) => isDigitalDocumentProduct({
     productType: sub.commercialTerms?.productType,
     itemName: sub.itemName,
@@ -3744,6 +3748,13 @@ export default function MyOrderPage() {
   }));
   const isDigitalOrder = hasDigitalSubOrders && !hasPhysicalSubOrders;
   const isMixedOrder = hasDigitalSubOrders && hasPhysicalSubOrders;
+  const subOrdersColumns = isClientPortalUser
+    ? (isDigitalOrder
+      ? ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "ACTIONS"]
+      : ["#", "SUB ORDER ID", "ITEM DETAILS", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "ACTIONS"])
+    : (isDigitalOrder
+      ? ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "VENDOR", "ACTIONS"]
+      : ["#", "SUB ORDER ID", "ITEM DETAILS", "PO NUMBER", "QTY", "UNIT PRICE", "TOTAL", "ITEM STATUS", "TRACKING INFO", "VENDOR", "ACTIONS"]);
   if (isDigitalOrder) {
     const quantityIndex = isClientPortalUser ? 3 : 4;
     subOrdersColumns[quantityIndex] = DIGITAL_PRODUCT_HEADERS.quantity;
@@ -3771,12 +3782,12 @@ export default function MyOrderPage() {
   // monitors) while still guaranteeing a readable minimum per column.
   const subOrdersColTemplate = isClientPortalUser
     ? (isDigitalOrder
-      ? "36px 130px minmax(220px,2fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
+      ? "36px 130px minmax(220px,2fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) 44px"
       : isMixedOrder
         ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
         : "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px")
     : (isDigitalOrder
-      ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
+      ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
       : isMixedOrder
         ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
         : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(180px,0.8fr)");
@@ -3785,8 +3796,8 @@ export default function MyOrderPage() {
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
   // instead of clipping; above it the fr tracks grow to fill the tab.
   const subOrdersMinWidth = isClientPortalUser
-    ? (isDigitalOrder ? 1190 : isMixedOrder ? 1510 : 1056)
-    : (isDigitalOrder ? 1570 : isMixedOrder ? 1870 : 1400);
+    ? (isDigitalOrder ? 1030 : isMixedOrder ? 1510 : 1056)
+    : (isDigitalOrder ? 1470 : isMixedOrder ? 1870 : 1400);
 
   const billingAddress = [
     clientInfo?.billing_address || clientInfo?.billingAddress,
@@ -4216,16 +4227,20 @@ export default function MyOrderPage() {
                           </div>
                         )}
                       </div>
-                      <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
-                        {sub.tracking ? (
-                          <>
-                            <div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber || sub.tracking.number}</div>
-                            <div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div>
-                            <div style={{ color: "#6b7280" }}>{sub.tracking.note}</div>
-                            <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel || sub.tracking.link || "Track Package"}</a>
-                          </>
-                        ) : <span style={{ color: "#d1d5db" }}>-</span>}
-                      </div>
+                      {!isDigitalOrder && (
+                        <div style={{ fontSize: 11.5, color: "#374151", lineHeight: 1.6, minWidth: 0, overflowWrap: "break-word" }}>
+                          {subIsDigital ? (
+                            <span style={{ color: "#d1d5db" }}>—</span>
+                          ) : sub.tracking ? (
+                            <>
+                              <div style={{ fontWeight: 600, fontSize: 12 }}>{sub.tracking.trackingNumber || sub.tracking.number}</div>
+                              <div style={{ color: "#6b7280" }}>{sub.tracking.carrier}</div>
+                              <div style={{ color: "#6b7280" }}>{sub.tracking.note}</div>
+                              <a href="#" onClick={e => e.preventDefault()} style={{ color: "#2563eb", textDecoration: "none", fontSize: 11.5 }}>{sub.tracking.linkLabel || sub.tracking.link || "Track Package"}</a>
+                            </>
+                          ) : <span style={{ color: "#d1d5db" }}>-</span>}
+                        </div>
+                      )}
                       {!isClientPortalUser && (
                         <div style={{ minWidth: 0 }}>
                           {isSubOrderCancelled ? (
@@ -4328,7 +4343,6 @@ export default function MyOrderPage() {
                             onRequestShipped={() => requestShipped(sub.id)}
                             canMarkShipped={canMarkShipped}
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
-                            onAddTracking={() => setTrackingTarget(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
                              cancelEnabled={!isOrderInactive && !itemCancelled && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
