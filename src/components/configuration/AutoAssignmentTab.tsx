@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   Info,
-  MoreHorizontal,
   Plus,
   Save,
   Trash2,
@@ -99,7 +98,9 @@ function reconcileRules(
   roles: NidoRole[],
   clients: StoredClient[],
 ): AutoAssignmentRule[] {
-  const availableUserIds = new Set(users.map((user) => user.id));
+  const availableUserIds = new Set(
+    users.filter((user) => user.status === "Active").map((user) => user.id),
+  );
   const availableClientIds = new Set(clients.map((client) => client.id));
   const cleanedRules = savedRules.map((rule) => ({
     ...rule,
@@ -218,6 +219,106 @@ function ClientMultiSelect({
   );
 }
 
+function UserMultiSelect({
+  users,
+  selectedIds,
+  open,
+  onOpenChange,
+  onToggle,
+}: {
+  users: NidoUser[];
+  selectedIds: string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onToggle: (userId: string) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selectedUsers = selectedIds
+    .map((id) => users.find((user) => user.id === id))
+    .filter((user): user is NidoUser => Boolean(user));
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) onOpenChange(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open, onOpenChange]);
+
+  return (
+    <div ref={rootRef} className="relative min-w-[230px]">
+      <div
+        className="flex min-h-10 w-full items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-sm hover:border-primary/50"
+        onClick={() => onOpenChange(!open)}
+      >
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+          {selectedUsers.length === 0 ? (
+            <span className="px-0.5 py-1 text-muted-foreground">Select users</span>
+          ) : (
+            selectedUsers.map((user) => (
+              <span
+                key={user.id}
+                className="inline-flex max-w-[190px] items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+              >
+                <span className="truncate">{getUserLabel(user)}</span>
+                <button
+                  type="button"
+                  className="rounded-full p-0.5 hover:bg-primary/20"
+                  aria-label={`Remove ${getUserLabel(user)}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggle(user.id);
+                  }}
+                >
+                  ×
+                </button>
+              </span>
+            ))
+          )}
+        </div>
+        <button
+          type="button"
+          className="shrink-0 rounded p-1 hover:bg-muted"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenChange(!open);
+          }}
+          aria-expanded={open}
+          aria-label="Select assigned users"
+        >
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-full min-w-[260px] overflow-y-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl">
+          <div className="mb-1 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Select assigned users
+          </div>
+          {users.length === 0 ? (
+            <p className="px-2 py-4 text-sm text-muted-foreground">No active users are available.</p>
+          ) : (
+            users.map((user) => {
+              const checked = selectedIds.includes(user.id);
+              return (
+                <label
+                  key={user.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted"
+                >
+                  <Checkbox checked={checked} onCheckedChange={() => onToggle(user.id)} />
+                  <span className="min-w-0 flex-1 truncate">{getUserLabel(user)}</span>
+                  {checked && <Check className="h-4 w-4 text-primary" />}
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AutoAssignmentTab() {
   const [enabled, setEnabled] = useState(true);
   const [users, setUsers] = useState<NidoUser[]>([]);
@@ -225,6 +326,7 @@ export default function AutoAssignmentTab() {
   const [clients, setClients] = useState<StoredClient[]>([]);
   const [rules, setRules] = useState<AutoAssignmentRule[]>([]);
   const [openClientRuleId, setOpenClientRuleId] = useState<string | null>(null);
+  const [openUserRuleId, setOpenUserRuleId] = useState<string | null>(null);
 
   const loadLiveSettings = () => {
     const nextUsers = getUsers();
@@ -300,7 +402,7 @@ export default function AutoAssignmentTab() {
     );
   };
 
-  const handleAddRule = () => {
+  const handleAddRole = () => {
     const department = departmentOptions[0] || "Unassigned Department";
     const role = roleOptions[0] || "Analyst";
     const availableUsers = users.filter(
@@ -364,9 +466,6 @@ export default function AutoAssignmentTab() {
                     Assign orders and tickets to the right user based on the live department, role and selected client rules.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleAddRule}>
-                  <Plus className="mr-1.5 h-4 w-4" /> Add Rule
-                </Button>
               </div>
 
               <div className="overflow-x-auto rounded-lg border border-border">
@@ -374,7 +473,20 @@ export default function AutoAssignmentTab() {
                   <thead className="bg-muted/50">
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Department</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Role</th>
+                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                         <div className="flex items-center justify-between gap-2">
+                           <span>Role</span>
+                           <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             className="h-7 px-2 text-xs normal-case text-primary hover:text-primary"
+                             onClick={handleAddRole}
+                           >
+                             <Plus className="mr-1 h-3.5 w-3.5" /> Add Role
+                           </Button>
+                         </div>
+                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assigned User(s)</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clients</th>
                       <th className="w-12 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
@@ -392,7 +504,6 @@ export default function AutoAssignmentTab() {
                         <Fragment key={group.department}>
                           {group.rules.map((rule, ruleIndex) => {
                             const availableUsers = usersForRule(rule);
-                            const selectedUserId = rule.assignedUserIds[0] || "";
                             return (
                               <tr key={rule.id} className="border-b border-border last:border-b-0 hover:bg-muted/20">
                                 {ruleIndex === 0 && (
@@ -419,16 +530,18 @@ export default function AutoAssignmentTab() {
                                   </select>
                                 </td>
                                 <td className={tableCellClass}>
-                                  <select
-                                    value={selectedUserId}
-                                    onChange={(event) => updateRule(rule.id, { assignedUserIds: event.target.value ? [event.target.value] : [] })}
-                                    className="h-9 min-w-[190px] rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                                  >
-                                    <option value="">Select user</option>
-                                    {availableUsers.map((user) => (
-                                      <option key={user.id} value={user.id}>{getUserLabel(user)}</option>
-                                    ))}
-                                  </select>
+                                   <UserMultiSelect
+                                     users={availableUsers}
+                                     selectedIds={rule.assignedUserIds}
+                                     open={openUserRuleId === rule.id}
+                                     onOpenChange={(open) => setOpenUserRuleId(open ? rule.id : null)}
+                                     onToggle={(userId) => {
+                                       const nextAssignedUserIds = rule.assignedUserIds.includes(userId)
+                                         ? rule.assignedUserIds.filter((id) => id !== userId)
+                                         : [...rule.assignedUserIds, userId];
+                                       updateRule(rule.id, { assignedUserIds: nextAssignedUserIds });
+                                     }}
+                                   />
                                 </td>
                                 <td className={tableCellClass}>
                                   <ClientMultiSelect
@@ -453,7 +566,7 @@ export default function AutoAssignmentTab() {
                                     aria-label={`Remove ${rule.department} ${rule.role} rule`}
                                     onClick={() => setRules((current) => current.filter((item) => item.id !== rule.id))}
                                   >
-                                    <MoreHorizontal className="h-4 w-4" />
+                                   <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </td>
                               </tr>
