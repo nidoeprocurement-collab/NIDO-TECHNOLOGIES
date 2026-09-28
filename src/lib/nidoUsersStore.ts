@@ -268,6 +268,15 @@ export function getUsers(): NidoUser[] {
   }
 }
 
+/** Returns the next sequential employee ID without mutating the users store. */
+export function getNextEmployeeId(users: NidoUser[] = getUsers()): string {
+  const highestSerial = users.reduce((highest, user) => {
+    const match = String(user.employeeId || "").trim().match(/^EMP-(\d+)$/i);
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0);
+  return `EMP-${String(highestSerial + 1).padStart(3, "0")}`;
+}
+
 export function saveUsers(users: NidoUser[]): void {
   localStorage.setItem(USERS_KEY, JSON.stringify(preserveSystemOwner(users)));
   window.dispatchEvent(new Event(NIDO_USERS_EVENT));
@@ -278,8 +287,10 @@ export function addUser(user: Omit<NidoUser, "id">): NidoUser {
     throw new Error("The System Owner role is reserved and cannot be assigned to another user.");
   }
   const users = getUsers();
+  const employeeId = getNextEmployeeId(users);
   const newUser: NidoUser = {
     ...user,
+    employeeId,
     id: genId("user"),
     createdAt: new Date().toISOString().split("T")[0],
     updatedAt: new Date().toISOString().split("T")[0],

@@ -355,6 +355,8 @@ export default function ManageUsersPanel() {
   const [userDialogOpen, setUserDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<NidoUser | null>(null)
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10
 
   const togglePassword = (id: string) =>
     setVisiblePasswords(prev => {
@@ -388,6 +390,16 @@ export default function ManageUsersPanel() {
     u.role.toLowerCase().includes(search.toLowerCase()) ||
     (u.employeeId || "").toLowerCase().includes(search.toLowerCase())
   )
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize))
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search])
+
+  useEffect(() => {
+    setCurrentPage(page => Math.min(page, totalPages))
+  }, [totalPages])
 
   const handleAddUser = () => { setEditingUser(null); setUserDialogOpen(true); }
   const handleEditUser = (user: NidoUser) => {
@@ -458,7 +470,7 @@ export default function ManageUsersPanel() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map(user => (
+              {paginatedUsers.map(user => (
                 <tr key={user.id} className="border-b hover:bg-muted/20">
                   <td className="px-4 py-3 text-xs font-mono">
                     {user.employeeId ? (
@@ -528,8 +540,31 @@ export default function ManageUsersPanel() {
               )}
             </tbody>
           </table>
-          <div className="border-t px-4 py-2 text-xs text-muted-foreground">
-            Showing {filteredUsers.length} of {users.length} users
+          <div className="flex flex-col gap-3 border-t px-4 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              {filteredUsers.length === 0
+                ? "Showing 0 users"
+                : `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filteredUsers.length)} of ${filteredUsers.length} matching users (${users.length} total)`}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              >
+                Previous
+              </Button>
+              <span className="min-w-20 text-center">Page {currentPage} of {totalPages}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -540,6 +575,7 @@ export default function ManageUsersPanel() {
         user={editingUser}
         roles={roles}
         onSave={handleSaveUser}
+        fullScreen={!editingUser}
       />
     </div>
   )

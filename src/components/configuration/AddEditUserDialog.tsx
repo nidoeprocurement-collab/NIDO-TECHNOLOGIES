@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
-import { SYSTEM_OWNER_ROLE, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore"
+import { getNextEmployeeId, SYSTEM_OWNER_ROLE, type NidoRole, type NidoUser } from "@/lib/nidoUsersStore"
 import { sanitizePhoneNumber, isValidPhoneNumber } from "@/lib/phoneValidation"
 
 interface AddEditUserDialogProps {
@@ -17,11 +17,12 @@ interface AddEditUserDialogProps {
   user: NidoUser | null
   roles: NidoRole[]
   onSave: (values: Omit<NidoUser, "id">) => void
+  fullScreen?: boolean
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export default function AddEditUserDialog({ open, onOpenChange, user, roles, onSave }: AddEditUserDialogProps) {
+export default function AddEditUserDialog({ open, onOpenChange, user, roles, onSave, fullScreen = false }: AddEditUserDialogProps) {
   const [employeeId, setEmployeeId]   = useState("")
   const [name, setName]               = useState("")
   const [email, setEmail]             = useState("")
@@ -42,7 +43,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       const assignableRole = roles.find(
         r => r.status === "Active" && r.name !== SYSTEM_OWNER_ROLE,
       )?.name ?? ""
-      setEmployeeId(user?.employeeId   ?? "")
+      setEmployeeId(user?.employeeId   ?? getNextEmployeeId())
       setName(      user?.name         ?? "")
       setEmail(     user?.email        ?? "")
       setPhone(     user?.phone        ?? "")
@@ -90,8 +91,10 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className={fullScreen
+        ? "fixed inset-0 left-0 top-0 z-50 flex h-screen w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-0 p-0"
+        : "max-w-2xl"}>
+        <DialogHeader className={fullScreen ? "shrink-0 border-b px-6 py-5 text-left sm:text-left" : undefined}>
           <DialogTitle>{isEdit ? "Edit User" : "Add User"}</DialogTitle>
           <DialogDescription>
             {isEdit
@@ -100,7 +103,9 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+        <div className={fullScreen
+          ? "grid flex-1 grid-cols-1 gap-5 overflow-y-auto px-6 py-6 md:grid-cols-2 lg:grid-cols-3"
+          : "grid max-h-[60vh] grid-cols-1 gap-4 overflow-y-auto pr-2"}>
           {/* Row 1 */}
           <div>
             <Label className="mb-2 block text-sm font-medium">Full Name <span className="text-red-500">*</span></Label>
@@ -131,7 +136,13 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           {/* Row 3 */}
           <div>
             <Label className="mb-2 block text-sm font-medium">Employee ID</Label>
-            <Input value={employeeId} onChange={e => setEmployeeId(e.target.value)} placeholder="EMP-001" />
+             <Input
+               value={employeeId}
+               onChange={e => setEmployeeId(e.target.value)}
+               placeholder="EMP-001"
+               disabled={!isEdit}
+             />
+             {!isEdit && <p className="mt-1 text-xs text-muted-foreground">Generated automatically from the next serial number.</p>}
           </div>
           <div>
             <Label className="mb-2 block text-sm font-medium">Role <span className="text-red-500">*</span></Label>
@@ -184,9 +195,9 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
+        {error && <p className="px-6 text-sm text-red-600">{error}</p>}
 
-        <DialogFooter>
+        <DialogFooter className={fullScreen ? "shrink-0 border-t px-6 py-4" : undefined}>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit}>{isEdit ? "Save Changes" : "Add User"}</Button>
         </DialogFooter>
