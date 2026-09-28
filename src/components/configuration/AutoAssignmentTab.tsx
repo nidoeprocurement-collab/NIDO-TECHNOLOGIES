@@ -34,6 +34,7 @@ import {
 } from "@/lib/nidoUsersStore";
 
 const FALLBACK_ROLES = ["Analyst", "Senior Analyst", "Lead Analyst"];
+const DEPARTMENTS_PER_PAGE = 10;
 const tableCellClass = "px-4 py-3 align-top";
 
 type RuleGroup = {
@@ -327,6 +328,7 @@ export default function AutoAssignmentTab() {
   const [rules, setRules] = useState<AutoAssignmentRule[]>([]);
   const [openClientRuleId, setOpenClientRuleId] = useState<string | null>(null);
   const [openUserRuleId, setOpenUserRuleId] = useState<string | null>(null);
+  const [departmentPage, setDepartmentPage] = useState(1);
 
   const loadLiveSettings = () => {
     const nextUsers = getUsers();
@@ -386,6 +388,23 @@ export default function AutoAssignmentTab() {
       rules: groupRules,
     }));
   }, [rules]);
+
+  const totalDepartmentPages = Math.max(
+    1,
+    Math.ceil(groupedRules.length / DEPARTMENTS_PER_PAGE),
+  );
+  const visibleGroups = useMemo(
+    () =>
+      groupedRules.slice(
+        (departmentPage - 1) * DEPARTMENTS_PER_PAGE,
+        departmentPage * DEPARTMENTS_PER_PAGE,
+      ),
+    [departmentPage, groupedRules],
+  );
+
+  useEffect(() => {
+    setDepartmentPage((currentPage) => Math.min(currentPage, totalDepartmentPages));
+  }, [totalDepartmentPages]);
 
   const usersForRule = (rule: AutoAssignmentRule) => {
     const departmentUsers = users.filter(
@@ -486,14 +505,14 @@ export default function AutoAssignmentTab() {
                         </td>
                       </tr>
                     ) : (
-                      groupedRules.map((group, groupIndex) => (
+                       visibleGroups.map((group) => (
                         <Fragment key={group.department}>
                           {group.rules.map((rule, ruleIndex) => {
                             const availableUsers = usersForRule(rule);
                             return (
                               <tr key={rule.id} className="border-b border-border last:border-b-0 hover:bg-muted/20">
                                 {ruleIndex === 0 && (
-                                  <td rowSpan={group.rules.length} className={`${tableCellClass} w-52 border-r border-border`}>
+                                   <td rowSpan={group.rules.length + 1} className={`${tableCellClass} w-52 border-r border-border`}>
                                     <div className="flex items-start gap-2">
                                       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                         <UsersRound className="h-4 w-4" />
@@ -506,27 +525,14 @@ export default function AutoAssignmentTab() {
                                   </td>
                                 )}
                                 <td className={tableCellClass}>
-                                   <div className="flex flex-wrap items-center gap-2">
-                                     <select
-                                       value={rule.role}
-                                       onChange={(event) => updateRule(rule.id, { role: event.target.value })}
-                                       className="h-9 min-w-[150px] rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                                     >
-                                       {!roleOptions.includes(rule.role) && <option value={rule.role}>{rule.role}</option>}
-                                       {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
-                                     </select>
-                                     {ruleIndex === 0 && (
-                                       <Button
-                                         type="button"
-                                         variant="ghost"
-                                         size="sm"
-                                         className="h-8 px-2 text-xs normal-case text-primary hover:text-primary"
-                                         onClick={() => handleAddRole(group.department)}
-                                       >
-                                         <Plus className="mr-1 h-3.5 w-3.5" /> Add Role
-                                       </Button>
-                                     )}
-                                   </div>
+                                   <select
+                                     value={rule.role}
+                                     onChange={(event) => updateRule(rule.id, { role: event.target.value })}
+                                     className="h-9 min-w-[150px] rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                                   >
+                                     {!roleOptions.includes(rule.role) && <option value={rule.role}>{rule.role}</option>}
+                                     {roleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+                                   </select>
                                 </td>
                                 <td className={tableCellClass}>
                                    <UserMultiSelect
@@ -571,12 +577,59 @@ export default function AutoAssignmentTab() {
                               </tr>
                             );
                           })}
+                           <tr className="border-b border-border">
+                             <td className={tableCellClass}>
+                               <Button
+                                 type="button"
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-8 px-2 text-xs normal-case text-primary hover:text-primary"
+                                 onClick={() => handleAddRole(group.department)}
+                               >
+                                 <Plus className="mr-1 h-3.5 w-3.5" /> Add Role
+                               </Button>
+                             </td>
+                             <td colSpan={3} className={tableCellClass} />
+                           </tr>
                         </Fragment>
                       ))
                     )}
                   </tbody>
                 </table>
               </div>
+
+              {groupedRules.length > 0 && (
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Showing departments {(departmentPage - 1) * DEPARTMENTS_PER_PAGE + 1}–
+                    {Math.min(departmentPage * DEPARTMENTS_PER_PAGE, groupedRules.length)} of{" "}
+                    {groupedRules.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={departmentPage === 1}
+                      onClick={() => setDepartmentPage((currentPage) => Math.max(1, currentPage - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="min-w-20 text-center text-xs text-muted-foreground">
+                      Page {departmentPage} of {totalDepartmentPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={departmentPage === totalDepartmentPages}
+                      onClick={() => setDepartmentPage((currentPage) => Math.min(totalDepartmentPages, currentPage + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-muted-foreground">
