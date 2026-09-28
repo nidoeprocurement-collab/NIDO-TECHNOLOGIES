@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { getClients, StoredClient } from "@/lib/clientStore";
 import { saveSupportTickets } from "@/lib/supportTicketStore";
+import { resolveAutoAssignment } from "@/lib/autoAssignmentStore";
+import { getUsers } from "@/lib/nidoUsersStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPrefix } from "@/lib/configService";
 
@@ -37,6 +39,7 @@ function getExistingTickets(): {
   priority: string; created: string; clientId?: string; clientName?: string;
   category?: string; subCategory?: string; department?: string;
   description?: string; ccEmail?: string; createdBy?: string;
+  assignedTo?: string; assignedRole?: string;
 }[] {
   try {
     const raw = localStorage.getItem("nido_support_tickets_v1");
@@ -88,6 +91,8 @@ interface CreatedTicket {
   status: string;
   createdOn: string;
   createdBy: string;
+  assignedTo: string;
+  assignedRole: string;
 }
 
 function SuccessScreen({ ticket }: { ticket: CreatedTicket }) {
@@ -117,6 +122,8 @@ function SuccessScreen({ ticket }: { ticket: CreatedTicket }) {
     { icon: <AlignJustify size={16} className="text-primary" />,label: "Subject",     value: ticket.subject },
     { icon: <Layers size={16} className="text-primary" />,     label: "Category",     value: ticket.category },
     { icon: <Building2 size={16} className="text-primary" />,  label: "Department",   value: ticket.department },
+    { icon: <User size={16} className="text-primary" />,       label: "Assigned To",  value: ticket.assignedTo },
+    { icon: <Shield size={16} className="text-primary" />,     label: "Assigned Role", value: ticket.assignedRole },
     { icon: <Shield size={16} className="text-primary" />,     label: "Status",       isStatus: true },
     { icon: <CheckCircle size={16} className="text-primary" />,label: "Priority",     isPriority: true },
     { icon: <Calendar size={16} className="text-primary" />,   label: "Created On",   value: ticket.createdOn },
@@ -310,6 +317,29 @@ export default function CreateSupportTicketPage() {
       hour: "2-digit", minute: "2-digit", hour12: true,
     });
     const createdBy = user?.name || "System Admin";
+    const internalRequester = getUsers().find((candidate) => {
+      const value = createdBy.trim().toLowerCase();
+      return (
+        candidate.name.trim().toLowerCase() === value
+        || candidate.email.trim().toLowerCase() === value
+      );
+    });
+    const role = internalRequester?.role || user?.role;
+    const autoAssignment =
+      resolveAutoAssignment({
+        department: internalRequester?.department,
+        role,
+        clientId,
+      })
+      ?? resolveAutoAssignment({ role, clientId })
+      ?? resolveAutoAssignment({ clientId });
+    const assignedUser = autoAssignment?.users[0];
+    const assignedTo = assignedUser?.name || assignedUser?.email || "Unassigned";
+    const assignedRole = assignedUser?.role || autoAssignment?.rule.role || "";
+    const assignedDepartment =
+      autoAssignment?.rule.department
+      || internalRequester?.department
+      || "Unassigned Department";
 
     const ticket = {
       id:          `tkt_${Date.now()}`,
@@ -323,7 +353,10 @@ export default function CreateSupportTicketPage() {
       category,
       subCategory,
       description: desc,
-      department:  "Customer Relationship Manager",
+      department:  assignedDepartment,
+      assignedTo,
+      assignedRole,
+      autoAssigned: Boolean(assignedUser),
       ccEmail,
       createdBy,
     };
@@ -334,6 +367,8 @@ export default function CreateSupportTicketPage() {
     saveSupportTickets(updated.map(t => ({
       id: t.id, number: t.number, subject: t.subject,
       status: t.status, priority: t.priority, created: t.created,
+      clientId: t.clientId, clientName: t.clientName,
+      department: t.department, assignedTo: t.assignedTo, assignedRole: t.assignedRole,
     })));
 
     setCreatedTicket({
@@ -342,11 +377,13 @@ export default function CreateSupportTicketPage() {
       category,
       subCategory,
       subject:     subject.trim(),
-      department:  "Customer Relationship Manager (Auto Assigned)",
+       department:  assignedDepartment,
       priority,
       status:      "open",
       createdOn,
       createdBy,
+       assignedTo,
+       assignedRole,
     });
   };
 

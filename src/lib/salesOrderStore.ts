@@ -55,6 +55,9 @@ export interface StoredSalesOrder {
   updatedAt: string;
   archived?: boolean;
   archivedAt?: string;
+  assignedTo?: string;
+  assignedRole?: string;
+  assignedDepartment?: string;
 }
 
 export function getOrders(): StoredSalesOrder[] {

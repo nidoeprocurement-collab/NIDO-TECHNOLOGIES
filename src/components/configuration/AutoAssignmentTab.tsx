@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
   Check,
@@ -14,6 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -41,6 +50,10 @@ type RuleGroup = {
   department: string;
   rules: AutoAssignmentRule[];
 };
+
+function assignmentSnapshot(enabled: boolean, rules: AutoAssignmentRule[]): string {
+  return JSON.stringify({ enabled, rules });
+}
 
 function ruleKey(department: string, role: string): string {
   return `${department.trim().toLowerCase()}::${role.trim().toLowerCase()}`;
@@ -321,6 +334,8 @@ function UserMultiSelect({
 }
 
 export default function AutoAssignmentTab() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [enabled, setEnabled] = useState(true);
   const [users, setUsers] = useState<NidoUser[]>([]);
   const [roles, setRoles] = useState<NidoRole[]>([]);
@@ -329,22 +344,33 @@ export default function AutoAssignmentTab() {
   const [openClientRuleId, setOpenClientRuleId] = useState<string | null>(null);
   const [openUserRuleId, setOpenUserRuleId] = useState<string | null>(null);
   const [departmentPage, setDepartmentPage] = useState(1);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const savedSnapshotRef = useRef("");
+  const currentPathRef = useRef(
+    `${location.pathname}${location.search}${location.hash}`,
+  );
+  const bypassNavigationRef = useRef(false);
+  const dirtyRef = useRef(false);
 
   const loadLiveSettings = () => {
     const nextUsers = getUsers();
     const nextRoles = getRoles();
     const nextClients = getClients();
     const settings = getAutoAssignmentSettings();
+    const nextRules = reconcileRules(settings.rules, nextUsers, nextRoles, nextClients);
     setUsers(nextUsers);
     setRoles(nextRoles);
     setClients(nextClients);
     setEnabled(settings.enabled);
-    setRules(reconcileRules(settings.rules, nextUsers, nextRoles, nextClients));
+    setRules(nextRules);
+    savedSnapshotRef.current = assignmentSnapshot(settings.enabled, nextRules);
   };
 
   useEffect(() => {
     loadLiveSettings();
-    const handleUpdate = () => loadLiveSettings();
+    const handleUpdate = () => {
+      if (!dirtyRef.current) loadLiveSettings();
+    };
     window.addEventListener(AUTO_ASSIGNMENT_EVENT, handleUpdate);
     window.addEventListener(NIDO_USERS_EVENT, handleUpdate);
     window.addEventListener(NIDO_ROLES_EVENT, handleUpdate);
@@ -358,6 +384,75 @@ export default function AutoAssignmentTab() {
       window.removeEventListener("storage", handleUpdate);
     };
   }, []);
+
+  const hasUnsavedChanges = useMemo(
+    () => assignmentSnapshot(enabled, rules) !== savedSnapshotRef.current,
+    [enabled, rules],
+  );
+  dirtyRef.current = hasUnsavedChanges;
+
+  useEffect(() => {
+    const currentPath = `${location.pathname}${location.search}${location.hash}`;
+    const previousPath = currentPathRef.current;
+
+    if (bypassNavigationRef.current) {
+      bypassNavigationRef.current = false;
+      currentPathRef.current = currentPath;
+      return;
+    }
+
+    if (hasUnsavedChanges && currentPath !== previousPath) {
+      setPendingNavigation(currentPath);
+      navigate(previousPath, { replace: true });
+      return;
+    }
+
+    currentPathRef.current = currentPath;
+  }, [hasUnsavedChanges, location.hash, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const handleAnchorClick = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented
+        || event.button !== 0
+        || event.metaKey
+        || event.ctrlKey
+        || event.shiftKey
+        || event.altKey
+      ) {
+        return;
+      }
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a");
+      if (!anchor || anchor.hasAttribute("download") || anchor.target === "_blank") return;
+
+      const href = anchor.getAttribute("href");
+      if (!href || href.startsWith("#")) return;
+      const nextUrl = new URL(href, window.location.href);
+      if (nextUrl.origin !== window.location.origin) return;
+
+      const nextPath = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
+      if (nextPath === currentPathRef.current) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingNavigation(nextPath);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("click", handleAnchorClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleAnchorClick, true);
+    };
+  }, [hasUnsavedChanges]);
 
   const roleOptions = useMemo(() => {
     const names = [
@@ -439,10 +534,21 @@ export default function AutoAssignmentTab() {
 
   const handleSave = () => {
     saveAutoAssignmentSettings({ enabled, rules });
+    savedSnapshotRef.current = assignmentSnapshot(enabled, rules);
     toast({ title: "Saved", description: "Auto assignment rules have been saved." });
   };
 
+  const handleLeaveWithoutSaving = () => {
+    if (!pendingNavigation) return;
+    const target = pendingNavigation;
+    setPendingNavigation(null);
+    bypassNavigationRef.current = true;
+    currentPathRef.current = target;
+    navigate(target);
+  };
+
   return (
+    <>
     <div className="min-h-screen bg-background">
       <div className="w-full space-y-5 px-3 py-4 sm:px-5 md:px-6 md:py-6">
         <div>
@@ -644,5 +750,27 @@ export default function AutoAssignmentTab() {
         </Card>
       </div>
     </div>
+    <Dialog
+      open={Boolean(pendingNavigation)}
+      onOpenChange={(open) => !open && setPendingNavigation(null)}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Unsaved Auto Assignment changes</DialogTitle>
+          <DialogDescription>
+            You have changes on this page that have not been saved. Leave without saving them?
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPendingNavigation(null)}>
+            Stay on page
+          </Button>
+          <Button variant="destructive" onClick={handleLeaveWithoutSaving}>
+            Leave without saving
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

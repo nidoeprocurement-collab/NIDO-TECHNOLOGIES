@@ -5,6 +5,8 @@ import { releaseVendorReservation } from "../lib/vendorStore";
 import { cancelDraftPOsForOrder, getAllPOs, isPOConfirmed } from "../lib/purchaseOrderStore";
 import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
 import { createDraftPOsForOrder } from "../lib/orderPurchaseOrderService";
+import { resolveAutoAssignment } from "../lib/autoAssignmentStore";
+import { getUsers } from "../lib/nidoUsersStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -178,6 +180,32 @@ function nextOrderId(): string {
   return `${getPrefix("order") || "ORD-"}${String(seq).padStart(6, "0")}`;
 }
 
+function getUserLabel(user: { name: string; email: string; employeeId: string }): string {
+  return user.name || user.email || user.employeeId || "Unassigned";
+}
+
+function resolveOrderAssignee(order: Omit<MyOrder, "id"> & { id?: string }) {
+  const requester = getUsers().find((user) => {
+    const requesterValue = String(order.requester || "").trim().toLowerCase();
+    return (
+      user.name.trim().toLowerCase() === requesterValue
+      || user.email.trim().toLowerCase() === requesterValue
+    );
+  });
+  const role = requester?.role || order.requesterRole;
+  const resolution =
+    resolveAutoAssignment({
+      department: requester?.department,
+      role,
+      clientId: order.clientId,
+    })
+    ?? resolveAutoAssignment({ role, clientId: order.clientId })
+    ?? resolveAutoAssignment({ clientId: order.clientId });
+  return resolution?.users[0]
+    ? { user: resolution.users[0], rule: resolution.rule }
+    : null;
+}
+
 export function MyOrdersProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<MyOrder[]>(() => {
     try {
@@ -233,7 +261,19 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       subOrderId: item.subOrderId
         || `${getPrefix("salesOrder") || "SO-"}${id}-${String(index + 1).padStart(3, "0")}`,
     }));
-    const normalizedOrder = { ...order, id, cartItems } as MyOrder;
+    const autoAssignee = resolveOrderAssignee(order);
+    const normalizedOrder = {
+      ...order,
+      ...(autoAssignee
+        ? {
+            assigned: getUserLabel(autoAssignee.user),
+            assignedRole: autoAssignee.user.role || autoAssignee.rule.role,
+            assignedInitial: getUserLabel(autoAssignee.user).charAt(0).toUpperCase(),
+          }
+        : {}),
+      id,
+      cartItems,
+    } as MyOrder;
     setOrders((prev) => [normalizedOrder, ...prev]);
     // Draft POs are created immediately for orders without an approval gate.
     // Client orders that require approval pass deferPurchaseOrders=true and

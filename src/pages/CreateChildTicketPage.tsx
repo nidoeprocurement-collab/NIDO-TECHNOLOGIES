@@ -6,6 +6,7 @@ import {
   ExternalLink, AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveAutoAssignment } from "@/lib/autoAssignmentStore";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export interface StoredChildTicket {
   subCategory: string;
   priority: string;
   assignedTo: string;
+  assignedRole?: string;
   description: string;
   status: string;
   created: string;
@@ -74,7 +76,7 @@ function loadParentTicket(parentNumber: string) {
     if (!raw) return null;
     const all = JSON.parse(raw) as {
       number: string; subject: string; status: string; priority: string;
-      created: string; clientName?: string; department?: string;
+      created: string; clientId?: string; clientName?: string; department?: string;
     }[];
     return all.find(t => t.number === parentNumber) ?? null;
   } catch { return null; }
@@ -224,6 +226,10 @@ export default function CreateChildTicketPage() {
 
     const number = `${parentNumber}-1`;
     const now = new Date().toISOString();
+    const autoAssignment =
+      resolveAutoAssignment({ department, clientId: parentRaw?.clientId })
+      ?? resolveAutoAssignment({ clientId: parentRaw?.clientId });
+    const autoAssignee = autoAssignment?.users[0];
     const ticket: StoredChildTicket = {
       id:           number,
       number,
@@ -233,7 +239,8 @@ export default function CreateChildTicketPage() {
       category,
       subCategory,
       priority,
-      assignedTo,
+      assignedTo: autoAssignee?.name || autoAssignee?.email || assignedTo,
+      assignedRole: autoAssignee?.role || autoAssignment?.rule.role,
       description:  description.trim(),
       status:       "open",
       created:      now,

@@ -1,3 +1,5 @@
+import { getUsers, type NidoUser } from "./nidoUsersStore";
+
 export interface AutoAssignmentRule {
   id: string;
   department: string;
@@ -10,6 +12,17 @@ export interface AutoAssignmentSettings {
   enabled: boolean;
   rules: AutoAssignmentRule[];
   updatedAt?: string;
+}
+
+export interface AutoAssignmentContext {
+  department?: string;
+  role?: string;
+  clientId?: string;
+}
+
+export interface AutoAssignmentResolution {
+  rule: AutoAssignmentRule;
+  users: NidoUser[];
 }
 
 export const AUTO_ASSIGNMENT_SETTINGS_KEY = "nido_auto_assignment_settings";
@@ -72,4 +85,42 @@ export function createAutoAssignmentRule(
   values: Omit<AutoAssignmentRule, "id">,
 ): AutoAssignmentRule {
   return { ...values, id: createRuleId() };
+}
+
+function normalize(value: string | undefined): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+/**
+ * Resolve the first enabled rule that matches the new record's department,
+ * role, and optional client scope. Rules are intentionally evaluated in their
+ * saved order because the Auto Assignment page exposes that order as priority.
+ */
+export function resolveAutoAssignment(
+  context: AutoAssignmentContext,
+): AutoAssignmentResolution | null {
+  const settings = getAutoAssignmentSettings();
+  if (!settings.enabled) return null;
+
+  const department = normalize(context.department);
+  const role = normalize(context.role);
+  const clientId = String(context.clientId || "");
+  const rule = settings.rules.find((candidate) => {
+    if (
+      candidate.clientIds.length > 0
+      && (!clientId || !candidate.clientIds.includes(clientId))
+    ) {
+      return false;
+    }
+    if (department && normalize(candidate.department) !== department) return false;
+    if (role && normalize(candidate.role) !== role) return false;
+    return true;
+  });
+
+  if (!rule) return null;
+
+  const users = getUsers().filter(
+    (user) => user.status === "Active" && rule.assignedUserIds.includes(user.id),
+  );
+  return { rule, users };
 }

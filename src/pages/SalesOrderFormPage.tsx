@@ -10,6 +10,7 @@ import {
   type StoredSalesOrder, type OrderLineItem, type OrderGstSlab,
 } from '@/lib/salesOrderStore';
 import { getProductCommercialTerms, getAvailabilityLabel } from '@/lib/productCommercialTerms';
+import { resolveAutoAssignment } from '@/lib/autoAssignmentStore';
 
 function todayISO(): string { return new Date().toISOString().split('T')[0]; }
 function addDays(dateStr: string, days: number): string {
@@ -262,6 +263,10 @@ export default function SalesOrderFormPage() {
     const placeOfSupply = client?.billingState || '';
     const now = new Date().toISOString();
     const existingId = isEdit && id ? id : (Date.now().toString() + Math.random().toString(36).slice(2));
+    const autoAssignment = !isEdit
+      ? resolveAutoAssignment({ clientId: client?.id })
+      : null;
+    const assignedUser = autoAssignment?.users[0];
     return {
       id: existingId,
       orderNumber,
@@ -286,6 +291,9 @@ export default function SalesOrderFormPage() {
       placeOfSupply,
       createdAt: now,
       updatedAt: now,
+      assignedTo: assignedUser?.name || assignedUser?.email || undefined,
+      assignedRole: assignedUser?.role || autoAssignment?.rule.role || undefined,
+      assignedDepartment: autoAssignment?.rule.department,
     };
   };
 

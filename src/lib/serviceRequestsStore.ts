@@ -7,6 +7,7 @@
 const STORE_KEY = "nido_service_requests";
 const SEQ_KEY   = "nido_service_requests_seq";
 import { getPrefix } from "./configService";
+import { resolveAutoAssignment } from "./autoAssignmentStore";
 
 export interface StoredServiceRequest {
   id: string;
@@ -20,6 +21,10 @@ export interface StoredServiceRequest {
   priority: string;
   nextAppointment: string;
   requestedBy: string;
+  department?: string;
+  assignedTo?: string;
+  assignedRole?: string;
+  autoAssigned?: boolean;
   /** Full form payload stored so the detail page can show it */
   payload?: Record<string, unknown>;
 }
@@ -56,6 +61,30 @@ export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "reques
 
   const full: StoredServiceRequest = {
     ...req,
+    ...(() => {
+      const payload = req.payload ?? {};
+      const clientId = typeof payload.clientId === "string" ? payload.clientId : undefined;
+      const department = typeof payload.department === "string" ? payload.department : undefined;
+      const role = typeof payload.role === "string" ? payload.role : undefined;
+      const resolution =
+        resolveAutoAssignment({ department, role, clientId })
+        ?? resolveAutoAssignment({ role, clientId })
+        ?? resolveAutoAssignment({ clientId });
+      const assignedUser = resolution?.users[0];
+      return {
+        department: resolution?.rule.department || department,
+        assignedTo: assignedUser?.name || assignedUser?.email || "Unassigned",
+        assignedRole: assignedUser?.role || resolution?.rule.role,
+        autoAssigned: Boolean(assignedUser),
+        payload: {
+          ...payload,
+          autoAssigned: Boolean(assignedUser),
+          assignedTo: assignedUser?.name || assignedUser?.email || "Unassigned",
+          assignedRole: assignedUser?.role || resolution?.rule.role || "",
+          assignedDepartment: resolution?.rule.department || department || "",
+        },
+      };
+    })(),
     id,
     requestDate,
     requestDateTs: now.getTime(),

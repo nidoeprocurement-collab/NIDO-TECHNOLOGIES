@@ -8,6 +8,11 @@ export interface SupportTicket {
   status: string;   // "open" | "in_progress" | "resolved"
   priority: string; // "high" | "medium" | "low"
   created: string;  // YYYY-MM-DD
+  clientId?: string;
+  clientName?: string;
+  department?: string;
+  assignedTo?: string;
+  assignedRole?: string;
 }
 
 const KEY = "nido_support_tickets";
