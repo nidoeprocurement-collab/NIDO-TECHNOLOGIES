@@ -12,9 +12,61 @@ const CATALOG_KEY = "nido_rbac_imported_catalog";
 const ROLES_KEY = "nido_config_roles";
 const PERMISSIONS_KEY = "nido_role_permissions";
 const CUSTOM_MODULES_KEY = "nido_custom_modules";
-const IMPORT_VERSION = "rbac-reference-v1";
+const IMPORT_VERSION = "rbac-reference-v2";
 
 const ACTIONS = ["view", "create", "edit", "delete", "approve", "export", "import", "manage", "configure"] as const;
+
+/**
+ * Department and role source of truth from the attached NIDO RBAC workbook.
+ * Keep this data in the frontend import so existing localStorage accounts are
+ * reconciled on their next visit to Configuration → User Roles.
+ */
+const REFERENCE_ROLES = [
+  ["Executive Management", "System Owner", "Full platform ownership and final escalation"],
+  ["Platform / IT Administration", "System Administrator", "Platform configuration, users, security and integrations"],
+  ["Platform / IT Administration", "Application Administrator", "Day-to-day application administration and monitoring"],
+  ["Customer Relationship & Client Operations", "Head - Customer Relationships", "Owns client relationship strategy and escalations"],
+  ["Customer Relationship & Client Operations", "CRM Manager / Team Lead", "Manages CRM portfolio, assignments and escalations"],
+  ["Customer Relationship & Client Operations", "Customer Relationship Manager", "Primary face of Nido-Tech for assigned clients"],
+  ["Customer Relationship & Client Operations", "Client Operations Analyst", "Client onboarding and operational administration"],
+  ["Procurement", "Procurement Head", "Owns procurement policy and high-value approvals"],
+  ["Procurement", "Procurement Manager / Lead", "Manages RFQ, sourcing, PO workflow and team"],
+  ["Procurement", "Procurement Analyst", "Processes requirements, RFQs, comparisons and POs"],
+  ["Vendor Management", "Vendor Management Head", "Owns vendor governance and escalations"],
+  ["Vendor Management", "Vendor Manager / Lead", "Manages vendor onboarding, performance and SLA"],
+  ["Vendor Management", "Vendor Coordinator", "Maintains vendor records, KYC, categories and follow-ups"],
+  ["Service Operations", "Service Operations Head", "Owns AMC, repair, rental and recycle operations"],
+  ["Service Operations", "Service Manager / Lead", "Manages service queues, vendors, SLA and scheduling"],
+  ["Service Operations", "Service Coordinator", "Coordinates service requests through closure"],
+  ["Support", "Support Head", "Owns support policy, escalations and service quality"],
+  ["Support", "Support Lead", "Manages ticket queues, SLA and assignments"],
+  ["Support", "Support Analyst", "Handles customer/application support tickets"],
+  ["Finance & Accounts", "Finance Head", "Owns finance controls and approvals"],
+  ["Finance & Accounts", "Finance Manager", "Manages receivables, payables and reconciliation"],
+  ["Finance & Accounts", "Finance Executive", "Processes invoices, receipts, bills and payments"],
+  ["Catalog & Pricing", "Catalog & Pricing Head", "Owns catalogue, pricing governance and margins"],
+  ["Catalog & Pricing", "Catalog / Pricing Manager", "Manages catalogue quality, price rules and approvals"],
+  ["Catalog & Pricing", "Catalog & Pricing Analyst", "Maintains products, vendor prices, MOQ, stock and client pricing"],
+] as const;
+
+const LEGACY_ROLE_DEPARTMENTS: Record<string, string> = {
+  "Super Admin": "Executive Management",
+  "Platform Admin": "Platform / IT Administration",
+  "IT Platform Admin": "Platform / IT Administration",
+  "IT Application Admin": "Platform / IT Administration",
+  "Procurement Lead": "Procurement",
+  "Vendor Manager": "Vendor Management",
+  "Service Operation Head": "Service Operations",
+  "Service Manager": "Service Operations",
+  "Client Department Head": "Customer Relationship & Client Operations",
+  "Client Relationship Manager": "Customer Relationship & Client Operations",
+  "Client Team Lead": "Customer Relationship & Client Operations",
+  "Client Analyst": "Customer Relationship & Client Operations",
+  "Catalog Head": "Catalog & Pricing",
+  "Catalog Manager": "Catalog & Pricing",
+  "Catalog Coordinator": "Catalog & Pricing",
+  "Catalog Analyst": "Catalog & Pricing",
+};
 
 function keyFor(label: string): string {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -91,6 +143,51 @@ function parsePermissionMatrix(): Record<string, Record<string, Record<string, b
   return result;
 }
 
+function reconcileReferenceRoles(existingRoles: Array<{
+  id: string;
+  name: string;
+  description?: string;
+  department?: string;
+  status?: "Active" | "Inactive";
+}>): Array<{
+  id: string;
+  name: string;
+  description: string;
+  department: string;
+  status: "Active" | "Inactive";
+}> {
+  const referenceByName = new Map(
+    REFERENCE_ROLES.map(([department, name, description]) => [
+      name.toLowerCase(),
+      { department, name, description },
+    ]),
+  );
+  const existingNames = new Set(existingRoles.map((role) => role.name.trim().toLowerCase()));
+
+  const normalizedExisting = existingRoles.map((role) => {
+    const reference = referenceByName.get(role.name.trim().toLowerCase());
+    const legacyDepartment = LEGACY_ROLE_DEPARTMENTS[role.name.trim()];
+    return {
+      ...role,
+      description: role.description?.trim() || reference?.description || "Imported NIDO RBAC role",
+      department: role.department?.trim() || reference?.department || legacyDepartment || "",
+      status: role.status === "Inactive" ? "Inactive" as const : "Active" as const,
+    };
+  });
+
+  const missingReferenceRoles = REFERENCE_ROLES
+    .filter(([, name]) => !existingNames.has(name.toLowerCase()))
+    .map(([department, name, description]) => ({
+      id: `workbook-role-${keyFor(name)}`,
+      name,
+      department,
+      description,
+      status: "Active" as const,
+    }));
+
+  return [...normalizedExisting, ...missingReferenceRoles];
+}
+
 /**
  * Imports the attached RBAC definitions into frontend localStorage once.
  * Existing roles and explicitly saved permissions are never overwritten.
@@ -106,15 +203,24 @@ export function importFrontendRbacData(): void {
   localStorage.setItem("nido_rbac_catalog", JSON.stringify(catalog));
 
   try {
-    const existingRoles = JSON.parse(localStorage.getItem(ROLES_KEY) || "[]");
-    const existingNames = new Set(existingRoles.map((role: { name: string }) => role.name));
-    const mergedRoles = [
-      ...existingRoles,
-      ...catalog.roles.filter(role => !existingNames.has(role.name)),
-    ];
-    localStorage.setItem(ROLES_KEY, JSON.stringify(mergedRoles));
+    const existingRoles = JSON.parse(localStorage.getItem(ROLES_KEY) || "[]") as Array<{
+      id: string;
+      name: string;
+      description?: string;
+      department?: string;
+      status?: "Active" | "Inactive";
+    }>;
+    localStorage.setItem(
+      ROLES_KEY,
+      JSON.stringify(reconcileReferenceRoles([
+        ...existingRoles,
+        ...catalog.roles.filter((role) => !existingRoles.some(
+          (existing) => existing.name.toLowerCase() === role.name.toLowerCase(),
+        )),
+      ])),
+    );
   } catch {
-    localStorage.setItem(ROLES_KEY, JSON.stringify(catalog.roles));
+    localStorage.setItem(ROLES_KEY, JSON.stringify(reconcileReferenceRoles(catalog.roles)));
   }
 
   try {
