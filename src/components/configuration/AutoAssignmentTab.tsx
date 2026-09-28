@@ -120,29 +120,48 @@ function ClientMultiSelect({
 
   return (
     <div ref={rootRef} className="relative min-w-[260px]">
-      <button
-        type="button"
+      <div
+        className="flex min-h-10 w-full items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-sm hover:border-primary/50"
         onClick={() => onOpenChange(!open)}
-        className="flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 text-left text-sm hover:border-primary/50"
-        aria-expanded={open}
-        aria-label="Select clients"
       >
-        <span className="flex min-w-0 flex-wrap gap-1.5">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
           {selectedClients.length === 0 ? (
-            <span className="text-muted-foreground">Select clients</span>
+            <span className="px-0.5 py-1 text-muted-foreground">Select clients</span>
           ) : (
             selectedClients.map((client) => (
               <span
                 key={client.id}
-                className="inline-flex max-w-[180px] items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                className="inline-flex max-w-[190px] items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
               >
                 <span className="truncate">{client.name}</span>
+                <button
+                  type="button"
+                  className="rounded-full p-0.5 hover:bg-primary/20"
+                  aria-label={`Remove ${client.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggle(client.id);
+                  }}
+                >
+                  ×
+                </button>
               </span>
             ))
           )}
-        </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
+        </div>
+        <button
+          type="button"
+          className="shrink-0 rounded p-1 hover:bg-muted"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenChange(!open);
+          }}
+          aria-expanded={open}
+          aria-label="Select clients"
+        >
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </div>
 
       {open && (
         <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-full min-w-[280px] overflow-y-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-xl">
