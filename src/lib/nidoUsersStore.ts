@@ -12,6 +12,7 @@ import { importFrontendUsers } from "./usersFrontendImport";
 
 export interface NidoRole {
   id: string;
+  department: string;
   name: string;
   description: string;
   status: "Active" | "Inactive";
@@ -83,7 +84,7 @@ export interface LoginContext {
 const NOW = new Date().toISOString().split("T")[0];
 
 const DEFAULT_ROLES: NidoRole[] = [
-  { id: "role-system-owner",       name: "System Owner",       description: "Full system access — all permissions always granted",        status: "Active" },
+  { id: "role-system-owner",       department: "All Departments", name: "System Owner", description: "Full system access — all permissions always granted", status: "Active" },
 ];
 
 // These identify only the seeded role records from the previous version.
@@ -193,6 +194,7 @@ export function getRoles(): NidoRole[] {
     }
     const storedRoles = removeLegacyDemoRoles(JSON.parse(raw)).map((role: NidoRole) => ({
       ...role,
+      department: role.department ?? "",
       status: role.status === "Inactive" ? "Inactive" as const : "Active" as const,
     }));
     const roles = storedRoles.some(role => role.name === SYSTEM_OWNER_ROLE)
@@ -425,8 +427,8 @@ function downloadBlob(content: BlobPart, filename: string, type: string): void {
 }
 
 export function exportRolesCsv(roles: NidoRole[]): void {
-  const headers = ["Role Name", "Description", "Status", "Assigned Users"];
-  const rows = roles.map((r) => [r.name, r.description, r.status, String(getRoleUserCount(r.name))]);
+  const headers = ["Department", "Role Name", "Description", "Status", "Assigned Users"];
+  const rows = roles.map((r) => [r.department, r.name, r.description, r.status, String(getRoleUserCount(r.name))]);
   const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
   downloadBlob(csv, `nido-user-roles-${Date.now()}.csv`, "text/csv;charset=utf-8;");
 }
@@ -444,8 +446,8 @@ export function exportRolesPdf(roles: NidoRole[]): void {
   doc.setFontSize(9); doc.setTextColor(120); doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
   autoTable(doc, {
     startY: 28,
-    head: [["Role Name", "Description", "Status", "Assigned Users"]],
-    body: roles.map((r) => [r.name, r.description, r.status, String(getRoleUserCount(r.name))]),
+    head: [["Department", "Role Name", "Description", "Status", "Assigned Users"]],
+    body: roles.map((r) => [r.department, r.name, r.description, r.status, String(getRoleUserCount(r.name))]),
     styles: { fontSize: 9 }, headStyles: { fillColor: [37, 99, 235] },
   });
   doc.save(`nido-user-roles-${Date.now()}.pdf`);

@@ -125,6 +125,7 @@ export default function NidoUsersPage() {
   }, [])
 
   const filteredRoles = roles.filter(r =>
+    r.department.toLowerCase().includes(searchRole.toLowerCase()) ||
     r.name.toLowerCase().includes(searchRole.toLowerCase())
   )
   const totalRolePages = Math.max(1, Math.ceil(filteredRoles.length / rolePageSize))
@@ -144,7 +145,7 @@ export default function NidoUsersPage() {
   const handleAddRole = () => { setEditingRole(null); setRoleDialogOpen(true); }
   const handleEditRole = (role: NidoRole) => { setEditingRole(role); setRoleDialogOpen(true); }
 
-  const handleSaveRole = (values: { name: string; description: string; status: "Active" | "Inactive" }) => {
+  const handleSaveRole = (values: { department: string; name: string; description: string; status: "Active" | "Inactive" }) => {
     if (editingRole) {
       updateRole(editingRole.id, values)
       toast.success("Role updated", { description: `"${values.name}" has been saved.` })
@@ -306,6 +307,7 @@ export default function NidoUsersPage() {
           })
         } else {
           addRole({
+            department: "",
             name: incoming.name,
             description: incoming.description,
             status: incoming.status,
@@ -432,6 +434,7 @@ export default function NidoUsersPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
+                      <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Department</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Role Name</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Description</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold uppercase">Status</th>
@@ -442,7 +445,8 @@ export default function NidoUsersPage() {
                   <tbody>
                     {paginatedRoles.map(role => (
                       <tr key={role.id} className="border-b border-border hover:bg-muted/30">
-                        <td className="px-6 py-4">
+                         <td className="px-6 py-4 text-sm">{role.department || "—"}</td>
+                         <td className="px-6 py-4">
                           <button className="font-medium text-blue-600 hover:underline" onClick={() => handleEditRole(role)}>
                             {role.name}
                           </button>
@@ -484,7 +488,7 @@ export default function NidoUsersPage() {
                     ))}
                     {filteredRoles.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-10 text-center text-sm text-muted-foreground">
+                        <td colSpan={6} className="px-6 py-10 text-center text-sm text-muted-foreground">
                           No roles match your search.
                         </td>
                       </tr>

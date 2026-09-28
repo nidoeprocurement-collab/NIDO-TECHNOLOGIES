@@ -26,10 +26,11 @@ interface AddEditRoleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   role: NidoRole | null
-  onSave: (values: { name: string; description: string; status: "Active" | "Inactive" }) => void
+  onSave: (values: { department: string; name: string; description: string; status: "Active" | "Inactive" }) => void
 }
 
 export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: AddEditRoleDialogProps) {
+  const [department, setDepartment] = useState("")
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [status, setStatus] = useState<"Active" | "Inactive">("Active")
@@ -37,6 +38,7 @@ export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: 
 
   useEffect(() => {
     if (open) {
+      setDepartment(role?.department ?? "")
       setName(role?.name ?? "")
       setDescription(role?.description ?? "")
       setStatus(role?.status ?? "Active")
@@ -49,7 +51,7 @@ export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: 
       setError("Role name is required.")
       return
     }
-    onSave({ name: name.trim(), description: description.trim(), status })
+    onSave({ department: department.trim(), name: name.trim(), description: description.trim(), status })
     onOpenChange(false)
   }
 
@@ -64,6 +66,11 @@ export default function AddEditRoleDialog({ open, onOpenChange, role, onSave }: 
         </DialogHeader>
 
         <div className="space-y-4">
+          <div>
+            <Label className="mb-2 block text-sm font-medium">Department</Label>
+            <Input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Finance" />
+          </div>
+
           <div>
             <Label className="mb-2 block text-sm font-medium">Role Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Warehouse Manager" />
