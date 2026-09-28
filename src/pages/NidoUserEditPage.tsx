@@ -37,6 +37,7 @@ export default function NidoUserEditPage() {
   const [role, setRole] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [designation, setDesignation] = useState("");
+  const [reportingManager, setReportingManager] = useState("");
   const [department, setDepartment] = useState("");
   const [dateOfJoining, setDateOfJoining] = useState("");
   const [status, setStatus] = useState<NidoUser["status"]>("Active");
@@ -68,6 +69,7 @@ export default function NidoUserEditPage() {
     setRole(selectedUser.role ?? "");
     setJobTitle(selectedUser.jobTitle ?? "");
     setDesignation(selectedUser.designation ?? "");
+    setReportingManager(selectedUser.reportingManager ?? "");
     setDepartment(selectedUser.department ?? "");
     setDateOfJoining(selectedUser.dateOfJoining ?? selectedUser.createdAt?.slice(0, 10) ?? "");
     setStatus(selectedUser.status ?? "Active");
@@ -123,6 +125,7 @@ export default function NidoUserEditPage() {
       role,
       jobTitle: jobTitle.trim(),
       designation: designation.trim() || jobTitle.trim(),
+      reportingManager: reportingManager.trim(),
       department: department.trim(),
       dateOfJoining: dateOfJoining || selectedUser.dateOfJoining || selectedUser.createdAt,
       status,
@@ -204,6 +207,10 @@ export default function NidoUserEditPage() {
             <div>
               <Label>Designation</Label>
               <Input className={inputClass} value={designation} onChange={(event) => setDesignation(event.target.value)} placeholder="e.g. Senior Manager" />
+            </div>
+            <div>
+              <Label>Reporting Manager</Label>
+              <Input className={inputClass} value={reportingManager} onChange={(event) => setReportingManager(event.target.value)} placeholder="e.g. John Smith" />
             </div>
             <div>
               <Label>Department</Label>

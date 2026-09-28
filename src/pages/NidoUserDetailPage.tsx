@@ -340,8 +340,12 @@ export default function NidoUserDetailPage() {
             <section className={`${cardClass} p-5 sm:p-6`}>
               <h2 className="text-h3 mb-5">Employee Information</h2>
               <div className="grid gap-6 md:grid-cols-[112px_1fr]">
-                <div className="flex items-start justify-center">
+                <div className="flex flex-col items-center text-center">
                   <div className="flex h-24 w-24 items-center justify-center rounded-full bg-blue-100 text-4xl font-semibold text-blue-600">{initials}</div>
+                  <div className="mt-3 w-full">
+                    <div className={labelClass}>Designation</div>
+                    <div className={`${valueClass} mt-1 break-words`}>{selectedUser.designation || selectedUser.jobTitle || "—"}</div>
+                  </div>
                 </div>
                 <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
                   {[
@@ -352,7 +356,7 @@ export default function NidoUserDetailPage() {
                     ["Role", selectedUser.role || "—"],
                     ["Department", selectedUser.department || "—"],
                     ["Job Title", selectedUser.jobTitle || "—"],
-                    ["Designation", selectedUser.designation || selectedUser.jobTitle || "—"],
+                    ["Reporting Manager", selectedUser.reportingManager || "—"],
                     ["Date of Joining", formatDate(selectedUser.dateOfJoining || selectedUser.createdAt)],
                     ["Password", selectedUser.password ? "••••••••" : "Not set"],
                     ["Last Login", selectedUser.lastLogin || "Never"],

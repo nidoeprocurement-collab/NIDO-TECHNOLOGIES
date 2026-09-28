@@ -37,6 +37,7 @@ export interface NidoUser {
   role: string;           // must match a NidoRole.name
   jobTitle: string;
   designation: string;
+  reportingManager: string;
   department: string;
   status: "Active" | "Inactive" | "Suspended";
   /** Calendar date the employee joined the organization. */
@@ -105,7 +106,7 @@ const SYSTEM_OWNER_USER: NidoUser = {
   id: SYSTEM_OWNER_ID, employeeId: "EMP-001",
   name: "System Owner", email: "owner@nidotech.com", password: "Owner@123",
   phone: "+91-44-1234-5678", role: SYSTEM_OWNER_ROLE,
-  jobTitle: "CEO", designation: "Chief Executive Officer", department: "Management",
+  jobTitle: "CEO", designation: "Chief Executive Officer", reportingManager: "", department: "Management",
   status: "Active", dateOfJoining: NOW, createdAt: NOW, updatedAt: NOW,
 };
 
@@ -166,6 +167,7 @@ function migrateUser(raw: any): NidoUser {
     role:                raw.role                ?? "",
     jobTitle:            raw.jobTitle            ?? "",
     designation:         raw.designation         ?? raw.jobTitle ?? "",
+    reportingManager:    raw.reportingManager    ?? "",
     department:          raw.department          ?? "",
     status:              raw.status              ?? "Active",
     dateOfJoining:       raw.dateOfJoining       ?? raw.createdAt ?? NOW,

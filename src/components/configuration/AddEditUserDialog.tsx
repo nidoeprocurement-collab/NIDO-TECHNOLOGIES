@@ -31,6 +31,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
   const [role, setRole]               = useState("")
   const [jobTitle, setJobTitle]       = useState("")
   const [designation, setDesignation] = useState("")
+  const [reportingManager, setReportingManager] = useState("")
   const [department, setDepartment]   = useState("")
   const [dateOfJoining, setDateOfJoining] = useState("")
   const [status, setStatus]           = useState<NidoUser["status"]>("Active")
@@ -51,6 +52,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       setRole(      user?.role         ?? assignableRole)
       setJobTitle(  user?.jobTitle     ?? "")
       setDesignation(user?.designation ?? "")
+      setReportingManager(user?.reportingManager ?? "")
       setDepartment(user?.department   ?? "")
       setDateOfJoining(user?.dateOfJoining ?? user?.createdAt?.slice(0, 10) ?? new Date().toISOString().split("T")[0])
       setStatus(    user?.status       ?? "Active")
@@ -78,6 +80,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
       role,
       jobTitle:            jobTitle.trim(),
       designation:         designation.trim() || jobTitle.trim(),
+      reportingManager:    reportingManager.trim(),
       department:          department.trim(),
       dateOfJoining:       dateOfJoining || now,
       status,
@@ -166,6 +169,10 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
           <div>
             <Label className="mb-2 block text-sm font-medium">Designation</Label>
             <Input value={designation} onChange={e => setDesignation(e.target.value)} placeholder="e.g. Senior Manager" />
+          </div>
+          <div>
+            <Label className="mb-2 block text-sm font-medium">Reporting Manager</Label>
+            <Input value={reportingManager} onChange={e => setReportingManager(e.target.value)} placeholder="e.g. John Smith" />
           </div>
 
           {/* Row 5 */}

@@ -63,8 +63,17 @@ function generateBreadcrumbs(pathname: string) {
   // Build breadcrumb trail
   let cumulativePath = '';
   const isShopProductPath = segments[0] === 'shop' && segments[1] === 'product';
+  const isNidoUserProfilePath =
+    segments[0] === 'configuration' &&
+    segments[1] === 'nido-users' &&
+    segments[2] === 'users' &&
+    segments[4] === 'profile';
   segments.forEach((segment, index) => {
     cumulativePath += `/${segment}`;
+    // The employee profile already identifies the employee in its header.
+    // Keep the higher-level NIDO Users breadcrumb, but hide the generic
+    // "Users" and employee-id segments from the global path.
+    if (isNidoUserProfilePath && (index === 2 || index === 3)) return;
     // Shop product detail pages already identify the item with its product
     // code. Omit the generic "Product" segment so the breadcrumb reads
     // Shop → product code instead of linking to the non-existent /shop/product
