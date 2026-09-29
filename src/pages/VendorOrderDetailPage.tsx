@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPODisplayStatus, getPOByNumber, updatePO, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
+import { getPODisplayStatus, getPOByNumber, updatePO, appendPOActivity, type StoredPO, type POLineItem, type PONote } from "@/lib/purchaseOrderStore";
 import { getAvailabilityLabel } from "@/lib/productCommercialTerms";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence } from "@/lib/digitalFulfillmentStatuses";
@@ -9,6 +9,7 @@ import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { sendEmail } from "@/lib/emailApi";
 import { derivePOFulfillmentStatus } from "@/lib/orderFulfillmentStatus";
 import { useMyOrders } from "@/contexts/MyOrdersContext";
+import { appendOrderActivity, createActivityNote, getActivityActor } from "@/lib/orderActivityStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const PO_DATA: Record<string, any> = {
@@ -132,6 +133,23 @@ function Avatar({ initials, color, size = 32 }: { initials: string; color: strin
       {initials}
     </div>
   );
+}
+
+function makePOActivity(
+  text: string,
+  eventType: "activity" | "status-change",
+  id?: string,
+): PONote {
+  const note = createActivityNote(text, {
+    actor: getActivityActor("System"),
+    eventType,
+    id,
+  });
+  return {
+    ...note,
+    initials: note.initials || "SY",
+    color: note.color || (eventType === "status-change" ? "#d97706" : "#6b7280"),
+  };
 }
 
 function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
@@ -837,9 +855,11 @@ export default function VendorOrderDetailPage() {
       if (event.key === "nido_all_purchase_orders") refreshFromStore();
     };
     window.addEventListener("poCreated", refreshFromStore);
+    window.addEventListener("poActivityUpdated", refreshFromStore);
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("poCreated", refreshFromStore);
+      window.removeEventListener("poActivityUpdated", refreshFromStore);
       window.removeEventListener("storage", onStorage);
     };
   }, [poKey]);
@@ -898,11 +918,20 @@ export default function VendorOrderDetailPage() {
     const po = getPOByNumber(poKey);
     const itemIndex = items.findIndex(it => it.id === id);
     if (po && itemIndex >= 0) {
+      const previousStatus = po.items[itemIndex]?.status || currentItem?.status || "Pending";
       const updatedLines = po.items.map((line, index) => index === itemIndex ? { ...line, status } : line);
       updatePO(poKey, {
         items: updatedLines,
       });
       setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
+      const text = `${currentItem?.name || "Item"} status changed from ${previousStatus} to ${status}.`;
+      const activity = makePOActivity(text, "status-change", `activity_item_status_${poKey}_${id}_${status}_${Date.now()}`);
+      appendPOActivity(poKey, activity);
+      appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${text}`, {
+        actor: activity.author,
+        eventType: "status-change",
+        id: activity.id,
+      });
     }
   };
   const confirmItemCancel = (reason: string) => {
@@ -911,6 +940,7 @@ export default function VendorOrderDetailPage() {
     setItems(prev => prev.map(it => it.id === pendingItemCancel.id ? { ...it, status: "Cancelled", cancelReason: reason } : it));
     const po = getPOByNumber(poKey);
     if (po && itemIndex >= 0) {
+      const previousStatus = po.items[itemIndex]?.status || "Pending";
       updatePO(poKey, {
         items: po.items.map((line, index) => index === itemIndex
           ? { ...line, status: "Cancelled", cancelReason: reason }
@@ -926,7 +956,16 @@ export default function VendorOrderDetailPage() {
           window.dispatchEvent(new CustomEvent("orderSubItemsUpdated", { detail: { orderId: po.orderId } }));
         } catch { /* storage unavailable */ }
       }
+      const text = `${pendingItemCancel.name} status changed from ${previousStatus} to Cancelled. Reason: ${reason}`;
+      const activity = makePOActivity(text, "status-change", `activity_item_cancel_${poKey}_${pendingItemCancel.id}_${Date.now()}`);
+      appendPOActivity(poKey, activity);
+      appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${text}`, {
+        actor: activity.author,
+        eventType: "status-change",
+        id: activity.id,
+      });
     }
+    setPendingItemCancel(null);
   };
   const handleItemFieldChange = (id: string, field: "referenceNumber" | "serialNumber", value: string) => {
     if (isCancelled) return;
@@ -992,6 +1031,18 @@ export default function VendorOrderDetailPage() {
       : trackedCount === activeLines.length ? "Shipped" : "Partially Shipped";
     updatePO(poKey, { items: updatedLines, status: shipmentStatus as StoredPO["status"] });
      setOrderStatus(derivePOFulfillmentStatus({ ...po, items: updatedLines }));
+    const previousStatus = currentItem.status;
+    const activity = makePOActivity(
+      `${currentItem.name} status changed from ${previousStatus} to ${normalizedTracking ? "Shipped" : previousStatus}. Tracking details were ${normalizedTracking ? "recorded" : "cleared"}.`,
+      normalizedTracking && previousStatus !== "Shipped" ? "status-change" : "activity",
+      `activity_tracking_${poKey}_${id}_${Date.now()}`,
+    );
+    appendPOActivity(poKey, activity);
+    appendOrderActivity(po.orderId, `PO ${po.poNumber}: ${activity.text}`, {
+      actor: activity.author,
+      eventType: activity.kind === "status-change" ? "status-change" : "activity",
+      id: activity.id,
+    });
 
   };
   const handleDeleteDoc = (id: string) => {
@@ -1004,7 +1055,8 @@ export default function VendorOrderDetailPage() {
     if (!noteText.trim()) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-    setNotes(prev => [{ id: "n" + Date.now(), author: "System Owner", initials: "SO", color: "#2563eb", date: dateStr, text: noteText.trim(), visibility: noteVisibility }, ...prev]);
+    const actor = getActivityActor("System Owner");
+    setNotes(prev => [{ id: "n" + Date.now(), author: actor, initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SO", color: "#2563eb", date: dateStr, text: noteText.trim(), visibility: noteVisibility }, ...prev]);
     setNoteText("");
   };
 
@@ -1030,12 +1082,13 @@ export default function VendorOrderDetailPage() {
       now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const auditNote: PONote = {
       id: "audit_confirm_" + Date.now(),
-      author: "System",
-      initials: "SY",
-      color: "#059669",
+      author: getActivityActor("System"),
+      initials: getActivityActor("System").split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
+      color: "#d97706",
       date: dateStr,
       text: `Purchase Order ${po.poNumber} confirmed. Status changed from Draft to Confirmed. Reserved stock converted to allocated. Vendor notification and email dispatched to ${po.vendorName} (${po.vendorEmail || "—"}).`,
       visibility: "Internal Note",
+      kind: "status-change",
     };
     const updatedNotes = [auditNote, ...(po.notes || [])];
 
@@ -1043,6 +1096,11 @@ export default function VendorOrderDetailPage() {
     updatePO(poKey, { status: "Confirmed", notes: updatedNotes });
     setOrderStatus("Processing");
     setNotes(updatedNotes);
+    appendOrderActivity(po.orderId, `Purchase Order ${po.poNumber} status changed from Draft to Confirmed.`, {
+      actor: auditNote.author,
+      eventType: "status-change",
+      id: `activity_po_confirmed_${po.poNumber}_${auditNote.id}`,
+    });
 
     // 4. Send vendor email notification
     if (po.vendorEmail) {
@@ -1536,7 +1594,7 @@ export default function VendorOrderDetailPage() {
           <div style={{ padding: "20px 24px 28px" }}>
             {/* Note list */}
             {notes.map((note, i) => (
-              <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+              <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
                 <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
@@ -1546,7 +1604,10 @@ export default function VendorOrderDetailPage() {
                       {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
+                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                    {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
+                    {note.text}
+                  </div>
                 </div>
               </div>
             ))}
@@ -1623,6 +1684,13 @@ export default function VendorOrderDetailPage() {
               // Persist the terminal status so the master order can mark every
               // covered item inactive and prevent vendor re-selection.
               updatePO(poKey, { status: "Cancelled", cancelReason: reason });
+              const activity = makePOActivity(`Purchase Order ${po.poNumber} status changed from ${po.status} to Cancelled. Reason: ${reason}`, "status-change", `activity_po_cancelled_${po.poNumber}_${Date.now()}`);
+              appendPOActivity(poKey, activity);
+              appendOrderActivity(po.orderId, activity.text, {
+                actor: activity.author,
+                eventType: "status-change",
+                id: activity.id,
+              });
             }
             setCancelled(true);
             setOrderStatus("Cancelled");

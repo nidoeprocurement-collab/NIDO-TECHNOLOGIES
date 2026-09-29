@@ -23,6 +23,7 @@ export interface PONote {
   date: string;
   text: string;
   visibility: string;
+  kind?: "activity" | "status-change";
 }
 
 export type POStatus =
@@ -240,6 +241,25 @@ export function updatePO(poNumber: string, changes: Partial<StoredPO>): void {
     }
 
     try { window.dispatchEvent(new CustomEvent("poCreated", { detail: { poNumber } })); } catch { /* SSR safe */ }
+  }
+}
+
+/** Append a durable PO activity entry without replacing manual notes. */
+export function appendPOActivity(
+  poNumber: string,
+  note: PONote,
+): void {
+  const all = getAllPOs();
+  const idx = all.findIndex(po => po.poNumber === poNumber);
+  if (idx < 0) return;
+  const existing = all[idx].notes || [];
+  if (existing.some(item => item.id === note.id)) return;
+  all[idx] = { ...all[idx], notes: [note, ...existing] };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  try {
+    window.dispatchEvent(new CustomEvent("poActivityUpdated", { detail: { poNumber } }));
+  } catch {
+    /* SSR safe */
   }
 }
 

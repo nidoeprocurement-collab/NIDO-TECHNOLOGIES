@@ -7,7 +7,7 @@ import { getClientForPortal, getClients } from "@/lib/clientStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
 import { sendEmail } from "@/lib/emailApi";
 import { getVendorById } from "@/lib/vendorDataStore";
-import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
+import { savePO, generatePoNumber, updatePO, getAllPOs, deleteDraftPO, removeSubOrderFromDraftPOs, appendPOActivity, type StoredPO, type POLineItem } from "@/lib/purchaseOrderStore";
 import { releaseVendorReservation } from "@/lib/vendorStore";
 import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
@@ -29,6 +29,11 @@ import { getOrderProductTypeMetadata } from "@/lib/orderProductType";
 import { DIGITAL_PRODUCT_HEADERS, getDocumentProductPresentation, isDigitalDocumentProduct } from "@/lib/productDocumentRules";
 import { getDigitalFulfillmentStatusIndex, getDigitalFulfillmentStatusSequence } from "@/lib/digitalFulfillmentStatuses";
 import { toast } from "sonner";
+import {
+  appendOrderActivity,
+  getActivityActor,
+  type ActivityNote,
+} from "@/lib/orderActivityStore";
 
 // ── Mock Data ─────────────────────────────────────────────────────────────────
 const VENDOR_POOL = [
@@ -52,7 +57,7 @@ const INITIAL_DOCS: {
   dataUrl?: string;
   passwordHash?: string;
 }[] = [];
-type OrderNote = { id: string; author: string; date: string; text: string; visibility: string };
+type OrderNote = ActivityNote;
 const INITIAL_NOTES: OrderNote[] = [];
 const DOCUMENT_GRID_COLUMNS = "minmax(220px, 1.5fr) minmax(110px, 0.8fr) minmax(160px, 1fr) minmax(120px, 0.9fr) minmax(220px, 2fr) 64px";
 
@@ -1548,6 +1553,15 @@ function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: st
   }, [orderId]);
 
   useEffect(() => {
+    const onOrderNotesUpdated = (event: Event) => {
+      if ((event as CustomEvent).detail?.orderId !== orderId) return;
+      try { setNotes(JSON.parse(localStorage.getItem(notesKey) || "null") || INITIAL_NOTES); } catch { /* ignore malformed notes */ }
+    };
+    window.addEventListener("orderNotesUpdated", onOrderNotesUpdated);
+    return () => window.removeEventListener("orderNotesUpdated", onOrderNotesUpdated);
+  }, [orderId, notesKey]);
+
+  useEffect(() => {
     localStorage.setItem(notesKey, JSON.stringify(notes));
   }, [notes, notesKey]);
 
@@ -1802,7 +1816,7 @@ function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: st
           {visibleNotes.length} note{visibleNotes.length !== 1 ? "s" : ""}{isClientPortalUser ? " \u2014 messages between you and the NIDO team" : ""}
         </div>
         {visibleNotes.map((note, i) => (
-          <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < visibleNotes.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+          <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < visibleNotes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
             <Avatar initial={(note.author?.[0] || "S").toUpperCase()} color="#2563eb" size={32} />
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
@@ -1814,7 +1828,10 @@ function DocumentsNotesTab({ orderId, locked = false, auditNote }: { orderId: st
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6 }}>{note.text}</div>
+               <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                 {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
+                 {note.text}
+               </div>
             </div>
           </div>
         ))}
@@ -2860,6 +2877,7 @@ export default function MyOrderPage() {
       date,
       text: `${text}\n\nActioned by: ${actor}\nActioned on: ${date}`,
       visibility: "External Note",
+      kind: "status-change",
     });
   };
 
@@ -2975,6 +2993,8 @@ export default function MyOrderPage() {
       (target.itemStatus === "Delivered" && status === "Return Request Raised")
       || (currentReturnIndex >= 0 && nextReturnIndex === currentReturnIndex + 1);
     if (nextReturnIndex >= 0 && (!validReturnTransition || (status === "Return Request Raised" && !isReturnAllowed(target)))) return;
+    const previousStatus = target.itemStatus;
+    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
     const now = new Date();
     setSubOrders(prev => prev.map(s => s.id === subId
       ? {
@@ -2990,6 +3010,23 @@ export default function MyOrderPage() {
         }
       : s
     ));
+    appendOrderActivity(
+      orderId,
+      `${target.itemName} status changed from ${previousStatus} to ${status}.`,
+      { actor, eventType: "status-change" },
+    );
+    getAllPOs()
+      .filter(po => po.orderId === orderId && poCoversSubOrder(po, subId))
+      .forEach(po => appendPOActivity(po.poNumber, {
+        id: `activity_item_status_${po.poNumber}_${subId}_${status}_${Date.now()}`,
+        author: actor,
+        initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
+        color: "#d97706",
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        text: `${target.itemName} status changed from ${previousStatus} to ${status}.`,
+        visibility: "Internal Note",
+        kind: "status-change",
+      }));
   };
 
   const handleRaiseReturn = (subId: string, reason: string, details: string) => {
@@ -3058,6 +3095,8 @@ export default function MyOrderPage() {
     }
     const updatedOn = new Date().toLocaleDateString("en-IN");
     const shouldMarkShipped = pendingShippedTarget === trackingTarget;
+    const previousStatus = target.itemStatus;
+    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
     setSubOrders(prev => prev.map(s => s.id === trackingTarget
       ? {
           ...s,
@@ -3069,6 +3108,24 @@ export default function MyOrderPage() {
         }
       : s
     ));
+    if (shouldMarkShipped && previousStatus !== "Shipped") {
+      appendOrderActivity(orderId, `${target.itemName} status changed from ${previousStatus} to Shipped. Tracking details were recorded.`, {
+        actor,
+        eventType: "status-change",
+      });
+      getAllPOs()
+        .filter(po => po.orderId === orderId && poCoversSubOrder(po, trackingTarget))
+        .forEach(po => appendPOActivity(po.poNumber, {
+          id: `activity_tracking_${po.poNumber}_${trackingTarget}_${Date.now()}`,
+          author: actor,
+          initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
+          color: "#d97706",
+          date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          text: `${target.itemName} status changed from ${previousStatus} to Shipped. Tracking details were recorded.`,
+          visibility: "Internal Note",
+          kind: "status-change",
+        }));
+    }
     setPendingShippedTarget(null);
   };
 
@@ -3102,6 +3159,21 @@ export default function MyOrderPage() {
       ? { ...s, itemStatus: "Cancelled", cancelReason: reason, updatedOn: new Date().toLocaleDateString("en-IN") }
       : s
     ));
+    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
+    appendOrderActivity(orderId, `${target.itemName} was cancelled. Reason: ${reason}`, {
+      actor,
+      eventType: "status-change",
+    });
+    targetPOs.forEach(po => appendPOActivity(po.poNumber, {
+      id: `activity_item_cancel_${po.poNumber}_${subId}_${Date.now()}`,
+      author: actor,
+      initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
+      color: "#d97706",
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+      text: `${target.itemName} was cancelled. Reason: ${reason}`,
+      visibility: "Internal Note",
+      kind: "status-change",
+    }));
     setCancelTarget(null);
     setPoRefreshKey(k => k + 1);
   };
@@ -3160,6 +3232,12 @@ export default function MyOrderPage() {
           ),
         }
     ));
+    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
+    appendOrderActivity(
+      orderId,
+      `${previousSubOrder?.itemName || subId} was assigned to vendor ${vendorName}.`,
+      { actor, eventType: "activity" },
+    );
 
     // A draft PO may already have been created automatically. A single-line
     // draft can be re-pointed in place. When the new vendor already has a
@@ -3688,7 +3766,16 @@ export default function MyOrderPage() {
         createdOnDisplay: displayDate,
         requestedDelivery: primarySub.requiredDate,
         documents: [],
-        notes: [],
+        notes: [{
+          id: `activity_po_generated_${poNumber}`,
+          author: getActivityActor("System"),
+          initials: getActivityActor("System").split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SY",
+          color: "#6b7280",
+          date: `${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
+          text: `Purchase Order ${poNumber} was generated for vendor ${meta.vendorName}. Status: Draft.`,
+          visibility: "Internal Note",
+          kind: "activity",
+        }],
       };
 
       try {
@@ -3700,6 +3787,11 @@ export default function MyOrderPage() {
       }
 
       savePO(po);
+      appendOrderActivity(
+        orderId,
+        `Purchase Order ${poNumber} was generated for vendor ${meta.vendorName}. Status: Draft.`,
+        { actor: getActivityActor("System"), eventType: "activity", id: `activity_po_generated_${poNumber}` },
+      );
 
       // Reduce vendor currentStock and reservedStock now that a PO has been raised.
       // This is the only point where physical stock is actually consumed.
@@ -4495,7 +4587,25 @@ export default function MyOrderPage() {
                           {!isOrderInactive && !isCancelledPO && (
                             <div style={{ padding: "10px 18px 14px", borderTop: "1px solid #f3f4f6", display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
                               <button
-                                onClick={() => { updatePO(po.poNumber, { status: "Cancelled", cancelReason: "Rejected by admin" }); setCreatedPOs(p => ({ ...p })); }}
+                                onClick={() => {
+                                  const actor = getActivityActor("System Owner");
+                                  const activity = createActivityNote(
+                                    `Purchase Order ${po.poNumber} status changed from ${po.status} to Cancelled. Reason: Rejected by admin.`,
+                                    { actor, eventType: "status-change", id: `activity_po_rejected_${po.poNumber}_${Date.now()}` },
+                                  );
+                                  updatePO(po.poNumber, { status: "Cancelled", cancelReason: "Rejected by admin" });
+                                  appendPOActivity(po.poNumber, {
+                                    ...activity,
+                                    initials: activity.initials || "SY",
+                                    color: activity.color || "#d97706",
+                                  });
+                                  appendOrderActivity(po.orderId, activity.text, {
+                                    actor,
+                                    eventType: "status-change",
+                                    id: activity.id,
+                                  });
+                                  setCreatedPOs(p => ({ ...p }));
+                                }}
                                 style={{ padding: "7px 16px", border: "1px solid #fca5a5", borderRadius: 7, background: "#fff", color: "#dc2626", cursor: "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}
                               >
                                 Reject
@@ -4538,7 +4648,22 @@ export default function MyOrderPage() {
                                       setPoRefreshKey(k => k + 1);
                                       return;
                                     }
+                                     const actor = getActivityActor("System Owner");
+                                     const confirmationActivity = createActivityNote(
+                                       `Purchase Order ${po.poNumber} status changed from ${po.status} to Confirmed.`,
+                                       { actor, eventType: "status-change", id: `activity_po_confirmed_${po.poNumber}_${Date.now()}` },
+                                     );
                                      updatePO(po.poNumber, { status: "Confirmed" });
+                                     appendPOActivity(po.poNumber, {
+                                       ...confirmationActivity,
+                                       initials: confirmationActivity.initials || "SY",
+                                       color: confirmationActivity.color || "#d97706",
+                                     });
+                                     appendOrderActivity(po.orderId, confirmationActivity.text, {
+                                       actor,
+                                       eventType: "status-change",
+                                       id: confirmationActivity.id,
+                                     });
                                      const updatedOn = new Date().toLocaleDateString("en-IN");
                                      const updatedSubOrders = subOrders.map(sub =>
                                        poCoversSubOrder(po, sub.id) &&

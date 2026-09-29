@@ -1,5 +1,6 @@
 import type { MyOrder, OrderCartItem } from "../contexts/MyOrdersContext";
 import { getPrefix } from "./configService";
+import { appendOrderActivity } from "./orderActivityStore";
 import { getEffectiveTaxPctForCategory } from "./taxEngine";
 import {
   generatePoNumber,
@@ -151,6 +152,11 @@ export function createDraftPOsForOrder(
       notes: [creationNote],
     };
     savePO(po);
+    appendOrderActivity(
+      orderId,
+      `Purchase Order ${poNumber} was generated for vendor ${po.vendorName}. Status: Draft.`,
+      { actor: "System", eventType: "activity", id: `activity_po_generated_${poNumber}` },
+    );
     createdCount += 1;
   }
 

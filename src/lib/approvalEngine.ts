@@ -1,6 +1,7 @@
 export type ApprovalStatus = "Pending" | "In Progress" | "Approved" | "Rejected" | "Sent Back" | "Cancelled" | "Escalated";
 
 import { createDraftPOsForStoredOrder } from "./orderPurchaseOrderService";
+import { appendOrderActivity } from "./orderActivityStore";
 
 export interface ApprovalCondition {
   joinOperator: "AND" | "OR";
@@ -565,6 +566,19 @@ export async function actOnApprovalRequest(id: string, payload: Record<string, u
     ? api<ApprovalRequest>(`/requests/${id}/action`, { method: "POST", body: JSON.stringify(payload) })
     : localActOnApprovalRequest(id, payload);
   const request = await updated;
+  const latestTimeline = Array.isArray(request.timeline) ? request.timeline[request.timeline.length - 1] : null;
+  const actor = String(latestTimeline?.user_name || "System");
+  if (request.module === "Order" && latestTimeline) {
+    appendOrderActivity(
+      request.reference,
+      `Approval status changed from ${latestTimeline.previous_status || "Pending"} to ${request.status}${latestTimeline.comment ? `. Comment: ${latestTimeline.comment}` : ""}.`,
+      {
+        actor,
+        eventType: request.status === "Approved" ? "activity" : "status-change",
+        id: `activity_approval_${request.id}_${latestTimeline.id || request.status}`,
+      },
+    );
+  }
   if (request.status === "Approved" && request.module === "Order") {
     createDraftPOsForStoredOrder(request.reference);
   }

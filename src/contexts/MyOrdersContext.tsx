@@ -7,6 +7,7 @@ import type { ProductCommercialTerms } from "../lib/productCommercialTerms";
 import { createDraftPOsForOrder } from "../lib/orderPurchaseOrderService";
 import { resolveAutoAssignment } from "../lib/autoAssignmentStore";
 import { getUsers } from "../lib/nidoUsersStore";
+import { appendOrderActivityOnce, getActivityActor } from "../lib/orderActivityStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type MyOrderStatus =
@@ -275,6 +276,12 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       cartItems,
     } as MyOrder;
     setOrders((prev) => [normalizedOrder, ...prev]);
+    appendOrderActivityOnce(
+      id,
+      `activity_order_placed_${id}`,
+      `Order ${id} was placed.`,
+      { actor: getActivityActor(order.requester || "System"), eventType: "activity" },
+    );
     // Draft POs are created immediately for orders without an approval gate.
     // Client orders that require approval pass deferPurchaseOrders=true and
     // are released by the approval service after final approval.
@@ -294,6 +301,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // (order detail page, list bulk update) without relying on each caller
   // to re-check.
   const updateOrderStatus = (orderId: string, status: MyOrderStatus, cancelReason?: string) => {
+    const activityId = `activity_order_status_${orderId}_${status}_${Date.now()}`;
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
@@ -323,12 +331,21 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       }
       cascadeStatusToSubOrders(target, status);
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
+      if (target.status !== status) {
+        appendOrderActivityOnce(
+          orderId,
+          activityId,
+          `Order status changed from ${target.status} to ${status}.${cancelReason ? ` Reason: ${cancelReason}` : ""}`,
+          { actor: getActivityActor(), eventType: "status-change" },
+        );
+      }
       return prev.map((o) => (o.id === orderId ? { ...o, status, ...extra } : o));
     });
   };
 
   const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus, cancelReason?: string) => {
     const idSet = new Set(orderIds);
+    const activityTimestamp = Date.now();
     setOrders((prev) => {
       prev.forEach((o) => {
         if (
@@ -338,6 +355,14 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
         ) {
           if (status === "Cancelled") cancelDraftPOsForOrder(o.id, cancelReason);
           cascadeStatusToSubOrders(o, status);
+          if (o.status !== status) {
+            appendOrderActivityOnce(
+              o.id,
+              `activity_order_status_${o.id}_${status}_${activityTimestamp}`,
+              `Order status changed from ${o.status} to ${status}.${cancelReason ? ` Reason: ${cancelReason}` : ""}`,
+              { actor: getActivityActor(), eventType: "status-change" },
+            );
+          }
         }
       });
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
