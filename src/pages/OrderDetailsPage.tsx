@@ -3879,17 +3879,17 @@ export default function MyOrderPage() {
         ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
         : "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px")
     : (isDigitalOrder
-      ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
+      ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(220px,0.9fr)"
       : isMixedOrder
-        ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(180px,0.8fr)"
-        : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(180px,0.8fr)");
+        ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(220px,0.9fr)"
+        : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(220px,0.9fr)");
   const subOrdersColGap = 6;
   // Sum of the column minimums above (plus gaps) — the smallest width the
   // grid will ever collapse to. Below this the wrapper scrolls horizontally
   // instead of clipping; above it the fr tracks grow to fill the tab.
   const subOrdersMinWidth = isClientPortalUser
     ? (isDigitalOrder ? 1030 : isMixedOrder ? 1510 : 1056)
-    : (isDigitalOrder ? 1470 : isMixedOrder ? 1870 : 1400);
+    : (isDigitalOrder ? 1510 : isMixedOrder ? 1910 : 1440);
 
   const billingAddress = [
     clientInfo?.billing_address || clientInfo?.billingAddress,
@@ -4181,7 +4181,18 @@ export default function MyOrderPage() {
                   *inside the tab* rather than being cut off. */}
               <div style={{ overflowX: "auto", overflowY: "visible" }}>
                 <div style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
-                  {subOrdersColumns.map(h => <div key={h} style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{h}</div>)}
+                  {subOrdersColumns.map((h, headerIndex) => (
+                    <div
+                      key={h}
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        textAlign: headerIndex === subOrdersColumns.length - 1 ? "right" : "left",
+                      }}
+                    >
+                      {h}
+                    </div>
+                  ))}
                 </div>
                 {filtered.map((sub, idx) => {
                   const expanded = expandedItems.has(sub.id), returnOk = isReturnAllowed(sub);
@@ -4420,7 +4431,7 @@ export default function MyOrderPage() {
                           )}
                         </div>
                       ) : (
-                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+                        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, textAlign: "right" }}>
                           {sub.itemStatus === "Shipped" && isPhysicalProduct(sub) && (
                             <button
                               onClick={() => generateProformaForSubOrder(sub.id)}
