@@ -18,7 +18,7 @@ import RolePermissionsDialog from "./RolePermissionsDialog"
 import {
   type NidoRole,
   getRoles, addRole, updateRole, deleteRole,
-  getRoleUserCount, exportRolesPdf,
+  getRoleUserCount, exportRolesCsv, exportRolesPdf,
   NIDO_ROLES_EVENT, NIDO_USERS_EVENT,
 } from "@/lib/nidoUsersStore"
 import {
@@ -391,7 +391,22 @@ export default function NidoUsersPage() {
                           onClick={exportNidoPermissionsCsv}
                           className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
                         >
-                          <Download className="mr-2 inline h-4 w-4" /> Export CSV
+                          <Download className="mr-2 inline h-4 w-4" /> Export Permissions CSV
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRoleActionsMenu(false)
+                            if (!filteredRoles.length) {
+                              toast.info("Nothing to export")
+                              return
+                            }
+                            exportRolesCsv(filteredRoles)
+                            toast.success("Roles CSV exported")
+                          }}
+                          className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                        >
+                          <Download className="mr-2 inline h-4 w-4" /> Export Roles CSV
                         </button>
                         <label className="block w-full cursor-pointer rounded-md px-3 py-2 text-left text-sm hover:bg-muted">
                           <Upload className="mr-2 inline h-4 w-4" /> Bulk Upload CSV

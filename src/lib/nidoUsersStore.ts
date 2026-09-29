@@ -426,42 +426,103 @@ function downloadBlob(content: BlobPart, filename: string, type: string): void {
   URL.revokeObjectURL(url);
 }
 
+function csvEscape(value: unknown): string {
+  const text = String(value ?? "");
+  // Keep ordinary platform values free of added quote symbols. CSV quoting is
+  // only required when the actual value contains a delimiter or line break.
+  return /[",\r\n]/.test(text)
+    ? `"${text.replace(/"/g, '""')}"`
+    : text;
+}
+
+function buildCsv(headers: string[], rows: unknown[][]): string {
+  return [headers, ...rows]
+    .map((row) => row.map(csvEscape).join(","))
+    .join("\r\n");
+}
+
+const USER_EXPORT_HEADERS = [
+  "Employee ID",
+  "Name",
+  "Email",
+  "Phone",
+  "Role",
+  "Job Title",
+  "Designation",
+  "Reporting Manager",
+  "Department",
+  "Date of Joining",
+  "Status",
+  "Last Login",
+];
+
+function userExportRow(user: NidoUser): unknown[] {
+  return [
+    user.employeeId,
+    user.name,
+    user.email,
+    user.phone,
+    user.role,
+    user.jobTitle,
+    user.designation,
+    user.reportingManager,
+    user.department,
+    user.dateOfJoining ?? "",
+    user.status,
+    user.lastLogin ?? "Never",
+  ];
+}
+
+const ROLE_EXPORT_HEADERS = [
+  "Department",
+  "Role Name",
+  "Description",
+  "Status",
+  "Assigned Users",
+];
+
+function roleExportRow(role: NidoRole): unknown[] {
+  return [
+    role.department,
+    role.name,
+    role.description,
+    role.status,
+    `${getRoleUserCount(role.name)} Users`,
+  ];
+}
+
 export function exportRolesCsv(roles: NidoRole[]): void {
-  const headers = ["Department", "Role Name", "Description", "Status", "Assigned Users"];
-  const rows = roles.map((r) => [r.department, r.name, r.description, r.status, String(getRoleUserCount(r.name))]);
-  const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const csv = buildCsv(ROLE_EXPORT_HEADERS, roles.map(roleExportRow));
   downloadBlob(csv, `nido-user-roles-${Date.now()}.csv`, "text/csv;charset=utf-8;");
 }
 
 export function exportUsersCsv(users: NidoUser[]): void {
-  const headers = ["Employee ID", "Name", "Email", "Phone", "Role", "Designation", "Department", "Status", "Last Login"];
-  const rows = users.map((u) => [u.employeeId, u.name, u.email, u.phone, u.role, u.designation, u.department, u.status, u.lastLogin ?? "—"]);
-  const csv = [headers, ...rows].map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+  const csv = buildCsv(USER_EXPORT_HEADERS, users.map(userExportRow));
   downloadBlob(csv, `nido-users-${Date.now()}.csv`, "text/csv;charset=utf-8;");
 }
 
 export function exportRolesPdf(roles: NidoRole[]): void {
-  const doc = new jsPDF();
-  doc.setFontSize(14); doc.text("Nido Tech — User Roles", 14, 16);
-  doc.setFontSize(9); doc.setTextColor(120); doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14); doc.text("User Roles", 14, 16);
   autoTable(doc, {
-    startY: 28,
-    head: [["Department", "Role Name", "Description", "Status", "Assigned Users"]],
-    body: roles.map((r) => [r.department, r.name, r.description, r.status, String(getRoleUserCount(r.name))]),
-    styles: { fontSize: 9 }, headStyles: { fillColor: [37, 99, 235] },
+    startY: 24,
+    head: [ROLE_EXPORT_HEADERS],
+    body: roles.map(roleExportRow),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [37, 99, 235] },
   });
   doc.save(`nido-user-roles-${Date.now()}.pdf`);
 }
 
 export function exportUsersPdf(users: NidoUser[]): void {
-  const doc = new jsPDF();
-  doc.setFontSize(14); doc.text("Nido Tech — Platform Users", 14, 16);
-  doc.setFontSize(9); doc.setTextColor(120); doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
+  const doc = new jsPDF({ orientation: "landscape" });
+  doc.setFontSize(14); doc.text("Platform Users", 14, 16);
   autoTable(doc, {
-    startY: 28,
-    head: [["EMP ID", "Name", "Email", "Role", "Department", "Status"]],
-    body: users.map((u) => [u.employeeId, u.name, u.email, u.role, u.department, u.status]),
-    styles: { fontSize: 9 }, headStyles: { fillColor: [37, 99, 235] },
+    startY: 24,
+    head: [USER_EXPORT_HEADERS],
+    body: users.map(userExportRow),
+    styles: { fontSize: 7 },
+    headStyles: { fillColor: [37, 99, 235] },
   });
   doc.save(`nido-users-${Date.now()}.pdf`);
 }
