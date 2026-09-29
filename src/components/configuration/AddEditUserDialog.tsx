@@ -142,7 +142,7 @@ export default function AddEditUserDialog({ open, onOpenChange, user, roles, onS
              <Input
                value={employeeId}
                onChange={e => setEmployeeId(e.target.value)}
-               placeholder="EMP-001"
+                placeholder="EMP-00001"
                disabled={!isEdit}
              />
              {!isEdit && <p className="mt-1 text-xs text-muted-foreground">Generated automatically from the next serial number.</p>}

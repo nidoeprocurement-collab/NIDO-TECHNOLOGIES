@@ -278,7 +278,7 @@ export function getNextEmployeeId(users: NidoUser[] = getUsers()): string {
     const match = String(user.employeeId || "").trim().match(/^EMP-(\d+)$/i);
     return match ? Math.max(highest, Number(match[1])) : highest;
   }, 0);
-  return `EMP-${String(highestSerial + 1).padStart(3, "0")}`;
+  return `EMP-${String(highestSerial + 1).padStart(5, "0")}`;
 }
 
 export function saveUsers(users: NidoUser[]): void {
