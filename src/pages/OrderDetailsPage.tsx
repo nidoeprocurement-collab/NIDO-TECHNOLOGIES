@@ -107,10 +107,10 @@ function Avatar({ initial, color, size = 28 }) {
   );
 }
 
-function StatusPill({ status }) {
+function StatusPill({ status, compact = false }) {
   const baseStatus = String(status || "").replace(/\s+\([^)]*\)$/, "");
   const s = ALL_STATUS_MAP[status] || ALL_STATUS_MAP[baseStatus] || { bg: "#f9fafb", color: "#374151", border: "#e5e7eb" };
-  return <span style={{ padding: "4px 11px", borderRadius: 14, fontSize: 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap", display: "inline-block" }}>{status}</span>;
+  return <span style={{ padding: compact ? "3px 7px" : "4px 11px", borderRadius: 14, fontSize: compact ? 11 : 12.5, fontWeight: 500, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: compact ? "normal" : "nowrap", overflowWrap: compact ? "anywhere" : undefined, lineHeight: compact ? 1.25 : undefined, textAlign: compact ? "center" : undefined, display: "inline-block", maxWidth: compact ? "100%" : undefined, boxSizing: "border-box" }}>{status}</span>;
 }
 
 function StarRating({ rating, max = 5 }) {
@@ -3862,34 +3862,22 @@ export default function MyOrderPage() {
       DIGITAL_PRODUCT_HEADERS.provisioning,
     );
   }
-  // Explicit min widths (via minmax) on every column plus a real column gap
-  // prevent long values (prices, badges, buttons) from visually overlapping
-  // into the neighboring column — a plain "1fr"/px template with no gap lets
-  // wide content bleed past its track. The whole row is also wrapped in its
-  // own horizontally-scrolling container (see subOrdersMinWidth below) so on
-  // narrow viewports the columns scroll *within the tab* instead of being
-  // clipped by the page's outer overflow.
-  // Columns use minmax(min, fr) instead of fixed px so the table stretches
-  // to fill whatever width the tab actually has (no dead space on wide
-  // monitors) while still guaranteeing a readable minimum per column.
+  // Keep every track shrinkable so this dense table always fits the tab
+  // instead of creating a second horizontal scrollbar. Long values are
+  // wrapped inside their own tracks below, which keeps status and vendor
+  // content from bleeding into adjacent columns.
   const subOrdersColTemplate = isClientPortalUser
     ? (isDigitalOrder
-      ? "36px 130px minmax(220px,2fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) 44px"
+      ? "28px 110px minmax(0,2fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.25fr) 48px"
       : isMixedOrder
-        ? "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) 78px minmax(120px,1fr) minmax(115px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px"
-        : "36px 130px minmax(220px,2fr) 60px minmax(90px,1fr) minmax(100px,1fr) minmax(120px,1fr) minmax(160px,1.2fr) 44px")
+        ? "28px 100px minmax(0,1.8fr) 48px 38px minmax(0,.7fr) 38px minmax(0,.8fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.1fr) 48px"
+        : "28px 100px minmax(0,2fr) 48px minmax(0,.8fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr) 48px")
     : (isDigitalOrder
-      ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(220px,0.9fr)"
+      ? "28px 110px minmax(0,1.8fr) 72px 38px minmax(0,.85fr) minmax(0,1fr) 72px minmax(0,1.25fr) minmax(0,1.2fr) 48px"
       : isMixedOrder
-        ? "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) 78px minmax(120px,0.5fr) minmax(115px,0.5fr) minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(220px,0.9fr)"
-        : "30px 170px minmax(220px,1fr) minmax(110px,0.4fr) 55px minmax(100px,0.4fr) minmax(100px,0.4fr) minmax(120px,0.6fr) minmax(160px,0.6fr) minmax(130px,0.5fr) minmax(220px,0.9fr)");
+        ? "28px 105px minmax(0,1.7fr) 72px 38px minmax(0,.7fr) 38px minmax(0,.8fr) minmax(0,1fr) 72px minmax(0,1fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1.15fr) 48px"
+        : "28px 105px minmax(0,1.8fr) 72px 48px minmax(0,.8fr) 72px minmax(0,1.05fr) minmax(0,1.1fr) minmax(0,1.1fr) 48px");
   const subOrdersColGap = 6;
-  // Sum of the column minimums above (plus gaps) — the smallest width the
-  // grid will ever collapse to. Below this the wrapper scrolls horizontally
-  // instead of clipping; above it the fr tracks grow to fill the tab.
-  const subOrdersMinWidth = isClientPortalUser
-    ? (isDigitalOrder ? 1030 : isMixedOrder ? 1510 : 1056)
-    : (isDigitalOrder ? 1510 : isMixedOrder ? 1910 : 1440);
 
   const billingAddress = [
     clientInfo?.billing_address || clientInfo?.billingAddress,
@@ -4173,14 +4161,10 @@ export default function MyOrderPage() {
           {/* Sub Orders / Items tab */}
           {activeTab === "Sub Orders / Items" && (
             <>
-              {/* Own horizontal scroll container, distinct from the outer
-                  tabs-section (which stays overflow:visible for the Actions
-                  flyout). This is the safety net against AppLayout's
-                  overflow-x-hidden silently clipping columns on narrow
-                  screens: if the row is ever wider than the tab, it scrolls
-                  *inside the tab* rather than being cut off. */}
-              <div style={{ overflowX: "auto", overflowY: "visible" }}>
-                <div style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
+              {/* Keep the table fluid so it fits the page without a horizontal
+                  scrollbar. Long content wraps inside its own grid track. */}
+              <div style={{ width: "100%", overflow: "visible" }}>
+                <div style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "10px 20px", boxSizing: "border-box", background: "#f9fafb", borderBottom: "1px solid #f3f4f6", fontSize: 10.5, fontWeight: 700, color: "#6b7280", letterSpacing: 0.4 }}>
                   {subOrdersColumns.map((h, headerIndex) => (
                     <div
                       key={h}
@@ -4224,7 +4208,7 @@ export default function MyOrderPage() {
                   const subAllocs = vendorAllocations?.[sub.id];
                   const isMultiVendor = subAllocs && subAllocs.length > 1;
                   return (
-                    <div key={sub.id} style={{ minWidth: subOrdersMinWidth, display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
+                    <div key={sub.id} style={{ width: "100%", display: "grid", gridTemplateColumns: subOrdersColTemplate, columnGap: subOrdersColGap, padding: "16px 20px", boxSizing: "border-box", alignItems: "start", borderBottom: idx < filtered.length - 1 ? "1px solid #f3f4f6" : "none", background: "#fff" }}>
                       <div style={{ color: "#6b7280", fontSize: 12.5, paddingTop: 3, minWidth: 0 }}>{sub.num}</div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#374151", overflowWrap: "break-word" }}>{sub.id}</div>
@@ -4310,8 +4294,8 @@ export default function MyOrderPage() {
                          </div>
                        )}
                       <div style={{ fontSize: 12.5, fontWeight: 600, minWidth: 0, overflowWrap: "break-word" }}>{sub.total}</div>
-                      <div style={{ minWidth: 0 }}>
-                        <StatusPill status={sub.itemStatus} />
+                      <div style={{ minWidth: 0, overflow: "hidden" }}>
+                        <StatusPill status={sub.itemStatus} compact />
                         <div style={{ fontSize: 10.5, color: "#9ca3af", marginTop: 4 }}>Updated on {sub.updatedOn}</div>
                         {(sub as any).cancelReason && (
                           <div style={{ fontSize: 10.5, color: "#991b1b", marginTop: 3, fontStyle: "italic", lineHeight: 1.4 }}>Reason: {(sub as any).cancelReason}</div>
@@ -4354,11 +4338,11 @@ export default function MyOrderPage() {
                             // confirmation; confirmed POs remain locked.
                             <div>
                               {subPOs.map((po: any, pi: number) => (
-                                <div key={po.poNumber} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                <div key={po.poNumber} style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 3, minWidth: 0 }}>
                                   <div style={{ width: 20, height: 20, borderRadius: "50%", background: pi === 0 ? "#2563eb" : "#16a34a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                                     {(po.vendorName?.[0] || "V").toUpperCase()}
                                   </div>
-                                  <div>
+                                  <div style={{ minWidth: 0 }}>
                                     <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{po.vendorName}</div>
                                     <div style={{ fontSize: 10, color: "#9ca3af" }}>{isConfirmedPO(po) ? "PO Issued" : "PO Pending"}</div>
                                   </div>
@@ -4376,11 +4360,11 @@ export default function MyOrderPage() {
                            ) : sub.selectedVendorName ? (
                             // Vendor was locked at cart add-to-cart time — display only
                             <div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ display: "flex", alignItems: "flex-start", gap: 6, minWidth: 0 }}>
                                 <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#2563eb", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
                                   {(sub.selectedVendorName[0] || "V").toUpperCase()}
                                 </div>
-                                <div>
+                                <div style={{ minWidth: 0 }}>
                                   <div style={{ fontSize: 12, fontWeight: 600, color: "#111827", overflowWrap: "break-word" }}>{sub.selectedVendorName}</div>
                                   <div style={{ fontSize: 10, color: "#9ca3af" }}>Selected at order</div>
                                 </div>
@@ -4435,7 +4419,7 @@ export default function MyOrderPage() {
                           {sub.itemStatus === "Shipped" && isPhysicalProduct(sub) && (
                             <button
                               onClick={() => generateProformaForSubOrder(sub.id)}
-                              style={{ padding: "6px 8px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", whiteSpace: "nowrap" }}
+                              style={{ maxWidth: "100%", padding: "6px 8px", border: "1px solid #c4b5fd", borderRadius: 6, background: "#faf5ff", color: "#6d28d9", cursor: "pointer", fontWeight: 700, fontSize: 11, fontFamily: "inherit", whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "right" }}
                             >
                               Generate Proforma Invoice
                             </button>
