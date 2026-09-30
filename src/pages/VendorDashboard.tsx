@@ -36,7 +36,7 @@ function qColor(q: number) {
 // ─── Shared UI Primitives ────────────────────────────────────────
 function SCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-card rounded-lg border border-border shadow-sm overflow-hidden ${className}`}>
+    <div className={`bg-card rounded-lg border border-border shadow-sm min-w-0 ${className}`}>
       {children}
     </div>
   );
@@ -44,10 +44,10 @@ function SCard({ children, className = "" }: { children: React.ReactNode; classN
 
 function SHead({ title, link }: { title: string; link?: string }) {
   return (
-    <div className="flex justify-between items-center px-3 py-1.5 border-b border-border">
-      <span className="text-[11px] font-semibold text-foreground">{title}</span>
+    <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 border-b border-border">
+      <span className="min-w-0 text-[11px] font-semibold text-foreground">{title}</span>
       {link && (
-        <span className="text-[10px] text-primary cursor-pointer hover:text-primary/80">
+        <span className="shrink-0 whitespace-nowrap text-[10px] text-primary cursor-pointer hover:text-primary/80">
           {link} →
         </span>
       )}
@@ -495,7 +495,7 @@ export default function VendorDashboard() {
               <p className="text-[10px] font-semibold text-gray-700">Delivery Performance</p>
               <span className="text-[9px] text-blue-500 cursor-pointer hover:underline">View All</span>
             </div>
-            <div className="flex gap-3 px-3 pb-3">
+            <div className="dashboard-delivery-panel px-4 pb-4">
               {/* Donut gauge */}
               <div className="flex flex-col items-center gap-1 shrink-0">
                 <div className="relative">
@@ -532,7 +532,7 @@ export default function VendorDashboard() {
               </div>
 
               {/* Vendor-level delivery score and order history */}
-              <div className="flex-1 min-w-0">
+              <div className="dashboard-delivery-table min-w-0">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 text-[8px] text-gray-500">
@@ -622,7 +622,7 @@ export default function VendorDashboard() {
         <div className="dashboard-activities min-w-0">
           <SCard className="flex-1">
             <SHead title="Recent Activities" />
-            <div className="px-2 py-1.5 space-y-2">
+              <div className="dashboard-activity-list px-3 py-3">
               {activities.slice(0, 9).map((a, i) => (
                 <div key={i} className="flex gap-1.5 items-start">
                   <div className="w-1.5 h-1.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: a.color }} />
@@ -839,7 +839,7 @@ export default function VendorDashboard() {
               <span className="text-[9px] text-gray-500 ml-1">Confirmed this month</span>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={72}>
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart data={paymentChartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
               <XAxis dataKey="month" tick={{ fontSize: 8, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
@@ -848,8 +848,8 @@ export default function VendorDashboard() {
                 formatter={(v: number, n: string) => [`₹${v.toFixed(2)} Cr`, n === "paid" ? "Confirmed POs" : "Draft POs"]}
                 contentStyle={{ fontSize: 9, padding: "2px 6px", borderRadius: 4 }}
               />
-              <Bar dataKey="paid"    fill={C.blue}   radius={[2,2,0,0]} barSize={7} />
-              <Bar dataKey="pending" fill={C.orange} radius={[2,2,0,0]} barSize={7} />
+              <Bar dataKey="paid"    fill={C.blue}   radius={[2,2,0,0]} barSize={12} />
+              <Bar dataKey="pending" fill={C.orange} radius={[2,2,0,0]} barSize={12} />
             </BarChart>
           </ResponsiveContainer>
         </SCard>
@@ -1031,6 +1031,7 @@ export default function VendorDashboard() {
       {/* ═══ ROW 6: Performance by Category ═══════════════════════════ */}
       <SCard>
         <SHead title="Performance by Category" />
+        <div className="dashboard-wide-table">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50 text-[9px] text-gray-500">
@@ -1069,6 +1070,7 @@ export default function VendorDashboard() {
             ))}
           </tbody>
         </table>
+        </div>
       </SCard>
 
       {/* ═══ ROW 7: Top Performing Products | Recent Issues ══════════════ */}

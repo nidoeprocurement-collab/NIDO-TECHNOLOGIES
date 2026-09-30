@@ -1,6 +1,9 @@
 .vendor-dashboard {
   color: hsl(var(--foreground));
   font-size: 14px;
+  min-width: 0;
+  container-name: vendor-dashboard;
+  container-type: inline-size;
 }
 
 .vendor-dashboard .text-gray-300,
@@ -20,8 +23,47 @@
   min-width: 0;
 }
 
+.dashboard-row-two,
+.dashboard-row-three,
+.dashboard-row-four,
+.dashboard-row-five,
+.dashboard-row-seven {
+  align-items: start;
+}
+
 .dashboard-kpis {
   gap: 12px;
+}
+
+.dashboard-vendor-spend {
+  container-name: vendor-spend;
+  container-type: inline-size;
+}
+
+.dashboard-delivery-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.dashboard-delivery-panel > :first-child {
+  justify-self: center;
+}
+
+.dashboard-activity-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px 16px;
+}
+
+.dashboard-wide-table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.dashboard-wide-table table {
+  min-width: 760px;
 }
 
 .dashboard-orders-card {
@@ -65,6 +107,7 @@
 .vendor-dashboard table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-variant-numeric: tabular-nums;
 }
 
@@ -74,6 +117,7 @@
   line-height: 1.4;
   vertical-align: middle;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .vendor-dashboard .recharts-cartesian-axis-tick-value,
@@ -87,26 +131,33 @@
   font-size: 12px !important;
 }
 
-@media (min-width: 640px) {
+@container vendor-dashboard (min-width: 520px) {
   .dashboard-kpis,
   .dashboard-row-three,
-  .dashboard-row-four,
-  .dashboard-row-seven {
+  .dashboard-row-four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboard-orders-card,
+  .dashboard-orders-card {
+    grid-column: 1 / -1;
+  }
+
   .dashboard-po-value-card {
     grid-column: 1 / -1;
   }
 }
 
-@media (min-width: 768px) {
+@container vendor-dashboard (min-width: 760px) {
   .dashboard-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .dashboard-row-two,
+  .dashboard-row-two {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+
+  .dashboard-row-three,
+  .dashboard-row-four,
   .dashboard-row-five {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -115,16 +166,17 @@
     grid-column: 1 / -1;
   }
 
-  .dashboard-row-three {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dashboard-activity-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .dashboard-row-four {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .dashboard-top-vendors-card,
+  .dashboard-responsiveness {
+    grid-column: 1 / -1;
   }
 }
 
-@media (min-width: 1024px) {
+@container vendor-dashboard (min-width: 960px) {
   .dashboard-row-three {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -136,9 +188,22 @@
   .dashboard-row-five {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .dashboard-top-vendors-card,
+  .dashboard-responsiveness {
+    grid-column: auto;
+  }
+
+  .dashboard-row-seven {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-row-four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-@media (min-width: 1280px) {
+@container vendor-dashboard (min-width: 1120px) {
   .dashboard-row-four {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -148,24 +213,47 @@
   }
 }
 
-@media (min-width: 1440px) {
-  .dashboard-kpis {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
+@container vendor-dashboard (min-width: 1240px) {
   .dashboard-row-two {
-    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(240px, 0.9fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr) minmax(240px, 0.85fr);
   }
 
   .dashboard-activities {
     grid-column: auto;
   }
 
+  .dashboard-activity-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dashboard-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
   .dashboard-row-three {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  .dashboard-orders-card {
+  .dashboard-category-card,
+  .dashboard-rating-card,
+  .dashboard-status-card,
+  .dashboard-top-vendors-card {
     grid-column: span 2;
+  }
+
+  .dashboard-orders-card {
+    grid-column: span 4;
+  }
+}
+
+@container vendor-spend (min-width: 640px) {
+  .dashboard-delivery-panel {
+    grid-template-columns: 160px minmax(0, 1fr);
+  }
+}
+
+@container vendor-dashboard (min-width: 1320px) {
+  .dashboard-kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
