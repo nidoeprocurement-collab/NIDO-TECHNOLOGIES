@@ -351,6 +351,8 @@ export default function CatalogUpdatesTab() {
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [viewItem, setViewItem] = useState<CatalogItem | null>(null);
   const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
+  const [publishConfirmItem, setPublishConfirmItem] = useState<CatalogItem | null>(null);
+  const [bulkPublishConfirmIds, setBulkPublishConfirmIds] = useState<string[]>([]);
 
   // Form state
   const [form, setForm] = useState<Omit<CatalogItem, 'id'>>(emptyItem);
@@ -556,7 +558,7 @@ export default function CatalogUpdatesTab() {
     setArchiveConfirmItem(null);
   };
 
-  const updateItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
+  const applyItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
     const products = getCatalogProducts();
     const product = products.find(p => p.id === id);
     if (!product) return;
@@ -564,20 +566,48 @@ export default function CatalogUpdatesTab() {
     saveCatalogProduct(updated);
     setItems(prev => prev.map(i => i.id === id ? { ...i, publishStatus: newStatus } : i));
     const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-    toast.success(`Status updated to ${label}`);
+    toast.success(newStatus === 'published' ? `"${product.productName}" published successfully` : `Status updated to ${label}`);
   };
 
-  const bulkUpdateStatus = (newStatus: 'draft' | 'published' | 'pending') => {
-    if (selectedIds.length === 0) return;
+  const updateItemStatus = (id: string, newStatus: 'draft' | 'published' | 'pending') => {
+    if (newStatus === 'published') {
+      const item = items.find(i => i.id === id);
+      if (!item || item.publishStatus === 'published') return;
+      setPublishConfirmItem(item);
+      return;
+    }
+    applyItemStatus(id, newStatus);
+  };
+
+  const confirmPublishItem = () => {
+    if (!publishConfirmItem) return;
+    applyItemStatus(publishConfirmItem.id, 'published');
+    setPublishConfirmItem(null);
+  };
+
+  const bulkUpdateStatus = (newStatus: 'draft' | 'published' | 'pending', ids = selectedIds) => {
+    if (ids.length === 0) return;
     const products = getCatalogProducts();
-    selectedIds.forEach(id => {
+    ids.forEach(id => {
       const product = products.find(p => p.id === id);
       if (product) saveCatalogProduct({ ...product, publishStatus: newStatus });
     });
-    setItems(prev => prev.map(i => selectedIds.includes(i.id) ? { ...i, publishStatus: newStatus } : i));
+    setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, publishStatus: newStatus } : i));
     const label = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-    toast.success(`${selectedIds.length} item${selectedIds.length > 1 ? 's' : ''} updated to ${label}`);
-    setSelectedIds([]);
+    toast.success(`${ids.length} item${ids.length > 1 ? 's' : ''} updated to ${label}`);
+    setSelectedIds(prev => prev.filter(id => !ids.includes(id)));
+  };
+
+  const requestBulkPublish = () => {
+    const idsToPublish = selectedIds.filter(id => items.some(item => item.id === id && item.publishStatus !== 'published'));
+    if (idsToPublish.length === 0) return;
+    setBulkPublishConfirmIds(idsToPublish);
+  };
+
+  const confirmBulkPublish = () => {
+    if (bulkPublishConfirmIds.length === 0) return;
+    bulkUpdateStatus('published', bulkPublishConfirmIds);
+    setBulkPublishConfirmIds([]);
   };
 
   const [bulkArchiveConfirmOpen, setBulkArchiveConfirmOpen] = useState(false);
@@ -1044,7 +1074,7 @@ export default function CatalogUpdatesTab() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem onClick={() => bulkUpdateStatus('published')} className="cursor-pointer" data-testid="menuitem-bulk-published">
+                <DropdownMenuItem onClick={requestBulkPublish} className="cursor-pointer" data-testid="menuitem-bulk-published">
                   <CheckCircle size={14} className="mr-2 text-green-600" /> Published
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => bulkUpdateStatus('pending')} className="cursor-pointer" data-testid="menuitem-bulk-pending">
@@ -1297,6 +1327,63 @@ export default function CatalogUpdatesTab() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Publish Confirmation Dialog */}
+      <Dialog open={!!publishConfirmItem} onOpenChange={(open) => { if (!open) setPublishConfirmItem(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle size={18} className="text-green-600" /> Publish Product?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-700">
+            Are you sure you want to publish <span className="font-semibold">"{publishConfirmItem?.name}"</span>?
+          </p>
+          <p className="text-sm text-gray-500">
+            This will change the product status to Published.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishConfirmItem(null)}>Cancel</Button>
+            <Button
+              data-confirmation-skip=""
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={confirmPublishItem}
+            >
+              <CheckCircle size={14} className="mr-2" /> Publish Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Publish Confirmation Dialog */}
+      <Dialog open={bulkPublishConfirmIds.length > 0} onOpenChange={(open) => { if (!open) setBulkPublishConfirmIds([]); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Publish {bulkPublishConfirmIds.length} selected product{bulkPublishConfirmIds.length === 1 ? '' : 's'}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Confirm that these products should change to Published:
+          </p>
+          <div className="max-h-40 overflow-y-auto rounded-md border bg-gray-50 px-3 py-2">
+            <ul className="space-y-1 text-sm text-gray-800">
+              {bulkPublishConfirmIds.map(id => {
+                const item = items.find(candidate => candidate.id === id);
+                return item ? <li key={id}>{item.name}</li> : null;
+              })}
+            </ul>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkPublishConfirmIds([])}>Cancel</Button>
+            <Button
+              data-confirmation-skip=""
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={confirmBulkPublish}
+            >
+              <CheckCircle size={14} className="mr-2" /> Publish Products
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Single Archive Confirmation Dialog */}
       <Dialog open={!!archiveConfirmItem} onOpenChange={(open) => { if (!open) setArchiveConfirmItem(null); }}>

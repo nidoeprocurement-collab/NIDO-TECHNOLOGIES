@@ -27,6 +27,7 @@ export default function AddMasterCatalogueItemWrapper() {
   const [editProductId, setEditProductId] = useState<string>('');
   const [editMasterCode, setEditMasterCode] = useState<string>('');
   const [masterProductCode] = useState(() => generateMasterProductCode());
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
 
   // In add-mode, seed state from the preview draft (if returning from preview)
   // so the user's in-progress work is never lost.
@@ -394,7 +395,12 @@ export default function AddMasterCatalogueItemWrapper() {
 
   const handlePublish = () => {
     if (!productName.trim()) { toast.error('Product name is required'); return; }
+    setPublishConfirmOpen(true);
+  };
+
+  const confirmPublish = () => {
     if (!saveProduct('published')) return;
+    setPublishConfirmOpen(false);
     clearDraft();
     toast.success('Product published successfully!');
     navigate('/configuration/master-catalogue');
@@ -905,6 +911,33 @@ export default function AddMasterCatalogueItemWrapper() {
           )}
         </div>
       </div>
+
+      {/* Publish Confirmation Dialog */}
+      <Dialog open={publishConfirmOpen} onOpenChange={setPublishConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Publish this product?</DialogTitle>
+          </DialogHeader>
+          <div className="py-1">
+            <p className="text-sm text-gray-700">
+              Are you sure you want to publish <span className="font-semibold">"{productName.trim() || 'Untitled Product'}"</span>?
+            </p>
+            <p className="mt-2 text-sm text-gray-500">
+              This will set its status to Published.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPublishConfirmOpen(false)}>Cancel</Button>
+            <Button
+              data-confirmation-skip=""
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={confirmPublish}
+            >
+              Publish Product
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add New Option Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
