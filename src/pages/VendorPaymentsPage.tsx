@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useConfig } from "@/contexts/ConfigContext";
+import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
+import { getReceipts } from "@/lib/paymentReceiptStore";
 import { POLink } from "@/components/shared/IdLinks";
 import {
   Wallet, CheckCircle, Clock, AlertTriangle, TrendingUp,
@@ -80,6 +82,31 @@ const ALL_PAYMENTS: Payment[] = [
   { id: "INV-2022-0230", poRef: "PO-09471", invoiceDate: "Sep 09, 2022", dueDate: "Oct 09, 2022", paymentDate: "Oct 06, 2022", method: "Bank Transfer", amount: 1320000, status: "Paid" },
 ];
 
+function getLivePayments(scope: VendorScope): Payment[] {
+  try {
+    const raw = localStorage.getItem("nido_purchase_payments_made_v1");
+    const purchaseEntries = raw ? JSON.parse(raw) : [];
+    const entries = [
+      ...(Array.isArray(purchaseEntries) ? purchaseEntries : []),
+      ...getReceipts().filter(receipt => !receipt.archived),
+    ];
+    return entries
+      .filter(entry => belongsToVendor(entry, scope))
+      .map(entry => ({
+        id: String(entry.paymentNumber || entry.id || ""),
+        poRef: String(entry.billNumber || entry.invoiceNumber || entry.referenceNumber || "—"),
+        invoiceDate: String(entry.date || entry.paymentDate || "—"),
+        dueDate: String(entry.dueDate || entry.paymentDate || "—"),
+        paymentDate: String(entry.date || entry.paymentDate || "—"),
+        method: (entry.mode || entry.paymentMode || "-") as PaymentMethod,
+        amount: Number(entry.amount || entry.amountReceived || 0),
+        status: entry.status === "PAID" || entry.status === "paid" ? "Paid" : "Pending",
+      }));
+  } catch {
+    return [];
+  }
+}
+
 function fmt(n: number) {
   return "₹" + n.toLocaleString("en-IN");
 }
@@ -112,19 +139,31 @@ function FilterSelect({ label, value, options, onChange }: {
   );
 }
 
-export default function VendorPaymentsPage() {
+export default function VendorPaymentsPage(scope: VendorScope = {}) {
   const { config } = useConfig();
   const invPrefix = config.prefixes.find(p => p.key === "invoice")?.value || "INV-";
   const poPrefix  = config.prefixes.find(p => p.key === "purchaseOrder")?.value || "PO-";
+  const scoped = hasVendorScope(scope);
+  const [livePayments, setLivePayments] = useState<Payment[]>(() => getLivePayments(scope));
+
+  useEffect(() => {
+    const refresh = () => setLivePayments(getLivePayments(scope));
+    window.addEventListener("storage", refresh);
+    window.addEventListener("nidoPurchasePaymentsUpdated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("nidoPurchasePaymentsUpdated", refresh);
+    };
+  }, [scope.vendorId, scope.vendorName]);
 
   // Remap hardcoded prefixes to whatever is configured right now
   const remappedPayments = useMemo(
-    () => ALL_PAYMENTS.map(p => ({
+    () => (scoped ? livePayments : ALL_PAYMENTS).map(p => ({
       ...p,
       id:    p.id.replace(/^INV-/, invPrefix),
       poRef: p.poRef.replace(/^PO-/, poPrefix),
     })),
-    [invPrefix, poPrefix]
+    [invPrefix, poPrefix, scoped, livePayments]
   );
 
   const [statusFilter, setStatusFilter] = useState("All");
@@ -146,11 +185,14 @@ export default function VendorPaymentsPage() {
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  const totalPaid = ALL_PAYMENTS.filter(p => p.status === "Paid").reduce((s, p) => s + p.amount, 0);
-  const totalPending = ALL_PAYMENTS.filter(p => p.status === "Pending").reduce((s, p) => s + p.amount, 0);
-  const totalOverdue = ALL_PAYMENTS.filter(p => p.status === "Overdue").reduce((s, p) => s + p.amount, 0);
+  const totalPaid = remappedPayments.filter(p => p.status === "Paid").reduce((s, p) => s + p.amount, 0);
+  const totalPending = remappedPayments.filter(p => p.status === "Pending").reduce((s, p) => s + p.amount, 0);
+  const totalOverdue = remappedPayments.filter(p => p.status === "Overdue").reduce((s, p) => s + p.amount, 0);
   const totalAll = totalPaid + totalPending + totalOverdue;
-  const thisMonth = 12450000;
+  const thisMonth = remappedPayments
+    .filter(p => p.paymentDate !== "-" && new Date(p.paymentDate).getMonth() === new Date().getMonth())
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  const percentage = (value: number) => totalAll ? `${((value / totalAll) * 100).toFixed(1)}% of Total` : "0.0% of Total";
 
   const allOnPage = paginated.every(p => selected.has(p.id));
   const toggleAll = () => {
@@ -176,15 +218,15 @@ export default function VendorPaymentsPage() {
       icon: <Wallet className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", accent: "text-gray-900",
     },
     {
-      label: "Paid Amount", value: fmt(totalPaid), sub: `${((totalPaid / totalAll) * 100).toFixed(1)}% of Total`,
+      label: "Paid Amount", value: fmt(totalPaid), sub: percentage(totalPaid),
       icon: <CheckCircle className="w-5 h-5 text-green-500" />, bg: "bg-green-50", accent: "text-green-700",
     },
     {
-      label: "Pending Amount", value: fmt(totalPending), sub: `${((totalPending / totalAll) * 100).toFixed(1)}% of Total`,
+      label: "Pending Amount", value: fmt(totalPending), sub: percentage(totalPending),
       icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", accent: "text-orange-600",
     },
     {
-      label: "Overdue Amount", value: fmt(totalOverdue), sub: `${((totalOverdue / totalAll) * 100).toFixed(1)}% of Total`,
+      label: "Overdue Amount", value: fmt(totalOverdue), sub: percentage(totalOverdue),
       icon: <AlertTriangle className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", accent: "text-purple-700",
     },
     {

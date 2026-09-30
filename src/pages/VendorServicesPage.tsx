@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Wrench, FileCheck, Boxes, Ticket, CheckCircle, IndianRupee, ChevronDown, Calendar } from "lucide-react";
+import { getServiceRequests, type StoredServiceRequest } from "@/lib/serviceRequestsStore";
+import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 
 type ServiceType = "AMC" | "Repair" | "Rental" | "Recycling";
 type ServiceStatus = "Active" | "In Progress" | "Completed" | "Pending";
@@ -87,6 +89,46 @@ const ENGINEERS     = ["All", ...Array.from(new Set(ALL_SERVICES.map(s => s.engi
 const DATE_OPTS     = ["This Year", "Last Year", "Last 6 Months", "Last 3 Months", "All Time"];
 const PAGE_SIZES    = [10, 25, 50];
 
+function toService(request: StoredServiceRequest): Service {
+  const payload = request.payload || {};
+  const rawType = request.requestType.toLowerCase();
+  const type: ServiceType = rawType.includes("repair")
+    ? "Repair"
+    : rawType.includes("rental")
+      ? "Rental"
+      : rawType.includes("recycl")
+        ? "Recycling"
+        : "AMC";
+  const engineer = request.assignedTo || "Unassigned";
+  const initials = engineer
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(part => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "—";
+  const status = request.status === "Scheduled" ? "Pending" : request.status;
+  const nextDueDate = request.nextAppointment || "–";
+
+  return {
+    id: request.id,
+    type,
+    client: String(payload.client || request.requestedBy || "—"),
+    asset: request.itemAsset || "—",
+    contractPO: String(payload.contractPO || payload.contractNumber || "—"),
+    engineer,
+    engineerInitials: initials,
+    engineerColor: "bg-blue-500",
+    nextDueDate,
+    daysLeft: null,
+    sla: String(payload.sla || "—"),
+    status: (["Active", "In Progress", "Completed", "Pending"].includes(status)
+      ? status
+      : "Pending") as ServiceStatus,
+    region: String(payload.region || payload.location || "—"),
+  };
+}
+
 function FilterSelect({ label, value, options, onChange }: {
   label: string; value: string; options: string[]; onChange: (v: string) => void;
 }) {
@@ -104,7 +146,29 @@ function FilterSelect({ label, value, options, onChange }: {
   );
 }
 
-export default function VendorServicesPage() {
+export default function VendorServicesPage(scope: VendorScope = {}) {
+  const [liveServices, setLiveServices] = useState<StoredServiceRequest[]>(() => getServiceRequests());
+  const scoped = hasVendorScope(scope);
+
+  useEffect(() => {
+    const refresh = () => setLiveServices(getServiceRequests());
+    window.addEventListener("serviceRequestsUpdated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("serviceRequestsUpdated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const services = useMemo(() => {
+    if (!scoped) return ALL_SERVICES;
+    return liveServices
+      .filter(request => belongsToVendor(request, scope))
+      .map(toService);
+  }, [liveServices, scoped, scope.vendorId, scope.vendorName]);
+  const clientOptions = ["All", ...Array.from(new Set(services.map(service => service.client))).sort()];
+  const regionOptions = ["All", ...Array.from(new Set(services.map(service => service.region))).filter(region => region !== "—").sort()];
+  const engineerOptions = ["All", ...Array.from(new Set(services.map(service => service.engineer))).sort()];
   const [typeFilter,     setTypeFilter]     = useState("All");
   const [statusFilter,   setStatusFilter]   = useState("All");
   const [clientFilter,   setClientFilter]   = useState("All");
@@ -115,7 +179,7 @@ export default function VendorServicesPage() {
   const [pageSize,       setPageSize]       = useState(10);
 
   const filtered = useMemo(() => {
-    return ALL_SERVICES.filter(s => {
+    return services.filter(s => {
       if (typeFilter     !== "All" && s.type     !== typeFilter)     return false;
       if (statusFilter   !== "All" && s.status   !== statusFilter)   return false;
       if (clientFilter   !== "All" && s.client   !== clientFilter)   return false;
@@ -123,18 +187,18 @@ export default function VendorServicesPage() {
       if (engineerFilter !== "All" && s.engineer !== engineerFilter) return false;
       return true;
     });
-  }, [typeFilter, statusFilter, clientFilter, regionFilter, engineerFilter, dateRange]);
+  }, [services, typeFilter, statusFilter, clientFilter, regionFilter, engineerFilter, dateRange]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const reset = () => setPage(1);
 
-  const active      = ALL_SERVICES.filter(s => s.status === "Active").length;
-  const amc         = ALL_SERVICES.filter(s => s.type   === "AMC").length;
-  const rental      = ALL_SERVICES.filter(s => s.type   === "Rental").length;
-  const openReqs    = ALL_SERVICES.filter(s => s.status === "In Progress" || s.status === "Pending").length;
-  const completed   = ALL_SERVICES.filter(s => s.status === "Completed").length;
+  const active      = services.filter(s => s.status === "Active").length;
+  const amc         = services.filter(s => s.type   === "AMC").length;
+  const rental      = services.filter(s => s.type   === "Rental").length;
+  const openReqs    = services.filter(s => s.status === "In Progress" || s.status === "Pending").length;
+  const completed   = services.filter(s => s.status === "Completed").length;
 
   const stats = [
     { label: "Active Services",       value: String(active),    sub: "View all active",    icon: <Wrench      className="w-5 h-5 text-green-500"  />, bg: "bg-green-50",  onClick: () => { setStatusFilter("Active");      reset(); } },
@@ -182,9 +246,9 @@ export default function VendorServicesPage() {
           <div className="px-5 py-2 border-b border-border flex items-end gap-3 flex-wrap">
             <FilterSelect label="Service Type" value={typeFilter}     options={SERVICE_TYPES} onChange={v => { setTypeFilter(v);     reset(); }} />
             <FilterSelect label="Status"       value={statusFilter}   options={STATUSES}      onChange={v => { setStatusFilter(v);   reset(); }} />
-            <FilterSelect label="Client"       value={clientFilter}   options={CLIENTS}       onChange={v => { setClientFilter(v);   reset(); }} />
-            <FilterSelect label="Region"       value={regionFilter}   options={REGIONS}       onChange={v => { setRegionFilter(v);   reset(); }} />
-            <FilterSelect label="Engineer"     value={engineerFilter} options={ENGINEERS}     onChange={v => { setEngineerFilter(v); reset(); }} />
+            <FilterSelect label="Client"       value={clientFilter}   options={scoped ? clientOptions : CLIENTS}       onChange={v => { setClientFilter(v);   reset(); }} />
+            <FilterSelect label="Region"       value={regionFilter}   options={scoped ? regionOptions : REGIONS}       onChange={v => { setRegionFilter(v);   reset(); }} />
+            <FilterSelect label="Engineer"     value={engineerFilter} options={scoped ? engineerOptions : ENGINEERS}     onChange={v => { setEngineerFilter(v); reset(); }} />
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">Date Range</label>
               <div className="relative">

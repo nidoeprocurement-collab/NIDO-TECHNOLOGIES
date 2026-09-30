@@ -5,6 +5,7 @@ import {
   X, Download, Archive, Pencil, Check,
   User, AlertTriangle, Plus, Upload,
 } from "lucide-react";
+import { hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
 type ContractStatus = "Active" | "Expired" | "Expiring Soon" | "Archived";
@@ -575,7 +576,7 @@ function ContractPanel({ contract, onClose, readOnly = false }: { contract: Cont
 }
 
 /* ─── Archived modal ────────────────────────────────────────────────────── */
-function ArchivedContractsModal({ onClose }: { onClose: () => void }) {
+function ArchivedContractsModal({ onClose, contracts = ARCHIVED_CONTRACTS }: { onClose: () => void; contracts?: Contract[] }) {
   const [selected, setSelected] = useState<Contract | null>(null);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -594,7 +595,7 @@ function ArchivedContractsModal({ onClose }: { onClose: () => void }) {
                 <tr>{["Contract ID", "Contract Name", "Type", "Start Date", "End Date", "Value", "Status"].map(h => <th key={h} className="text-left px-2 py-2 text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {ARCHIVED_CONTRACTS.map(c => (
+                {contracts.map(c => (
                   <tr key={c.id} onClick={() => setSelected(c)} className="hover:bg-gray-50 cursor-pointer transition-colors">
                     <td className="px-4 py-2 whitespace-nowrap"><span className="text-blue-600 font-semibold text-sm">{c.id}</span></td>
                     <td className="px-4 py-2 text-gray-700 text-sm">{c.name}</td>
@@ -632,8 +633,26 @@ function useDropdown() {
 }
 
 /* ���── Main export ─────────────────────────────────────────────────���─────── */
-export default function VendorContractsPage() {
-  const [contracts, setContracts] = useState(CONTRACTS);
+function readContracts(scope: VendorScope): Contract[] {
+  if (!hasVendorScope(scope)) return CONTRACTS;
+  try {
+    const raw = localStorage.getItem(`nido_vendor_contracts_${scope.vendorId}`);
+    const records = raw ? JSON.parse(raw) : [];
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistContracts(scope: VendorScope, contracts: Contract[]) {
+  if (!scope.vendorId) return;
+  localStorage.setItem(`nido_vendor_contracts_${scope.vendorId}`, JSON.stringify(contracts));
+  window.dispatchEvent(new Event("vendorContractsUpdated"));
+}
+
+export default function VendorContractsPage(scope: VendorScope = {}) {
+  const scoped = hasVendorScope(scope);
+  const [contracts, setContracts] = useState(() => readContracts(scope));
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null);
   const [showAddContract, setShowAddContract] = useState(false);
@@ -641,23 +660,47 @@ export default function VendorContractsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const topMenu = useDropdown();
 
+  useEffect(() => {
+    const refresh = () => setContracts(readContracts(scope));
+    window.addEventListener("vendorContractsUpdated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("vendorContractsUpdated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [scope.vendorId, scope.vendorName]);
+
   const handleSaveContract = (updated: Contract) => {
     if (editingContract) {
-      setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
+      setContracts(prev => {
+        const next = prev.map(c => c.id === updated.id ? updated : c);
+        persistContracts(scope, next);
+        return next;
+      });
       if (selectedContract?.id === updated.id) setSelectedContract(updated);
       setEditingContract(null);
     } else {
-      setContracts(prev => [updated, ...prev]);
+      setContracts(prev => {
+        const next = [updated, ...prev];
+        persistContracts(scope, next);
+        return next;
+      });
       setShowAddContract(false);
     }
   };
 
+  const activeContracts = contracts.filter(c => c.status !== "Archived");
+  const archivedContracts = contracts.filter(c => c.status === "Archived");
+  const totalValue = activeContracts.reduce((sum, contract) => {
+    const value = Number(contract.value.replace(/[^\d.-]/g, ""));
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0);
   const stats = [
-    { icon: <FileText className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "Total Contracts", value: "3", sub: "All Time" },
-    { icon: <CheckCircle className="w-5 h-5 text-green-500" />, bg: "bg-green-50", label: "Active Contracts", value: "2", sub: "Currently Active" },
-    { icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", label: "Expiring in 30 Days", value: "0", sub: "No Contracts" },
-    { icon: <IndianRupee className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", label: "Contract Value", value: "₹12,80,00,000", sub: "Total Value" },
-    { icon: <RefreshCcw className="w-5 h-5 text-blue-400" />, bg: "bg-blue-50", label: "Renewal Rate", value: "100%", sub: "On-time Renewals" },
+    { icon: <FileText className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "Total Contracts", value: String(activeContracts.length), sub: "All Time" },
+    { icon: <CheckCircle className="w-5 h-5 text-green-500" />, bg: "bg-green-50", label: "Active Contracts", value: String(activeContracts.filter(c => c.status === "Active").length), sub: "Currently Active" },
+    { icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", label: "Expiring in 30 Days", value: String(activeContracts.filter(c => c.expiryIn && !c.expiryIn.includes("Days") || c.expiryIn === "30 Days").length), sub: "Current records" },
+    { icon: <IndianRupee className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", label: "Contract Value", value: totalValue ? `₹${totalValue.toLocaleString("en-IN")}` : "₹0", sub: "Total Value" },
+    { icon: <RefreshCcw className="w-5 h-5 text-blue-400" />, bg: "bg-blue-50", label: "Renewal Rate", value: activeContracts.length ? `${Math.round(activeContracts.filter(c => c.autoRenewal).length / activeContracts.length * 100)}%` : "0%", sub: "Current records" },
   ];
 
   if (showAddContract) {
@@ -772,7 +815,7 @@ export default function VendorContractsPage() {
         </div>
       </div>
 
-      {showArchived && <ArchivedContractsModal onClose={() => setShowArchived(false)} />}
+      {showArchived && <ArchivedContractsModal onClose={() => setShowArchived(false)} contracts={scoped ? archivedContracts : ARCHIVED_CONTRACTS} />}
     </div>
   );
 }

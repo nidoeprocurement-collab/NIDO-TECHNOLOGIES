@@ -7,6 +7,7 @@ import { getProcurementSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
+import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 
 type OrderStatus = string;
 
@@ -318,7 +319,7 @@ function BulkNotesModal({ selectedCount, onApply, onClose }: {
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
-export default function VendorOrderList() {
+export default function VendorOrderList(scope: VendorScope = {}) {
   const navigate = useNavigate();
   const { config } = useConfig();
   const orderStatusConfig = useOrderStatusConfig();
@@ -333,21 +334,23 @@ export default function VendorOrderList() {
   const poTabs: (OrderStatus | "All")[] = ["All", ...poStatusOptions];
 
   // Build orders list: real POs from store (prepended) + static demo orders
-  const [orders, setOrders] = useState<Order[]>(() => {
+  const loadOrders = () => {
     const realPOs = getAllPOs().map(storedPOToOrder);
+    if (hasVendorScope(scope)) {
+      return realPOs.filter(order => belongsToVendor(order, scope));
+    }
     // De-duplicate: real POs take precedence over static entries with the same ID
     const realIds = new Set(realPOs.map(o => o.id));
     const staticOrders = INITIAL_ORDERS.filter(o => !realIds.has(o.id));
     return [...realPOs, ...staticOrders];
-  });
+  };
+
+  const [orders, setOrders] = useState<Order[]>(loadOrders);
 
   // Re-read store when page mounts (e.g. after navigation back from a PO detail)
   useEffect(() => {
-    const realPOs = getAllPOs().map(storedPOToOrder);
-    const realIds = new Set(realPOs.map(o => o.id));
-    const staticOrders = INITIAL_ORDERS.filter(o => !realIds.has(o.id));
-    setOrders([...realPOs, ...staticOrders]);
-  }, []);
+    setOrders(loadOrders());
+  }, [scope.vendorId, scope.vendorName]);
   const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
   const [vendorFilter, setVendorFilter] = useState("All Vendors");

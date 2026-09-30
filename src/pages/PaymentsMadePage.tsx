@@ -364,6 +364,7 @@ export default function PaymentsMadePage() {
   const persist = (next: PaymentEntry[]) => {
     setPayments(next);
     localStorage.setItem(PAYMENTS_STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event("nidoPurchasePaymentsUpdated"));
   };
 
   const updateBillsForPayment = (payment: PaymentEntry) => {

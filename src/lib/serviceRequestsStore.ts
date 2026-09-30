@@ -92,6 +92,7 @@ export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "reques
 
   const existing = load();
   save([full, ...existing]);
+  window.dispatchEvent(new Event("serviceRequestsUpdated"));
   return full;
 }
 

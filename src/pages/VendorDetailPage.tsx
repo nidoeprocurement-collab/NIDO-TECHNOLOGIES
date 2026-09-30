@@ -649,13 +649,13 @@ export default function VendorDetailPage() {
       <div className="flex-1 overflow-auto">
         {activeTab === "overview" && <div className="px-6 py-5"><OverviewTab key={dataVersion} vendor={vendor} /></div>}
         {activeTab === "products" && <VendorProductsPage />}
-        {activeTab === "orders" && <VendorOrdersPage />}
-        {activeTab === "services" && <VendorServicesPage />}
-        {activeTab === "performance" && <VendorPerformancePage />}
-        {activeTab === "contracts" && <VendorContractsPage />}
+        {activeTab === "orders" && <VendorOrdersPage vendorId={vendor.id} vendorName={vendor.name} />}
+        {activeTab === "services" && <VendorServicesPage vendorId={vendor.id} vendorName={vendor.name} />}
+        {activeTab === "performance" && <VendorPerformancePage vendor={vendor} />}
+        {activeTab === "contracts" && <VendorContractsPage vendorId={vendor.id} vendorName={vendor.name} />}
         {activeTab === "configuration" && <div className="px-6 py-5"><VendorConfigurationTab vendorId={vendor.id} /></div>}
-        {activeTab === "payments" && <VendorPaymentsPage />}
-        {activeTab === "news" && <VendorNewsActivityPage />}
+        {activeTab === "payments" && <VendorPaymentsPage vendorId={vendor.id} vendorName={vendor.name} />}
+        {activeTab === "news" && <VendorNewsActivityPage vendorId={vendor.id} vendorName={vendor.name} />}
       </div>
     </div>
   );

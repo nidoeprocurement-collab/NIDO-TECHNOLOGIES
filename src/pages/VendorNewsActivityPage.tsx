@@ -1,9 +1,11 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Bold, Italic, List, ListOrdered, Link2, AtSign, Paperclip,
   MoreVertical, Search, ChevronDown, Info,
   FileText, MessageSquare, CreditCard, RefreshCw, FileCheck,
 } from "lucide-react";
+import { getAllPOs, getPODisplayStatus } from "@/lib/purchaseOrderStore";
+import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 
 type NoteVisibility = "Private" | "Internal" | "Public";
 type NoteTab = "All Notes" | "My Notes" | "Mentions";
@@ -127,9 +129,39 @@ const INITIAL_ACTIVITIES: Activity[] = [
   },
 ];
 
-export default function VendorNewsActivityPage() {
-  const [notes, setNotes]               = useState<Note[]>(INITIAL_NOTES);
-  const [activities, setActivities]     = useState<Activity[]>(INITIAL_ACTIVITIES);
+function readScopedNotes(scope: VendorScope): Note[] {
+  if (!scope.vendorId) return [];
+  try {
+    const raw = localStorage.getItem(`nido_vendor_notes_${scope.vendorId}`);
+    const records = raw ? JSON.parse(raw) : [];
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+}
+
+function getScopedActivities(scope: VendorScope): Activity[] {
+  return getAllPOs()
+    .filter(po => belongsToVendor(po, scope))
+    .map(po => {
+      const date = new Date(po.createdOn);
+      return {
+        icon: <CreditCard className="w-4 h-4 text-purple-600" />,
+        iconBg: "bg-purple-100",
+        category: "Purchase order updated",
+        title: `${po.poNumber} is ${getPODisplayStatus(po.status).toLowerCase()}`,
+        subtitle: "Live purchase-order record",
+        date: Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        time: Number.isNaN(date.getTime()) ? "—" : date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+        link: "View Order",
+      };
+    });
+}
+
+export default function VendorNewsActivityPage(scope: VendorScope = {}) {
+  const scoped = hasVendorScope(scope);
+  const [notes, setNotes]               = useState<Note[]>(() => scoped ? readScopedNotes(scope) : INITIAL_NOTES);
+  const [activities, setActivities]     = useState<Activity[]>(() => scoped ? getScopedActivities(scope) : INITIAL_ACTIVITIES);
   const [noteText, setNoteText]         = useState("");
   const [visibility, setVisibility]     = useState<NoteVisibility>("Internal");
   const [activeTab, setActiveTab]       = useState<NoteTab>("All Notes");
@@ -139,6 +171,23 @@ export default function VendorNewsActivityPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const MAX_CHARS = 2000;
+
+  useEffect(() => {
+    const refresh = () => {
+      if (scoped) {
+        setNotes(readScopedNotes(scope));
+        setActivities(getScopedActivities(scope));
+      }
+    };
+    window.addEventListener("storage", refresh);
+    window.addEventListener("poCreated", refresh);
+    window.addEventListener("vendorNoteUpdated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("vendorNoteUpdated", refresh);
+    };
+  }, [scope.vendorId, scope.vendorName, scoped]);
 
   const visibleNotes = useMemo(() => {
     let list = notes;
@@ -170,6 +219,10 @@ export default function VendorNewsActivityPage() {
       isCurrentUser: true,
     };
     setNotes(prev => [newNote, ...prev]);
+    if (scoped && scope.vendorId) {
+      localStorage.setItem(`nido_vendor_notes_${scope.vendorId}`, JSON.stringify([newNote, ...notes]));
+      window.dispatchEvent(new Event("vendorNoteUpdated"));
+    }
     setActivities(prev => [{
       icon: <MessageSquare className="w-4 h-4 text-blue-600" />,
       iconBg: "bg-blue-100",

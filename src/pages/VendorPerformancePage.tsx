@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { Users, FileBarChart, Search, Star, Clock, ChevronDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { getAllPOs, type StoredPO } from "@/lib/purchaseOrderStore";
+import { belongsToVendor } from "@/lib/vendorScope";
+import type { StoredVendor } from "@/lib/vendorDataStore";
 
 /* ─── Dropdown periods ──────────────────────────────────────────────────── */
 type Period = "Weekly" | "Monthly" | "Quarterly" | "Yearly";
@@ -164,34 +167,108 @@ const CATEGORIES = [
   { name: "Peripherals",  spend: "₹1.39 Cr", orders: 9,  ontime: "91.3%", quality: "4.2 / 5", returns: "1.5%", vsLastYear: "-5.6%",  up: false },
 ];
 
+function vendorSpendTrend(orders: StoredPO[]) {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - 11 + index, 1);
+    const spend = orders
+      .filter(order => {
+        const created = new Date(order.createdOn);
+        return created.getFullYear() === date.getFullYear() && created.getMonth() === date.getMonth();
+      })
+      .reduce((sum, order) => sum + Number(order.grandTotal || 0), 0);
+    return {
+      label: date.toLocaleDateString("en-IN", { month: "short" }),
+      thisYear: Math.round(spend / 100000),
+      lastYear: 0,
+    };
+  });
+}
+
+function vendorPerfTrend(orders: StoredPO[], quality: number) {
+  const now = new Date();
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - 11 + index, 1);
+    const monthOrders = orders.filter(order => {
+      const created = new Date(order.createdOn);
+      return created.getFullYear() === date.getFullYear() && created.getMonth() === date.getMonth();
+    });
+    const delivered = monthOrders.filter(order => order.status === "Delivered").length;
+    return {
+      label: date.toLocaleDateString("en-IN", { month: "short" }),
+      ontime: monthOrders.length ? Math.round((delivered / monthOrders.length) * 100) : 0,
+      quality: quality / 20,
+    };
+  });
+}
+
 /* ─── Main page ─────────────────────────────────────────────────────────── */
-export default function VendorPerformancePage() {
+export default function VendorPerformancePage({ vendor }: { vendor?: StoredVendor } = {}) {
   const [spendPeriod, setSpendPeriod]   = useState<Period>("Monthly");
   const [perfPeriod,  setPerfPeriod]    = useState<Period>("Monthly");
+  const [dataVersion, setDataVersion] = useState(0);
 
-  const spendData = SPEND_DATA[spendPeriod];
-  const perfData  = PERF_DATA[perfPeriod];
+  useEffect(() => {
+    const refresh = () => setDataVersion(value => value + 1);
+    window.addEventListener("poCreated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
+  const vendorOrders = useMemo(
+    () => vendor ? getAllPOs().filter(order => belongsToVendor(order, { vendorId: vendor.id, vendorName: vendor.name })) : [],
+    [vendor, dataVersion],
+  );
+  const scoped = Boolean(vendor);
+  const qualityScore = vendor?.performanceQuality ?? (vendor?.rating ? vendor.rating * 20 : 0);
+  const totalSpend = vendorOrders.reduce((sum, order) => sum + Number(order.grandTotal || 0), 0);
+  const completedOrders = vendorOrders.filter(order => order.status !== "Draft" && order.status !== "Cancelled");
+  const deliveredOrders = completedOrders.filter(order => order.status === "Delivered").length;
+  const onTime = completedOrders.length ? Math.round((deliveredOrders / completedOrders.length) * 100) : 0;
+
+  const spendData = scoped
+    ? (spendPeriod === "Monthly" ? vendorSpendTrend(vendorOrders) : [])
+    : SPEND_DATA[spendPeriod];
+  const perfData  = scoped
+    ? (perfPeriod === "Monthly" ? vendorPerfTrend(vendorOrders, qualityScore) : [])
+    : PERF_DATA[perfPeriod];
 
   const stats = [
-    { icon: <Users className="w-5 h-5 text-blue-500" />,        bg: "bg-blue-50",   label: "Total Spend",        value: "₹12.45 Cr", trend: "+12.6% vs last year", up: true  },
-    { icon: <FileBarChart className="w-5 h-5 text-teal-500" />,  bg: "bg-teal-50",   label: "Total Orders",       value: "156",        trend: "+8.3% vs last year",  up: true  },
-    { icon: <Search className="w-5 h-5 text-blue-500" />,        bg: "bg-blue-50",   label: "On-time Delivery",   value: "94.2%",      trend: "+3.5% vs last year",  up: true  },
-    { icon: <Star className="w-5 h-5 text-purple-500" />,        bg: "bg-purple-50", label: "Quality Score",      value: "4.6 / 5",   trend: "+0.4 vs last year",   up: true  },
-    { icon: <Clock className="w-5 h-5 text-orange-400" />,       bg: "bg-orange-50", label: "Avg. Response Time", value: "12.5 Hrs",  trend: "↓2.1 hrs vs last year", up: false },
+    { icon: <Users className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "Total Spend", value: scoped ? `₹${totalSpend.toLocaleString("en-IN")}` : "₹12.45 Cr", trend: scoped ? "Live purchase-order total" : "+12.6% vs last year", up: true },
+    { icon: <FileBarChart className="w-5 h-5 text-teal-500" />, bg: "bg-teal-50", label: "Total Orders", value: scoped ? String(completedOrders.length) : "156", trend: scoped ? "Live purchase-order count" : "+8.3% vs last year", up: true },
+    { icon: <Search className="w-5 h-5 text-blue-500" />, bg: "bg-blue-50", label: "On-time Delivery", value: scoped ? `${onTime}%` : "94.2%", trend: scoped ? "Delivered orders" : "+3.5% vs last year", up: true },
+    { icon: <Star className="w-5 h-5 text-purple-500" />, bg: "bg-purple-50", label: "Quality Score", value: scoped ? `${(qualityScore / 20).toFixed(1)} / 5` : "4.6 / 5", trend: scoped ? "Vendor score" : "+0.4 vs last year", up: true },
+    { icon: <Clock className="w-5 h-5 text-orange-400" />, bg: "bg-orange-50", label: "Avg. Response Time", value: scoped ? "—" : "12.5 Hrs", trend: scoped ? "Not recorded" : "↓2.1 hrs vs last year", up: false },
   ];
 
   const deliverySegments = [
-    { name: "On-time", value: 147, color: "#22c55e", pct: "147 (94.2%)" },
-    { name: "Late",    value: 7,   color: "#f97316", pct: "7 (4.5%)" },
-    { name: "Early",   value: 2,   color: "#3b82f6", pct: "2 (1.3%)" },
+    { name: "On-time", value: scoped ? deliveredOrders : 147, color: "#22c55e", pct: `${scoped ? deliveredOrders : 147} (${scoped ? onTime : 94.2}%)` },
+    { name: "Late", value: scoped ? Math.max(0, completedOrders.length - deliveredOrders) : 7, color: "#f97316", pct: `${scoped ? Math.max(0, completedOrders.length - deliveredOrders) : 7}` },
+    { name: "Early", value: scoped ? 0 : 2, color: "#3b82f6", pct: `${scoped ? 0 : 2}` },
   ];
 
   const qualitySegments = [
-    { name: "Excellent (5)", value: 82, color: "#22c55e", pct: "82 (52.6%)" },
-    { name: "Good (4)",      value: 61, color: "#3b82f6", pct: "61 (39.1%)" },
-    { name: "Average (3)",   value: 10, color: "#f59e0b", pct: "10 (6.4%)" },
-    { name: "Poor (1-2)",    value: 3,  color: "#ef4444", pct: "3 (1.9%)" },
+    { name: scoped ? "Vendor score" : "Excellent (5)", value: scoped ? (qualityScore ? 1 : 0) : 82, color: "#22c55e", pct: scoped ? `${qualityScore ? 1 : 0}` : "82 (52.6%)" },
+    { name: "Good (4)", value: scoped ? 0 : 61, color: "#3b82f6", pct: scoped ? "0" : "61 (39.1%)" },
+    { name: "Average (3)", value: scoped ? 0 : 10, color: "#f59e0b", pct: scoped ? "0" : "10 (6.4%)" },
+    { name: "Poor (1-2)", value: scoped ? 0 : 3, color: "#ef4444", pct: scoped ? "0" : "3 (1.9%)" },
   ];
+
+  const categoryRows = scoped
+    ? [{
+        name: vendor?.category || "Uncategorized",
+        spend: `₹${totalSpend.toLocaleString("en-IN")}`,
+        orders: completedOrders.length,
+        ontime: `${onTime}%`,
+        quality: `${(qualityScore / 20).toFixed(1)} / 5`,
+        returns: "—",
+        vsLastYear: "—",
+        up: true,
+      }]
+    : CATEGORIES;
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -276,16 +353,16 @@ export default function VendorPerformancePage() {
               <h3 className="text-sm font-bold text-gray-800">Delivery Performance</h3>
               <button className="text-xs text-blue-600 font-medium hover:underline">View Details</button>
             </div>
-            <DonutChart segments={deliverySegments} centerLabel="156" centerSub="Total Orders" />
+            <DonutChart segments={deliverySegments} centerLabel={String(scoped ? completedOrders.length : 156)} centerSub="Total Orders" />
             <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-400 mb-0.5">Average Delivery Time</p>
-                <p className="text-xl font-bold text-gray-900">3.2 Days</p>
+                <p className="text-xl font-bold text-gray-900">{scoped ? "—" : "3.2 Days"}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-0.5">vs Last Year</p>
                 <p className="text-sm font-semibold text-green-600 flex items-center gap-0.5 justify-end">
-                  <ArrowDownRight className="w-3.5 h-3.5" /> 0.6 Days
+                  <ArrowDownRight className="w-3.5 h-3.5" /> {scoped ? "—" : "0.6 Days"}
                 </p>
               </div>
             </div>
@@ -297,16 +374,16 @@ export default function VendorPerformancePage() {
               <h3 className="text-sm font-bold text-gray-800">Quality Performance</h3>
               <button className="text-xs text-blue-600 font-medium hover:underline">View Details</button>
             </div>
-            <DonutChart segments={qualitySegments} centerLabel="156" centerSub="Total Orders" />
+            <DonutChart segments={qualitySegments} centerLabel={String(scoped ? completedOrders.length : 156)} centerSub="Total Orders" />
             <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-400 mb-0.5">Average Quality Score</p>
-                <p className="text-xl font-bold text-gray-900">4.6 / 5</p>
+                <p className="text-xl font-bold text-gray-900">{scoped ? `${(qualityScore / 20).toFixed(1)} / 5` : "4.6 / 5"}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-0.5">vs Last Year</p>
                 <p className="text-sm font-semibold text-green-600 flex items-center gap-0.5 justify-end">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> 0.4
+                  <ArrowUpRight className="w-3.5 h-3.5" /> {scoped ? "—" : "0.4"}
                 </p>
               </div>
             </div>
@@ -318,21 +395,25 @@ export default function VendorPerformancePage() {
               <h3 className="text-sm font-bold text-gray-800">Response Time Performance</h3>
               <button className="text-xs text-blue-600 font-medium hover:underline">View Details</button>
             </div>
-            <div className="flex flex-col gap-4">
-              <ResponseRow label="Within 4 Hrs"  pct={68.2} color="#22c55e" iconBg="bg-green-50" />
-              <ResponseRow label="4 – 24 Hrs"    pct={25.6} color="#3b82f6" iconBg="bg-blue-50" />
-              <ResponseRow label="24 – 48 Hrs"   pct={4.3}  color="#f59e0b" iconBg="bg-yellow-50" />
-              <ResponseRow label="> 48 Hrs"      pct={1.9}  color="#ef4444" iconBg="bg-red-50" />
-            </div>
+            {scoped ? (
+              <p className="py-6 text-sm text-gray-400">No response-time records for this vendor.</p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <ResponseRow label="Within 4 Hrs" pct={68.2} color="#22c55e" iconBg="bg-green-50" />
+                <ResponseRow label="4 – 24 Hrs" pct={25.6} color="#3b82f6" iconBg="bg-blue-50" />
+                <ResponseRow label="24 – 48 Hrs" pct={4.3} color="#f59e0b" iconBg="bg-yellow-50" />
+                <ResponseRow label="> 48 Hrs" pct={1.9} color="#ef4444" iconBg="bg-red-50" />
+              </div>
+            )}
             <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
               <div>
                 <p className="text-xs text-gray-400 mb-0.5">Average Response Time</p>
-                <p className="text-xl font-bold text-gray-900">12.5 Hrs</p>
+                <p className="text-xl font-bold text-gray-900">{scoped ? "—" : "12.5 Hrs"}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-0.5">vs Last Year</p>
                 <p className="text-sm font-semibold text-green-600 flex items-center gap-0.5 justify-end">
-                  <ArrowDownRight className="w-3.5 h-3.5" /> 2.1 Hrs
+                  <ArrowDownRight className="w-3.5 h-3.5" /> {scoped ? "—" : "2.1 Hrs"}
                 </p>
               </div>
             </div>
@@ -353,7 +434,7 @@ export default function VendorPerformancePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {CATEGORIES.map(c => (
+              {categoryRows.map(c => (
                 <tr key={c.name} className="hover:bg-gray-50/70 transition-colors">
                   <td className="px-5 py-3.5 font-semibold text-gray-800">{c.name}</td>
                   <td className="px-5 py-3.5 text-gray-600">{c.spend}</td>
@@ -372,7 +453,7 @@ export default function VendorPerformancePage() {
             </tbody>
           </table>
           <div className="px-5 py-2 border-t border-gray-100 text-right">
-            <p className="text-xs text-gray-400">Showing 1 to {CATEGORIES.length} of {CATEGORIES.length} categories</p>
+            <p className="text-xs text-gray-400">Showing 1 to {categoryRows.length} of {categoryRows.length} categories</p>
           </div>
         </div>
 
