@@ -100,6 +100,7 @@ import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { hasPortalPermission } from "@/lib/portalUserStore";
+import { observeNativeSelects } from "@/lib/alphabeticalDropdowns";
 
 const queryClient = new QueryClient();
 
@@ -1272,11 +1273,17 @@ function AppRoutes() {
   );
 }
 
+function AlphabeticalDropdownOrdering() {
+  useEffect(() => observeNativeSelects(), []);
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <AlphabeticalDropdownOrdering />
       <BrowserRouter>
         <ConfigProvider>
         <ThemeProvider>

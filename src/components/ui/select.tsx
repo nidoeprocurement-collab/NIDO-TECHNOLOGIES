@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
+import {
+  getReactNodeText,
+  sortByDropdownLabel,
+} from "@/lib/alphabeticalDropdowns";
 
 interface SelectContextType {
   value?: string;
@@ -158,6 +162,15 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         : { top: rect.bottom + 4 }),
     };
 
+    const childArray = React.Children.toArray(children);
+    const selectItems = childArray.filter(isSelectItem);
+    const orderedChildren =
+      selectItems.length > 1 && selectItems.length === childArray.length
+        ? sortByDropdownLabel(selectItems, (item) =>
+            getReactNodeText(item.props.children),
+          )
+        : children;
+
     const content = (
       <div
         ref={(el) => {
@@ -170,7 +183,7 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
         className={`rounded-md border border-border bg-background text-foreground shadow-xl overflow-y-auto ${className || ""}`}
         {...props}
       >
-        {children}
+        {orderedChildren}
       </div>
     );
 
@@ -182,6 +195,14 @@ const SelectContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
   }
 );
 SelectContent.displayName = "SelectContent";
+
+function isSelectItem(
+  child: React.ReactNode,
+): child is React.ReactElement<{ children?: React.ReactNode }> {
+  if (!React.isValidElement(child)) return false;
+  const type = child.type as { displayName?: string };
+  return type.displayName === "SelectItem";
+}
 
 const SelectItem = React.forwardRef<
   HTMLDivElement,

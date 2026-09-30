@@ -17,8 +17,8 @@ The full-stack dev server listens on port **5000** and is accessible in the Repl
 This repository is already configured for Replit. To keep a fresh import
 lightweight:
 
-1. Install the locked dependencies with `npm ci` (do not regenerate the lockfile
-   or migrate the project to another package manager).
+1. Install the locked dependencies with `pnpm install --frozen-lockfile` (do not
+   regenerate the lockfile or migrate the project to another package manager).
 2. Run the existing **Start application** workflow; it uses
    `npm run dev:full` on port 5000.
 3. Do not add database or email secrets unless the email features are needed.
@@ -26,7 +26,7 @@ lightweight:
 4. Avoid asking an Agent to rebuild or broadly analyze the imported project
    when the goal is only to run it. Ask for specific changes instead.
 
-The committed `package-lock.json`, `.replit` workflow, and this setup guide are
+The committed `pnpm-lock.yaml`, `.replit` workflow, and this setup guide are
 the source of truth for the imported project.
 
 ## Tech stack
