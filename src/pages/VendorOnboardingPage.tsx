@@ -135,14 +135,6 @@ export default function AddVendorPage() {
     Object.entries(CATEGORY_SUBCATEGORIES).map(([k, v]) => [k, [...(v as string[])]])
   );
 
-  const contactsBase = [
-    'Rahul Sharma (Manager - Sales)',
-    'Amit Verma (Regional Manager)',
-    'Neha Kapoor (Senior Director)',
-    'Pooja Nair (Partner Manager)',
-    'Rohit Mehta (Sales Lead)',
-  ];
-
   const designationsBase = ['CEO / Director', 'Managing Director', 'Vice President', 'General Manager', 'Manager', 'Assistant Manager', 'Executive', 'Specialist', 'Others'];
   const vendorTypesBase = ['Supplier', 'Manufacturer', 'Distributor', 'Reseller', 'Service Provider', 'Consultant', 'Contractor', 'OEM', 'Others'];
   const phoneCodesBase = ['+91 (India)', '+1 (USA)', '+44 (UK)', '+971 (UAE)', '+65 (Singapore)', '+61 (Australia)', '+86 (China)', '+81 (Japan)', '+49 (Germany)', '+33 (France)'];
@@ -627,8 +619,14 @@ export default function AddVendorPage() {
         <FormSection number={2} title="Primary Contact">
           <div className="grid grid-cols-2 gap-6">
             <FormField label="Contact Person" required input={
-              <AddableSelect name="contactPerson" value={formData.contactPerson} onChange={handleChange}
-                baseOptions={contactsBase} addLabel="+ Add New Contact" placeholder="Select contact person" className={selectClass} />
+              <input
+                type="text"
+                placeholder="Enter contact person"
+                name="contactPerson"
+                value={formData.contactPerson}
+                onChange={handleChange}
+                className={inputClass}
+              />
             } />
             <FormField label="Designation" input={
               <AddableSelect name="designation" value={formData.designation} onChange={handleChange}
