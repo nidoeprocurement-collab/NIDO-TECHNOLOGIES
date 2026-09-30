@@ -386,10 +386,11 @@ export function getRecommendedVendor(
 export function getVendorComparisonBadge(
   comparison: VendorComparisonRow,
   comparisons: VendorComparisonRow[],
+  isEligible: (row: VendorComparisonRow) => boolean = canVendorFulfillMoq,
 ): "Recommended" | "Fastest" | "Best Price" | "Top Rated" | null {
-  const eligible = comparisons.filter(canVendorFulfillMoq);
-  const recommended = getRecommendedVendor(comparisons);
-  if (!recommended || !canVendorFulfillMoq(comparison)) return null;
+  const eligible = comparisons.filter(isEligible);
+  const recommended = eligible[0] ?? null;
+  if (!recommended || !isEligible(comparison)) return null;
   if (comparison.vendorId === recommended.vendorId) return "Recommended";
 
   const fastest = eligible.reduce((best, row) =>

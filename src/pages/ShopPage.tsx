@@ -1311,12 +1311,22 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
   }, [product.productCode, product.category]);
 
   useEffect(() => {
-    setSelectedVendor(current => {
-      if (!current) return current;
-      const refreshed = vendorComps.find(comp => comp.vendorId === current.vendorId);
-      return refreshed && canUseVendor(refreshed) ? refreshed : null;
-    });
-  }, [vendorComps]);
+    if (!selectedVendor) return;
+    const refreshed = vendorComps.find(comp => comp.vendorId === selectedVendor.vendorId);
+    if (!refreshed || !canUseVendor(refreshed)) {
+      const defaultQty = Math.max(1, product.moq || 1);
+      setSelectedVendor(null);
+      setQty(defaultQty);
+      setQtyDraft(String(defaultQty));
+      return;
+    }
+    if (refreshed !== selectedVendor) setSelectedVendor(refreshed);
+    const minimum = Math.max(1, refreshed.moq || 1);
+    if (qty < minimum) {
+      setQty(minimum);
+      setQtyDraft(String(minimum));
+    }
+  }, [vendorComps, selectedVendor, qty, product.moq]);
 
   useEffect(() => {
     const handleOutsidePointerDown = (event: PointerEvent) => {
@@ -1543,7 +1553,7 @@ function ProductCard({ product, onPreview, clientId, isGrid }: { product: Produc
               {filteredVendors.map(comp => {
                 const isSelected = selectedVendor?.vendorId === comp.vendorId;
                 const isOOS = !canUseVendor(comp);
-                const badge = getVendorComparisonBadge(comp, vendorComps);
+                const badge = getVendorComparisonBadge(comp, vendorComps, canUseVendor);
                 const availability = getAvailabilityByType(comp.stock, productType);
                 const leadTime = formatLeadTimeByType(comp.leadTime, productType);
                 const price = !isOOS && clientId

@@ -62,6 +62,13 @@ The vendor product table and Shop vendor selectors use one shared rule set for p
 
 **How to apply:** Reuse the shared product-type rule helpers whenever adding another product comparison, catalog card, or vendor-selection surface.
 
+## Physical MOQ eligibility
+A physical vendor offer is selectable and recommendable only when its available stock meets that vendor's own MOQ. Keep below-MOQ offers visible for comparison, but hide their price, mark them unavailable, and block selection/cart addition. Digital-only offers are exempt from physical stock and MOQ checks.
+
+**Why:** Showing an offer as purchasable when it cannot fulfill its minimum order quantity misleads clients; applying a physical MOQ to digital licenses would incorrectly block valid subscriptions.
+
+**How to apply:** Use vendor-specific comparison data for availability, price visibility, recommendation, and selected quantity. Keep the digital-only exception consistent between Shop and Product Detail.
+
 ## Digital variation pricing
 Digital product variation fields and option price adjustments are owned by each `VendorProduct`, then carried through vendor comparisons to Shop after the client selects a vendor. Shop adds the selected total to the vendor base price before landed-cost and client-price calculations. Master-catalog variation data is legacy-only and must not drive digital configuration.
 

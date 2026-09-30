@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer,
@@ -8,6 +9,9 @@ import {
   BarChart2, Download, Settings, Bell, Upload,
   IndianRupee, UserCheck,
 } from "lucide-react";
+import { getVendors, type StoredVendor } from "@/lib/vendorDataStore";
+import { getAllPOs, getPODisplayStatus, type StoredPO } from "@/lib/purchaseOrderStore";
+import { belongsToVendor } from "@/lib/vendorScope";
 
 // ─── Color Palette ──────────────────────────────────────────────
 const C = {
@@ -19,148 +23,6 @@ const C = {
   cyan:   "#00CFE8",
   gray:   "#ADB5BD",
 };
-
-// ─── Data ───────────────────────────────────────────────────────
-const spendByVendorData = [
-  { name: "Dell Technologies", value: 40.6 },
-  { name: "HP India",          value: 19.4 },
-  { name: "Lenovo India",      value: 15.2 },
-  { name: "Canon Supplies",    value: 9.8  },
-  { name: "Cisco Systems",     value: 9.2  },
-  { name: "Honeywell",         value: 7.4  },
-  { name: "ViewSonic Corp",    value: 5.9  },
-  { name: "Logitech India",    value: 4.2  },
-  { name: "Samsung India",     value: 3.8  },
-  { name: "Others",            value: 2.5  },
-];
-
-const vendorRankingData = [
-  { name: "Dell Technologies", category: "IT Hardware",     quality: 4.8, delivery: 98.2 },
-  { name: "HP India",          category: "IT Hardware",     quality: 4.5, delivery: 95.8 },
-  { name: "Lenovo India",      category: "IT Hardware",     quality: 4.3, delivery: 92.1 },
-  { name: "Canon Supplies",    category: "Office Supplies", quality: 4.6, delivery: 96.4 },
-  { name: "Cisco Systems",     category: "Networking",      quality: 4.7, delivery: 94.0 },
-  { name: "Honeywell",         category: "Peripherals",     quality: 3.9, delivery: 87.5 },
-  { name: "ViewSonic Corp",    category: "IT Hardware",     quality: 4.2, delivery: 90.3 },
-  { name: "Microsoft India",   category: "Software",        quality: 4.6, delivery: 97.0 },
-  { name: "Logitech India",    category: "Peripherals",     quality: 4.4, delivery: 93.5 },
-  { name: "Seagate India",     category: "Storage",         quality: 4.1, delivery: 89.2 },
-  { name: "Samsung India",     category: "IT Hardware",     quality: 4.5, delivery: 94.8 },
-  { name: "LG Electronics",    category: "Displays",        quality: 4.3, delivery: 91.6 },
-];
-
-const slaVendorData = [
-  { vendor: "Dell Technologies", category: "IT Hardware",     sla: 98.2, target: 95, tickets: 124, resolved: 122, status: "Met"    },
-  { vendor: "HP India",          category: "IT Hardware",     sla: 95.8, target: 95, tickets: 87,  resolved: 83,  status: "Met"    },
-  { vendor: "Canon Supplies",    category: "Office Supplies", sla: 96.4, target: 95, tickets: 52,  resolved: 50,  status: "Met"    },
-  { vendor: "Cisco Systems",     category: "Networking",      sla: 94.0, target: 95, tickets: 68,  resolved: 64,  status: "Missed" },
-  { vendor: "Lenovo India",      category: "IT Hardware",     sla: 92.1, target: 95, tickets: 95,  resolved: 88,  status: "Missed" },
-  { vendor: "Honeywell",         category: "Peripherals",     sla: 87.5, target: 90, tickets: 40,  resolved: 35,  status: "Missed" },
-  { vendor: "ViewSonic Corp",    category: "IT Hardware",     sla: 90.3, target: 90, tickets: 31,  resolved: 28,  status: "Met"    },
-];
-
-const slaData = [
-  { name: "Met",    value: 91, color: "#2B2D42" },
-  { name: "Missed", value: 9,  color: "#E5E7EB"  },
-];
-
-const activities = [
-  { text: "Dell Latitude 5440 Laptop",     sub: "PO-10027 received & verified",      time: "2h ago",  color: C.green  },
-  { text: "HP LaserJet M404dn printer",    sub: "New vendor onboarding completed",    time: "4h ago",  color: C.blue   },
-  { text: "Lenovo ThinkPad E14 Gen 4",     sub: "Quality assessment: 4.8/5",          time: "6h ago",  color: C.green  },
-  { text: "Canon imageCLASS MF3010",       sub: "Contract renewed for 1 year",        time: "1d ago",  color: C.orange },
-  { text: "Cisco Catalyst 9200 Switch",    sub: "Invoice approved & processed",       time: "1d ago",  color: C.blue   },
-];
-
-const spendCategoryData = [
-  { name: "IT Hardware",     value: 52, color: C.blue   },
-  { name: "Office Supplies", value: 18, color: C.orange },
-  { name: "Networking",      value: 12, color: C.purple },
-  { name: "Accessories",     value: 10, color: C.green  },
-  { name: "Others",          value: 8,  color: C.gray   },
-];
-
-const orderStatusData = [
-  { name: "Processing", value: 152, color: C.orange },
-  { name: "In Transit", value: 245, color: C.blue   },
-  { name: "Delivered",  value: 421, color: C.green  },
-  { name: "Cancelled",  value: 40,  color: C.red    },
-];
-
-const recentOrdersData = [
-  { vendor: "Dell Technologies", category: "IT Hardware",     amount: "₹4.20 Cr", date: "Apr 15", status: "Delivered",   sc: C.green  },
-  { vendor: "HP India",          category: "IT Hardware",     amount: "₹1.85 Cr", date: "Apr 12", status: "In Transit",  sc: C.blue   },
-  { vendor: "Lenovo India",      category: "IT Hardware",     amount: "₹2.10 Cr", date: "Apr 10", status: "Processing",  sc: C.orange },
-  { vendor: "Canon Supplies",    category: "Office Supplies", amount: "₹0.45 Cr", date: "Apr 08", status: "Delivered",   sc: C.green  },
-  { vendor: "Cisco Systems",     category: "Networking",      amount: "₹1.20 Cr", date: "Apr 05", status: "Delivered",   sc: C.green  },
-];
-
-const topVendorsData = [
-  { rank: 1, name: "Dell Technologies", score: 9.8, color: C.blue   },
-  { rank: 2, name: "Canon Supplies",    score: 9.4, color: C.green  },
-  { rank: 3, name: "Cisco Systems",     score: 9.1, color: C.purple },
-  { rank: 4, name: "HP India",          score: 8.9, color: C.orange },
-  { rank: 5, name: "ViewSonic Corp",    score: 8.7, color: C.cyan   },
-];
-
-const contractPieData = [
-  { name: "Active",   value: 89, color: C.green  },
-  { name: "Expiring", value: 23, color: C.orange },
-  { name: "Expired",  value: 12, color: C.red    },
-  { name: "Renewal",  value: 4,  color: C.blue   },
-];
-
-const paymentChartData = [
-  { month: "Oct", paid: 1.2, pending: 0.4 },
-  { month: "Nov", paid: 0.9, pending: 0.3 },
-  { month: "Dec", paid: 1.8, pending: 0.6 },
-  { month: "Jan", paid: 1.1, pending: 0.2 },
-  { month: "Feb", paid: 1.4, pending: 0.5 },
-  { month: "Mar", paid: 0.7, pending: 0.1 },
-];
-
-const riskData = [
-  { level: "Low",      count: 342, pct: 65, color: C.green  },
-  { level: "Medium",   count: 128, pct: 25, color: C.orange },
-  { level: "High",     count: 42,  pct: 8,  color: C.red    },
-  { level: "Critical", count: 12,  pct: 2,  color: "#7B1A1A"},
-];
-
-const deliveryPieData = [
-  { name: "On-time", value: 147, color: C.green },
-  { name: "Early",   value: 5,   color: C.blue  },
-  { name: "Late",    value: 4,   color: C.red   },
-];
-
-const qualityPieData = [
-  { name: "Excellent (5)", value: 102, color: C.green  },
-  { name: "Good (4)",      value: 38,  color: C.blue   },
-  { name: "Average (3)",   value: 10,  color: C.orange },
-  { name: "Poor",          value: 6,   color: C.red    },
-];
-
-const performanceCatData = [
-  { category: "Laptops",      spend: "₹5.42 Cr", orders: 90, onTime: "98.8%", quality: "4.7 / 5", returnRate: "0.8%", growth: "+12.3%", pos: true  },
-  { category: "Monitors",     spend: "₹1.9 Cr",  orders: 81, onTime: "93.2%", quality: "4.3 / 5", returnRate: "0.9%", growth: "+8.7%",  pos: true  },
-  { category: "Accessories",  spend: "₹1.1 Cr",  orders: 33, onTime: "88.8%", quality: "4.4 / 5", returnRate: "0.7%", growth: "+16.4%", pos: true  },
-  { category: "Networking",   spend: "₹0.63 Cr", orders: 18, onTime: "80.0%", quality: "4.2 / 5", returnRate: "3.4%", growth: "-3.4%",  pos: false },
-  { category: "Peripherals",  spend: "₹1.26 Cr", orders: 9,  onTime: "31.3%", quality: "—",        returnRate: "1.9%", growth: "+5.4%",  pos: true  },
-];
-
-const topProductsData = [
-  { rank: 1, name: "Dell Latitude 5440 Laptop",    amount: "₹3.20 Cr", pct: 25.7 },
-  { rank: 2, name: "Dell 24 Monitor - P2422H",     amount: "₹2.14 Cr", pct: 17.2 },
-  { rank: 3, name: "Dell WD19 Docking Station",    amount: "₹1.89 Cr", pct: 15.1 },
-  { rank: 4, name: "Dell OptiPlex 7020",           amount: "₹1.45 Cr", pct: 11.6 },
-  { rank: 5, name: "Dell PowerEdge T350",          amount: "₹1.12 Cr", pct: 9.0  },
-];
-
-const recentIssuesData = [
-  { issue: "Delayed delivery for PO-10027",       date: "Apr 09, 2026", status: "Closed",   sc: "#6C757D" },
-  { issue: "Quality Issue in Monitor P2422H",     date: "Mar 18, 2026", status: "Resolved", sc: C.green  },
-  { issue: "Missing items in shipment",           date: "Feb 27, 2026", status: "Closed",   sc: "#6C757D" },
-  { issue: "Invoice discrepancy in PO-10018",     date: "Feb 10, 2026", status: "Closed",   sc: "#6C757D" },
-];
 
 // ─── Helper ─────────────────────────────────────────────────────
 function qColor(q: number) {
@@ -192,17 +54,362 @@ function SHead({ title, link }: { title: string; link?: string }) {
   );
 }
 
+function dashboardAmount(po: StoredPO): number {
+  const amount = Number(po.grandTotal);
+  if (Number.isFinite(amount) && amount > 0) return amount;
+  return Number(po.subtotal || 0) + Number(po.sgstAmt || 0) + Number(po.cgstAmt || 0);
+}
+
+function dashboardDate(value?: string): number {
+  if (!value) return 0;
+  const parsed = new Date(value).getTime();
+  if (Number.isFinite(parsed)) return parsed;
+  const parts = value.split("/");
+  if (parts.length === 3) {
+    const [day, month, year] = parts.map(Number);
+    return new Date(year, month - 1, day).getTime() || 0;
+  }
+  return 0;
+}
+
+function formatCr(amount: number): string {
+  if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
+  if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)} L`;
+  return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+}
+
+function buildLiveDashboardData() {
+  const vendors = getVendors().filter(vendor => !vendor.archived);
+  const purchaseOrders = getAllPOs();
+  const activePOs = purchaseOrders.filter(po => po.status !== "Draft" && po.status !== "Cancelled");
+  const vendorOrders = (vendor: StoredVendor) =>
+    purchaseOrders.filter(po => belongsToVendor(po, { vendorId: vendor.id, vendorName: vendor.name }));
+  const spendByVendor = vendors.map(vendor => {
+    const orders = vendorOrders(vendor).filter(po => po.status !== "Draft" && po.status !== "Cancelled");
+    return {
+      vendor,
+      orders,
+      spend: orders.reduce((total, po) => total + dashboardAmount(po), 0),
+    };
+  });
+
+  const spendByVendorData = spendByVendor
+    .filter(row => row.spend > 0)
+    .sort((a, b) => b.spend - a.spend)
+    .slice(0, 10)
+    .map(row => ({ name: row.vendor.name, value: row.spend / 10000000 }));
+
+  const vendorRankingData = vendors
+    .map(vendor => ({
+      name: vendor.name,
+      category: vendor.category || "—",
+      quality: Number(vendor.rating || (vendor.performanceQuality || 0) / 20),
+      delivery: Number(vendor.performanceDelivery || 0),
+    }))
+    .sort((a, b) => b.quality - a.quality || b.delivery - a.delivery)
+    .slice(0, 10);
+
+  const slaVendorData = vendors
+    .map(vendor => {
+      const orders = vendorOrders(vendor).filter(po => po.status !== "Draft" && po.status !== "Cancelled");
+      const delivered = orders.filter(po => po.status === "Delivered").length;
+      return {
+        vendor: vendor.name,
+        category: vendor.category || "—",
+        sla: Number(vendor.performanceDelivery || 0),
+        tickets: orders.length,
+        resolved: delivered,
+        status: Number(vendor.performanceDelivery || 0) > 0 ? "Recorded" : "No data",
+      };
+    })
+    .filter(row => row.tickets > 0 || row.sla > 0)
+    .sort((a, b) => b.sla - a.sla)
+    .slice(0, 7);
+
+  const avgDelivery = vendors.length
+    ? vendors.reduce((total, vendor) => total + Number(vendor.performanceDelivery || 0), 0) / vendors.length
+    : 0;
+  const slaData = [
+    { name: "Recorded", value: avgDelivery, color: "#2B2D42" },
+    { name: "Remaining", value: Math.max(0, 100 - avgDelivery), color: "#E5E7EB" },
+  ];
+
+  const activities = [...purchaseOrders]
+    .sort((a, b) => dashboardDate(b.createdOn || b.createdOnDisplay) - dashboardDate(a.createdOn || a.createdOnDisplay))
+    .slice(0, 9)
+    .map(po => ({
+      text: `${po.item || po.items?.[0]?.item || "Purchase order"} · ${po.poNumber}`,
+      sub: `${po.vendorName || "Vendor"} · ${getPODisplayStatus(po.status)}`,
+      time: po.createdOn
+        ? new Date(po.createdOn).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+        : po.createdOnDisplay || "Date not recorded",
+      color: po.status === "Delivered" ? C.green : po.status === "Cancelled" ? C.red : C.blue,
+    }));
+
+  const categorySpend = new Map<string, number>();
+  for (const po of activePOs) {
+    const items = po.items?.length ? po.items : [{
+      category: po.category,
+      lineSubtotal: po.subtotal,
+    }];
+    for (const item of items) {
+      const category = String(item.category || "Uncategorised");
+      categorySpend.set(category, (categorySpend.get(category) || 0) + Number(item.lineSubtotal || 0));
+    }
+  }
+  const totalCategorySpend = [...categorySpend.values()].reduce((sum, amount) => sum + amount, 0);
+  const spendCategoryData = [...categorySpend.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, amount], index) => ({
+      name,
+      value: totalCategorySpend ? Math.round((amount / totalCategorySpend) * 100) : 0,
+      color: [C.blue, C.orange, C.purple, C.green, C.gray][index],
+    }));
+
+  const statusGroups = [
+    { name: "Pending", matches: ["draft"], color: C.orange },
+    { name: "Processing", matches: ["confirmed", "accepted", "vendor notified"], color: C.blue },
+    { name: "In Transit", matches: ["dispatched", "partially shipped", "shipped", "partially delivered"], color: C.cyan },
+    { name: "Delivered", matches: ["delivered", "completed"], color: C.green },
+    { name: "Cancelled", matches: ["cancelled", "rejected"], color: C.red },
+  ];
+  const orderStatusData = statusGroups.map(group => ({
+    name: group.name,
+    value: purchaseOrders.filter(po => group.matches.includes(String(po.status || "").toLowerCase())).length,
+    color: group.color,
+  })).filter(group => group.value > 0);
+
+  const recentOrdersData = [...purchaseOrders]
+    .sort((a, b) => dashboardDate(b.createdOn || b.createdOnDisplay) - dashboardDate(a.createdOn || a.createdOnDisplay))
+    .slice(0, 5)
+    .map(po => {
+      const status = getPODisplayStatus(po.status);
+      const colors: Record<string, string> = { Delivered: C.green, Completed: C.green, Dispatched: C.blue, "Partially Shipped": C.blue, Processing: C.orange, Pending: C.orange, Cancelled: C.red };
+      return {
+        vendor: po.vendorName || "—",
+        category: po.category || po.items?.[0]?.category || "—",
+        amount: formatCr(dashboardAmount(po)),
+        date: po.createdOn
+          ? new Date(po.createdOn).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+          : po.createdOnDisplay || "—",
+        status,
+        sc: colors[status] || C.gray,
+      };
+    });
+
+  const topVendorsData = [...spendByVendor]
+    .sort((a, b) =>
+      Number(b.vendor.rating || (b.vendor.performanceQuality || 0) / 20) -
+      Number(a.vendor.rating || (a.vendor.performanceQuality || 0) / 20),
+    )
+    .slice(0, 5)
+    .map((row, index) => ({
+      rank: index + 1,
+      name: row.vendor.name,
+      score: Number(row.vendor.rating || (row.vendor.performanceQuality || 0) / 20),
+      color: [C.blue, C.green, C.purple, C.orange, C.cyan][index],
+    }));
+
+  const contractStatuses = new Map<string, number>();
+  for (const vendor of vendors) {
+    try {
+      const contracts = JSON.parse(localStorage.getItem(`nido_vendor_contracts_${vendor.id}`) || "[]");
+      if (!Array.isArray(contracts)) continue;
+      for (const contract of contracts) {
+        const status = String(contract.status || "Active");
+        const normalized = status.toLowerCase();
+        const label = normalized.includes("expired") ? "Expired"
+          : normalized.includes("expir") ? "Expiring"
+          : normalized.includes("renew") ? "Renewal" : "Active";
+        contractStatuses.set(label, (contractStatuses.get(label) || 0) + 1);
+      }
+    } catch { /* malformed vendor contract records are excluded */ }
+  }
+  const contractPieData = [
+    { name: "Active", value: contractStatuses.get("Active") || 0, color: C.green },
+    { name: "Expiring", value: contractStatuses.get("Expiring") || 0, color: C.orange },
+    { name: "Expired", value: contractStatuses.get("Expired") || 0, color: C.red },
+    { name: "Renewal", value: contractStatuses.get("Renewal") || 0, color: C.blue },
+  ].filter(row => row.value > 0);
+
+  const monthlyTotals = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - (5 - index));
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    const monthPOs = activePOs.filter(po => {
+      const created = new Date(dashboardDate(po.createdOn || po.createdOnDisplay));
+      return created.getMonth() === month && created.getFullYear() === year;
+    });
+    return {
+      month: date.toLocaleDateString("en-IN", { month: "short" }),
+      paid: monthPOs.reduce((sum, po) => sum + dashboardAmount(po), 0) / 10000000,
+      pending: purchaseOrders
+        .filter(po => {
+          if (po.status !== "Draft") return false;
+          const created = new Date(dashboardDate(po.createdOn || po.createdOnDisplay));
+          return created.getMonth() === month && created.getFullYear() === year;
+        })
+        .reduce((sum, po) => sum + dashboardAmount(po), 0) / 10000000,
+    };
+  });
+
+  const issueVendors = vendors.filter(vendor => Number(vendor.complianceIssues || 0) > 0).length;
+  const riskData = [
+    { level: "No reported issues", count: vendors.length - issueVendors, pct: vendors.length ? Math.round(((vendors.length - issueVendors) / vendors.length) * 100) : 0, color: C.green },
+    { level: "Reported issues", count: issueVendors, pct: vendors.length ? Math.round((issueVendors / vendors.length) * 100) : 0, color: C.orange },
+  ];
+
+  const deliveryCounts = [
+    { name: "Delivered", value: purchaseOrders.filter(po => po.status === "Delivered" || po.status === "Completed").length, color: C.green },
+    { name: "In progress", value: purchaseOrders.filter(po => !["Delivered", "Completed", "Cancelled"].includes(po.status) && po.status !== "Draft").length, color: C.blue },
+    { name: "Pending", value: purchaseOrders.filter(po => po.status === "Draft").length, color: C.orange },
+    { name: "Cancelled", value: purchaseOrders.filter(po => po.status === "Cancelled").length, color: C.red },
+  ];
+  const qualityCounts = [
+    { name: "4.5–5", min: 4.5, max: 5.01, color: C.green },
+    { name: "3.5–4.4", min: 3.5, max: 4.5, color: C.blue },
+    { name: "2.5–3.4", min: 2.5, max: 3.5, color: C.orange },
+    { name: "Below 2.5", min: 0, max: 2.5, color: C.red },
+  ].map(group => ({
+    name: group.name,
+    value: vendors.filter(vendor => {
+      const rating = Number(vendor.rating || (vendor.performanceQuality || 0) / 20);
+      return rating >= group.min && rating < group.max;
+    }).length,
+    color: group.color,
+  })).filter(group => group.value > 0);
+
+  const categoryPerformance = new Map<string, { spend: number; orders: number; vendors: StoredVendor[] }>();
+  for (const vendor of vendors) {
+    const category = vendor.category || "Uncategorised";
+    const value = categoryPerformance.get(category) || { spend: 0, orders: 0, vendors: [] };
+    const orders = vendorOrders(vendor).filter(po => po.status !== "Draft" && po.status !== "Cancelled");
+    value.spend += orders.reduce((sum, po) => sum + dashboardAmount(po), 0);
+    value.orders += orders.length;
+    value.vendors.push(vendor);
+    categoryPerformance.set(category, value);
+  }
+  const performanceCatData = [...categoryPerformance.entries()]
+    .sort((a, b) => b[1].spend - a[1].spend)
+    .map(([category, data]) => {
+      const deliveryScores = data.vendors.map(vendor => Number(vendor.performanceDelivery || 0)).filter(score => score > 0);
+      const qualityScores = data.vendors.map(vendor => Number(vendor.rating || (vendor.performanceQuality || 0) / 20)).filter(score => score > 0);
+      return {
+        category,
+        spend: formatCr(data.spend),
+        orders: data.orders,
+        onTime: deliveryScores.length ? `${(deliveryScores.reduce((sum, score) => sum + score, 0) / deliveryScores.length).toFixed(1)}%` : "—",
+        quality: qualityScores.length ? `${(qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length).toFixed(1)} / 5` : "—",
+        returnRate: "—",
+        growth: "—",
+        pos: true,
+      };
+    });
+
+  const productSpend = new Map<string, { spend: number; qty: number }>();
+  for (const po of activePOs) {
+    const lines = po.items?.length ? po.items : [{
+      item: po.item,
+      lineSubtotal: po.subtotal,
+      qty: po.qty,
+    }];
+    for (const line of lines) {
+      const name = String(line.item || "Unspecified product");
+      const value = productSpend.get(name) || { spend: 0, qty: 0 };
+      value.spend += Number(line.lineSubtotal || 0);
+      value.qty += Number(line.qty || 0);
+      productSpend.set(name, value);
+    }
+  }
+  const totalProductSpend = [...productSpend.values()].reduce((sum, value) => sum + value.spend, 0);
+  const topProductsData = [...productSpend.entries()]
+    .sort((a, b) => b[1].spend - a[1].spend)
+    .slice(0, 5)
+    .map(([name, value], index) => ({
+      rank: index + 1,
+      name,
+      amount: formatCr(value.spend),
+      pct: totalProductSpend ? Number(((value.spend / totalProductSpend) * 100).toFixed(1)) : 0,
+    }));
+
+  const recentIssuesData = vendors
+    .filter(vendor => Number(vendor.complianceIssues || 0) > 0)
+    .sort((a, b) => Number(b.complianceIssues) - Number(a.complianceIssues))
+    .slice(0, 5)
+    .map(vendor => ({
+      issue: `${vendor.name} · ${vendor.complianceIssues} reported compliance issue(s)`,
+      date: "Date not recorded",
+      status: "Review",
+      sc: C.orange,
+    }));
+
+  const totalSpend = activePOs.reduce((sum, po) => sum + dashboardAmount(po), 0);
+  const deliveredPOs = purchaseOrders.filter(po => po.status === "Delivered" || po.status === "Completed");
+  const qualityScores = vendors.map(vendor => Number(vendor.rating || (vendor.performanceQuality || 0) / 20)).filter(score => score > 0);
+  const avgQuality = qualityScores.length ? qualityScores.reduce((sum, score) => sum + score, 0) / qualityScores.length : 0;
+  const preferredCount = vendors.filter(vendor => String(vendor.preferredVendor || "").toLowerCase() === "yes").length;
+  const totalDelivery = vendors.map(vendor => Number(vendor.performanceDelivery || 0)).filter(score => score > 0);
+  const responsivenessScores = vendors
+    .map(vendor => ({ vendor: vendor.name, value: Number(vendor.performanceResponsiveness || 0) }))
+    .filter(row => row.value > 0)
+    .sort((a, b) => b.value - a.value);
+  const avgResponsiveness = responsivenessScores.length
+    ? responsivenessScores.reduce((sum, row) => sum + row.value, 0) / responsivenessScores.length
+    : 0;
+  const responsivenessData = responsivenessScores.slice(0, 4).map((row, index) => ({
+    label: row.vendor,
+    pct: Math.min(100, row.value),
+    color: [C.green, C.blue, C.orange, C.purple][index],
+  }));
+  const now = new Date();
+  const currentMonthSpend = activePOs.filter(po => {
+    const created = new Date(dashboardDate(po.createdOn || po.createdOnDisplay));
+    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+  }).reduce((sum, po) => sum + dashboardAmount(po), 0);
+  const draftSpend = purchaseOrders
+    .filter(po => po.status === "Draft")
+    .reduce((sum, po) => sum + dashboardAmount(po), 0);
+
+  return {
+    vendors, purchaseOrders, totalSpend, preferredCount, avgQuality,
+    avgDelivery: totalDelivery.length ? totalDelivery.reduce((sum, score) => sum + score, 0) / totalDelivery.length : 0,
+    spendByVendorData, vendorRankingData, slaVendorData, slaData, activities, spendCategoryData,
+    orderStatusData, recentOrdersData, topVendorsData, contractPieData, paymentChartData: monthlyTotals,
+    riskData, deliveryPieData: deliveryCounts, qualityPieData: qualityCounts, performanceCatData,
+    topProductsData, recentIssuesData, deliveredPOs, responsivenessData, avgResponsiveness,
+    currentMonthSpend, draftSpend,
+  };
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────
-export default function App() {
-  const totalOrders = orderStatusData.reduce((s, d) => s + d.value, 0);
+export default function VendorDashboard() {
+  const [dataVersion, setDataVersion] = useState(0);
+  useEffect(() => {
+    const refresh = () => setDataVersion(version => version + 1);
+    const events = ["nidoVendorsUpdated", "vendorProductsUpdated", "poCreated", "poActivityUpdated", "vendorContractsUpdated", "storage"];
+    events.forEach(event => window.addEventListener(event, refresh));
+    return () => events.forEach(event => window.removeEventListener(event, refresh));
+  }, []);
+  const live = useMemo(() => buildLiveDashboardData(), [dataVersion]);
+  const {
+    vendors, purchaseOrders, totalSpend, preferredCount, avgQuality, avgDelivery,
+    spendByVendorData, vendorRankingData, slaVendorData, slaData, activities, spendCategoryData,
+    orderStatusData, recentOrdersData, topVendorsData, contractPieData, paymentChartData,
+    riskData, deliveryPieData, qualityPieData, performanceCatData, topProductsData, recentIssuesData,
+    deliveredPOs, responsivenessData, avgResponsiveness, currentMonthSpend, draftSpend,
+  } = live;
+  const totalOrders = purchaseOrders.length;
 
   const kpis = [
-    { label: "Total Vendors",          value: "524",     Icon: Users,       color: C.blue,   sub: "+12 this month"        },
-    { label: "Active Vendors",         value: "482",     Icon: UserCheck,   color: C.green,  sub: "91.6% active"          },
-    { label: "Preferred Vendors",      value: "128",     Icon: Star,        color: C.orange, sub: "26.6% of total"        },
-    { label: "Vendor Spend",           value: "₹12.5 Cr",Icon: IndianRupee, color: C.red,    sub: "This Financial Year"   },
-    { label: "On-Time Delivery Count", value: "94.2%",   Icon: Truck,       color: C.cyan,   sub: "Last 90 days"          },
-    { label: "Avg Quality Score",      value: "4.6 / 5", Icon: Award,       color: C.purple, sub: "Based on 156 orders"   },
+    { label: "Total Vendors",          value: String(vendors.length), Icon: Users,       color: C.blue,   sub: "Current vendor records" },
+    { label: "Active Vendors",         value: String(vendors.filter(v => v.status === "Active").length), Icon: UserCheck, color: C.green, sub: "Current vendor status" },
+    { label: "Preferred Vendors",      value: String(preferredCount), Icon: Star,         color: C.orange, sub: "Marked preferred" },
+    { label: "Vendor Spend",           value: formatCr(totalSpend), Icon: IndianRupee, color: C.red, sub: `${purchaseOrders.filter(po => po.status !== "Draft" && po.status !== "Cancelled").length} confirmed POs` },
+    { label: "Delivery Performance",   value: avgDelivery ? `${avgDelivery.toFixed(1)}%` : "—", Icon: Truck, color: C.cyan, sub: "From vendor records" },
+    { label: "Avg Quality Score",      value: avgQuality ? `${avgQuality.toFixed(1)} / 5` : "—", Icon: Award, color: C.purple, sub: `Across ${vendors.length} vendors` },
   ];
 
   const quickActions = [
@@ -281,10 +488,10 @@ export default function App() {
             </ResponsiveContainer>
           </div>
 
-          {/* SLA Compliance — detailed section below the chart */}
+          {/* Vendor delivery score from the live vendor records */}
           <div className="border-t border-gray-100 mt-1">
             <div className="flex items-center justify-between px-3 pt-2 pb-1">
-              <p className="text-[10px] font-semibold text-gray-700">SLA Compliance</p>
+              <p className="text-[10px] font-semibold text-gray-700">Delivery Performance</p>
               <span className="text-[9px] text-blue-500 cursor-pointer hover:underline">View All</span>
             </div>
             <div className="flex gap-3 px-3 pb-3">
@@ -304,34 +511,34 @@ export default function App() {
                     </Pie>
                   </PieChart>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-sm font-bold text-gray-800">91%</span>
+                    <span className="text-sm font-bold text-gray-800">{avgDelivery ? `${avgDelivery.toFixed(0)}%` : "—"}</span>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <div className="flex items-center gap-0.5">
                     <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#2B2D42" }} />
-                    <span className="text-[8px] text-gray-500">Met</span>
+                    <span className="text-[8px] text-gray-500">Recorded</span>
                   </div>
                   <div className="flex items-center gap-0.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-gray-200" />
-                    <span className="text-[8px] text-gray-500">Missed</span>
+                    <span className="text-[8px] text-gray-500">Remaining</span>
                   </div>
                 </div>
                 <div className="text-center mt-0.5">
-                  <p className="text-[9px] font-semibold text-gray-700">SLA Met</p>
-                  <p className="text-[8px] text-red-400">9% Missed</p>
+                  <p className="text-[9px] font-semibold text-gray-700">Vendor score</p>
+                  <p className="text-[8px] text-gray-500">Profile data</p>
                 </div>
               </div>
 
-              {/* Vendor-level SLA table */}
+              {/* Vendor-level delivery score and order history */}
               <div className="flex-1 min-w-0">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 text-[8px] text-gray-500">
                       <th className="text-left py-1 px-1.5 font-medium rounded-l">Vendor</th>
                       <th className="text-left py-1 px-1 font-medium">Category</th>
-                      <th className="text-center py-1 px-1 font-medium">SLA %</th>
-                      <th className="text-center py-1 px-1 font-medium">Tickets</th>
+                      <th className="text-center py-1 px-1 font-medium">Delivery %</th>
+                      <th className="text-center py-1 px-1 font-medium">Delivered / POs</th>
                       <th className="text-center py-1 px-1 font-medium rounded-r">Status</th>
                     </tr>
                   </thead>
@@ -345,8 +552,8 @@ export default function App() {
                           <span className="block truncate">{row.category}</span>
                         </td>
                         <td className="py-1 px-1 text-center">
-                          <span className="text-[8px] font-semibold" style={{ color: row.sla >= row.target ? C.green : C.red }}>
-                            {row.sla}%
+                          <span className="text-[8px] font-semibold" style={{ color: row.status === "Recorded" ? C.green : C.gray }}>
+                            {row.sla ? `${row.sla}%` : "—"}
                           </span>
                         </td>
                         <td className="py-1 px-1 text-center text-[8px] text-gray-500">
@@ -356,8 +563,8 @@ export default function App() {
                           <span
                             className="text-[7px] font-semibold px-1.5 py-0.5 rounded-full"
                             style={{
-                              color: row.status === "Met" ? C.green : C.red,
-                              backgroundColor: (row.status === "Met" ? C.green : C.red) + "18",
+                              color: row.status === "Recorded" ? C.green : C.gray,
+                              backgroundColor: (row.status === "Recorded" ? C.green : C.gray) + "18",
                             }}
                           >
                             {row.status}
@@ -415,7 +622,7 @@ export default function App() {
           <SCard className="flex-1">
             <SHead title="Recent Activities" />
             <div className="px-2 py-1.5 space-y-2">
-              {[...activities, ...activities].slice(0, 9).map((a, i) => (
+              {activities.slice(0, 9).map((a, i) => (
                 <div key={i} className="flex gap-1.5 items-start">
                   <div className="w-1.5 h-1.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: a.color }} />
                   <div className="min-w-0">
@@ -462,33 +669,33 @@ export default function App() {
           </div>
         </SCard>
 
-        {/* NPS Status */}
+        {/* Vendor ratings */}
         <SCard style={{ width: 130, minWidth: 130 }}>
-          <SHead title="NPS Status" />
+          <SHead title="Vendor Ratings" />
           <div className="p-2">
             <div className="text-center mb-2">
-              <span className="text-2xl font-bold text-gray-800">52</span>
-              <p className="text-[8px] text-gray-500">NPS Score</p>
+              <span className="text-2xl font-bold text-gray-800">{avgQuality ? avgQuality.toFixed(1) : "—"}</span>
+              <p className="text-[8px] text-gray-500">Average / 5</p>
             </div>
             <div className="space-y-1.5">
-              {[
-                { label: "Promoters",  pct: 70, color: C.green  },
-                { label: "Passives",   pct: 12, color: "#FFC107" },
-                { label: "Detractors", pct: 18, color: C.red    },
-              ].map((item) => (
-                <div key={item.label}>
+              {qualityPieData.map((item) => {
+                const ratedVendors = qualityPieData.reduce((sum, group) => sum + group.value, 0);
+                const pct = ratedVendors ? Math.round((item.value / ratedVendors) * 100) : 0;
+                return (
+                <div key={item.name}>
                   <div className="flex justify-between items-center mb-0.5">
-                    <span className="text-[8px] text-gray-600">{item.label}</span>
-                    <span className="text-[8px] font-semibold" style={{ color: item.color }}>{item.pct}%</span>
+                    <span className="text-[8px] text-gray-600">{item.name}</span>
+                    <span className="text-[8px] font-semibold" style={{ color: item.color }}>{pct}%</span>
                   </div>
                   <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${item.pct}%`, backgroundColor: item.color }} />
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: item.color }} />
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <p className="text-[8px] text-gray-500 mt-2 text-center">
-              Detractors: <span className="font-bold text-red-500">18</span>
+              Rated vendors: <span className="font-bold text-gray-700">{qualityPieData.reduce((sum, item) => sum + item.value, 0)}</span>
             </p>
           </div>
         </SCard>
@@ -510,8 +717,8 @@ export default function App() {
                 </Pie>
               </PieChart>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xs font-bold text-gray-800">304</span>
-                <span className="text-[7px] text-gray-500">Processing</span>
+                <span className="text-xs font-bold text-gray-800">{totalOrders}</span>
+                <span className="text-[7px] text-gray-500">Purchase Orders</span>
               </div>
             </div>
             <div className="mt-1.5 w-full space-y-0.5">
@@ -569,7 +776,7 @@ export default function App() {
 
         {/* Top Performing Vendors */}
         <SCard style={{ width: 150, minWidth: 150 }}>
-          <SHead title="Top Performing Vendors" />
+          <SHead title="Top Rated Vendors" />
           <div className="px-2 py-1.5 space-y-1.5">
             {topVendorsData.map((v) => (
               <div key={v.rank} className="flex items-center gap-1.5">
@@ -581,7 +788,7 @@ export default function App() {
                   className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
                   style={{ color: v.color, backgroundColor: v.color + "20" }}
                 >
-                  {v.score}
+                  {v.score ? `${v.score.toFixed(1)} / 5` : "—"}
                 </span>
               </div>
             ))}
@@ -618,17 +825,17 @@ export default function App() {
           </div>
         </SCard>
 
-        {/* Payment Summary */}
+        {/* Purchase-order value summary */}
         <SCard className="flex-[1.8]">
-          <SHead title="Payment Summary" link="View All" />
+          <SHead title="Purchase Order Value" link="View All" />
           <div className="px-3 pt-1.5 flex justify-between">
             <div>
-              <span className="text-xs font-bold text-gray-800">₹1.8 Cr</span>
-              <span className="text-[9px] text-gray-500 ml-1">Pending</span>
+              <span className="text-xs font-bold text-gray-800">{formatCr(draftSpend)}</span>
+              <span className="text-[9px] text-gray-500 ml-1">Draft POs</span>
             </div>
             <div>
-              <span className="text-xs font-bold text-gray-700">₹42 Lakh</span>
-              <span className="text-[9px] text-gray-500 ml-1">This month</span>
+              <span className="text-xs font-bold text-gray-700">{formatCr(currentMonthSpend)}</span>
+              <span className="text-[9px] text-gray-500 ml-1">Confirmed this month</span>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={72}>
@@ -637,7 +844,7 @@ export default function App() {
               <XAxis dataKey="month" tick={{ fontSize: 8, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 8, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
               <Tooltip
-                formatter={(v: number, n: string) => [`₹${v}Cr`, n === "paid" ? "Paid" : "Pending"]}
+                formatter={(v: number, n: string) => [`₹${v.toFixed(2)} Cr`, n === "paid" ? "Confirmed POs" : "Draft POs"]}
                 contentStyle={{ fontSize: 9, padding: "2px 6px", borderRadius: 4 }}
               />
               <Bar dataKey="paid"    fill={C.blue}   radius={[2,2,0,0]} barSize={7} />
@@ -646,9 +853,9 @@ export default function App() {
           </ResponsiveContainer>
         </SCard>
 
-        {/* Risk Monitor */}
+        {/* Compliance issues */}
         <SCard className="flex-[1.4]">
-          <SHead title="Risk Monitor" link="View All" />
+          <SHead title="Compliance Issues" link="View All" />
           <div className="p-3 space-y-2">
             {riskData.map((r) => (
               <div key={r.level}>
@@ -689,9 +896,9 @@ export default function App() {
       {/* ═══ ROW 5: Delivery Performance | Quality Performance | Response Time ═══ */}
       <div className="flex gap-1.5">
 
-        {/* Delivery Performance */}
+        {/* Purchase-order status */}
         <SCard className="flex-1">
-          <SHead title="Delivery Performance" link="View Details" />
+          <SHead title="Purchase Order Status" link="View Details" />
           <div className="p-2 flex gap-3 items-center">
             <div className="relative shrink-0">
               <PieChart width={96} height={96}>
@@ -706,35 +913,32 @@ export default function App() {
                 </Pie>
               </PieChart>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-sm font-bold text-gray-800">156</span>
+                <span className="text-sm font-bold text-gray-800">{totalOrders}</span>
                 <span className="text-[7px] text-gray-500 leading-tight">Total</span>
-                <span className="text-[7px] text-gray-500 leading-tight">Orders</span>
+                <span className="text-[7px] text-gray-500 leading-tight">POs</span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
               <div className="space-y-1.5">
-                {[
-                  { label: "On-time", value: "147 (94.2%)", color: C.green  },
-                  { label: "Early",   value: "5 (3.2%)",    color: C.blue   },
-                  { label: "Late",    value: "4 (2.6%)",    color: C.red    },
-                ].map((item) => (
-                  <div key={item.label} className="flex justify-between items-center">
+                {deliveryPieData.map((item) => {
+                  const pct = totalOrders ? Math.round((item.value / totalOrders) * 100) : 0;
+                  return <div key={item.name} className="flex justify-between items-center">
                     <div className="flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-[9px] text-gray-600">{item.label}</span>
+                      <span className="text-[9px] text-gray-600">{item.name}</span>
                     </div>
-                    <span className="text-[9px] font-medium text-gray-700">{item.value}</span>
-                  </div>
-                ))}
+                    <span className="text-[9px] font-medium text-gray-700">{item.value} ({pct}%)</span>
+                  </div>;
+                })}
               </div>
               <div className="mt-2 border-t border-gray-100 pt-1.5 grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-[8px] text-gray-500">Avg Delivery Time</p>
-                  <p className="text-xs font-bold text-gray-800">2.3 Days</p>
+                  <p className="text-[8px] text-gray-500">Delivered POs</p>
+                  <p className="text-xs font-bold text-gray-800">{deliveredPOs.length}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] text-gray-500">vs Last Year</p>
-                  <p className="text-xs font-bold text-green-600">-0.4 days</p>
+                  <p className="text-[8px] text-gray-500">Total POs</p>
+                  <p className="text-xs font-bold text-gray-700">{totalOrders}</p>
                 </div>
               </div>
             </div>
@@ -758,55 +962,47 @@ export default function App() {
                 </Pie>
               </PieChart>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-sm font-bold text-gray-800">156</span>
-                <span className="text-[7px] text-gray-500 leading-tight">Total</span>
-                <span className="text-[7px] text-gray-500 leading-tight">Orders</span>
+                <span className="text-sm font-bold text-gray-800">{qualityPieData.reduce((sum, item) => sum + item.value, 0)}</span>
+                <span className="text-[7px] text-gray-500 leading-tight">Rated</span>
+                <span className="text-[7px] text-gray-500 leading-tight">Vendors</span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
               <div className="space-y-1.5">
-                {[
-                  { label: "Excellent (5)", value: "102 (65.4%)", color: C.green  },
-                  { label: "Good (4)",      value: "38 (24.4%)",  color: C.blue   },
-                  { label: "Average (3)",   value: "10 (6.4%)",   color: C.orange },
-                  { label: "Poor",          value: "6 (3.8%)",    color: C.red    },
-                ].map((item) => (
-                  <div key={item.label} className="flex justify-between items-center">
+                {qualityPieData.map((item) => {
+                  const ratedVendors = qualityPieData.reduce((sum, group) => sum + group.value, 0);
+                  const pct = ratedVendors ? Math.round((item.value / ratedVendors) * 100) : 0;
+                  return <div key={item.name} className="flex justify-between items-center">
                     <div className="flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                      <span className="text-[9px] text-gray-600">{item.label}</span>
+                      <span className="text-[9px] text-gray-600">{item.name}</span>
                     </div>
-                    <span className="text-[9px] font-medium text-gray-700">{item.value}</span>
-                  </div>
-                ))}
+                    <span className="text-[9px] font-medium text-gray-700">{item.value} ({pct}%)</span>
+                  </div>;
+                })}
               </div>
               <div className="mt-2 border-t border-gray-100 pt-1.5 grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-[8px] text-gray-500">Avg Quality Score</p>
-                  <p className="text-xs font-bold text-gray-800">4.6 / 5</p>
+                  <p className="text-xs font-bold text-gray-800">{avgQuality ? `${avgQuality.toFixed(1)} / 5` : "—"}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] text-gray-500">vs Last Year</p>
-                  <p className="text-xs font-bold text-green-600">+0.4</p>
+                  <p className="text-[8px] text-gray-500">Vendors with scores</p>
+                  <p className="text-xs font-bold text-gray-700">{qualityPieData.reduce((sum, item) => sum + item.value, 0)}</p>
                 </div>
               </div>
             </div>
           </div>
         </SCard>
 
-        {/* Response Time Performance */}
+        {/* Vendor responsiveness score */}
         <SCard className="flex-[1.4]">
-          <SHead title="Response Time Performance" link="View Details" />
+          <SHead title="Vendor Responsiveness" link="View Details" />
           <div className="p-3">
             <div className="space-y-2.5">
-              {[
-                { label: "Within 4 hrs", pct: 98.2, color: C.green  },
-                { label: "4 – 24 hrs",   pct: 23.6, color: C.blue   },
-                { label: "24 – 48 hrs",  pct: 4.3,  color: C.orange },
-                { label: "48+ hrs",      pct: 1.9,  color: C.red    },
-              ].map((item) => (
+              {responsivenessData.map((item) => (
                 <div key={item.label} className="flex items-center gap-2">
-                  <span className="text-[9px] text-gray-600 w-20 shrink-0">{item.label}</span>
+                  <span className="text-[9px] text-gray-600 w-20 shrink-0 truncate" title={item.label}>{item.label}</span>
                   <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
@@ -819,12 +1015,12 @@ export default function App() {
             </div>
             <div className="mt-3 border-t border-gray-100 pt-2 flex justify-between items-end">
               <div>
-                <p className="text-[8px] text-gray-500">Average Response Time</p>
-                <p className="text-sm font-bold text-gray-800">12.5 hrs</p>
+                <p className="text-[8px] text-gray-500">Average recorded score</p>
+                <p className="text-sm font-bold text-gray-800">{avgResponsiveness ? `${avgResponsiveness.toFixed(1)}%` : "—"}</p>
               </div>
               <div className="text-right">
-                <p className="text-[8px] text-gray-500">vs Last Year</p>
-                <p className="text-xs font-bold text-green-600">-3.1 hrs</p>
+                <p className="text-[8px] text-gray-500">Scores recorded</p>
+                <p className="text-xs font-bold text-gray-700">{responsivenessData.length}</p>
               </div>
             </div>
           </div>
@@ -840,10 +1036,10 @@ export default function App() {
               <th className="text-left py-2 px-3 font-medium">Category</th>
               <th className="text-right py-2 px-3 font-medium">Total Spend</th>
               <th className="text-center py-2 px-3 font-medium">Orders</th>
-              <th className="text-center py-2 px-3 font-medium">On-time Delivery</th>
+              <th className="text-center py-2 px-3 font-medium">Delivery Score</th>
               <th className="text-center py-2 px-3 font-medium">Quality</th>
               <th className="text-center py-2 px-3 font-medium">Return Rate</th>
-              <th className="text-center py-2 px-3 font-medium">vs Last Year</th>
+              <th className="text-center py-2 px-3 font-medium">Growth</th>
             </tr>
           </thead>
           <tbody>
@@ -858,9 +1054,11 @@ export default function App() {
                 <td className="py-2 px-3 text-center">
                   <span
                     className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
-                      row.pos
-                        ? "text-green-700 bg-green-100"
-                        : "text-red-700 bg-red-100"
+                      row.growth === "—"
+                        ? "text-gray-500 bg-gray-100"
+                        : row.pos
+                          ? "text-green-700 bg-green-100"
+                          : "text-red-700 bg-red-100"
                     }`}
                   >
                     {row.growth}
@@ -905,12 +1103,12 @@ export default function App() {
 
         {/* Recent Issues */}
         <SCard className="flex-1">
-          <SHead title="Recent Issues" link="View All" />
+          <SHead title="Vendor Compliance Follow-up" link="View All" />
           <table className="w-full mt-0.5">
             <thead>
               <tr className="bg-gray-50 text-[9px] text-gray-500">
                 <th className="text-left py-1.5 px-3 font-medium">Issue</th>
-                <th className="text-center py-1.5 px-3 font-medium">Raised On</th>
+                <th className="text-center py-1.5 px-3 font-medium">Date</th>
                 <th className="text-center py-1.5 px-3 font-medium">Status</th>
               </tr>
             </thead>

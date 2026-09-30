@@ -220,13 +220,28 @@ export default function ProductDetailPage() {
     if (product) setQty(Math.max(1, product.moq));
   }, [product?.moq]);
 
-  // Load vendor comparisons for this product
+  // Keep vendor comparisons and the selected MOQ current when a vendor listing changes.
   useEffect(() => {
     if (!product?.productCode) return;
-    const comps = computeVendorComparisons(product.productCode, product.category);
-    setVendorComps(comps);
-    setSelectedVendor(null);
+    const refreshVendors = () => {
+      setVendorComps(computeVendorComparisons(product.productCode, product.category));
+    };
+    refreshVendors();
+    window.addEventListener("vendorProductsUpdated", refreshVendors);
+    return () => window.removeEventListener("vendorProductsUpdated", refreshVendors);
   }, [product?.productCode, product?.category]);
+
+  useEffect(() => {
+    if (!selectedVendor) return;
+    const refreshed = vendorComps.find(comp => comp.vendorId === selectedVendor.vendorId);
+    if (!refreshed || !canUseVendor(refreshed)) {
+      setSelectedVendor(null);
+      setQty(Math.max(1, product.moq || 1));
+      return;
+    }
+    if (refreshed !== selectedVendor) setSelectedVendor(refreshed);
+    setQty(value => Math.max(Math.max(1, refreshed.moq || 1), value));
+  }, [vendorComps, selectedVendor, product?.moq]);
 
   // Load related products from client catalog
   useEffect(() => {
@@ -303,7 +318,9 @@ export default function ProductDetailPage() {
 
   const handleAdd = () => {
     if (added || !selectedVendor || !canUseVendor(selectedVendor)) return;
-    const orderQty = vendorMaxQty !== undefined ? Math.min(vendorMaxQty, qty) : qty;
+    const orderQty = vendorMaxQty !== undefined
+      ? Math.min(vendorMaxQty, Math.max(Math.max(1, selectedVendor.moq || 1), qty))
+      : Math.max(Math.max(1, selectedVendor.moq || 1), qty);
     addItem(
       {
         id: Math.random() * 10000,
@@ -561,7 +578,7 @@ export default function ProductDetailPage() {
                           const eligible = canUseVendor(comp);
                           const availability = getAvailabilityByType(comp.stock, productType);
                           const leadTime = formatLeadTimeByType(comp.leadTime, productType);
-                          const badge = getVendorComparisonBadge(comp, vendorComps);
+                          const badge = getVendorComparisonBadge(comp, vendorComps, canUseVendor);
                           return (
                             <button
                               key={comp.vendorId}
@@ -585,8 +602,8 @@ export default function ProductDetailPage() {
                                     ))
                                   : "—"}
                               </span>
-                              <span className={`text-[9px] leading-tight font-semibold ${availability.status === "Out of Stock" ? "text-red-500" : availability.status === "Low Stock" ? "text-amber-600" : "text-emerald-600"}`}>
-                                {availability.primary}<span className="block text-[8px] text-gray-400 font-medium">{availability.isUnlimited ? "Instant" : availability.status}</span>
+                              <span className={`text-[9px] leading-tight font-semibold ${!eligible || availability.status === "Out of Stock" ? "text-red-500" : availability.status === "Low Stock" ? "text-amber-600" : "text-emerald-600"}`}>
+                                {!eligible ? "Out of Stock" : availability.primary}<span className="block text-[8px] text-gray-400 font-medium">{eligible && availability.isUnlimited ? "Instant" : !eligible ? "Below MOQ" : availability.status}</span>
                               </span>
                               <span className="text-[9px] leading-tight text-gray-700">{leadTime.primary}<span className="block text-[8px] text-gray-400">{leadTime.secondary || "Subject to Availability"}</span></span>
                               <span className="text-[9px] text-gray-700">{comp.moq > 0 ? `${comp.moq} ${productQuantityLabel}` : "—"}</span>
