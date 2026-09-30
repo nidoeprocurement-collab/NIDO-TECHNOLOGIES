@@ -345,7 +345,7 @@ export default function AddMasterCatalogueItemWrapper() {
       productName: productName || 'Untitled Product',
       physicalType, category, subcategory, brand, tags,
       description, specifications, generalSpecs, variations: [], productNotes, videoUrl, images,
-      createdAt: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+      createdAt: new Date().toISOString(),
     };
     sessionStorage.setItem('nido_preview_draft', JSON.stringify(previewData));
     navigate('/preview-product');

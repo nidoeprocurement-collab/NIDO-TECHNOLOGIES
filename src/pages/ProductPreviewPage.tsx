@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, Timer, Wifi, FileText, Shield, Cpu, HardDrive, Monitor, Settings2, Package } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nProvider';
 
 interface PreviewData {
   masterProductCode: string;
@@ -36,6 +37,7 @@ function getSpecIcon(name: string) {
 
 export default function ProductPreviewPage() {
   const navigate = useNavigate();
+  const { fmtDate, locale } = useI18n();
   const [data, setData] = useState<PreviewData | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
 
@@ -64,6 +66,13 @@ export default function ProductPreviewPage() {
     );
   }
 
+  const addedAt = new Date(data.createdAt);
+  const hasValidAddedAt = Boolean(data.createdAt) && !Number.isNaN(addedAt.getTime());
+  const addedDate = hasValidAddedAt ? fmtDate(addedAt) : data.createdAt || '—';
+  const addedTime = hasValidAddedAt
+    ? addedAt.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', hour12: true })
+    : null;
+
   return (
     <div className="h-screen overflow-y-auto bg-white">
       <div className="max-w-5xlpx-2 py-2 space-y-0">
@@ -84,11 +93,17 @@ export default function ProductPreviewPage() {
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-bold text-gray-900 leading-tight">{data.productName || 'Untitled Product'}</h1>
 
-              <div className="flex items-center gap-3 mt-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-2">
                 {data.category && (
                   <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">{data.category}</span>
                 )}
-                <span className="text-xs text-gray-400">Added on: {data.createdAt}</span>
+                <span className="inline-flex flex-wrap items-center gap-x-2.5 text-sm font-medium text-gray-700">
+                  <span className="text-xs font-semibold text-gray-500">Added on:</span>
+                  <time dateTime={hasValidAddedAt ? addedAt.toISOString() : undefined} className="inline-flex flex-wrap items-center gap-x-2.5">
+                    <span>{addedDate}</span>
+                    {addedTime && <span>{addedTime}</span>}
+                  </time>
+                </span>
               </div>
 
               {data.description && (
