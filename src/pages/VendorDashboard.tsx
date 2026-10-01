@@ -600,11 +600,11 @@ export default function VendorDashboard() {
         </div>
       </div>
 
-      {/* ═══ ROW 3: Spend by Category | NPS | Order Status | Recent Orders | Top Vendors ═══ */}
+      {/* ═══ ROW 3: Spend by Category | Vendor Ratings | Order Status | Recent Vendor Orders ═══ */}
       <div className="flex gap-1.5">
 
         {/* Spend by Category */}
-        <SCard style={{ width: 148, minWidth: 148 }}>
+        <SCard className="flex-[1.15] min-w-[170px]">
           <SHead title="Spend by Category" />
           <div className="p-2 flex flex-col items-center">
             <PieChart width={90} height={90}>
@@ -633,7 +633,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Vendor ratings */}
-        <SCard style={{ width: 130, minWidth: 130 }}>
+        <SCard className="flex-[1.1] min-w-[160px]">
           <SHead title="Vendor Ratings" />
           <div className="p-2">
             <div className="text-center mb-2">
@@ -664,7 +664,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Order Status */}
-        <SCard style={{ width: 148, minWidth: 148 }}>
+        <SCard className="flex-[1.15] min-w-[170px]">
           <SHead title="Order Status" />
           <div className="p-2 flex flex-col items-center">
             <div className="relative">
@@ -703,7 +703,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Recent Vendor Orders */}
-        <SCard className="flex-1">
+        <SCard className="flex-[1.2] min-w-[260px]">
           <SHead title="Recent Vendor Orders" link="View All" />
           <table className="w-full">
             <thead>
