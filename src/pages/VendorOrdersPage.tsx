@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useConfig } from "@/contexts/ConfigContext";
 import { useNavigate } from "react-router-dom";
 import { POLink, OrderLink } from "@/components/shared/IdLinks";
 import { getAllPOs, getPODisplayStatus, getPOByNumber, updatePO, type StoredPO } from "@/lib/purchaseOrderStore";
@@ -21,40 +20,11 @@ interface Order {
   amount: number;
   amountStr: string;
   delivery: string;
-  by: string;
+  items: string;
 }
 
-const INITIAL_ORDERS: Order[] = [
-  { id: "PO-10034", orderId: "ORD-8821", vendor: "TechHub Solutions", date: "2026-04-16", dateStr: "Apr 16, 2026", status: "Processing", amount: 2192.0, amountStr: "$2,192.00", delivery: "Apr 28, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10033", orderId: "ORD-8820", vendor: "Office Supplies Co.", date: "2026-04-15", dateStr: "Apr 15, 2026", status: "Confirmed", amount: 856.5, amountStr: "$856.50", delivery: "Apr 27, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10032", orderId: "ORD-8819", vendor: "Global Industrial", date: "2026-04-15", dateStr: "Apr 15, 2026", status: "Shipped", amount: 1450.0, amountStr: "$1,450.00", delivery: "Apr 25, 2026", by: "John Smith" },
-  { id: "PO-10031", orderId: "ORD-8818", vendor: "Furniture Mart", date: "2026-04-14", dateStr: "Apr 14, 2026", status: "Delivered", amount: 3200.0, amountStr: "$3,200.00", delivery: "Apr 24, 2026", by: "Sarah Johnson" },
-  { id: "PO-10030", orderId: "ORD-8817", vendor: "TechHub Solutions", date: "2026-04-14", dateStr: "Apr 14, 2026", status: "Draft", amount: 750.0, amountStr: "$750.00", delivery: "–", by: "Pavan (System Owner)" },
-  { id: "PO-10029", orderId: "ORD-8816", vendor: "Printer World", date: "2026-04-13", dateStr: "Apr 13, 2026", status: "Confirmed", amount: 620.0, amountStr: "$620.00", delivery: "Apr 23, 2026", by: "Mike Wilson" },
-  { id: "PO-10028", orderId: "ORD-8815", vendor: "Office Supplies Co.", date: "2026-04-13", dateStr: "Apr 13, 2026", status: "Processing", amount: 1125.75, amountStr: "$1,125.75", delivery: "Apr 22, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10027", orderId: "ORD-8814", vendor: "Global Industrial", date: "2026-04-12", dateStr: "Apr 12, 2026", status: "Delivered", amount: 2890.0, amountStr: "$2,890.00", delivery: "Apr 21, 2026", by: "John Smith" },
-  { id: "PO-10026", orderId: "ORD-8813", vendor: "Furniture Mart", date: "2026-04-11", dateStr: "Apr 11, 2026", status: "Shipped", amount: 1980.0, amountStr: "$1,980.00", delivery: "Apr 20, 2026", by: "Sarah Johnson" },
-  { id: "PO-10025", orderId: "ORD-8812", vendor: "TechHub Solutions", date: "2026-04-11", dateStr: "Apr 11, 2026", status: "Closed", amount: 4500.0, amountStr: "$4,500.00", delivery: "Apr 19, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10024", orderId: "ORD-8811", vendor: "Office Supplies Co.", date: "2026-04-10", dateStr: "Apr 10, 2026", status: "Delivered", amount: 1340.0, amountStr: "$1,340.00", delivery: "Apr 18, 2026", by: "Mike Wilson" },
-  { id: "PO-10023", orderId: "ORD-8810", vendor: "Global Industrial", date: "2026-04-09", dateStr: "Apr 9, 2026", status: "Closed", amount: 5200.0, amountStr: "$5,200.00", delivery: "Apr 17, 2026", by: "John Smith" },
-  { id: "PO-10022", orderId: "ORD-8809", vendor: "Printer World", date: "2026-04-09", dateStr: "Apr 9, 2026", status: "Delivered", amount: 430.0, amountStr: "$430.00", delivery: "Apr 15, 2026", by: "Sarah Johnson" },
-  { id: "PO-10021", orderId: "ORD-8808", vendor: "TechHub Solutions", date: "2026-04-08", dateStr: "Apr 8, 2026", status: "Shipped", amount: 3100.0, amountStr: "$3,100.00", delivery: "Apr 16, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10020", orderId: "ORD-8807", vendor: "Furniture Mart", date: "2026-04-07", dateStr: "Apr 7, 2026", status: "Delivered", amount: 2670.0, amountStr: "$2,670.00", delivery: "Apr 14, 2026", by: "John Smith" },
-  { id: "PO-10019", orderId: "ORD-8806", vendor: "Office Supplies Co.", date: "2026-04-07", dateStr: "Apr 7, 2026", status: "Closed", amount: 890.0, amountStr: "$890.00", delivery: "Apr 13, 2026", by: "Mike Wilson" },
-  { id: "PO-10018", orderId: "ORD-8805", vendor: "Global Industrial", date: "2026-04-06", dateStr: "Apr 6, 2026", status: "Processing", amount: 4100.0, amountStr: "$4,100.00", delivery: "Apr 20, 2026", by: "Sarah Johnson" },
-  { id: "PO-10017", orderId: "ORD-8804", vendor: "Printer World", date: "2026-04-05", dateStr: "Apr 5, 2026", status: "Delivered", amount: 710.0, amountStr: "$710.00", delivery: "Apr 11, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10016", orderId: "ORD-8803", vendor: "TechHub Solutions", date: "2026-04-04", dateStr: "Apr 4, 2026", status: "Shipped", amount: 2250.0, amountStr: "$2,250.00", delivery: "Apr 10, 2026", by: "John Smith" },
-  { id: "PO-10015", orderId: "ORD-8802", vendor: "Furniture Mart", date: "2026-04-03", dateStr: "Apr 3, 2026", status: "Closed", amount: 3750.0, amountStr: "$3,750.00", delivery: "Apr 8, 2026", by: "Sarah Johnson" },
-  { id: "PO-10014", orderId: "ORD-8801", vendor: "Office Supplies Co.", date: "2026-04-02", dateStr: "Apr 2, 2026", status: "Processing", amount: 960.0, amountStr: "$960.00", delivery: "Apr 12, 2026", by: "Mike Wilson" },
-  { id: "PO-10013", orderId: "ORD-8800", vendor: "Global Industrial", date: "2026-04-01", dateStr: "Apr 1, 2026", status: "Delivered", amount: 3300.0, amountStr: "$3,300.00", delivery: "Apr 6, 2026", by: "Pavan (System Owner)" },
-  { id: "PO-10012", orderId: "ORD-8799", vendor: "Printer World", date: "2026-03-31", dateStr: "Mar 31, 2026", status: "Processing", amount: 580.0, amountStr: "$580.00", delivery: "Apr 9, 2026", by: "John Smith" },
-  { id: "PO-10011", orderId: "ORD-8798", vendor: "TechHub Solutions", date: "2026-03-30", dateStr: "Mar 30, 2026", status: "Draft", amount: 1200.0, amountStr: "$1,200.00", delivery: "–", by: "Sarah Johnson" },
-  { id: "PO-10010", orderId: "ORD-8797", vendor: "Furniture Mart", date: "2026-03-29", dateStr: "Mar 29, 2026", status: "Delivered", amount: 4800.0, amountStr: "$4,800.00", delivery: "Apr 2, 2026", by: "Mike Wilson" },
-  { id: "PO-10009", orderId: "ORD-8796", vendor: "Office Supplies Co.", date: "2026-03-28", dateStr: "Mar 28, 2026", status: "Processing", amount: 720.0, amountStr: "$720.00", delivery: "Apr 5, 2026", by: "Pavan (System Owner)" },
-];
-
 const LEGACY_PO_STATUSES: OrderStatus[] = ["Pending", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
-const MAX_LISTED_ORDERS = 5;
+const PAGE_SIZE = 10;
 
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
   Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
@@ -76,136 +46,6 @@ function Badge({ status }: { status: OrderStatus }) {
   );
 }
 
-// ─── Order Detail Page ───────────────────────────────────────────────────────
-interface OrderDetailProps {
-  order: Order;
-  onBack: () => void;
-}
-
-const LINE_ITEMS = [
-  { name: "Office Chair", sku: "SKU-0041", qty: 2, unit: "$320.00", total: "$640.00" },
-  { name: "Standing Desk", sku: "SKU-0089", qty: 1, unit: "$750.00", total: "$750.00" },
-  { name: "Monitor Stand", sku: "SKU-0103", qty: 3, unit: "$60.00",  total: "$180.00" },
-];
-
-function OrderDetail({ order, onBack }: OrderDetailProps) {
-  const { config } = useConfig();
-  const skuPrefix = config.prefixes.find(p => p.key === "sku")?.value || "SKU-";
-  const displayedLineItems = useMemo(
-    () => LINE_ITEMS.map(li => ({ ...li, sku: li.sku.replace(/^SKU-/, skuPrefix) })),
-    [skuPrefix]
-  );
-  const infoRows: [string, React.ReactNode][] = [
-    ["Order ID",   <OrderLink id={order.orderId} style={{ fontFamily: "monospace", fontWeight: 500 }} />],
-    ["PO Number",  <POLink id={order.id} style={{ fontWeight: 500 }} />],
-    ["Vendor",     order.vendor],
-    ["PO Date",    order.dateStr],
-    ["Delivery",   order.delivery],
-  ];
-  const finRows: [string, React.ReactNode][] = [
-    ["Total Amount", <strong>{order.amountStr}</strong>],
-    ["Created By",   order.by],
-    ["Status",       <Badge status={order.status} />],
-  ];
-  const timeline = [
-    { label: "Order created", who: order.by, when: order.dateStr, icon: "➕", color: "#4a6cf7" },
-    { label: `Status set to ${order.status}`, who: "System", when: order.dateStr, icon: "🔄", color: "#3b6d11" },
-    { label: "Delivery scheduled", who: "System", when: order.delivery, icon: "🚚", color: "#888" },
-  ];
-
-  const _bg   = "hsl(var(--background))";
-  const _card = "hsl(var(--card))";
-  const _fg   = "hsl(var(--foreground))";
-  const _muted= "hsl(var(--muted-foreground))";
-  const _bdr  = "hsl(var(--border))";
-  const _mutedBg = "hsl(var(--muted))";
-
-  const cell: React.CSSProperties = { padding: "9px 12px", fontSize: 13, borderBottom: `1px solid ${_bdr}`, color: _fg };
-  const th: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", padding: "8px 12px", borderBottom: `1px solid ${_bdr}`, textAlign: "left", background: _mutedBg };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: _bg, zIndex: 500, overflowY: "auto" }}>
-      <div style={{ padding: "28px 36px" }}>
-        {/* Breadcrumb */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
-          <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: `1px solid ${_bdr}`, borderRadius: 8, background: _card, fontSize: 13, cursor: "pointer", color: _fg }}>
-            ← Back to Orders
-          </button>
-          <span style={{ color: _muted }}>/</span>
-          <POLink id={order.id} style={{ fontSize: 13 }} />
-          <span style={{ color: _muted }}>/</span>
-          <OrderLink id={order.orderId} style={{ fontSize: 13 }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 600, color: _fg, marginBottom: 6 }}>
-              Order Detail — <OrderLink id={order.orderId} style={{ fontSize: 22 }} />
-            </h1>
-            <p style={{ fontSize: 13, color: _muted }}>Purchase Order: <POLink id={order.id} style={{ fontWeight: 700 }} /></p>
-          </div>
-          <Badge status={order.status} />
-        </div>
-
-        {/* Info cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          {[{ title: "Order Information", rows: infoRows }, { title: "Financial Summary", rows: finRows }].map(({ title, rows }) => (
-            <div key={title} style={{ background: _card, border: `1px solid ${_bdr}`, borderRadius: 12, padding: 20 }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>{title}</p>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <tbody>
-                  {rows.map(([label, val]) => (
-                    <tr key={label}>
-                      <td style={{ ...cell, color: _muted, width: "45%" }}>{label}</td>
-                      <td style={cell}>{val}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-
-        {/* Line items */}
-        <div style={{ background: _card, border: `1px solid ${_bdr}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Line Items</p>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>{["Item", "SKU", "Qty", "Unit Price", "Total"].map(h => <th key={h} style={th}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {displayedLineItems.map(item => (
-                <tr key={item.sku}>
-                  <td style={cell}>{item.name}</td>
-                  <td style={{ ...cell, fontFamily: "monospace", fontSize: 12, color: _muted }}>{item.sku}</td>
-                  <td style={cell}>{item.qty}</td>
-                  <td style={cell}>{item.unit}</td>
-                  <td style={{ ...cell, fontWeight: 500 }}>{item.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Timeline */}
-        <div style={{ background: _card, border: `1px solid ${_bdr}`, borderRadius: 12, padding: 20 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: _muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 14 }}>Activity Timeline</p>
-          {timeline.map((t, i) => (
-            <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: _mutedBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13 }}>{t.icon}</div>
-              <div>
-                <p style={{ fontSize: 13, color: _fg, fontWeight: 500 }}>{t.label}</p>
-                <p style={{ fontSize: 12, color: _muted }}>{t.who} · {t.when}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Toast ───────────────────────────────────────────────────────────────────
 function useToast() {
   const [msg, setMsg] = useState("");
@@ -222,19 +62,20 @@ function useToast() {
 // ── Map a StoredPO → the Order shape used by this list ───────────────────────
 function storedPOToOrder(po: StoredPO): Order {
   const createdDate = new Date(po.createdOn);
+  const hasValidDate = !Number.isNaN(createdDate.getTime());
   const fmtINR = (n: number) =>
     "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return {
     id:        po.poNumber,
     orderId:   po.orderId,
     vendor:    po.vendorName,
-    date:      createdDate.toISOString().split("T")[0],
-    dateStr:   createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+    date:      hasValidDate ? createdDate.toISOString().split("T")[0] : "",
+    dateStr:   hasValidDate ? createdDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : po.createdOnDisplay || "—",
     status:    getPODisplayStatus(po.status),
     amount:    po.grandTotal,
     amountStr: fmtINR(po.grandTotal),
     delivery:  po.requestedDelivery || "Within 30 days",
-    by:        "System Owner",
+    items:     (po.items?.length ? po.items.map(item => item.item).filter(Boolean) : [po.item]).filter(Boolean).join(", ") || "—",
   };
 }
 
@@ -320,52 +161,56 @@ function BulkNotesModal({ selectedCount, onApply, onClose }: {
 // ─── Main Component ──────────────────────────────────────────────────────────
 export default function VendorOrderList(scope: VendorScope = {}) {
   const navigate = useNavigate();
-  const { config } = useConfig();
   const orderStatusConfig = useOrderStatusConfig();
-  const poPrefix = config.prefixes.find(p => p.key === "purchaseOrder")?.value || "PO-";
-  const poStatusOptions = Array.from(new Set([
-    ...orderStatusConfig.statuses
-      .filter(status => status.category === "Purchase Orders" && status.visible)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map(status => status.name),
-    ...LEGACY_PO_STATUSES,
-  ]));
-  const poTabs: (OrderStatus | "All")[] = ["All", ...poStatusOptions];
 
-  // Build orders list: real POs from store (prepended) + static demo orders
+  // The shared PO store is the only source of records for this page.
   const loadOrders = () => {
-    const realPOs = getAllPOs().map(storedPOToOrder);
-    if (hasVendorScope(scope)) {
-      return realPOs.filter(order => belongsToVendor(order, scope));
-    }
-    // De-duplicate: real POs take precedence over static entries with the same ID
-    const realIds = new Set(realPOs.map(o => o.id));
-    const staticOrders = INITIAL_ORDERS.filter(o => !realIds.has(o.id));
-    return [...realPOs, ...staticOrders];
+    return getAllPOs()
+      .map(storedPOToOrder)
+      .filter(order => !hasVendorScope(scope) || belongsToVendor(order, scope));
   };
 
   const [orders, setOrders] = useState<Order[]>(loadOrders);
 
-  // Keep the list current as purchase orders are created or updated.
+  // Refresh for same-tab edits, cross-tab edits, and when the page is resumed.
   useEffect(() => {
     const refresh = () => setOrders(loadOrders());
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
     refresh();
     window.addEventListener("poCreated", refresh);
+    window.addEventListener("poActivityUpdated", refresh);
     window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("poActivityUpdated", refresh);
       window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [scope.vendorId, scope.vendorName]);
+  const poStatusOptions = Array.from(new Set([
+    ...orderStatusConfig.statuses
+      .filter(status => status.category === "Purchase Orders" && status.visible)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(status => getPODisplayStatus(status.name)),
+    ...LEGACY_PO_STATUSES,
+    ...orders.map(order => getPODisplayStatus(order.status)),
+  ]));
+  const poTabs: (OrderStatus | "All")[] = ["All", ...poStatusOptions];
   const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
   const [vendorFilter, setVendorFilter] = useState("All Vendors");
+  const [dateRange, setDateRange] = useState("All Dates");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [sortCol, setSortCol] = useState<keyof Order | "">("");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [statusModal, setStatusModal] = useState(false);
   const [notesModal, setNotesModal] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | "">("");
@@ -381,14 +226,12 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     return () => document.removeEventListener("click", handler);
   }, []);
 
-  // Remap static "PO-" IDs to the configured prefix reactively
   const displayedOrders = useMemo(
     () => orders.map(o => ({
       ...o,
-      id: o.id.replace(/^PO-/, poPrefix),
       status: getPODisplayStatus(o.status),
     })),
-    [orders, poPrefix]
+    [orders]
   );
 
   const getFiltered = (): Order[] => {
@@ -399,8 +242,25 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     if (search) rows = rows.filter(r =>
       r.id.toLowerCase().includes(search) ||
       r.vendor.toLowerCase().includes(search) ||
-      r.orderId.toLowerCase().includes(search)
+      r.orderId.toLowerCase().includes(search) ||
+      r.items.toLowerCase().includes(search)
     );
+    if (dateRange !== "All Dates") {
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      const start = new Date(today);
+      if (dateRange === "This Month") {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+      } else {
+        start.setDate(start.getDate() - (dateRange === "Last 7 Days" ? 6 : 29));
+        start.setHours(0, 0, 0, 0);
+      }
+      rows = rows.filter(row => {
+        const rowDate = new Date(`${row.date}T00:00:00`);
+        return Boolean(row.date) && !Number.isNaN(rowDate.getTime()) && rowDate >= start && rowDate <= today;
+      });
+    }
     if (sortCol) {
       rows.sort((a, b) => {
         const va = a[sortCol as keyof Order];
@@ -414,7 +274,9 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   };
 
   const filtered = getFiltered();
-  const listedOrders = filtered.slice(0, MAX_LISTED_ORDERS);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const listedOrders = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const pageRows = listedOrders;
   const vendorOptions = ["All Vendors", ...Array.from(new Set(displayedOrders.map(order => order.vendor))).sort()];
 
@@ -422,6 +284,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     t === "All" ? displayedOrders.length : displayedOrders.filter(r => r.status === t).length;
 
   const handleSort = (col: keyof Order) => {
+    setPage(1);
     if (sortCol === col) setSortDir(d => (d === 1 ? -1 : 1));
     else { setSortCol(col); setSortDir(1); }
   };
@@ -448,30 +311,30 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   };
 
   const performBulkStatusUpdate = (status: OrderStatus, cancelReason?: string) => {
-    // Orders already Cancelled are a terminal state and are skipped — they
-    // can no longer be edited or processed further.
-    const eligible = [...selected].filter(id => orders.find(o => o.id === id)?.status !== "Cancelled");
-    setOrders(prev => prev.map(r => {
-      if (!eligible.includes(r.id)) return r;
-      const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
-      return { ...r, status, ...extra };
-    }));
-    // Persist cancellations to the store so purchaseOrderStore dispatches the
-    // poCancelled event and OrderDetailsPage resets its vendor-selection state.
-    if (status === "Cancelled") {
-      for (const id of eligible) {
-        const changes: any = { status: "Cancelled" };
-        if (cancelReason) changes.cancelReason = cancelReason;
-        updatePO(id, changes);
-      }
+    // Cancellation is terminal; delivered and already-cancelled POs cannot
+    // be cancelled again.
+    const eligible = [...selected].filter(id => {
+      const po = getPOByNumber(id);
+      return po && po.status !== "Cancelled" && po.status !== "Delivered";
+    });
+    if (status !== "Cancelled") {
+      toast.show("Use each purchase order's details to update its fulfillment status.");
+      return;
     }
+    // Cancellation is the only safe bulk lifecycle action; other transitions
+    // require line-level tracking, inventory, and notification updates.
+    for (const id of eligible) {
+      updatePO(id, { status: "Cancelled", cancelReason: cancelReason || "Cancelled from Vendor Orders" });
+    }
+    setOrders(loadOrders());
     const skipped = selected.size - eligible.length;
     toast.show(
       skipped > 0
-        ? `Status updated to "${status}" for ${eligible.length} order(s). ${skipped} already-cancelled order(s) were skipped.`
-        : `Status updated to "${status}" for ${eligible.length} order(s)`
+        ? `${eligible.length} PO(s) cancelled. ${skipped} delivered or already-cancelled PO(s) were skipped.`
+        : `${eligible.length} PO(s) cancelled.`
     );
     setStatusModal(false); setBulkStatus(""); setConfirmBulkCancel(false); setBulkCancelReason("");
+    setSelected(new Set());
   };
 
   const applyBulkNotes = (note: string, visibility: string) => {
@@ -504,8 +367,9 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   };
 
   const doExport = () => {
-    const csv = ["PO Number,Order ID,Vendor,PO Date,Status,Total Amount,Requested Delivery,Created By",
-      ...listedOrders.map(r => `${r.id},${r.orderId},${r.vendor},${r.dateStr},${r.status},${r.amountStr},${r.delivery},${r.by}`)
+    const csvCell = (value: string) => `"${String(value).replaceAll('"', '""')}"`;
+    const csv = ["PO Number,Order ID,Vendor,PO Date,Items,Status,Total Amount,Requested Delivery",
+      ...listedOrders.map(r => [r.id, r.orderId, r.vendor, r.dateStr, r.items, r.status, r.amountStr, r.delivery].map(csvCell).join(","))
     ].join("\n");
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
@@ -586,8 +450,6 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     });
   }, [listedOrders.map(order => order.id).join("|")]);
 
-  if (detailOrder) return <OrderDetail order={detailOrder} onBack={() => setDetailOrder(null)} />;
-
   return (
     <div style={s.page}>
       {/* Toast */}
@@ -598,11 +460,10 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       )}
 
       {/* Modals */}
-      <Modal open={statusModal} title="Bulk update status" onClose={() => setStatusModal(false)} onApply={applyBulkStatus}>
-        <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value as OrderStatus)} style={{ width: "100%", padding: "9px 12px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, marginBottom: 16, outline: "none", background: card, color: fg }}>
-          <option value="">Select a status...</option>
-          {poStatusOptions.map(st => <option key={st}>{st}</option>)}
-        </select>
+      <Modal open={statusModal} title={`Cancel ${selected.size} selected PO${selected.size === 1 ? "" : "s"}?`} onClose={() => setStatusModal(false)} onApply={applyBulkStatus}>
+        <p style={{ fontSize: 13, lineHeight: 1.5, color: fg, margin: "0 0 16px" }}>
+          Cancellation is permanent. Fulfillment status changes are managed from each PO's details so item, stock, and tracking data stay in sync.
+        </p>
       </Modal>
       {notesModal && (
         <BulkNotesModal
@@ -639,15 +500,15 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         </div>
       )}
 
-      <h1 style={{ fontSize: 24, fontWeight: 600, color: fg, marginBottom: 4 }}>Orders</h1>
-      <p style={{ fontSize: 13, color: muted, marginBottom: 24 }}>Manage and track all purchase orders across your organization</p>
+      <h1 style={{ fontSize: 24, fontWeight: 600, color: fg, marginBottom: 4 }}>Vendor Orders</h1>
+      <p style={{ fontSize: 13, color: muted, marginBottom: 24 }}>Live purchase orders from the shared procurement store</p>
 
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
         <div style={{ position: "relative", flex: "0 0 300px" }}>
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: muted, fontSize: 15 }}>🔍</span>
-          <input value={search} onChange={e => { setSearch(e.target.value.toLowerCase()); }}
-            placeholder="Search by PO number, vendor, or items..."
+          <input value={search} onChange={e => { setPage(1); setSearch(e.target.value.toLowerCase().trimStart()); }}
+            placeholder="Search PO, order, vendor, or item..."
             style={{ width: "100%", padding: "8px 10px 8px 34px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, outline: "none" }} />
         </div>
 
@@ -658,7 +519,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
           </button>
           <Dropdown id="status">
             {(["All", ...poStatusOptions] as (OrderStatus | "All")[]).map(st => (
-              <button key={st} style={s.ddItem} onClick={() => { setStatusFilter(st); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
+              <button key={st} style={s.ddItem} onClick={() => { setPage(1); setStatusFilter(st); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
             ))}
           </Dropdown>
         </div>
@@ -670,12 +531,19 @@ export default function VendorOrderList(scope: VendorScope = {}) {
           </button>
           <Dropdown id="vendor">
             {vendorOptions.map(v => (
-              <button key={v} style={s.ddItem} onClick={() => { setVendorFilter(v); setOpenDropdown(null); }}>{v}</button>
+              <button key={v} style={s.ddItem} onClick={() => { setPage(1); setVendorFilter(v); setOpenDropdown(null); }}>{v}</button>
             ))}
           </Dropdown>
         </div>
 
-        <button style={s.btn}>Date Range ▾</button>
+        <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+          <button style={s.btn} onClick={() => setOpenDropdown(openDropdown === "date" ? null : "date")}>{dateRange} ▾</button>
+          <Dropdown id="date">
+            {["All Dates", "Last 7 Days", "Last 30 Days", "This Month"].map(option => (
+              <button key={option} style={s.ddItem} onClick={() => { setPage(1); setDateRange(option); setOpenDropdown(null); }}>{option}</button>
+            ))}
+          </Dropdown>
+        </div>
 
         {/* More menu */}
         <div style={{ marginLeft: "auto", position: "relative" }} onClick={e => e.stopPropagation()}>
@@ -683,8 +551,8 @@ export default function VendorOrderList(scope: VendorScope = {}) {
           <Dropdown id="more">
             <button style={s.ddItem} onClick={doExport}>📥 Export</button>
             <hr style={{ border: "none", borderTop: `1px solid ${bdr}`, margin: "4px 0" }} />
-            <button style={s.ddItem} onClick={() => { setStatusModal(true); setOpenDropdown(null); }}>🔄 Bulk Update Status</button>
-            <button style={s.ddItem} onClick={() => { setNotesModal(true); setOpenDropdown(null); }}>📝 Bulk Update Notes</button>
+            <button style={s.ddItem} disabled={selected.size === 0} onClick={() => { setBulkStatus("Cancelled"); setStatusModal(true); setOpenDropdown(null); }}>Cancel Selected POs</button>
+            <button style={s.ddItem} disabled={selected.size === 0} onClick={() => { setNotesModal(true); setOpenDropdown(null); }}>📝 Bulk Update Notes</button>
           </Dropdown>
         </div>
       </div>
@@ -692,7 +560,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: `1.5px solid ${bdr}`, gap: 0, overflowX: "auto" }}>
         {poTabs.map(t => (
-          <div key={t} onClick={() => { setActiveTab(t); }}
+          <div key={t} onClick={() => { setPage(1); setActiveTab(t); }}
             style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : muted, cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
             {t === "All" ? "All Orders" : t} ({tabCount(t)})
           </div>
@@ -720,7 +588,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
             <thead>
               <tr>
                 <th style={{ ...s.th, width: 48, paddingLeft: 16 }}></th>
-                {([["id","PO Number"],["vendor","Vendor"],["date","PO Date"],["orderId","Order ID"],["status","Status"],["amount","Total Amount"],["delivery","Requested Delivery"],["by","Created By"]] as [keyof Order, string][]).map(([col, label]) => (
+                {([["id","PO Number"],["vendor","Vendor"],["date","PO Date"],["items","Items"],["orderId","Order ID"],["status","Status"],["amount","Total Amount"],["delivery","Requested Delivery"]] as [keyof Order, string][]).map(([col, label]) => (
                   <th key={col} style={s.th}>
                     <span onClick={() => handleSort(col)} style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", userSelect: "none" }}>
                       {label} <SortIcon col={col} />
@@ -732,7 +600,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
             </thead>
             <tbody>
               {pageRows.length === 0 ? (
-                <tr><td colSpan={10} style={{ ...s.td, textAlign: "center", color: muted, padding: 32 }}>No orders found</td></tr>
+                <tr><td colSpan={10} style={{ ...s.td, textAlign: "center", color: muted, padding: 32 }}>No live purchase orders match these filters.</td></tr>
               ) : pageRows.map(row => (
                 <tr
                   key={row.id}
@@ -745,13 +613,13 @@ export default function VendorOrderList(scope: VendorScope = {}) {
                   <td style={s.td}><POLink id={row.id} /></td>
                   <td style={s.td}>{row.vendor}</td>
                   <td style={s.td}>{row.dateStr}</td>
+                  <td style={{ ...s.td, maxWidth: 220 }}>{row.items}</td>
                   <td style={s.td} onClick={e => e.stopPropagation()}>
                     <OrderLink id={row.orderId} />
                   </td>
                   <td style={s.td}><Badge status={row.status} /></td>
                   <td style={s.td}>{row.amountStr}</td>
                   <td style={s.td}>{row.delivery}</td>
-                  <td style={s.td}>{row.by}</td>
                   <td style={s.td} onClick={e => e.stopPropagation()}>
                     {(() => {
                       const stages = getProcurementSLA();
@@ -781,10 +649,17 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         </div>
 
         {/* Pagination */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", fontSize: 13, color: "#888", borderTop: "1px solid #f0f0f5" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "14px 16px", fontSize: 13, color: muted, borderTop: `1px solid ${bdr}` }}>
           <span>{filtered.length === 0
-            ? "No orders found"
-            : `Showing ${listedOrders.length} of ${filtered.length} matching orders · maximum ${MAX_LISTED_ORDERS} shown`}</span>
+            ? "No live purchase orders match these filters."
+            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filtered.length)} of ${filtered.length} live purchase orders`}</span>
+          {filtered.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button style={{ ...s.btn, padding: "6px 11px" }} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}>Previous</button>
+              <span>Page {currentPage} of {totalPages} · {PAGE_SIZE} per page</span>
+              <button style={{ ...s.btn, padding: "6px 11px" }} onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}>Next</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
