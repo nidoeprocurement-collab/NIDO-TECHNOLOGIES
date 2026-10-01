@@ -425,9 +425,20 @@ export default function VendorDashboard() {
 
   return (
     <div
-      className="min-h-screen p-2 space-y-1.5 bg-background"
+      className="vendor-dashboard min-h-screen p-2 space-y-1.5 bg-background"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
+      <style>{`
+        .vendor-dashboard .text-\\[7px\\] { font-size: calc(7px + 0.5mm) !important; }
+        .vendor-dashboard .text-\\[8px\\] { font-size: calc(8px + 0.5mm) !important; }
+        .vendor-dashboard .text-\\[9px\\] { font-size: calc(9px + 0.5mm) !important; }
+        .vendor-dashboard .text-\\[10px\\] { font-size: calc(10px + 0.5mm) !important; }
+        .vendor-dashboard .text-\\[11px\\] { font-size: calc(11px + 0.5mm) !important; }
+        .vendor-dashboard .text-\\[13px\\] { font-size: calc(13px + 0.5mm) !important; }
+        .vendor-dashboard .text-xs { font-size: calc(0.75rem + 0.5mm) !important; line-height: calc(1rem + 0.5mm); }
+        .vendor-dashboard .text-sm { font-size: calc(0.875rem + 0.5mm) !important; line-height: calc(1.25rem + 0.5mm); }
+        .vendor-dashboard .text-2xl { font-size: calc(1.5rem + 0.5mm) !important; line-height: calc(2rem + 0.5mm); }
+      `}</style>
 
       {/* ═══ ROW 1: KPI Cards ═══════════════════════════════════════ */}
       <div className="flex gap-1.5">
