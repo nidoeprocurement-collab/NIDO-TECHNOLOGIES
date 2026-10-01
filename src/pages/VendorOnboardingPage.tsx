@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CATEGORY_LIST, CATEGORY_SUBCATEGORIES } from '@/lib/categories';
 import { addVendor, getVendors } from '@/lib/vendorDataStore';
 import { getPrefix } from '@/lib/configService';
-import { getUsers } from '@/lib/nidoUsersStore';
+import { getVendorCreationAuditFields } from '@/lib/vendorAudit';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 import AddressPairFields from '@/components/shared/AddressPairFields';
 import {
@@ -387,18 +387,9 @@ export default function AddVendorPage() {
     const onboardedDate = formData.onboardingDate
       ? new Date(`${formData.onboardingDate}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
       : today;
-    const authenticatedEmail = currentAuthenticatedUser?.email.trim().toLowerCase();
-    const enteredBy = getUsers().find(employee =>
-      employee.id === currentAuthenticatedUser?.id ||
-      (authenticatedEmail && employee.email.trim().toLowerCase() === authenticatedEmail)
-    );
-
     addVendor({
       id: newId,
-      createdByName: enteredBy?.name || currentAuthenticatedUser?.name || '',
-      createdByEmployeeId: enteredBy?.employeeId || '',
-      createdByEmail: enteredBy?.email || currentAuthenticatedUser?.email || '',
-      createdAt: new Date().toISOString(),
+      ...getVendorCreationAuditFields(currentAuthenticatedUser),
       onboardingFormData: { ...formData },
       onboardingAddressDetails: {
         billing: { ...addressDetails.billing },

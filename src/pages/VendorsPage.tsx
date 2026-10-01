@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { getVendors, saveVendors, type StoredVendor, type VendorStatus } from "@/lib/vendorDataStore";
+import { useAuth } from "@/contexts/AuthContext";
+import { getVendorUpdateAuditFields } from "@/lib/vendorAudit";
 import * as XLSX from "xlsx";
 
 type Vendor = StoredVendor;
@@ -293,6 +295,7 @@ function ArchivedModal({ vendors, onClose, onVendorClick }: { vendors: Vendor[];
 // ----- Main App -----
 export default function App() {
   const navigate = useNavigate();
+  const { currentAuthenticatedUser } = useAuth();
   const [vendors, setVendors] = useState<Vendor[]>(() => getVendors());
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
   const [archiveConfirmVendor, setArchiveConfirmVendor] = useState<Vendor | null>(null);
@@ -345,13 +348,15 @@ export default function App() {
   };
   const confirmArchiveVendor = () => {
     if (!archiveConfirmVendor) return;
-    const updated = vendors.map(v => v.id === archiveConfirmVendor.id ? { ...v, archived: true } : v);
+    const auditFields = getVendorUpdateAuditFields(currentAuthenticatedUser);
+    const updated = vendors.map(v => v.id === archiveConfirmVendor.id ? { ...v, ...auditFields, archived: true } : v);
     saveVendors(updated);
     setVendors(updated);
     setArchiveConfirmVendor(null);
   };
   const setVendorStatus = (id: string, status: VendorStatus) => {
-    const updated = vendors.map(v => v.id === id ? { ...v, status } : v);
+    const auditFields = getVendorUpdateAuditFields(currentAuthenticatedUser);
+    const updated = vendors.map(v => v.id === id ? { ...v, ...auditFields, status } : v);
     saveVendors(updated);
     setVendors(updated);
   };
@@ -379,6 +384,7 @@ export default function App() {
     const headers = columns.map(column =>
       column.split(".").map(part => part.replace(/([a-z0-9])([A-Z])/g, "$1 $2"))
         .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .map(part => part.replace(/\bId\b/g, "ID"))
         .join(" / ")
     );
     const worksheet = XLSX.utils.aoa_to_sheet([

@@ -6,6 +6,8 @@ import { Cloud, Star, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { getVendorById, updateVendor } from '@/lib/vendorDataStore';
 import type { StoredVendor, VendorStatus } from '@/lib/vendorDataStore';
+import { useAuth } from '@/contexts/AuthContext';
+import { getVendorUpdateAuditFields } from '@/lib/vendorAudit';
 import { sanitizePhoneNumber, isValidPhoneNumber } from '@/lib/phoneValidation';
 
 // Helper: ensure a current value (from stored data) appears in the options list.
@@ -132,6 +134,7 @@ function createEditFormData(vendor?: StoredVendor) {
 export default function VendorEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { currentAuthenticatedUser } = useAuth();
   const vendor = getVendorById(id!);
 
   // ── Dropdown option lists ───────────────────────────────────────────────────
@@ -245,6 +248,8 @@ export default function VendorEditPage() {
     const phone = formData.phoneNumber ? `${formData.phone} ${formData.phoneNumber}` : '';
     const mobile = formData.mobileNumber ? `${formData.mobile} ${formData.mobileNumber}` : '';
     updateVendor(vendor.id, {
+      ...getVendorUpdateAuditFields(currentAuthenticatedUser),
+      lastUpdatedFormData: { ...formData },
       vendorCode: formData.vendorCode,
       name: formData.vendorName,
       category: formData.category,

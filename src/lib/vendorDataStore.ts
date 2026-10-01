@@ -55,6 +55,16 @@ export interface StoredVendor {
   performanceDelivery?: number;
   performanceResponsiveness?: number;
   performanceCompliance?: number;
+  createdByName?: string;
+  createdByEmployeeId?: string;
+  createdByEmail?: string;
+  createdAt?: string;
+  updatedByName?: string;
+  updatedByEmployeeId?: string;
+  updatedByEmail?: string;
+  updatedAt?: string;
+  onboardingFormData?: Record<string, unknown>;
+  lastUpdatedFormData?: Record<string, unknown>;
   [key: string]: any;
 }
 
