@@ -9,7 +9,6 @@ import {
   BarChart2, Download, Settings, Bell, Upload,
   IndianRupee, UserCheck,
 } from "lucide-react";
-import "./VendorDashboard.css";
 import { getVendors, type StoredVendor } from "@/lib/vendorDataStore";
 import { getAllPOs, getPODisplayStatus, type StoredPO } from "@/lib/purchaseOrderStore";
 import { belongsToVendor } from "@/lib/vendorScope";
@@ -36,7 +35,7 @@ function qColor(q: number) {
 // ─── Shared UI Primitives ────────────────────────────────────────
 function SCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-card rounded-lg border border-border shadow-sm min-w-0 ${className}`}>
+    <div className={`bg-card rounded-lg border border-border shadow-sm overflow-hidden ${className}`}>
       {children}
     </div>
   );
@@ -44,10 +43,10 @@ function SCard({ children, className = "" }: { children: React.ReactNode; classN
 
 function SHead({ title, link }: { title: string; link?: string }) {
   return (
-    <div className="flex flex-wrap justify-between items-center gap-2 px-4 py-3 border-b border-border">
-      <span className="min-w-0 text-[11px] font-semibold text-foreground">{title}</span>
+    <div className="flex justify-between items-center px-3 py-1.5 border-b border-border">
+      <span className="text-[11px] font-semibold text-foreground">{title}</span>
       {link && (
-        <span className="shrink-0 whitespace-nowrap text-[10px] text-primary cursor-pointer hover:text-primary/80">
+        <span className="text-[10px] text-primary cursor-pointer hover:text-primary/80">
           {link} →
         </span>
       )}
@@ -426,20 +425,20 @@ export default function VendorDashboard() {
 
   return (
     <div
-      className="vendor-dashboard min-h-screen p-4 md:p-6 space-y-4 bg-background"
+      className="min-h-screen p-2 space-y-1.5 bg-background"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
 
       {/* ═══ ROW 1: KPI Cards ═══════════════════════════════════════ */}
-      <div className="dashboard-kpis">
+      <div className="flex gap-1.5">
         {kpis.map(({ label, value, Icon, color, sub }) => (
-          <SCard key={label} className="px-4 py-3">
+          <SCard key={label} className="flex-1 px-3 py-2">
             <div className="flex items-center gap-2">
               <div
-                className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
+                className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
                 style={{ backgroundColor: color + "22" }}
               >
-                <Icon size={18} style={{ color }} />
+                <Icon size={14} style={{ color }} />
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] text-gray-500 truncate leading-tight">{label}</p>
@@ -452,13 +451,13 @@ export default function VendorDashboard() {
       </div>
 
       {/* ═══ ROW 2: Spend by Vendor + SLA | Ranking | Activities ═══ */}
-      <div className="dashboard-row-two">
+      <div className="flex gap-1.5">
 
         {/* Spend by Vendor + SLA Compliance below */}
-        <SCard className="dashboard-vendor-spend min-w-0">
+        <SCard className="flex-[2.2]">
           <SHead title="Spend by Vendor (Top 10)" link="View All" />
           <div className="p-1 pt-1">
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart
                 data={spendByVendorData}
                 layout="vertical"
@@ -495,7 +494,7 @@ export default function VendorDashboard() {
               <p className="text-[10px] font-semibold text-gray-700">Delivery Performance</p>
               <span className="text-[9px] text-blue-500 cursor-pointer hover:underline">View All</span>
             </div>
-            <div className="dashboard-delivery-panel px-4 pb-4">
+            <div className="flex gap-3 px-3 pb-3">
               {/* Donut gauge */}
               <div className="flex flex-col items-center gap-1 shrink-0">
                 <div className="relative">
@@ -532,7 +531,7 @@ export default function VendorDashboard() {
               </div>
 
               {/* Vendor-level delivery score and order history */}
-              <div className="dashboard-delivery-table min-w-0">
+              <div className="flex-1 min-w-0">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 text-[8px] text-gray-500">
@@ -581,7 +580,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Vendor Performance Ranking — all rows filled */}
-        <SCard className="dashboard-vendor-ranking min-w-0">
+        <SCard className="flex-[1.6]">
           <SHead title="Vendor Performance Ranking" link="View All" />
           <table className="w-full">
             <thead>
@@ -619,10 +618,10 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Right column: Recent Activities — stretched full height */}
-        <div className="dashboard-activities min-w-0">
+        <div className="flex flex-col gap-2" style={{ width: 160, minWidth: 160 }}>
           <SCard className="flex-1">
             <SHead title="Recent Activities" />
-              <div className="dashboard-activity-list px-3 py-3">
+            <div className="px-2 py-1.5 space-y-2">
               {activities.slice(0, 9).map((a, i) => (
                 <div key={i} className="flex gap-1.5 items-start">
                   <div className="w-1.5 h-1.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: a.color }} />
@@ -639,10 +638,10 @@ export default function VendorDashboard() {
       </div>
 
       {/* ═══ ROW 3: Spend by Category | NPS | Order Status | Recent Orders | Top Vendors ═══ */}
-      <div className="dashboard-row-three">
+      <div className="flex gap-1.5">
 
         {/* Spend by Category */}
-        <SCard className="dashboard-category-card min-w-0">
+        <SCard style={{ width: 148, minWidth: 148 }}>
           <SHead title="Spend by Category" />
           <div className="p-2 flex flex-col items-center">
             <PieChart width={90} height={90}>
@@ -671,7 +670,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Vendor ratings */}
-        <SCard className="dashboard-rating-card min-w-0">
+        <SCard style={{ width: 130, minWidth: 130 }}>
           <SHead title="Vendor Ratings" />
           <div className="p-2">
             <div className="text-center mb-2">
@@ -702,7 +701,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Order Status */}
-        <SCard className="dashboard-status-card min-w-0">
+        <SCard style={{ width: 148, minWidth: 148 }}>
           <SHead title="Order Status" />
           <div className="p-2 flex flex-col items-center">
             <div className="relative">
@@ -741,7 +740,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Recent Vendor Orders */}
-        <SCard className="dashboard-orders-card min-w-0">
+        <SCard className="flex-1">
           <SHead title="Recent Vendor Orders" link="View All" />
           <table className="w-full">
             <thead>
@@ -776,7 +775,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Top Performing Vendors */}
-        <SCard className="dashboard-top-vendors-card min-w-0">
+        <SCard style={{ width: 150, minWidth: 150 }}>
           <SHead title="Top Rated Vendors" />
           <div className="px-2 py-1.5 space-y-1.5">
             {topVendorsData.map((v) => (
@@ -798,10 +797,10 @@ export default function VendorDashboard() {
       </div>
 
       {/* ═══ ROW 4: Contract Summary | Payment Summary | Risk Monitor | Quick Actions ═══ */}
-      <div className="dashboard-row-four">
+      <div className="flex gap-1.5">
 
         {/* Contract Summary */}
-        <SCard className="dashboard-contract-card min-w-0">
+        <SCard style={{ width: 190, minWidth: 190 }}>
           <SHead title="Contract Summary" link="View All" />
           <div className="p-2 flex gap-2 items-center">
             <PieChart width={64} height={64}>
@@ -827,7 +826,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Purchase-order value summary */}
-        <SCard className="dashboard-po-value-card min-w-0">
+        <SCard className="flex-[1.8]">
           <SHead title="Purchase Order Value" link="View All" />
           <div className="px-3 pt-1.5 flex justify-between">
             <div>
@@ -839,7 +838,7 @@ export default function VendorDashboard() {
               <span className="text-[9px] text-gray-500 ml-1">Confirmed this month</span>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={160}>
+          <ResponsiveContainer width="100%" height={72}>
             <BarChart data={paymentChartData} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
               <XAxis dataKey="month" tick={{ fontSize: 8, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
@@ -848,14 +847,14 @@ export default function VendorDashboard() {
                 formatter={(v: number, n: string) => [`₹${v.toFixed(2)} Cr`, n === "paid" ? "Confirmed POs" : "Draft POs"]}
                 contentStyle={{ fontSize: 9, padding: "2px 6px", borderRadius: 4 }}
               />
-              <Bar dataKey="paid"    fill={C.blue}   radius={[2,2,0,0]} barSize={12} />
-              <Bar dataKey="pending" fill={C.orange} radius={[2,2,0,0]} barSize={12} />
+              <Bar dataKey="paid"    fill={C.blue}   radius={[2,2,0,0]} barSize={7} />
+              <Bar dataKey="pending" fill={C.orange} radius={[2,2,0,0]} barSize={7} />
             </BarChart>
           </ResponsiveContainer>
         </SCard>
 
         {/* Compliance issues */}
-        <SCard className="dashboard-compliance-card min-w-0">
+        <SCard className="flex-[1.4]">
           <SHead title="Compliance Issues" link="View All" />
           <div className="p-3 space-y-2">
             {riskData.map((r) => (
@@ -876,7 +875,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Quick Actions */}
-        <SCard className="dashboard-quick-actions-card min-w-0">
+        <SCard className="flex-[1.2]">
           <SHead title="Quick Actions" />
           <div className="p-2 grid grid-cols-4 gap-1.5">
             {quickActions.map(({ Icon, label, color }) => (
@@ -895,10 +894,10 @@ export default function VendorDashboard() {
       </div>
 
       {/* ═══ ROW 5: Delivery Performance | Quality Performance | Response Time ═══ */}
-      <div className="dashboard-row-five">
+      <div className="flex gap-1.5">
 
         {/* Purchase-order status */}
-        <SCard className="dashboard-status-performance min-w-0">
+        <SCard className="flex-1">
           <SHead title="Purchase Order Status" link="View Details" />
           <div className="p-2 flex gap-3 items-center">
             <div className="relative shrink-0">
@@ -947,7 +946,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Quality Performance */}
-        <SCard className="dashboard-quality-performance min-w-0">
+        <SCard className="flex-1">
           <SHead title="Quality Performance" link="View Details" />
           <div className="p-2 flex gap-3 items-center">
             <div className="relative shrink-0">
@@ -997,7 +996,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Vendor responsiveness score */}
-        <SCard className="dashboard-responsiveness min-w-0">
+        <SCard className="flex-[1.4]">
           <SHead title="Vendor Responsiveness" link="View Details" />
           <div className="p-3">
             <div className="space-y-2.5">
@@ -1031,7 +1030,6 @@ export default function VendorDashboard() {
       {/* ═══ ROW 6: Performance by Category ═══════════════════════════ */}
       <SCard>
         <SHead title="Performance by Category" />
-        <div className="dashboard-wide-table">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50 text-[9px] text-gray-500">
@@ -1070,14 +1068,13 @@ export default function VendorDashboard() {
             ))}
           </tbody>
         </table>
-        </div>
       </SCard>
 
       {/* ═══ ROW 7: Top Performing Products | Recent Issues ══════════════ */}
-      <div className="dashboard-row-seven pb-4">
+      <div className="flex gap-2 pb-3">
 
         {/* Top Performing Products */}
-        <SCard className="min-w-0">
+        <SCard className="flex-1">
           <SHead title="Top Performing Products" link="View All" />
           <p className="text-[9px] text-gray-500 px-3 pt-1">By Spend</p>
           <table className="w-full mt-0.5">
@@ -1105,7 +1102,7 @@ export default function VendorDashboard() {
         </SCard>
 
         {/* Recent Issues */}
-        <SCard className="min-w-0">
+        <SCard className="flex-1">
           <SHead title="Vendor Compliance Follow-up" link="View All" />
           <table className="w-full mt-0.5">
             <thead>
