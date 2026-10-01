@@ -54,8 +54,7 @@ const INITIAL_ORDERS: Order[] = [
 ];
 
 const LEGACY_PO_STATUSES: OrderStatus[] = ["Pending", "Processing", "Shipped", "Delivered", "Closed", "Cancelled"];
-const VENDORS = ["All Vendors", "TechHub Solutions", "Office Supplies Co.", "Global Industrial", "Furniture Mart", "Printer World"];
-const PER_PAGE = 10;
+const MAX_LISTED_ORDERS = 5;
 
 const badgeStyles: Record<string, { bg: string; color: string; border: string }> = {
   Processing: { bg: "#eff6ff", color: "#185fa5", border: "#b5d4f4" },
@@ -347,9 +346,16 @@ export default function VendorOrderList(scope: VendorScope = {}) {
 
   const [orders, setOrders] = useState<Order[]>(loadOrders);
 
-  // Re-read store when page mounts (e.g. after navigation back from a PO detail)
+  // Keep the list current as purchase orders are created or updated.
   useEffect(() => {
-    setOrders(loadOrders());
+    const refresh = () => setOrders(loadOrders());
+    refresh();
+    window.addEventListener("poCreated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("poCreated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, [scope.vendorId, scope.vendorName]);
   const [activeTab, setActiveTab] = useState<OrderStatus | "All">("All");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
@@ -358,7 +364,6 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   const [sortCol, setSortCol] = useState<keyof Order | "">("");
   const [sortDir, setSortDir] = useState<1 | -1>(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [currentPage, setCurrentPage] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [statusModal, setStatusModal] = useState(false);
@@ -402,14 +407,16 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         const vb = b[sortCol as keyof Order];
         return (typeof va === "number" ? (va as number) - (vb as number) : String(va).localeCompare(String(vb))) * sortDir;
       });
+    } else {
+      rows.sort((a, b) => b.date.localeCompare(a.date));
     }
     return rows;
   };
 
   const filtered = getFiltered();
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const page = Math.min(currentPage, totalPages);
-  const pageRows = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const listedOrders = filtered.slice(0, MAX_LISTED_ORDERS);
+  const pageRows = listedOrders;
+  const vendorOptions = ["All Vendors", ...Array.from(new Set(displayedOrders.map(order => order.vendor))).sort()];
 
   const tabCount = (t: OrderStatus | "All") =>
     t === "All" ? displayedOrders.length : displayedOrders.filter(r => r.status === t).length;
@@ -424,8 +431,8 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   };
 
   const toggleAll = () => {
-    const allSel = filtered.every(r => selected.has(r.id));
-    setSelected(allSel ? new Set() : new Set(filtered.map(r => r.id)));
+    const allSel = listedOrders.length > 0 && listedOrders.every(r => selected.has(r.id));
+    setSelected(allSel ? new Set() : new Set(listedOrders.map(r => r.id)));
   };
 
   const applyBulkStatus = () => {
@@ -498,7 +505,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
 
   const doExport = () => {
     const csv = ["PO Number,Order ID,Vendor,PO Date,Status,Total Amount,Requested Delivery,Created By",
-      ...filtered.map(r => `${r.id},${r.orderId},${r.vendor},${r.dateStr},${r.status},${r.amountStr},${r.delivery},${r.by}`)
+      ...listedOrders.map(r => `${r.id},${r.orderId},${r.vendor},${r.dateStr},${r.status},${r.amountStr},${r.delivery},${r.by}`)
     ].join("\n");
     const a = document.createElement("a");
     a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
@@ -568,8 +575,16 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     );
   };
 
-  const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id));
+  const allSelected = listedOrders.length > 0 && listedOrders.every(r => selected.has(r.id));
   const someSelected = selected.size > 0 && !allSelected;
+
+  useEffect(() => {
+    const listedIds = new Set(listedOrders.map(order => order.id));
+    setSelected(current => {
+      const next = new Set([...current].filter(id => listedIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [listedOrders.map(order => order.id).join("|")]);
 
   if (detailOrder) return <OrderDetail order={detailOrder} onBack={() => setDetailOrder(null)} />;
 
@@ -631,7 +646,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
         <div style={{ position: "relative", flex: "0 0 300px" }}>
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: muted, fontSize: 15 }}>🔍</span>
-          <input value={search} onChange={e => { setSearch(e.target.value.toLowerCase()); setCurrentPage(1); }}
+          <input value={search} onChange={e => { setSearch(e.target.value.toLowerCase()); }}
             placeholder="Search by PO number, vendor, or items..."
             style={{ width: "100%", padding: "8px 10px 8px 34px", border: `1px solid ${bdr}`, borderRadius: 8, fontSize: 13, background: card, color: fg, outline: "none" }} />
         </div>
@@ -643,7 +658,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
           </button>
           <Dropdown id="status">
             {(["All", ...poStatusOptions] as (OrderStatus | "All")[]).map(st => (
-              <button key={st} style={s.ddItem} onClick={() => { setStatusFilter(st); setCurrentPage(1); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
+              <button key={st} style={s.ddItem} onClick={() => { setStatusFilter(st); setOpenDropdown(null); }}>{st === "All" ? "All Statuses" : st}</button>
             ))}
           </Dropdown>
         </div>
@@ -654,8 +669,8 @@ export default function VendorOrderList(scope: VendorScope = {}) {
             Vendor ▾
           </button>
           <Dropdown id="vendor">
-            {VENDORS.map(v => (
-              <button key={v} style={s.ddItem} onClick={() => { setVendorFilter(v); setCurrentPage(1); setOpenDropdown(null); }}>{v}</button>
+            {vendorOptions.map(v => (
+              <button key={v} style={s.ddItem} onClick={() => { setVendorFilter(v); setOpenDropdown(null); }}>{v}</button>
             ))}
           </Dropdown>
         </div>
@@ -677,7 +692,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: `1.5px solid ${bdr}`, gap: 0, overflowX: "auto" }}>
         {poTabs.map(t => (
-          <div key={t} onClick={() => { setActiveTab(t); setCurrentPage(1); }}
+          <div key={t} onClick={() => { setActiveTab(t); }}
             style={{ padding: "10px 18px", fontSize: 13, color: activeTab === t ? "#4a6cf7" : muted, cursor: "pointer", borderBottom: activeTab === t ? "2.5px solid #4a6cf7" : "2.5px solid transparent", marginBottom: -1.5, whiteSpace: "nowrap", fontWeight: activeTab === t ? 500 : 400 }}>
             {t === "All" ? "All Orders" : t} ({tabCount(t)})
           </div>
@@ -690,7 +705,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         {selected.size > 0 ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", fontSize: 13, color: fg, borderBottom: `1px solid ${bdr}`, background: mutedBg }}>
             <Checkbox checked={allSelected} indeterminate={someSelected} onClick={toggleAll} />
-            <span>{selected.size} of {filtered.length} selected &nbsp;|&nbsp;
+            <span>{selected.size} of {listedOrders.length} listed selected &nbsp;|&nbsp;
               <button onClick={() => setSelected(new Set())} style={{ color: "#4a6cf7", background: "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, padding: 0 }}>Clear</button>
             </span>
           </div>
@@ -767,14 +782,9 @@ export default function VendorOrderList(scope: VendorScope = {}) {
 
         {/* Pagination */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", fontSize: 13, color: "#888", borderTop: "1px solid #f0f0f5" }}>
-          <span>{filtered.length === 0 ? "No orders found" : `Showing ${(page - 1) * PER_PAGE + 1} to ${Math.min(page * PER_PAGE, filtered.length)} of ${filtered.length} orders`}</span>
-          <div style={{ display: "flex", gap: 4 }}>
-            <div style={s.pgBtn(false)} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>‹</div>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <div key={p} style={s.pgBtn(p === page)} onClick={() => setCurrentPage(p)}>{p}</div>
-            ))}
-            <div style={s.pgBtn(false)} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>›</div>
-          </div>
+          <span>{filtered.length === 0
+            ? "No orders found"
+            : `Showing ${listedOrders.length} of ${filtered.length} matching orders · maximum ${MAX_LISTED_ORDERS} shown`}</span>
         </div>
       </div>
     </div>

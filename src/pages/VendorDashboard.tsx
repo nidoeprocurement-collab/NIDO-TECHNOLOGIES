@@ -162,7 +162,11 @@ function buildVendorRatingSummary(vendors: StoredVendor[]) {
 
 function buildLiveDashboardData() {
   const vendors = getVendors().filter(vendor => !vendor.archived);
-  const purchaseOrders = getAllPOs();
+  const purchaseOrders = getAllPOs().filter(po =>
+    vendors.some(vendor =>
+      belongsToVendor(po, { vendorId: vendor.id, vendorName: vendor.name })
+    )
+  );
   const vendorRatingSummary = buildVendorRatingSummary(vendors);
   const activePOs = purchaseOrders.filter(po => po.status !== "Draft" && po.status !== "Cancelled");
   const vendorOrders = (vendor: StoredVendor) =>
@@ -454,9 +458,26 @@ export default function VendorDashboard() {
   const [dataVersion, setDataVersion] = useState(0);
   useEffect(() => {
     const refresh = () => setDataVersion(version => version + 1);
-    const events = ["nidoVendorsUpdated", "vendorProductsUpdated", "priceEngineSettingsUpdated", "poCreated", "poActivityUpdated", "vendorContractsUpdated", "storage"];
+    const events = [
+      "nidoVendorsUpdated",
+      "vendorProductsUpdated",
+      "priceEngineSettingsUpdated",
+      "poCreated",
+      "poActivityUpdated",
+      "poCancelled",
+      "storage",
+    ];
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
     events.forEach(event => window.addEventListener(event, refresh));
-    return () => events.forEach(event => window.removeEventListener(event, refresh));
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      events.forEach(event => window.removeEventListener(event, refresh));
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, []);
   const live = useMemo(() => buildLiveDashboardData(), [dataVersion]);
   const {
