@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { getVendors, saveVendors, type StoredVendor, type VendorStatus } from "@/lib/vendorDataStore";
+import * as XLSX from "xlsx";
 
 type Vendor = StoredVendor;
 
@@ -354,6 +355,41 @@ export default function App() {
     saveVendors(updated);
     setVendors(updated);
   };
+  const exportVendors = () => {
+    const rows = activeVendors.map(vendor => {
+      const flattened: Record<string, string | number | boolean> = {};
+      const addValue = (key: string, value: unknown) => {
+        if (value === null || value === undefined) {
+          flattened[key] = "";
+        } else if (Array.isArray(value)) {
+          flattened[key] = JSON.stringify(value);
+        } else if (typeof value === "object") {
+          Object.entries(value as Record<string, unknown>).forEach(([childKey, childValue]) => {
+            addValue(`${key}.${childKey}`, childValue);
+          });
+        } else {
+          flattened[key] = value;
+        }
+      };
+
+      Object.entries(vendor).forEach(([key, value]) => addValue(key, value));
+      return flattened;
+    });
+    const columns = Array.from(new Set(rows.flatMap(row => Object.keys(row))));
+    const headers = columns.map(column =>
+      column.split(".").map(part => part.replace(/([a-z0-9])([A-Z])/g, "$1 $2"))
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" / ")
+    );
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      headers,
+      ...rows.map(row => columns.map(column => row[column] ?? "")),
+    ]);
+    worksheet["!cols"] = headers.map(header => ({ wch: Math.min(Math.max(header.length + 2, 14), 36) }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Vendors");
+    XLSX.writeFile(workbook, "vendors-export.xlsx");
+  };
 
   const onHoldCount = activeVendors.filter(v => v.status === "On Hold").length;
   const pendingCount = activeVendors.filter(v => v.status === "Pending").length;
@@ -386,15 +422,7 @@ export default function App() {
               <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/vendors/onboarding')}>
                 <Plus className="h-4 w-4 mr-2" /> Vendor Onboarding
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                const csv = activeVendors.map(v => `${v.id},${v.name},${v.category},${v.primaryContact},${v.email},${v.status}`).join('\n');
-                const headers = 'Vendor ID,Name,Category,Contact,Email,Status\n';
-                const blob = new Blob([headers + csv], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'vendors-export.csv';
-                document.body.appendChild(a); a.click(); document.body.removeChild(a);
-              }}>
+              <DropdownMenuItem className="cursor-pointer" onClick={exportVendors}>
                 <Download className="h-4 w-4 mr-2" /> Export Vendors
               </DropdownMenuItem>
               <DropdownMenuItem className="cursor-pointer" onClick={() => setShowArchived(true)}>
