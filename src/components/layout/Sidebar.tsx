@@ -40,7 +40,6 @@ const adminNavigationItems: NavItem[] = [
     children: [
       { label: 'Vendor List',      icon: <List size={16} />,         path: '/vendors',           moduleKey: 'vendors' },
       { label: 'Vendor Orders',    icon: <ClipboardList size={16} />,path: '/vendors/orders',    moduleKey: 'vendors' },
-      { label: 'Vendor Dashboard', icon: <LayoutDashboard size={16}/>,path: '/vendors/dashboard',moduleKey: 'vendors' },
       { label: 'Categories',       icon: <Tags size={16} />,         path: '/vendors/categories',moduleKey: 'vendors' },
     ],
   },
