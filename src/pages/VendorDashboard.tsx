@@ -607,11 +607,11 @@ export default function VendorDashboard() {
         <SCard className="flex-[1.15] min-w-[170px]">
           <SHead title="Spend by Category" />
           <div className="p-2 flex flex-col items-center">
-            <PieChart width={90} height={90}>
+            <PieChart width={109} height={109}>
               <Pie
                 data={spendCategoryData}
-                cx={45} cy={45}
-                innerRadius={24} outerRadius={42}
+                cx={54.5} cy={54.5}
+                innerRadius={29} outerRadius={51.5}
                 dataKey="value"
                 paddingAngle={2}
               >
@@ -668,11 +668,11 @@ export default function VendorDashboard() {
           <SHead title="Order Status" />
           <div className="p-2 flex flex-col items-center">
             <div className="relative">
-              <PieChart width={90} height={90}>
+              <PieChart width={109} height={109}>
                 <Pie
                   data={orderStatusData}
-                  cx={45} cy={45}
-                  innerRadius={24} outerRadius={42}
+                  cx={54.5} cy={54.5}
+                  innerRadius={29} outerRadius={51.5}
                   dataKey="value"
                   paddingAngle={2}
                 >
