@@ -47,15 +47,16 @@ export interface BuiltinReportView {
   description: string;
   module: string;
   selectedColumns: string[];
+  format: ReportFormat;
 }
 
 const BUILTIN_REPORT_VIEWS: BuiltinReportView[] = [
-  { id: "r1", name: "Master Order Report", description: "Summary of all orders across clients and vendors", module: "Orders", selectedColumns: ["ID", "Created On", "Client Name", "Vendor Name", "Status", "Amount"] },
-  { id: "r2", name: "Client Activity Report", description: "Client users, catalog, orders and requests", module: "Clients", selectedColumns: ["ID", "Created On", "Client Name", "Client Email", "Client Status"] },
-  { id: "r3", name: "Vendor Performance Report", description: "Vendor users, catalog, orders and tickets", module: "Vendors", selectedColumns: ["ID", "Created On", "Vendor Name", "Vendor Email", "Vendor Status"] },
-  { id: "r4", name: "Support Tickets Report", description: "All support tickets and resolution status", module: "Support Tickets", selectedColumns: ["ID", "Created On", "Priority", "Status"] },
-  { id: "r5", name: "Services Requests Report", description: "All service requests and status", module: "Services", selectedColumns: ["ID", "Created On", "Status", "Priority"] },
-  { id: "r6", name: "User Summary Report", description: "All platform users and roles", module: "Users", selectedColumns: ["ID", "Created On", "Created By", "Status"] },
+  { id: "r1", name: "Master Order Report", description: "Summary of all orders across clients and vendors", module: "Orders", selectedColumns: ["Order ID", "Order Date", "Client Name", "Order Status", "Amount", "Tax", "Total"], format: "Excel" },
+  { id: "r2", name: "Client Activity Report", description: "Client users, catalog, orders and requests", module: "Clients", selectedColumns: ["ID", "Created On", "Client Name", "Client Email", "Client Status"], format: "PDF" },
+  { id: "r3", name: "Vendor Performance Report", description: "Vendor users, catalog, orders and tickets", module: "Vendors", selectedColumns: ["ID", "Created On", "Vendor Name", "Vendor Email", "Vendor Status"], format: "Excel" },
+  { id: "r4", name: "Support Tickets Report", description: "All support tickets and resolution status", module: "Support Tickets", selectedColumns: ["ID", "Created On", "Priority", "Status"], format: "PDF" },
+  { id: "r5", name: "Services Requests Report", description: "All service requests and status", module: "Services", selectedColumns: ["ID", "Created On", "Status", "Priority"], format: "Excel" },
+  { id: "r6", name: "User Summary Report", description: "All platform users and roles", module: "Users", selectedColumns: ["ID", "Created On", "Created By", "Status"], format: "Excel" },
 ];
 
 export function getCustomReports(): CustomReport[] {

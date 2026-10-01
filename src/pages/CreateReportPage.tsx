@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { nanoid } from "nanoid";
 import {
   saveCustomReport,
   generateReportId,
+  getCustomReports,
+  getBuiltinReportView,
   type ReportFormat,
   type ReportFrequency,
 } from "@/lib/reportStore";
@@ -108,6 +110,18 @@ const FORMATS: { value: ReportFormat; label: string }[] = [
 const FILTER_OPERATORS = ["equals", "not equals", "contains", "greater than", "less than", "is empty", "is not empty"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+function toFormTime(value: string): string {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+  if (!match) return "09:00";
+  let hours = Number(match[1]);
+  const meridiem = match[3]?.toUpperCase();
+  if (meridiem) {
+    hours %= 12;
+    if (meridiem === "PM") hours += 12;
+  }
+  return `${String(hours).padStart(2, "0")}:${match[2]}`;
+}
 
 function SectionBadge({ n }: { n: number }) {
   return (
@@ -389,7 +403,12 @@ function SelectColumnsPanel({
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function CreateReportPage() {
-  usePageMeta({ title: "Create Report" });
+  const [searchParams] = useSearchParams();
+  const editingId = searchParams.get("edit");
+  const cloningId = searchParams.get("clone");
+  const isEditing = Boolean(editingId);
+  const isCloning = Boolean(cloningId);
+  usePageMeta({ title: isEditing ? "Edit Report" : isCloning ? "Customize Report" : "Create Report" });
   const navigate = useNavigate();
 
   // Form state
@@ -411,6 +430,59 @@ export default function CreateReportPage() {
   const [format,           setFormat]            = useState<ReportFormat>("Excel");
   const [includeCharts,    setIncludeCharts]     = useState(true);
   const [includeSummary,   setIncludeSummary]    = useState(true);
+
+  useEffect(() => {
+    if (editingId) {
+      const existing = getCustomReports().find((report) => report.id === editingId);
+      if (!existing) {
+        toast({ title: "Report not found", description: "This report may have been deleted.", variant: "destructive" });
+        navigate("/reports");
+        return;
+      }
+      setReportName(existing.name);
+      setDescription(existing.description);
+      setReportType(existing.reportType);
+      setModule(existing.module);
+      setSelectedColumns(existing.selectedColumns);
+      setFilters(existing.filters);
+      setFrequency(existing.frequency);
+      setStartDate(existing.startDate);
+      setTime(toFormTime(existing.time));
+      setTimezone(existing.timeZone);
+      setDeliveryEmail(existing.deliveryEmail);
+      setDeliveryDownload(existing.deliveryDownload);
+      setEmailRecipients(existing.emailRecipients);
+      setFormat(existing.format);
+      setIncludeCharts(existing.includeCharts);
+      setIncludeSummary(existing.includeSummary);
+      return;
+    }
+
+    if (cloningId) {
+      const source = getBuiltinReportView(cloningId);
+      if (!source) {
+        toast({ title: "Built-in report not found", variant: "destructive" });
+        navigate("/reports");
+        return;
+      }
+      setReportName(`${source.name} (Custom)`);
+      setDescription(source.description);
+      setReportType("Detailed Report");
+      setModule(source.module);
+      setSelectedColumns(source.selectedColumns);
+      setFilters([]);
+      setFrequency("Daily");
+      setStartDate(new Date().toISOString().slice(0, 10));
+      setTime("08:00");
+      setTimezone("(IST) Asia/Kolkata");
+      setDeliveryEmail(false);
+      setDeliveryDownload(false);
+      setEmailRecipients("");
+      setFormat(source.format);
+      setIncludeCharts(true);
+      setIncludeSummary(true);
+    }
+  }, [editingId, cloningId, navigate]);
 
   // Derived field list
   const activeModule  = module || "All Modules";
@@ -459,11 +531,21 @@ export default function CreateReportPage() {
   const handleSave = () => {
     if (!reportName.trim()) { toast({ title: "Report name is required", variant: "destructive" }); return; }
     if (!reportType)        { toast({ title: "Report type is required",  variant: "destructive" }); return; }
+    const existing = editingId
+      ? getCustomReports().find((report) => report.id === editingId)
+      : undefined;
+    if (editingId && !existing) {
+      toast({ title: "Report not found", description: "This report may have been deleted.", variant: "destructive" });
+      navigate("/reports");
+      return;
+    }
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
     const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    const reportId = existing?.id ?? generateReportId();
     saveCustomReport({
-      id: generateReportId(),
+      ...existing,
+      id: reportId,
       name: reportName.trim(),
       description: description.trim(),
       reportType,
@@ -480,13 +562,18 @@ export default function CreateReportPage() {
       format,
       includeCharts,
       includeSummary,
-      createdBy: "System Admin",
-      createdAt: `${dateStr} ${timeStr}`,
+      createdBy: existing?.createdBy ?? "System Admin",
+      createdAt: existing?.createdAt ?? `${dateStr} ${timeStr}`,
       lastRunDate: dateStr,
       lastRunStatus: "Success" as const,
     });
-    toast({ title: "Report saved!", description: `"${reportName.trim()}" has been added to your reports.` });
-    navigate("/reports");
+    toast({
+      title: existing ? "Report updated" : isCloning ? "Custom report created" : "Report saved!",
+      description: existing
+        ? `"${reportName.trim()}" has been updated.`
+        : `"${reportName.trim()}" has been added to your reports.`,
+    });
+    navigate(`/reports/custom/${encodeURIComponent(reportId)}`);
   };
 
   return (
@@ -494,17 +581,21 @@ export default function CreateReportPage() {
       {/* ── Page Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Create New Report</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Build a custom report to view and analyze your business data.</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isEditing ? "Edit Report" : isCloning ? "Customize Report" : "Create New Report"}
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {isEditing ? "Update this report’s settings and save your changes." : "Build a custom report to view and analyze your business data."}
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate("/reports")}
+          <button type="button" onClick={() => navigate(editingId ? `/reports/custom/${encodeURIComponent(editingId)}` : "/reports")}
             className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
             Cancel
           </button>
           <button type="button" onClick={handleSave}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-            Save &amp; Next
+            {isEditing ? "Save Changes" : isCloning ? "Create Custom Copy" : "Save & Next"}
           </button>
         </div>
       </div>
@@ -799,7 +890,7 @@ export default function CreateReportPage() {
             </div>
             <button type="button" onClick={handleSave}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors ml-2">
-              <Save className="w-4 h-4" /> Save Report
+              <Save className="w-4 h-4" /> {isEditing ? "Save Changes" : isCloning ? "Create Custom Copy" : "Save Report"}
             </button>
           </div>
         </div>
