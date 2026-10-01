@@ -5,8 +5,6 @@ import {
 } from "recharts";
 import {
   Users, Star, Truck, Award,
-  Plus, CreditCard,
-  BarChart2, Download, Settings, Bell, Upload,
   IndianRupee, UserCheck,
 } from "lucide-react";
 import { getVendors, type StoredVendor } from "@/lib/vendorDataStore";
@@ -198,41 +196,6 @@ function buildLiveDashboardData() {
       };
     });
 
-  const topVendorsData = [...spendByVendor]
-    .sort((a, b) =>
-      Number(b.vendor.rating || (b.vendor.performanceQuality || 0) / 20) -
-      Number(a.vendor.rating || (a.vendor.performanceQuality || 0) / 20),
-    )
-    .slice(0, 5)
-    .map((row, index) => ({
-      rank: index + 1,
-      name: row.vendor.name,
-      score: Number(row.vendor.rating || (row.vendor.performanceQuality || 0) / 20),
-      color: [C.blue, C.green, C.purple, C.orange, C.cyan][index],
-    }));
-
-  const contractStatuses = new Map<string, number>();
-  for (const vendor of vendors) {
-    try {
-      const contracts = JSON.parse(localStorage.getItem(`nido_vendor_contracts_${vendor.id}`) || "[]");
-      if (!Array.isArray(contracts)) continue;
-      for (const contract of contracts) {
-        const status = String(contract.status || "Active");
-        const normalized = status.toLowerCase();
-        const label = normalized.includes("expired") ? "Expired"
-          : normalized.includes("expir") ? "Expiring"
-          : normalized.includes("renew") ? "Renewal" : "Active";
-        contractStatuses.set(label, (contractStatuses.get(label) || 0) + 1);
-      }
-    } catch { /* malformed vendor contract records are excluded */ }
-  }
-  const contractPieData = [
-    { name: "Active", value: contractStatuses.get("Active") || 0, color: C.green },
-    { name: "Expiring", value: contractStatuses.get("Expiring") || 0, color: C.orange },
-    { name: "Expired", value: contractStatuses.get("Expired") || 0, color: C.red },
-    { name: "Renewal", value: contractStatuses.get("Renewal") || 0, color: C.blue },
-  ].filter(row => row.value > 0);
-
   const monthlyTotals = Array.from({ length: 6 }, (_, index) => {
     const date = new Date();
     date.setDate(1);
@@ -377,7 +340,7 @@ function buildLiveDashboardData() {
     vendors, purchaseOrders, totalSpend, preferredCount, avgQuality,
     avgDelivery: totalDelivery.length ? totalDelivery.reduce((sum, score) => sum + score, 0) / totalDelivery.length : 0,
     spendByVendorData, vendorRankingData, slaVendorData, slaData, activities, spendCategoryData,
-    orderStatusData, recentOrdersData, topVendorsData, contractPieData, paymentChartData: monthlyTotals,
+    orderStatusData, recentOrdersData, paymentChartData: monthlyTotals,
     riskData, deliveryPieData: deliveryCounts, qualityPieData: qualityCounts, performanceCatData,
     topProductsData, recentIssuesData, deliveredPOs, responsivenessData, avgResponsiveness,
     currentMonthSpend, draftSpend,
@@ -397,7 +360,7 @@ export default function VendorDashboard() {
   const {
     vendors, purchaseOrders, totalSpend, preferredCount, avgQuality, avgDelivery,
     spendByVendorData, vendorRankingData, slaVendorData, slaData, activities, spendCategoryData,
-    orderStatusData, recentOrdersData, topVendorsData, contractPieData, paymentChartData,
+    orderStatusData, recentOrdersData, paymentChartData,
     riskData, deliveryPieData, qualityPieData, performanceCatData, topProductsData, recentIssuesData,
     deliveredPOs, responsivenessData, avgResponsiveness, currentMonthSpend, draftSpend,
   } = live;
@@ -410,17 +373,6 @@ export default function VendorDashboard() {
     { label: "Vendor Spend",           value: formatCr(totalSpend), Icon: IndianRupee, color: C.red, sub: `${purchaseOrders.filter(po => po.status !== "Draft" && po.status !== "Cancelled").length} confirmed POs` },
     { label: "Delivery Performance",   value: avgDelivery ? `${avgDelivery.toFixed(1)}%` : "—", Icon: Truck, color: C.cyan, sub: "From vendor records" },
     { label: "Avg Quality Score",      value: avgQuality ? `${avgQuality.toFixed(1)} / 5` : "—", Icon: Award, color: C.purple, sub: `Across ${vendors.length} vendors` },
-  ];
-
-  const quickActions = [
-    { Icon: Plus,      label: "Create PO",  color: C.blue   },
-    { Icon: Users,     label: "New Vendor", color: C.green  },
-    { Icon: CreditCard,label: "Payment",    color: C.orange },
-    { Icon: BarChart2, label: "Analytics",  color: C.purple },
-    { Icon: Upload,    label: "Import",     color: C.cyan   },
-    { Icon: Download,  label: "Export",     color: C.gray   },
-    { Icon: Bell,      label: "Alerts",     color: C.red    },
-    { Icon: Settings,  label: "Settings",   color: "#6C757D"},
   ];
 
   return (
@@ -785,56 +737,10 @@ export default function VendorDashboard() {
           </table>
         </SCard>
 
-        {/* Top Performing Vendors */}
-        <SCard style={{ width: 150, minWidth: 150 }}>
-          <SHead title="Top Rated Vendors" />
-          <div className="px-2 py-1.5 space-y-1.5">
-            {topVendorsData.map((v) => (
-              <div key={v.rank} className="flex items-center gap-1.5">
-                <span className="text-[9px] font-bold text-gray-400 w-3 shrink-0">{v.rank}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-medium text-gray-700 truncate">{v.name}</p>
-                </div>
-                <span
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                  style={{ color: v.color, backgroundColor: v.color + "20" }}
-                >
-                  {v.score ? `${v.score.toFixed(1)} / 5` : "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </SCard>
       </div>
 
-      {/* ═══ ROW 4: Contract Summary | Payment Summary | Risk Monitor | Quick Actions ═══ */}
+      {/* ═══ ROW 4: Purchase Order Value | Compliance Issues ═══ */}
       <div className="flex gap-1.5">
-
-        {/* Contract Summary */}
-        <SCard style={{ width: 190, minWidth: 190 }}>
-          <SHead title="Contract Summary" link="View All" />
-          <div className="p-2 flex gap-2 items-center">
-            <PieChart width={64} height={64}>
-              <Pie
-                data={contractPieData}
-                cx={32} cy={32}
-                innerRadius={18} outerRadius={30}
-                dataKey="value"
-                paddingAngle={2}
-              >
-                {contractPieData.map((e, i) => <Cell key={i} fill={e.color} />)}
-              </Pie>
-            </PieChart>
-            <div className="flex-1 grid grid-cols-2 gap-1">
-              {contractPieData.map((d) => (
-                <div key={d.name} className="text-center p-1 rounded" style={{ backgroundColor: d.color + "18" }}>
-                  <p className="text-sm font-bold leading-tight" style={{ color: d.color }}>{d.value}</p>
-                  <p className="text-[8px] text-gray-500">{d.name}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </SCard>
 
         {/* Purchase-order value summary */}
         <SCard className="flex-[1.8]">
@@ -885,23 +791,6 @@ export default function VendorDashboard() {
           </div>
         </SCard>
 
-        {/* Quick Actions */}
-        <SCard className="flex-[1.2]">
-          <SHead title="Quick Actions" />
-          <div className="p-2 grid grid-cols-4 gap-1.5">
-            {quickActions.map(({ Icon, label, color }) => (
-              <div key={label} className="flex flex-col items-center gap-0.5 cursor-pointer group">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-150"
-                  style={{ backgroundColor: color + "20" }}
-                >
-                  <Icon size={13} style={{ color }} />
-                </div>
-                <span className="text-[8px] text-gray-500 text-center leading-tight">{label}</span>
-              </div>
-            ))}
-          </div>
-        </SCard>
       </div>
 
       {/* ═══ ROW 5: Delivery Performance | Quality Performance | Response Time ═══ */}
