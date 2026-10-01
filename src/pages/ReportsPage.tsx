@@ -16,7 +16,17 @@ const SlaReportPage           = lazy(() => import("@/pages/reports/SlaReportPage
 const ApprovalReportPage      = lazy(() => import("@/pages/reports/ApprovalReportPage"));
 const TaxReportPage           = lazy(() => import("@/pages/reports/TaxReportPage"));
 const AuditTrailPage          = lazy(() => import("@/pages/AuditTrailPage"));
-import { getCustomReports, deleteCustomReport, saveCustomReport, generateReportId, moduleToCategoryLabel, scheduleLabel as buildScheduleLabel, type CustomReport } from "@/lib/reportStore";
+import {
+  getCustomReports,
+  deleteCustomReport,
+  saveCustomReport,
+  generateReportId,
+  getBuiltinReportSchedule,
+  saveBuiltinReportSchedule,
+  moduleToCategoryLabel,
+  scheduleLabel as buildScheduleLabel,
+  type CustomReport,
+} from "@/lib/reportStore";
 import { getClients } from "@/lib/clientStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getUsers } from "@/lib/nidoUsersStore";
@@ -74,6 +84,7 @@ type TabKey = "all" | "scheduled" | "mine" | "shared";
 
 interface ReportRow {
   id: string;
+  isCustom?: boolean;
   name: string;
   description: string;
   category: Exclude<ReportCategory, "All">;
@@ -244,22 +255,33 @@ function FormatBadge({ format }: { format: ReportFormat }) {
 const FREQ_OPTIONS: CustomReport["frequency"][] = ["One Time", "Daily", "Weekly", "Monthly", "Quarterly"];
 const TZ_OPTIONS = ["UTC", "EST (UTC-5)", "CST (UTC-6)", "MST (UTC-7)", "PST (UTC-8)", "IST (UTC+5:30)", "CET (UTC+1)", "AEST (UTC+10)"];
 
-function EditScheduleModal({ reportId, reportName, onClose, onSaved }: {
-  reportId: string;
+function EditScheduleModal({ report, reportName, onClose, onSaved }: {
+  report: ReportRow;
   reportName: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const reportId = report.id;
   const stored = getCustomReports().find((r) => r.id === reportId);
-  const [frequency, setFrequency] = useState<CustomReport["frequency"]>(stored?.frequency ?? "Daily");
-  const [time, setTime] = useState(stored?.time ?? "08:00 AM");
-  const [timeZone, setTimeZone] = useState(stored?.timeZone ?? "UTC");
-  const [emailOn, setEmailOn] = useState(stored?.deliveryEmail ?? false);
-  const [recipients, setRecipients] = useState(stored?.emailRecipients ?? "");
+  const savedBuiltinSchedule = getBuiltinReportSchedule(reportId);
+  const defaultFrequency = report.scheduleLabel.split("\n")[0] as CustomReport["frequency"];
+  const defaultRecipients = SCHEDULED.find((scheduled) => scheduled.name === reportName)?.recipients ?? "";
+  const [frequency, setFrequency] = useState<CustomReport["frequency"]>(
+    stored?.frequency ?? savedBuiltinSchedule?.frequency ?? defaultFrequency
+  );
+  const [time, setTime] = useState(stored?.time ?? savedBuiltinSchedule?.time ?? report.lastRunTime ?? "08:00 AM");
+  const [timeZone, setTimeZone] = useState(stored?.timeZone ?? savedBuiltinSchedule?.timeZone ?? "UTC");
+  const [emailOn, setEmailOn] = useState(
+    stored?.deliveryEmail ?? savedBuiltinSchedule?.deliveryEmail ?? Boolean(defaultRecipients)
+  );
+  const [recipients, setRecipients] = useState(
+    stored?.emailRecipients ?? savedBuiltinSchedule?.emailRecipients ?? defaultRecipients
+  );
 
   const handleSave = () => {
-    if (!stored) { onClose(); return; }
-    saveCustomReport({ ...stored, frequency, time, timeZone, deliveryEmail: emailOn, emailRecipients: recipients });
+    const schedule = { frequency, time, timeZone, deliveryEmail: emailOn, emailRecipients: recipients };
+    if (stored) saveCustomReport({ ...stored, ...schedule });
+    else saveBuiltinReportSchedule(reportId, schedule);
     onSaved();
     toast({ title: "Schedule updated", description: `"${reportName}" schedule has been saved.` });
     onClose();
@@ -410,7 +432,7 @@ function RowActions({ report, onRefresh }: { report: ReportRow; onRefresh?: () =
   const [open, setOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const isCustom = report.id.startsWith("RPT-");
+  const isCustom = report.isCustom === true;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -426,8 +448,7 @@ function RowActions({ report, onRefresh }: { report: ReportRow; onRefresh?: () =
 
   const handleView = () => {
     setOpen(false);
-    if (isCustom) navigate(`/reports/custom/${report.id}`);
-    else toast({ title: `Viewing: ${report.name}` });
+    navigate(`/reports/custom/${report.id}`);
   };
 
   const handleDownload = () => {
@@ -438,11 +459,7 @@ function RowActions({ report, onRefresh }: { report: ReportRow; onRefresh?: () =
 
   const handleEditSchedule = () => {
     setOpen(false);
-    if (isCustom) {
-      setScheduleOpen(true);
-    } else {
-      toast({ title: "Cannot edit schedule for built-in reports." });
-    }
+    setScheduleOpen(true);
   };
 
   const handleDelete = () => {
@@ -460,7 +477,7 @@ function RowActions({ report, onRefresh }: { report: ReportRow; onRefresh?: () =
     <>
       {scheduleOpen && (
         <EditScheduleModal
-          reportId={report.id}
+          report={report}
           reportName={report.name}
           onClose={() => setScheduleOpen(false)}
           onSaved={() => onRefresh?.()}
@@ -581,20 +598,13 @@ function ReportTable({
                   <input type="checkbox" className="rounded border-gray-300" />
                 </td>
                 <td className="py-3 px-3 min-w-[200px]">
-                  {r.id.startsWith("RPT-") ? (
-                    <button
-                      onClick={() => navigate(`/reports/custom/${r.id}`)}
-                      className="text-left group"
-                    >
-                      <div className="font-medium text-blue-600 group-hover:text-blue-800 group-hover:underline text-sm transition-colors">{r.name}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{r.description}</div>
-                    </button>
-                  ) : (
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">{r.name}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{r.description}</div>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => navigate(`/reports/custom/${r.id}`)}
+                    className="text-left group"
+                  >
+                    <div className="font-medium text-blue-600 group-hover:text-blue-800 group-hover:underline text-sm transition-colors">{r.name}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{r.description}</div>
+                  </button>
                 </td>
                 <td className="py-3 px-3">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[r.category]}`}>
@@ -996,6 +1006,7 @@ function customToRow(r: CustomReport): ReportRow {
     r.format === "CSV" ? "CSV" : r.format === "PDF" ? "PDF" : "Excel";
   return {
     id: r.id,
+    isCustom: true,
     name: r.name,
     description: r.description || r.reportType,
     category: cat,
@@ -1027,9 +1038,26 @@ export default function ReportsPage() {
     getCustomReports().map(customToRow)
   );
 
-  const refreshCustom = () => setCustomReports(getCustomReports().map(customToRow));
+  const [builtinScheduleRevision, setBuiltinScheduleRevision] = useState(0);
+  const refreshReports = () => {
+    setCustomReports(getCustomReports().map(customToRow));
+    setBuiltinScheduleRevision((revision) => revision + 1);
+  };
 
-  const allReports = useMemo(() => [...customReports, ...REPORTS], [customReports]);
+  const builtInReports = useMemo(
+    () => REPORTS.map((report) => {
+      const schedule = getBuiltinReportSchedule(report.id);
+      if (!schedule) return report;
+      return {
+        ...report,
+        scheduleLabel: buildScheduleLabel(schedule.frequency, schedule.time),
+        scheduleIcon: schedule.frequency === "Monthly" || schedule.frequency === "Quarterly" ? "calendar" as const : "recurring" as const,
+        lastRunTime: schedule.time,
+      };
+    }),
+    [builtinScheduleRevision]
+  );
+  const allReports = useMemo(() => [...customReports, ...builtInReports], [customReports, builtInReports]);
 
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
@@ -1256,7 +1284,7 @@ export default function ReportsPage() {
                 </div>
               )}
 
-              {activeTab === "all"       && <ReportTable reports={allReports} search={search} category={catFilter} format={fmtFilter} onRefresh={refreshCustom} />}
+              {activeTab === "all"       && <ReportTable reports={allReports} search={search} category={catFilter} format={fmtFilter} onRefresh={refreshReports} />}
               {activeTab === "scheduled" && <ScheduledReportsTab />}
               {activeTab === "mine"      && <MyReportsTab />}
               {activeTab === "shared"    && <SharedReportsTab />}

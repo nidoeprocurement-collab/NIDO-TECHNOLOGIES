@@ -1,4 +1,5 @@
 const STORE_KEY = "nido_custom_reports_v1";
+const BUILTIN_SCHEDULES_KEY = "nido_builtin_report_schedules_v1";
 
 export type ReportFormat = "Excel" | "CSV" | "PDF";
 export type ReportFrequency = "One Time" | "Daily" | "Weekly" | "Monthly" | "Quarterly";
@@ -35,12 +36,58 @@ export interface ReportFilter {
   value: string;
 }
 
+export type BuiltinReportSchedule = Pick<
+  CustomReport,
+  "frequency" | "time" | "timeZone" | "deliveryEmail" | "emailRecipients"
+>;
+
+export interface BuiltinReportView {
+  id: string;
+  name: string;
+  description: string;
+  module: string;
+  selectedColumns: string[];
+}
+
+const BUILTIN_REPORT_VIEWS: BuiltinReportView[] = [
+  { id: "r1", name: "Master Order Report", description: "Summary of all orders across clients and vendors", module: "Orders", selectedColumns: ["ID", "Created On", "Client Name", "Vendor Name", "Status", "Amount"] },
+  { id: "r2", name: "Client Activity Report", description: "Client users, catalog, orders and requests", module: "Clients", selectedColumns: ["ID", "Created On", "Client Name", "Client Email", "Client Status"] },
+  { id: "r3", name: "Vendor Performance Report", description: "Vendor users, catalog, orders and tickets", module: "Vendors", selectedColumns: ["ID", "Created On", "Vendor Name", "Vendor Email", "Vendor Status"] },
+  { id: "r4", name: "Support Tickets Report", description: "All support tickets and resolution status", module: "Support Tickets", selectedColumns: ["ID", "Created On", "Priority", "Status"] },
+  { id: "r5", name: "Services Requests Report", description: "All service requests and status", module: "Services", selectedColumns: ["ID", "Created On", "Status", "Priority"] },
+  { id: "r6", name: "User Summary Report", description: "All platform users and roles", module: "Users", selectedColumns: ["ID", "Created On", "Created By", "Status"] },
+];
+
 export function getCustomReports(): CustomReport[] {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return [];
+}
+
+export function getBuiltinReportView(id: string): BuiltinReportView | undefined {
+  return BUILTIN_REPORT_VIEWS.find((report) => report.id === id);
+}
+
+export function getBuiltinReportSchedule(id: string): BuiltinReportSchedule | undefined {
+  try {
+    const schedules = JSON.parse(localStorage.getItem(BUILTIN_SCHEDULES_KEY) ?? "{}") as Record<string, BuiltinReportSchedule>;
+    return schedules[id];
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveBuiltinReportSchedule(id: string, schedule: BuiltinReportSchedule): void {
+  let schedules: Record<string, BuiltinReportSchedule> = {};
+  try {
+    schedules = JSON.parse(localStorage.getItem(BUILTIN_SCHEDULES_KEY) ?? "{}");
+  } catch {
+    schedules = {};
+  }
+  schedules[id] = schedule;
+  localStorage.setItem(BUILTIN_SCHEDULES_KEY, JSON.stringify(schedules));
 }
 
 export function saveCustomReport(report: CustomReport): void {

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
-import { getCustomReports, type CustomReport } from "@/lib/reportStore";
+import { getBuiltinReportView, getCustomReports, type BuiltinReportView, type CustomReport } from "@/lib/reportStore";
 import {
   Download, Calendar, Pencil, ChevronLeft, ChevronRight,
   FileSpreadsheet, FileText, Users, ShoppingCart, Building2,
@@ -231,8 +231,8 @@ export default function CustomReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const report: CustomReport | undefined = useMemo(
-    () => getCustomReports().find((r) => r.id === id),
+  const report: CustomReport | BuiltinReportView | undefined = useMemo(
+    () => (id ? getCustomReports().find((r) => r.id === id) ?? getBuiltinReportView(id) : undefined),
     [id],
   );
 
