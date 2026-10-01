@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis,
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, LabelList,
   CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { getVendors, type StoredVendor } from "@/lib/vendorDataStore";
 import { getAllPOs, getPODisplayStatus, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllVendorProducts } from "@/lib/vendorStore";
+import { getLandedCost, getVendorCommonSettings } from "@/lib/priceEngineStore";
 import { belongsToVendor } from "@/lib/vendorScope";
 
 // ─── Color Palette ──────────────────────────────────────────────
@@ -76,9 +78,92 @@ function formatCr(amount: number): string {
   return `₹${amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
+function clampRatingScore(value: number): number {
+  return Math.max(0, Math.min(100, value));
+}
+
+function buildVendorRatingSummary(vendors: StoredVendor[]) {
+  const productsByVendor = getAllVendorProducts();
+  const offersByProduct = new Map<string, Map<string, number>>();
+
+  for (const vendor of vendors) {
+    const vendorSettings = getVendorCommonSettings(vendor.id);
+    const vendorOffers = new Map<string, number>();
+    for (const product of productsByVendor[vendor.id] || []) {
+      const productCode = String(product.masterProductCode || "").trim();
+      const basePrice = Number.parseFloat(String(product.price || "").replace(/,/g, ""));
+      if (product.status !== "Active" || !productCode || !Number.isFinite(basePrice) || basePrice <= 0) continue;
+
+      const landedCost = getLandedCost(basePrice, vendorSettings, product.category);
+      if (!Number.isFinite(landedCost) || landedCost <= 0) continue;
+      const currentCost = vendorOffers.get(productCode);
+      if (currentCost === undefined || landedCost < currentCost) vendorOffers.set(productCode, landedCost);
+    }
+
+    for (const [productCode, landedCost] of vendorOffers) {
+      const offers = offersByProduct.get(productCode) || new Map<string, number>();
+      offers.set(vendor.id, landedCost);
+      offersByProduct.set(productCode, offers);
+    }
+  }
+
+  const vendorCostTotals = new Map<string, { total: number; count: number }>();
+  for (const offers of offersByProduct.values()) {
+    if (offers.size < 2) continue;
+    const lowestLandedCost = Math.min(...offers.values());
+    for (const [vendorId, landedCost] of offers) {
+      const score = clampRatingScore((lowestLandedCost / landedCost) * 100);
+      const total = vendorCostTotals.get(vendorId) || { total: 0, count: 0 };
+      total.total += score;
+      total.count += 1;
+      vendorCostTotals.set(vendorId, total);
+    }
+  }
+
+  const ratings = vendors.map(vendor => {
+    const costTotal = vendorCostTotals.get(vendor.id);
+    const costScore = costTotal?.count ? costTotal.total / costTotal.count : null;
+    const storedRating = Number(vendor.rating || 0);
+    const storedQuality = Number(vendor.performanceQuality || 0);
+    const qualityScore = storedRating > 0
+      ? clampRatingScore(storedRating <= 5 ? storedRating * 20 : storedRating)
+      : storedQuality > 0 ? clampRatingScore(storedQuality) : null;
+    const storedDelivery = Number(vendor.performanceDelivery || 0);
+    const deliveryScore = storedDelivery > 0 ? clampRatingScore(storedDelivery) : null;
+    const overallScore = costScore !== null && qualityScore !== null && deliveryScore !== null
+      ? (costScore + qualityScore + deliveryScore) / 3
+      : null;
+
+    return {
+      vendorId: vendor.id,
+      name: vendor.name,
+      costScore,
+      qualityScore,
+      deliveryScore,
+      overallScore,
+    };
+  });
+
+  const averageScore = (scores: Array<number | null>) => {
+    const recorded = scores.filter((score): score is number => score !== null && Number.isFinite(score));
+    return recorded.length ? recorded.reduce((sum, score) => sum + score, 0) / recorded.length : null;
+  };
+
+  return {
+    ratings,
+    averageCostScore: averageScore(ratings.map(row => row.costScore)),
+    averageQualityScore: averageScore(ratings.map(row => row.qualityScore)),
+    averageDeliveryScore: averageScore(ratings.map(row => row.deliveryScore)),
+    averageOverallScore: averageScore(ratings.map(row => row.overallScore)),
+    completeVendorCount: ratings.filter(row => row.overallScore !== null).length,
+    vendorCount: vendors.length,
+  };
+}
+
 function buildLiveDashboardData() {
   const vendors = getVendors().filter(vendor => !vendor.archived);
   const purchaseOrders = getAllPOs();
+  const vendorRatingSummary = buildVendorRatingSummary(vendors);
   const activePOs = purchaseOrders.filter(po => po.status !== "Draft" && po.status !== "Cancelled");
   const vendorOrders = (vendor: StoredVendor) =>
     purchaseOrders.filter(po => belongsToVendor(po, { vendorId: vendor.id, vendorName: vendor.name }));
@@ -97,14 +182,23 @@ function buildLiveDashboardData() {
     .slice(0, 10)
     .map(row => ({ name: row.vendor.name, value: row.spend / 10000000 }));
 
+  const ratingByVendorId = new Map(vendorRatingSummary.ratings.map(rating => [rating.vendorId, rating]));
   const vendorRankingData = vendors
-    .map(vendor => ({
-      name: vendor.name,
-      category: vendor.category || "—",
-      quality: Number(vendor.rating || (vendor.performanceQuality || 0) / 20),
-      delivery: Number(vendor.performanceDelivery || 0),
-    }))
-    .sort((a, b) => b.quality - a.quality || b.delivery - a.delivery)
+    .map(vendor => {
+      const rating = ratingByVendorId.get(vendor.id);
+      return {
+        name: vendor.name,
+        costScore: rating?.costScore ?? null,
+        qualityScore: rating?.qualityScore ?? null,
+        deliveryScore: rating?.deliveryScore ?? null,
+        overallScore: rating?.overallScore ?? null,
+      };
+    })
+    .sort((a, b) =>
+      (b.overallScore ?? -1) - (a.overallScore ?? -1) ||
+      (b.qualityScore ?? -1) - (a.qualityScore ?? -1) ||
+      (b.deliveryScore ?? -1) - (a.deliveryScore ?? -1),
+    )
     .slice(0, 10);
 
   const slaVendorData = vendors
@@ -159,11 +253,15 @@ function buildLiveDashboardData() {
   const spendCategoryData = [...categorySpend.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([name, amount], index) => ({
-      name,
-      value: totalCategorySpend ? Math.round((amount / totalCategorySpend) * 100) : 0,
-      color: [C.blue, C.orange, C.purple, C.green, C.gray][index],
-    }));
+    .map(([name, amount], index) => {
+      const value = totalCategorySpend ? Math.round((amount / totalCategorySpend) * 100) : 0;
+      return {
+        name,
+        value,
+        displayValue: `${value}%`,
+        color: [C.blue, C.orange, C.purple, C.green, C.gray][index],
+      };
+    });
 
   const statusGroups = [
     { name: "Pending", matches: ["draft"], color: C.orange },
@@ -172,11 +270,15 @@ function buildLiveDashboardData() {
     { name: "Delivered", matches: ["delivered", "completed"], color: C.green },
     { name: "Cancelled", matches: ["cancelled", "rejected"], color: C.red },
   ];
-  const orderStatusData = statusGroups.map(group => ({
-    name: group.name,
-    value: purchaseOrders.filter(po => group.matches.includes(String(po.status || "").toLowerCase())).length,
-    color: group.color,
-  })).filter(group => group.value > 0);
+  const orderStatusData = statusGroups.map(group => {
+    const value = purchaseOrders.filter(po => group.matches.includes(String(po.status || "").toLowerCase())).length;
+    return {
+      name: group.name,
+      value,
+      displayValue: String(value),
+      color: group.color,
+    };
+  }).filter(group => group.value > 0);
 
   const recentOrdersData = [...purchaseOrders]
     .sort((a, b) => dashboardDate(b.createdOn || b.createdOnDisplay) - dashboardDate(a.createdOn || a.createdOnDisplay))
@@ -337,7 +439,7 @@ function buildLiveDashboardData() {
     .reduce((sum, po) => sum + dashboardAmount(po), 0);
 
   return {
-    vendors, purchaseOrders, totalSpend, preferredCount, avgQuality,
+    vendors, purchaseOrders, totalSpend, preferredCount, avgQuality, vendorRatingSummary,
     avgDelivery: totalDelivery.length ? totalDelivery.reduce((sum, score) => sum + score, 0) / totalDelivery.length : 0,
     spendByVendorData, vendorRankingData, slaVendorData, slaData, activities, spendCategoryData,
     orderStatusData, recentOrdersData, paymentChartData: monthlyTotals,
@@ -352,13 +454,13 @@ export default function VendorDashboard() {
   const [dataVersion, setDataVersion] = useState(0);
   useEffect(() => {
     const refresh = () => setDataVersion(version => version + 1);
-    const events = ["nidoVendorsUpdated", "vendorProductsUpdated", "poCreated", "poActivityUpdated", "vendorContractsUpdated", "storage"];
+    const events = ["nidoVendorsUpdated", "vendorProductsUpdated", "priceEngineSettingsUpdated", "poCreated", "poActivityUpdated", "vendorContractsUpdated", "storage"];
     events.forEach(event => window.addEventListener(event, refresh));
     return () => events.forEach(event => window.removeEventListener(event, refresh));
   }, []);
   const live = useMemo(() => buildLiveDashboardData(), [dataVersion]);
   const {
-    vendors, purchaseOrders, totalSpend, preferredCount, avgQuality, avgDelivery,
+    vendors, purchaseOrders, totalSpend, preferredCount, avgQuality, avgDelivery, vendorRatingSummary,
     spendByVendorData, vendorRankingData, slaVendorData, slaData, activities, spendCategoryData,
     orderStatusData, recentOrdersData, paymentChartData,
     riskData, deliveryPieData, qualityPieData, performanceCatData, topProductsData, recentIssuesData,
@@ -550,9 +652,10 @@ export default function VendorDashboard() {
               <tr className="bg-gray-50 text-[9px] text-gray-500">
                 <th className="text-left py-1.5 px-2 font-medium">#</th>
                 <th className="text-left py-1.5 px-1 font-medium">Name</th>
-                <th className="text-left py-1.5 px-1 font-medium">Category</th>
-                <th className="text-center py-1.5 px-1 font-medium">Quality</th>
-                <th className="text-center py-1.5 px-1 font-medium">Delivery</th>
+                <th className="text-center py-1.5 px-1 font-medium">Cost / 5</th>
+                <th className="text-center py-1.5 px-1 font-medium">Quality / 5</th>
+                <th className="text-center py-1.5 px-1 font-medium">Delivery / 5</th>
+                <th className="text-center py-1.5 px-1 font-medium">Overall / 5</th>
               </tr>
             </thead>
             <tbody>
@@ -562,18 +665,34 @@ export default function VendorDashboard() {
                   <td className="py-1.5 px-1 text-[9px] font-medium text-gray-700 max-w-[80px]">
                     <span className="block truncate">{v.name}</span>
                   </td>
-                  <td className="py-1.5 px-1 text-[9px] text-gray-500 max-w-[65px]">
-                    <span className="block truncate">{v.category}</span>
+                  <td className="py-1.5 px-1 text-[9px] text-center text-gray-600">
+                    {v.costScore === null ? "—" : `${(v.costScore / 20).toFixed(1)}`}
                   </td>
                   <td className="py-1.5 px-1 text-center">
                     <span
                       className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                      style={{ color: qColor(v.quality), backgroundColor: qColor(v.quality) + "20" }}
+                      style={{
+                        color: v.qualityScore === null ? C.gray : qColor(v.qualityScore / 20),
+                        backgroundColor: (v.qualityScore === null ? C.gray : qColor(v.qualityScore / 20)) + "20",
+                      }}
                     >
-                      {v.quality}
+                      {v.qualityScore === null ? "—" : (v.qualityScore / 20).toFixed(1)}
                     </span>
                   </td>
-                  <td className="py-1.5 px-1 text-[9px] text-center text-gray-600">{v.delivery}%</td>
+                  <td className="py-1.5 px-1 text-[9px] text-center text-gray-600">
+                    {v.deliveryScore === null ? "—" : (v.deliveryScore / 20).toFixed(1)}
+                  </td>
+                  <td className="py-1.5 px-1 text-center">
+                    <span
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                      style={{
+                        color: v.overallScore === null ? C.gray : qColor(v.overallScore / 20),
+                        backgroundColor: (v.overallScore === null ? C.gray : qColor(v.overallScore / 20)) + "20",
+                      }}
+                    >
+                      {v.overallScore === null ? "—" : (v.overallScore / 20).toFixed(1)}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -606,29 +725,42 @@ export default function VendorDashboard() {
         {/* Spend by Category */}
         <SCard className="flex-[1.15] min-w-[170px]">
           <SHead title="Spend by Category" />
-          <div className="p-2 flex flex-col items-center">
-            <PieChart width={109} height={109}>
-              <Pie
-                data={spendCategoryData}
-                cx={54.5} cy={54.5}
-                innerRadius={29} outerRadius={51.5}
-                dataKey="value"
-                paddingAngle={2}
-              >
-                {spendCategoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
-              </Pie>
-            </PieChart>
-            <div className="mt-1.5 w-full space-y-0.5">
-              {spendCategoryData.map((d) => (
-                <div key={d.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: d.color }} />
-                    <span className="text-[8px] text-gray-600">{d.name}</span>
-                  </div>
-                  <span className="text-[8px] font-semibold text-gray-700">{d.value}%</span>
-                </div>
-              ))}
-            </div>
+          <div className="p-1">
+            {spendCategoryData.length ? (
+              <ResponsiveContainer width="100%" height={Math.max(120, spendCategoryData.length * 26 + 20)}>
+                <BarChart data={spendCategoryData} layout="vertical" margin={{ top: 4, right: 28, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tickFormatter={(value) => `${value}%`}
+                    tick={{ fontSize: 8, fill: "#6B7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={76}
+                    tick={{ fontSize: 8, fill: "#4B5563" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${value}%`, "Spend share"]}
+                    contentStyle={{ fontSize: 10, borderRadius: 6, borderColor: "#E5E7EB" }}
+                  />
+                  <Bar dataKey="value" barSize={12} radius={[0, 3, 3, 0]}>
+                    {spendCategoryData.map(item => <Cell key={item.name} fill={item.color} />)}
+                    <LabelList dataKey="displayValue" position="right" fontSize={8} fill="#4B5563" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[140px] flex items-center justify-center text-[9px] text-gray-400">
+                No category spend recorded
+              </div>
+            )}
           </div>
         </SCard>
 
@@ -637,28 +769,40 @@ export default function VendorDashboard() {
           <SHead title="Vendor Ratings" />
           <div className="p-2">
             <div className="text-center mb-2">
-              <span className="text-2xl font-bold text-gray-800">{avgQuality ? avgQuality.toFixed(1) : "—"}</span>
-              <p className="text-[8px] text-gray-500">Average / 5</p>
+              <span className="text-2xl font-bold text-gray-800">
+                {vendorRatingSummary.averageOverallScore === null
+                  ? "—"
+                  : (vendorRatingSummary.averageOverallScore / 20).toFixed(1)}
+              </span>
+              <p className="text-[8px] text-gray-500">Overall rating / 5</p>
             </div>
             <div className="space-y-1.5">
-              {qualityPieData.map((item) => {
-                const ratedVendors = qualityPieData.reduce((sum, group) => sum + group.value, 0);
-                const pct = ratedVendors ? Math.round((item.value / ratedVendors) * 100) : 0;
-                return (
+              {[
+                { name: "Cost", score: vendorRatingSummary.averageCostScore, color: C.blue },
+                { name: "Quality", score: vendorRatingSummary.averageQualityScore, color: C.green },
+                { name: "Delivery", score: vendorRatingSummary.averageDeliveryScore, color: C.orange },
+              ].map(item => (
                 <div key={item.name}>
                   <div className="flex justify-between items-center mb-0.5">
                     <span className="text-[8px] text-gray-600">{item.name}</span>
-                    <span className="text-[8px] font-semibold" style={{ color: item.color }}>{pct}%</span>
+                    <span className="text-[8px] font-semibold" style={{ color: item.color }}>
+                      {item.score === null ? "—" : `${(item.score / 20).toFixed(1)} / 5`}
+                    </span>
                   </div>
                   <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: item.color }} />
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${item.score ?? 0}%`, backgroundColor: item.color }}
+                    />
                   </div>
                 </div>
-                );
-              })}
+              ))}
             </div>
             <p className="text-[8px] text-gray-500 mt-2 text-center">
-              Rated vendors: <span className="font-bold text-gray-700">{qualityPieData.reduce((sum, item) => sum + item.value, 0)}</span>
+              Complete ratings: <span className="font-bold text-gray-700">{vendorRatingSummary.completeVendorCount}</span> / {vendorRatingSummary.vendorCount}
+            </p>
+            <p className="text-[7px] text-gray-400 mt-1 text-center">
+              Cost compares landed prices for matching active products. The three dimensions have equal weight.
             </p>
           </div>
         </SCard>
@@ -666,39 +810,45 @@ export default function VendorDashboard() {
         {/* Order Status */}
         <SCard className="flex-[1.15] min-w-[170px]">
           <SHead title="Order Status" />
-          <div className="p-2 flex flex-col items-center">
-            <div className="relative">
-              <PieChart width={109} height={109}>
-                <Pie
-                  data={orderStatusData}
-                  cx={54.5} cy={54.5}
-                  innerRadius={29} outerRadius={51.5}
-                  dataKey="value"
-                  paddingAngle={2}
-                >
-                  {orderStatusData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-              </PieChart>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xs font-bold text-gray-800">{totalOrders}</span>
-                <span className="text-[7px] text-gray-500">Purchase Orders</span>
-              </div>
+          <div className="p-1">
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-[8px] text-gray-500">Purchase orders</span>
+              <span className="text-[8px] font-bold text-gray-700">{totalOrders}</span>
             </div>
-            <div className="mt-1.5 w-full space-y-0.5">
-              {orderStatusData.map((d) => (
-                <div key={d.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: d.color }} />
-                    <span className="text-[8px] text-gray-600">{d.name}</span>
-                  </div>
-                  <span className="text-[8px] font-semibold text-gray-700">{d.value}</span>
-                </div>
-              ))}
-              <div className="border-t border-gray-100 pt-0.5 flex justify-between">
-                <span className="text-[8px] font-medium text-gray-600">Total</span>
-                <span className="text-[8px] font-bold text-gray-800">{totalOrders}</span>
+            {orderStatusData.length ? (
+              <ResponsiveContainer width="100%" height={Math.max(120, orderStatusData.length * 26 + 20)}>
+                <BarChart data={orderStatusData} layout="vertical" margin={{ top: 4, right: 24, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 8, fill: "#6B7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={76}
+                    tick={{ fontSize: 8, fill: "#4B5563" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [`${value} POs`, "Orders"]}
+                    contentStyle={{ fontSize: 10, borderRadius: 6, borderColor: "#E5E7EB" }}
+                  />
+                  <Bar dataKey="value" barSize={12} radius={[0, 3, 3, 0]}>
+                    {orderStatusData.map(item => <Cell key={item.name} fill={item.color} />)}
+                    <LabelList dataKey="displayValue" position="right" fontSize={8} fill="#4B5563" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[140px] flex items-center justify-center text-[9px] text-gray-400">
+                No purchase orders recorded
               </div>
-            </div>
+            )}
           </div>
         </SCard>
 
