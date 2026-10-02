@@ -561,7 +561,9 @@ export default function AddVendorProductsPage() {
           const preview = `${vpcPrefix}${String(peekVpcCounter() + rows.length + 1).padStart(5, '0')}`;
           return [...rows, {
             catalogProduct: product,
-             price: String(Number.isFinite(product.price) ? product.price : 0),
+            price: isDigitalCatalogProduct(product)
+              ? String(Number.isFinite(product.price) ? product.price : 0)
+              : "",
             moq: isDigitalCatalogProduct(product) ? "1" : "",
             leadTime: "",
             stock: "",
