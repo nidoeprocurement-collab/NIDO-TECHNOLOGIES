@@ -19,3 +19,4 @@
 - [Proforma eligibility source](proforma-eligibility-source.md) — eligibility must use original product metadata; missing or conflicting type data must fail closed, never default to physical.
 - [Digital document headers](digital-document-headers.md) — digital-only documents use Users / Licenses, Tenure / Billing, and Provisioning Time while physical layouts remain unchanged.
 - [Vendor detail data scoping](vendor-detail-data-scoping.md) — scoped tabs must match explicit vendor ID/name references and never fall back to unrelated demo records.
+- [Order export filters](order-export-filters.md) — date, status, and client selections narrow the current result set; blank filters include all and date bounds are inclusive.

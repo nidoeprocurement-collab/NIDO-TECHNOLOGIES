@@ -8,6 +8,9 @@ import SLABadge from "@/components/shared/SLABadge";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
 import { buildVendorOrdersCsv } from "@/lib/orderCsvExport";
+import type { MyOrder } from "@/contexts/MyOrdersContext";
+import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
+import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
 
 type OrderStatus = string;
 
@@ -20,6 +23,8 @@ interface Order {
   status: OrderStatus;
   amount: number;
   amountStr: string;
+  client: string;
+  clientId: string;
   delivery: string;
   items: string;
 }
@@ -75,9 +80,21 @@ function storedPOToOrder(po: StoredPO): Order {
     status:    getPODisplayStatus(po.status),
     amount:    po.grandTotal,
     amountStr: fmtINR(po.grandTotal),
+    client:    "",
+    clientId:  "",
     delivery:  po.requestedDelivery || "Within 30 days",
     items:     (po.items?.length ? po.items.map(item => item.item).filter(Boolean) : [po.item]).filter(Boolean).join(", ") || "—",
   };
+}
+
+function getSavedMasterOrders(): MyOrder[] {
+  try {
+    const value = localStorage.getItem("nido_my_orders");
+    const parsed = value ? JSON.parse(value) : [];
+    return Array.isArray(parsed) ? parsed as MyOrder[] : [];
+  } catch {
+    return [];
+  }
 }
 
 // ─── Bulk Notes Modal ─────────────────────────────────────────────────────────
@@ -166,8 +183,16 @@ export default function VendorOrderList(scope: VendorScope = {}) {
 
   // The shared PO store is the only source of records for this page.
   const loadOrders = () => {
+    const ordersById = new Map(getSavedMasterOrders().map(order => [order.id, order]));
     return getAllPOs()
-      .map(storedPOToOrder)
+      .map(po => {
+        const masterOrder = ordersById.get(po.orderId);
+        return {
+          ...storedPOToOrder(po),
+          client: masterOrder?.client || "",
+          clientId: masterOrder?.clientId || masterOrder?.cartItems?.find(item => item.clientId)?.clientId || "",
+        };
+      })
       .filter(order => !hasVendorScope(scope) || belongsToVendor(order, scope));
   };
 
@@ -214,6 +239,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [statusModal, setStatusModal] = useState(false);
   const [notesModal, setNotesModal] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [bulkStatus, setBulkStatus] = useState<OrderStatus | "">("");
   const [bulkNote, setBulkNote] = useState("");
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
@@ -234,6 +260,21 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     })),
     [orders]
   );
+  const exportStatusOptions = useMemo<OrderExportOption[]>(() =>
+    [...new Set(displayedOrders.map(order => order.status))]
+      .sort((a, b) => a.localeCompare(b))
+      .map(status => ({ value: status, label: status })),
+  [displayedOrders]);
+  const exportClientOptions = useMemo<OrderExportOption[]>(() => {
+    const clients = new Map<string, string>();
+    displayedOrders.forEach(order => {
+      const value = order.clientId || order.client;
+      if (value && !clients.has(value)) clients.set(value, order.client || value);
+    });
+    return [...clients.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [displayedOrders]);
 
   const getFiltered = (): Order[] => {
     let rows = [...displayedOrders];
@@ -367,11 +408,20 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     setNotesModal(false); setBulkNote("");
   };
 
-  const doExport = () => {
+  const doExport = (exportFilters: OrderExportFilters) => {
+    const ordersToExport = filterOrdersForExport(filtered, exportFilters, {
+      getDate: order => order.date,
+      getStatus: order => order.status,
+      getClient: order => order.clientId || order.client,
+    });
     const poByNumber = new Map(getAllPOs().map((po) => [po.poNumber, po]));
-    const exportablePOs = filtered
+    const exportablePOs = ordersToExport
       .map((order) => poByNumber.get(order.id))
       .filter((po): po is StoredPO => Boolean(po));
+    if (exportablePOs.length === 0) {
+      toast.show("No vendor orders match the selected export filters.");
+      return false;
+    }
     const csv = buildVendorOrdersCsv(exportablePOs, { hideInternal: hasVendorScope(scope) });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -384,6 +434,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
     toast.show(`Exported ${exportablePOs.length} vendor order${exportablePOs.length === 1 ? "" : "s"} using the workbook export format.`);
     setOpenDropdown(null);
+    return true;
   };
 
   // ── Styles ─────────────────────────────────────────────────────────────────
@@ -460,6 +511,13 @@ export default function VendorOrderList(scope: VendorScope = {}) {
 
   return (
     <div style={s.page}>
+      <OrderExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        statuses={exportStatusOptions}
+        clients={exportClientOptions}
+        onExport={doExport}
+      />
       {/* Toast */}
       {toast.visible && (
         <div style={{ position: "fixed", bottom: 24, right: 24, background: "#1a1a2e", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13, zIndex: 999 }}>
@@ -557,7 +615,7 @@ export default function VendorOrderList(scope: VendorScope = {}) {
         <div style={{ marginLeft: "auto", position: "relative" }} onClick={e => e.stopPropagation()}>
           <button style={{ ...s.btn, padding: "8px 11px" }} onClick={() => setOpenDropdown(openDropdown === "more" ? null : "more")}>⋯</button>
           <Dropdown id="more">
-            <button style={s.ddItem} onClick={doExport}>📥 Export</button>
+            <button style={s.ddItem} onClick={() => { setShowExportDialog(true); setOpenDropdown(null); }}>📥 Export</button>
             <hr style={{ border: "none", borderTop: `1px solid ${bdr}`, margin: "4px 0" }} />
             <button style={s.ddItem} disabled={selected.size === 0} onClick={() => { setBulkStatus("Cancelled"); setStatusModal(true); setOpenDropdown(null); }}>Cancel Selected POs</button>
             <button style={s.ddItem} disabled={selected.size === 0} onClick={() => { setNotesModal(true); setOpenDropdown(null); }}>📝 Bulk Update Notes</button>

@@ -8,6 +8,8 @@ import SLABadge from "@/components/shared/SLABadge";
 import { getAllPOs, isPOConfirmed } from "@/lib/purchaseOrderStore";
 import { buildOrdersCsv } from "@/lib/orderCsvExport";
 import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
+import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
+import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -413,10 +415,26 @@ export default function MyOrderPage() {
       o.client === user.clientName
     );
   }, [orders, isClientPortalUser, user?.clientId, user?.clientName]);
+  const exportStatusOptions = useMemo<OrderExportOption[]>(() =>
+    [...new Set(visibleOrders.map(order => order.status))]
+      .sort((a, b) => a.localeCompare(b))
+      .map(status => ({ value: status, label: status })),
+  [visibleOrders]);
+  const exportClientOptions = useMemo<OrderExportOption[]>(() => {
+    const clients = new Map<string, string>();
+    visibleOrders.forEach(order => {
+      const value = order.clientId || order.cartItems?.find(item => item.clientId)?.clientId || order.client;
+      if (value && !clients.has(value)) clients.set(value, order.client || value);
+    });
+    return [...clients.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [visibleOrders]);
   const [activeTab, setActiveTab] = useState("All Orders");
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [selected, setSelected] = useState<Set<string>>(new Set<string>());
@@ -480,11 +498,21 @@ export default function MyOrderPage() {
   const totalSelected = [...selected].length;
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
-  const handleExport = async () => {
+  const handleExport = async (exportFilters: OrderExportFilters) => {
+    const ordersToExport = filterOrdersForExport(filteredOrders, exportFilters, {
+      getDate: order => order.orderDate || order.createdAt,
+      getStatus: order => order.status,
+      getClient: order => order.clientId || order.cartItems?.find(item => item.clientId)?.clientId || order.client,
+    });
+    if (ordersToExport.length === 0) {
+      showToast("No orders match the selected export filters.");
+      return false;
+    }
+
     let approvalRequests: ApprovalRequest[] = [];
     try {
       const approvalData = await loadApprovalBootstrap();
-      const orderIds = new Set(filteredOrders.map((order) => order.id));
+      const orderIds = new Set(ordersToExport.map((order) => order.id));
       approvalRequests = approvalData.requests.filter((request) =>
         request.module === "Order" && orderIds.has(request.reference),
       );
@@ -492,7 +520,7 @@ export default function MyOrderPage() {
       // The order export remains available when the optional approval service is unavailable.
     }
 
-    const csv = buildOrdersCsv(filteredOrders, {
+    const csv = buildOrdersCsv(ordersToExport, {
       approvalRequests,
       hideInternal: isClientPortalUser,
     });
@@ -505,7 +533,8 @@ export default function MyOrderPage() {
     a.click();
     a.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    showToast(`Exported ${filteredOrders.length} order${filteredOrders.length === 1 ? "" : "s"} using the workbook export format.`);
+    showToast(`Exported ${ordersToExport.length} order${ordersToExport.length === 1 ? "" : "s"} using the workbook export format.`);
+    return true;
   };
 
   // ── Bulk update status ──────────────────────────────────────────────────────
@@ -598,6 +627,13 @@ export default function MyOrderPage() {
           setShowActions(false);
       }}
     >
+      <OrderExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        statuses={exportStatusOptions}
+        clients={exportClientOptions}
+        onExport={handleExport}
+      />
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: "28px 28px 40px" }}>
 
         {/* Header */}
@@ -617,7 +653,7 @@ export default function MyOrderPage() {
             >⋮</button>
             {showActions && (
               <ActionDropdown
-                onExport={handleExport}
+                onExport={() => setShowExportDialog(true)}
                 onCreateOrder={() => {
                   if (isViewOnly) {
                     showToast("This action is disabled while using client-user impersonation.");
