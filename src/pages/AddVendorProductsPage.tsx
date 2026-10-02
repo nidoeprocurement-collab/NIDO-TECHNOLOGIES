@@ -369,9 +369,10 @@ function SelectedProductsTable({
                       min={0}
                       step="0.01"
                       value={row.price}
-                      readOnly
+                      onChange={(e) => updateRow(row.catalogProduct.id, "price", e.target.value)}
                       aria-label={`${row.catalogProduct.productName} price per unit`}
-                      className="w-full min-w-[90px] max-w-[110px] cursor-not-allowed rounded-md border border-gray-200 bg-gray-50 px-2 py-1.5 text-sm text-gray-600 outline-none"
+                      placeholder="0.00"
+                      className="w-full min-w-[90px] max-w-[110px] rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                     />
                   </td>
                 )}
