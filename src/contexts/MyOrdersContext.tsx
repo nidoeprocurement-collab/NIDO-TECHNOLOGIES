@@ -59,6 +59,11 @@ export interface OrderCartItem {
 
 export interface MyOrder {
   id: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  updateCount?: number;
   /** Client tenant that owns this order. */
   clientId?: string;
   client: string;
@@ -257,6 +262,8 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
 
   const addOrder = (order: Omit<MyOrder, "id"> & { id?: string }) => {
     const id = nextOrderId();
+    const createdAt = order.createdAt || new Date().toISOString();
+    const createdBy = order.createdBy || getActivityActor(order.requester || "System");
     const cartItems = order.cartItems?.map((item, index) => ({
       ...item,
       subOrderId: item.subOrderId
@@ -265,6 +272,11 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
     const autoAssignee = resolveOrderAssignee(order);
     const normalizedOrder = {
       ...order,
+      createdBy,
+      createdAt,
+      updatedBy: order.updatedBy || createdBy,
+      updatedAt: order.updatedAt || createdAt,
+      updateCount: order.updateCount || 0,
       ...(autoAssignee
         ? {
             assigned: getUserLabel(autoAssignee.user),
@@ -280,7 +292,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       id,
       `activity_order_placed_${id}`,
       `Order ${id} was placed.`,
-      { actor: getActivityActor(order.requester || "System"), eventType: "activity" },
+      { actor: createdBy, eventType: "activity" },
     );
     // Draft POs are created immediately for orders without an approval gate.
     // Client orders that require approval pass deferPurchaseOrders=true and
@@ -302,9 +314,12 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // to re-check.
   const updateOrderStatus = (orderId: string, status: MyOrderStatus, cancelReason?: string) => {
     const activityId = `activity_order_status_${orderId}_${status}_${Date.now()}`;
+    const updatedBy = getActivityActor();
+    const updatedAt = new Date().toISOString();
     setOrders((prev) => {
       const target = prev.find((o) => o.id === orderId);
       if (!target || target.status === "Cancelled") return prev;
+      if (target.status === status) return prev;
       if (target.status === "Delivered") return prev;
       if (
         status === "Delivered" &&
@@ -336,16 +351,25 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
           orderId,
           activityId,
           `Order status changed from ${target.status} to ${status}.${cancelReason ? ` Reason: ${cancelReason}` : ""}`,
-          { actor: getActivityActor(), eventType: "status-change" },
+          { actor: updatedBy, eventType: "status-change" },
         );
       }
-      return prev.map((o) => (o.id === orderId ? { ...o, status, ...extra } : o));
+      return prev.map((o) => (o.id === orderId ? {
+        ...o,
+        status,
+        ...extra,
+        updatedBy,
+        updatedAt,
+        updateCount: (Number(o.updateCount) || 0) + 1,
+      } : o));
     });
   };
 
   const updateOrdersStatus = (orderIds: string[], status: MyOrderStatus, cancelReason?: string) => {
     const idSet = new Set(orderIds);
     const activityTimestamp = Date.now();
+    const updatedBy = getActivityActor();
+    const updatedAt = new Date().toISOString();
     setOrders((prev) => {
       prev.forEach((o) => {
         if (
@@ -360,7 +384,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
               o.id,
               `activity_order_status_${o.id}_${status}_${activityTimestamp}`,
               `Order status changed from ${o.status} to ${status}.${cancelReason ? ` Reason: ${cancelReason}` : ""}`,
-              { actor: getActivityActor(), eventType: "status-change" },
+              { actor: updatedBy, eventType: "status-change" },
             );
           }
         }
@@ -368,9 +392,17 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
       const extra = status === "Cancelled" && cancelReason ? { cancelReason } : {};
       return prev.map((o) => (
         idSet.has(o.id) &&
+        o.status !== status &&
         o.status !== "Cancelled" &&
         !(status === "Cancelled" && getAllPOs().some((po) => po.orderId === o.id && isPOConfirmed(po)))
-          ? { ...o, status, ...extra }
+          ? {
+              ...o,
+              status,
+              ...extra,
+              updatedBy,
+              updatedAt,
+              updateCount: (Number(o.updateCount) || 0) + 1,
+            }
           : o
       ));
     });

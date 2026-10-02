@@ -3215,10 +3215,15 @@ export default function MyOrderPage() {
 
     // Keep the vendor choice on the order snapshot as well as this page's
     // derived sub-order state, so a refresh does not revert the selection.
+    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
+    const updatedAt = new Date().toISOString();
     setOrders(prev => prev.map(existingOrder => existingOrder.id !== orderId
       ? existingOrder
       : {
           ...existingOrder,
+          updatedBy: actor,
+          updatedAt,
+          updateCount: (Number(existingOrder.updateCount) || 0) + 1,
           cartItems: existingOrder.cartItems?.map(item => item.subOrderId !== subId
             ? item
             : {
@@ -3232,7 +3237,6 @@ export default function MyOrderPage() {
           ),
         }
     ));
-    const actor = user?.name || user?.email || getActivityActor(isClientPortalUser ? "Client" : "System Owner");
     appendOrderActivity(
       orderId,
       `${previousSubOrder?.itemName || subId} was assigned to vendor ${vendorName}.`,

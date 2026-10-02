@@ -6,6 +6,8 @@ import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { getAllPOs, isPOConfirmed } from "@/lib/purchaseOrderStore";
+import { buildOrdersCsv } from "@/lib/orderCsvExport";
+import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -478,23 +480,32 @@ export default function MyOrderPage() {
   const totalSelected = [...selected].length;
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
-  const handleExport = () => {
-    const headers = ["Order ID", "Client", "Requester", "Assigned", "Order Date", "Status", "SLA Time", "Total Amount"];
-    const rows = filteredOrders.map(o => [
-      o.id, o.client, `${o.requester} (${o.requesterRole})`,
-      `${o.assigned} (${o.assignedRole})`,
-      `${o.orderDate} ${o.orderTime}`, o.status,
-      o.slaTime ?? "-", o.totalAmount,
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(cell => `"${cell}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+  const handleExport = async () => {
+    let approvalRequests: ApprovalRequest[] = [];
+    try {
+      const approvalData = await loadApprovalBootstrap();
+      const orderIds = new Set(filteredOrders.map((order) => order.id));
+      approvalRequests = approvalData.requests.filter((request) =>
+        request.module === "Order" && orderIds.has(request.reference),
+      );
+    } catch {
+      // The order export remains available when the optional approval service is unavailable.
+    }
+
+    const csv = buildOrdersCsv(filteredOrders, {
+      approvalRequests,
+      hideInternal: isClientPortalUser,
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `orders_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `orders_full_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
-    showToast(`Exported ${filteredOrders.length} orders as CSV`);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    showToast(`Exported ${filteredOrders.length} order${filteredOrders.length === 1 ? "" : "s"} with item, processing, audit, note, and document details.`);
   };
 
   // ── Bulk update status ──────────────────────────────────────────────────────
