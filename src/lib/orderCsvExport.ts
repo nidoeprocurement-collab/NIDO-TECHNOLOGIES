@@ -472,6 +472,179 @@ function createRow(
   };
 }
 
+function serializeCsv(rows: CsvRow[]): string {
+  const escape = (value: unknown) => {
+    const text = value === null || value === undefined ? "" : String(value);
+    const protectedText = typeof value === "string" && /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${protectedText.replace(/"/g, '""')}"`;
+  };
+  const csvRows = [
+    COLUMNS.map(({ header }) => header),
+    ...rows.map((row) => COLUMNS.map(({ key }) => row[key])),
+  ];
+  return `\uFEFF${csvRows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
+}
+
+function fallbackOrderForPO(po: StoredPO): MyOrder {
+  const status: MyOrder["status"] = (() => {
+    switch (po.status) {
+      case "Draft": return "Draft";
+      case "Cancelled": return "Cancelled";
+      case "Delivered":
+      case "Completed": return "Delivered";
+      case "Partially Shipped": return "Partially Shipped";
+      case "Dispatched": return "Shipped";
+      default: return "Processing";
+    }
+  })();
+  return {
+    id: po.orderId || po.poNumber,
+    client: "",
+    clientColor: "",
+    clientInitial: "",
+    poNumber: "",
+    requester: "",
+    requesterRole: "",
+    requesterInitial: "",
+    requesterColor: "",
+    assigned: "",
+    assignedRole: "",
+    assignedInitial: "",
+    assignedColor: "",
+    orderDate: po.createdOnDisplay || "",
+    orderTime: "",
+    status,
+    slaTime: "",
+    slaAlert: false,
+    totalAmount: String(po.grandTotal ?? ""),
+    totalAmountNum: Number(po.grandTotal) || 0,
+    createdAt: po.createdOn || "",
+    paymentTerms: po.paymentTerms || "",
+  };
+}
+
+function orderItemForPOLine(
+  po: StoredPO,
+  line: NonNullable<StoredPO["items"]>[number],
+  order: MyOrder,
+  lineIndex: number,
+): OrderCartItem {
+  const normalized = (value: unknown) => String(value ?? "").trim().toLowerCase();
+  const orderItem = order.cartItems?.find((item) =>
+    (line.subOrderId && item.subOrderId === line.subOrderId)
+    || (line.productCode && normalized(item.productCode) === normalized(line.productCode))
+    || (line.sku && normalized(item.productCode) === normalized(line.sku))
+    || (line.item && normalized(item.name) === normalized(line.item)),
+  );
+  const unitPrice = Number(line.unitPrice) || 0;
+  return {
+    ...(orderItem || {
+      id: lineIndex + 1,
+      image: "",
+      moq: 1,
+      specs: [],
+    }),
+    id: orderItem?.id ?? lineIndex + 1,
+    name: line.item || orderItem?.name || po.item || "",
+    image: orderItem?.image || "",
+    priceNum: unitPrice,
+    quantity: Number(line.qty) || 0,
+    category: line.category || orderItem?.category || po.category || "",
+    specs: Array.isArray(line.specs) ? line.specs : orderItem?.specs || [],
+    moq: orderItem?.moq || 1,
+    clientId: orderItem?.clientId || order.clientId || "",
+    productCode: line.productCode || line.sku || orderItem?.productCode || po.sku || "",
+    productType: line.productType || orderItem?.productType,
+    physicalType: orderItem?.physicalType,
+    fulfillmentType: orderItem?.fulfillmentType,
+    selectedVendorId: po.vendorId,
+    selectedVendorName: po.vendorName,
+    vendorPrice: unitPrice,
+    landedCost: unitPrice,
+    clientSellingPriceExclGst: orderItem?.clientSellingPriceExclGst,
+    gstSnapshot: orderItem?.gstSnapshot,
+    hsnSnapshot: line.hsnCode || orderItem?.hsnSnapshot,
+    vendorAllocations: orderItem?.vendorAllocations,
+    subOrderId: line.subOrderId || po.subOrderId || orderItem?.subOrderId,
+    configuration: orderItem?.configuration,
+    configurationPriceAdjustment: orderItem?.configurationPriceAdjustment,
+    stockReservationId: orderItem?.stockReservationId,
+  };
+}
+
+export function buildVendorOrdersCsv(
+  purchaseOrders: StoredPO[],
+  { hideInternal = false }: Pick<ExportOptions, "hideInternal"> = {},
+): string {
+  const savedOrders = readLocalJson<unknown>("nido_my_orders", []);
+  const orderById = new Map(
+    (Array.isArray(savedOrders) ? savedOrders as MyOrder[] : []).map((order) => [order.id, order]),
+  );
+  const rows: CsvRow[] = [];
+
+  for (const po of purchaseOrders) {
+    const order = orderById.get(po.orderId) || fallbackOrderForPO(po);
+    const sourceLines = Array.isArray(po.items) && po.items.length > 0
+      ? po.items
+      : [{
+          subOrderId: po.subOrderId || po.subOrderIds?.[0] || "",
+          item: po.item || "",
+          sku: po.sku || "",
+          productCode: po.sku || "",
+          category: po.category || "",
+          hsnCode: po.hsnCode || "",
+          specs: Array.isArray(po.specs) ? po.specs : [],
+          referenceNumber: po.referenceNumber || "",
+          serialNumber: po.serialNumber,
+          qty: Number(po.qty) || 0,
+          unitPrice: Number(po.unitPrice) || 0,
+          lineSubtotal: Number(po.subtotal) || 0,
+          status: getPODisplayStatus(po.status),
+          tracking: null,
+        }];
+    const poLines = sourceLines.map((line, index) => ({
+      ...line,
+      subOrderId: line.subOrderId
+        || po.subOrderIds?.[index]
+        || (index === 0 ? po.subOrderId : `SO-${po.orderId}-${String(index + 1).padStart(3, "0")}`),
+    }));
+
+    poLines.forEach((line, index) => {
+      const item = orderItemForPOLine(po, line, order, index);
+      const rowPO: StoredPO = {
+        ...po,
+        subOrderId: line.subOrderId,
+        subOrderIds: line.subOrderId ? [line.subOrderId] : [],
+        items: [line],
+      };
+      const row = createRow(order, item, index, [rowPO], [], false);
+
+      if (hideInternal) {
+        const visibleActivity = getOrderActivity(order.id, true);
+        const visibleNotes = getOrderNotes(order.id, true).filter((note) => !note.kind);
+        const visiblePONotes = visibleRecords(po.notes || [], true)
+          .sort((a, b) => parseDate(b.date) - parseDate(a.date));
+        row["Created By"] = order.requester || "";
+        row["Approval Status"] = "";
+        row["Approval Workflow"] = "";
+        row["Approval Requested By"] = "";
+        row["Approval Date"] = "";
+        row["Approved By"] = "";
+        row["Updated By"] = "";
+        row["Last Updated At"] = "";
+        row["Update Count"] = visibleActivity.length;
+        row["Order Notes"] = jsonCell(visibleNotes);
+        row["Last Updated BY"] = visiblePONotes[0]?.author ?? "";
+        row["Vendor Last Updated At"] = visiblePONotes[0]?.date ?? "";
+        row["Last Comment"] = visiblePONotes[0]?.text ?? "";
+      }
+      rows.push(row);
+    });
+  }
+
+  return serializeCsv(rows);
+}
+
 export function buildOrdersCsv(
   orders: MyOrder[],
   { approvalRequests = [], hideInternal = false }: ExportOptions = {},
@@ -483,14 +656,5 @@ export function buildOrdersCsv(
       ? items.map((item, index) => createRow(order, item, index, allPos, approvalRequests, hideInternal))
       : [createRow(order, undefined, -1, allPos, approvalRequests, hideInternal)];
   });
-  const escape = (value: unknown) => {
-    const text = value === null || value === undefined ? "" : String(value);
-    const protectedText = typeof value === "string" && /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
-    return `"${protectedText.replace(/"/g, '""')}"`;
-  };
-  const csvRows = [
-    COLUMNS.map(({ header }) => header),
-    ...rows.map((row) => COLUMNS.map(({ key }) => row[key])),
-  ];
-  return `\uFEFF${csvRows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
+  return serializeCsv(rows);
 }

@@ -7,6 +7,7 @@ import { computeSLAStatus } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
 import { useOrderStatusConfig } from "@/lib/orderStatusStore";
 import { belongsToVendor, hasVendorScope, type VendorScope } from "@/lib/vendorScope";
+import { buildVendorOrdersCsv } from "@/lib/orderCsvExport";
 
 type OrderStatus = string;
 
@@ -367,14 +368,21 @@ export default function VendorOrderList(scope: VendorScope = {}) {
   };
 
   const doExport = () => {
-    const csvCell = (value: string) => `"${String(value).replaceAll('"', '""')}"`;
-    const csv = ["PO Number,Order ID,Vendor,PO Date,Items,Status,Total Amount,Requested Delivery",
-      ...listedOrders.map(r => [r.id, r.orderId, r.vendor, r.dateStr, r.items, r.status, r.amountStr, r.delivery].map(csvCell).join(","))
-    ].join("\n");
+    const poByNumber = new Map(getAllPOs().map((po) => [po.poNumber, po]));
+    const exportablePOs = filtered
+      .map((order) => poByNumber.get(order.id))
+      .filter((po): po is StoredPO => Boolean(po));
+    const csv = buildVendorOrdersCsv(exportablePOs, { hideInternal: hasVendorScope(scope) });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-    a.download = "orders.csv"; a.click();
-    toast.show("Orders exported as CSV");
+    a.href = url;
+    a.download = `vendor_orders_full_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    toast.show(`Exported ${exportablePOs.length} vendor order${exportablePOs.length === 1 ? "" : "s"} using the workbook export format.`);
     setOpenDropdown(null);
   };
 

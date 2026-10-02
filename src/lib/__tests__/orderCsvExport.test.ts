@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildOrdersCsv } from "../orderCsvExport";
+import { buildOrdersCsv, buildVendorOrdersCsv } from "../orderCsvExport";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
 
 const TEMPLATE_HEADERS = [
@@ -281,5 +281,77 @@ describe("buildOrdersCsv", () => {
     expect(cell("Order Notes")).toContain("External update");
     expect(cell("Order Notes")).not.toContain("Internal review");
     expect(csv).not.toContain("InfoTech Pvt. Ltd.");
+  });
+
+  it("exports Vendor Orders with the same workbook headers and PO line data", () => {
+    localStorage.setItem("nido_my_orders", JSON.stringify([order]));
+    const csv = buildVendorOrdersCsv([{
+      poNumber: "VPO-0001",
+      orderId: order.id,
+      subOrderId: "SO-ORD-000001-001",
+      subOrderIds: ["SO-ORD-000001-001"],
+      items: [{
+        subOrderId: "SO-ORD-000001-001",
+        item: "Samsung Galaxy",
+        sku: "MPC-2026-000001",
+        productCode: "MPC-2026-000001",
+        category: "Electronics",
+        hsnCode: "8517",
+        specs: ["128GB"],
+        referenceNumber: "REF-1",
+        qty: 1,
+        unitPrice: 5000,
+        lineSubtotal: 5000,
+        status: "Processing",
+        tracking: { number: "TRACK-1", carrier: "UPS", note: "On the way", link: "https://example.com/track" },
+      }],
+      vendorId: "VND-1001",
+      vendorName: "InfoTech Pvt. Ltd.",
+      vendorContact: "",
+      vendorEmail: "",
+      vendorPhone: "",
+      vendorGstin: "",
+      vendorAddress: "",
+      vendorAddressLine1: "",
+      vendorAddressLine2: "",
+      vendorCity: "",
+      vendorState: "",
+      vendorPincode: "",
+      item: "Samsung Galaxy",
+      sku: "MPC-2026-000001",
+      category: "Electronics",
+      hsnCode: "8517",
+      specs: ["128GB"],
+      referenceNumber: "REF-1",
+      qty: 1,
+      unitPrice: 5000,
+      subtotal: 5000,
+      sgstPct: 0,
+      cgstPct: 0,
+      sgstAmt: 0,
+      cgstAmt: 0,
+      grandTotal: 5000,
+      paymentTerms: "Net 30",
+      status: "Confirmed",
+      createdOn: "2026-10-01T17:20:00.000Z",
+      createdOnDisplay: "01/10/2026",
+      requestedDelivery: "Oct 10, 2026",
+      documents: [],
+      notes: [],
+    }]);
+
+    const [headers, data] = parseCsv(csv);
+    expect(headers).toEqual(TEMPLATE_HEADERS);
+    expect(data).toHaveLength(TEMPLATE_HEADERS.length);
+
+    const cell = (header: string) => data[headers.indexOf(header)];
+    expect(cell("Master Order ID")).toBe(order.id);
+    expect(cell("SUB ORDER ID")).toBe("SO-ORD-000001-001");
+    expect(cell("Item Name")).toBe("Samsung Galaxy");
+    expect(cell("Unit Price")).toBe("5000");
+    expect(cell("Line Amount")).toBe("5000");
+    expect(cell("Tracking Number")).toBe("TRACK-1");
+    expect(cell("Selected Vendor")).toBe("InfoTech Pvt. Ltd.");
+    expect(cell("Vendor PO Numbers")).toBe("VPO-0001");
   });
 });
