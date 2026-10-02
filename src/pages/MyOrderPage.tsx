@@ -505,7 +505,7 @@ export default function MyOrderPage() {
     a.click();
     a.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    showToast(`Exported ${filteredOrders.length} order${filteredOrders.length === 1 ? "" : "s"} with item, processing, audit, note, and document details.`);
+    showToast(`Exported ${filteredOrders.length} order${filteredOrders.length === 1 ? "" : "s"} using the workbook export format.`);
   };
 
   // ── Bulk update status ──────────────────────────────────────────────────────

@@ -2,6 +2,53 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildOrdersCsv } from "../orderCsvExport";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
 
+const TEMPLATE_HEADERS = [
+  "Report From ", "Report To", "Master Order ID", "SUB ORDER ID", "Client PO Reference", "Client", "Client ID",
+  "Created By", "Created At", "Requester", "Requester Role", "Ordered For", "Assigned To", "Assigned Role",
+  "Order Date", "Order Time", "Current Order Status", "Approval Status", "Approval Workflow", "Approval Requested By",
+  "Approval Date", "Approved By", "Updated By", "Last Updated At", "Update Count", "SLA Time", "SLA Alert",
+  "Order Total", "Payment Method", "Payment Terms", "Delivery Attention", "Delivery Address", "City", "State",
+  "Country", "ZIP Code", "Delivery Phone", "Delivery Notes", "Checkout Note", "Order Notes", "Cancel Reason",
+  "Item Name", "SKU / Product Code", "Category", "Quantity", "Unit Price", "Line Amount", "Item Status",
+  "Item Status Updated At", "Reference Number", "Serial Number", "Tracking Number", "Tracking Carrier",
+  "Tracking Note", "Selected Vendor", "Vendor PO Numbers", "PO Created AT", "Vendor PO Statuses",
+  "Last Updated BY", "Last Updated At", "Last Comment",
+];
+
+function parseCsv(csv: string): string[][] {
+  const input = csv.replace(/^\uFEFF/, "");
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < input.length; i += 1) {
+    const char = input[i];
+    const next = input[i + 1];
+    if (char === '"' && quoted && next === '"') {
+      field += '"';
+      i += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(field);
+      field = "";
+    } else if ((char === "\r" || char === "\n") && !quoted) {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+      if (char === "\r" && next === "\n") i += 1;
+    } else {
+      field += char;
+    }
+  }
+  if (field || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
 const order: MyOrder = {
   id: "ORD-000001",
   createdBy: "Rajesh Kumar",
@@ -32,6 +79,16 @@ const order: MyOrder = {
   paymentMethod: "Company BAN",
   paymentTerms: "Net 30",
   deliveryAddress: "123 Tech Street, Mumbai",
+  deliveryDetails: {
+    attentionName: "Receiving Desk",
+    line1: "123 Tech Street",
+    city: "Mumbai",
+    state: "Maharashtra",
+    country: "India",
+    zip: "400001",
+    phone: "9000000000",
+    instructions: "Use the east gate",
+  },
   orderNotes: "=SUM(A1:A3)",
   cartItems: [{
     id: 2049,
@@ -51,7 +108,7 @@ const order: MyOrder = {
 afterEach(() => localStorage.clear());
 
 describe("buildOrdersCsv", () => {
-  it("exports item rows, creator/update audit, approvals, notes, and safe document metadata", () => {
+  it("matches the workbook columns exactly and exports their order and item details", () => {
     localStorage.setItem("nido_notes_ORD-000001", JSON.stringify([
       {
         id: "status-change-1",
@@ -103,6 +160,7 @@ describe("buildOrdersCsv", () => {
         hsnCode: "8517",
         specs: ["128GB"],
         referenceNumber: "REF-1",
+        tracking: { number: "TRACK-1", carrier: "UPS", note: "Shipped on Oct 1", link: "https://example.com/track" },
         qty: 1,
         unitPrice: 5000,
         lineSubtotal: 5000,
@@ -163,16 +221,48 @@ describe("buildOrdersCsv", () => {
       }],
     });
 
-    expect(csv).toContain("Master Order ID");
-    expect(csv).toContain("Rajesh Kumar");
-    expect(csv).toContain("Admin User");
-    expect(csv).toContain("Update Count");
-    expect(csv).toContain("Order status changed from Draft to Processing.");
-    expect(csv).toContain("purchase-request.pdf");
-    expect(csv).toContain("vendor-po.pdf");
-    expect(csv).toContain("Please call before delivery.");
-    expect(csv).toContain("Order approval");
-    expect(csv).toContain("\"'=SUM(A1:A3)\"");
+    const rows = parseCsv(csv);
+    const [headers, data] = rows;
+    expect(headers).toEqual(TEMPLATE_HEADERS);
+    expect(data).toHaveLength(TEMPLATE_HEADERS.length);
+
+    const cell = (header: string, occurrence = 0) => {
+      let seen = 0;
+      const index = headers.findIndex((value) => {
+        if (value !== header) return false;
+        if (seen === occurrence) return true;
+        seen += 1;
+        return false;
+      });
+      return data[index];
+    };
+
+    expect(cell("Report From ")).toBe("");
+    expect(cell("Report To")).toBe("");
+    expect(cell("Master Order ID")).toBe(order.id);
+    expect(cell("SUB ORDER ID")).toBe("SO-ORD-000001-001");
+    expect(cell("Approval Workflow")).toBe("Order approval");
+    expect(cell("Delivery Attention")).toBe("Receiving Desk");
+    expect(cell("City")).toBe("Mumbai");
+    expect(cell("Delivery Notes")).toBe("Use the east gate");
+    expect(cell("Checkout Note")).toBe("'=SUM(A1:A3)");
+    expect(cell("Unit Price")).toBe("5900");
+    expect(cell("Line Amount")).toBe("5900");
+    expect(cell("Tracking Number")).toBe("TRACK-1");
+    expect(cell("Tracking Carrier")).toBe("UPS");
+    expect(cell("Tracking Note")).toBe("Shipped on Oct 1");
+    expect(cell("Selected Vendor")).toBe("InfoTech Pvt. Ltd.");
+    expect(cell("PO Created AT")).toBe("2026-10-01T17:20:00.000Z");
+    expect(cell("Last Updated BY")).toBe("Admin");
+    expect(cell("Last Updated At", 1)).toBe("Oct 1, 2026");
+    expect(cell("Last Comment")).toBe("PO issued");
+    expect(cell("Order Notes")).toContain("Please call before delivery.");
+    expect(csv).not.toContain("Record Type");
+    expect(csv).not.toContain("All Approval Requests");
+    expect(csv).not.toContain("Order Documents");
+    expect(csv).not.toContain("Update History");
+    expect(csv).not.toContain("purchase-request.pdf");
+    expect(csv).not.toContain("vendor-po.pdf");
     expect(csv).not.toContain("private-file-payload");
     expect(csv).not.toContain("private-document-password-hash");
     expect(csv).not.toContain("po-private-payload");
@@ -184,8 +274,12 @@ describe("buildOrdersCsv", () => {
       { id: "external", author: "Client", date: "Oct 2, 2026", text: "External update", visibility: "External Note" },
     ]));
     const csv = buildOrdersCsv([order], { hideInternal: true });
-    expect(csv).toContain("External update");
-    expect(csv).not.toContain("Internal review");
+    const rows = parseCsv(csv);
+    const headers = rows[0];
+    const data = rows[1];
+    const cell = (header: string) => data[headers.indexOf(header)];
+    expect(cell("Order Notes")).toContain("External update");
+    expect(cell("Order Notes")).not.toContain("Internal review");
     expect(csv).not.toContain("InfoTech Pvt. Ltd.");
   });
 });

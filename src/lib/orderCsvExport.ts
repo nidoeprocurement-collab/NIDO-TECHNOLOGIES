@@ -30,71 +30,68 @@ type StoredDocument = {
 };
 type LooseRecord = Record<string, unknown>;
 
-const HEADERS = [
-  "Record Type",
-  "Master Order ID",
-  "Client PO Reference",
-  "Client",
-  "Client ID",
-  "Created By",
-  "Created At",
-  "Requester",
-  "Requester Role",
-  "Ordered For",
-  "Assigned To",
-  "Assigned Role",
-  "Order Date",
-  "Order Time",
-  "Current Order Status",
-  "Approval Status",
-  "Approval Workflow",
-  "Approval Request ID",
-  "Approval Requested By",
-  "Current Approver",
-  "Approval Due At",
-  "Approval Date",
-  "Approved By",
-  "Approval History",
-  "Updated By",
-  "Last Updated At",
-  "Update Count",
-  "Update History",
-  "SLA Time",
-  "SLA Alert",
-  "Order Total",
-  "Payment Method",
-  "Payment Terms",
-  "Delivery Address",
-  "Delivery Details",
-  "Checkout Note",
-  "Order Notes",
-  "Cancel Reason",
-  "Sub Order ID",
-  "Item Name",
-  "Product ID",
-  "SKU / Product Code",
-  "Category",
-  "Product Type",
-  "Fulfillment Type",
-  "Specifications",
-  "Configuration",
-  "Quantity",
-  "Unit Price",
-  "Line Amount",
-  "Item Status",
-  "Item Status Updated At",
-  "Reference Number",
-  "Serial Number",
-  "Tracking Details",
-  "Item Processing Details",
-  "Selected Vendor",
-  "Vendor PO Numbers",
-  "Vendor PO Statuses",
-  "Vendor PO Created At",
-  "Vendor PO Details",
-  "Order Documents",
-  "Vendor PO Documents",
-  "Vendor PO Notes",
+const COLUMNS = [
+  { header: "Report From ", key: "Report From " },
+  { header: "Report To", key: "Report To" },
+  { header: "Master Order ID", key: "Master Order ID" },
+  { header: "SUB ORDER ID", key: "Sub Order ID" },
+  { header: "Client PO Reference", key: "Client PO Reference" },
+  { header: "Client", key: "Client" },
+  { header: "Client ID", key: "Client ID" },
+  { header: "Created By", key: "Created By" },
+  { header: "Created At", key: "Created At" },
+  { header: "Requester", key: "Requester" },
+  { header: "Requester Role", key: "Requester Role" },
+  { header: "Ordered For", key: "Ordered For" },
+  { header: "Assigned To", key: "Assigned To" },
+  { header: "Assigned Role", key: "Assigned Role" },
+  { header: "Order Date", key: "Order Date" },
+  { header: "Order Time", key: "Order Time" },
+  { header: "Current Order Status", key: "Current Order Status" },
+  { header: "Approval Status", key: "Approval Status" },
+  { header: "Approval Workflow", key: "Approval Workflow" },
+  { header: "Approval Requested By", key: "Approval Requested By" },
+  { header: "Approval Date", key: "Approval Date" },
+  { header: "Approved By", key: "Approved By" },
+  { header: "Updated By", key: "Updated By" },
+  { header: "Last Updated At", key: "Last Updated At" },
+  { header: "Update Count", key: "Update Count" },
+  { header: "SLA Time", key: "SLA Time" },
+  { header: "SLA Alert", key: "SLA Alert" },
+  { header: "Order Total", key: "Order Total" },
+  { header: "Payment Method", key: "Payment Method" },
+  { header: "Payment Terms", key: "Payment Terms" },
+  { header: "Delivery Attention", key: "Delivery Attention" },
+  { header: "Delivery Address", key: "Delivery Address" },
+  { header: "City", key: "City" },
+  { header: "State", key: "State" },
+  { header: "Country", key: "Country" },
+  { header: "ZIP Code", key: "ZIP Code" },
+  { header: "Delivery Phone", key: "Delivery Phone" },
+  { header: "Delivery Notes", key: "Delivery Notes" },
+  { header: "Checkout Note", key: "Checkout Note" },
+  { header: "Order Notes", key: "Order Notes" },
+  { header: "Cancel Reason", key: "Cancel Reason" },
+  { header: "Item Name", key: "Item Name" },
+  { header: "SKU / Product Code", key: "SKU / Product Code" },
+  { header: "Category", key: "Category" },
+  { header: "Quantity", key: "Quantity" },
+  { header: "Unit Price", key: "Unit Price" },
+  { header: "Line Amount", key: "Line Amount" },
+  { header: "Item Status", key: "Item Status" },
+  { header: "Item Status Updated At", key: "Item Status Updated At" },
+  { header: "Reference Number", key: "Reference Number" },
+  { header: "Serial Number", key: "Serial Number" },
+  { header: "Tracking Number", key: "Tracking Number" },
+  { header: "Tracking Carrier", key: "Tracking Carrier" },
+  { header: "Tracking Note", key: "Tracking Note" },
+  { header: "Selected Vendor", key: "Selected Vendor" },
+  { header: "Vendor PO Numbers", key: "Vendor PO Numbers" },
+  { header: "PO Created AT", key: "PO Created AT" },
+  { header: "Vendor PO Statuses", key: "Vendor PO Statuses" },
+  { header: "Last Updated BY", key: "Last Updated BY" },
+  { header: "Last Updated At", key: "Vendor Last Updated At" },
+  { header: "Last Comment", key: "Last Comment" },
 ];
 
 function readLocalJson<T>(key: string, fallback: T): T {
@@ -350,13 +347,30 @@ function createRow(
     selectedVendorId: item.selectedVendorId || "",
     stockAllocations: item.vendorAllocations || [],
   } : null;
+  const itemTracking = asRecord(subItemState.tracking);
+  const orderTracking = subItemState.trackingOwner === "order-details" ? itemTracking : null;
+  const poTracking = poLines
+    .map((line) => asRecord(line.tracking))
+    .find((tracking) => tracking !== null) || null;
+  const tracking = hideInternal
+    ? orderTracking
+    : orderTracking || itemTracking || poTracking;
+  const latestPoUpdate = relatedPos
+    .flatMap((po) => visibleRecords(po.notes || [], hideInternal))
+    .sort((a, b) => parseDate(b.date) - parseDate(a.date))[0];
+  const delivery = order.deliveryDetails;
+  const cancelReason = order.cancelReason
+    || subItemState.cancelReason
+    || poLines.find((line) => line.cancelReason)?.cancelReason
+    || relatedPos.find((po) => po.cancelReason)?.cancelReason
+    || "";
 
   return {
     "Record Type": item ? "Order Item" : "Order",
     "Master Order ID": order.id,
     "Client PO Reference": order.poNumber,
     "Client": order.client,
-    "Client ID": order.clientId ?? "",
+    "Client ID": order.clientId ?? item?.clientId ?? "",
     "Created By": hideInternal ? order.requester : creator,
     "Created At": createdAt,
     "Requester": order.requester,
@@ -386,10 +400,20 @@ function createRow(
     "Payment Method": order.paymentMethod ?? "",
     "Payment Terms": order.paymentTerms ?? "",
     "Delivery Address": order.deliveryAddress ?? "",
+    "Report From ": "",
+    "Report To": "",
+    "SUB ORDER ID": subOrderId,
+    "Delivery Attention": delivery?.attentionName ?? "",
+    City: delivery?.city ?? "",
+    State: delivery?.state ?? "",
+    Country: delivery?.country ?? "",
+    "ZIP Code": delivery?.zip ?? "",
+    "Delivery Phone": delivery?.phone ?? "",
+    "Delivery Notes": delivery?.instructions ?? "",
     "Delivery Details": jsonCell(order.deliveryDetails),
     "Checkout Note": order.orderNotes ?? "",
     "Order Notes": jsonCell(allVisibleNotes),
-    "Cancel Reason": order.cancelReason ?? "",
+    "Cancel Reason": cancelReason,
     "Sub Order ID": subOrderId,
     "Item Name": item?.name ?? "",
     "Product ID": item?.id ?? "",
@@ -407,11 +431,15 @@ function createRow(
     "Reference Number": subItemState.referenceNumber ?? poLines.find((line) => line.referenceNumber)?.referenceNumber ?? "",
     "Serial Number": subItemState.serialNumber ?? poLines.find((line) => line.serialNumber)?.serialNumber ?? "",
     "Tracking Details": jsonCell(itemProcessingDetails?.tracking ?? {}),
+    "Tracking Number": tracking?.trackingNumber ?? tracking?.number ?? "",
+    "Tracking Carrier": tracking?.carrier ?? "",
+    "Tracking Note": tracking?.note ?? "",
     "Item Processing Details": jsonCell(itemProcessingDetails),
     "Selected Vendor": hideInternal ? "" : item?.selectedVendorName ?? relatedPos.map((po) => po.vendorName).filter(Boolean).join("; "),
     "Vendor PO Numbers": hideInternal ? "" : relatedPos.map((po) => po.poNumber).join("; "),
     "Vendor PO Statuses": hideInternal ? "" : relatedPos.map((po) => `${po.poNumber}: ${po.status}`).join("; "),
     "Vendor PO Created At": hideInternal ? "" : relatedPos.map((po) => `${po.poNumber}: ${po.createdOn}`).join("; "),
+    "PO Created AT": hideInternal ? "" : relatedPos.map((po) => po.createdOn).join("; "),
     "Vendor PO Details": hideInternal ? "" : jsonCell(relatedPos.map((po) => safePo(po, subOrderId, hideInternal))),
     "Order Documents": jsonCell(safeDocuments),
     "Vendor PO Documents": hideInternal ? "" : jsonCell(relatedPos.flatMap((po) => (po.documents || []).flatMap((doc) => {
@@ -428,6 +456,9 @@ function createRow(
         kind: note.kind ?? "",
       })),
     )),
+    "Last Updated BY": hideInternal ? "" : latestPoUpdate?.author ?? "",
+    "Vendor Last Updated At": hideInternal ? "" : latestPoUpdate?.date ?? "",
+    "Last Comment": hideInternal ? "" : latestPoUpdate?.text ?? "",
     __approvalRecords: hideInternal ? "" : jsonCell(approvalRecords.map((record) => ({
       id: record.id,
       workflow: record.workflow,
@@ -452,18 +483,14 @@ export function buildOrdersCsv(
       ? items.map((item, index) => createRow(order, item, index, allPos, approvalRequests, hideInternal))
       : [createRow(order, undefined, -1, allPos, approvalRequests, hideInternal)];
   });
-  const headers = [...HEADERS, "All Approval Requests"];
   const escape = (value: unknown) => {
     const text = value === null || value === undefined ? "" : String(value);
     const protectedText = typeof value === "string" && /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text;
     return `"${protectedText.replace(/"/g, '""')}"`;
   };
   const csvRows = [
-    headers,
-    ...rows.map((row) => [
-      ...HEADERS.map((header) => row[header]),
-      row.__approvalRecords,
-    ]),
+    COLUMNS.map(({ header }) => header),
+    ...rows.map((row) => COLUMNS.map(({ key }) => row[key])),
   ];
   return `\uFEFF${csvRows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
 }
