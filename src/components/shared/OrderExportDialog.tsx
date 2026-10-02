@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
+import * as Popover from "@radix-ui/react-popover";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,74 +57,85 @@ function MultiSelectDropdown({
   };
 
   return (
-    <div className="relative min-w-0">
-      <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
-      <Button
-        type="button"
-        variant="outline"
-          aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => onOpenChange(!open)}
-        className="w-full justify-between font-normal"
-      >
-        <span className="truncate">{selectedLabel}</span>
-        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
-      </Button>
-      {open && (
-        <div className="absolute left-0 top-full z-[70] mt-1 w-full min-w-[230px] rounded-md border bg-popover text-popover-foreground shadow-md">
-          <div className="border-b p-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                autoFocus
-                value={search}
-                onChange={(event) => onSearchChange(event.target.value)}
-                placeholder={`Search ${label.toLocaleLowerCase()}...`}
-                className="h-9 pl-8"
-                aria-label={`Search ${label.toLocaleLowerCase()}`}
-              />
-            </div>
-            <div className="mt-2 flex justify-between">
-              <button
-                type="button"
-                onClick={() => onSelectedChange(options.map((option) => option.value))}
-                className="text-xs text-primary hover:underline"
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectedChange([])}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div role="group" aria-label={label} className="max-h-56 overflow-y-auto p-1">
-            {visibleOptions.length ? visibleOptions.map((option) => {
-              const checked = selected.includes(option.value);
-              const checkboxId = `${label.toLocaleLowerCase()}-option-${option.value.replace(/[^a-z0-9_-]/gi, "-")}`;
-              return (
-                <div
-                  key={option.value}
-                  className="flex items-center gap-2 rounded-sm px-2 py-2 text-sm hover:bg-accent"
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <div className="min-w-0">
+        <label className="mb-1.5 block text-sm font-medium text-foreground">{label}</label>
+        <Popover.Trigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate">{selectedLabel}</span>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-60" />
+          </Button>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content
+            side="bottom"
+            align="start"
+            sideOffset={4}
+            collisionPadding={12}
+            className="z-[80] flex flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md outline-none"
+            style={{
+              width: "min(max(var(--radix-popover-trigger-width), 20rem), calc(100vw - 2rem))",
+              maxHeight: "min(34rem, var(--radix-popover-content-available-height, 34rem))",
+            }}
+          >
+            <div className="border-b p-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={search}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder={`Search ${label.toLocaleLowerCase()}...`}
+                  className="h-9 pl-8"
+                  aria-label={`Search ${label.toLocaleLowerCase()}`}
+                />
+              </div>
+              <div className="mt-2 flex justify-between">
+                <button
+                  type="button"
+                  onClick={() => onSelectedChange(options.map((option) => option.value))}
+                  className="text-xs text-primary hover:underline"
                 >
-                  <Checkbox
-                    id={checkboxId}
-                    checked={checked}
-                    onCheckedChange={(nextChecked) => toggleOption(option.value, nextChecked === true)}
-                  />
-                  <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer truncate">{option.label}</label>
-                </div>
-              );
-            }) : (
-              <p className="px-2 py-3 text-sm text-muted-foreground">No {pluralLabel} found.</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectedChange([])}
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div role="group" aria-label={label} className="min-h-0 overflow-y-auto p-1">
+              {visibleOptions.length ? visibleOptions.map((option) => {
+                const checked = selected.includes(option.value);
+                const checkboxId = `${label.toLocaleLowerCase()}-option-${option.value.replace(/[^a-z0-9_-]/gi, "-")}`;
+                return (
+                  <div
+                    key={option.value}
+                    className="flex items-center gap-2 rounded-sm px-2 py-2 text-sm hover:bg-accent"
+                  >
+                    <Checkbox
+                      id={checkboxId}
+                      checked={checked}
+                      onCheckedChange={(nextChecked) => toggleOption(option.value, nextChecked === true)}
+                    />
+                    <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer truncate">{option.label}</label>
+                  </div>
+                );
+              }) : (
+                <p className="px-2 py-3 text-sm text-muted-foreground">No {pluralLabel} found.</p>
+              )}
+            </div>
+          </Popover.Content>
+        </Popover.Portal>
+      </div>
+    </Popover.Root>
   );
 }
 
@@ -169,7 +181,7 @@ export default function OrderExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto p-6">
+      <DialogContent className="w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] max-w-4xl overflow-y-auto p-6 sm:p-8">
         <DialogHeader>
           <DialogTitle>Export orders</DialogTitle>
           <DialogDescription>
