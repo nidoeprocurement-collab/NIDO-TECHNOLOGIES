@@ -1,6 +1,6 @@
 import { recordStockEvent } from './stockHistoryStore';
 import { getVendorById } from './vendorDataStore';
-import type { CatalogVariation } from './catalogStore';
+import type { CatalogProduct, CatalogVariation } from './catalogStore';
 
 const STORE_KEY = 'nido_vendor_products';
 
@@ -75,6 +75,18 @@ function writeStore(store: Store): void {
 
 export function getVendorProducts(vendorId: string): VendorProduct[] {
   return readStore()[vendorId] || [];
+}
+
+export function isCatalogProductAlreadyAssigned(
+  catalogProduct: Pick<CatalogProduct, 'id' | 'masterProductCode'>,
+  vendorProducts: readonly Pick<VendorProduct, 'id' | 'masterProductCode'>[],
+): boolean {
+  const catalogId = String(catalogProduct.id ?? '').trim().toLocaleLowerCase();
+  const masterProductCode = String(catalogProduct.masterProductCode ?? '').trim().toLocaleLowerCase();
+  return vendorProducts.some((product) =>
+    (catalogId && String(product.id ?? '').trim().toLocaleLowerCase() === catalogId)
+    || (masterProductCode && String(product.masterProductCode ?? '').trim().toLocaleLowerCase() === masterProductCode),
+  );
 }
 
 export function saveVendorProducts(vendorId: string, products: VendorProduct[]): void {

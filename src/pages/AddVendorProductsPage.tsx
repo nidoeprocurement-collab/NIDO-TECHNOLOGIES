@@ -7,6 +7,7 @@ import {
   addVendorProducts,
   updateVendorProduct,
   getVendorProducts,
+  isCatalogProductAlreadyAssigned,
   getAllVendorProducts,
   peekVpcCounter,
   reserveVendorProductCodes,
@@ -472,6 +473,7 @@ export default function AddVendorProductsPage() {
 
   // ── Catalog ──────────────────────────────────────────────────────────────
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [vendorProducts, setVendorProducts] = useState<VendorProduct[]>(() => getVendorProducts(vendorId));
   useEffect(() => {
     const loadPublished = () =>
       setCatalog(getCatalogProducts().filter((p) => p.publishStatus === "published"));
@@ -479,16 +481,27 @@ export default function AddVendorProductsPage() {
     window.addEventListener("catalogUpdated", loadPublished);
     return () => window.removeEventListener("catalogUpdated", loadPublished);
   }, []);
+  useEffect(() => {
+    const loadVendorProducts = () => setVendorProducts(getVendorProducts(vendorId));
+    loadVendorProducts();
+    window.addEventListener("vendorProductsUpdated", loadVendorProducts);
+    return () => window.removeEventListener("vendorProductsUpdated", loadVendorProducts);
+  }, [vendorId]);
 
   // ── Search ───────────────────────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [query]);
 
+  const availableCatalog = useMemo(
+    () => catalog.filter((product) => !isCatalogProductAlreadyAssigned(product, vendorProducts)),
+    [catalog, vendorProducts],
+  );
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
-    if (!q) return catalog;
-    return catalog.filter(
+    if (!q) return availableCatalog;
+    return availableCatalog.filter(
       (p) =>
         p.productName.toLowerCase().includes(q) ||
         p.skuCode.toLowerCase().includes(q) ||
@@ -496,7 +509,7 @@ export default function AddVendorProductsPage() {
         p.brand.toLowerCase().includes(q) ||
         p.masterProductCode.toLowerCase().includes(q)
     );
-  }, [catalog, query]);
+  }, [availableCatalog, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -752,6 +765,10 @@ export default function AddVendorProductsPage() {
               {catalog.length === 0 ? (
                 <div className="px-5 py-10 text-center text-gray-400 text-sm">
                   No products in master catalog yet. Add products via Master Catalog first.
+                </div>
+              ) : availableCatalog.length === 0 && !query.trim() ? (
+                <div className="px-5 py-10 text-center text-gray-400 text-sm">
+                  All published products have already been added to this vendor.
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="px-5 py-2 text-center text-gray-400 text-sm">
