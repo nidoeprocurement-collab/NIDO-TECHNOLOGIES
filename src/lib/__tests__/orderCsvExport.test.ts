@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildOrdersCsv, buildVendorOrdersCsv } from "../orderCsvExport";
+import { buildOrderReportRows, buildOrdersCsv, buildVendorOrdersCsv } from "../orderCsvExport";
+import type { ApprovalRequest } from "../approvalEngine";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
 
 const TEMPLATE_HEADERS = [
@@ -266,6 +267,50 @@ describe("buildOrdersCsv", () => {
     expect(csv).not.toContain("private-file-payload");
     expect(csv).not.toContain("private-document-password-hash");
     expect(csv).not.toContain("po-private-payload");
+  });
+
+  it("builds report rows from the saved master order and item records", () => {
+    const approvalRequest: ApprovalRequest = {
+      id: "APR-1",
+      workflowId: "WF-1",
+      workflow: "Order approval",
+      workflowVersion: 1,
+      module: "Order",
+      trigger: "Order Placed",
+      reference: order.id,
+      requestedBy: "user-1",
+      requestedByName: "Rajesh Kumar",
+      currentApprover: "Admin User",
+      currentLevel: 1,
+      status: "Approved",
+      amount: order.totalAmountNum,
+      context: {},
+      createdAt: "2026-10-01T17:17:00.000Z",
+      timeline: [{
+        action: "approve",
+        user_name: "Admin User",
+        created_at: "2026-10-02T08:30:00.000Z",
+      }],
+    };
+    const rows = buildOrderReportRows([order], { approvalRequests: [approvalRequest] });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].order.id).toBe(order.id);
+    expect(rows[0].fields).toMatchObject({
+      "Master Order ID": order.id,
+      "SUB ORDER ID": "SO-ORD-000001-001",
+      "Client": order.client,
+      "Client ID": "CI-00019",
+      "Item Name": "Samsung Galaxy",
+      "SKU / Product Code": "MPC-2026-000001",
+      "Order Total": 5900,
+      "Delivery Attention": "Receiving Desk",
+      "Checkout Note": "=SUM(A1:A3)",
+      "Approval Status": "Approved",
+      "Approval Workflow": "Order approval",
+      "Approval Requested By": "Rajesh Kumar",
+      "Approval Date": "2026-10-02T08:30:00.000Z",
+      "Approved By": "Admin User",
+    });
   });
 
   it("omits internal notes and vendor procurement details for client-portal exports", () => {

@@ -8,6 +8,11 @@ type ExportOptions = {
 };
 
 type CsvRow = Record<string, unknown>;
+export type OrderReportRow = {
+  order: MyOrder;
+  itemIndex: number;
+  fields: Record<string, unknown>;
+};
 type StoredNote = {
   id?: string;
   author?: string;
@@ -196,12 +201,15 @@ function summarizeApproval(approval: ApprovalRequest | undefined) {
     ?? approvedEvent?.actedBy
     ?? approvedEvent?.approver
     ?? approvedEvent?.userName
+    ?? approvedEvent?.user_name
     ?? approvedEvent?.user
+    ?? approvedEvent?.user_id
     ?? "";
   const approvedAt = approvedEvent?.date
     ?? approvedEvent?.actedAt
     ?? approvedEvent?.timestamp
     ?? approvedEvent?.createdAt
+    ?? approvedEvent?.created_at
     ?? "";
   return {
     status: approval.status ?? "",
@@ -472,6 +480,31 @@ function createRow(
   };
 }
 
+/**
+ * Build the live report rows for master orders using the same order, approval,
+ * fulfillment, activity, and vendor-PO data as the Orders export.
+ */
+export function buildOrderReportRows(
+  orders: MyOrder[],
+  { approvalRequests = [], hideInternal = false }: ExportOptions = {},
+): OrderReportRow[] {
+  const allPos = getAllPOs();
+  return orders.flatMap((order) => {
+    const items = order.cartItems || [];
+    return items.length
+      ? items.map((item, itemIndex) => ({
+          order,
+          itemIndex,
+          fields: createRow(order, item, itemIndex, allPos, approvalRequests, hideInternal),
+        }))
+      : [{
+          order,
+          itemIndex: -1,
+          fields: createRow(order, undefined, -1, allPos, approvalRequests, hideInternal),
+        }];
+  });
+}
+
 function serializeCsv(rows: CsvRow[]): string {
   const escape = (value: unknown) => {
     const text = value === null || value === undefined ? "" : String(value);
@@ -647,14 +680,7 @@ export function buildVendorOrdersCsv(
 
 export function buildOrdersCsv(
   orders: MyOrder[],
-  { approvalRequests = [], hideInternal = false }: ExportOptions = {},
+  options: ExportOptions = {},
 ): string {
-  const allPos = getAllPOs();
-  const rows = orders.flatMap((order) => {
-    const items = order.cartItems || [];
-    return items.length
-      ? items.map((item, index) => createRow(order, item, index, allPos, approvalRequests, hideInternal))
-      : [createRow(order, undefined, -1, allPos, approvalRequests, hideInternal)];
-  });
-  return serializeCsv(rows);
+  return serializeCsv(buildOrderReportRows(orders, options).map((row) => row.fields));
 }

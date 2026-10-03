@@ -14,6 +14,9 @@ import {
   type ReportFrequency,
 } from "@/lib/reportStore";
 import { getOrders, type StoredSalesOrder } from "@/lib/salesOrderStore";
+import type { MyOrder } from "@/contexts/MyOrdersContext";
+import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
+import { buildOrderReportRows, type OrderReportRow } from "@/lib/orderCsvExport";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { useI18n } from "@/i18n/I18nProvider";
 import * as XLSX from "xlsx";
@@ -70,6 +73,20 @@ function dateKey(value: string): string {
   return `${year}-${month}-${day}`;
 }
 
+const MASTER_ORDER_REPORT_FIELDS = new Set([
+  "Master Order ID", "Sub Order ID", "PO Reference", "Client", "Client ID", "Created At",
+  "Requester", "Requester Role", "Ordered For", "Assigned To", "Assigned Role", "Order Time",
+  "Current Order Status", "Approval Status", "Approval Workflow", "Approval Requested By",
+  "Approval Date", "Approved By", "Updated By", "Last Updated By", "Last Updated At",
+  "Updated At", "Update Count", "SLA Time", "SLA Alert", "Order Total", "Payment Method",
+  "Payment Terms", "Delivery Attention", "Delivery Address", "City", "State", "Country",
+  "ZIP Code", "Delivery Phone", "Delivery Notes", "Checkout Note", "Order Notes", "Cancel Reason",
+  "Item Name", "SKU / Product Code", "Category", "Quantity", "Unit Price", "Line Amount",
+  "Item Status", "Reference Number", "Serial Number", "Tracking Number", "Tracking Carrier",
+  "Tracking Note", "Selected Vendor", "Vendor PO Numbers", "PO Created At",
+  "Vendor PO Statuses", "Last Comment",
+]);
+
 function getOrderValue(order: StoredSalesOrder, column: string): string {
   switch (column) {
     case "ID":
@@ -96,6 +113,64 @@ function getOrderValue(order: StoredSalesOrder, column: string): string {
     default:
       return "—";
   }
+}
+
+function readMyOrders(): MyOrder[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem("nido_my_orders") || "[]");
+    return Array.isArray(parsed) ? parsed as MyOrder[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function getMyOrderTotal(order: MyOrder): number {
+  const total = Number(order.totalAmountNum);
+  if (Number.isFinite(total)) return total;
+  const parsed = Number(String(order.totalAmount || "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getMyOrderTax(order: MyOrder): number | undefined {
+  const items = order.cartItems || [];
+  if (!items.length || items.some((item) =>
+    item.clientSellingPriceExclGst == null || item.gstSnapshot == null
+  )) return undefined;
+  return items.reduce((sum, item) => {
+    const taxable = Number(item.clientSellingPriceExclGst) * Number(item.quantity);
+    return sum + taxable * Number(item.gstSnapshot) / 100;
+  }, 0);
+}
+
+function getMyOrderReportValue(row: OrderReportRow, column: string): string {
+  const aliases: Record<string, string> = {
+    ID: "Master Order ID",
+    "Order ID": "Master Order ID",
+    "PO Reference": "Client PO Reference",
+    "Client Name": "Client",
+    "Vendor Name": "Selected Vendor",
+    "Order Status": "Current Order Status",
+    Status: "Current Order Status",
+    "Created On": "Created At",
+    "Updated At": "Item Status Updated At",
+    "Last Updated By": "Last Updated BY",
+    "PO Created At": "PO Created AT",
+    Total: "Order Total",
+    Amount: "Order Total",
+  };
+  let value = row.fields[aliases[column] || column];
+
+  if (column === "Tax") value = getMyOrderTax(row.order);
+  if (value === undefined || value === null || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (["Amount", "Tax", "Total", "Order Total", "Unit Price", "Line Amount"].includes(column)) {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? formatCurrency(amount) : String(value);
+  }
+  if (column === "Created On" || column === "Order Date") {
+    return formatDate(String(value));
+  }
+  return String(value);
 }
 
 const REPORT_FREQUENCIES: ReportFrequency[] = ["One Time", "Daily", "Weekly", "Monthly", "Quarterly"];
@@ -176,11 +251,13 @@ interface KpiConfig {
   valColor?: string;
 }
 
-function getKpis(module: string, orders: StoredSalesOrder[] = []): KpiConfig[] {
+function getKpis(module: string, orders: Array<{ status: string; grandTotal: number }> = []): KpiConfig[] {
   switch (module) {
     case "Orders": {
-      const completed = orders.filter((order) => order.status === "Completed").length;
-      const pending = orders.filter((order) => ["Draft", "Confirmed", "Processing"].includes(order.status)).length;
+      const completed = orders.filter((order) => ["Completed", "Delivered"].includes(order.status)).length;
+      const pending = orders.filter((order) =>
+        ["Draft", "Confirmed", "Processing", "Pending Shipping", "Partially Shipped", "Shipped", "Partially Delivered"].includes(order.status)
+      ).length;
       const cancelled = orders.filter((order) => order.status === "Cancelled").length;
       const totalValue = orders.reduce((sum, order) => sum + (Number(order.grandTotal) || 0), 0);
       return [
@@ -244,7 +321,7 @@ function getKpis(module: string, orders: StoredSalesOrder[] = []): KpiConfig[] {
 
 // ── Filter configs ─────────────────────────────────────────────────────────────
 
-function getFilters(module: string, orders: StoredSalesOrder[] = []) {
+function getFilters(module: string, orders: Array<{ clientName: string; status: string }> = []) {
   const base = [
     {
       label: "Date Range",
@@ -392,7 +469,7 @@ function ReportScheduleDialog({ reportId, reportName, onClose, onSaved }: {
 }
 
 const STATUS_COLS = new Set([
-  "Client Status","Vendor Status","Order Status","Status","Priority",
+  "Client Status","Vendor Status","Order Status","Current Order Status","Approval Status","Item Status","Status","Priority",
 ]);
 
 // ── Main page ──────────────────────────────────────────────────────────────────
@@ -410,6 +487,10 @@ export default function CustomReportDetailPage() {
   usePageMeta({ title: report?.name ?? "Report Detail" });
 
   const [orders, setOrders] = useState<StoredSalesOrder[]>(() => getOrders());
+  const [masterOrders, setMasterOrders] = useState<MyOrder[]>(() => readMyOrders());
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
+  const [approvalLoadError, setApprovalLoadError] = useState("");
+  const [masterDataRevision, setMasterDataRevision] = useState(0);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [appliedFilterValues, setAppliedFilterValues] = useState<Record<string, string>>({});
   const [draftDateRange, setDraftDateRange] = useState({ from: "", to: "" });
@@ -419,12 +500,77 @@ export default function CustomReportDetailPage() {
   const [rowMenuOrderId, setRowMenuOrderId] = useState<string | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 10;
+  const isMasterOrderReport = Boolean(
+    report
+    && report.module === "Orders"
+    && "reportType" in report
+    && report.selectedColumns.some((column) => MASTER_ORDER_REPORT_FIELDS.has(column)),
+  );
 
   useEffect(() => {
     const refresh = () => setOrders(getOrders());
     window.addEventListener("nidoSalesOrdersUpdated", refresh);
     return () => window.removeEventListener("nidoSalesOrdersUpdated", refresh);
   }, []);
+
+  useEffect(() => {
+    if (!isMasterOrderReport) return;
+    let disposed = false;
+    const refreshOrders = () => setMasterOrders(readMyOrders());
+    const refreshRelatedData = () => setMasterDataRevision((revision) => revision + 1);
+    const refreshApprovals = async () => {
+      try {
+        const bootstrap = await loadApprovalBootstrap();
+        if (disposed) return;
+        setApprovalRequests(Array.isArray(bootstrap.requests) ? bootstrap.requests : []);
+        setApprovalLoadError("");
+      } catch (error) {
+        if (disposed) return;
+        console.error("Unable to load approval data for the order report.", error);
+        setApprovalRequests([]);
+        setApprovalLoadError("Approval fields could not be loaded. Other order data is still available.");
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (!event.key || event.key === "nido_my_orders") refreshOrders();
+      if (!event.key || event.key === "nido_all_purchase_orders") refreshRelatedData();
+      if (!event.key || event.key === "nido_local_approval_engine") void refreshApprovals();
+    };
+    const onOrderActivity = () => {
+      refreshRelatedData();
+      void refreshApprovals();
+    };
+
+    refreshOrders();
+    void refreshApprovals();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("orderFulfillmentStatusUpdated", refreshOrders);
+    window.addEventListener("orderSubItemsUpdated", refreshRelatedData);
+    window.addEventListener("poCreated", refreshRelatedData);
+    window.addEventListener("poActivityUpdated", refreshRelatedData);
+    window.addEventListener("orderNotesUpdated", onOrderActivity);
+    return () => {
+      disposed = true;
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("orderFulfillmentStatusUpdated", refreshOrders);
+      window.removeEventListener("orderSubItemsUpdated", refreshRelatedData);
+      window.removeEventListener("poCreated", refreshRelatedData);
+      window.removeEventListener("poActivityUpdated", refreshRelatedData);
+      window.removeEventListener("orderNotesUpdated", onOrderActivity);
+    };
+  }, [isMasterOrderReport]);
+
+  const masterReportRows = useMemo(
+    () => {
+      // The row builder reads related PO, fulfillment, and activity data from
+      // localStorage, so this revision invalidates the cached snapshot.
+      void masterDataRevision;
+      return isMasterOrderReport
+        ? buildOrderReportRows(masterOrders, { approvalRequests })
+        : [];
+    },
+    [isMasterOrderReport, masterOrders, approvalRequests, masterDataRevision],
+  );
 
   useEffect(() => {
     if (!rowMenuOrderId) return;
@@ -457,8 +603,11 @@ export default function CustomReportDetailPage() {
     ? report.selectedColumns
     : ["ID", "Created On", "Status"];
   const isOrderReport = report.module === "Orders";
-  const filterConfig = getFilters(report.module, orders);
-  const filteredOrders = isOrderReport
+  const filterOrders = isMasterOrderReport
+    ? masterOrders.map((order) => ({ clientName: order.client, status: order.status }))
+    : orders;
+  const filterConfig = getFilters(report.module, filterOrders);
+  const filteredOrders = isOrderReport && !isMasterOrderReport
     ? orders.filter((order) => {
         const client = appliedFilterValues.Client;
         const status = appliedFilterValues.Status;
@@ -470,24 +619,72 @@ export default function CustomReportDetailPage() {
         return true;
       })
     : [];
-  const totalRows = isOrderReport ? filteredOrders.length : 50;
+  const filteredMasterOrders = isMasterOrderReport
+    ? masterOrders.filter((order) => {
+        const client = appliedFilterValues.Client;
+        const status = appliedFilterValues.Status;
+        const orderDate = dateKey(order.orderDate || order.createdAt || "");
+        if (client && client !== "All Clients" && order.client !== client) return false;
+        if (status && status !== "All Status" && order.status !== status) return false;
+        if (appliedDateRange.from && (!orderDate || orderDate < appliedDateRange.from)) return false;
+        if (appliedDateRange.to && (!orderDate || orderDate > appliedDateRange.to)) return false;
+        return true;
+      })
+    : [];
+  const filteredMasterOrderIds = new Set(filteredMasterOrders.map((order) => order.id));
+  const filteredMasterRows = isMasterOrderReport
+    ? masterReportRows.filter((row) => filteredMasterOrderIds.has(row.order.id))
+    : [];
+  const totalRows = isMasterOrderReport
+    ? filteredMasterRows.length
+    : isOrderReport ? filteredOrders.length : 50;
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
   const startRow = totalRows === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endRow = Math.min(page * PAGE_SIZE, totalRows);
   const pageOrders = filteredOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const rows: { index: number; values: string[]; order?: StoredSalesOrder }[] = isOrderReport
+  const pageMasterRows = filteredMasterRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  type ReportTableRow = {
+    index: number;
+    rowKey: string;
+    values: string[];
+    order?: StoredSalesOrder;
+    masterOrderId?: string;
+    orderDisplayId?: string;
+  };
+  const rows: ReportTableRow[] = isMasterOrderReport
+    ? pageMasterRows.map((row, index) => ({
+        index: (page - 1) * PAGE_SIZE + index,
+        rowKey: `master:${row.order.id}:${row.itemIndex}`,
+        masterOrderId: row.order.id,
+        orderDisplayId: row.order.id,
+        values: columns.map((column) => getMyOrderReportValue(row, column)),
+      }))
+    : isOrderReport
     ? pageOrders.map((order, index) => ({
         index: (page - 1) * PAGE_SIZE + index,
+        rowKey: `sales:${order.id}`,
         order,
+        orderDisplayId: order.orderNumber || order.id,
         values: columns.map((column) => getOrderValue(order, column)),
       }))
     : Array.from({ length: PAGE_SIZE }, (_, index) => {
         const rowIndex = (page - 1) * PAGE_SIZE + index;
-        return { index: rowIndex, values: columns.map((column) => getMockValue(column, rowIndex)) };
+        return {
+          index: rowIndex,
+          rowKey: `mock:${rowIndex}`,
+          values: columns.map((column) => getMockValue(column, rowIndex)),
+        };
       });
-  const kpis = getKpis(report.module, isOrderReport ? filteredOrders : []);
+  const kpis = getKpis(
+    report.module,
+    isMasterOrderReport
+      ? filteredMasterOrders.map((order) => ({ status: order.status, grandTotal: getMyOrderTotal(order) }))
+      : isOrderReport ? filteredOrders : [],
+  );
   const genStr = `${formatDate(new Date())} ${new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
-  const exportRows = isOrderReport
+  const exportRows = isMasterOrderReport
+    ? filteredMasterRows.map((row) => columns.map((column) => getMyOrderReportValue(row, column)))
+    : isOrderReport
     ? filteredOrders.map((order) => columns.map((column) => getOrderValue(order, column)))
     : rows.map((row) => row.values);
   const firstVisiblePage = Math.max(1, Math.min(page - 2, totalPages - 4));
@@ -552,10 +749,10 @@ export default function CustomReportDetailPage() {
     }
   })();
 
-  const copyOrderNumber = async (order: StoredSalesOrder) => {
+  const copyOrderNumber = async (orderNumber: string) => {
     try {
-      await navigator.clipboard.writeText(order.orderNumber || order.id);
-      toast({ title: "Order number copied", description: order.orderNumber || order.id });
+      await navigator.clipboard.writeText(orderNumber);
+      toast({ title: "Order number copied", description: orderNumber });
     } catch {
       toast({ title: "Could not copy order number", variant: "destructive" });
     }
@@ -673,6 +870,12 @@ export default function CustomReportDetailPage() {
         </div>
       </div>
 
+      {isMasterOrderReport && approvalLoadError && (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {approvalLoadError}
+        </p>
+      )}
+
       {/* ── KPI Cards ────────────────────────────────────────────────────────── */}
       <div className={`grid gap-3 ${kpis.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
         {kpis.map((k, ki) => (
@@ -768,16 +971,16 @@ export default function CustomReportDetailPage() {
                   </td>
                 </tr>
               )}
-              {rows.map(({ index, values, order }) => (
+              {rows.map(({ index, rowKey, values, order, masterOrderId, orderDisplayId }) => (
                 <tr
-                  key={index}
+                  key={rowKey}
                   className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors"
                 >
                   {columns.map((col, ci) => {
                     const val = values[ci];
                     const isStatus = STATUS_COLS.has(col);
-                    const isAmount = col === "Amount" || col === "Total" || col === "Tax" || col === "Price";
-                    const isName = col === "Client Name" || col === "Vendor Name";
+                    const isAmount = ["Amount", "Total", "Tax", "Price", "Order Total", "Unit Price", "Line Amount"].includes(col);
+                    const isName = ["Client", "Client Name", "Vendor Name", "Selected Vendor"].includes(col);
                     return (
                       <td key={col} className="py-3 px-4 whitespace-nowrap">
                         {isStatus ? (
@@ -793,28 +996,31 @@ export default function CustomReportDetailPage() {
                     );
                   })}
                   <td className="py-3 px-4">
-                    {order && (
+                    {(order || masterOrderId) && (
                       <div className="relative">
                         <button
                           type="button"
-                          aria-label={`Actions for ${order.orderNumber || order.id}`}
-                          onClick={() => setRowMenuOrderId((current) => current === order.id ? null : order.id)}
+                          aria-label={`Actions for ${orderDisplayId || order?.id || masterOrderId}`}
+                          onClick={() => setRowMenuOrderId((current) => current === rowKey ? null : rowKey)}
                           className="rounded p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
                         >
                           <MoreVertical className="h-3.5 w-3.5" />
                         </button>
-                        {rowMenuOrderId === order.id && (
+                        {rowMenuOrderId === rowKey && (
                           <div ref={rowMenuRef} className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-100 bg-white py-1 shadow-xl">
                             <button
                               type="button"
-                              onClick={() => { setRowMenuOrderId(null); navigate(`/sales/orders/${order.id}`); }}
+                              onClick={() => {
+                                setRowMenuOrderId(null);
+                                navigate(masterOrderId ? `/orders/${masterOrderId}` : `/sales/orders/${order?.id}`);
+                              }}
                               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
                             >
                               <Eye className="h-3.5 w-3.5" /> View order
                             </button>
                             <button
                               type="button"
-                              onClick={() => void copyOrderNumber(order)}
+                              onClick={() => void copyOrderNumber(orderDisplayId || order?.orderNumber || order?.id || masterOrderId || "")}
                               className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50"
                             >
                               <Copy className="h-3.5 w-3.5" /> Copy order number

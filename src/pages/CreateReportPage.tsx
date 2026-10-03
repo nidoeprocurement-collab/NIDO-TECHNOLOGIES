@@ -81,7 +81,50 @@ const FIELDS_BY_MODULE: Record<string, { group: string; fields: string[] }[]> = 
     { group: "CATALOG", fields: ["ID", "Created On", "Item Name", "SKU", "Category", "Price", "Stock", "Unit"] },
   ],
   Orders: [
-    { group: "ORDERS", fields: ["ID", "Created On", "Created By", "Order ID", "Order Date", "Order Status", "Client Name", "Vendor Name", "Amount", "Tax", "Total"] },
+    {
+      group: "ORDER DETAILS",
+      fields: [
+        "ID", "Master Order ID", "Sub Order ID", "Order ID", "PO Reference",
+        "Created By", "Created On", "Created At", "Order Date", "Order Time",
+      ],
+    },
+    {
+      group: "CLIENT & ASSIGNMENT",
+      fields: [
+        "Client", "Client Name", "Client ID", "Requester", "Requester Role",
+        "Ordered For", "Assigned To", "Assigned Role",
+      ],
+    },
+    {
+      group: "STATUS, APPROVAL & SLA",
+      fields: [
+        "Order Status", "Current Order Status", "Approval Status", "Approval Workflow",
+        "Approval Requested By", "Approval Date", "Approved By", "Updated By",
+        "Last Updated By", "Last Updated At", "Updated At", "Update Count",
+        "SLA Time", "SLA Alert",
+      ],
+    },
+    {
+      group: "PAYMENT & DELIVERY",
+      fields: [
+        "Amount", "Tax", "Total", "Order Total", "Payment Method", "Payment Terms",
+        "Delivery Attention", "Delivery Address", "City", "State", "Country",
+        "ZIP Code", "Delivery Phone", "Delivery Notes", "Checkout Note",
+        "Order Notes", "Cancel Reason",
+      ],
+    },
+    {
+      group: "ITEMS & FULFILLMENT",
+      fields: [
+        "Item Name", "SKU / Product Code", "Category", "Quantity", "Unit Price",
+        "Line Amount", "Item Status", "Reference Number", "Serial Number",
+        "Tracking Number", "Tracking Carrier", "Tracking Note", "Selected Vendor",
+      ],
+    },
+    {
+      group: "VENDOR PURCHASE ORDERS",
+      fields: ["Vendor Name", "Vendor PO Numbers", "PO Created At", "Vendor PO Statuses", "Last Comment"],
+    },
   ],
   Services: [
     { group: "SERVICES", fields: ["ID", "Created On", "Service Name", "Request Date", "Client Name", "Status", "Priority", "Assigned To"] },
@@ -621,8 +664,8 @@ export default function CreateReportPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Report Type <span className="text-red-500">*</span>
               </label>
-              <RichDropdown
-                value={reportType as any}
+              <RichDropdown<string>
+                value={reportType}
                 placeholder="Select report type"
                 options={REPORT_TYPES.map(r => ({ value: r.value, desc: r.desc, icon: r.icon }))}
                 onChange={v => setReportType(v)}
@@ -657,8 +700,8 @@ export default function CreateReportPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Module / Data Source <span className="text-red-500">*</span>
             </label>
-            <RichDropdown
-              value={module as any}
+            <RichDropdown<string>
+              value={module}
               placeholder="Select module"
               options={MODULES.map(m => ({ value: m.value, desc: m.desc, icon: m.icon }))}
               onChange={v => { setModule(v); setSelectedColumns([]); setFieldSearch(""); }}
