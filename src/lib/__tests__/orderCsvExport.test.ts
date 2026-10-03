@@ -259,8 +259,8 @@ describe("buildOrdersCsv", () => {
     expect(cell("PO Created AT")).toBe("2026-10-01T17:20:00.000Z");
     expect(cell("Last Updated BY")).toBe("Admin");
     expect(cell("Last Updated At", 1)).toBe("Oct 1, 2026");
-    expect(cell("Last Comment")).toBe("PO issued");
-    expect(cell("Order Notes")).toContain("Please call before delivery.");
+    expect(cell("Last Comment")).toBe("Please call before delivery.");
+    expect(cell("Order Notes")).toBe("'=SUM(A1:A3)");
     expect(csv).not.toContain("Record Type");
     expect(csv).not.toContain("All Approval Requests");
     expect(csv).not.toContain("Order Documents");
@@ -326,8 +326,9 @@ describe("buildOrdersCsv", () => {
     const headers = rows[0];
     const data = rows[1];
     const cell = (header: string) => data[headers.indexOf(header)];
-    expect(cell("Order Notes")).toContain("External update");
-    expect(cell("Order Notes")).not.toContain("Internal review");
+    expect(cell("Order Notes")).toBe("'=SUM(A1:A3)");
+    expect(cell("Last Comment")).toBe("External update");
+    expect(cell("Last Comment")).not.toContain("Internal review");
     expect(csv).not.toContain("InfoTech Pvt. Ltd.");
   });
 
@@ -385,7 +386,10 @@ describe("buildOrdersCsv", () => {
       createdOnDisplay: "01/10/2026",
       requestedDelivery: "Oct 10, 2026",
       documents: [],
-      notes: [],
+      notes: [
+        { id: "old-comment", author: "Admin", initials: "A", color: "#000", date: "Oct 1, 2026 08:00 AM", text: "Older note", visibility: "Internal Note" },
+        { id: "new-comment", author: "Admin", initials: "A", color: "#000", date: "Oct 2, 2026 08:31 AM", text: "Newest vendor note", visibility: "Internal Note" },
+      ],
     }], {
       reportFrom: "2026-10-01",
       reportTo: "2026-10-31",
@@ -407,5 +411,7 @@ describe("buildOrdersCsv", () => {
     expect(cell("Tracking Number")).toBe("TRACK-1");
     expect(cell("Selected Vendor")).toBe("InfoTech Pvt. Ltd.");
     expect(cell("Vendor PO Numbers")).toBe("VPO-0001");
+    expect(cell("Order Notes")).toBe("'=SUM(A1:A3)");
+    expect(cell("Last Comment")).toBe("Newest vendor note");
   });
 });

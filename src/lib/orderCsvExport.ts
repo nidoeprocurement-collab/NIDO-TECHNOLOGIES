@@ -1,6 +1,6 @@
 import type { MyOrder, OrderCartItem } from "@/contexts/MyOrdersContext";
 import type { ApprovalRequest } from "@/lib/approvalEngine";
-import { getAllPOs, isPOConfirmed, type StoredPO } from "@/lib/purchaseOrderStore";
+import { getAllPOs, getPODisplayStatus, isPOConfirmed, type StoredPO } from "@/lib/purchaseOrderStore";
 
 type ExportOptions = {
   approvalRequests?: ApprovalRequest[];
@@ -170,6 +170,27 @@ function parseDate(value: unknown): number {
   if (!value) return 0;
   const time = new Date(String(value)).getTime();
   return Number.isFinite(time) ? time : 0;
+}
+
+function getLatestComment(
+  orderNotes: StoredNote[],
+  purchaseOrders: StoredPO[],
+  hideInternal: boolean,
+): StoredNote | undefined {
+  const candidates = [
+    ...orderNotes,
+    ...purchaseOrders.flatMap((po) => po.notes || []),
+  ].filter((note) =>
+    !note.kind
+    && Boolean(note.text?.trim())
+    && (!hideInternal || note.visibility !== "Internal Note"),
+  );
+
+  // Both detail pages prepend new notes, so stable ties retain the newest
+  // entry when their displayed timestamps have only minute-level precision.
+  return candidates.reduce<StoredNote | undefined>((latest, note) =>
+    !latest || parseDate(note.date) > parseDate(latest.date) ? note : latest,
+  undefined);
 }
 
 function formatCsvDate(value: string | undefined): string {
@@ -371,7 +392,7 @@ function createRow(
     visibility: event.visibility ?? "",
     change: event.text ?? "",
   }));
-  const allVisibleNotes = notes.filter((note) => !note.kind);
+  const latestComment = getLatestComment(notes, relatedPos, hideInternal);
   const itemProcessingDetails = item ? {
     ...subItemState,
     tracking: subItemState.tracking || poLines.map((line) => line.tracking).filter(Boolean),
@@ -443,7 +464,7 @@ function createRow(
     "Delivery Notes": delivery?.instructions ?? "",
     "Delivery Details": jsonCell(order.deliveryDetails),
     "Checkout Note": order.orderNotes ?? "",
-    "Order Notes": jsonCell(allVisibleNotes),
+    "Order Notes": order.orderNotes ?? "",
     "Cancel Reason": cancelReason,
     "Sub Order ID": subOrderId,
     "Item Name": item?.name ?? "",
@@ -489,7 +510,7 @@ function createRow(
     )),
     "Last Updated BY": hideInternal ? "" : latestPoUpdate?.author ?? "",
     "Vendor Last Updated At": hideInternal ? "" : latestPoUpdate?.date ?? "",
-    "Last Comment": hideInternal ? "" : latestPoUpdate?.text ?? "",
+    "Last Comment": latestComment?.text ?? (hideInternal ? "" : latestPoUpdate?.text ?? ""),
     __approvalRecords: hideInternal ? "" : jsonCell(approvalRecords.map((record) => ({
       id: record.id,
       workflow: record.workflow,
@@ -687,7 +708,6 @@ export function buildVendorOrdersCsv(
 
       if (hideInternal) {
         const visibleActivity = getOrderActivity(order.id, true);
-        const visibleNotes = getOrderNotes(order.id, true).filter((note) => !note.kind);
         const visiblePONotes = visibleRecords(po.notes || [], true)
           .sort((a, b) => parseDate(b.date) - parseDate(a.date));
         row["Created By"] = order.requester || "";
@@ -699,10 +719,12 @@ export function buildVendorOrdersCsv(
         row["Updated By"] = "";
         row["Last Updated At"] = "";
         row["Update Count"] = visibleActivity.length;
-        row["Order Notes"] = jsonCell(visibleNotes);
+        row["Order Notes"] = order.orderNotes ?? "";
         row["Last Updated BY"] = visiblePONotes[0]?.author ?? "";
         row["Vendor Last Updated At"] = visiblePONotes[0]?.date ?? "";
-        row["Last Comment"] = visiblePONotes[0]?.text ?? "";
+        row["Last Comment"] = getLatestComment(getOrderNotes(order.id, true), [po], true)?.text
+          ?? visiblePONotes[0]?.text
+          ?? "";
       }
       rows.push(row);
     });

@@ -1049,14 +1049,26 @@ export default function VendorOrderDetailPage() {
     setDocuments(prev => prev.filter(d => d.id !== id));
   };
   const handleDeleteNote = (id: string) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
+    const nextNotes = notes.filter(n => n.id !== id);
+    updatePO(poKey, { notes: nextNotes });
+    setNotes(nextNotes);
   };
   const handleAddNote = () => {
     if (!noteText.trim()) return;
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + " " + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
     const actor = getActivityActor("System Owner");
-    setNotes(prev => [{ id: "n" + Date.now(), author: actor, initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SO", color: "#2563eb", date: dateStr, text: noteText.trim(), visibility: noteVisibility }, ...prev]);
+    const nextNotes = [{
+      id: "n" + Date.now(),
+      author: actor,
+      initials: actor.split(/\s+/).map(part => part[0]).join("").slice(0, 2).toUpperCase() || "SO",
+      color: "#2563eb",
+      date: dateStr,
+      text: noteText.trim(),
+      visibility: noteVisibility,
+    }, ...notes];
+    updatePO(poKey, { notes: nextNotes });
+    setNotes(nextNotes);
     setNoteText("");
   };
 
