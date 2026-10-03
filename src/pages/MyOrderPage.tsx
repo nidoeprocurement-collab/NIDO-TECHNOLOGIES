@@ -523,6 +523,8 @@ export default function MyOrderPage() {
     const csv = buildOrdersCsv(ordersToExport, {
       approvalRequests,
       hideInternal: isClientPortalUser,
+      reportFrom: exportFilters.fromDate,
+      reportTo: exportFilters.toDate,
     });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

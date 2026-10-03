@@ -4,7 +4,7 @@ import type { ApprovalRequest } from "../approvalEngine";
 import type { MyOrder } from "@/contexts/MyOrdersContext";
 
 const TEMPLATE_HEADERS = [
-  "Report From ", "Report To", "Master Order ID", "SUB ORDER ID", "Client PO Reference", "Client", "Client ID",
+  "Report From", "Report To", "Master Order ID", "SUB ORDER ID", "Client PO Reference", "Client", "Client ID",
   "Created By", "Created At", "Requester", "Requester Role", "Ordered For", "Assigned To", "Assigned Role",
   "Order Date", "Order Time", "Current Order Status", "Approval Status", "Approval Workflow", "Approval Requested By",
   "Approval Date", "Approved By", "Updated By", "Last Updated At", "Update Count", "SLA Time", "SLA Alert",
@@ -202,7 +202,9 @@ describe("buildOrdersCsv", () => {
       notes: [{ id: "po-note", author: "Admin", initials: "A", color: "#000", date: "Oct 1, 2026", text: "PO issued", visibility: "Internal Note", kind: "activity" }],
     }]));
 
-    const csv = buildOrdersCsv([order], {
+    const csv = buildOrdersCsv([{ ...order, createdAt: "2026-10-01T17:17:00" }], {
+      reportFrom: "2026-10-01",
+      reportTo: "2026-10-31",
       approvalRequests: [{
         id: "approval-1",
         workflowId: "workflow-1",
@@ -238,9 +240,10 @@ describe("buildOrdersCsv", () => {
       return data[index];
     };
 
-    expect(cell("Report From ")).toBe("");
-    expect(cell("Report To")).toBe("");
+    expect(cell("Report From")).toBe("01/10/2026");
+    expect(cell("Report To")).toBe("31/10/2026");
     expect(cell("Master Order ID")).toBe(order.id);
+    expect(cell("Created At")).toBe("01/10/2026 05:17 PM");
     expect(cell("SUB ORDER ID")).toBe("SO-ORD-000001-001");
     expect(cell("Approval Workflow")).toBe("Order approval");
     expect(cell("Delivery Attention")).toBe("Receiving Desk");
@@ -383,7 +386,10 @@ describe("buildOrdersCsv", () => {
       requestedDelivery: "Oct 10, 2026",
       documents: [],
       notes: [],
-    }]);
+    }], {
+      reportFrom: "2026-10-01",
+      reportTo: "2026-10-31",
+    });
 
     const [headers, data] = parseCsv(csv);
     expect(headers).toEqual(TEMPLATE_HEADERS);
@@ -391,6 +397,9 @@ describe("buildOrdersCsv", () => {
 
     const cell = (header: string) => data[headers.indexOf(header)];
     expect(cell("Master Order ID")).toBe(order.id);
+    expect(cell("Report From")).toBe("01/10/2026");
+    expect(cell("Report To")).toBe("31/10/2026");
+    expect(cell("Created At")).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} (AM|PM)$/);
     expect(cell("SUB ORDER ID")).toBe("SO-ORD-000001-001");
     expect(cell("Item Name")).toBe("Samsung Galaxy");
     expect(cell("Unit Price")).toBe("5000");

@@ -422,7 +422,11 @@ export default function VendorOrderList(scope: VendorScope = {}) {
       toast.show("No vendor orders match the selected export filters.");
       return false;
     }
-    const csv = buildVendorOrdersCsv(exportablePOs, { hideInternal: hasVendorScope(scope) });
+    const csv = buildVendorOrdersCsv(exportablePOs, {
+      hideInternal: hasVendorScope(scope),
+      reportFrom: exportFilters.fromDate,
+      reportTo: exportFilters.toDate,
+    });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

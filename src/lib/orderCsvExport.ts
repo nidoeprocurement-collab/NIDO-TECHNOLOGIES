@@ -5,6 +5,8 @@ import { getAllPOs, isPOConfirmed, type StoredPO } from "@/lib/purchaseOrderStor
 type ExportOptions = {
   approvalRequests?: ApprovalRequest[];
   hideInternal?: boolean;
+  reportFrom?: string;
+  reportTo?: string;
 };
 
 type CsvRow = Record<string, unknown>;
@@ -36,7 +38,7 @@ type StoredDocument = {
 type LooseRecord = Record<string, unknown>;
 
 const COLUMNS = [
-  { header: "Report From ", key: "Report From " },
+  { header: "Report From", key: "Report From" },
   { header: "Report To", key: "Report To" },
   { header: "Master Order ID", key: "Master Order ID" },
   { header: "SUB ORDER ID", key: "Sub Order ID" },
@@ -168,6 +170,27 @@ function parseDate(value: unknown): number {
   if (!value) return 0;
   const time = new Date(String(value)).getTime();
   return Number.isFinite(time) ? time : 0;
+}
+
+function formatCsvDate(value: string | undefined): string {
+  if (!value) return "";
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) return `${dateOnly[3]}/${dateOnly[2]}/${dateOnly[1]}`;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+}
+
+function formatCsvDateTime(value: unknown): unknown {
+  if (value === undefined || value === null || value === "") return value;
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return value;
+
+  const hour24 = date.getHours();
+  const hour12 = hour24 % 12 || 12;
+  const meridiem = hour24 >= 12 ? "PM" : "AM";
+  return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()} ${String(hour12).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")} ${meridiem}`;
 }
 
 function getApprovalRecords(order: MyOrder, requests: ApprovalRequest[]) {
@@ -408,7 +431,7 @@ function createRow(
     "Payment Method": order.paymentMethod ?? "",
     "Payment Terms": order.paymentTerms ?? "",
     "Delivery Address": order.deliveryAddress ?? "",
-    "Report From ": "",
+    "Report From": "",
     "Report To": "",
     "SUB ORDER ID": subOrderId,
     "Delivery Attention": delivery?.attentionName ?? "",
@@ -513,7 +536,9 @@ function serializeCsv(rows: CsvRow[]): string {
   };
   const csvRows = [
     COLUMNS.map(({ header }) => header),
-    ...rows.map((row) => COLUMNS.map(({ key }) => row[key])),
+    ...rows.map((row) => COLUMNS.map(({ key }) =>
+      key === "Created At" ? formatCsvDateTime(row[key]) : row[key],
+    )),
   ];
   return `\uFEFF${csvRows.map((row) => row.map(escape).join(",")).join("\r\n")}`;
 }
@@ -607,8 +632,14 @@ function orderItemForPOLine(
 
 export function buildVendorOrdersCsv(
   purchaseOrders: StoredPO[],
-  { hideInternal = false }: Pick<ExportOptions, "hideInternal"> = {},
+  {
+    hideInternal = false,
+    reportFrom,
+    reportTo,
+  }: Pick<ExportOptions, "hideInternal" | "reportFrom" | "reportTo"> = {},
 ): string {
+  const formattedReportFrom = formatCsvDate(reportFrom);
+  const formattedReportTo = formatCsvDate(reportTo);
   const savedOrders = readLocalJson<unknown>("nido_my_orders", []);
   const orderById = new Map(
     (Array.isArray(savedOrders) ? savedOrders as MyOrder[] : []).map((order) => [order.id, order]),
@@ -651,6 +682,8 @@ export function buildVendorOrdersCsv(
         items: [line],
       };
       const row = createRow(order, item, index, [rowPO], [], false);
+      row["Report From"] = formattedReportFrom;
+      row["Report To"] = formattedReportTo;
 
       if (hideInternal) {
         const visibleActivity = getOrderActivity(order.id, true);
@@ -682,5 +715,11 @@ export function buildOrdersCsv(
   orders: MyOrder[],
   options: ExportOptions = {},
 ): string {
-  return serializeCsv(buildOrderReportRows(orders, options).map((row) => row.fields));
+  const reportFrom = formatCsvDate(options.reportFrom);
+  const reportTo = formatCsvDate(options.reportTo);
+  return serializeCsv(buildOrderReportRows(orders, options).map(({ fields }) => ({
+    ...fields,
+    "Report From": reportFrom,
+    "Report To": reportTo,
+  })));
 }
