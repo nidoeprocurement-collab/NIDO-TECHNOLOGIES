@@ -1592,28 +1592,8 @@ export default function VendorOrderDetailPage() {
             <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>{notes.length} note{notes.length !== 1 ? "s" : ""}</div>
           </div>
           <div style={{ padding: "20px 24px 28px" }}>
-            {/* Note list */}
-            {notes.map((note, i) => (
-              <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
-                <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
-                    <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
-                    <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
-                      {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
-                    {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
-                    {note.text}
-                  </div>
-                </div>
-              </div>
-            ))}
-
             {/* Inline Add Note composer */}
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginTop: notes.length > 0 ? 8 : 0 }}>
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden", marginBottom: 18 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 220px" }}>
                 <div style={{ padding: "14px 16px", borderRight: "1px solid #e5e7eb" }}>
                   <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 8, color: "#111827" }}>Add Note</div>
@@ -1653,6 +1633,25 @@ export default function VendorOrderDetailPage() {
                 </div>
               </div>
             </div>
+            {/* Note list */}
+            {notes.map((note, i) => (
+              <div key={note.id} style={{ display: "flex", gap: 12, marginBottom: 14, padding: note.kind ? "10px 12px 14px" : "0 0 14px", borderBottom: i < notes.length - 1 ? "1px solid #f3f4f6" : "none", borderLeft: note.kind === "status-change" ? "3px solid #f59e0b" : note.kind ? "3px solid #9ca3af" : "none", background: note.kind === "status-change" ? "#fffbeb" : note.kind ? "#f9fafb" : "transparent", borderRadius: note.kind ? 7 : 0 }}>
+                <Avatar initials={(note.initials || note.author?.charAt(0) || "U")} color={note.color || "#2563eb"} size={32} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13.5, color: "#111827" }}>{note.author}</span>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>{note.date}</span>
+                    <span style={{ fontSize: 11, background: note.visibility === "Internal Note" ? "#eff6ff" : "#faf5ff", color: note.visibility === "Internal Note" ? "#1d4ed8" : "#7c3aed", padding: "2px 8px", borderRadius: 10, fontWeight: 500 }}>
+                      {note.visibility === "Internal Note" ? "🔒 Internal" : "🌐 External"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.6, whiteSpace: "pre-line" }}>
+                    {note.kind && <span style={{ display: "inline-block", marginRight: 8, padding: "2px 7px", borderRadius: 8, background: note.kind === "status-change" ? "#fef3c7" : "#e5e7eb", color: note.kind === "status-change" ? "#92400e" : "#4b5563", fontSize: 10.5, fontWeight: 700, verticalAlign: "middle" }}>{note.kind === "status-change" ? "STATUS CHANGE" : "ACTIVITY"}</span>}
+                    {note.text}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
