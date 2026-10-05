@@ -3113,10 +3113,13 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
 
   const provisionPortalAccess = (row: UserRecord) => {
     if (!clientId || row.status !== "Active") return;
+    const existingPortalUser = getPortalUsersByClient(clientId).find(
+      candidate => candidate.email.trim().toLowerCase() === row.email.trim().toLowerCase(),
+    );
     const credentials = provisionPortalUser(clientId, clientName || "Client", {
       email: row.email,
       name: row.name,
-      role: "Employee",
+      role: existingPortalUser?.role || row.role || "Employee",
       phone: row.phone,
       details: row.details,
     });
@@ -3128,7 +3131,7 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
 
   const createUser = (user: UserRecord) => {
     if (clientId) {
-      provisionPortalUser(clientId, clientName || "Client", {
+      const credentials = provisionPortalUser(clientId, clientName || "Client", {
         email: user.email,
         name: user.name,
         role: user.role,
@@ -3136,6 +3139,9 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
         phone: user.phone,
         details: user.details,
       });
+      window.alert(
+        `Client Portal sign-in credentials:\n\nEmail: ${credentials.email}\nTemporary password: ${credentials.password}\n\n${user.status === "Active" ? "Access is active." : "This account is inactive and must be activated before sign-in."}\nSave these credentials; the password is shown only now.`,
+      );
       // Use the canonical persisted record (and its ID) rather than the
       // temporary table record. This keeps edit/deactivate actions live.
       const persisted = getPortalUsersByClient(clientId).find(
