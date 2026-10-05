@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -19,9 +20,10 @@ const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 
 export default function InventoryReportPage() {
   usePageMeta({ title: "Inventory Reports" });
-  const stockHistory = useMemo(() => getStockHistory(), []);
-  const products = useMemo(() => getCatalogProducts?.() ?? [], []);
-  const thresholds = useMemo(() => getAllThresholds(), []);
+  const liveRevision = useLiveReportRevision();
+  const stockHistory = useMemo(() => getStockHistory(), [liveRevision]);
+  const products = useMemo(() => getCatalogProducts(), [liveRevision]);
+  const thresholds = useMemo(() => getAllThresholds(), [liveRevision]);
 
   // Stock events by action
   const actionMap: Record<string, number> = {};

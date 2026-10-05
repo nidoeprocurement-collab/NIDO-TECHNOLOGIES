@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -20,8 +21,9 @@ const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 
 export default function VendorPerformancePage() {
   usePageMeta({ title: "Vendor Performance" });
-  const vendors = useMemo(() => getVendors(), []);
-  const pos = useMemo(() => getAllPOs(), []);
+  const liveRevision = useLiveReportRevision();
+  const vendors = useMemo(() => getVendors(), [liveRevision]);
+  const pos = useMemo(() => getAllPOs(), [liveRevision]);
 
   const activeVendors = vendors.filter(v => v.status === "Active");
   const avgRating = vendors.length > 0

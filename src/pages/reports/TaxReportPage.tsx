@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -9,6 +10,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -16,12 +18,11 @@ import {
 import { Receipt, DollarSign, TrendingUp, FileText, Calculator, CheckCircle } from "lucide-react";
 
 const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul"];
-
 export default function TaxReportPage() {
   usePageMeta({ title: "Tax Reports" });
-  const invoices = useMemo(() => getInvoices(), []);
-  const pos = useMemo(() => getAllPOs(), []);
+  const liveRevision = useLiveReportRevision();
+  const invoices = useMemo(() => getInvoices(), [liveRevision]);
+  const pos = useMemo(() => getAllPOs(), [liveRevision]);
 
   // Tax collected (sales side)
   const taxCollected = invoices.reduce((s, i) => s + (i.totalTax ?? 0), 0);
@@ -50,11 +51,14 @@ export default function TaxReportPage() {
     { hsn: "8528", desc: "Displays", taxable: Math.round(taxCollected * 0.15), gst: Math.round(taxCollected * 0.15 * 0.18) },
   ];
 
-  // Monthly tax trend
-  const monthlyTax = MONTHS.map(m => ({
-    month: m,
-    collected: Math.round(taxCollected / 7 * (0.5 + Math.random())),
-    paid: Math.round(taxPaid / 7 * (0.5 + Math.random())),
+  const monthlyTax = getRecentReportMonths().map(({ key, label }) => ({
+    month: label,
+    collected: invoices
+      .filter((invoice) => getReportMonthKey(invoice.invoiceDate ?? invoice.createdAt) === key)
+      .reduce((sum, invoice) => sum + (invoice.totalTax ?? 0), 0),
+    paid: pos
+      .filter((po) => getReportMonthKey(po.createdOn ?? po.createdAt) === key)
+      .reduce((sum, po) => sum + (po.sgstAmt ?? 0) + (po.cgstAmt ?? 0), 0),
   }));
 
   // GST component breakdown

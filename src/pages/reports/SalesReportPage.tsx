@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -11,6 +12,7 @@ import { getOrders } from "@/lib/salesOrderStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getQuotes } from "@/lib/quoteStore";
 import { getClients } from "@/lib/clientStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
@@ -18,15 +20,14 @@ import {
 import { DollarSign, FileText, TrendingUp, Users, Receipt, ShoppingBag } from "lucide-react";
 
 const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul"];
-
 export default function SalesReportPage() {
   usePageMeta({ title: "Sales Reports" });
+  const liveRevision = useLiveReportRevision();
 
-  const orders = useMemo(() => getOrders(), []);
-  const invoices = useMemo(() => getInvoices(), []);
-  const quotes = useMemo(() => getQuotes(), []);
-  const clients = useMemo(() => getClients(), []);
+  const orders = useMemo(() => getOrders(), [liveRevision]);
+  const invoices = useMemo(() => getInvoices(), [liveRevision]);
+  const quotes = useMemo(() => getQuotes(), [liveRevision]);
+  const clients = useMemo(() => getClients(), [liveRevision]);
 
   const totalRevenue = useMemo(() =>
     invoices.filter(i => i.status === "Paid").reduce((s, i) => s + (i.grandTotal ?? 0), 0), [invoices]);
@@ -39,10 +40,12 @@ export default function SalesReportPage() {
     ? ((quotes.filter(q => q.status === "Accepted").length / quotes.length) * 100).toFixed(1)
     : "0.0";
 
-  const revenueTrend = MONTHS.map((m) => ({
-    month: m,
-    revenue: Math.round(totalRevenue / 7 * (0.5 + Math.random() * 1)),
-    orders: Math.round(orders.length / 7 * (0.5 + Math.random() * 1)),
+  const revenueTrend = getRecentReportMonths().map(({ key, label }) => ({
+    month: label,
+    revenue: invoices
+      .filter((invoice) => invoice.status === "Paid" && getReportMonthKey(invoice.invoiceDate ?? invoice.createdAt) === key)
+      .reduce((sum, invoice) => sum + (invoice.grandTotal ?? 0), 0),
+    orders: orders.filter((order) => getReportMonthKey(order.orderDate ?? order.createdAt) === key).length,
   }));
 
   // Client revenue map

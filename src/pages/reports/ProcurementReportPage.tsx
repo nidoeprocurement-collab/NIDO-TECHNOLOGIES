@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -9,6 +10,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -19,9 +21,10 @@ const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
 export default function ProcurementReportPage() {
   usePageMeta({ title: "Procurement Reports" });
+  const liveRevision = useLiveReportRevision();
 
-  const pos = useMemo(() => getAllPOs(), []);
-  const vendors = useMemo(() => getVendors(), []);
+  const pos = useMemo(() => getAllPOs(), [liveRevision]);
+  const vendors = useMemo(() => getVendors(), [liveRevision]);
 
   const totalSpend = useMemo(() => pos.reduce((s, p) => s + (p.grandTotal ?? 0), 0), [pos]);
   const confirmedPOs = pos.filter(p => p.status === "Confirmed" || p.status === "Delivered");
@@ -51,12 +54,14 @@ export default function ProcurementReportPage() {
   pos.forEach(p => { statusMap[p.status] = (statusMap[p.status] ?? 0) + 1; });
   const statusData = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
 
-  // Monthly trend
-  const monthlyData = ["Jan","Feb","Mar","Apr","May","Jun","Jul"].map(m => ({
-    month: m,
-    pos: Math.round(pos.length / 7 * (0.5 + Math.random())),
-    spend: Math.round(totalSpend / 7 * (0.5 + Math.random())),
-  }));
+  const monthlyData = getRecentReportMonths().map(({ key, label }) => {
+    const monthPos = pos.filter((po) => getReportMonthKey(po.createdOn ?? po.createdAt) === key);
+    return {
+      month: label,
+      pos: monthPos.length,
+      spend: monthPos.reduce((sum, po) => sum + (po.grandTotal ?? po.subtotal ?? 0), 0),
+    };
+  });
 
   const tableData = pos.slice(0, 50).map(p => ({
     poNumber: p.poNumber,

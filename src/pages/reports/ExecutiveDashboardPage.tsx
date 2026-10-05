@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -15,6 +16,7 @@ import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
 import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getReceipts } from "@/lib/paymentReceiptStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend,
@@ -24,20 +26,20 @@ import {
   HeadphonesIcon, FileText, TrendingUp, Receipt,
 } from "lucide-react";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
 export default function ExecutiveDashboardPage() {
   usePageMeta({ title: "Executive Dashboard" });
+  const liveRevision = useLiveReportRevision();
 
-  const orders = useMemo(() => getOrders(), []);
-  const invoices = useMemo(() => getInvoices(), []);
-  const pos = useMemo(() => getAllPOs(), []);
-  const quotes = useMemo(() => getQuotes(), []);
-  const vendors = useMemo(() => getVendors(), []);
-  const clients = useMemo(() => getClients(), []);
-  const tickets = useMemo(() => getSupportTickets(), []);
-  const receipts = useMemo(() => getReceipts(), []);
+  const orders = useMemo(() => getOrders(), [liveRevision]);
+  const invoices = useMemo(() => getInvoices(), [liveRevision]);
+  const pos = useMemo(() => getAllPOs(), [liveRevision]);
+  const quotes = useMemo(() => getQuotes(), [liveRevision]);
+  const vendors = useMemo(() => getVendors(), [liveRevision]);
+  const clients = useMemo(() => getClients(), [liveRevision]);
+  const tickets = useMemo(() => getSupportTickets(), [liveRevision]);
+  const receipts = useMemo(() => getReceipts(), [liveRevision]);
 
   const totalRevenue = useMemo(() =>
     invoices.filter(i => i.status === "Paid").reduce((s, i) => s + (i.grandTotal ?? 0), 0), [invoices]);
@@ -49,11 +51,14 @@ export default function ExecutiveDashboardPage() {
 
   const openTickets = useMemo(() => tickets.filter(t => t.status === "open" || t.status === "in_progress").length, [tickets]);
 
-  // Revenue trend (monthly mock based on invoice data count)
-  const revenueTrend = MONTHS.slice(0, 7).map((m, i) => ({
-    month: m,
-    revenue: Math.round(totalRevenue / 7 * (0.7 + Math.random() * 0.6)),
-    spend: Math.round(totalSpend / 7 * (0.7 + Math.random() * 0.6)),
+  const revenueTrend = getRecentReportMonths().map(({ key, label }) => ({
+    month: label,
+    revenue: invoices
+      .filter((invoice) => invoice.status === "Paid" && getReportMonthKey(invoice.invoiceDate ?? invoice.createdAt) === key)
+      .reduce((sum, invoice) => sum + (invoice.grandTotal ?? 0), 0),
+    spend: pos
+      .filter((po) => getReportMonthKey(po.createdOn ?? po.createdAt) === key)
+      .reduce((sum, po) => sum + (po.grandTotal ?? po.subtotal ?? 0), 0),
   }));
 
   // Order status distribution

@@ -464,7 +464,7 @@ export default function CreateReportPage() {
   const [selectedColumns,  setSelectedColumns]   = useState<string[]>([]);
   const [filters,          setFilters]           = useState<{ id: string; field: string; operator: string; value: string }[]>([]);
   const [frequency,        setFrequency]         = useState<ReportFrequency>("One Time");
-  const [startDate,        setStartDate]         = useState("2026-08-01");
+  const [startDate,        setStartDate]         = useState(() => new Date().toISOString().slice(0, 10));
   const [time,             setTime]              = useState("09:00");
   const [timezone,         setTimezone]          = useState("(IST) Asia/Kolkata");
   const [deliveryEmail,    setDeliveryEmail]     = useState(true);
@@ -605,10 +605,10 @@ export default function CreateReportPage() {
       format,
       includeCharts,
       includeSummary,
-      createdBy: existing?.createdBy ?? "System Admin",
+      createdBy: existing?.createdBy ?? "Current User",
       createdAt: existing?.createdAt ?? `${dateStr} ${timeStr}`,
-      lastRunDate: dateStr,
-      lastRunStatus: "Success" as const,
+      lastRunDate: existing?.lastRunDate,
+      lastRunStatus: existing?.lastRunStatus,
     });
     toast({
       title: existing ? "Report updated" : isCloning ? "Custom report created" : "Report saved!",

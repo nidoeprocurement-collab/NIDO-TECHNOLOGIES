@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -19,7 +20,8 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul"];
 
 export default function SlaReportPage() {
   usePageMeta({ title: "SLA Reports" });
-  const tickets = useMemo(() => getSupportTickets(), []);
+  const liveRevision = useLiveReportRevision();
+  const tickets = useMemo(() => getSupportTickets(), [liveRevision]);
 
   // Simulate SLA compliance based on ticket data
   const resolved = tickets.filter(t => t.status === "resolved");

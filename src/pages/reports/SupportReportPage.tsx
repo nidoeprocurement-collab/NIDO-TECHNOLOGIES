@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -9,6 +10,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -19,8 +21,9 @@ const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 
 export default function SupportReportPage() {
   usePageMeta({ title: "Support Reports" });
-  const tickets = useMemo(() => getSupportTickets(), []);
-  const serviceReqs = useMemo(() => getServiceRequests(), []);
+  const liveRevision = useLiveReportRevision();
+  const tickets = useMemo(() => getSupportTickets(), [liveRevision]);
+  const serviceReqs = useMemo(() => getServiceRequests(), [liveRevision]);
 
   const openTickets    = tickets.filter(t => t.status === "open");
   const inProgressTickets = tickets.filter(t => t.status === "in_progress");
@@ -50,12 +53,14 @@ export default function SupportReportPage() {
   serviceReqs.forEach(r => { reqTypeMap[r.requestType] = (reqTypeMap[r.requestType] ?? 0) + 1; });
   const reqTypeData = Object.entries(reqTypeMap).map(([name, value]) => ({ name, value }));
 
-  // Weekly trend (mock)
-  const weeklyTrend = ["W1","W2","W3","W4","W5","W6","W7"].map(w => ({
-    week: w,
-    opened: Math.max(0, Math.round(tickets.length / 7 * (0.5 + Math.random()))),
-    resolved: Math.max(0, Math.round(resolvedTickets.length / 7 * (0.5 + Math.random()))),
-  }));
+  const weeklyTrend = getRecentReportMonths().map(({ key, label }) => {
+    const monthTickets = tickets.filter((ticket) => getReportMonthKey(ticket.created) === key);
+    return {
+      week: label,
+      opened: monthTickets.length,
+      resolved: monthTickets.filter((ticket) => ticket.status === "resolved").length,
+    };
+  });
 
   // Service request status
   const svcStatusMap: Record<string, number> = {};

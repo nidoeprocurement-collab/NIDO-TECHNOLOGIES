@@ -2,6 +2,7 @@ import { useState, useMemo, lazy, Suspense, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import ReportShellContext from "@/contexts/ReportShellContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 
 // Lazy-loaded BI report pages (rendered inline when a tile is active)
 const ExecutiveDashboardPage  = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
@@ -22,11 +23,14 @@ import {
   saveCustomReport,
   generateReportId,
   getBuiltinReportSchedule,
+  getBuiltinReportView,
+  getBuiltinReportViews,
   saveBuiltinReportSchedule,
   moduleToCategoryLabel,
   scheduleLabel as buildScheduleLabel,
   type CustomReport,
 } from "@/lib/reportStore";
+import { applyStoredReportFilters, getReportFieldValue, getReportRecords } from "@/lib/reportData";
 import { getClients } from "@/lib/clientStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getUsers } from "@/lib/nidoUsersStore";
@@ -93,7 +97,7 @@ interface ReportRow {
   scheduleIcon: "recurring" | "calendar";
   lastRunDate: string;
   lastRunTime: string;
-  lastRunStatus: "Success" | "Failed" | "Pending";
+  lastRunStatus: "Success" | "Failed" | "Pending" | "Not run";
   format: ReportFormat;
 }
 
@@ -106,115 +110,52 @@ interface ScheduledReport {
   format: ReportFormat;
 }
 
-// ── Static data ────────────────────────────────────────────────────────────────
-
-const REPORTS: ReportRow[] = [
-  {
-    id: "r1",
-    name: "Master Order Report",
-    description: "Summary of all orders across clients and vendors",
-    category: "Orders",
-    createdBy: "System Admin",
-    scheduleLabel: "Daily\n08:00 AM",
-    scheduleIcon: "recurring",
-    lastRunDate: "Jul 31, 2026",
-    lastRunTime: "08:00 AM",
-    lastRunStatus: "Success",
-    format: "Excel",
-  },
-  {
-    id: "r2",
-    name: "Client Activity Report",
-    description: "Client users, catalog, orders and requests",
-    category: "Clients",
-    createdBy: "System Admin",
-    scheduleLabel: "Weekly\nEvery Monday 09:00 AM",
-    scheduleIcon: "recurring",
-    lastRunDate: "Jul 28, 2026",
-    lastRunTime: "09:00 AM",
-    lastRunStatus: "Success",
-    format: "PDF",
-  },
-  {
-    id: "r3",
-    name: "Vendor Performance Report",
-    description: "Vendor users, catalog, orders and tickets",
-    category: "Vendors",
-    createdBy: "System Admin",
-    scheduleLabel: "Weekly\nEvery Monday 09:00 AM",
-    scheduleIcon: "recurring",
-    lastRunDate: "Jul 28, 2026",
-    lastRunTime: "09:00 AM",
-    lastRunStatus: "Success",
-    format: "Excel",
-  },
-  {
-    id: "r4",
-    name: "Support Tickets Report",
-    description: "All support tickets and resolution status",
-    category: "Support",
-    createdBy: "System Admin",
-    scheduleLabel: "Daily\n07:00 PM",
-    scheduleIcon: "recurring",
-    lastRunDate: "Jul 30, 2026",
-    lastRunTime: "07:00 PM",
-    lastRunStatus: "Success",
-    format: "PDF",
-  },
-  {
-    id: "r5",
-    name: "Services Requests Report",
-    description: "All service requests and status",
-    category: "Services",
-    createdBy: "System Admin",
-    scheduleLabel: "Daily\n06:00 PM",
-    scheduleIcon: "recurring",
-    lastRunDate: "Jul 30, 2026",
-    lastRunTime: "06:00 PM",
-    lastRunStatus: "Success",
-    format: "Excel",
-  },
-  {
-    id: "r6",
-    name: "User Summary Report",
-    description: "All platform users and roles",
-    category: "Users",
-    createdBy: "System Admin",
-    scheduleLabel: "Monthly\n1st of every month",
+// Built-in report definitions are templates; run history and schedules are
+// shown only when those values exist in the report store.
+const REPORTS: ReportRow[] = getBuiltinReportViews().map((view) => {
+  const category = moduleToCategoryLabel(view.module);
+  return {
+    id: view.id,
+    name: view.name,
+    description: view.description,
+    category: (category === "All Modules" || category === "Catalog" ? "Orders" : category) as Exclude<ReportCategory, "All">,
+    createdBy: "Built-in",
+    scheduleLabel: "Not scheduled",
     scheduleIcon: "calendar",
-    lastRunDate: "Jul 01, 2026",
-    lastRunTime: "09:00 AM",
-    lastRunStatus: "Success",
-    format: "Excel",
-  },
-];
+    lastRunDate: "Not run",
+    lastRunTime: "",
+    lastRunStatus: "Not run",
+    format: view.format,
+  };
+});
 
-const SCHEDULED: ScheduledReport[] = [
-  {
-    id: "s1",
-    name: "Master Order Report",
-    schedule: "Daily at 08:00 AM",
-    nextRun: "Aug 01, 2026 08:00 AM",
-    recipients: "admin@nido-tech.com, reports@nido-tech.com",
-    format: "Excel",
-  },
-  {
-    id: "s2",
-    name: "Client Activity Report",
-    schedule: "Weekly on Monday 09:00 AM",
-    nextRun: "Aug 04, 2026 09:00 AM",
-    recipients: "admin@nido-tech.com",
-    format: "PDF",
-  },
-  {
-    id: "s3",
-    name: "Vendor Performance Report",
-    schedule: "Weekly on Monday 09:00 AM",
-    nextRun: "Aug 04, 2026 09:00 AM",
-    recipients: "admin@nido-tech.com, vendor@nido-tech.com",
-    format: "Excel",
-  },
-];
+const SCHEDULED: ScheduledReport[] = [];
+
+function getSavedScheduledReports(): ScheduledReport[] {
+  const builtin = getBuiltinReportViews().flatMap((view) => {
+    const schedule = getBuiltinReportSchedule(view.id);
+    if (!schedule || schedule.frequency === "One Time") return [];
+    return [{
+      id: view.id,
+      name: view.name,
+      schedule: buildScheduleLabel(schedule.frequency, schedule.time).replace("\n", " · "),
+      nextRun: "Not tracked",
+      recipients: schedule.deliveryEmail ? schedule.emailRecipients : "",
+      format: view.format,
+    }];
+  });
+  const custom = getCustomReports()
+    .filter((report) => report.frequency !== "One Time")
+    .map((report) => ({
+      id: report.id,
+      name: report.name,
+      schedule: buildScheduleLabel(report.frequency, report.time).replace("\n", " · "),
+      nextRun: "Not tracked",
+      recipients: report.deliveryEmail ? report.emailRecipients : "",
+      format: report.format,
+    }));
+  return [...builtin, ...custom];
+}
 
 const CATEGORIES: ReportCategory[] = ["All", "Orders", "Clients", "Vendors", "Support", "Services", "Users"];
 const FORMATS: (ReportFormat | "All Formats")[] = ["All Formats", "Excel", "PDF", "CSV"];
@@ -401,19 +342,20 @@ function EditScheduleModal({ report, reportName, onClose, onSaved }: {
 
 function downloadReportAsCSV(report: ReportRow) {
   const stored = getCustomReports().find((r) => r.id === report.id);
+  const builtIn = getBuiltinReportView(report.id);
   const columns = stored?.selectedColumns?.length
     ? stored.selectedColumns
-    : ["ID", "Name", "Status", "Date", "Amount"];
-
-  // Build a simple 5-row CSV with placeholder data
-  const MOCK_VALUES: Record<string, string[]> = {
-    default: ["Value 1", "Value 2", "Value 3", "Value 4", "Value 5"],
-  };
-  const rows = Array.from({ length: 5 }, (_, i) =>
-    columns.map((col) => MOCK_VALUES[col]?.[i] ?? `${col} ${i + 1}`).join(",")
+    : builtIn?.selectedColumns ?? ["ID", "Created On", "Status"];
+  const module = stored?.module ?? builtIn?.module ?? "All Modules";
+  const records = applyStoredReportFilters(
+    getReportRecords(module),
+    stored?.filters ?? [],
   );
-
-  const csv = [columns.join(","), ...rows].join("\n");
+  const escapeCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const rows = records.map((record) =>
+    columns.map((column) => escapeCell(getReportFieldValue(record, column))).join(",")
+  );
+  const csv = [columns.map(escapeCell).join(","), ...rows].join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

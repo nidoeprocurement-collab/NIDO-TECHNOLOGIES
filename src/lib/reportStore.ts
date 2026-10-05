@@ -71,6 +71,10 @@ export function getBuiltinReportView(id: string): BuiltinReportView | undefined 
   return BUILTIN_REPORT_VIEWS.find((report) => report.id === id);
 }
 
+export function getBuiltinReportViews(): BuiltinReportView[] {
+  return [...BUILTIN_REPORT_VIEWS];
+}
+
 export function getBuiltinReportSchedule(id: string): BuiltinReportSchedule | undefined {
   try {
     const schedules = JSON.parse(localStorage.getItem(BUILTIN_SCHEDULES_KEY) ?? "{}") as Record<string, BuiltinReportSchedule>;
@@ -89,6 +93,7 @@ export function saveBuiltinReportSchedule(id: string, schedule: BuiltinReportSch
   }
   schedules[id] = schedule;
   localStorage.setItem(BUILTIN_SCHEDULES_KEY, JSON.stringify(schedules));
+  window.dispatchEvent(new Event("nidoCustomReportsUpdated"));
 }
 
 export function saveCustomReport(report: CustomReport): void {
@@ -97,11 +102,13 @@ export function saveCustomReport(report: CustomReport): void {
   if (idx >= 0) all[idx] = report;
   else all.unshift(report);
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event("nidoCustomReportsUpdated"));
 }
 
 export function deleteCustomReport(id: string): void {
   const all = getCustomReports().filter((r) => r.id !== id);
   localStorage.setItem(STORE_KEY, JSON.stringify(all));
+  window.dispatchEvent(new Event("nidoCustomReportsUpdated"));
 }
 
 export function generateReportId(): string {

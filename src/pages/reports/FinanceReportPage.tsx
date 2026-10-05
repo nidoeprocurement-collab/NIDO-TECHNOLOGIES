@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -11,6 +12,7 @@ import { getInvoices } from "@/lib/invoiceStore";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
 import { getReceipts } from "@/lib/paymentReceiptStore";
 import { getOrders } from "@/lib/salesOrderStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, AreaChart, Area, ComposedChart, Line,
@@ -18,14 +20,13 @@ import {
 import { DollarSign, TrendingUp, TrendingDown, Receipt, AlertCircle, CreditCard } from "lucide-react";
 
 const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul"];
-
 export default function FinanceReportPage() {
   usePageMeta({ title: "Finance Reports" });
-  const invoices = useMemo(() => getInvoices(), []);
-  const pos = useMemo(() => getAllPOs(), []);
-  const receipts = useMemo(() => getReceipts(), []);
-  const orders = useMemo(() => getOrders(), []);
+  const liveRevision = useLiveReportRevision();
+  const invoices = useMemo(() => getInvoices(), [liveRevision]);
+  const pos = useMemo(() => getAllPOs(), [liveRevision]);
+  const receipts = useMemo(() => getReceipts(), [liveRevision]);
+  const orders = useMemo(() => getOrders(), [liveRevision]);
 
   const totalRevenue = invoices.filter(i => i.status === "Paid").reduce((s, i) => s + (i.grandTotal ?? 0), 0);
   const totalExpenses = pos.reduce((s, p) => s + (p.grandTotal ?? 0), 0);
@@ -44,13 +45,15 @@ export default function FinanceReportPage() {
   invoices.forEach(i => { invStatusMap[i.status] = (invStatusMap[i.status] ?? 0) + 1; });
   const invStatusData = Object.entries(invStatusMap).map(([name, value]) => ({ name, value }));
 
-  // Monthly P&L
-  const monthlyPL = MONTHS.map(m => ({
-    month: m,
-    revenue: Math.round(totalRevenue / 7 * (0.5 + Math.random())),
-    expenses: Math.round(totalExpenses / 7 * (0.5 + Math.random())),
-    profit: 0,
-  })).map(d => ({ ...d, profit: d.revenue - d.expenses }));
+  const monthlyPL = getRecentReportMonths().map(({ key, label }) => {
+    const revenue = invoices
+      .filter((invoice) => invoice.status === "Paid" && getReportMonthKey(invoice.invoiceDate ?? invoice.createdAt) === key)
+      .reduce((sum, invoice) => sum + (invoice.grandTotal ?? 0), 0);
+    const expenses = pos
+      .filter((po) => getReportMonthKey(po.createdOn ?? po.createdAt) === key)
+      .reduce((sum, po) => sum + (po.grandTotal ?? po.subtotal ?? 0), 0);
+    return { month: label, revenue, expenses, profit: revenue - expenses };
+  });
 
   // Payment method distribution
   const payModeMap: Record<string, number> = {};

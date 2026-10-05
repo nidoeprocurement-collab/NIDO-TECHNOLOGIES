@@ -29,38 +29,14 @@ import {
   Clock, BarChart3, ChevronDown, Filter, Eye, MoreVertical, Copy,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { getPrefix } from "@/lib/configService";
-
-// ── Mock data helpers ──────────────────────────────────────────────────────────
-
-const CLIENT_NAMES = [
-  "TechNova Solutions", "Bright Future Ltd", "Innovatech Pvt Ltd",
-  "Global Enterprises", "Alpha Infotech", "NextGen Systems",
-  "Skyline Corp", "Vertex Solutions", "Zento Technologies",
-  "Pinnacle Industries", "Horizon Tech", "Apex Corp",
-  "BlueStar Solutions", "Delta Systems", "Omega Industries",
-];
-const VENDOR_NAMES = [
-  "Prime Supplies Pvt Ltd", "Office Needs Co.", "PanTree Supplies",
-  "FurniHub Pvt Ltd", "Tech Solutions Pvt Ltd", "Metro Logistics",
-  "Rapid Supply Co.", "National Distributors", "Allied Traders",
-  "Capital Goods Ltd",
-];
-const STATUSES = ["Completed", "Pending", "Cancelled", "Active", "Inactive"];
-const PRIORITIES = ["High", "Medium", "Low", "Critical"];
-const ROLES = ["System Admin", "Client Admin", "Client User", "Vendor Admin", "Vendor User"];
-const CITIES = ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Pune", "Kolkata", "Ahmedabad"];
-
-function fmtDate(offset = 0) {
-  const d = new Date(2026, 6, 31 - offset);
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-}
-function fmtTime(h = 10, m = 45) {
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} AM`;
-}
-function fmtAmount(base: number) {
-  return formatCurrency(base);
-}
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import {
+  applyStoredReportFilters,
+  getReportFieldValue,
+  getReportRecordDate,
+  getReportRecords,
+  type ReportRecord,
+} from "@/lib/reportData";
 
 function dateKey(value: string): string {
   const direct = value.match(/^(\d{4}-\d{2}-\d{2})/);
@@ -195,51 +171,6 @@ function toStoredTime(value: string): string {
   return `${String(hour12).padStart(2, "0")}:${minutes} ${suffix}`;
 }
 
-function getMockValue(col: string, idx: number): string {
-  const i = idx % 10;
-  switch (col) {
-    case "ID":              return String(idx + 1).padStart(3, "0");
-    case "Created On":      return fmtDate(i);
-    case "Created By":      return ROLES[i % ROLES.length];
-    case "Client Name":     return CLIENT_NAMES[i];
-    case "Client Email":    return `info@${CLIENT_NAMES[i].toLowerCase().replace(/\s+/g, "")}.com`;
-    case "Client Phone":    return `+91 9${(800000000 + idx * 11111).toString().slice(0, 9)}`;
-    case "Client City":     return CITIES[i % CITIES.length];
-    case "Client Status":   return i < 7 ? "Active" : "Inactive";
-    case "Client Tier":     return ["Gold", "Silver", "Bronze", "Platinum"][i % 4];
-    case "Contract Start":  return fmtDate(30 + i);
-    case "Contract End":    return fmtDate(-180 + i);
-    case "Vendor Name":     return VENDOR_NAMES[i % VENDOR_NAMES.length];
-    case "Vendor Email":    return `contact@${VENDOR_NAMES[i % VENDOR_NAMES.length].toLowerCase().replace(/\s+/g, "")}.com`;
-    case "Vendor Phone":    return `+91 9${(700000000 + idx * 13579).toString().slice(0, 9)}`;
-    case "Vendor Category": return ["Electronics", "Office Supplies", "Furniture", "Logistics", "IT Services"][i % 5];
-    case "Vendor Status":   return i < 8 ? "Active" : "Inactive";
-    case "Rating":          return `${(3.5 + (i % 15) * 0.1).toFixed(1)} / 5`;
-    case "Order ID":        return `${getPrefix("order") || "ORD-"}2026-${String(i + 1).padStart(4, "0")}`;
-    case "Order Date":      return fmtDate(i) + " " + fmtTime(10 + (i % 8), (i * 17) % 60);
-    case "Order Status":    return ["Completed", "Pending", "Cancelled", "Completed", "Pending", "Completed", "Completed", "Pending", "Completed", "Pending"][i];
-    case "Amount":          return fmtAmount(50000 + (idx * 17531) % 200000);
-    case "Tax":             return fmtAmount(Math.round((50000 + (idx * 17531) % 200000) * 0.18));
-    case "Total":           return fmtAmount(Math.round((50000 + (idx * 17531) % 200000) * 1.18));
-    case "Item Name":       return ["Laptop Pro", "Office Chair", "Printer Ink", "USB Hub", "Monitor 24\"", "Keyboard", "Desk Lamp", "Webcam", "Headset", "Mouse"][i];
-    case "SKU":             return `${getPrefix("sku") || "SKU-"}${String(1000 + idx).padStart(6, "0")}`;
-    case "Category":        return ["Electronics", "Furniture", "Consumables", "Peripherals", "Accessories"][i % 5];
-    case "Price":           return fmtAmount(500 + (idx * 1234) % 50000);
-    case "Stock":           return String(5 + (idx * 7) % 200);
-    case "Unit":            return ["pcs", "box", "set", "pack"][i % 4];
-    case "Service Name":    return ["AC Maintenance", "IT Support", "Network Setup", "Server Repair", "CCTV Install", "UPS Service", "Printer Fix", "WiFi Config", "Data Backup", "Security Audit"][i];
-    case "Request Date":    return fmtDate(i);
-    case "Status":          return STATUSES[i % STATUSES.length];
-    case "Priority":        return PRIORITIES[i % PRIORITIES.length];
-    case "Assigned To":     return ["Rahul Sharma", "Priya Mehta", "Amit Verma", "Sneha Iyer", "Vikram Singh"][i % 5];
-    case "Ticket ID":       return `${getPrefix("supportTicket") || "TKT-"}2026-${String(i + 1).padStart(4, "0")}`;
-    case "Subject":         return ["Login issue", "Payment failed", "Report error", "Access denied", "Slow performance", "Data mismatch", "Email not sent", "Export broken", "UI bug", "Missing invoice"][i];
-    case "Resolution Date": return i < 6 ? fmtDate(i + 2) : "—";
-    case "Agent":           return ["Rahul S.", "Priya M.", "Amit V.", "Sneha I.", "Vikram S."][i % 5];
-    default:                return "—";
-  }
-}
-
 // ── Module KPI configs ─────────────────────────────────────────────────────────
 
 interface KpiConfig {
@@ -342,14 +273,14 @@ function getFilters(module: string, orders: Array<{ clientName: string; status: 
     case "Clients":
       return [
         ...base,
-        { label: "Client", type: "select" as const, options: ["All Clients", ...CLIENT_NAMES.slice(0, 5)], value: "All Clients" },
+        { label: "Client", type: "select" as const, options: ["All Clients", ...getReportRecords("Clients").map((record) => String(record.name ?? "")).filter(Boolean)], value: "All Clients" },
         { label: "Activity Type", type: "select" as const, options: ["All Activities", "Orders", "Invoices", "Requests"], value: "All Activities" },
         { label: "Status", type: "select" as const, options: ["All Status", "Active", "Inactive"], value: "All Status" },
       ];
     case "Vendors":
       return [
         ...base,
-        { label: "Vendor",   type: "select" as const, options: ["All Vendors",   ...VENDOR_NAMES.slice(0, 5)], value: "All Vendors" },
+        { label: "Vendor",   type: "select" as const, options: ["All Vendors",   ...getReportRecords("Vendors").map((record) => String(record.name ?? "")).filter(Boolean)], value: "All Vendors" },
         { label: "Category", type: "select" as const, options: ["All Categories","Electronics","Office Supplies","Furniture","Logistics"], value: "All Categories" },
         { label: "Status",   type: "select" as const, options: ["All Status", "Active", "Inactive"], value: "All Status" },
       ];
@@ -360,6 +291,75 @@ function getFilters(module: string, orders: Array<{ clientName: string; status: 
         { label: "Status", type: "select" as const, options: ["All Status","Active","Inactive","Completed","Pending"], value: "All Status" },
       ];
   }
+}
+
+function getLiveFilters(module: string, records: ReportRecord[]) {
+  const unique = (values: unknown[]) =>
+    [...new Set(values.filter((value): value is string => typeof value === "string" && Boolean(value.trim())))].sort();
+  const statuses = unique(records.map((record) => record.status));
+  const base = [{ label: "Date Range", type: "daterange" as const, value: "Select a date range" }];
+
+  if (module === "Orders") {
+    return [
+      ...base,
+      { label: "Client", type: "select" as const, options: ["All Clients", ...unique(records.map((record) => record.clientName ?? record.client))], value: "All Clients" },
+      { label: "Status", type: "select" as const, options: ["All Status", ...statuses], value: "All Status" },
+    ];
+  }
+  if (module === "Clients") {
+    return [
+      ...base,
+      { label: "Client", type: "select" as const, options: ["All Clients", ...unique(records.map((record) => record.name))], value: "All Clients" },
+      { label: "Status", type: "select" as const, options: ["All Status", ...statuses], value: "All Status" },
+    ];
+  }
+  if (module === "Vendors") {
+    return [
+      ...base,
+      { label: "Vendor", type: "select" as const, options: ["All Vendors", ...unique(records.map((record) => record.name))], value: "All Vendors" },
+      { label: "Category", type: "select" as const, options: ["All Categories", ...unique(records.map((record) => record.category))], value: "All Categories" },
+      { label: "Status", type: "select" as const, options: ["All Status", ...statuses], value: "All Status" },
+    ];
+  }
+  return [
+    ...base,
+    ...(module === "All Modules" ? [{
+      label: "Module",
+      type: "select" as const,
+      options: ["All Modules", ...unique(records.map((record) => record.__module))],
+      value: "All Modules",
+    }] : []),
+    { label: "Status", type: "select" as const, options: ["All Status", ...statuses], value: "All Status" },
+  ];
+}
+
+function getLiveKpis(records: ReportRecord[]): KpiConfig[] {
+  const statusCounts = new Map<string, number>();
+  records.forEach((record) => {
+    const status = String(record.status ?? "").trim();
+    if (status) statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+  });
+  const amountKeys = ["grandTotal", "totalAmount", "amount", "subtotal", "total"];
+  const amountRecords = records.filter((record) => amountKeys.some((key) => record[key] !== undefined && record[key] !== null));
+  const amountTotal = amountRecords.reduce((sum, record) => {
+    const raw = amountKeys.map((key) => Number(record[key])).find(Number.isFinite);
+    return sum + (raw ?? 0);
+  }, 0);
+  return [
+    { label: "Total Records", value: records.length.toLocaleString(), icon: <BarChart3 className="w-5 h-5 text-blue-500" />, iconBg: "bg-blue-50" },
+    ...[...statusCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([label, value]) => ({
+      label,
+      value: value.toLocaleString(),
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
+      iconBg: "bg-emerald-50",
+    })),
+    ...(amountRecords.length ? [{
+      label: "Total Amount",
+      value: formatCurrency(amountTotal, undefined, { compact: true }),
+      icon: <ShoppingCart className="w-5 h-5 text-green-500" />,
+      iconBg: "bg-green-50",
+    }] : []),
+  ];
 }
 
 // ── Status badge ───────────────────────────────────────────────────────────────
@@ -478,10 +478,15 @@ export default function CustomReportDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   useI18n();
+  const reportRevision = useLiveReportRevision();
 
   const report: CustomReport | BuiltinReportView | undefined = useMemo(
     () => (id ? getCustomReports().find((r) => r.id === id) ?? getBuiltinReportView(id) : undefined),
-    [id],
+    [id, reportRevision],
+  );
+  const liveReportRecords = useMemo(
+    () => report ? getReportRecords(report.module) : [],
+    [report?.module, reportRevision],
   );
 
   usePageMeta({ title: report?.name ?? "Report Detail" });
@@ -603,10 +608,11 @@ export default function CustomReportDetailPage() {
     ? report.selectedColumns
     : ["ID", "Created On", "Status"];
   const isOrderReport = report.module === "Orders";
-  const filterOrders = isMasterOrderReport
-    ? masterOrders.map((order) => ({ clientName: order.client, status: order.status }))
-    : orders;
-  const filterConfig = getFilters(report.module, filterOrders);
+  const savedFilters = "reportType" in report ? report.filters : [];
+  const filterRecords = isMasterOrderReport
+    ? masterOrders.map((order) => ({ ...order, clientName: order.client }) as ReportRecord)
+    : isOrderReport ? orders as unknown as ReportRecord[] : liveReportRecords;
+  const filterConfig = getLiveFilters(report.module, filterRecords);
   const filteredOrders = isOrderReport && !isMasterOrderReport
     ? orders.filter((order) => {
         const client = appliedFilterValues.Client;
@@ -616,7 +622,7 @@ export default function CustomReportDetailPage() {
         if (status && status !== "All Status" && order.status !== status) return false;
         if (appliedDateRange.from && (!orderDate || orderDate < appliedDateRange.from)) return false;
         if (appliedDateRange.to && (!orderDate || orderDate > appliedDateRange.to)) return false;
-        return true;
+        return applyStoredReportFilters([order as unknown as ReportRecord], savedFilters).length > 0;
       })
     : [];
   const filteredMasterOrders = isMasterOrderReport
@@ -631,18 +637,44 @@ export default function CustomReportDetailPage() {
         return true;
       })
     : [];
-  const filteredMasterOrderIds = new Set(filteredMasterOrders.map((order) => order.id));
   const filteredMasterRows = isMasterOrderReport
-    ? masterReportRows.filter((row) => filteredMasterOrderIds.has(row.order.id))
+    ? masterReportRows.filter((row) =>
+        filteredMasterOrders.some((order) => order.id === row.order.id)
+        && applyStoredReportFilters([{ ...row.order, ...row.fields } as ReportRecord], savedFilters).length > 0
+      )
+    : [];
+  const filteredReportRecords = !isOrderReport
+    ? applyStoredReportFilters(liveReportRecords, savedFilters).filter((record) => {
+        const status = appliedFilterValues.Status;
+        const client = appliedFilterValues.Client;
+        const vendor = appliedFilterValues.Vendor;
+        const category = appliedFilterValues.Category;
+        const module = appliedFilterValues.Module;
+        const recordStatus = String(record.status ?? "");
+        const recordClient = String(record.clientName ?? record.client ?? (report.module === "Clients" ? record.name : ""));
+        const recordVendor = String(record.vendorName ?? record.vendor ?? (report.module === "Vendors" ? record.name : ""));
+        const recordCategory = String(record.category ?? "");
+        const recordModule = String(record.__module ?? "");
+        const recordDate = getReportRecordDate(record);
+        if (status && status !== "All Status" && recordStatus !== status) return false;
+        if (client && client !== "All Clients" && recordClient !== client) return false;
+        if (vendor && vendor !== "All Vendors" && recordVendor !== vendor) return false;
+        if (category && category !== "All Categories" && recordCategory !== category) return false;
+        if (module && module !== "All Modules" && recordModule !== module) return false;
+        if (appliedDateRange.from && (!recordDate || recordDate < appliedDateRange.from)) return false;
+        if (appliedDateRange.to && (!recordDate || recordDate > appliedDateRange.to)) return false;
+        return true;
+      })
     : [];
   const totalRows = isMasterOrderReport
     ? filteredMasterRows.length
-    : isOrderReport ? filteredOrders.length : 50;
+    : isOrderReport ? filteredOrders.length : filteredReportRecords.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
   const startRow = totalRows === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endRow = Math.min(page * PAGE_SIZE, totalRows);
   const pageOrders = filteredOrders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const pageMasterRows = filteredMasterRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const pageReportRecords = filteredReportRecords.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   type ReportTableRow = {
     index: number;
     rowKey: string;
@@ -667,26 +699,25 @@ export default function CustomReportDetailPage() {
         orderDisplayId: order.orderNumber || order.id,
         values: columns.map((column) => getOrderValue(order, column)),
       }))
-    : Array.from({ length: PAGE_SIZE }, (_, index) => {
-        const rowIndex = (page - 1) * PAGE_SIZE + index;
-        return {
-          index: rowIndex,
-          rowKey: `mock:${rowIndex}`,
-          values: columns.map((column) => getMockValue(column, rowIndex)),
-        };
-      });
-  const kpis = getKpis(
-    report.module,
-    isMasterOrderReport
-      ? filteredMasterOrders.map((order) => ({ status: order.status, grandTotal: getMyOrderTotal(order) }))
-      : isOrderReport ? filteredOrders : [],
-  );
+    : pageReportRecords.map((record, index) => ({
+        index: (page - 1) * PAGE_SIZE + index,
+        rowKey: `${String(record.__module ?? report.module)}:${String(record.id ?? record.number ?? index)}`,
+        values: columns.map((column) => getReportFieldValue(record, column)),
+      }));
+  const kpiRecords: ReportRecord[] = isMasterOrderReport
+    ? [...new Map(filteredMasterRows.map((row) => [row.order.id, row.order])).values()].map((order) => ({
+        ...order,
+        status: order.status,
+        grandTotal: getMyOrderTotal(order),
+      }))
+    : isOrderReport ? filteredOrders as unknown as ReportRecord[] : filteredReportRecords;
+  const kpis = getLiveKpis(kpiRecords);
   const genStr = `${formatDate(new Date())} ${new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
   const exportRows = isMasterOrderReport
     ? filteredMasterRows.map((row) => columns.map((column) => getMyOrderReportValue(row, column)))
     : isOrderReport
     ? filteredOrders.map((order) => columns.map((column) => getOrderValue(order, column)))
-    : rows.map((row) => row.values);
+    : filteredReportRecords.map((record) => columns.map((column) => getReportFieldValue(record, column)));
   const firstVisiblePage = Math.max(1, Math.min(page - 2, totalPages - 4));
 
   const handleApplyFilters = () => {
@@ -820,30 +851,23 @@ export default function CustomReportDetailPage() {
             <div key={fi} className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-500">{f.label}</label>
               {f.type === "daterange" ? (
-                isOrderReport ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      aria-label="Start date"
-                      type="date"
-                      value={draftDateRange.from}
-                      onChange={(event) => setDraftDateRange((range) => ({ ...range, from: event.target.value }))}
-                      className="min-w-[145px] rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-700"
-                    />
-                    <span className="text-xs text-gray-400">to</span>
-                    <input
-                      aria-label="End date"
-                      type="date"
-                      value={draftDateRange.to}
-                      onChange={(event) => setDraftDateRange((range) => ({ ...range, to: event.target.value }))}
-                      className="min-w-[145px] rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-700"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white min-w-[200px]">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span className="text-sm">{f.value}</span>
-                  </div>
-                )
+                <div className="flex items-center gap-2">
+                  <input
+                    aria-label="Start date"
+                    type="date"
+                    value={draftDateRange.from}
+                    onChange={(event) => setDraftDateRange((range) => ({ ...range, from: event.target.value }))}
+                    className="min-w-[145px] rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-700"
+                  />
+                  <span className="text-xs text-gray-400">to</span>
+                  <input
+                    aria-label="End date"
+                    type="date"
+                    value={draftDateRange.to}
+                    onChange={(event) => setDraftDateRange((range) => ({ ...range, to: event.target.value }))}
+                    className="min-w-[145px] rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-700"
+                  />
+                </div>
               ) : (
                 <div className="relative">
                   <select

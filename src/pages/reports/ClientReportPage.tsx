@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -10,6 +11,7 @@ import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getClients } from "@/lib/clientStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getOrders } from "@/lib/salesOrderStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, AreaChart, Area,
@@ -20,9 +22,10 @@ const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 
 export default function ClientReportPage() {
   usePageMeta({ title: "Client Reports" });
-  const clients = useMemo(() => getClients(), []);
-  const invoices = useMemo(() => getInvoices(), []);
-  const orders = useMemo(() => getOrders(), []);
+  const liveRevision = useLiveReportRevision();
+  const clients = useMemo(() => getClients(), [liveRevision]);
+  const invoices = useMemo(() => getInvoices(), [liveRevision]);
+  const orders = useMemo(() => getOrders(), [liveRevision]);
 
   const activeClients = clients.filter(c => c.status !== "Inactive" && c.status !== "Archived");
   const inactiveClients = clients.filter(c => c.status === "Inactive");
@@ -52,11 +55,12 @@ export default function ClientReportPage() {
   clients.forEach(c => { const s = c.status ?? "Active"; statusMap[s] = (statusMap[s] ?? 0) + 1; });
   const statusData = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
 
-  // Monthly trend mock
-  const monthlyData = ["Jan","Feb","Mar","Apr","May","Jun","Jul"].map(m => ({
-    month: m,
-    revenue: Math.round(totalRevenue / 7 * (0.5 + Math.random())),
-    clients: Math.round(activeClients.length * (0.8 + Math.random() * 0.4)),
+  const monthlyData = getRecentReportMonths().map(({ key, label }) => ({
+    month: label,
+    revenue: invoices
+      .filter((invoice) => getReportMonthKey(invoice.invoiceDate ?? invoice.createdAt) === key)
+      .reduce((sum, invoice) => sum + (invoice.grandTotal ?? 0), 0),
+    clients: clients.filter((client) => getReportMonthKey(client.contractStartDate ?? client.onboardedDate ?? client.createdAt) === key).length,
   }));
 
   // Contract expiry check

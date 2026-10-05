@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
+import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -9,6 +10,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -19,8 +21,9 @@ const PIE_COLORS = ["#10B981","#EF4444","#F59E0B","#2563EB","#8B5CF6"];
 
 export default function ApprovalReportPage() {
   usePageMeta({ title: "Approval Reports" });
-  const pos = useMemo(() => getAllPOs(), []);
-  const serviceReqs = useMemo(() => getServiceRequests(), []);
+  const liveRevision = useLiveReportRevision();
+  const pos = useMemo(() => getAllPOs(), [liveRevision]);
+  const serviceReqs = useMemo(() => getServiceRequests(), [liveRevision]);
 
   // PO approval status
   const pendingPOs    = pos.filter(p => p.status === "Draft" || p.status === "Processing");
@@ -56,13 +59,18 @@ export default function ApprovalReportPage() {
   const vendorApproval = Object.entries(vendorMap).sort((a, b) => (b[1].approved + b[1].rejected) - (a[1].approved + a[1].rejected)).slice(0, 6)
     .map(([name, d]) => ({ name: name.length > 14 ? name.slice(0, 14) + "…" : name, ...d }));
 
-  // Monthly approval trend
-  const monthlyData = ["Jan","Feb","Mar","Apr","May","Jun","Jul"].map(m => ({
-    month: m,
-    approved: Math.round(totalApproved / 7 * (0.5 + Math.random())),
-    pending: Math.round(totalPending / 7 * (0.5 + Math.random())),
-    rejected: Math.round(totalRejected / 7 * (0.5 + Math.random())),
-  }));
+  const monthlyData = getRecentReportMonths().map(({ key, label }) => {
+    const records = [
+      ...pos.map((po) => ({ date: po.createdOn ?? po.createdAt, status: po.status })),
+      ...serviceReqs.map((request) => ({ date: request.requestDate ?? request.createdAt, status: request.status })),
+    ].filter((record) => getReportMonthKey(record.date) === key);
+    return {
+      month: label,
+      approved: records.filter((record) => ["Confirmed", "Shipped", "Delivered", "Approved", "Completed", "approved", "completed"].includes(record.status)).length,
+      pending: records.filter((record) => ["Draft", "Processing", "Pending", "pending"].includes(record.status)).length,
+      rejected: records.filter((record) => ["Cancelled", "Rejected", "rejected"].includes(record.status)).length,
+    };
+  });
 
   // Service request by type
   const reqTypeMap: Record<string, number> = {};
