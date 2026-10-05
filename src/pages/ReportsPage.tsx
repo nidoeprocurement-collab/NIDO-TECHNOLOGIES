@@ -484,20 +484,6 @@ function RowActions({ report, onRefresh }: { report: ReportRow; onRefresh?: () =
         />
       )}
       <div className="flex items-center gap-1 relative">
-        <button
-          title="View Report"
-          onClick={handleView}
-          className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <Eye className="w-3.5 h-3.5" />
-        </button>
-        <button
-          title="Download"
-          onClick={handleDownload}
-          className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <Download className="w-3.5 h-3.5" />
-        </button>
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setOpen((p) => !p)}
@@ -584,7 +570,7 @@ function ReportTable({
               <th className="w-8 py-3 px-3">
                 <input type="checkbox" className="rounded border-gray-300" />
               </th>
-              {["Report Name", "Category", "Created By", "Schedule", "Last Run", "Format", "Actions"].map((h) => (
+              {["Report Name", "Category", "Created By", "Schedule", "Last Run", "Actions"].map((h) => (
                 <th key={h} className="py-3 px-3 text-left text-xs font-semibold text-gray-500 whitespace-nowrap">
                   {h}
                 </th>
@@ -629,16 +615,13 @@ function ReportTable({
                   </div>
                 </td>
                 <td className="py-3 px-3">
-                  <FormatBadge format={r.format} />
-                </td>
-                <td className="py-3 px-3">
                   <RowActions report={r} onRefresh={onRefresh} />
                 </td>
               </tr>
             ))}
             {paged.length === 0 && (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-sm text-gray-400">
+                <td colSpan={7} className="py-12 text-center text-sm text-gray-400">
                   No reports found matching your filters.
                 </td>
               </tr>
