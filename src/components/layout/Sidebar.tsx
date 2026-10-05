@@ -6,6 +6,7 @@ import { useOrgConfig } from '@/contexts/ConfigContext';
 import { usePermissions } from '@/contexts/PermissionsContext';
 import { getPlatformModuleKey } from '@/lib/platformModuleCatalog';
 import { hasPortalPermission } from '@/lib/portalUserStore';
+import { getClientForPortal } from '@/lib/clientStore';
 import {
   LayoutDashboard, ShoppingCart, Wrench, Headphones, Users,
   TrendingUp, Package, DollarSign, Settings, ChevronDown,
@@ -266,6 +267,9 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
   const { user, logout, isClientPortalUser } = useAuth();
   const { hasPermission, hasRoutePermission, isSuperAdmin } = usePermissions();
   const org = useOrgConfig();
+  const portalClient = isClientPortalUser && user?.clientId
+    ? getClientForPortal(user.clientId)
+    : undefined;
   const navigate = useNavigate();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -408,9 +412,26 @@ export default function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) 
 
         {/* Client badge */}
         {isClientPortalUser && !effectiveCollapsed && (
-          <div className="px-4 py-2 bg-purple-500/10 border-b border-purple-500/20">
-            <p className="text-xs text-purple-400 font-medium truncate">{user?.clientName}</p>
-            <p className="text-[10px] text-purple-400/70 truncate">Client ID: {user?.clientId}</p>
+          <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-200">
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5 flex items-center justify-center">
+              {portalClient?.client_logo_url ? (
+                <img
+                  src={portalClient.client_logo_url}
+                  alt={`${portalClient.name || user?.clientName || 'Client'} logo`}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                <span className="text-sm font-semibold text-gray-700">
+                  {(portalClient?.name || user?.clientName || 'C').trim().charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-gray-900 font-medium truncate">
+                {portalClient?.name || user?.clientName}
+              </p>
+              <p className="text-[10px] text-gray-500 truncate">Client ID: {user?.clientId}</p>
+            </div>
           </div>
         )}
 
