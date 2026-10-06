@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ChevronRight, Copy, Check, Mail, Phone, MapPin, CreditCard } from "lucide-react";
+import { ChevronRight, Copy, Check, MapPin, CreditCard } from "lucide-react";
 import FloatingCartButton from "@/components/FloatingCartButton";
-import { useOrgConfig } from "@/contexts/ConfigContext";
 import { getSlabDiscountPct } from "@/lib/priceEngineStore";
 import { useI18n } from "@/i18n/I18nProvider";
 import { formatCurrency } from "@/lib/formatters";
@@ -63,7 +62,6 @@ export default function OrderConfirmationPage() {
   const navigate = useNavigate();
   const { orderId } = useParams<{ orderId: string }>();
   const [copied, setCopied] = useState(false);
-  const org = useOrgConfig();
   const isPortalFlow = location.pathname.startsWith("/portal/");
   const ordersPath = isPortalFlow ? "/portal/orders" : "/orders";
   const shopPath = isPortalFlow ? "/portal/catalog" : "/shop";
@@ -176,22 +174,6 @@ export default function OrderConfirmationPage() {
                     </a>
                   </span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />
-                  <span>
-                    If you need assistance, contact customer support
-                    {(org.supportEmail || org.email) && (
-                      <> at{" "}
-                        <a href={`mailto:${org.supportEmail || org.email}`} className="text-blue-600 hover:underline">
-                          {org.supportEmail || org.email}
-                        </a>
-                      </>
-                    )}
-                    {(org.supportPhone || org.phone) && (
-                      <> or <strong className="text-gray-800">{org.supportPhone || org.phone}</strong></>
-                    )}
-                  </span>
-                </li>
               </ul>
 
               <button
@@ -205,29 +187,6 @@ export default function OrderConfirmationPage() {
               </button>
             </div>
 
-            {/* Need Help card */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-2">
-              <h3 className="text-base font-semibold text-gray-900 mb-2">Need Help?</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Contact our support team for assistance:
-              </p>
-              <div className="space-y-2">
-                {(org.supportEmail || org.email) && (
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Mail size={14} className="text-gray-400 shrink-0" />
-                    <a href={`mailto:${org.supportEmail || org.email}`} className="text-blue-600 hover:underline">
-                      {org.supportEmail || org.email}
-                    </a>
-                  </div>
-                )}
-                {(org.supportPhone || org.phone) && (
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <Phone size={14} className="text-gray-400 shrink-0" />
-                    <span>{org.supportPhone || org.phone}</span>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* ── Right column: Order Details panel ── */}
