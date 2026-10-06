@@ -67,6 +67,28 @@ describe("My Requests", () => {
       .toBe(`/my-services/requests/${request.id}`);
   });
 
+  it("shows the row actions menu outside the table wrapper", () => {
+    addRepairRequest();
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Request actions" }));
+    const editAction = screen.getByRole("button", { name: "Edit Request" });
+
+    expect(editAction.parentElement?.parentElement).toBe(document.body);
+    expect(editAction.parentElement?.classList.contains("fixed")).toBe(true);
+    expect(screen.getByRole("button", { name: "View Details" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancel Request" })).toBeTruthy();
+  });
+
+  it("shows no more than ten services per page", () => {
+    for (let i = 0; i < 11; i += 1) addRepairRequest();
+    renderPage();
+
+    expect(screen.getAllByRole("button", { name: "Request actions" })).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(screen.getAllByRole("button", { name: "Request actions" })).toHaveLength(1);
+  });
+
   it("resolves a shared-prefix ID to its saved service type", () => {
     const id = "SVC-2026-12345";
     localStorage.setItem("nido_service_requests", JSON.stringify([{

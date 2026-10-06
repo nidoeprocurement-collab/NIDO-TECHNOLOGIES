@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   MoreVertical,
   Filter,
@@ -118,11 +119,60 @@ function RowActions({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+
+  const calculateMenuPosition = useCallback(() => {
+    const buttonRect = buttonRef.current?.getBoundingClientRect();
+    if (!buttonRect) return;
+
+    const menuWidth = 176;
+    const menuHeight = 112;
+    const margin = 8;
+    const left = Math.min(
+      Math.max(buttonRect.right - menuWidth, margin),
+      Math.max(margin, window.innerWidth - menuWidth - margin),
+    );
+    let top = buttonRect.bottom + 4;
+    if (top + menuHeight > window.innerHeight - margin) {
+      top = buttonRect.top - menuHeight - 4;
+    }
+    top = Math.min(
+      Math.max(top, margin),
+      Math.max(margin, window.innerHeight - menuHeight - margin),
+    );
+    setMenuPosition({ top, left });
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const h = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const reposition = () => calculateMenuPosition();
+    document.addEventListener("mousedown", h);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      document.removeEventListener("mousedown", h);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [open, calculateMenuPosition]);
+
+  const toggleMenu = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    calculateMenuPosition();
+    setOpen(true);
+  };
+
   const actions = [
     { label: "View Details", action: onView, disabled: false, cls: "text-gray-700 hover:bg-gray-50" },
     { label: "Edit Request", action: onEdit, disabled: false, cls: "text-gray-700 hover:bg-gray-50" },
@@ -136,16 +186,21 @@ function RowActions({
   return (
     <div ref={ref} className="relative flex justify-center">
       <button
+        ref={buttonRef}
         type="button"
         aria-label="Request actions"
         aria-expanded={open}
-        onClick={() => setOpen(p => !p)}
+        onClick={toggleMenu}
         className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
       >
         <MoreVertical className="w-3.5 h-3.5" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
+      {open && menuPosition && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed w-44 rounded-xl border border-gray-100 bg-white py-1 shadow-xl"
+          style={{ top: menuPosition.top, left: menuPosition.left, zIndex: 1000 }}
+        >
           {actions.map(({ label, action, disabled, cls }) => (
             <button
               key={label}
@@ -157,7 +212,8 @@ function RowActions({
               {label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -618,7 +674,7 @@ export default function MyRequestsPage() {
             </div>
 
             {/* ── Table ── */}
-            <div className="overflow-x-auto">
+            <div className="w-full">
               <table className="w-full table-fixed text-xs">
                 <colgroup>
                   <col style={{ width: "11%" }} />
