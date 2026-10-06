@@ -39,6 +39,7 @@ function getExistingTickets(): {
   priority: string; created: string; clientId?: string; clientName?: string;
   category?: string; subCategory?: string; department?: string;
   description?: string; ccEmail?: string; createdBy?: string;
+  createdById?: string; createdByEmail?: string;
   assignedTo?: string; assignedRole?: string;
 }[] {
   try {
@@ -359,6 +360,8 @@ export default function CreateSupportTicketPage() {
       autoAssigned: Boolean(assignedUser),
       ccEmail,
       createdBy,
+      createdById: user?.id || "",
+      createdByEmail: user?.email || "",
     };
 
     const existing = getExistingTickets();
@@ -369,6 +372,7 @@ export default function CreateSupportTicketPage() {
       status: t.status, priority: t.priority, created: t.created,
       clientId: t.clientId, clientName: t.clientName,
       department: t.department, assignedTo: t.assignedTo, assignedRole: t.assignedRole,
+      createdBy: t.createdBy, createdById: t.createdById, createdByEmail: t.createdByEmail,
     })));
 
     setCreatedTicket({

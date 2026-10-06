@@ -10,6 +10,9 @@ export interface SupportTicket {
   created: string;  // YYYY-MM-DD
   clientId?: string;
   clientName?: string;
+  createdBy?: string;
+  createdById?: string;
+  createdByEmail?: string;
   department?: string;
   assignedTo?: string;
   assignedRole?: string;
@@ -19,9 +22,27 @@ const KEY = "nido_support_tickets";
 
 export function getSupportTickets(): SupportTicket[] {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as SupportTicket[];
+    const summaryRaw = localStorage.getItem(KEY);
+    const rawTickets = localStorage.getItem("nido_support_tickets_v1");
+    const summary = summaryRaw ? JSON.parse(summaryRaw) as SupportTicket[] : [];
+    const detailed = rawTickets ? JSON.parse(rawTickets) as SupportTicket[] : [];
+    const byId = new Map<string, SupportTicket>();
+
+    detailed.forEach((ticket) => {
+      if (ticket?.id) byId.set(ticket.id, ticket);
+    });
+    summary.forEach((ticket) => {
+      if (!ticket?.id) return;
+      const original = byId.get(ticket.id);
+      byId.set(ticket.id, {
+        ...original,
+        ...ticket,
+        createdBy: ticket.createdBy || original?.createdBy,
+        createdById: ticket.createdById || original?.createdById,
+        createdByEmail: ticket.createdByEmail || original?.createdByEmail,
+      });
+    });
+    return Array.from(byId.values());
   } catch {
     return [];
   }

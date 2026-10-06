@@ -4,6 +4,35 @@ const ACTIVITIES_KEY = "nido_client_activities_v1";
 const DOCUMENTS_KEY = "nido_client_documents_v1";
 const CONTRACTS_KEY = "nido_client_contracts_v1";
 
+interface SharedOrderCartItem {
+  id?: string | number;
+  productCode?: string;
+  name?: string;
+  category?: string;
+  priceNum?: number | string;
+  quantity?: number | string;
+  clientId?: string;
+  subOrderId?: string;
+}
+
+interface SharedOrderRecord {
+  id: string;
+  cartItems?: SharedOrderCartItem[];
+  client?: string;
+  orderDate?: string;
+  createdAt?: string;
+  totalAmount?: string;
+  totalAmountNum?: number | string;
+  status?: string;
+  requester?: string;
+  requestedBy?: string;
+  requesterId?: string;
+  requestedById?: string;
+  requesterEmail?: string;
+  requestedByEmail?: string;
+  poNumber?: string;
+}
+
 export interface ClientOrderRecord {
   id: string;
   clientId: string;
@@ -17,6 +46,16 @@ export interface ClientOrderRecord {
   requestedBy?: string;
   requestedById?: string;
   requestedByEmail?: string;
+  poNumber?: string;
+  productDetails?: Array<{
+    id?: string;
+    productCode?: string;
+    name: string;
+    category?: string;
+    priceNum?: number;
+    quantity?: number;
+    subOrderId?: string;
+  }>;
 }
 
 export interface ClientServiceRecord {
@@ -98,10 +137,10 @@ function matchesClient(value: { clientId: string }, clientId: string): boolean {
 export function getClientOrders(clientId: string, clientName?: string): ClientOrderRecord[] {
   const saved = read<ClientOrderRecord[]>(ORDERS_KEY, []).filter((item) => matchesClient(item, clientId));
   try {
-    const shared = JSON.parse(localStorage.getItem("nido_my_orders") || "[]") as Array<Record<string, any>>;
+    const shared = JSON.parse(localStorage.getItem("nido_my_orders") || "[]") as SharedOrderRecord[];
     const sharedOrders = shared
       .filter((order) =>
-        order.cartItems?.some((item: Record<string, any>) => item.clientId === clientId) ||
+        order.cartItems?.some((item) => item.clientId === clientId) ||
         order.client === clientId ||
         (clientName && order.client === clientName)
       )
@@ -109,7 +148,7 @@ export function getClientOrders(clientId: string, clientName?: string): ClientOr
         id: order.id,
         clientId,
         date: order.orderDate || "",
-        items: order.cartItems?.reduce((sum: number, item: Record<string, any>) => sum + Number(item.quantity || 0), 0) || order.cartItems?.length || 0,
+        items: order.cartItems?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || order.cartItems?.length || 0,
         amount: order.totalAmount || `₹${Number(order.totalAmountNum || 0).toLocaleString("en-IN")}`,
         amountNum: Number(order.totalAmountNum || 0),
         client: order.client || clientName || clientId,
@@ -117,6 +156,18 @@ export function getClientOrders(clientId: string, clientName?: string): ClientOr
         requestedBy: order.requester || order.requestedBy || "",
         requestedById: order.requesterId || order.requestedById || "",
         requestedByEmail: order.requesterEmail || order.requestedByEmail || "",
+        poNumber: order.poNumber || "",
+        productDetails: Array.isArray(order.cartItems)
+          ? order.cartItems.map((item) => ({
+              id: item.id === undefined ? undefined : String(item.id),
+              productCode: item.productCode ? String(item.productCode) : undefined,
+              name: String(item.name || ""),
+              category: item.category ? String(item.category) : undefined,
+              priceNum: Number(item.priceNum || 0),
+              quantity: Number(item.quantity || 0),
+              subOrderId: item.subOrderId ? String(item.subOrderId) : undefined,
+            }))
+          : [],
       }));
     const byId = new Map([...saved, ...sharedOrders].map((item) => [item.id, item]));
     return Array.from(byId.values()).sort((a, b) => b.date.localeCompare(a.date));

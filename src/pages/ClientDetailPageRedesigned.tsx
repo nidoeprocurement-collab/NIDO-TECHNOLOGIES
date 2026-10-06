@@ -20,7 +20,6 @@ import {
   RefreshCw,
   ShoppingCart,
   TicketCheck,
-  Users,
   Wrench,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,6 +39,7 @@ import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogSt
 import { getInvoices, type StoredInvoice } from "@/lib/invoiceStore";
 import { getSupportTickets, type SupportTicket } from "@/lib/supportTicketStore";
 import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { belongsToPortalUser, invoiceBelongsToPortalUser } from "@/lib/clientDashboardScoping";
 import RolesPage from "./ClientRolesPage";
 import UsersPage from "./ClientUsersPage";
 import OrdersPage from "./ClientOrdersPage";
@@ -90,7 +90,13 @@ function toDateInputValue(date: Date): string {
 }
 
 function normalizeDate(value?: string): string {
-  return value?.slice(0, 10) || "";
+  const raw = value?.trim() || "";
+  const isoDate = raw.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (isoDate) return isoDate;
+  if (!raw) return "";
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return "";
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
 }
 
 function isDateInRange(value: string | undefined, range: ClientDateRange): boolean {
@@ -129,6 +135,43 @@ function formatDateRange(range: ClientDateRange): string {
 function formatMoney(value: number, currency?: string): string {
   const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : "₹";
   return `${symbol}${Math.round(value).toLocaleString("en-IN")}`;
+}
+
+interface DashboardProduct {
+  productCode: string;
+  name: string;
+  category: string;
+  price: string;
+  availability: string;
+  quantity: number;
+}
+
+function getProductsFromOrders(orders: ClientOrderRecord[], currency?: string): DashboardProduct[] {
+  const products = new Map<string, DashboardProduct>();
+  for (const order of orders) {
+    for (const item of order.productDetails || []) {
+      const name = item.name.trim();
+      if (!name) continue;
+      const key = (item.productCode || item.id || name).trim().toLowerCase();
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      const existing = products.get(key);
+      if (existing) {
+        existing.quantity += quantity;
+        existing.availability = String(existing.quantity);
+        continue;
+      }
+      const priceNum = Number(item.priceNum) || 0;
+      products.set(key, {
+        productCode: item.productCode || item.id || key,
+        name,
+        category: item.category || "",
+        price: priceNum > 0 ? formatMoney(priceNum, currency) : "—",
+        availability: String(quantity),
+        quantity,
+      });
+    }
+  }
+  return Array.from(products.values()).sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
 }
 
 function orderStatusGroup(status: string): "Completed" | "Processing" | "Awaiting Payment" | "Cancelled" {
@@ -333,30 +376,50 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
     selectedDateRange.end &&
     selectedDateRange.start <= selectedDateRange.end,
   );
+  const dashboardOrders = useMemo(
+    () => portalMode
+      ? orders.filter((order) => belongsToPortalUser(order, user, portalUsers))
+      : orders,
+    [orders, portalMode, portalUsers, user],
+  );
   const periodOrders = useMemo(
-    () => validDateRange ? orders.filter((order) => isDateInRange(order.date, selectedDateRange)) : [],
-    [orders, selectedDateRange.end, selectedDateRange.start, validDateRange],
+    () => validDateRange ? dashboardOrders.filter((order) => isDateInRange(order.date, selectedDateRange)) : [],
+    [dashboardOrders, selectedDateRange, validDateRange],
   );
 
   if (!client) return <NotFound id={clientId} />;
 
   const currency = client.currency;
-  const clientInvoices = invoices.filter((invoice) => invoice.clientName.toLowerCase() === client.name.toLowerCase());
+  const clientInvoices = invoices.filter((invoice) => {
+    const belongsToClient = invoice.clientId
+      ? invoice.clientId === clientId
+      : invoice.clientName.trim().toLowerCase() === client.name.trim().toLowerCase();
+    return belongsToClient && (
+      !portalMode || invoiceBelongsToPortalUser(invoice, dashboardOrders, user, portalUsers)
+    );
+  });
   const periodInvoices = validDateRange
     ? clientInvoices.filter((invoice) => isDateInRange(invoice.invoiceDate, selectedDateRange))
     : [];
   const clientTickets = tickets.filter((ticket) => {
     const record = ticket as SupportTicket & { clientId?: string; clientName?: string };
-    return !record.clientId && !record.clientName
-      ? true
-      : record.clientId === clientId || record.clientName?.toLowerCase() === client.name.toLowerCase();
+    const belongsToClient = record.clientId
+      ? record.clientId === clientId
+      : record.clientName
+        ? record.clientName.trim().toLowerCase() === client.name.trim().toLowerCase()
+        : !portalMode;
+    return belongsToClient && (
+      !portalMode || belongsToPortalUser(record, user, portalUsers)
+    );
   });
   const periodTickets = validDateRange
     ? clientTickets.filter((ticket) => isDateInRange(ticket.created, selectedDateRange))
     : [];
   const totalSpend = periodOrders.reduce((sum, order) => sum + Number(order.amountNum || 0), 0);
-  const openOrders = periodOrders.filter((order) => !["Completed", "Cancelled"].includes(orderStatusGroup(order.status))).length;
-  const activeServices = services.filter((service) => service.status.toLowerCase() === "active" && overlapsDateRange(service.startDate, service.endDate, selectedDateRange));
+  const dashboardServices = portalMode
+    ? services.filter((service) => belongsToPortalUser(service, user, portalUsers))
+    : services;
+  const activeServices = dashboardServices.filter((service) => service.status.toLowerCase() === "active" && overlapsDateRange(service.startDate, service.endDate, selectedDateRange));
   const pendingInvoices = periodInvoices.filter((invoice) => !["Paid", "Cancelled"].includes(invoice.status));
   const unpaidAmount = pendingInvoices.reduce((sum, invoice) => sum + Number(invoice.grandTotal || 0), 0);
   const statusCounts = (["Completed", "Processing", "Awaiting Payment", "Cancelled"] as const).map((status) => ({
@@ -365,11 +428,29 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
   }));
   const totalStatusCount = Math.max(periodOrders.length, 1);
   const recentOrders = [...periodOrders].sort((a, b) => dateValue(b.date) - dateValue(a.date)).slice(0, 5);
-  const topProducts = catalog.slice(0, 5);
+  const personalProducts = portalMode ? getProductsFromOrders(periodOrders, currency) : [];
+  const topProducts = portalMode
+    ? personalProducts.slice(0, 5)
+    : catalog.slice(0, 5).map((product) => ({
+        productCode: product.productCode,
+        name: product.name,
+        category: product.category,
+        price: product.price,
+        availability: product.availability,
+        quantity: 0,
+      }));
   const startDate = client.contractStartDate || client.contract_start_date;
   const contractStart = startDate ? new Date(startDate).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "N/A";
   const address = [client.billingAddress || client.billing_address, client.billingCity || client.billing_city, client.billingState || client.billing_state, client.billingPincode || client.billing_pincode].filter(Boolean).join(", ");
   const initials = initialsFor(client);
+  const currentPortalUser = portalUsers.find((portalUser) => portalUser.id === user?.id);
+  const profileEmail = portalMode
+    ? currentPortalUser?.email || user?.email || ""
+    : client.email || "";
+  const detailsPhone = currentPortalUser?.details?.phone;
+  const profilePhone = portalMode
+    ? currentPortalUser?.phone || (typeof detailsPhone === "string" ? detailsPhone : "")
+    : client.phone || client.mobile || "";
   const formatDate = (value: string) => value ? new Date(value).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—";
   const visibleAdminTabs = ADMIN_TABS.filter(tab => {
     if (tab === "Overview") return true;
@@ -478,7 +559,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
         <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-5 lg:px-7">
           <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
             <div>
-              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome back, {client.name}! <span aria-hidden="true">👋</span></h1>
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Welcome back, {portalMode ? user?.name || "there" : client.name}! <span aria-hidden="true">👋</span></h1>
               <p className="mt-1 text-xs text-gray-500">Here's what's happening with your account today.</p>
             </div>
           </header>
@@ -540,13 +621,12 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
             Data shown below: <span className="font-semibold">{formatDateRange(selectedDateRange)}</span>
           </p>
 
-           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
              <MetricCard label="Total Orders" value={periodOrders.length} change={`${periodOrders.length ? 100 : 0}%`} icon={<ShoppingCart size={18} className="text-violet-600" />} color="bg-violet-50" values={periodOrders.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/orders", "Orders")} />
              <MetricCard label="Total Spent" value={formatMoney(totalSpend, currency)} change={`${totalSpend ? 100 : 0}%`} icon={<CircleDollarSign size={19} className="text-emerald-600" />} color="bg-emerald-50" values={periodOrders.map((order) => order.amountNum)} positive={true} onClick={() => openOverviewLink("/portal/reports", "Orders")} />
-             <MetricCard label="Products" value={catalog.length} change={`${catalog.length ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
+              <MetricCard label="Products" value={portalMode ? personalProducts.length : catalog.length} change={`${(portalMode ? personalProducts.length : catalog.length) ? 100 : 0}%`} icon={<Package size={18} className="text-blue-600" />} color="bg-blue-50" values={portalMode ? personalProducts.map((product) => product.quantity) : catalog.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/catalog", "Catalog")} />
              <MetricCard label="Invoices" value={periodInvoices.length} change={`${periodInvoices.length ? 100 : 0}%`} icon={<Receipt size={18} className="text-orange-600" />} color="bg-orange-50" values={periodInvoices.map((invoice) => invoice.grandTotal)} positive={false} onClick={() => openOverviewLink("/portal/invoices", "Documents")} />
-             <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => ticket.status !== "resolved").length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/support", "Overview")} />
-             <MetricCard label="Total Users" value={portalUsers.length} change={`${portalUsers.length ? 100 : 0}%`} icon={<Users size={18} className="text-indigo-600" />} color="bg-indigo-50" values={portalUsers.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/users", "Users")} />
+              <MetricCard label="Open Support Tickets" value={periodTickets.filter((ticket) => !["resolved", "closed"].includes(ticket.status.toLowerCase())).length} change={`${periodTickets.length ? 100 : 0}%`} icon={<Headphones size={18} className="text-violet-600" />} color="bg-violet-50" values={periodTickets.map((_, i) => i + 1)} onClick={() => openOverviewLink("/portal/support", "Overview")} />
           </div>
 
           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -559,8 +639,8 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
                 </div>
               </div>
               <div className="mt-4 space-y-2 text-[10px] text-gray-600">
-                <a href={client.email ? `mailto:${client.email}` : undefined} className="flex items-center gap-2 truncate hover:text-blue-600"><Mail size={12} className="shrink-0 text-gray-400" />{client.email || "No email available"}</a>
-                <a href={client.phone ? `tel:${client.phone}` : undefined} className="flex items-center gap-2 hover:text-blue-600"><Phone size={12} className="shrink-0 text-gray-400" />{client.phone || "No phone available"}</a>
+                 <a href={profileEmail ? `mailto:${profileEmail}` : undefined} className="flex items-center gap-2 truncate hover:text-blue-600"><Mail size={12} className="shrink-0 text-gray-400" />{profileEmail || "No email available"}</a>
+                 <a href={profilePhone ? `tel:${profilePhone}` : undefined} className="flex items-center gap-2 hover:text-blue-600"><Phone size={12} className="shrink-0 text-gray-400" />{profilePhone || "No phone available"}</a>
                 <span className="flex items-start gap-2"><MapPin size={12} className="mt-0.5 shrink-0 text-gray-400" />{address || "No billing address available"}</span>
                 {client.website && <a href={client.website.startsWith("http") ? client.website : `https://${client.website}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 truncate text-blue-600 hover:underline"><Globe2 size={12} className="shrink-0" />{client.website}</a>}
               </div>
@@ -585,7 +665,7 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
 
              <Panel title="Account Summary" action={!portalMode && <button type="button" onClick={() => goTo("Documents")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Invoices</button>}>
               <div className="space-y-2.5 text-[10px]">
-                <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Active Contracts</span><strong>{contract ? 1 : 0}</strong></button>
+                 {!portalMode && <button type="button" onClick={() => goTo("Contracts")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><BriefcaseBusiness size={14} className="text-violet-600" />Active Contracts</span><strong>{contract ? 1 : 0}</strong></button>}
                 <button type="button" onClick={() => goTo("Services")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><Wrench size={14} className="text-violet-600" />Active Services</span><strong>{activeServices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between border-b border-gray-100 pb-2 text-left hover:text-blue-600"><span className="flex items-center gap-2"><FileText size={14} className="text-orange-500" />Pending Invoices</span><strong>{pendingInvoices.length}</strong></button>
                 <button type="button" onClick={() => goTo("Documents")} className="flex w-full items-center justify-between text-left hover:text-blue-600"><span className="flex items-center gap-2"><CircleDollarSign size={14} className="text-red-500" />Unpaid Amount</span><strong className="text-red-500">{formatMoney(unpaidAmount, currency)}</strong></button>
@@ -595,11 +675,11 @@ export default function ClientDetailPageRedesigned({ portalMode = false }: Clien
 
           <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
              <Panel title="Top Products" action={!portalMode && <button type="button" onClick={() => goTo("Catalog")} className="text-[10px] font-semibold text-violet-700 hover:underline">View All Products</button>} className="overflow-hidden">
-              {topProducts.length === 0 ? <EmptyState message="No products have been assigned to this client yet." /> : (
+               {topProducts.length === 0 ? <EmptyState message={portalMode ? "No products in your orders during this period." : "No products have been assigned to this client yet."} /> : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[460px] text-left text-[10px]">
-                    <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">Stock</th></tr></thead>
-                    <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
+                     <thead className="border-b border-gray-100 text-[9px] text-gray-500"><tr><th className="pb-2 font-semibold">Product</th><th className="pb-2 font-semibold">Category</th><th className="pb-2 font-semibold">Price</th><th className="pb-2 text-right font-semibold">{portalMode ? "Qty Ordered" : "Stock"}</th></tr></thead>
+                     <tbody>{topProducts.map((product) => <tr key={product.productCode} onClick={() => goTo("Catalog")} className="cursor-pointer border-b border-gray-50 last:border-0 hover:bg-gray-50"><td className="py-2 font-semibold text-gray-800">{product.name}</td><td className="py-2 text-gray-500">{product.category || "—"}</td><td className="py-2 font-semibold text-gray-800">{product.price || "—"}</td><td className="py-2 text-right font-semibold text-emerald-600">{product.availability || "—"}</td></tr>)}</tbody>
                   </table>
                 </div>
               )}

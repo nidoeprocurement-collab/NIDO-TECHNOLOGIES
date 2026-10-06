@@ -60,6 +60,8 @@ export interface OrderCartItem {
 export interface MyOrder {
   id: string;
   createdBy?: string;
+  requesterId?: string;
+  requesterEmail?: string;
   createdAt?: string;
   updatedBy?: string;
   updatedAt?: string;

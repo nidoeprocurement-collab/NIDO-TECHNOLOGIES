@@ -222,6 +222,8 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
         clientInitial: "N",
         poNumber: `${getPrefix("purchaseOrder") || "PO-"}${poRef}`,
         requester: orderedBy,
+        requesterId: user?.id || "",
+        requesterEmail: user?.email || "",
         orderedFor,
         // Hold every newly placed order until the centralized approval
         // evaluation completes. Orders without a matching workflow are

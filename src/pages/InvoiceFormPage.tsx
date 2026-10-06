@@ -664,9 +664,30 @@ export default function InvoiceFormPage() {
       return;
     }
     const now = new Date().toISOString();
+    const shippedOrderId = selectedShippedRefs
+      .map((reference) => {
+        try {
+          const parsed: unknown = JSON.parse(reference);
+          return Array.isArray(parsed) && parsed.length === 2 ? String(parsed[0]) : "";
+        } catch {
+          return "";
+        }
+      })
+      .find(Boolean);
+    const originatingOrderId = isOrderProformaFlow
+      ? restrictedOrderId
+      : importSource === "order"
+        ? selectedRef
+        : importSource === "shippedproduct"
+          ? shippedOrderId || ""
+          : existing?.originatingOrderId || "";
+    const matchingClient = getClients().find(
+      (client) => client.name.trim().toLowerCase() === clientName.trim().toLowerCase(),
+    );
     let invoice: StoredInvoice = {
       id: existing?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       invoiceNumber,
+      clientId: matchingClient?.id || (existing?.clientName === clientName.trim() ? existing.clientId : undefined),
       clientName: clientName.trim(),
       contactPerson,
       clientGstin:      clientGstin      || undefined,
@@ -679,6 +700,7 @@ export default function InvoiceFormPage() {
       invoiceDate,
       dueDate,
       poReference:    poReference    || undefined,
+      originatingOrderId: originatingOrderId || existing?.originatingOrderId || undefined,
       placeOfSupply:  placeOfSupply  || undefined,
       status,
       lineItems,

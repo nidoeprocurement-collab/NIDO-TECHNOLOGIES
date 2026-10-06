@@ -46,6 +46,7 @@ export interface StoredInvoice {
   archiveReason?: string;
   archivedAt?: string;
   // client
+  clientId?: string;
   clientName: string;
   contactPerson: string;
   clientGstin?: string;
@@ -61,6 +62,8 @@ export interface StoredInvoice {
   invoiceDate: string;
   dueDate: string;
   poReference?: string;
+  /** Main client-portal order used to create this invoice, when applicable. */
+  originatingOrderId?: string;
   placeOfSupply?: string;
   // status
   status: InvoiceStatus;
