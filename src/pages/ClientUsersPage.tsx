@@ -253,6 +253,10 @@ function AddUserModal({ clientId, clientName, onClose, onCreate }: { clientId?: 
       setNotification("Please enter a valid email address.");
       return;
     }
+    if (!getPortalRoles(clientId || "").some(role => role.name === form.role && role.status === "active")) {
+      setNotification("Create and activate a client role before creating a portal user.");
+      return;
+    }
 
     const initials = form.fullName
       .trim()
@@ -3116,29 +3120,39 @@ export default function ClientUsersPage({ clientId, clientName }: { clientId?: s
     const existingPortalUser = getPortalUsersByClient(clientId).find(
       candidate => candidate.email.trim().toLowerCase() === row.email.trim().toLowerCase(),
     );
-    const credentials = provisionPortalUser(clientId, clientName || "Client", {
-      email: row.email,
-      name: row.name,
-      role: existingPortalUser?.role || row.role || "Employee",
-      phone: row.phone,
-      details: row.details,
-    });
-    setRowMenu(null);
-    window.alert(
-      `Client Portal access is active.\n\nEmail: ${credentials.email}\nPassword: ${credentials.password}\n\nSave these credentials. The password is shown only now.`,
-    );
+    try {
+      const credentials = provisionPortalUser(clientId, clientName || "Client", {
+        email: row.email,
+        name: row.name,
+        role: existingPortalUser?.role || row.role,
+        phone: row.phone,
+        details: row.details,
+      });
+      setRowMenu(null);
+      window.alert(
+        `Client Portal access is active.\n\nEmail: ${credentials.email}\nPassword: ${credentials.password}\n\nSave these credentials. The password is shown only now.`,
+      );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not activate portal access.");
+    }
   };
 
   const createUser = (user: UserRecord) => {
     if (clientId) {
-      const credentials = provisionPortalUser(clientId, clientName || "Client", {
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        status: user.status === "Active" ? "active" : "inactive",
-        phone: user.phone,
-        details: user.details,
-      });
+      let credentials: ReturnType<typeof provisionPortalUser>;
+      try {
+        credentials = provisionPortalUser(clientId, clientName || "Client", {
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          status: user.status === "Active" ? "active" : "inactive",
+          phone: user.phone,
+          details: user.details,
+        });
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : "Could not create portal access.");
+        return;
+      }
       window.alert(
         `Client Portal sign-in credentials:\n\nEmail: ${credentials.email}\nTemporary password: ${credentials.password}\n\n${user.status === "Active" ? "Access is active." : "This account is inactive and must be activated before sign-in."}\nSave these credentials; the password is shown only now.`,
       );

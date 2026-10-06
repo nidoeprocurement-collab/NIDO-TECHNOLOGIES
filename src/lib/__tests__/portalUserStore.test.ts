@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   addPortalUser,
   createPortalRolePermission,
+  activateClientPortal,
   findPortalUser,
   getPortalModuleForPath,
   getPortalRoles,
+  getPortalUsersByClient,
   hasPortalPermission,
   PORTAL_MODULES,
   provisionPortalUser,
@@ -16,6 +18,13 @@ import {
 const clientId = "client-auth-test";
 
 function seedUser(overrides: Partial<Parameters<typeof addPortalUser>[0]> = {}) {
+  savePortalRoles(clientId, [{
+    id: "employee-role",
+    name: "Employee",
+    description: "",
+    status: "active",
+    permissions: [createPortalRolePermission("Dashboard", { view: true })],
+  }]);
   addPortalUser({
     id: "portal-client-auth-test-user",
     email: "user@example.com",
@@ -60,7 +69,21 @@ describe("client portal authentication", () => {
     expect(findPortalUser("user@example.com", "Correct@123")).toBeNull();
   });
 
-  it("persists generated credentials so a newly provisioned user can sign in", () => {
+  it("requires a saved active role instead of falling back to a sample role", () => {
+    expect(() => provisionPortalUser(clientId, "Authentication Test Client", {
+      email: "new.user@example.com",
+      name: "New User",
+    })).toThrow("Create and activate a client role before provisioning a portal user.");
+  });
+
+  it("persists generated credentials against a role configured for that client", () => {
+    savePortalRoles(clientId, [{
+      id: "employee-role",
+      name: "Employee",
+      description: "",
+      status: "active",
+      permissions: [createPortalRolePermission("Dashboard", { view: true })],
+    }]);
     const credentials = provisionPortalUser(clientId, "Authentication Test Client", {
       email: "new.user@example.com",
       name: "New User",
@@ -72,14 +95,111 @@ describe("client portal authentication", () => {
     );
   });
 
-  it("keeps only granted modules on default roles and includes distinct sidebar modules", () => {
-    const employee = getPortalRoles(clientId).find(role => role.name === "Employee");
-
-    expect(employee?.permissions.map(permission => permission.module)).toContain("Approvals");
-    expect(employee?.permissions.map(permission => permission.module)).toContain("My Profile");
-    expect(employee?.permissions.map(permission => permission.module)).not.toContain("Invoices");
+  it("does not seed sample roles for a client with no saved role data", () => {
+    expect(getPortalRoles(clientId)).toEqual([]);
+    expect(localStorage.getItem(`nido_portal_roles_${clientId}`)).toBe("[]");
     expect(PORTAL_MODULES).toContain("Approvals");
     expect(PORTAL_MODULES).toContain("My Profile");
+  });
+
+  it("creates an explicit administrator role when portal access is activated", () => {
+    activateClientPortal(clientId, "Authentication Test Client", {
+      email: "admin@example.com",
+      password: "Admin@1234!",
+      userId: "portal-admin-test",
+    });
+
+    const adminRole = getPortalRoles(clientId).find(role => role.name === "Client Admin");
+    expect(adminRole?.permissions).toHaveLength(PORTAL_MODULES.length);
+    expect(hasPortalPermission(clientId, "Client Admin", "Catalog", "view")).toBe(true);
+    expect(findPortalUser("admin@example.com", "Admin@1234!")?.id).toBe("portal-admin-test");
+  });
+
+  it("uses the configured permission rows instead of a hardcoded administrator bypass", () => {
+    savePortalRoles(clientId, [{
+      id: "client-admin-role",
+      name: "Client Admin",
+      description: "",
+      status: "active",
+      permissions: [createPortalRolePermission("Dashboard", { view: true })],
+    }]);
+
+    expect(hasPortalPermission(clientId, "Client Admin", "Dashboard", "view")).toBe(true);
+    expect(hasPortalPermission(clientId, "Client Admin", "Catalog", "view")).toBe(false);
+  });
+
+  it("keeps user assignments aligned when an inactive role is renamed", () => {
+    seedUser();
+    savePortalRoles(clientId, [{
+      id: "employee-role",
+      name: "Former Employee",
+      description: "",
+      status: "inactive",
+      permissions: [],
+    }]);
+
+    updatePortalUser("portal-client-auth-test-user", { role: "Former Employee" });
+
+    expect(getPortalUsersByClient(clientId)[0]?.role).toBe("Former Employee");
+  });
+
+  it("removes only untouched, unused legacy sample roles", () => {
+    localStorage.setItem(`nido_portal_roles_${clientId}`, JSON.stringify([
+      {
+        id: "r4",
+        name: "Finance",
+        description: "Access to invoices and reports",
+        status: "active",
+        permissions: [
+          createPortalRolePermission("Dashboard", { view: true }),
+          createPortalRolePermission("Invoices", { view: true }),
+          createPortalRolePermission("Reports", { view: true }),
+          createPortalRolePermission("My Profile", { view: true }),
+        ],
+      },
+      {
+        id: "r7",
+        name: "Employee",
+        description: "Browse catalog and submit requests",
+        status: "active",
+        permissions: [
+          createPortalRolePermission("Dashboard", { view: true }),
+          createPortalRolePermission("Catalog", { view: true }),
+          createPortalRolePermission("Orders", { view: true, create: true }),
+          createPortalRolePermission("Services", { view: true }),
+          createPortalRolePermission("Notifications", { view: true }),
+          createPortalRolePermission("Approvals", { view: true, create: true }),
+          createPortalRolePermission("My Profile", { view: true }),
+        ],
+      },
+      {
+        id: "r2",
+        name: "Procurement Manager",
+        description: "Can manage orders and catalog",
+        status: "active",
+        permissions: [createPortalRolePermission("Catalog", { view: true })],
+      },
+      { id: "client-role-custom", name: "Custom Role", description: "", status: "active", permissions: [] },
+    ]));
+    localStorage.setItem(`nido_portal_role_modules_migrated_${clientId}`, "1");
+    localStorage.setItem("nido_portal_users", JSON.stringify([{
+      id: "assigned-employee",
+      email: "employee@example.com",
+      password: "not-used",
+      name: "Employee User",
+      userType: "client_user",
+      clientId,
+      clientName: "Authentication Test Client",
+      role: "Employee",
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }]));
+
+    expect(getPortalRoles(clientId).map(role => role.name)).toEqual([
+      "Employee",
+      "Procurement Manager",
+      "Custom Role",
+    ]);
   });
 
   it("persists added modules, including a module with no permissions enabled yet", () => {

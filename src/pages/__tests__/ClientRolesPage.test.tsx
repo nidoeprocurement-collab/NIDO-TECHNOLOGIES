@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ClientRolesPage from "@/pages/ClientRolesPage";
 import {
   createPortalRolePermission,
+  addPortalUser,
   getPortalRoles,
   hasPortalPermission,
   savePortalRoles,
@@ -49,5 +50,43 @@ describe("client role module editor", () => {
     const savedRole = getPortalRoles(clientId).find(role => role.id === "limited-role");
     expect(savedRole?.permissions.find(permission => permission.module === "Approvals")?.view).toBe(true);
     expect(hasPortalPermission(clientId, "Limited Role", "Approvals", "view")).toBe(true);
+  });
+
+  it("shows only saved roles and refreshes assigned-user counts from live client users", async () => {
+    render(
+      <MemoryRouter initialEntries={[`/clients/${clientId}/roles`]}>
+        <Routes>
+          <Route path="/clients/:id/roles" element={<ClientRolesPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("No roles configured")).toBeTruthy();
+    expect(screen.queryByText("Procurement Manager")).toBeNull();
+
+    act(() => savePortalRoles(clientId, [{
+      id: "actual-role",
+      name: "Actual Role",
+      description: "Read from this client's saved role data",
+      status: "active",
+      permissions: [createPortalRolePermission("Dashboard", { view: true })],
+    }]));
+    const roleButton = () => screen.getByRole("button", { name: /Actual Role/ });
+    await waitFor(() => expect(within(roleButton()).getByText(/0\s+assigned users/)).toBeTruthy());
+
+    act(() => addPortalUser({
+      id: "actual-client-user",
+      email: "person@example.com",
+      password: "not-used",
+      name: "Actual Person",
+      userType: "client_user",
+      clientId,
+      clientName: "Role Test Client",
+      role: "Actual Role",
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }));
+
+    await waitFor(() => expect(within(roleButton()).getByText(/1\s+assigned user$/)).toBeTruthy());
   });
 });

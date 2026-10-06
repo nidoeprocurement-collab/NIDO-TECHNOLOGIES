@@ -20,6 +20,7 @@ export interface PortalUser {
 const STORE_KEY = 'nido_portal_users';
 const ROLE_STORE_PREFIX = 'nido_portal_roles_';
 const ROLE_MODULES_MIGRATION_PREFIX = 'nido_portal_role_modules_migrated_';
+const LEGACY_ROLE_SEED_CLEANUP_PREFIX = 'nido_portal_role_seed_cleanup_';
 
 export interface PortalRolePermission {
   module: string;
@@ -64,17 +65,6 @@ export function getPortalModuleDescription(module: string): string {
     || 'Client portal module.';
 }
 
-const ROLE_BLUEPRINTS: Array<Pick<PortalRole, 'id' | 'name' | 'description'> & { view: string[]; create?: string[]; edit?: string[] }> = [
-  { id: 'r1', name: 'Client Admin', description: 'Full access to all portal modules', view: [...PORTAL_MODULES], create: [...PORTAL_MODULES], edit: [...PORTAL_MODULES] },
-  { id: 'r2', name: 'Procurement Manager', description: 'Can manage orders and catalog', view: [...PORTAL_MODULES], create: ['Catalog', 'Orders'], edit: ['Catalog', 'Orders'] },
-  { id: 'r3', name: 'Purchase Executive', description: 'Can place and track orders', view: ['Dashboard', 'Catalog', 'Orders', 'Notifications'], create: ['Orders'], edit: ['Orders'] },
-  { id: 'r4', name: 'Finance', description: 'Access to invoices and reports', view: ['Dashboard', 'Invoices', 'Reports'] },
-  { id: 'r5', name: 'Store Manager', description: 'Manages catalog and services', view: ['Dashboard', 'Catalog', 'Services', 'Orders'], create: ['Catalog', 'Services'], edit: ['Catalog', 'Services'] },
-  { id: 'r6', name: 'Approver', description: 'Reviews and approves orders', view: ['Dashboard', 'Orders', 'Services'], edit: ['Orders'] },
-  { id: 'r7', name: 'Employee', description: 'Browse catalog and submit requests', view: ['Dashboard', 'Catalog', 'Orders', 'Services', 'Notifications'], create: ['Orders'] },
-  { id: 'r8', name: 'Viewer', description: 'Read-only access across all modules', view: [...PORTAL_MODULES] },
-];
-
 const PORTAL_PERMISSION_ACTIONS = [
   'view',
   'create',
@@ -87,33 +77,119 @@ const PORTAL_PERMISSION_ACTIONS = [
   'configure',
 ] as const;
 
-function defaultPortalRoles(): PortalRole[] {
-  return ROLE_BLUEPRINTS.map(r => {
-    const assignedModules = new Set([...r.view, ...(r.create ?? []), ...(r.edit ?? [])]);
-    if (assignedModules.has('Orders')) assignedModules.add('Approvals');
-    if (assignedModules.has('Dashboard')) assignedModules.add('My Profile');
+// Historical seed definitions are retained only so the migration can remove
+// untouched demo rows safely. They are never used to create runtime roles.
+const LEGACY_ROLE_SEED_BLUEPRINTS: Array<{
+  id: string;
+  name: string;
+  description: string;
+  view: string[];
+  create?: string[];
+  edit?: string[];
+}> = [
+  {
+    id: 'r1',
+    name: 'Client Admin',
+    description: 'Full access to all portal modules',
+    view: [...PORTAL_MODULES],
+    create: [...PORTAL_MODULES],
+    edit: [...PORTAL_MODULES],
+  },
+  {
+    id: 'r2',
+    name: 'Procurement Manager',
+    description: 'Can manage orders and catalog',
+    view: [...PORTAL_MODULES],
+    create: ['Catalog', 'Orders'],
+    edit: ['Catalog', 'Orders'],
+  },
+  {
+    id: 'r3',
+    name: 'Purchase Executive',
+    description: 'Can place and track orders',
+    view: ['Dashboard', 'Catalog', 'Orders', 'Notifications'],
+    create: ['Orders'],
+    edit: ['Orders'],
+  },
+  {
+    id: 'r4',
+    name: 'Finance',
+    description: 'Access to invoices and reports',
+    view: ['Dashboard', 'Invoices', 'Reports'],
+  },
+  {
+    id: 'r5',
+    name: 'Store Manager',
+    description: 'Manages catalog and services',
+    view: ['Dashboard', 'Catalog', 'Services', 'Orders'],
+    create: ['Catalog', 'Services'],
+    edit: ['Catalog', 'Services'],
+  },
+  {
+    id: 'r6',
+    name: 'Approver',
+    description: 'Reviews and approves orders',
+    view: ['Dashboard', 'Orders', 'Services'],
+    edit: ['Orders'],
+  },
+  {
+    id: 'r7',
+    name: 'Employee',
+    description: 'Browse catalog and submit requests',
+    view: ['Dashboard', 'Catalog', 'Orders', 'Services', 'Notifications'],
+    create: ['Orders'],
+  },
+  {
+    id: 'r8',
+    name: 'Viewer',
+    description: 'Read-only access across all modules',
+    view: [...PORTAL_MODULES],
+  },
+];
 
-    return {
-      id: r.id,
-      name: r.name,
-      description: r.description,
-      status: 'active' as const,
-      permissions: [...assignedModules].map(module => {
-        const sourceModule = module === 'Approvals'
-          ? 'Orders'
-          : module === 'My Profile'
-            ? 'Dashboard'
-            : module;
-        return createPortalRolePermission(module, {
-          view: r.view.includes(sourceModule),
-          create: r.create?.includes(sourceModule) ?? false,
-          edit: r.edit?.includes(sourceModule) ?? false,
-          delete: false,
-          approve: r.name === 'Approver' && ['Orders', 'Approvals'].includes(module),
-        });
-      }),
-    };
+function legacySeedPermissions(
+  role: (typeof LEGACY_ROLE_SEED_BLUEPRINTS)[number],
+): PortalRolePermission[] {
+  const assignedModules = new Set([...role.view, ...(role.create ?? []), ...(role.edit ?? [])]);
+  if (assignedModules.has('Orders')) assignedModules.add('Approvals');
+  if (assignedModules.has('Dashboard')) assignedModules.add('My Profile');
+
+  return [...assignedModules].map(module => {
+    const sourceModule = module === 'Approvals'
+      ? 'Orders'
+      : module === 'My Profile'
+        ? 'Dashboard'
+        : module;
+    return createPortalRolePermission(module, {
+      view: role.view.includes(sourceModule),
+      create: role.create?.includes(sourceModule) ?? false,
+      edit: role.edit?.includes(sourceModule) ?? false,
+      approve: role.name === 'Approver' && ['Orders', 'Approvals'].includes(module),
+    });
   });
+}
+
+function hasUnchangedLegacySeed(role: PortalRole): boolean {
+  const seed = LEGACY_ROLE_SEED_BLUEPRINTS.find(candidate => candidate.id === role.id);
+  if (
+    !seed ||
+    role.name !== seed.name ||
+    role.description !== seed.description ||
+    role.status !== 'active'
+  ) return false;
+
+  const signature = (permissions: PortalRolePermission[]) => permissions
+    .map(permission => {
+      const normalized = createPortalRolePermission(permission.module, permission);
+      return JSON.stringify([
+        normalized.module,
+        ...PORTAL_PERMISSION_ACTIONS.map(action => normalized[action]),
+      ]);
+    })
+    .sort()
+    .join('|');
+
+  return signature(role.permissions) === signature(legacySeedPermissions(seed));
 }
 
 export function createPortalRolePermission(
@@ -135,7 +211,7 @@ export function createPortalRolePermission(
 }
 
 function normalizePortalRoles(value: unknown): PortalRole[] {
-  if (!Array.isArray(value)) return defaultPortalRoles();
+  if (!Array.isArray(value)) return [];
 
   return value.map((candidate, index) => {
     const role = candidate && typeof candidate === 'object'
@@ -167,13 +243,14 @@ function normalizePortalRoles(value: unknown): PortalRole[] {
 export function getPortalRoles(clientId: string): PortalRole[] {
   const roleStorageKey = `${ROLE_STORE_PREFIX}${clientId}`;
   const migrationKey = `${ROLE_MODULES_MIGRATION_PREFIX}${clientId}`;
+  const seedCleanupKey = `${LEGACY_ROLE_SEED_CLEANUP_PREFIX}${clientId}`;
   try {
     const raw = localStorage.getItem(roleStorageKey);
     if (!raw) {
-      const defaults = defaultPortalRoles();
-      localStorage.setItem(roleStorageKey, JSON.stringify(defaults));
+      localStorage.setItem(roleStorageKey, JSON.stringify([]));
       localStorage.setItem(migrationKey, '1');
-      return defaults;
+      localStorage.setItem(seedCleanupKey, '1');
+      return [];
     }
     let normalized = normalizePortalRoles(JSON.parse(raw));
 
@@ -206,10 +283,20 @@ export function getPortalRoles(clientId: string): PortalRole[] {
       localStorage.setItem(migrationKey, '1');
     }
 
+    // Remove only untouched, unassigned demo roles from older versions.
+    // Edited roles and roles used by real client users are preserved.
+    if (localStorage.getItem(seedCleanupKey) !== '1') {
+      const assignedRoleNames = new Set(getPortalUsersByClient(clientId).map(user => user.role));
+      normalized = normalized.filter(role =>
+        !hasUnchangedLegacySeed(role) || assignedRoleNames.has(role.name),
+      );
+      localStorage.setItem(seedCleanupKey, '1');
+    }
+
     localStorage.setItem(roleStorageKey, JSON.stringify(normalized));
     return normalized;
   } catch {
-    return defaultPortalRoles();
+    return [];
   }
 }
 
@@ -217,6 +304,7 @@ export function savePortalRoles(clientId: string, roles: PortalRole[]): void {
   const normalized = normalizePortalRoles(roles);
   localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(normalized));
   localStorage.setItem(`${ROLE_MODULES_MIGRATION_PREFIX}${clientId}`, '1');
+  localStorage.setItem(`${LEGACY_ROLE_SEED_CLEANUP_PREFIX}${clientId}`, '1');
   window.dispatchEvent(new Event('nidoPortalRolesUpdated'));
 }
 
@@ -265,10 +353,6 @@ export function hasPortalPermission(
 ): boolean {
   const role = getPortalRoles(clientId).find(item => item.name === roleName);
   if (!role || role.status !== 'active') return false;
-  if (roleName === 'Client Admin') return true;
-  // Preserve the built-in approver role's intended capability for legacy
-  // records that were saved before the approve permission was added.
-  if (roleName === 'Approver' && ['Orders', 'Approvals'].includes(module) && action === 'approve') return true;
   return !!role?.permissions.find(permission => permission.module === module)?.[action];
 }
 
@@ -304,13 +388,7 @@ export function savePortalUsers(users: PortalUser[]): void {
 export function addPortalUser(user: PortalUser): void {
   const users = getPortalUsers();
   const idx = users.findIndex(u => u.id === user.id);
-  const availableRoles = getPortalRoles(user.clientId).filter(item => item.status === 'active');
-  const role = availableRoles.some(item => item.name === user.role)
-    ? user.role
-    : availableRoles.find(item => item.name === 'Employee')?.name
-      || availableRoles[0]?.name
-      || 'Employee';
-  const normalizedUser = { ...user, role };
+  const normalizedUser = { ...user, role: String(user.role || '').trim() };
   if (idx > -1) {
     users[idx] = normalizedUser;
   } else {
@@ -325,8 +403,8 @@ export function updatePortalUser(id: string, updates: Partial<PortalUser>): void
   if (idx > -1) {
     const next = { ...users[idx], ...updates };
     if (updates.role) {
-      const roleNames = new Set(getPortalRoleNames(next.clientId));
-      if (!roleNames.has(updates.role)) next.role = users[idx].role;
+      const roleExists = getPortalRoles(next.clientId).some(role => role.name === updates.role);
+      if (!roleExists) next.role = users[idx].role;
     }
     users[idx] = next;
     savePortalUsers(users);
@@ -399,6 +477,21 @@ export function activateClientPortal(
   credentials: ProvisionResult,
   reason = ''
 ): void {
+  const roles = getPortalRoles(clientId);
+  if (!roles.some(role => role.name === 'Client Admin')) {
+    const fullAccess = Object.fromEntries(PORTAL_PERMISSION_ACTIONS.map(action => [action, true]));
+    savePortalRoles(clientId, [
+      ...roles,
+      {
+        id: `client-role-admin-${clientId}`,
+        name: 'Client Admin',
+        description: 'Administrator access for this client portal.',
+        status: 'active',
+        permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module, fullAccess)),
+      },
+    ]);
+  }
+
   const existing = getPortalUsers().find(
     (user) => user.clientId === clientId && user.userType === 'client_admin'
   );
@@ -454,11 +547,11 @@ export function provisionPortalUser(
   );
   const userId = existing?.id || `portal-${clientId}-${Date.now()}`;
   const availableRoles = getPortalRoles(clientId).filter(item => item.status === 'active');
-  const role = availableRoles.some(item => item.name === details.role)
-    ? details.role!
-    : availableRoles.find(item => item.name === 'Employee')?.name
-      || availableRoles[0]?.name
-      || 'Employee';
+  const requestedRole = details.role?.trim() || existing?.role || '';
+  const role = availableRoles.find(item => item.name === requestedRole)?.name;
+  if (!role) {
+    throw new Error('Create and activate a client role before provisioning a portal user.');
+  }
   addPortalUser({
     id: userId,
     email,
@@ -468,7 +561,7 @@ export function provisionPortalUser(
     userType: existing?.userType || 'client_user',
     clientId,
     clientName,
-    role: role || existing?.role || 'Employee',
+    role,
     status: details.status || 'active',
     createdAt: existing?.createdAt || new Date().toISOString(),
     provisionedAt: new Date().toISOString(),
