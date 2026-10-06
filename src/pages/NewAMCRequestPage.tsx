@@ -221,6 +221,7 @@ function TextField({ label, required, value, onChange, placeholder, type = "text
       <input
         type={type}
         value={value}
+        required={required}
         onChange={e => onChange?.(e.target.value)}
         placeholder={placeholder}
         readOnly={readOnly}
@@ -386,6 +387,7 @@ export default function NewAMCRequestPage() {
   const handleSubmit = () => {
     if (!clientId || !location || !requestType) { toast.error("Please fill in all required Request Details."); return; }
     if (!category || !brand || !model)          { toast.error("Please fill in all required Equipment Details."); return; }
+    if (!purchaseDate)                          { toast.error("Please enter the Purchase Date in Equipment Details."); return; }
     if (!amcPeriod || !startDate || !endDate || !visitFreq) { toast.error("Please fill in all AMC Plan fields."); return; }
     if (!issueSubject || !issueDesc || !priority) { toast.error("Please fill in all Issue / Visit Details."); return; }
 
@@ -663,7 +665,7 @@ export default function NewAMCRequestPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
             <TextField label="Serial Number"          value={serialNumber} onChange={setSerialNumber} placeholder="Enter Serial Number" />
             <TextField label="Asset Tag (Optional)"   value={assetTag}     onChange={setAssetTag}     placeholder="Enter Asset Tag" />
-            <TextField label="Purchase Date (Optional)" type="date" value={purchaseDate} onChange={setPurchaseDate} />
+            <TextField label="Purchase Date" required type="date" value={purchaseDate} onChange={setPurchaseDate} />
           </div>
         </div>
 
