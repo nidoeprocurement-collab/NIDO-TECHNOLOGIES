@@ -15,12 +15,17 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import {
+  getServiceRequests,
+  updateServiceRequest,
+  type ServiceRequestUpdates,
+} from "@/lib/serviceRequestsStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type RequestStatus = "In Progress" | "Active" | "Scheduled" | "Completed" | "Cancelled" | "Pending";
-type RequestPriority = "Low" | "Medium" | "High";
+type RequestStatus = string;
+type RequestPriority = string;
 
 interface ServiceRequest {
   id: string;
@@ -34,80 +39,42 @@ interface ServiceRequest {
   priority: RequestPriority;
   nextAppointment: string;
   requestedBy: string;
+  payload?: Record<string, unknown>;
 }
 
 // ─── Date helper ─────────────────────────────────────────────────────────────
 function parseDate(s: string): number {
-  return new Date(s).getTime();
+  const timestamp = new Date(s).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-// ─── Sample Data ──────────────────────────────────────────────────────────────
-const RAW: Omit<ServiceRequest, "requestDateTs">[] = [
-  { id: "REP-2026-00187", requestType: "Repair Service",     itemAsset: "Dell Latitude 5420",        assetTag: "AST-1001", location: "Bangalore - Main Office", requestDate: "22 Jul 2026", status: "In Progress", priority: "Medium", nextAppointment: "24 Jul 2026\n10:00 AM", requestedBy: "Ramesh K."    },
-  { id: "AMC-2026-00124", requestType: "AMC",                itemAsset: "Dell Latitude 5420",        assetTag: "AST-1001", location: "Bangalore - Main Office", requestDate: "01 Jul 2026", status: "Active",      priority: "Medium", nextAppointment: "15 Aug 2026\n10:00 AM", requestedBy: "Ramesh K."    },
-  { id: "REC-2026-00056", requestType: "Recycle / Disposal", itemAsset: "IT Assets (10 Items)",      assetTag: "",         location: "Bangalore - Main Office", requestDate: "18 Jul 2026", status: "Scheduled",   priority: "Low",    nextAppointment: "25 Jul 2026\n11:00 AM", requestedBy: "Priya Sharma" },
-  { id: "RET-2026-00031", requestType: "Return / Replace",   itemAsset: "HP LaserJet Pro MFP 4103",  assetTag: "AST-1002", location: "Bangalore - Main Office", requestDate: "16 Jul 2026", status: "In Progress", priority: "High",   nextAppointment: "23 Jul 2026\n02:00 PM", requestedBy: "Vikram Singh" },
-  { id: "REP-2026-00120", requestType: "Repair Service",     itemAsset: "APC Smart UPS 1500VA",      assetTag: "AST-1004", location: "Pune - Branch Office",    requestDate: "10 Jul 2026", status: "Completed",   priority: "Low",    nextAppointment: "10 Jul 2026\n04:30 PM", requestedBy: "Anita Patil"  },
-  { id: "AMC-2026-00110", requestType: "AMC",                itemAsset: "Cisco Switch WS-C2960X",    assetTag: "AST-1003", location: "Hyderabad - Branch",      requestDate: "05 Jul 2026", status: "Completed",   priority: "Medium", nextAppointment: "05 Jul 2026\n11:30 AM", requestedBy: "Vikram Singh" },
-  { id: "REP-2026-00098", requestType: "Repair Service",     itemAsset: "Lenovo ThinkPad E14",       assetTag: "AST-1005", location: "Bangalore - Main Office", requestDate: "08 Jul 2026", status: "Cancelled",   priority: "Low",    nextAppointment: "-",                     requestedBy: "Ramesh K."    },
-  { id: "REC-2026-00021", requestType: "Recycle / Disposal", itemAsset: "Old Monitors (5 Items)",    assetTag: "",         location: "Chennai - Branch",        requestDate: "01 Jul 2026", status: "Cancelled",   priority: "Low",    nextAppointment: "-",                     requestedBy: "Suresh B."    },
-  { id: "REP-2026-00091", requestType: "Repair Service",     itemAsset: "HP EliteBook 840",          assetTag: "AST-1006", location: "Mumbai - Office",         requestDate: "03 Jul 2026", status: "Completed",   priority: "Medium", nextAppointment: "04 Jul 2026\n09:00 AM", requestedBy: "Anita Patil"  },
-  { id: "AMC-2026-00085", requestType: "AMC",        itemAsset: "Dell PowerEdge R440",       assetTag: "AST-1007", location: "Bangalore - Main Office", requestDate: "01 Jul 2026", status: "Active",      priority: "High",   nextAppointment: "01 Aug 2026\n10:00 AM", requestedBy: "Ramesh K."    },
-  { id: "REC-2026-00078", requestType: "Recycle / Disposal", itemAsset: "Old Printers (3 Items)",    assetTag: "",         location: "Pune - Branch Office",    requestDate: "28 Jun 2026", status: "Completed",   priority: "Low",    nextAppointment: "30 Jun 2026\n02:00 PM", requestedBy: "Suresh B."    },
-  { id: "RET-2026-00072", requestType: "Return / Replace",   itemAsset: "Canon ImageRunner 2625",    assetTag: "AST-1008", location: "Hyderabad - Branch",      requestDate: "25 Jun 2026", status: "Completed",   priority: "Medium", nextAppointment: "27 Jun 2026\n11:00 AM", requestedBy: "Vikram Singh" },
-  { id: "REP-2026-00068", requestType: "Repair Service",     itemAsset: "Epson WorkForce 7720",      assetTag: "AST-1009", location: "Chennai - Branch",        requestDate: "22 Jun 2026", status: "Cancelled",   priority: "Low",    nextAppointment: "-",                     requestedBy: "Priya Sharma" },
-  { id: "AMC-2026-00061", requestType: "AMC",        itemAsset: "Cisco IP Phone 7945",       assetTag: "AST-1010", location: "Bangalore - Main Office", requestDate: "18 Jun 2026", status: "Active",      priority: "Medium", nextAppointment: "18 Jul 2026\n09:30 AM", requestedBy: "Ramesh K."    },
-  { id: "REC-2026-00055", requestType: "Recycle / Disposal", itemAsset: "Keyboards & Mice (20)",     assetTag: "",         location: "Mumbai - Office",         requestDate: "14 Jun 2026", status: "Completed",   priority: "Low",    nextAppointment: "15 Jun 2026\n03:00 PM", requestedBy: "Anita Patil"  },
-  { id: "REP-2026-00048", requestType: "Repair Service",     itemAsset: "Zebra ZT410 Barcode",       assetTag: "AST-1011", location: "Pune - Branch Office",    requestDate: "10 Jun 2026", status: "Completed",   priority: "High",   nextAppointment: "11 Jun 2026\n10:00 AM", requestedBy: "Vikram Singh" },
-  { id: "AMC-2026-00042", requestType: "AMC",        itemAsset: "APC UPS 3000VA",            assetTag: "AST-1012", location: "Hyderabad - Branch",      requestDate: "06 Jun 2026", status: "Active",      priority: "Medium", nextAppointment: "06 Jul 2026\n10:00 AM", requestedBy: "Suresh B."    },
-  { id: "RET-2026-00038", requestType: "Return / Replace",   itemAsset: "Dell Monitor P2422H",       assetTag: "AST-1013", location: "Bangalore - Main Office", requestDate: "03 Jun 2026", status: "Completed",   priority: "Low",    nextAppointment: "05 Jun 2026\n02:00 PM", requestedBy: "Priya Sharma" },
-  { id: "REP-2026-00031", requestType: "Repair Service",     itemAsset: "HP LaserJet M404dn",        assetTag: "AST-1014", location: "Chennai - Branch",        requestDate: "28 May 2026", status: "Cancelled",   priority: "Low",    nextAppointment: "-",                     requestedBy: "Ramesh K."    },
-  { id: "REC-2026-00025", requestType: "Recycle / Disposal", itemAsset: "Network Switches (5)",      assetTag: "",         location: "Mumbai - Office",         requestDate: "22 May 2026", status: "Completed",   priority: "Medium", nextAppointment: "24 May 2026\n11:00 AM", requestedBy: "Anita Patil"  },
-  { id: "AMC-2026-00019", requestType: "AMC",        itemAsset: "Fortinet FortiGate 60F",    assetTag: "AST-1015", location: "Bangalore - Main Office", requestDate: "18 May 2026", status: "Active",      priority: "High",   nextAppointment: "18 Jun 2026\n09:00 AM", requestedBy: "Vikram Singh" },
-  { id: "REP-2026-00012", requestType: "Repair Service",     itemAsset: "Lenovo IdeaCentre 510",     assetTag: "AST-1016", location: "Hyderabad - Branch",      requestDate: "12 May 2026", status: "Completed",   priority: "Low",    nextAppointment: "13 May 2026\n02:00 PM", requestedBy: "Suresh B."    },
-  { id: "RET-2026-00008", requestType: "Return / Replace",   itemAsset: "Cisco Catalyst 2960-X",     assetTag: "AST-1017", location: "Pune - Branch Office",    requestDate: "08 May 2026", status: "Completed",   priority: "Medium", nextAppointment: "10 May 2026\n10:00 AM", requestedBy: "Priya Sharma" },
-  { id: "REC-2026-00004", requestType: "Recycle / Disposal", itemAsset: "Old Servers (2 Items)",     assetTag: "",         location: "Bangalore - Main Office", requestDate: "03 May 2026", status: "Completed",   priority: "High",   nextAppointment: "05 May 2026\n09:00 AM", requestedBy: "Ramesh K."    },
-  { id: "REN-2026-00078", requestType: "Rental Service",    itemAsset: "Laptop - Dell Latitude 5420", assetTag: "",        location: "Bangalore - Main Office", requestDate: "12 Jul 2026", status: "Active",      priority: "Medium", nextAppointment: "-",                     requestedBy: "Ramesh K."    },
-  { id: "PUR-2026-00126", requestType: "Regular Purchase",  itemAsset: "20 Liter Water Can",          assetTag: "",        location: "Bangalore - Main Office", requestDate: "28 Jul 2026", status: "In Progress", priority: "Medium", nextAppointment: "01 Aug 2026\n11:00 AM", requestedBy: "Ramesh K."    },
-];
-
-const STATIC_REQUESTS: ServiceRequest[] = RAW.map(r => ({
-  ...r,
-  requestDateTs: parseDate(r.requestDate),
-}));
-
 function loadAllRequests(): ServiceRequest[] {
-  const stored = getServiceRequests().map(s => ({
+  return getServiceRequests().map(s => ({
     id:              s.id,
-    requestType:     s.requestType,
-    itemAsset:       s.itemAsset,
-    assetTag:        s.assetTag,
-    location:        s.location,
-    requestDate:     s.requestDate,
-    requestDateTs:   s.requestDateTs,
-    status:          (s.status as ServiceRequest["status"]),
-    priority:        (s.priority as ServiceRequest["priority"]),
-    nextAppointment: s.nextAppointment,
-    requestedBy:     s.requestedBy,
+    requestType:     s.requestType || "Service Request",
+    itemAsset:       s.itemAsset || "—",
+    assetTag:        s.assetTag || "",
+    location:        s.location || "—",
+    requestDate:     s.requestDate || "—",
+    requestDateTs:   s.requestDateTs || parseDate(s.requestDate),
+    status:          s.status || "Pending",
+    priority:        s.priority || "Medium",
+    nextAppointment: s.nextAppointment || "—",
+    requestedBy:     s.requestedBy || "—",
+    payload:         s.payload,
   }));
-  // Deduplicate: stored entries take precedence over static ones
-  const storedIds = new Set(stored.map(r => r.id));
-  return [...stored, ...STATIC_REQUESTS.filter(r => !storedIds.has(r.id))];
 }
 
 // ─── Date-range options ───────────────────────────────────────────────────────
 const DATE_RANGES = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "This Year", "All Time"] as const;
 type DateRange = typeof DATE_RANGES[number];
 
-/** Reference "today" anchored to the latest entry so demo data is always visible */
-const ANCHOR = new Date("2026-07-31").getTime();
-
-function dateRangeCutoff(range: DateRange): number {
+function dateRangeCutoff(range: DateRange, now = Date.now()): number {
   switch (range) {
-    case "Last 7 Days":  return ANCHOR - 7  * 86400000;
-    case "Last 30 Days": return ANCHOR - 30 * 86400000;
-    case "Last 90 Days": return ANCHOR - 90 * 86400000;
-    case "This Year":    return new Date("2026-01-01").getTime();
+    case "Last 7 Days":  return now - 7  * 86400000;
+    case "Last 30 Days": return now - 30 * 86400000;
+    case "Last 90 Days": return now - 90 * 86400000;
+    case "This Year":    return new Date(new Date(now).getFullYear(), 0, 1).getTime();
     default:             return 0;
   }
 }
@@ -138,7 +105,17 @@ function Badge({ children, className }: { children: React.ReactNode; className?:
 }
 
 // ─── Row Actions ──────────────────────────────────────────────────────────────
-function RowActions({ onView }: { onView: () => void }) {
+function RowActions({
+  onView,
+  onEdit,
+  onCancel,
+  cancelDisabled,
+}: {
+  onView: () => void;
+  onEdit: () => void;
+  onCancel: () => void;
+  cancelDisabled: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -146,20 +123,37 @@ function RowActions({ onView }: { onView: () => void }) {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+  const actions = [
+    { label: "View Details", action: onView, disabled: false, cls: "text-gray-700 hover:bg-gray-50" },
+    { label: "Edit Request", action: onEdit, disabled: false, cls: "text-gray-700 hover:bg-gray-50" },
+    {
+      label: "Cancel Request",
+      action: onCancel,
+      disabled: cancelDisabled,
+      cls: cancelDisabled ? "text-gray-300 cursor-not-allowed" : "text-red-600 hover:bg-red-50",
+    },
+  ];
   return (
     <div ref={ref} className="relative flex justify-center">
-      <button onClick={() => setOpen(p => !p)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+      <button
+        type="button"
+        aria-label="Request actions"
+        aria-expanded={open}
+        onClick={() => setOpen(p => !p)}
+        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+      >
         <MoreVertical className="w-3.5 h-3.5" />
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1">
-          {[
-            { label: "View Details",   action: onView,           cls: "text-gray-700 hover:bg-gray-50" },
-            { label: "Edit Request",   action: () => {},         cls: "text-gray-700 hover:bg-gray-50" },
-            { label: "Cancel Request", action: () => {},         cls: "text-red-600 hover:bg-red-50"   },
-          ].map(({ label, action, cls }) => (
-            <button key={label} onClick={() => { action(); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors ${cls}`}>
+          {actions.map(({ label, action, disabled, cls }) => (
+            <button
+              key={label}
+              type="button"
+              disabled={disabled}
+              onClick={() => { action(); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors disabled:bg-transparent ${cls}`}
+            >
               {label}
             </button>
           ))}
@@ -180,12 +174,13 @@ interface Filters {
 const EMPTY_FILTERS: Filters = { requestType: "All", priority: "All", location: "All", requestedBy: "All" };
 
 function FilterPanel({
-  open, onClose, filters, onApply,
+  open, onClose, filters, onApply, requests,
 }: {
   open: boolean;
   onClose: () => void;
   filters: Filters;
   onApply: (f: Filters) => void;
+  requests: ServiceRequest[];
 }) {
   const [local, setLocal] = useState<Filters>(filters);
   const ref = useRef<HTMLDivElement>(null);
@@ -199,10 +194,10 @@ function FilterPanel({
 
   if (!open) return null;
 
-  const requestTypes = ["All", ...Array.from(new Set(STATIC_REQUESTS.map(r => r.requestType)))];
+  const requestTypes = ["All", ...Array.from(new Set(requests.map(r => r.requestType).filter(Boolean)))];
   const priorities   = ["All", "High", "Medium", "Low"];
-  const locations    = ["All", ...Array.from(new Set(STATIC_REQUESTS.map(r => r.location)))];
-  const requestedBys = ["All", ...Array.from(new Set(STATIC_REQUESTS.map(r => r.requestedBy)))];
+  const locations    = ["All", ...Array.from(new Set(requests.map(r => r.location).filter(value => value && value !== "—")))];
+  const requestedBys = ["All", ...Array.from(new Set(requests.map(r => r.requestedBy).filter(value => value && value !== "—")))];
 
   const Field = ({ label, field, options }: { label: string; field: keyof Filters; options: string[] }) => (
     <div>
@@ -273,6 +268,131 @@ function exportCSV(rows: ServiceRequest[]) {
   URL.revokeObjectURL(url);
 }
 
+function RequestEditModal({
+  request,
+  onClose,
+  onSave,
+}: {
+  request: ServiceRequest;
+  onClose: () => void;
+  onSave: (updates: ServiceRequestUpdates) => void;
+}) {
+  const [draft, setDraft] = useState({
+    itemAsset: request.itemAsset,
+    assetTag: request.assetTag,
+    location: request.location === "—" ? "" : request.location,
+    status: request.status,
+    priority: request.priority,
+    nextAppointment: request.nextAppointment === "—" ? "" : request.nextAppointment,
+    requestedBy: request.requestedBy === "—" ? "" : request.requestedBy,
+  });
+  const statuses = Array.from(new Set([
+    "Pending", "Scheduled", "Active", "In Progress", "Completed", draft.status,
+  ].filter(Boolean)));
+  const priorities = Array.from(new Set(["Low", "Medium", "High", draft.priority].filter(Boolean)));
+  const setField = (field: keyof typeof draft, value: string) => {
+    setDraft(current => ({ ...current, [field]: value }));
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const itemAsset = draft.itemAsset.trim();
+    const location = draft.location.trim();
+    if (!itemAsset || !location) {
+      toast.error("Item / Asset and Location are required.");
+      return;
+    }
+    onSave({
+      itemAsset,
+      assetTag: draft.assetTag.trim(),
+      location,
+      status: draft.status,
+      priority: draft.priority,
+      nextAppointment: draft.nextAppointment.trim() || "—",
+      requestedBy: draft.requestedBy.trim() || "—",
+      payload: {
+        ...(request.payload ?? {}),
+        location,
+        status: draft.status,
+        priority: draft.priority,
+      },
+    });
+  };
+
+  const inputClass = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
+  const labelClass = "mb-1 block text-xs font-medium text-gray-600";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-request-title"
+        className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl"
+      >
+        <header className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <h2 id="edit-request-title" className="text-base font-semibold text-gray-900">Edit Request</h2>
+            <p className="mt-0.5 text-xs text-gray-500">{request.id} · {request.requestType}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close edit request" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2">
+            <label>
+              <span className={labelClass}>Item / Asset *</span>
+              <input required className={inputClass} value={draft.itemAsset} onChange={e => setField("itemAsset", e.target.value)} />
+            </label>
+            <label>
+              <span className={labelClass}>Asset Tag</span>
+              <input className={inputClass} value={draft.assetTag} onChange={e => setField("assetTag", e.target.value)} />
+            </label>
+            <label>
+              <span className={labelClass}>Location *</span>
+              <input required className={inputClass} value={draft.location} onChange={e => setField("location", e.target.value)} />
+            </label>
+            <label>
+              <span className={labelClass}>Status</span>
+              <select className={inputClass} value={draft.status} onChange={e => setField("status", e.target.value)}>
+                {statuses.map(status => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className={labelClass}>Priority</span>
+              <select className={inputClass} value={draft.priority} onChange={e => setField("priority", e.target.value)}>
+                {priorities.map(priority => <option key={priority} value={priority}>{priority}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className={labelClass}>Requested By</span>
+              <input className={inputClass} value={draft.requestedBy} onChange={e => setField("requestedBy", e.target.value)} />
+            </label>
+            <label className="sm:col-span-2">
+              <span className={labelClass}>Next Appointment</span>
+              <textarea
+                rows={2}
+                className={inputClass}
+                value={draft.nextAppointment}
+                onChange={e => setField("nextAppointment", e.target.value)}
+              />
+            </label>
+          </div>
+          <footer className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
+            <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+              Discard
+            </button>
+            <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              Save Changes
+            </button>
+          </footer>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function MyRequestsPage() {
   const navigate = useNavigate();
@@ -280,23 +400,33 @@ export default function MyRequestsPage() {
 
   const [currentPage,  setCurrentPage]  = useState(1);
   const [tileFilter,   setTileFilter]   = useState("All");
-  const [dateRange,    setDateRange]     = useState<DateRange>("Last 30 Days");
+  const [dateRange,    setDateRange]     = useState<DateRange>("All Time");
   const [filters,      setFilters]       = useState<Filters>(EMPTY_FILTERS);
   const [filterOpen,   setFilterOpen]   = useState(false);
   const [allRequests,  setAllRequests]  = useState<ServiceRequest[]>(() => loadAllRequests());
+  const [editingRequest, setEditingRequest] = useState<ServiceRequest | null>(null);
   const filterBtnRef = useRef<HTMLDivElement>(null);
 
-  // Refresh from localStorage whenever the page mounts (e.g. navigated back after a submission)
+  // Keep the list current after submissions, edits, or cancellations.
   useEffect(() => {
-    setAllRequests(loadAllRequests());
+    const refresh = () => setAllRequests(loadAllRequests());
+    refresh();
+    window.addEventListener("serviceRequestsUpdated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("serviceRequestsUpdated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   // ── Apply all filters ──
-  const cutoff = dateRangeCutoff(dateRange);
+  const now = Date.now();
+  const cutoff = dateRangeCutoff(dateRange, now);
 
   const filtered = allRequests.filter(r => {
-    if (tileFilter !== "All" && r.status !== tileFilter)              return false;
-    if (r.requestDateTs < cutoff)                                     return false;
+    if (tileFilter === "Pending / Scheduled" && !["Pending", "Scheduled", "Active"].includes(r.status)) return false;
+    if (tileFilter !== "All" && tileFilter !== "Pending / Scheduled" && r.status !== tileFilter) return false;
+    if (dateRange !== "All Time" && (r.requestDateTs < cutoff || r.requestDateTs > now)) return false;
     if (filters.requestType !== "All" && r.requestType !== filters.requestType) return false;
     if (filters.priority    !== "All" && r.priority    !== filters.priority)    return false;
     if (filters.location    !== "All" && r.location    !== filters.location)    return false;
@@ -313,6 +443,32 @@ export default function MyRequestsPage() {
     setCurrentPage(1);
   };
 
+  const handleSaveEdit = (updates: ServiceRequestUpdates) => {
+    if (!editingRequest) return;
+    const updated = updateServiceRequest(editingRequest.id, updates);
+    if (!updated) {
+      toast.error("This request is no longer available.");
+      setEditingRequest(null);
+      return;
+    }
+    toast.success("Request updated.");
+    setEditingRequest(null);
+  };
+
+  const handleCancelRequest = (request: ServiceRequest) => {
+    if (["completed", "cancelled", "closed"].includes(request.status.toLowerCase())) return;
+    if (!window.confirm(`Cancel service request ${request.id}?`)) return;
+    const updated = updateServiceRequest(request.id, {
+      status: "Cancelled",
+      payload: { ...(request.payload ?? {}), status: "Cancelled" },
+    });
+    if (!updated) {
+      toast.error("This request is no longer available.");
+      return;
+    }
+    toast.success("Request cancelled.");
+  };
+
   const activeFilterCount = Object.values(filters).filter(v => v !== "All").length;
   const hasAnyFilter = tileFilter !== "All" || activeFilterCount > 0;
 
@@ -326,7 +482,7 @@ export default function MyRequestsPage() {
   const stats = [
     { label: "Total Requests",      value: allRequests.length,                                                       filterKey: "All",        icon: <ClipboardList className="w-5 h-5 text-blue-500" />,   iconBg: "bg-blue-50",    border: "border-blue-100",    valueColor: "text-gray-900"    },
     { label: "In Progress",         value: allRequests.filter(r => r.status === "In Progress").length,               filterKey: "In Progress", icon: <CheckCircle2  className="w-5 h-5 text-emerald-500" />, iconBg: "bg-emerald-50", border: "border-emerald-100", valueColor: "text-emerald-600" },
-    { label: "Pending / Scheduled", value: allRequests.filter(r => r.status === "Scheduled" || r.status === "Active").length, filterKey: "Scheduled", icon: <Clock className="w-5 h-5 text-amber-500" />, iconBg: "bg-amber-50", border: "border-amber-100", valueColor: "text-amber-600" },
+    { label: "Pending / Scheduled", value: allRequests.filter(r => ["Pending", "Scheduled", "Active"].includes(r.status)).length, filterKey: "Pending / Scheduled", icon: <Clock className="w-5 h-5 text-amber-500" />, iconBg: "bg-amber-50", border: "border-amber-100", valueColor: "text-amber-600" },
     { label: "Completed",           value: allRequests.filter(r => r.status === "Completed").length,                 filterKey: "Completed",   icon: <CheckSquare   className="w-5 h-5 text-purple-500" />,  iconBg: "bg-purple-50",  border: "border-purple-100",  valueColor: "text-purple-600"  },
     { label: "Cancelled",           value: allRequests.filter(r => r.status === "Cancelled").length,                 filterKey: "Cancelled",   icon: <XCircle       className="w-5 h-5 text-red-400" />,     iconBg: "bg-red-50",     border: "border-red-100",     valueColor: "text-red-500"     },
   ];
@@ -434,6 +590,7 @@ export default function MyRequestsPage() {
                     open={filterOpen}
                     onClose={() => setFilterOpen(false)}
                     filters={filters}
+                    requests={allRequests}
                     onApply={f => { setFilters(f); setCurrentPage(1); }}
                   />
                 </div>
@@ -519,15 +676,20 @@ export default function MyRequestsPage() {
                       <td className="px-3 py-3 text-gray-600 truncate">{req.location}</td>
                       <td className="px-3 py-3 text-gray-600">{req.requestDate}</td>
                       <td className="px-3 py-3">
-                        <Badge className={statusColors[req.status]}>{req.status}</Badge>
+                        <Badge className={statusColors[req.status] ?? "bg-gray-100 text-gray-600"}>{req.status}</Badge>
                       </td>
                       <td className="px-3 py-3">
-                        <Badge className={priorityColors[req.priority]}>{req.priority}</Badge>
+                        <Badge className={priorityColors[req.priority] ?? "bg-gray-100 text-gray-600"}>{req.priority}</Badge>
                       </td>
                       <td className="px-3 py-3 text-gray-600 whitespace-pre-line leading-tight text-xs">{req.nextAppointment}</td>
                       <td className="px-3 py-3 text-gray-700 truncate">{req.requestedBy}</td>
                       <td className="px-3 py-3">
-                        <RowActions onView={() => navigate(`/my-services/requests/${req.id}`)} />
+                        <RowActions
+                          onView={() => navigate(`/my-services/requests/${req.id}`)}
+                          onEdit={() => setEditingRequest(req)}
+                          onCancel={() => handleCancelRequest(req)}
+                          cancelDisabled={["completed", "cancelled", "closed"].includes(req.status.toLowerCase())}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -571,6 +733,13 @@ export default function MyRequestsPage() {
           </CardContent>
         </Card>
       </div>
+      {editingRequest && (
+        <RequestEditModal
+          request={editingRequest}
+          onClose={() => setEditingRequest(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
     </div>
   );
 }

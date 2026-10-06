@@ -1,7 +1,6 @@
 /**
  * Shared localStorage store for user-submitted service requests.
- * MyRequestsPage merges these with the static sample data so submitted
- * requests appear in the list immediately.
+ * MyRequestsPage reads these records directly and updates them in place.
  */
 
 const STORE_KEY = "nido_service_requests";
@@ -28,6 +27,8 @@ export interface StoredServiceRequest {
   /** Full form payload stored so the detail page can show it */
   payload?: Record<string, unknown>;
 }
+
+export type ServiceRequestUpdates = Partial<Omit<StoredServiceRequest, "id" | "requestDateTs">>;
 
 function load(): StoredServiceRequest[] {
   try {
@@ -98,6 +99,27 @@ export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "reques
 
 export function getServiceRequests(): StoredServiceRequest[] {
   return load();
+}
+
+export function updateServiceRequest(
+  id: string,
+  updates: ServiceRequestUpdates,
+): StoredServiceRequest | null {
+  const requests = load();
+  const index = requests.findIndex(request => request.id === id);
+  if (index === -1) return null;
+
+  const existing = requests[index];
+  const updated: StoredServiceRequest = {
+    ...existing,
+    ...updates,
+    id: existing.id,
+    requestDateTs: existing.requestDateTs,
+  };
+  requests[index] = updated;
+  save(requests);
+  window.dispatchEvent(new Event("serviceRequestsUpdated"));
+  return updated;
 }
 
 /**

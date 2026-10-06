@@ -1,0 +1,117 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import MyRequestsPage from "@/pages/MyRequestsPage";
+import MyRequestDetailPage from "@/pages/MyRequestDetailPage";
+import {
+  addServiceRequest,
+  getServiceRequests,
+} from "@/lib/serviceRequestsStore";
+
+function LocationProbe() {
+  const { pathname } = useLocation();
+  return <output data-testid="current-path">{pathname}</output>;
+}
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={["/my-services"]}>
+      <LocationProbe />
+      <MyRequestsPage />
+    </MemoryRouter>,
+  );
+}
+
+function addRepairRequest() {
+  return addServiceRequest({
+    requestType: "Repair Service",
+    itemAsset: "Latitude Workstation",
+    assetTag: "ASSET-42",
+    location: "Pune Office",
+    requestDate: "",
+    status: "Scheduled",
+    priority: "Medium",
+    nextAppointment: "14 Oct 2026\n10:00 AM",
+    requestedBy: "Service Desk",
+    payload: { requestType: "Repair Service", location: "Pune Office" },
+  }, "REP");
+}
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  vi.restoreAllMocks();
+});
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+describe("My Requests", () => {
+  it("shows no hard-coded sample requests when the store is empty", () => {
+    renderPage();
+
+    expect(screen.getByText("No entries")).toBeTruthy();
+    expect(screen.queryByText("REP-2026-00187")).toBeNull();
+    expect(screen.queryByText("Bangalore - Main Office")).toBeNull();
+  });
+
+  it("opens the details route for a newly submitted request", () => {
+    const request = addRepairRequest();
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Request actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "View Details" }));
+
+    expect(screen.getByTestId("current-path").textContent)
+      .toBe(`/my-services/requests/${request.id}`);
+  });
+
+  it("resolves a shared-prefix ID to its saved service type", () => {
+    const id = "SVC-2026-12345";
+    localStorage.setItem("nido_service_requests", JSON.stringify([{
+      id,
+      requestType: "Repair Service",
+      itemAsset: "Latitude Workstation",
+      assetTag: "ASSET-42",
+      location: "Pune Office",
+      requestDate: "06 Oct 2026",
+      requestDateTs: Date.now(),
+      status: "Scheduled",
+      priority: "Medium",
+      nextAppointment: "14 Oct 2026",
+      requestedBy: "Service Desk",
+      payload: { category: "Computers", brand: "Dell", model: "Latitude" },
+    }]));
+
+    render(
+      <MemoryRouter initialEntries={[`/my-services/requests/${id}`]}>
+        <Routes>
+          <Route path="/my-services/requests/:requestId" element={<MyRequestDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: id })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Raise Follow-up/ })).toBeTruthy();
+  });
+
+  it("saves edits and cancels a stored request from the row menu", () => {
+    const request = addRepairRequest();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Request actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Request" }));
+    fireEvent.change(screen.getByLabelText("Asset Tag"), { target: { value: "ASSET-99" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(getServiceRequests().find(item => item.id === request.id)?.assetTag).toBe("ASSET-99");
+
+    fireEvent.click(screen.getByRole("button", { name: "Request actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Request" }));
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(getServiceRequests().find(item => item.id === request.id)?.status).toBe("Cancelled");
+  });
+});

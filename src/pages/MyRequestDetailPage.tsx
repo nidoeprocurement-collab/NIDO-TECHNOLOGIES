@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { getServiceRequests } from "@/lib/serviceRequestsStore";
 import AMCRequestDetailPage from "./AMCRequestDetailPage";
 import RepairServiceDetailPage from "./RepairServiceDetailPage";
 import RecycleDisposalDetailPage from "./RecycleDisposalDetailPage";
@@ -10,21 +11,23 @@ import RegularPurchaseDetailPage from "./RegularPurchaseDetailPage";
 export default function MyRequestDetailPage() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
+  const storedRequest = getServiceRequests().find(request => request.id === requestId);
+  const requestType = storedRequest?.requestType.trim().toLowerCase();
 
-  // Route to the correct detail page based on ID prefix
-  if (requestId?.startsWith("AMC-")) {
+  // Use the saved request type for new records whose IDs use a shared prefix.
+  if (requestType === "amc" || requestId?.startsWith("AMC-")) {
     return <AMCRequestDetailPage requestId={requestId} />;
   }
-  if (requestId?.startsWith("REP-")) {
+  if (requestType === "repair service" || requestId?.startsWith("REP-")) {
     return <RepairServiceDetailPage requestId={requestId} />;
   }
-  if (requestId?.startsWith("REC-")) {
+  if (requestType === "recycle / disposal" || requestId?.startsWith("REC-")) {
     return <RecycleDisposalDetailPage requestId={requestId} />;
   }
-  if (requestId?.startsWith("REN-")) {
+  if (requestType === "rental service" || requestId?.startsWith("REN-")) {
     return <RentalServiceDetailPage requestId={requestId} />;
   }
-  if (requestId?.startsWith("PUR-")) {
+  if (requestType === "regular purchase" || requestId?.startsWith("PUR-")) {
     return <RegularPurchaseDetailPage requestId={requestId} />;
   }
 
