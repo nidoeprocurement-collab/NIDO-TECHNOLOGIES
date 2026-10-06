@@ -52,7 +52,7 @@ export default function ClientPortalRolesPage() {
       name: newRoleName.trim(),
       description: newRoleDesc.trim(),
       status: 'active',
-      permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module)),
+      permissions: [],
     };
     const updated = [...roles, r];
     setRoles(updated);

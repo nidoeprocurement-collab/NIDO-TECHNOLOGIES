@@ -19,6 +19,7 @@ export interface PortalUser {
 
 const STORE_KEY = 'nido_portal_users';
 const ROLE_STORE_PREFIX = 'nido_portal_roles_';
+const ROLE_MODULES_MIGRATION_PREFIX = 'nido_portal_role_modules_migrated_';
 
 export interface PortalRolePermission {
   module: string;
@@ -45,6 +46,7 @@ export const PORTAL_MODULE_CATALOG = [
   { name: 'Dashboard', description: 'Client portal overview and account activity.' },
   { name: 'Catalog', description: 'Browse and manage the products available to this client.' },
   { name: 'Orders', description: 'Create, review, and track client orders.' },
+  { name: 'Approvals', description: 'Review and approve requests assigned for client approval.' },
   { name: 'Services', description: 'View and manage active client services.' },
   { name: 'Invoices', description: 'View invoices, balances, and payment status.' },
   { name: 'Reports', description: 'View client purchasing and spend reports.' },
@@ -52,6 +54,7 @@ export const PORTAL_MODULE_CATALOG = [
   { name: 'Addresses', description: 'Manage delivery and billing addresses.' },
   { name: 'Contracts', description: 'View current client contracts and terms.' },
   { name: 'Support', description: 'Create and track client support requests.' },
+  { name: 'My Profile', description: 'View and manage the signed-in client user profile.' },
 ] as const;
 
 export const PORTAL_MODULES = PORTAL_MODULE_CATALOG.map(module => module.name);
@@ -72,20 +75,45 @@ const ROLE_BLUEPRINTS: Array<Pick<PortalRole, 'id' | 'name' | 'description'> & {
   { id: 'r8', name: 'Viewer', description: 'Read-only access across all modules', view: [...PORTAL_MODULES] },
 ];
 
+const PORTAL_PERMISSION_ACTIONS = [
+  'view',
+  'create',
+  'edit',
+  'delete',
+  'approve',
+  'export',
+  'import',
+  'manage',
+  'configure',
+] as const;
+
 function defaultPortalRoles(): PortalRole[] {
-  return ROLE_BLUEPRINTS.map(r => ({
-    id: r.id,
-    name: r.name,
-    description: r.description,
-    status: 'active',
-    permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module, {
-      view: r.view.includes(module),
-      create: r.create?.includes(module) ?? false,
-      edit: r.edit?.includes(module) ?? false,
-      delete: false,
-      approve: r.name === 'Approver' && module === 'Orders',
-    })),
-  }));
+  return ROLE_BLUEPRINTS.map(r => {
+    const assignedModules = new Set([...r.view, ...(r.create ?? []), ...(r.edit ?? [])]);
+    if (assignedModules.has('Orders')) assignedModules.add('Approvals');
+    if (assignedModules.has('Dashboard')) assignedModules.add('My Profile');
+
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      status: 'active' as const,
+      permissions: [...assignedModules].map(module => {
+        const sourceModule = module === 'Approvals'
+          ? 'Orders'
+          : module === 'My Profile'
+            ? 'Dashboard'
+            : module;
+        return createPortalRolePermission(module, {
+          view: r.view.includes(sourceModule),
+          create: r.create?.includes(sourceModule) ?? false,
+          edit: r.edit?.includes(sourceModule) ?? false,
+          delete: false,
+          approve: r.name === 'Approver' && ['Orders', 'Approvals'].includes(module),
+        });
+      }),
+    };
+  });
 }
 
 export function createPortalRolePermission(
@@ -129,26 +157,56 @@ function normalizePortalRoles(value: unknown): PortalRole[] {
       name: String(role.name || `Role ${index + 1}`),
       description: String(role.description || ''),
       status: String(role.status || 'active').toLowerCase() === 'active' ? 'active' : 'inactive',
-      permissions: PORTAL_MODULES.map(module => createPortalRolePermission(
-        module,
-        permissionByModule.get(module),
-      )),
+      permissions: [...permissionByModule.entries()]
+        .filter(([module]) => module.trim().length > 0)
+        .map(([module, permission]) => createPortalRolePermission(module, permission)),
     };
   });
 }
 
 export function getPortalRoles(clientId: string): PortalRole[] {
+  const roleStorageKey = `${ROLE_STORE_PREFIX}${clientId}`;
+  const migrationKey = `${ROLE_MODULES_MIGRATION_PREFIX}${clientId}`;
   try {
-    const raw = localStorage.getItem(`${ROLE_STORE_PREFIX}${clientId}`);
+    const raw = localStorage.getItem(roleStorageKey);
     if (!raw) {
       const defaults = defaultPortalRoles();
-      localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(defaults));
+      localStorage.setItem(roleStorageKey, JSON.stringify(defaults));
+      localStorage.setItem(migrationKey, '1');
       return defaults;
     }
-    const normalized = normalizePortalRoles(JSON.parse(raw));
-    // Keep legacy saved roles compatible with the canonical portal module
-    // catalog and complete permission shape.
-    localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(normalized));
+    let normalized = normalizePortalRoles(JSON.parse(raw));
+
+    // Old role records contained every module, including empty rows generated
+    // by normalization. Keep real grants, while converting the former shared
+    // sidebar permissions into independent Approvals and My Profile modules.
+    if (localStorage.getItem(migrationKey) !== '1') {
+      const knownModules = new Set<string>(PORTAL_MODULES);
+      normalized = normalized.map(role => {
+        const permissionByModule = new Map(role.permissions.map(permission => [permission.module, permission]));
+        const legacyAliases = [
+          ['Orders', 'Approvals'],
+          ['Dashboard', 'My Profile'],
+        ] as const;
+        for (const [sourceModule, targetModule] of legacyAliases) {
+          if (!permissionByModule.has(targetModule)) {
+            const sourcePermission = permissionByModule.get(sourceModule);
+            if (sourcePermission) {
+              permissionByModule.set(targetModule, createPortalRolePermission(targetModule, sourcePermission));
+            }
+          }
+        }
+
+        const permissions = [...permissionByModule.values()].filter(permission => {
+          const hasGrant = PORTAL_PERMISSION_ACTIONS.some(action => permission[action]);
+          return hasGrant || !knownModules.has(permission.module);
+        });
+        return { ...role, permissions };
+      });
+      localStorage.setItem(migrationKey, '1');
+    }
+
+    localStorage.setItem(roleStorageKey, JSON.stringify(normalized));
     return normalized;
   } catch {
     return defaultPortalRoles();
@@ -158,7 +216,32 @@ export function getPortalRoles(clientId: string): PortalRole[] {
 export function savePortalRoles(clientId: string, roles: PortalRole[]): void {
   const normalized = normalizePortalRoles(roles);
   localStorage.setItem(`${ROLE_STORE_PREFIX}${clientId}`, JSON.stringify(normalized));
+  localStorage.setItem(`${ROLE_MODULES_MIGRATION_PREFIX}${clientId}`, '1');
   window.dispatchEvent(new Event('nidoPortalRolesUpdated'));
+}
+
+const PORTAL_ROUTE_MODULES: Array<{ path: string; module: string }> = [
+  { path: '/portal/catalog', module: 'Catalog' },
+  { path: '/portal/orders', module: 'Orders' },
+  { path: '/portal/approvals', module: 'Approvals' },
+  { path: '/portal/invoices', module: 'Invoices' },
+  { path: '/portal/my-services', module: 'Services' },
+  { path: '/portal/services', module: 'Services' },
+  { path: '/portal/support', module: 'Support' },
+  { path: '/portal/contracts', module: 'Contracts' },
+  { path: '/portal/reports', module: 'Reports' },
+  { path: '/portal/notifications', module: 'Notifications' },
+  { path: '/portal/addresses', module: 'Addresses' },
+  { path: '/portal/dashboard', module: 'Dashboard' },
+  { path: '/portal/profile', module: 'My Profile' },
+];
+
+export function getPortalModuleForPath(pathname: string): string | null {
+  const normalized = pathname.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+  const match = PORTAL_ROUTE_MODULES
+    .filter(route => normalized === route.path || normalized.startsWith(`${route.path}/`))
+    .sort((left, right) => right.path.length - left.path.length)[0];
+  return match?.module ?? null;
 }
 
 export function getPortalRoleNames(clientId: string): string[] {
@@ -185,7 +268,7 @@ export function hasPortalPermission(
   if (roleName === 'Client Admin') return true;
   // Preserve the built-in approver role's intended capability for legacy
   // records that were saved before the approve permission was added.
-  if (roleName === 'Approver' && module === 'Orders' && action === 'approve') return true;
+  if (roleName === 'Approver' && ['Orders', 'Approvals'].includes(module) && action === 'approve') return true;
   return !!role?.permissions.find(permission => permission.module === module)?.[action];
 }
 

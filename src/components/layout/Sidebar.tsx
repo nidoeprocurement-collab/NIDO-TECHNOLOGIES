@@ -99,9 +99,9 @@ const clientNavigationItems: NavItem[] = [
   { label: 'My Services', icon: <Wrench size={20} />,          path: '/portal/my-services', moduleKey: 'Services' },
   { label: 'Support',     icon: <Headphones size={20} />,      path: '/portal/support', moduleKey: 'Support' },
   { label: 'Contracts',   icon: <FileText size={20} />,        path: '/portal/contracts', moduleKey: 'Contracts' },
-  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals', moduleKey: 'Orders' },
+  { label: 'Approvals',   icon: <FileCheck size={20} />,       path: '/portal/approvals', moduleKey: 'Approvals' },
   { label: 'Reports',     icon: <TrendingUp size={20} />,      path: '/portal/reports', moduleKey: 'Reports' },
-  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile', moduleKey: 'Dashboard' },
+  { label: 'My Profile',  icon: <User size={20} />,            path: '/portal/profile', moduleKey: 'My Profile' },
 ];
 
 // ── Permission-based nav filtering ────────────────────────────────────────────

@@ -938,7 +938,7 @@ export default function ClientRolesPage() {
       name: newRoleName.trim(),
       description: newRoleDescription.trim(),
       status: "active",
-      permissions: PORTAL_MODULES.map(module => createPortalRolePermission(module)),
+      permissions: [],
     };
     persist([...roles, role]);
     setSelectedId(role.id);
@@ -1094,8 +1094,8 @@ export default function ClientRolesPage() {
           name: incoming.name,
           description: incoming.description,
           status: incoming.status,
-          permissions: PORTAL_MODULES.map(module =>
-            incoming.permissions.get(module) || createPortalRolePermission(module),
+          permissions: [...incoming.permissions.values()].filter(permission =>
+            CLIENT_ACTIONS.some(action => permission[action]),
           ),
         };
       });

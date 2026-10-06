@@ -99,7 +99,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { Loader2, ShoppingCart } from "lucide-react";
 import { PreferencesProvider } from "./store/preferencesStore";
 import { I18nProvider } from "./i18n/I18nProvider";
-import { hasPortalPermission } from "@/lib/portalUserStore";
+import { getPortalModuleForPath, hasPortalPermission } from "@/lib/portalUserStore";
 import { observeNativeSelects } from "@/lib/alphabeticalDropdowns";
 
 const queryClient = new QueryClient();
@@ -157,14 +157,7 @@ function ClientPortalRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!isClientPortalUser && !isImpersonating) return <Navigate to="/dashboard" replace />;
   const adminOnly = /\/(users|roles|addresses)(\/|$)/.test(location.pathname);
-  const moduleByPath: Array<[string, string]> = [
-    ["catalog", "Catalog"], ["orders", "Orders"], ["invoices", "Invoices"],
-    ["services", "Services"], ["support", "Support"], ["contracts", "Contracts"],
-    ["approvals", "Orders"], ["reports", "Reports"], ["dashboard", "Dashboard"],
-  ];
-  const portalModule = moduleByPath.find(([segment]) =>
-    location.pathname.includes(`/portal/${segment}`)
-  )?.[1];
+  const portalModule = getPortalModuleForPath(location.pathname);
   const permitted = isImpersonating || (
     !!user?.clientId &&
     (adminOnly
