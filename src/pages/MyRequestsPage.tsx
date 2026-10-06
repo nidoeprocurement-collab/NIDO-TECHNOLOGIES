@@ -492,8 +492,7 @@ export default function MyRequestsPage() {
       {/* ── Header ── */}
       <div className="bg-transparent border-b border-gray-200/70">
         <div className="w-full px-4 py-3">
-          <p className="text-xs text-gray-500">Services / My Requests</p>
-          <h1 className="text-2xl font-bold text-gray-900">My Requests</h1>
+          <h1 className="text-2xl font-bold text-gray-900">My Services</h1>
           <p className="text-sm text-gray-500 mt-0.5">View and track all your service requests</p>
         </div>
       </div>
