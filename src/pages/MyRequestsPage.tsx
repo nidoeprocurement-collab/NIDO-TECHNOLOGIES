@@ -18,6 +18,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { serviceRequestBelongsToPortalUser } from "@/lib/serviceRequestAccess";
 import {
   getServiceRequests,
   updateServiceRequest,
@@ -39,6 +42,9 @@ interface ServiceRequest {
   priority: RequestPriority;
   nextAppointment: string;
   requestedBy: string;
+  clientId?: string;
+  requestedById?: string;
+  requestedByEmail?: string;
   payload?: Record<string, unknown>;
 }
 
@@ -61,6 +67,9 @@ function loadAllRequests(): ServiceRequest[] {
     priority:        s.priority || "Medium",
     nextAppointment: s.nextAppointment || "—",
     requestedBy:     s.requestedBy || "—",
+    clientId:        s.clientId || (typeof s.payload?.clientId === "string" ? s.payload.clientId : undefined),
+    requestedById:   s.requestedById || (typeof s.payload?.requestedById === "string" ? s.payload.requestedById : undefined),
+    requestedByEmail:s.requestedByEmail || (typeof s.payload?.requestedByEmail === "string" ? s.payload.requestedByEmail : undefined),
     payload:         s.payload,
   }));
 }
@@ -326,6 +335,8 @@ function exportCSV(rows: ServiceRequest[]) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function MyRequestsPage() {
   const navigate = useNavigate();
+  const { user, isClientPortalUser } = useAuth();
+  const myServicesPath = isClientPortalUser ? "/portal/my-services" : "/my-services";
   const ITEMS_PER_PAGE = 10;
 
   const [currentPage,  setCurrentPage]  = useState(1);
@@ -348,11 +359,20 @@ export default function MyRequestsPage() {
     };
   }, []);
 
+  const portalClientUsers = isClientPortalUser && user?.clientId
+    ? getPortalUsersByClient(user.clientId)
+    : [];
+  const visibleRequests = isClientPortalUser && user
+    ? allRequests.filter((request) => serviceRequestBelongsToPortalUser(request, user, portalClientUsers))
+    : isClientPortalUser
+      ? []
+      : allRequests;
+
   // ── Apply all filters ──
   const now = Date.now();
   const cutoff = dateRangeCutoff(dateRange, now);
 
-  const filtered = allRequests.filter(r => {
+  const filtered = visibleRequests.filter(r => {
     if (tileFilter === "Pending / Scheduled" && !["Pending", "Scheduled", "Active"].includes(r.status)) return false;
     if (tileFilter !== "All" && tileFilter !== "Pending / Scheduled" && r.status !== tileFilter) return false;
     if (dateRange !== "All Time" && (r.requestDateTs < cutoff || r.requestDateTs > now)) return false;
@@ -397,11 +417,11 @@ export default function MyRequestsPage() {
 
   // ── Stats (dynamic) ──
   const stats = [
-    { label: "Total Requests",      value: allRequests.length,                                                       filterKey: "All",        icon: <ClipboardList className="w-5 h-5 text-blue-500" />,   iconBg: "bg-blue-50",    border: "border-blue-100",    valueColor: "text-gray-900"    },
-    { label: "In Progress",         value: allRequests.filter(r => r.status === "In Progress").length,               filterKey: "In Progress", icon: <CheckCircle2  className="w-5 h-5 text-emerald-500" />, iconBg: "bg-emerald-50", border: "border-emerald-100", valueColor: "text-emerald-600" },
-    { label: "Pending / Scheduled", value: allRequests.filter(r => ["Pending", "Scheduled", "Active"].includes(r.status)).length, filterKey: "Pending / Scheduled", icon: <Clock className="w-5 h-5 text-amber-500" />, iconBg: "bg-amber-50", border: "border-amber-100", valueColor: "text-amber-600" },
-    { label: "Completed",           value: allRequests.filter(r => r.status === "Completed").length,                 filterKey: "Completed",   icon: <CheckSquare   className="w-5 h-5 text-purple-500" />,  iconBg: "bg-purple-50",  border: "border-purple-100",  valueColor: "text-purple-600"  },
-    { label: "Cancelled",           value: allRequests.filter(r => r.status === "Cancelled").length,                 filterKey: "Cancelled",   icon: <XCircle       className="w-5 h-5 text-red-400" />,     iconBg: "bg-red-50",     border: "border-red-100",     valueColor: "text-red-500"     },
+    { label: "Total Requests",      value: visibleRequests.length,                                                       filterKey: "All",        icon: <ClipboardList className="w-5 h-5 text-blue-500" />,   iconBg: "bg-blue-50",    border: "border-blue-100",    valueColor: "text-gray-900"    },
+    { label: "In Progress",         value: visibleRequests.filter(r => r.status === "In Progress").length,               filterKey: "In Progress", icon: <CheckCircle2  className="w-5 h-5 text-emerald-500" />, iconBg: "bg-emerald-50", border: "border-emerald-100", valueColor: "text-emerald-600" },
+    { label: "Pending / Scheduled", value: visibleRequests.filter(r => ["Pending", "Scheduled", "Active"].includes(r.status)).length, filterKey: "Pending / Scheduled", icon: <Clock className="w-5 h-5 text-amber-500" />, iconBg: "bg-amber-50", border: "border-amber-100", valueColor: "text-amber-600" },
+    { label: "Completed",           value: visibleRequests.filter(r => r.status === "Completed").length,                 filterKey: "Completed",   icon: <CheckSquare   className="w-5 h-5 text-purple-500" />,  iconBg: "bg-purple-50",  border: "border-purple-100",  valueColor: "text-purple-600"  },
+    { label: "Cancelled",           value: visibleRequests.filter(r => r.status === "Cancelled").length,                 filterKey: "Cancelled",   icon: <XCircle       className="w-5 h-5 text-red-400" />,     iconBg: "bg-red-50",     border: "border-red-100",     valueColor: "text-red-500"     },
   ];
 
   return (
@@ -506,7 +526,7 @@ export default function MyRequestsPage() {
                     open={filterOpen}
                     onClose={() => setFilterOpen(false)}
                     filters={filters}
-                    requests={allRequests}
+                    requests={visibleRequests}
                     onApply={f => { setFilters(f); setCurrentPage(1); }}
                   />
                 </div>
@@ -578,7 +598,7 @@ export default function MyRequestsPage() {
                     <tr key={req.id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3">
                         <button
-                          onClick={() => navigate(`/my-services/requests/${req.id}`)}
+                          onClick={() => navigate(`${myServicesPath}/requests/${req.id}`)}
                           className="text-blue-600 font-semibold hover:underline text-xs truncate block max-w-full text-left"
                         >
                           {req.id}
@@ -602,7 +622,7 @@ export default function MyRequestsPage() {
                       <td className="px-3 py-3">
                         <RowActions
                           onView={() => navigate(`/my-services/requests/${req.id}`)}
-                          onEdit={() => navigate(`/my-services/requests/${req.id}/edit`)}
+                          onEdit={() => navigate(`${myServicesPath}/requests/${req.id}/edit`)}
                           onCancel={() => handleCancelRequest(req)}
                           cancelDisabled={["completed", "cancelled", "closed"].includes(req.status.toLowerCase())}
                         />

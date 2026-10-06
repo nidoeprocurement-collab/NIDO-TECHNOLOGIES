@@ -216,7 +216,7 @@ export default function RegularPurchaseDetailPage({ requestId }: { requestId?: s
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate("/my-services")}
+                onClick={() => navigate(window.location.pathname.startsWith("/portal/") ? "/portal/my-services" : "/my-services")}
                 className="mt-1 p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />

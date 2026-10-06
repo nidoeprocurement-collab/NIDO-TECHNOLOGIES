@@ -1167,6 +1167,36 @@ function AppRoutes() {
           />
           {/* Services */}
           <Route
+            path="portal/my-services"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="My Services failed to load" resetKey={location.pathname}>
+                  <MyRequestsPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/my-services/requests/:requestId/edit"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Service request edit failed to load" resetKey={location.pathname}>
+                  <EditServiceRequestPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
+            path="portal/my-services/requests/:requestId"
+            element={
+              <ClientPortalRoute>
+                <PageErrorBoundary title="Service request details failed to load" resetKey={location.pathname}>
+                  <MyRequestDetailPage />
+                </PageErrorBoundary>
+              </ClientPortalRoute>
+            }
+          />
+          <Route
             path="portal/services"
             element={
               <ClientPortalRoute>

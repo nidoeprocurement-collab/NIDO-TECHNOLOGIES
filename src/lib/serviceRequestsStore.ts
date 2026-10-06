@@ -20,6 +20,9 @@ export interface StoredServiceRequest {
   priority: string;
   nextAppointment: string;
   requestedBy: string;
+  clientId?: string;
+  requestedById?: string;
+  requestedByEmail?: string;
   department?: string;
   assignedTo?: string;
   assignedRole?: string;
@@ -64,7 +67,7 @@ export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "reques
     ...req,
     ...(() => {
       const payload = req.payload ?? {};
-      const clientId = typeof payload.clientId === "string" ? payload.clientId : undefined;
+      const clientId = req.clientId || (typeof payload.clientId === "string" ? payload.clientId : undefined);
       const department = typeof payload.department === "string" ? payload.department : undefined;
       const role = typeof payload.role === "string" ? payload.role : undefined;
       const resolution =
@@ -73,6 +76,7 @@ export function addServiceRequest(req: Omit<StoredServiceRequest, "id" | "reques
         ?? resolveAutoAssignment({ clientId });
       const assignedUser = resolution?.users[0];
       return {
+        clientId,
         department: resolution?.rule.department || department,
         assignedTo: assignedUser?.name || assignedUser?.email || "Unassigned",
         assignedRole: assignedUser?.role || resolution?.rule.role,

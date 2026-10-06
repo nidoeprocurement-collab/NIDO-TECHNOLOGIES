@@ -424,7 +424,7 @@ export default function AMCRequestDetailPage({ requestId }: { requestId: string 
           {/* Left */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate("/my-services")}
+              onClick={() => navigate(window.location.pathname.startsWith("/portal/") ? "/portal/my-services" : "/my-services")}
               className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />

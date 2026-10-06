@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { getServiceRequests, updateServiceRequest } from "@/lib/serviceRequestsStore";
 import type { StoredServiceRequest } from "@/lib/serviceRequestsStore";
+import { getPortalUsersByClient } from "@/lib/portalUserStore";
+import { serviceRequestBelongsToPortalUser } from "@/lib/serviceRequestAccess";
 
 type EditableValue = string | number | boolean;
 
@@ -83,16 +86,27 @@ const labelClass = "mb-1 block text-sm font-medium text-gray-700";
 export default function EditServiceRequestPage() {
   const { requestId = "" } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
+  const { user, isClientPortalUser } = useAuth();
   const [request] = useState(() => getServiceRequests().find((item) => item.id === requestId));
   const [draft, setDraft] = useState<EditDraft | null>(() => initialDraft(request));
+  const myServicesPath = isClientPortalUser ? "/portal/my-services" : "/my-services";
+  const canEdit = !isClientPortalUser || Boolean(
+    user
+    && request
+    && serviceRequestBelongsToPortalUser(
+      request,
+      user,
+      user.clientId ? getPortalUsersByClient(user.clientId) : [],
+    ),
+  );
 
-  if (!request || !draft) {
+  if (!request || !draft || !canEdit) {
     return (
       <div className="min-h-screen bg-gray-50">
         <header className="border-b border-gray-200 bg-white px-6 py-5">
           <button
             type="button"
-            onClick={() => navigate("/my-services")}
+            onClick={() => navigate(myServicesPath)}
             className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" /> Back to My Services
@@ -170,11 +184,11 @@ export default function EditServiceRequestPage() {
 
     if (!updated) {
       toast.error("This request is no longer available.");
-      navigate("/my-services");
+      navigate(myServicesPath);
       return;
     }
     toast.success("Request updated.");
-    navigate("/my-services");
+    navigate(myServicesPath);
   };
 
   const payloadFields = Object.entries(draft.payloadValues);
@@ -202,7 +216,7 @@ export default function EditServiceRequestPage() {
           </div>
           <button
             type="button"
-            onClick={() => navigate("/my-services")}
+            onClick={() => navigate(myServicesPath)}
             className="flex flex-shrink-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             <ListChecks className="h-4 w-4" /> My Services
@@ -345,7 +359,7 @@ export default function EditServiceRequestPage() {
           <div className="flex justify-end gap-3 pb-2">
             <button
               type="button"
-              onClick={() => navigate("/my-services")}
+              onClick={() => navigate(myServicesPath)}
               className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Cancel

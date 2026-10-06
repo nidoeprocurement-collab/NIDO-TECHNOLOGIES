@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 import MyRequestsPage from "@/pages/MyRequestsPage";
 import MyRequestDetailPage from "@/pages/MyRequestDetailPage";
 import EditServiceRequestPage from "@/pages/EditServiceRequestPage";
@@ -16,14 +17,16 @@ function LocationProbe() {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={["/my-services"]}>
-      <LocationProbe />
-      <Routes>
-        <Route path="/my-services" element={<MyRequestsPage />} />
-        <Route path="/my-services/requests/:requestId/edit" element={<EditServiceRequestPage />} />
-        <Route path="/my-services/requests/:requestId" element={<MyRequestDetailPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter initialEntries={["/my-services"]}>
+        <LocationProbe />
+        <Routes>
+          <Route path="/my-services" element={<MyRequestsPage />} />
+          <Route path="/my-services/requests/:requestId/edit" element={<EditServiceRequestPage />} />
+          <Route path="/my-services/requests/:requestId" element={<MyRequestDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   );
 }
 
@@ -121,11 +124,13 @@ describe("My Requests", () => {
     }]));
 
     render(
-      <MemoryRouter initialEntries={[`/my-services/requests/${id}`]}>
-        <Routes>
-          <Route path="/my-services/requests/:requestId" element={<MyRequestDetailPage />} />
-        </Routes>
-      </MemoryRouter>,
+      <AuthProvider>
+        <MemoryRouter initialEntries={[`/my-services/requests/${id}`]}>
+          <Routes>
+            <Route path="/my-services/requests/:requestId" element={<MyRequestDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
     );
 
     expect(screen.getByRole("heading", { name: id })).toBeTruthy();
