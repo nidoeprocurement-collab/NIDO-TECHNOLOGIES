@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import MyRequestsPage from "@/pages/MyRequestsPage";
 import MyRequestDetailPage from "@/pages/MyRequestDetailPage";
+import EditServiceRequestPage from "@/pages/EditServiceRequestPage";
 import {
   addServiceRequest,
   getServiceRequests,
@@ -17,7 +18,11 @@ function renderPage() {
   return render(
     <MemoryRouter initialEntries={["/my-services"]}>
       <LocationProbe />
-      <MyRequestsPage />
+      <Routes>
+        <Route path="/my-services" element={<MyRequestsPage />} />
+        <Route path="/my-services/requests/:requestId/edit" element={<EditServiceRequestPage />} />
+        <Route path="/my-services/requests/:requestId" element={<MyRequestDetailPage />} />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -33,7 +38,16 @@ function addRepairRequest() {
     priority: "Medium",
     nextAppointment: "14 Oct 2026\n10:00 AM",
     requestedBy: "Service Desk",
-    payload: { requestType: "Repair Service", location: "Pune Office" },
+    payload: {
+      requestType: "Repair Service",
+      location: "Pune Office",
+      category: "Computers & Laptops",
+      brand: "Dell",
+      model: "Latitude 5420",
+      serialNumber: "SER-42",
+      issueSubject: "Screen flickers",
+      issueDesc: "Intermittent flicker.",
+    },
   }, "REP");
 }
 
@@ -118,17 +132,21 @@ describe("My Requests", () => {
     expect(screen.getByRole("button", { name: /Raise Follow-up/ })).toBeTruthy();
   });
 
-  it("saves edits and cancels a stored request from the row menu", () => {
+  it("opens a full-page edit form, saves changes, and cancels from the row menu", () => {
     const request = addRepairRequest();
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Request actions" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit Request" }));
+    expect(screen.getByRole("heading", { name: "Edit Request" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.change(screen.getByLabelText("Asset Tag"), { target: { value: "ASSET-99" } });
+    fireEvent.change(screen.getByLabelText("Issue Subject"), { target: { value: "Power issue" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     expect(getServiceRequests().find(item => item.id === request.id)?.assetTag).toBe("ASSET-99");
+    expect(getServiceRequests().find(item => item.id === request.id)?.payload?.issueSubject).toBe("Power issue");
 
     fireEvent.click(screen.getByRole("button", { name: "Request actions" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel Request" }));

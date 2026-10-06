@@ -278,6 +278,7 @@ const CreateChildTicketPage = lazy(() => import("@/pages/CreateChildTicketPage")
 const ChildTicketDetailPage = lazy(() => import("@/pages/ChildTicketDetailPage"));
 const MyRequestsPage = lazy(() => import("@/pages/MyRequestsPage"));
 const MyRequestDetailPage = lazy(() => import("@/pages/MyRequestDetailPage"));
+const EditServiceRequestPage = lazy(() => import("@/pages/EditServiceRequestPage"));
 const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
 const ClientServicesPage = lazy(() => import("@/pages/ClientServicesPage"));
 const NewAMCRequestPage = lazy(() => import("@/pages/NewAMCRequestPage"));
@@ -796,6 +797,7 @@ function AppRoutes() {
          <Route path="services/rental/new" element={<NewRentalServicePage />} />
          <Route path="services/purchase/new" element={<NewRegularPurchasePage />} />
           <Route path="my-services" element={<MyRequestsPage />} />
+           <Route path="my-services/requests/:requestId/edit" element={<EditServiceRequestPage />} />
           <Route path="my-services/requests/:requestId" element={<MyRequestDetailPage />} />
           <Route path="support" element={<SupportPage />} />
           <Route path="support/tickets" element={<SupportTicketsPage />} />

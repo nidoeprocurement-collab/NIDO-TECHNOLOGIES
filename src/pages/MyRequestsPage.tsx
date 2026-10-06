@@ -21,7 +21,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   getServiceRequests,
   updateServiceRequest,
-  type ServiceRequestUpdates,
 } from "@/lib/serviceRequestsStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -324,131 +323,6 @@ function exportCSV(rows: ServiceRequest[]) {
   URL.revokeObjectURL(url);
 }
 
-function RequestEditModal({
-  request,
-  onClose,
-  onSave,
-}: {
-  request: ServiceRequest;
-  onClose: () => void;
-  onSave: (updates: ServiceRequestUpdates) => void;
-}) {
-  const [draft, setDraft] = useState({
-    itemAsset: request.itemAsset,
-    assetTag: request.assetTag,
-    location: request.location === "—" ? "" : request.location,
-    status: request.status,
-    priority: request.priority,
-    nextAppointment: request.nextAppointment === "—" ? "" : request.nextAppointment,
-    requestedBy: request.requestedBy === "—" ? "" : request.requestedBy,
-  });
-  const statuses = Array.from(new Set([
-    "Pending", "Scheduled", "Active", "In Progress", "Completed", draft.status,
-  ].filter(Boolean)));
-  const priorities = Array.from(new Set(["Low", "Medium", "High", draft.priority].filter(Boolean)));
-  const setField = (field: keyof typeof draft, value: string) => {
-    setDraft(current => ({ ...current, [field]: value }));
-  };
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const itemAsset = draft.itemAsset.trim();
-    const location = draft.location.trim();
-    if (!itemAsset || !location) {
-      toast.error("Item / Asset and Location are required.");
-      return;
-    }
-    onSave({
-      itemAsset,
-      assetTag: draft.assetTag.trim(),
-      location,
-      status: draft.status,
-      priority: draft.priority,
-      nextAppointment: draft.nextAppointment.trim() || "—",
-      requestedBy: draft.requestedBy.trim() || "—",
-      payload: {
-        ...(request.payload ?? {}),
-        location,
-        status: draft.status,
-        priority: draft.priority,
-      },
-    });
-  };
-
-  const inputClass = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
-  const labelClass = "mb-1 block text-xs font-medium text-gray-600";
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-request-title"
-        className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl"
-      >
-        <header className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <div>
-            <h2 id="edit-request-title" className="text-base font-semibold text-gray-900">Edit Request</h2>
-            <p className="mt-0.5 text-xs text-gray-500">{request.id} · {request.requestType}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close edit request" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
-            <X className="h-4 w-4" />
-          </button>
-        </header>
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 gap-4 px-5 py-4 sm:grid-cols-2">
-            <label>
-              <span className={labelClass}>Item / Asset *</span>
-              <input required className={inputClass} value={draft.itemAsset} onChange={e => setField("itemAsset", e.target.value)} />
-            </label>
-            <label>
-              <span className={labelClass}>Asset Tag</span>
-              <input className={inputClass} value={draft.assetTag} onChange={e => setField("assetTag", e.target.value)} />
-            </label>
-            <label>
-              <span className={labelClass}>Location *</span>
-              <input required className={inputClass} value={draft.location} onChange={e => setField("location", e.target.value)} />
-            </label>
-            <label>
-              <span className={labelClass}>Status</span>
-              <select className={inputClass} value={draft.status} onChange={e => setField("status", e.target.value)}>
-                {statuses.map(status => <option key={status} value={status}>{status}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className={labelClass}>Priority</span>
-              <select className={inputClass} value={draft.priority} onChange={e => setField("priority", e.target.value)}>
-                {priorities.map(priority => <option key={priority} value={priority}>{priority}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className={labelClass}>Requested By</span>
-              <input className={inputClass} value={draft.requestedBy} onChange={e => setField("requestedBy", e.target.value)} />
-            </label>
-            <label className="sm:col-span-2">
-              <span className={labelClass}>Next Appointment</span>
-              <textarea
-                rows={2}
-                className={inputClass}
-                value={draft.nextAppointment}
-                onChange={e => setField("nextAppointment", e.target.value)}
-              />
-            </label>
-          </div>
-          <footer className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
-            <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-              Discard
-            </button>
-            <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              Save Changes
-            </button>
-          </footer>
-        </form>
-      </section>
-    </div>
-  );
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function MyRequestsPage() {
   const navigate = useNavigate();
@@ -460,7 +334,6 @@ export default function MyRequestsPage() {
   const [filters,      setFilters]       = useState<Filters>(EMPTY_FILTERS);
   const [filterOpen,   setFilterOpen]   = useState(false);
   const [allRequests,  setAllRequests]  = useState<ServiceRequest[]>(() => loadAllRequests());
-  const [editingRequest, setEditingRequest] = useState<ServiceRequest | null>(null);
   const filterBtnRef = useRef<HTMLDivElement>(null);
 
   // Keep the list current after submissions, edits, or cancellations.
@@ -497,18 +370,6 @@ export default function MyRequestsPage() {
   const handleTile = (key: string) => {
     setTileFilter(prev => prev === key ? "All" : key);
     setCurrentPage(1);
-  };
-
-  const handleSaveEdit = (updates: ServiceRequestUpdates) => {
-    if (!editingRequest) return;
-    const updated = updateServiceRequest(editingRequest.id, updates);
-    if (!updated) {
-      toast.error("This request is no longer available.");
-      setEditingRequest(null);
-      return;
-    }
-    toast.success("Request updated.");
-    setEditingRequest(null);
   };
 
   const handleCancelRequest = (request: ServiceRequest) => {
@@ -741,7 +602,7 @@ export default function MyRequestsPage() {
                       <td className="px-3 py-3">
                         <RowActions
                           onView={() => navigate(`/my-services/requests/${req.id}`)}
-                          onEdit={() => setEditingRequest(req)}
+                          onEdit={() => navigate(`/my-services/requests/${req.id}/edit`)}
                           onCancel={() => handleCancelRequest(req)}
                           cancelDisabled={["completed", "cancelled", "closed"].includes(req.status.toLowerCase())}
                         />
@@ -788,13 +649,6 @@ export default function MyRequestsPage() {
           </CardContent>
         </Card>
       </div>
-      {editingRequest && (
-        <RequestEditModal
-          request={editingRequest}
-          onClose={() => setEditingRequest(null)}
-          onSave={handleSaveEdit}
-        />
-      )}
     </div>
   );
 }
