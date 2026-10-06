@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { addServiceRequest, peekNextId } from "@/lib/serviceRequestsStore";
 import { getClients, type StoredClient } from "@/lib/clientStore";
 import { getHsnCodes, getSacCodes } from "@/lib/taxEngine";
+import {
+  addCustomAMCEquipmentOption,
+  getCustomAMCEquipmentOptions,
+  type CustomAMCEquipmentOptions,
+} from "@/lib/amcEquipmentOptionsStore";
 
 // ─── Static options ────────────────────────────────────────────────────────────
 const REQUEST_TYPES = ["AMC Service"];
@@ -141,7 +146,8 @@ function clientLocationLabel(c: StoredClient): string {
 function loadCategories(): string[] {
   const hsn = getHsnCodes().filter(c => c.status === "Active").map(c => c.productCategory);
   const sac = getSacCodes().filter(c => c.status === "Active").map(c => c.serviceCategory);
-  return Array.from(new Set([...hsn, ...sac])).sort((a, b) => a.localeCompare(b));
+  const custom = getCustomAMCEquipmentOptions().categories;
+  return Array.from(new Set([...hsn, ...sac, ...custom])).sort((a, b) => a.localeCompare(b));
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -153,8 +159,22 @@ interface SelectFieldProps {
   options: string[];
   placeholder?: string;
   disabled?: boolean;
+  onAddNew?: () => void;
+  addNewLabel?: string;
 }
-function SelectField({ label, required, value, onChange, options, placeholder = `Select ${label}`, disabled }: SelectFieldProps) {
+const ADD_NEW_OPTION_VALUE = "__add_new_option__";
+
+function SelectField({
+  label,
+  required,
+  value,
+  onChange,
+  options,
+  placeholder = `Select ${label}`,
+  disabled,
+  onAddNew,
+  addNewLabel = `+ Add new ${label.toLowerCase()}`,
+}: SelectFieldProps) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-sm font-medium text-gray-700">
@@ -163,12 +183,19 @@ function SelectField({ label, required, value, onChange, options, placeholder = 
       <div className="relative">
         <select
           value={value}
-          onChange={e => onChange(e.target.value)}
+          onChange={e => {
+            if (e.target.value === ADD_NEW_OPTION_VALUE) {
+              onAddNew?.();
+              return;
+            }
+            onChange(e.target.value);
+          }}
           disabled={disabled}
           className="w-full appearance-none pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400 cursor-pointer transition-colors hover:border-gray-400"
         >
           <option value="">{placeholder}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
+          {onAddNew && <option value={ADD_NEW_OPTION_VALUE}>{addNewLabel}</option>}
         </select>
         <svg className="w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </div>
@@ -210,16 +237,23 @@ export default function NewAMCRequestPage() {
   // ── Live data ──
   const [clients,    setClients]    = useState<StoredClient[]>(() => getClients());
   const [categories, setCategories] = useState<string[]>(() => loadCategories());
+  const [equipmentOptions, setEquipmentOptions] = useState<CustomAMCEquipmentOptions>(() => getCustomAMCEquipmentOptions());
 
   // Reload when underlying stores change
   useEffect(() => {
     const onClientsChange = () => setClients(getClients());
     const onTaxChange     = () => setCategories(loadCategories());
+    const onEquipmentOptionsChange = () => {
+      setEquipmentOptions(getCustomAMCEquipmentOptions());
+      setCategories(loadCategories());
+    };
     window.addEventListener("nidoClientsUpdated", onClientsChange);
     window.addEventListener("taxEngineUpdated",   onTaxChange);
+    window.addEventListener("amcEquipmentOptionsUpdated", onEquipmentOptionsChange);
     return () => {
       window.removeEventListener("nidoClientsUpdated", onClientsChange);
       window.removeEventListener("taxEngineUpdated",   onTaxChange);
+      window.removeEventListener("amcEquipmentOptionsUpdated", onEquipmentOptionsChange);
     };
   }, []);
 
@@ -232,6 +266,9 @@ export default function NewAMCRequestPage() {
   const [category,     setCategory]     = useState("");
   const [brand,        setBrand]        = useState("");
   const [model,        setModel]        = useState("");
+  const [addingOptionFor, setAddingOptionFor] = useState<"category" | "brand" | "model" | null>(null);
+  const [newOptionValue, setNewOptionValue] = useState("");
+  const [newOptionError, setNewOptionError] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [assetTag,     setAssetTag]     = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
@@ -278,12 +315,62 @@ export default function NewAMCRequestPage() {
 
   // ── Computed options ──
   const availableBrands = category
-    ? (BRANDS_BY_CATEGORY[category] ?? ["Other"])
+    ? Array.from(new Set([
+        ...(BRANDS_BY_CATEGORY[category] ?? []),
+        ...(equipmentOptions.brandsByCategory[category] ?? []),
+      ])).sort((a, b) => a.localeCompare(b))
     : [];
 
   const availableModels = category && brand
-    ? (MODELS_BY_BRAND[category]?.[brand] ?? ["Other"])
+    ? Array.from(new Set([
+        ...(MODELS_BY_BRAND[category]?.[brand] ?? []),
+        ...(equipmentOptions.modelsByCategory[category]?.[brand] ?? []),
+      ])).sort((a, b) => a.localeCompare(b))
     : [];
+
+  const startAddingOption = (kind: "category" | "brand" | "model") => {
+    setAddingOptionFor(kind);
+    setNewOptionValue("");
+    setNewOptionError("");
+  };
+
+  const saveNewEquipmentOption = () => {
+    const cleaned = newOptionValue.trim().replace(/\s+/g, " ");
+    if (!cleaned || !addingOptionFor) {
+      setNewOptionError("Enter a name to add.");
+      return;
+    }
+
+    const currentOptions = addingOptionFor === "category"
+      ? categories
+      : addingOptionFor === "brand"
+        ? availableBrands
+        : availableModels;
+    const existing = currentOptions.find((option) => option.toLocaleLowerCase() === cleaned.toLocaleLowerCase());
+    if (existing) {
+      if (addingOptionFor === "category") setCategory(existing);
+      if (addingOptionFor === "brand") setBrand(existing);
+      if (addingOptionFor === "model") setModel(existing);
+      setAddingOptionFor(null);
+      setNewOptionValue("");
+      toast.info(`${existing} is already available and has been selected.`);
+      return;
+    }
+
+    try {
+      const result = addCustomAMCEquipmentOption(addingOptionFor, cleaned, category, brand);
+      setEquipmentOptions(getCustomAMCEquipmentOptions());
+      if (addingOptionFor === "category") setCategory(result.value);
+      if (addingOptionFor === "brand") setBrand(result.value);
+      if (addingOptionFor === "model") setModel(result.value);
+      setAddingOptionFor(null);
+      setNewOptionValue("");
+      setNewOptionError("");
+      toast.success(`${result.value} added to ${addingOptionFor} options.`);
+    } catch (error) {
+      setNewOptionError(error instanceof Error ? error.message : "Could not add this option.");
+    }
+  };
 
   // ── Computed AMC schedule info ──
   const totalVisits  = VISITS_PER_PERIOD[amcPeriod]?.[visitFreq] ?? 0;
@@ -511,18 +598,68 @@ export default function NewAMCRequestPage() {
             <SelectField
               label="Category" required value={category} onChange={setCategory}
               options={categories} placeholder="Select Category"
+              onAddNew={() => startAddingOption("category")}
             />
             <SelectField
               label="Brand" required value={brand} onChange={setBrand}
               options={availableBrands} placeholder={category ? "Select Brand" : "Select Category first"}
               disabled={!category}
+              onAddNew={() => startAddingOption("brand")}
             />
             <SelectField
               label="Model" required value={model} onChange={setModel}
               options={availableModels} placeholder={brand ? "Select Model" : "Select Brand first"}
               disabled={!brand}
+              onAddNew={() => startAddingOption("model")}
             />
           </div>
+          {addingOptionFor && (
+            <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+              <label htmlFor="new-amc-equipment-option" className="mb-2 block text-sm font-medium text-gray-800">
+                Add new {addingOptionFor}
+                {addingOptionFor !== "category" && (
+                  <span className="ml-1 text-xs font-normal text-gray-500">
+                    under {addingOptionFor === "brand" ? category : `${brand} · ${category}`}
+                  </span>
+                )}
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="new-amc-equipment-option"
+                  autoFocus
+                  value={newOptionValue}
+                  onChange={(event) => {
+                    setNewOptionValue(event.target.value);
+                    setNewOptionError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      saveNewEquipmentOption();
+                    }
+                  }}
+                  placeholder={`Enter ${addingOptionFor} name`}
+                  className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setAddingOptionFor(null)}
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveNewEquipmentOption}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Add {addingOptionFor}
+                </button>
+              </div>
+              {newOptionError && <p role="alert" className="mt-2 text-xs text-red-600">{newOptionError}</p>}
+              <p className="mt-2 text-xs text-gray-500">This option will be saved for future AMC requests.</p>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
             <TextField label="Serial Number"          value={serialNumber} onChange={setSerialNumber} placeholder="Enter Serial Number" />
             <TextField label="Asset Tag (Optional)"   value={assetTag}     onChange={setAssetTag}     placeholder="Enter Asset Tag" />
