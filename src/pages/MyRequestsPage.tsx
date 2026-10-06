@@ -621,7 +621,7 @@ export default function MyRequestsPage() {
                       <td className="px-3 py-3 text-gray-700 truncate">{req.requestedBy}</td>
                       <td className="px-3 py-3">
                         <RowActions
-                          onView={() => navigate(`/my-services/requests/${req.id}`)}
+                          onView={() => navigate(`${myServicesPath}/requests/${req.id}`)}
                           onEdit={() => navigate(`${myServicesPath}/requests/${req.id}/edit`)}
                           onCancel={() => handleCancelRequest(req)}
                           cancelDisabled={["completed", "cancelled", "closed"].includes(req.status.toLowerCase())}
