@@ -298,9 +298,14 @@ export async function generatePOPdfBase64(po: StoredPO): Promise<string> {
   y += cardHeight + 16;
 
   // ── Line items table ──────────────────────────────────────────────────────
+  const activePoLines = (po.items || []).filter(
+    (line) => String((line as any).status || "").toLowerCase() !== "cancelled",
+  );
   const tableItems =
-    po.items && po.items.length > 0
-      ? po.items
+    activePoLines.length > 0
+      ? activePoLines
+      : po.items && po.items.length > 0
+        ? []
       : [{ item: po.item, referenceNumber: po.referenceNumber, hsnCode: po.hsnCode, qty: po.qty, unitPrice: po.unitPrice, lineSubtotal: po.subtotal }];
 
   const gstRate = po.sgstPct + po.cgstPct; // combined GST % for all PO items

@@ -5,14 +5,12 @@
   import CheckoutStepper from "./CheckoutStepper";
   import OrderSummaryPanel from "./OrderSummaryPanel";
   import { useCart } from "@/contexts/CartContext";
-  import { computeCartGST } from "@/lib/cartGstHelper";
-  import { getSlabDiscountPct } from "@/lib/priceEngineStore";
+import { calculateCartPricing } from "@/lib/cartPricing";
   import { useMyOrders, type OrderCartItem } from "@/contexts/MyOrdersContext";
 import { createApprovalRequest } from "@/lib/approvalEngine";
   import { reserveVendorStock } from "@/lib/vendorStore";
   import { useI18n } from "@/i18n/I18nProvider";
   import { formatCurrency } from "@/lib/formatters";
-import { getCartTaxRate, getCartUnitPriceInclusive } from "@/lib/vendorCartPricing";
 import {
   DELIVERY_INSTRUCTIONS_KEY,
   ORDER_NOTES_KEY,
@@ -175,27 +173,28 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
 
     const paymentSummary = getPaymentSummary();
 
-    // priceNum is tax-inclusive — extract embedded GST, don't add on top.
-    // Apply slab discount (same logic as CartPage) before computing GST.
-    const getEffectivePrice = (i: Parameters<typeof getCartUnitPriceInclusive>[0] & { quantity: number }) => {
-      const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-      const taxRate = getCartTaxRate(i) ?? 0;
-      const inclusivePrice = getCartUnitPriceInclusive(i, taxRate);
-      return discountPct > 0 ? inclusivePrice * (1 - discountPct / 100) : inclusivePrice;
-    };
-    const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
-      cart.map(i => ({ inclusiveAmount: getEffectivePrice(i) * i.quantity, category: i.category, taxRate: getCartTaxRate(i) }))
-    );
-    const subtotal = preTaxSubtotal;
+    const cartPricing = calculateCartPricing(cart);
+    const {
+      slabs: gstSlabs,
+      totalGst,
+      preTaxSubtotal: subtotal,
+      shippingDeliveryFee,
+      platformFee,
+      grandTotal: totalAmount,
+    } = cartPricing;
     const handlePlaceOrder = async () => {
       const now = new Date();
       const today = now.toISOString().split("T")[0];
-      const itemsSnapshot = cart.map((i) => ({ ...i }));
+      const itemsSnapshot = cart.map((i, index) => ({
+        ...i,
+        checkoutUnitPriceInclusive: cartPricing.lines[index].checkoutUnitPriceInclusive,
+        checkoutUnitPriceExclGst: cartPricing.lines[index].checkoutUnitPriceExclGst,
+        checkoutGstRate: cartPricing.lines[index].taxRate,
+      }));
       const orderNotes = limitCheckoutNote(localStorage.getItem(ORDER_NOTES_KEY) || "").trim();
-      const totalAmount = subtotal + totalGst;
       const orderDate = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
       const orderTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-      const formattedTotal = "₹" + totalAmount.toLocaleString("en-IN");
+      const formattedTotal = formatCurrency(totalAmount);
       const poRef = Date.now().toString().slice(-6);
       const requesterOptions = getOrderRequesterOptions(
         getPortalUsersByClient(cart[0]?.clientId || clientId).filter(user => user.status === "active"),
@@ -244,6 +243,10 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
         slaAlert: false,
         totalAmount: formattedTotal,
         totalAmountNum: totalAmount,
+        checkoutPricingSnapshot: {
+          shippingDeliveryFee,
+          platformFeePct: cartPricing.platformFeePct,
+        },
         paymentMethod: paymentSummary.label,
         paymentDetail: paymentSummary.detail,
         paymentTerms: paymentTermsLabel,
@@ -275,6 +278,10 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
           category: i.category,
           specs: Array.isArray(i.specs) ? i.specs : i.specs ? [i.specs] : [],
           moq: i.moq,
+          productType: i.productType,
+          physicalType: i.physicalType,
+          fulfillmentType: i.fulfillmentType,
+          commercialTerms: i.commercialTerms,
           clientId: i.clientId,
           productCode: i.productCode,
           vendorAllocations: i.vendorAllocations,
@@ -285,6 +292,9 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
           clientSellingPriceExclGst: i.clientSellingPriceExclGst,
           landedCost: i.landedCost,
           gstSnapshot: i.gstSnapshot,
+          checkoutUnitPriceInclusive: i.checkoutUnitPriceInclusive,
+          checkoutUnitPriceExclGst: i.checkoutUnitPriceExclGst,
+          checkoutGstRate: i.checkoutGstRate,
           hsnSnapshot: i.hsnSnapshot,
           vendorRating: i.vendorRating,
           configuration: i.configuration,
@@ -347,7 +357,8 @@ import { createDraftPOsForOrder } from "@/lib/orderPurchaseOrderService";
           subtotal,
           gst: totalGst,
           gstSlabs,
-          shipping: 0,
+          shipping: shippingDeliveryFee,
+          platformFee,
           total: totalAmount,
           address: selectedAddr
             ? { label: selectedAddr.label, line1: selectedAddr.line1, line2: selectedAddr.line2 ?? "", city: selectedAddr.city ?? "", state: selectedAddr.state ?? "", zip: selectedAddr.zip ?? "", phone: selectedAddr.phone }

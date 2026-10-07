@@ -1,3 +1,5 @@
+import { formatCurrency } from "./formatters";
+
 const ORDERS_KEY = "nido_client_orders_v1";
 const SERVICES_KEY = "nido_client_services_v1";
 const ACTIVITIES_KEY = "nido_client_activities_v1";
@@ -149,7 +151,9 @@ export function getClientOrders(clientId: string, clientName?: string): ClientOr
         clientId,
         date: order.orderDate || "",
         items: order.cartItems?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || order.cartItems?.length || 0,
-        amount: order.totalAmount || `₹${Number(order.totalAmountNum || 0).toLocaleString("en-IN")}`,
+        amount: Number.isFinite(Number(order.totalAmountNum))
+          ? formatCurrency(Number(order.totalAmountNum))
+          : order.totalAmount || "",
         amountNum: Number(order.totalAmountNum || 0),
         client: order.client || clientName || clientId,
         status: order.status || "Processing",

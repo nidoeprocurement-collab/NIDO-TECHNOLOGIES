@@ -1157,6 +1157,7 @@ export default function VendorOrderDetailPage() {
   const handleDraftItemQtyChange = (itemId: string, newQty: number) => {
     if (!isDraft || isCancelled) return;
     setItems(prev => {
+      if (prev.some(it => it.id === itemId && String(it.status || "").toLowerCase() === "cancelled")) return prev;
       const updated = prev.map(it => {
         if (it.id !== itemId) return it;
         const po = getPOByNumber(poKey);
@@ -1172,8 +1173,9 @@ export default function VendorOrderDetailPage() {
           if (updated[i]?.id !== itemId) return li;
           return { ...li, qty: newQty, lineSubtotal: li.unitPrice * newQty };
         });
-        const newSubtotal = updatedLineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-        const sgstAmt = Math.round(updatedLineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
+        const activeLineItems = updatedLineItems.filter((li) => String(li.status || "").toLowerCase() !== "cancelled");
+        const newSubtotal = activeLineItems.reduce((s, li) => s + li.lineSubtotal, 0);
+        const sgstAmt = Math.round(activeLineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
         updatePO(poKey, { items: updatedLineItems, subtotal: newSubtotal, sgstAmt, cgstAmt: sgstAmt, grandTotal: newSubtotal + sgstAmt * 2 });
       }
       return updated;
@@ -1183,6 +1185,7 @@ export default function VendorOrderDetailPage() {
   const handleDraftItemPriceChange = (itemId: string, newPrice: number) => {
     if (!isDraft || isCancelled) return;
     setItems(prev => {
+      if (prev.some(it => it.id === itemId && String(it.status || "").toLowerCase() === "cancelled")) return prev;
       const updated = prev.map(it => {
         if (it.id !== itemId) return it;
         const fmt = (n: number) => "₹ " + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1195,8 +1198,9 @@ export default function VendorOrderDetailPage() {
           if (updated[i]?.id !== itemId) return li;
           return { ...li, unitPrice: newPrice, lineSubtotal: newPrice * li.qty };
         });
-        const newSubtotal = updatedLineItems.reduce((s, li) => s + li.lineSubtotal, 0);
-        const sgstAmt = Math.round(updatedLineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
+        const activeLineItems = updatedLineItems.filter((li) => String(li.status || "").toLowerCase() !== "cancelled");
+        const newSubtotal = activeLineItems.reduce((s, li) => s + li.lineSubtotal, 0);
+        const sgstAmt = Math.round(activeLineItems.reduce((s, li) => s + li.lineSubtotal * ((li.gstPct ?? 18) / 2) / 100, 0) * 100) / 100;
         updatePO(poKey, { items: updatedLineItems, subtotal: newSubtotal, sgstAmt, cgstAmt: sgstAmt, grandTotal: newSubtotal + sgstAmt * 2 });
       }
       return updated;

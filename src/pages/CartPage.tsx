@@ -15,7 +15,7 @@ import {
   getRecommendedVendor,
   type VendorStockAllocation,
 } from "@/lib/priceEngineStore";
-import { computeCartGST } from "@/lib/cartGstHelper";
+import { calculateCartPricing } from "@/lib/cartPricing";
 import { getClientCatalog, type ClientCatalogEntry } from "@/lib/clientCatalogStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import { getEffectiveTaxPctForCategory, getProductCategoryTaxMap, getHsnCodes } from "@/lib/taxEngine";
@@ -271,36 +271,17 @@ export default function CartPage() {
     }
   }, [digitalCartItems.length, physicalCartItems.length, productTab]);
 
-  const primaryClientId = cart.find((item) => item.clientId)?.clientId;
-  const primaryClientPricing = primaryClientId
-    ? getClientCartPricingSettings(primaryClientId)
-    : { discountPct: 0, shippingDeliveryFee: 0, platformFeePct: 0 };
-
-  const { slabs: gstSlabs, totalGst, preTaxSubtotal } = computeCartGST(
-    cart.map(i => {
-      const discountPct    = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-      const clientDiscountPct = i.clientId ? getClientCartPricingSettings(i.clientId).discountPct : 0;
-      const taxRate = getCartTaxRate(i) ?? getEffectiveTaxPctForCategory(i.category || "");
-      const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate);
-      const slabPrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
-      const effectivePrice = clientDiscountPct > 0 ? slabPrice * (1 - clientDiscountPct / 100) : slabPrice;
-      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
-    })
-  );
-  const { preTaxSubtotal: preClientDiscountSubtotal } = computeCartGST(
-    cart.map(i => {
-      const discountPct = i.clientId ? getSlabDiscountPct(i.clientId, i.category || "", i.quantity) : 0;
-      const taxRate = getCartTaxRate(i) ?? getEffectiveTaxPctForCategory(i.category || "");
-      const vendorInclusivePrice = getCartUnitPriceInclusive(i, taxRate);
-      const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
-      return { inclusiveAmount: effectivePrice * i.quantity, category: i.category, taxRate };
-    })
-  );
-  const clientDiscountAmount = Math.max(0, preClientDiscountSubtotal - preTaxSubtotal);
-  const platformFee = (preTaxSubtotal * primaryClientPricing.platformFeePct) / 100;
-  const shippingDeliveryFee = primaryClientPricing.shippingDeliveryFee;
-  const subtotal = preClientDiscountSubtotal;
-  const grandTotal = preTaxSubtotal + totalGst + shippingDeliveryFee + platformFee;
+  const cartPricing = calculateCartPricing(cart);
+  const {
+    slabs: gstSlabs,
+    totalGst,
+    preTaxSubtotal,
+    clientDiscountAmount,
+    platformFee,
+    shippingDeliveryFee,
+    preClientDiscountSubtotal: subtotal,
+    grandTotal,
+  } = cartPricing;
 
   const visibleCount = 4;
   const maxScroll = Math.max(0, suggested.length - visibleCount);

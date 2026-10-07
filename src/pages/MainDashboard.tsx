@@ -9,6 +9,7 @@ import { getAllPOs, type StoredPO } from '@/lib/purchaseOrderStore';
 import { getServiceRequests } from '@/lib/serviceRequestsStore';
 import { useI18n } from '@/i18n/I18nProvider';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatCurrency } from '@/lib/formatters';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280'];
 const CATEGORY_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#6b7280', '#ec4899'];
@@ -150,7 +151,9 @@ function RecentOrdersTable({ orders, poByOrderId }: { orders: MyOrder[]; poByOrd
                     </td>
                     <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-gray-600">{order.client}</td>
                     <td className="px-4 md:px-6 py-2 md:py-4 text-sm text-gray-600">{po ? po.vendorName : '—'}</td>
-                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-gray-900">{order.totalAmount}</td>
+                    <td className="px-4 md:px-6 py-2 md:py-4 text-sm font-medium text-gray-900">
+                      {typeof order.totalAmountNum === 'number' ? formatCurrency(order.totalAmountNum) : order.totalAmount}
+                    </td>
                     <td className="px-4 md:px-6 py-2 md:py-4 text-sm">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         {order.status}

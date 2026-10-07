@@ -23,6 +23,7 @@ type ConfirmationState = {
     category?: string;
     specs?: string[];
     clientId?: string;
+    checkoutUnitPriceInclusive?: number;
     selectedVendorId?: string;
     selectedVendorName?: string;
     vendorPrice?: number;
@@ -33,6 +34,7 @@ type ConfirmationState = {
   gst: number;
   gstSlabs?: GstSlab[];
   shipping: number;
+  platformFee?: number;
   total: number;
   address: { label: string; line1: string; line2: string; city?: string; state?: string; zip?: string; line3?: string; phone: string } | null;
   paymentMethod: string;
@@ -75,6 +77,7 @@ export default function OrderConfirmationPage() {
   const gst = state?.gst ?? 0;
   const gstSlabs: GstSlab[] = state?.gstSlabs ?? [];
   const shipping = state?.shipping ?? 0;
+  const platformFee = state?.platformFee ?? 0;
   const total = state?.total ?? 0;
   const address = state?.address ?? null;
   const clientEmail = state?.clientEmail ?? "—";
@@ -221,6 +224,9 @@ export default function OrderConfirmationPage() {
                     </span>
                     <span className="text-gray-800 font-medium shrink-0">
                       {(() => {
+                        if (typeof item.checkoutUnitPriceInclusive === "number") {
+                          return formatPrice(item.checkoutUnitPriceInclusive * item.quantity);
+                        }
                         const discountPct = item.clientId ? getSlabDiscountPct(item.clientId, item.category || "", item.quantity) : 0;
                         const vendorInclusivePrice = getCartUnitPriceInclusive(item, getCartTaxRate(item) ?? 0);
                         const effectivePrice = discountPct > 0 ? vendorInclusivePrice * (1 - discountPct / 100) : vendorInclusivePrice;
@@ -253,6 +259,18 @@ export default function OrderConfirmationPage() {
                   <span className="text-gray-700 font-medium">{formatPrice(gst)}</span>
                 </div>
               ) : null}
+              {shipping > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Shipping / delivery</span>
+                  <span className="text-gray-700 font-medium">{formatPrice(shipping)}</span>
+                </div>
+              )}
+              {platformFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Platform fee</span>
+                  <span className="text-gray-700 font-medium">{formatPrice(platformFee)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center border-t border-gray-100 pt-2 mt-1">
                 <span className="text-sm font-bold text-gray-900">Total</span>
                 <span className="text-sm font-bold text-gray-900">{formatPrice(total)}</span>

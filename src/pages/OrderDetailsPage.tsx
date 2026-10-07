@@ -13,7 +13,11 @@ import { downloadPOPdf, getPODataUri } from "@/lib/generatePO";
 import { getClientSLA } from "@/lib/slaEngine";
 import { computeSLAStatus, parseLooseDate } from "@/lib/slaUtils";
 import SLABadge from "@/components/shared/SLABadge";
-import { computeCartGST } from "@/lib/cartGstHelper";
+import {
+  calculateRemainingOrderPricing,
+  getOrderLineUnitPriceInclusive,
+} from "@/lib/orderPricing";
+import { formatCurrency } from "@/lib/formatters";
 import { getEffectiveTaxPctForCategory } from "@/lib/taxEngine";
 import { releaseStock, consumeStockForPO } from "@/lib/stockEngine";
 import { computeVendorComparisons, type VendorComparisonRow } from "@/lib/priceEngineStore";
@@ -2426,7 +2430,7 @@ function ThreeDotMenu({
           <div style={{ height: 1, background: "#f3f4f6", margin: "2px 0" }} />
           <button
             disabled={!cancelEnabled}
-            title={!cancelEnabled ? "Cancellation is unavailable after a purchase order has been generated or the item is locked." : undefined}
+            title={!cancelEnabled ? "Cancellation is unavailable after shipment begins or the item is locked." : undefined}
             style={{
               ...menuItemSt,
               color: cancelEnabled ? "#dc2626" : "#d1d5db",
@@ -2499,8 +2503,8 @@ function cartItemsToSubOrders(cartItems: any[], orderId: string, orderDate: stri
     vendorColor: item.selectedVendorId ? "#2563eb" : "#9ca3af",
     poNumber: poNumber,
     qty: item.quantity,
-    unitPrice: `₹${Number(item.landedCost || item.priceNum).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-    total: `₹${((item.landedCost || item.priceNum) * item.quantity).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    unitPrice: formatCurrency(getOrderLineUnitPriceInclusive(item)),
+    total: formatCurrency(getOrderLineUnitPriceInclusive(item) * Number(item.quantity || 0)),
     requiredDate: item.leadTime ? `Within ${item.leadTime}` : "Within 30 Days",
     itemStatus: "Pending",
     updatedOn: orderDate,
@@ -2670,6 +2674,58 @@ function isPOItemShipped(po: any, subOrderId: string): boolean {
       po.tracking?.carrier,
     )
   );
+}
+
+function hasPOItemShipmentStarted(po: any, subOrderId: string, subOrder?: any): boolean {
+  if (!poCoversSubOrder(po, subOrderId)) return false;
+  const matchingLine = (po.items || []).find((line: any) =>
+    poLineMatchesSubOrder(line, subOrderId, subOrder),
+  );
+  if (matchingLine) {
+    const status = String(matchingLine.status || "").toLowerCase();
+    return status.includes("shipped") ||
+      status.includes("dispatched") ||
+      status.includes("delivered") ||
+      status.includes("in transit");
+  }
+  const poStatus = String(po.status || "").toLowerCase();
+  return poStatus.includes("shipped") ||
+    poStatus.includes("dispatched") ||
+    poStatus.includes("delivered") ||
+    poStatus.includes("in transit");
+}
+
+function getPOAggregateAfterLineCancellation(items: POLineItem[]): Partial<StoredPO> {
+  const activeItems = items.filter((item: any) => String(item.status || "").toLowerCase() !== "cancelled");
+  const primary = activeItems[0] || items[0];
+  const subtotal = activeItems.reduce((sum, item) => sum + Number(item.lineSubtotal || 0), 0);
+  const sgstAmt = Math.round(
+    activeItems.reduce(
+      (sum, item) => sum + Number(item.lineSubtotal || 0) * ((item.gstPct ?? 18) / 2) / 100,
+      0,
+    ) * 100,
+  ) / 100;
+
+  return {
+    items,
+    subOrderId: primary?.subOrderId || "",
+    subOrderIds: items.map((item) => item.subOrderId),
+    item: primary?.item || "",
+    sku: primary?.sku || "",
+    category: primary?.category || "",
+    hsnCode: primary?.hsnCode || "",
+    specs: primary?.specs || [],
+    referenceNumber: primary?.referenceNumber || "",
+    serialNumber: primary?.serialNumber || "",
+    qty: activeItems.length ? (primary?.qty || 0) : 0,
+    unitPrice: activeItems.length ? (primary?.unitPrice || 0) : 0,
+    subtotal,
+    sgstPct: (primary?.gstPct ?? 18) / 2,
+    cgstPct: (primary?.gstPct ?? 18) / 2,
+    sgstAmt,
+    cgstAmt: sgstAmt,
+    grandTotal: subtotal + sgstAmt + sgstAmt,
+  };
 }
 
 function isConfirmedPO(po: any): boolean {
@@ -3141,19 +3197,62 @@ export default function MyOrderPage() {
     ) return;
 
     const targetPOs = getAllPOs().filter(po => po.orderId === orderId && poCoversSubOrder(po, subId));
+    if (targetPOs.some((po) => hasPOItemShipmentStarted(po, subId, target))) return;
 
     // Return the pre-PO reservation to vendor availability.
     if (target.stockAllocations?.length && targetPOs.length === 0) releaseStock(target.stockAllocations);
 
     // Keep the line in the PO so the vendor-order detail page shows the
     // cancelled item and its reason instead of removing the audit trail.
+    // Recalculate financial totals from the still-active lines only; vendor
+    // unit prices remain unchanged on every retained PO line.
     targetPOs.forEach((po: any) => {
+      const nextItems = (po.items || []).map((line: any) =>
+          poLineMatchesSubOrder(line, subId, target) ? { ...line, status: "Cancelled", cancelReason: reason } : line
+      );
+      const activeItems = nextItems.filter((line: any) => String(line.status || "").toLowerCase() !== "cancelled");
+      const documents = (po.documents || []).map((doc: any) => {
+        const isSystemDocument = String(doc.uploadedBy || "").toLowerCase() === "system";
+        const isGeneratedPO = isSystemDocument && (
+          String(doc.type || "").toLowerCase().includes("purchase order") ||
+          String(doc.name || "").toLowerCase() === `${String(po.poNumber || "").toLowerCase()}.pdf`
+        );
+        return isGeneratedPO ? { ...doc, dataUrl: undefined } : doc;
+      });
       updatePO(po.poNumber, {
-        items: (po.items || []).map((line: any) =>
-          line.subOrderId === subId ? { ...line, status: "Cancelled", cancelReason: reason } : line
-        ),
+        ...getPOAggregateAfterLineCancellation(nextItems),
+        documents,
+        ...(activeItems.length === 0 ? { status: "Cancelled", cancelReason: reason } : {}),
       });
     });
+
+    const cancelledSubOrderIds = new Set([
+      ...subOrders.filter((sub) => sub.itemStatus === "Cancelled").map((sub) => sub.id),
+      subId,
+    ]);
+    const currentOrder = orders.find((candidate) => candidate.id === orderId) || order;
+    if (currentOrder) {
+      const pricing = calculateRemainingOrderPricing(currentOrder, cancelledSubOrderIds);
+      const originalTotal = currentOrder.initialTotalAmountNum ??
+        currentOrder.totalAmountNum ??
+          (Number(String(currentOrder.totalAmount || "").replace(/[^0-9.-]/g, "")) || 0);
+      const updatedOrders = orders.map((candidate) => candidate.id === orderId
+        ? {
+            ...candidate,
+            initialTotalAmountNum: originalTotal,
+            totalAmountNum: pricing.grandTotal,
+            totalAmount: formatCurrency(pricing.grandTotal),
+          }
+        : candidate
+      );
+      try {
+        localStorage.setItem("nido_my_orders", JSON.stringify(updatedOrders));
+      } catch (error) {
+        console.error("Could not save the recalculated order total:", error);
+      }
+      setOrders(updatedOrders);
+      window.dispatchEvent(new CustomEvent("orderFulfillmentStatusUpdated", { detail: { orderId } }));
+    }
 
     setSubOrders(prev => prev.map(s => s.id === subId
       ? { ...s, itemStatus: "Cancelled", cancelReason: reason, updatedOn: new Date().toLocaleDateString("en-IN") }
@@ -4074,7 +4173,7 @@ export default function MyOrderPage() {
               ["Master Order ID", orderId],
               ["Sub Orders", String(subOrders.length)],
               ["Total Items", String(subOrders.reduce((s, o) => s + o.qty, 0))],
-              ["Total Amount", order?.totalAmount || "—"],
+              ["Total Amount", order?.totalAmountNum != null ? formatCurrency(order.totalAmountNum) : order?.totalAmount || "—"],
               ["Created On", order ? `${order.orderDate} ${order.orderTime}` : "—"],
               ["Order Note", order?.orderNotes || "No order note provided"],
             ].map(([l, v]) => (
@@ -4193,6 +4292,9 @@ export default function MyOrderPage() {
                   // A cancelled sub-order is fully inactive in this view. Do
                   // not expose stale PO/vendor projections or action handlers.
                     const allOrderPOs = Object.values(createdPOs) as any[];
+                    const hasShipmentStarted = allOrderPOs.some((po: any) =>
+                      hasPOItemShipmentStarted(po, sub.id, sub),
+                    );
                     const cancelledPO = getCancelledPOForSubOrder(allOrderPOs, sub.id, sub);
                     const canonicalPO = getCanonicalPOForSubOrder(allOrderPOs, sub);
                     const cancelledLine = allOrderPOs.some((po: any) =>
@@ -4403,7 +4505,7 @@ export default function MyOrderPage() {
                              >
                                Raise Return Request
                              </button>
-                           ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) ? (
+                            ) : sub.itemStatus !== "Cancelled" && sub.itemStatus !== "Shipped" && sub.itemStatus !== "Delivered" && !RETURN_WORKFLOW_STATUSES.includes(sub.itemStatus) && !hasShipmentStarted ? (
                             <button
                                 disabled={isOrderInactive}
                                 title={isOrderInactive ? "This order is inactive." : undefined}
@@ -4414,6 +4516,8 @@ export default function MyOrderPage() {
                             </button>
                            ) : sub.itemStatus === "Delivered" ? (
                              <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>Return window expired</span>
+                           ) : hasShipmentStarted ? (
+                              <span style={{ fontSize: 11.5, color: "#9ca3af", lineHeight: 1.4 }}>Cancellation unavailable after shipment</span>
                           ) : (
                             <span style={{ fontSize: 12, color: "#d1d5db" }}>—</span>
                           )}
@@ -4436,7 +4540,7 @@ export default function MyOrderPage() {
                             onRequestDelivered={() => setPendingItemDelivered(sub.id)}
                             onCancel={() => setCancelTarget(sub.id)}
                              canRaiseReturn={isPhysicalProduct(sub)}
-                             cancelEnabled={!isOrderInactive && !itemCancelled && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
+                             cancelEnabled={!isOrderInactive && !itemCancelled && !hasShipmentStarted && !["Shipped", "Delivered", ...RETURN_WORKFLOW_STATUSES].includes(sub.itemStatus)}
                             onRaiseReturn={() => setReturnTarget(sub.id)}
                             returnAllowed={returnOk}
                              onRequestPickupScheduled={() => setPickupScheduledTarget(sub.id)}
@@ -4450,36 +4554,51 @@ export default function MyOrderPage() {
                 })}
               </div>
               {(() => {
-                // Use computeCartGST on the real cart items — same logic as CartPage and ReviewPage.
-                // priceNum is tax-inclusive so we back-calculate per-category rates, not a flat 18%.
-                const cartItems = order.cartItems || [];
-                const { slabs, totalGst, preTaxSubtotal } = computeCartGST(
-                  cartItems.map(i => ({ inclusiveAmount: i.priceNum * i.quantity, category: i.category }))
+                const cancelledSubOrderIds = new Set(
+                  subOrders.filter((sub) => sub.itemStatus === "Cancelled").map((sub) => sub.id),
                 );
-                const grandTotal = preTaxSubtotal + totalGst;
-                const fmt = (n: number) => "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+                const pricing = calculateRemainingOrderPricing(order, cancelledSubOrderIds);
+                const fmt = (n: number) => formatCurrency(n);
                 return (
                   <div style={{ padding: "16px 20px", borderTop: "1px solid #f3f4f6", display: "flex", justifyContent: "flex-end" }}>
                     <div style={{ width: 300 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                         <span style={{ fontSize: 13.5, color: "#6b7280" }}>Sub-total (excl. GST)</span>
-                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(preTaxSubtotal)}</span>
+                        <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.preTaxSubtotal)}</span>
                       </div>
-                      {slabs.map(sl => (
+                      {pricing.slabs.map(sl => (
                         <div key={sl.rate} style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                           <span style={{ fontSize: 13.5, color: "#6b7280" }}>GST ({sl.rate}%)</span>
                           <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(sl.gst)}</span>
                         </div>
                       ))}
-                      {slabs.length === 0 && (
+                      {pricing.slabs.length === 0 && (
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                           <span style={{ fontSize: 13.5, color: "#6b7280" }}>GST</span>
-                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(totalGst)}</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.totalGst)}</span>
+                        </div>
+                      )}
+                      {pricing.shippingDeliveryFee > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Shipping / delivery</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.shippingDeliveryFee)}</span>
+                        </div>
+                      )}
+                      {pricing.platformFee > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Platform fee</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.platformFee)}</span>
+                        </div>
+                      )}
+                      {Math.abs(pricing.otherAdjustments) > 0.005 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 13.5, color: "#6b7280" }}>Legacy price adjustment</span>
+                          <span style={{ fontSize: 13.5, fontWeight: 500 }}>{fmt(pricing.otherAdjustments)}</span>
                         </div>
                       )}
                       <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
                         <span style={{ fontSize: 14, fontWeight: 700 }}>Total Order Amount</span>
-                        <span style={{ fontSize: 15, fontWeight: 800 }}>{fmt(grandTotal)}</span>
+                        <span style={{ fontSize: 15, fontWeight: 800 }}>{fmt(pricing.grandTotal)}</span>
                       </div>
                     </div>
                   </div>

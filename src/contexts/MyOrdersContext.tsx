@@ -46,6 +46,12 @@ export interface OrderCartItem {
   clientSellingPriceExclGst?: number;
   landedCost?: number;
   gstSnapshot?: number;
+  /** Exact discounted customer price including GST at checkout. */
+  checkoutUnitPriceInclusive?: number;
+  /** Exact discounted customer price before GST at checkout for invoice imports. */
+  checkoutUnitPriceExclGst?: number;
+  /** GST rate used for the saved customer checkout price. */
+  checkoutGstRate?: number;
   hsnSnapshot?: string;
   vendorRating?: number;
   /** Cloud/service configuration selected before the item was added to cart. */
@@ -94,6 +100,13 @@ export interface MyOrder {
   cartItems?: OrderCartItem[];
   // Numeric total for easy calculation
   totalAmountNum?: number;
+  /** Original total retained so legacy orders can allocate cancellations consistently. */
+  initialTotalAmountNum?: number;
+  /** Checkout fees needed to recalculate the remaining total after line cancellation. */
+  checkoutPricingSnapshot?: {
+    shippingDeliveryFee: number;
+    platformFeePct: number;
+  };
   // Payment & delivery captured at checkout
   paymentMethod?: string;
   paymentDetail?: string;

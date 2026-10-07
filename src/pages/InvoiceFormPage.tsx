@@ -384,13 +384,14 @@ export default function InvoiceFormPage() {
             selectedSubOrderIds.includes(getOrderSubOrderId(order.id, ci.subOrderId, index)),
           )
         : order.cartItems;
-      const invoiceableItems = scopedItems.filter((ci, index) =>
-        !RETURNED_ORDER_ITEM_STATUSES.has(getOrderSubItemStatus(
+      const invoiceableItems = scopedItems.filter((ci, index) => {
+        const itemStatus = String(getOrderSubItemStatus(
           order.id,
           ci.subOrderId,
           order.cartItems?.indexOf(ci) ?? index,
-        )),
-      );
+        )).toLowerCase();
+        return itemStatus !== 'cancelled' && !RETURNED_ORDER_ITEM_STATUSES.has(itemStatus);
+      });
       const eligibleItems = isProformaMode
         ? invoiceableItems.filter((ci) =>
             isPhysicalOrHybridProduct(getOrderProductTypeMetadata(ci)),
@@ -407,19 +408,27 @@ export default function InvoiceFormPage() {
           const productMetadata = getOrderProductTypeMetadata(ci);
           // Selected vendor tax is snapshotted on the order. Legacy orders
           // continue to resolve their rate from the current tax settings.
-          const gstRate    = typeof ci.gstSnapshot === 'number'
-            ? ci.gstSnapshot
+          const gstRate    = typeof ci.checkoutGstRate === 'number'
+            ? ci.checkoutGstRate
+            : typeof ci.gstSnapshot === 'number'
+              ? ci.gstSnapshot
             : getEffectiveTaxPctForCategory(ci.category || '');
           // Cart prices are GST-inclusive for display, but vendor-selected
           // orders also carry the exact client selling price before GST.
           // Use that pre-tax snapshot so the invoice adds GST exactly once.
           // Legacy orders without the snapshot still recover their pre-tax
           // rate from the stored GST-inclusive price.
+          const hasCheckoutSellingPrice = typeof ci.checkoutUnitPriceExclGst === 'number'
+            && Number.isFinite(ci.checkoutUnitPriceExclGst);
           const hasClientSellingPrice = typeof ci.clientSellingPriceExclGst === 'number'
             && Number.isFinite(ci.clientSellingPriceExclGst);
-          const preTaxRate = hasClientSellingPrice
+          const preTaxRate = hasCheckoutSellingPrice
+            ? Math.max(0, ci.checkoutUnitPriceExclGst as number)
+            : hasClientSellingPrice
             ? Math.max(0, ci.clientSellingPriceExclGst as number)
-            : gstRate > 0
+            : typeof ci.checkoutUnitPriceInclusive === 'number' && gstRate > 0
+              ? Math.round((ci.checkoutUnitPriceInclusive * 100 / (100 + gstRate)) * 100) / 100
+              : gstRate > 0
               ? Math.round((ci.priceNum * 100 / (100 + gstRate)) * 100) / 100
               : (ci.priceNum || 0);
           return {
@@ -441,9 +450,39 @@ export default function InvoiceFormPage() {
           };
         })
       );
+      const isFullOrderInvoice = !isOrderProformaFlow && !(shippedSubOrderIds?.length);
+      if (isFullOrderInvoice && order.checkoutPricingSnapshot) {
+        const invoiceSubtotal = eligibleItems.reduce((sum, ci) => {
+          const gstRate = typeof ci.checkoutGstRate === 'number'
+            ? ci.checkoutGstRate
+            : typeof ci.gstSnapshot === 'number'
+              ? ci.gstSnapshot
+              : getEffectiveTaxPctForCategory(ci.category || '');
+          const unitPrice = typeof ci.checkoutUnitPriceExclGst === 'number'
+            ? ci.checkoutUnitPriceExclGst
+            : typeof ci.checkoutUnitPriceInclusive === 'number' && gstRate > 0
+              ? ci.checkoutUnitPriceInclusive * 100 / (100 + gstRate)
+              : ci.clientSellingPriceExclGst || 0;
+          return sum + unitPrice * (Number(ci.quantity) || 0);
+        }, 0);
+        setShippingCharges(Math.max(0, Number(order.checkoutPricingSnapshot.shippingDeliveryFee) || 0));
+        setAdjustment(
+          invoiceSubtotal * Math.max(0, Number(order.checkoutPricingSnapshot.platformFeePct) || 0) / 100,
+        );
+      } else if (isFullOrderInvoice) {
+        setShippingCharges(Number((order as any).shippingCharges) || 0);
+        setAdjustment(Number((order as any).adjustment) || 0);
+      } else {
+        // A proforma or shipped-line invoice is scoped to part of the order;
+        // do not apply the full-order shipping or platform charge repeatedly.
+        setShippingCharges(0);
+        setAdjustment(0);
+      }
     } else {
       setReturnedItemCount(0);
       setLineItems([]);
+      setShippingCharges(0);
+      setAdjustment(0);
     }
 
     setImportedRefLabel(

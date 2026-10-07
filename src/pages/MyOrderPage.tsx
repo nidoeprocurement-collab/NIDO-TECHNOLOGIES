@@ -10,6 +10,7 @@ import { buildOrdersCsv } from "@/lib/orderCsvExport";
 import { loadApprovalBootstrap, type ApprovalRequest } from "@/lib/approvalEngine";
 import OrderExportDialog, { type OrderExportOption } from "@/components/shared/OrderExportDialog";
 import { filterOrdersForExport, type OrderExportFilters } from "@/lib/orderExportFilters";
+import { formatCurrency } from "@/lib/formatters";
 
 const STATUS_STYLE: Record<OrderStatus, { bg: string; color: string; border: string }> = {
   Processing:            { bg: "#fffbeb", color: "#92400e", border: "#fcd34d" },
@@ -819,7 +820,9 @@ export default function MyOrderPage() {
                           return <SLABadge sla={sla} compact />;
                         })()}
                       </td>
-                      <td style={{ ...tdSt, fontWeight: 600, color: "hsl(var(--foreground))" }}>{order.totalAmount}</td>
+                      <td style={{ ...tdSt, fontWeight: 600, color: "hsl(var(--foreground))" }}>
+                        {typeof order.totalAmountNum === "number" ? formatCurrency(order.totalAmountNum) : order.totalAmount}
+                      </td>
                     </tr>
                   );
                 })}
