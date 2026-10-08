@@ -21,9 +21,17 @@ interface FilterBarProps {
   vendors?: string[];
   categories?: string[];
   statuses?: string[];
+  statusLabel?: string;
 }
 
-export default function FilterBar({ onFilterChange, clients = [], vendors = [], categories = [], statuses = [] }: FilterBarProps) {
+export default function FilterBar({
+  onFilterChange,
+  clients = [],
+  vendors = [],
+  categories = [],
+  statuses = [],
+  statusLabel = "Status",
+}: FilterBarProps) {
   const { filters, setFilters } = useReportFilterControls();
   const [expanded, setExpanded] = useState(false);
   const activeFiltersCount = Object.entries(filters).filter(([key, value]) =>
@@ -117,7 +125,7 @@ export default function FilterBar({ onFilterChange, clients = [], vendors = [], 
             { label: "Client", key: "client" as const, opts: clients },
             { label: "Vendor", key: "vendor" as const, opts: vendors },
             { label: "Category", key: "category" as const, opts: categories },
-            { label: "Status", key: "status" as const, opts: statuses },
+            { label: statusLabel, key: "status" as const, opts: statuses },
             { label: "User / Assigned", key: "user" as const, opts: [] },
           ].map(({ label, key, opts }) => (
             <div key={key}>

@@ -20,6 +20,7 @@ interface ReportDataTableProps<T extends Record<string, unknown>> {
   searchPlaceholder?: string;
   pageSize?: number;
   emptyMessage?: string;
+  applyGlobalFilters?: boolean;
 }
 
 export default function ReportDataTable<T extends Record<string, unknown>>({
@@ -29,6 +30,7 @@ export default function ReportDataTable<T extends Record<string, unknown>>({
   searchPlaceholder = "Search...",
   pageSize = 10,
   emptyMessage = "No data available.",
+  applyGlobalFilters = true,
 }: ReportDataTableProps<T>) {
   const setExportData = useSetReportExportData();
   const reportFilters = useReportFilters();
@@ -38,7 +40,10 @@ export default function ReportDataTable<T extends Record<string, unknown>>({
   const [page, setPage] = useState(1);
   const [visibleCols, setVisibleCols] = useState<string[]>(columns.map((c) => c.key));
 
-  const reportFilteredData = useMemo(() => applyReportFilters(data, reportFilters), [data, reportFilters]);
+  const reportFilteredData = useMemo(
+    () => applyGlobalFilters ? applyReportFilters(data, reportFilters) : data,
+    [applyGlobalFilters, data, reportFilters],
+  );
 
   const filtered = useMemo(() => {
     if (!search) return reportFilteredData;
