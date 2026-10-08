@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -10,6 +11,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
+import { applyReportFilters } from "@/lib/reportData";
 import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -22,8 +24,9 @@ const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 export default function SupportReportPage() {
   usePageMeta({ title: "Support Reports" });
   const liveRevision = useLiveReportRevision();
-  const tickets = useMemo(() => getSupportTickets(), [liveRevision]);
-  const serviceReqs = useMemo(() => getServiceRequests(), [liveRevision]);
+  const filters = useReportFilters();
+  const tickets = useMemo(() => applyReportFilters(getSupportTickets(), filters), [liveRevision, filters]);
+  const serviceReqs = useMemo(() => applyReportFilters(getServiceRequests(), filters), [liveRevision, filters]);
 
   const openTickets    = tickets.filter(t => t.status === "open");
   const inProgressTickets = tickets.filter(t => t.status === "in_progress");

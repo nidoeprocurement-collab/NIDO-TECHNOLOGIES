@@ -1,22 +1,9 @@
 import { useState } from "react";
-import { Filter, RotateCcw, Bookmark, ChevronDown, X } from "lucide-react";
+import { Filter, RotateCcw, ChevronDown } from "lucide-react";
+import { DEFAULT_REPORT_FILTERS, useReportFilterControls, type ReportDatePreset, type ReportFilters } from "@/contexts/ReportControlsContext";
 
-type DatePreset = "today" | "yesterday" | "week" | "lastweek" | "month" | "lastmonth" | "quarter" | "fy" | "custom";
-
-interface FilterState {
-  datePreset: DatePreset;
-  dateFrom: string;
-  dateTo: string;
-  branch: string;
-  department: string;
-  client: string;
-  vendor: string;
-  category: string;
-  status: string;
-  user: string;
-}
-
-const DATE_PRESETS: { label: string; value: DatePreset }[] = [
+const DATE_PRESETS: { label: string; value: ReportDatePreset }[] = [
+  { label: "All Time", value: "all" },
   { label: "Today", value: "today" },
   { label: "Yesterday", value: "yesterday" },
   { label: "This Week", value: "week" },
@@ -28,21 +15,8 @@ const DATE_PRESETS: { label: string; value: DatePreset }[] = [
   { label: "Custom", value: "custom" },
 ];
 
-const DEFAULT: FilterState = {
-  datePreset: "month",
-  dateFrom: "",
-  dateTo: "",
-  branch: "",
-  department: "",
-  client: "",
-  vendor: "",
-  category: "",
-  status: "",
-  user: "",
-};
-
 interface FilterBarProps {
-  onFilterChange?: (f: FilterState) => void;
+  onFilterChange?: (f: ReportFilters) => void;
   clients?: string[];
   vendors?: string[];
   categories?: string[];
@@ -50,22 +24,21 @@ interface FilterBarProps {
 }
 
 export default function FilterBar({ onFilterChange, clients = [], vendors = [], categories = [], statuses = [] }: FilterBarProps) {
-  const [filters, setFilters] = useState<FilterState>(DEFAULT);
+  const { filters, setFilters } = useReportFilterControls();
   const [expanded, setExpanded] = useState(false);
-  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const activeFiltersCount = Object.entries(filters).filter(([key, value]) =>
+    key !== "datePreset" && value !== ""
+  ).length + (filters.datePreset === "all" ? 0 : 1);
 
-  const update = (key: keyof FilterState, value: string) => {
+  const update = (key: keyof ReportFilters, value: string) => {
     const next = { ...filters, [key]: value };
     setFilters(next);
-    const count = Object.entries(next).filter(([k, v]) => k !== "datePreset" && v !== "").length;
-    setActiveFiltersCount(count);
     onFilterChange?.(next);
   };
 
   const reset = () => {
-    setFilters(DEFAULT);
-    setActiveFiltersCount(0);
-    onFilterChange?.(DEFAULT);
+    setFilters(DEFAULT_REPORT_FILTERS);
+    onFilterChange?.(DEFAULT_REPORT_FILTERS);
   };
 
   return (

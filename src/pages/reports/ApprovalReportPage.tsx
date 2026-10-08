@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -10,7 +11,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
-import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
+import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -22,8 +23,9 @@ const PIE_COLORS = ["#10B981","#EF4444","#F59E0B","#2563EB","#8B5CF6"];
 export default function ApprovalReportPage() {
   usePageMeta({ title: "Approval Reports" });
   const liveRevision = useLiveReportRevision();
-  const pos = useMemo(() => getAllPOs(), [liveRevision]);
-  const serviceReqs = useMemo(() => getServiceRequests(), [liveRevision]);
+  const filters = useReportFilters();
+  const pos = useMemo(() => applyReportFilters(getAllPOs(), filters), [liveRevision, filters]);
+  const serviceReqs = useMemo(() => applyReportFilters(getServiceRequests(), filters), [liveRevision, filters]);
 
   // PO approval status
   const pendingPOs    = pos.filter(p => p.status === "Draft" || p.status === "Processing");

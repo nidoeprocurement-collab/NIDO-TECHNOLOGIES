@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -15,14 +16,16 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from "recharts";
 import { Package, AlertTriangle, TrendingDown, TrendingUp, Archive, RefreshCw } from "lucide-react";
+import { applyReportFilters } from "@/lib/reportData";
 
 const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 
 export default function InventoryReportPage() {
   usePageMeta({ title: "Inventory Reports" });
   const liveRevision = useLiveReportRevision();
-  const stockHistory = useMemo(() => getStockHistory(), [liveRevision]);
-  const products = useMemo(() => getCatalogProducts(), [liveRevision]);
+  const filters = useReportFilters();
+  const stockHistory = useMemo(() => applyReportFilters(getStockHistory() as any[], filters), [liveRevision, filters]);
+  const products = useMemo(() => applyReportFilters(getCatalogProducts() as any[], filters), [liveRevision, filters]);
   const thresholds = useMemo(() => getAllThresholds(), [liveRevision]);
 
   // Stock events by action

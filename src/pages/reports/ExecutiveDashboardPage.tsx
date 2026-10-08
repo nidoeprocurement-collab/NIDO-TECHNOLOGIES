@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -16,7 +17,7 @@ import { getVendors } from "@/lib/vendorDataStore";
 import { getClients } from "@/lib/clientStore";
 import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getReceipts } from "@/lib/paymentReceiptStore";
-import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
+import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend,
@@ -31,15 +32,16 @@ const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4
 export default function ExecutiveDashboardPage() {
   usePageMeta({ title: "Executive Dashboard" });
   const liveRevision = useLiveReportRevision();
+  const filters = useReportFilters();
 
-  const orders = useMemo(() => getOrders(), [liveRevision]);
-  const invoices = useMemo(() => getInvoices(), [liveRevision]);
-  const pos = useMemo(() => getAllPOs(), [liveRevision]);
-  const quotes = useMemo(() => getQuotes(), [liveRevision]);
-  const vendors = useMemo(() => getVendors(), [liveRevision]);
-  const clients = useMemo(() => getClients(), [liveRevision]);
-  const tickets = useMemo(() => getSupportTickets(), [liveRevision]);
-  const receipts = useMemo(() => getReceipts(), [liveRevision]);
+  const orders = useMemo(() => applyReportFilters(getOrders(), filters), [liveRevision, filters]);
+  const invoices = useMemo(() => applyReportFilters(getInvoices(), filters), [liveRevision, filters]);
+  const pos = useMemo(() => applyReportFilters(getAllPOs(), filters), [liveRevision, filters]);
+  const quotes = useMemo(() => applyReportFilters(getQuotes(), filters), [liveRevision, filters]);
+  const vendors = useMemo(() => applyReportFilters(getVendors(), filters), [liveRevision, filters]);
+  const clients = useMemo(() => applyReportFilters(getClients(), filters), [liveRevision, filters]);
+  const tickets = useMemo(() => applyReportFilters(getSupportTickets(), filters), [liveRevision, filters]);
+  const receipts = useMemo(() => applyReportFilters(getReceipts(), filters), [liveRevision, filters]);
 
   const totalRevenue = useMemo(() =>
     invoices.filter(i => i.status === "Paid").reduce((s, i) => s + (i.grandTotal ?? 0), 0), [invoices]);

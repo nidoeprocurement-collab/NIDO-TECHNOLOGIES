@@ -21,6 +21,7 @@ const REPORT_DATA_EVENTS = [
   "taxEngineUpdated",
   "slaEngineUpdated",
   "nidoCustomReportsUpdated",
+  "nidoReportRefresh",
 ];
 
 /** Re-read report sources when their local stores change, including across tabs. */

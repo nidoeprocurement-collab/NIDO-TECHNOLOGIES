@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import ReportShellContext from "@/contexts/ReportShellContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { DEFAULT_REPORT_FILTERS, useReportFilterControls, useSetReportExportData } from "@/contexts/ReportControlsContext";
+import FilterBar from "@/components/reports/FilterBar";
+import ExportBar from "@/components/reports/ExportBar";
 
 // Lazy-loaded BI report pages (rendered inline when a tile is active)
 const ExecutiveDashboardPage  = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
@@ -30,7 +33,7 @@ import {
   scheduleLabel as buildScheduleLabel,
   type CustomReport,
 } from "@/lib/reportStore";
-import { applyStoredReportFilters, getReportFieldValue, getReportRecords } from "@/lib/reportData";
+import { applyReportFilters, applyStoredReportFilters, getReportFieldValue, getReportRecords } from "@/lib/reportData";
 import { getClients } from "@/lib/clientStore";
 import { getVendors } from "@/lib/vendorDataStore";
 import { getUsers } from "@/lib/nidoUsersStore";
@@ -948,6 +951,8 @@ function customToRow(r: CustomReport): ReportRow {
 export default function ReportsPage() {
   usePageMeta({ title: "Reports" });
   const navigate = useNavigate();
+  const { filters: reportFilters, setFilters: setReportFilters } = useReportFilterControls();
+  const setExportData = useSetReportExportData();
 
   // Live counts from stores
   const clients = getClients();
@@ -983,6 +988,10 @@ export default function ReportsPage() {
     [builtinScheduleRevision]
   );
   const allReports = useMemo(() => [...customReports, ...builtInReports], [customReports, builtInReports]);
+  const filteredReports = useMemo(
+    () => applyReportFilters(allReports, reportFilters),
+    [allReports, reportFilters],
+  );
 
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [search, setSearch] = useState("");
@@ -1019,6 +1028,23 @@ export default function ReportsPage() {
 
   const [activeModule, setActiveModule] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (activeModule !== "custom") return;
+    setExportData({
+      title: "Custom Reports",
+      columns: [
+        { key: "name", label: "Report" },
+        { key: "category", label: "Category" },
+        { key: "createdBy", label: "Created By" },
+        { key: "scheduleLabel", label: "Schedule" },
+        { key: "lastRunDate", label: "Last Run Date" },
+        { key: "lastRunStatus", label: "Last Run Status" },
+        { key: "format", label: "Format" },
+      ],
+      rows: filteredReports as unknown as Record<string, unknown>[],
+    });
+  }, [activeModule, filteredReports, setExportData]);
+
   const BI_MODULES = [
     { id: "executive",   label: "Executive Dashboard",  desc: "Revenue, profit, KPIs & growth",        icon: <LayoutDashboard className="w-5 h-5" />, color: "bg-blue-50 text-blue-600",    ring: "ring-blue-400",    activeText: "text-blue-700"    },
     { id: "sales",       label: "Sales Reports",         desc: "Quotes, orders, invoices & revenue",    icon: <TrendingUp className="w-5 h-5" />,      color: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-400", activeText: "text-emerald-700" },
@@ -1036,7 +1062,12 @@ export default function ReportsPage() {
   ];
 
   function toggleModule(id: string) {
-    setActiveModule((prev) => (prev === id ? null : id));
+    if (activeModule === id) {
+      setActiveModule(null);
+      return;
+    }
+    setReportFilters(DEFAULT_REPORT_FILTERS);
+    setActiveModule(id);
   }
 
   return (
@@ -1128,6 +1159,13 @@ export default function ReportsPage() {
       {/* ── Custom Reports inline content ───────────────────────────────── */}
       {activeModule === "custom" && (
         <div className="space-y-5">
+          <div className="space-y-3">
+            <ExportBar reportTitle="Custom Reports" onRefresh={refreshReports} />
+            <FilterBar
+              categories={CATEGORIES.filter((category) => category !== "All")}
+              statuses={["Success", "Failed", "Pending", "Not run"]}
+            />
+          </div>
 
           {/* Stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1209,7 +1247,7 @@ export default function ReportsPage() {
                 </div>
               )}
 
-              {activeTab === "all"       && <ReportTable reports={allReports} search={search} category={catFilter} format={fmtFilter} onRefresh={refreshReports} />}
+              {activeTab === "all"       && <ReportTable reports={filteredReports} search={search} category={catFilter} format={fmtFilter} onRefresh={refreshReports} />}
               {activeTab === "scheduled" && <ScheduledReportsTab />}
               {activeTab === "mine"      && <MyReportsTab />}
               {activeTab === "shared"    && <SharedReportsTab />}

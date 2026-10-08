@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Search, Download, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { useReportFilters, useSetReportExportData } from "@/contexts/ReportControlsContext";
+import { applyReportFilters } from "@/lib/reportData";
+import { downloadReportExport } from "@/lib/reportExport";
 
 export interface Column<T> {
   key: string;
@@ -28,21 +30,25 @@ export default function ReportDataTable<T extends Record<string, unknown>>({
   pageSize = 10,
   emptyMessage = "No data available.",
 }: ReportDataTableProps<T>) {
+  const setExportData = useSetReportExportData();
+  const reportFilters = useReportFilters();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
   const [visibleCols, setVisibleCols] = useState<string[]>(columns.map((c) => c.key));
 
+  const reportFilteredData = useMemo(() => applyReportFilters(data, reportFilters), [data, reportFilters]);
+
   const filtered = useMemo(() => {
-    if (!search) return data;
+    if (!search) return reportFilteredData;
     const q = search.toLowerCase();
-    return data.filter((row) =>
+    return reportFilteredData.filter((row) =>
       Object.values(row).some((v) =>
         String(v ?? "").toLowerCase().includes(q)
       )
     );
-  }, [data, search]);
+  }, [reportFilteredData, search]);
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
@@ -71,7 +77,15 @@ export default function ReportDataTable<T extends Record<string, unknown>>({
       : <ChevronDown className="w-3 h-3 text-blue-600" />;
   };
 
-  const visibleColumns = columns.filter((c) => visibleCols.includes(c.key));
+  const visibleColumns = useMemo(() => columns.filter((c) => visibleCols.includes(c.key)), [columns, visibleCols]);
+
+  useEffect(() => {
+    setExportData({
+      title: title || "Report",
+      columns: visibleColumns.map(({ key, label }) => ({ key, label })),
+      rows: sorted,
+    });
+  }, [setExportData, title, visibleColumns, sorted]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -111,7 +125,12 @@ export default function ReportDataTable<T extends Record<string, unknown>>({
             </div>
           </div>
           <button
-            onClick={() => toast({ title: "Exporting to CSV..." })}
+            onClick={() => downloadReportExport(
+              "CSV",
+              title || "Report",
+              visibleColumns.map(({ key, label }) => ({ key, label })),
+              sorted,
+            )}
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
           >
             <Download className="w-3 h-3" /> Export

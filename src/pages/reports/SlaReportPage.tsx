@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -9,6 +10,7 @@ import AiInsightsPanel from "@/components/reports/AiInsightsPanel";
 import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getSupportTickets } from "@/lib/supportTicketStore";
+import { applyReportFilters } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line, RadialBarChart, RadialBar,
@@ -21,7 +23,8 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul"];
 export default function SlaReportPage() {
   usePageMeta({ title: "SLA Reports" });
   const liveRevision = useLiveReportRevision();
-  const tickets = useMemo(() => getSupportTickets(), [liveRevision]);
+  const filters = useReportFilters();
+  const tickets = useMemo(() => applyReportFilters(getSupportTickets(), filters), [liveRevision, filters]);
 
   // Simulate SLA compliance based on ticket data
   const resolved = tickets.filter(t => t.status === "resolved");

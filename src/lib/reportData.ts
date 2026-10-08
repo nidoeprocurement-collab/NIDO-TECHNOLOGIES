@@ -6,6 +6,7 @@ import { getServiceRequests } from "@/lib/serviceRequestsStore";
 import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getUsers } from "@/lib/nidoUsersStore";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import type { ReportFilters } from "@/contexts/ReportControlsContext";
 
 export type ReportRecord = Record<string, unknown>;
 
@@ -65,8 +66,8 @@ export function getReportRecords(module: string): ReportRecord[] {
 
 const FIELD_ALIASES: Record<string, string[]> = {
   id: ["id", "clientId", "vendorId", "productId", "requestId", "number", "orderNumber", "poNumber"],
-  createdon: ["createdAt", "createdOn", "createdOnDisplay", "created", "createdDate", "onboardedDate", "requestDate", "orderDate"],
-  createdat: ["createdAt", "createdOn", "created", "requestDate", "orderDate"],
+  createdon: ["createdAt", "createdOn", "createdOnDisplay", "created", "createdDate", "lastRunDate", "onboardedDate", "requestDate", "orderDate", "invoiceDate", "date", "timestamp", "created_at"],
+  createdat: ["createdAt", "createdOn", "created", "lastRunDate", "requestDate", "orderDate", "invoiceDate", "date", "timestamp", "created_at"],
   createdby: ["createdByName", "createdBy", "requestedBy", "assignedTo"],
   clientname: ["clientName", "client", "name"],
   clientemail: ["email", "clientEmail"],
@@ -158,9 +159,98 @@ export function getReportFieldValue(record: ReportRecord, column: string): strin
 
 export function getReportRecordDate(record: ReportRecord): string {
   const value = lookup(record, FIELD_ALIASES.createdon);
-  if (typeof value !== "string" && typeof value !== "number") return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+  if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) return "";
+  return toLocalDateKey(value);
+}
+
+function toLocalDateKey(value: unknown): string {
+  if (typeof value !== "string" && typeof value !== "number" && !(value instanceof Date)) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function datePresetRange(filters: ReportFilters, now = new Date()): [string, string] | null {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dateKey = (date: Date) => toLocalDateKey(date);
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+
+  switch (filters.datePreset) {
+    case "today":
+      return [dateKey(today), dateKey(today)];
+    case "yesterday": {
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      return [dateKey(yesterday), dateKey(yesterday)];
+    }
+    case "week":
+      return [dateKey(startOfWeek), dateKey(today)];
+    case "lastweek": {
+      const end = new Date(startOfWeek);
+      end.setDate(end.getDate() - 1);
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      return [dateKey(start), dateKey(end)];
+    }
+    case "month":
+      return [dateKey(new Date(today.getFullYear(), today.getMonth(), 1)), dateKey(today)];
+    case "lastmonth":
+      return [
+        dateKey(new Date(today.getFullYear(), today.getMonth() - 1, 1)),
+        dateKey(new Date(today.getFullYear(), today.getMonth(), 0)),
+      ];
+    case "quarter": {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      return [dateKey(new Date(today.getFullYear(), quarterStartMonth, 1)), dateKey(today)];
+    }
+    case "fy": {
+      const fyYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+      return [dateKey(new Date(fyYear, 3, 1)), dateKey(today)];
+    }
+    case "custom":
+      return [filters.dateFrom, filters.dateTo];
+    case "all":
+    default:
+      return null;
+  }
+}
+
+function normalizedFieldValue(record: ReportRecord, candidates: string[]): string {
+  const raw = lookup(record, candidates);
+  return raw === undefined || raw === null ? "" : String(raw).toLowerCase();
+}
+
+/** Apply the common report toolbar filters to a module's source records. */
+export function applyReportFilters<T extends object>(records: T[], filters: ReportFilters): T[] {
+  const range = datePresetRange(filters);
+  const selectedFields: Array<[string, string[]]> = [
+    [filters.client, ["clientName", "client", "companyName", "name"]],
+    [filters.vendor, ["vendorName", "vendor", "name"]],
+    [filters.category, ["category", "requestType", "action"]],
+    [filters.status, ["status", "severity", "lastRunStatus"]],
+    [filters.user, ["user", "userName", "createdByName", "createdBy", "requestedBy", "assignedTo", "agent"]],
+    [filters.branch, ["branch", "location", "branchName"]],
+    [filters.department, ["department", "departmentName", "team"]],
+  ];
+
+  return records.filter((source) => {
+    const record = source as ReportRecord;
+    if (range) {
+      const [from, to] = range;
+      const recordDate = getReportRecordDate(record);
+      if ((from || to) && !recordDate) return false;
+      if (from && recordDate < from) return false;
+      if (to && recordDate > to) return false;
+    }
+
+    return selectedFields.every(([selected, fields]) => {
+      if (!selected) return true;
+      const value = normalizedFieldValue(record, fields);
+      return Boolean(value) && value === selected.toLowerCase();
+    });
+  });
 }
 
 export function applyStoredReportFilters<T extends ReportRecord>(

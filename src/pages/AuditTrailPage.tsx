@@ -2,6 +2,11 @@ import { useState, useMemo, Fragment, useEffect } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import ReportShell from "@/components/reports/ReportShell";
 import { useReportShellContext } from "@/contexts/ReportShellContext";
+import FilterBar from "@/components/reports/FilterBar";
+import ExportBar from "@/components/reports/ExportBar";
+import { useReportFilters, useSetReportExportData } from "@/contexts/ReportControlsContext";
+import { applyReportFilters } from "@/lib/reportData";
+import { downloadReportExport } from "@/lib/reportExport";
 import {
   Search, Filter, Download, RefreshCw, ChevronDown,
   User, Shield, AlertTriangle, Info, XCircle, CheckCircle2,
@@ -965,7 +970,12 @@ function UserActivityTab({ data }: { data: UserActivity[] }) {
           <Filter className="w-3.5 h-3.5" /> Clear
         </button>
         <span className="ml-auto text-xs text-gray-400">{filtered.length} events</span>
-        <button onClick={() => toast({ title: "Exported user activity log as CSV" })}
+        <button onClick={() => downloadReportExport("CSV", "User Activity", [
+          { key: "user", label: "User" }, { key: "role", label: "Role" }, { key: "action", label: "Action" },
+          { key: "resource", label: "Resource" }, { key: "module", label: "Module" }, { key: "ip", label: "IP" },
+          { key: "location", label: "Location" }, { key: "timestamp", label: "Time" }, { key: "status", label: "Status" },
+          { key: "details", label: "Details" },
+        ], filtered)}
           className="flex items-center gap-1.5 text-xs px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
           <Download className="w-3.5 h-3.5" /> Export
         </button>
@@ -1133,7 +1143,11 @@ function SystemLogsTab({ data }: { data: SystemLog[] }) {
           <Filter className="w-3.5 h-3.5" /> Clear
         </button>
         <span className="ml-auto text-xs text-gray-400">{filtered.length} logs</span>
-        <button onClick={() => toast({ title: "Exported system logs as CSV" })}
+        <button onClick={() => downloadReportExport("CSV", "System Logs", [
+          { key: "severity", label: "Severity" }, { key: "event", label: "Event" }, { key: "category", label: "Category" },
+          { key: "service", label: "Service" }, { key: "message", label: "Message" }, { key: "user", label: "User" },
+          { key: "duration", label: "Duration" }, { key: "timestamp", label: "Timestamp" },
+        ], filtered)}
           className="flex items-center gap-1.5 text-xs px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
           <Download className="w-3.5 h-3.5" /> Export
         </button>
@@ -1241,6 +1255,8 @@ function SystemLogsTab({ data }: { data: SystemLog[] }) {
 export default function AuditTrailPage() {
   usePageMeta({ title: "Audit Reports" });
   const { inline } = useReportShellContext();
+  const filters = useReportFilters();
+  const setExportData = useSetReportExportData();
   const [tab, setTab]         = useState<"activity" | "logs">("activity");
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -1296,12 +1312,32 @@ export default function AuditTrailPage() {
                           dateRange === "Last 30 Days" ? 30 * 86_400_000 : Infinity;
 
   const filteredActivity = useMemo(() =>
-    activity.filter(a => (now - a.tsMs) <= rangeMs),
-  [activity, rangeMs]);
+    applyReportFilters(activity.filter(a => (now - a.tsMs) <= rangeMs), filters),
+  [activity, rangeMs, filters]);
 
   const filteredLogs = useMemo(() =>
-    systemLogs.filter(l => (now - l.tsMs) <= rangeMs),
-  [systemLogs, rangeMs]);
+    applyReportFilters(systemLogs.filter(l => (now - l.tsMs) <= rangeMs), filters),
+  [systemLogs, rangeMs, filters]);
+
+  useEffect(() => {
+    const activityView = tab === "activity";
+    setExportData({
+      title: activityView ? "User Activity" : "System Logs",
+      columns: activityView
+        ? [
+            { key: "user", label: "User" }, { key: "role", label: "Role" }, { key: "action", label: "Action" },
+            { key: "resource", label: "Resource" }, { key: "module", label: "Module" }, { key: "ip", label: "IP" },
+            { key: "location", label: "Location" }, { key: "timestamp", label: "Time" }, { key: "status", label: "Status" },
+            { key: "details", label: "Details" },
+          ]
+        : [
+            { key: "severity", label: "Severity" }, { key: "event", label: "Event" }, { key: "category", label: "Category" },
+            { key: "service", label: "Service" }, { key: "message", label: "Message" }, { key: "user", label: "User" },
+            { key: "duration", label: "Duration" }, { key: "timestamp", label: "Timestamp" },
+          ],
+      rows: (activityView ? filteredActivity : filteredLogs) as unknown as Record<string, unknown>[],
+    });
+  }, [setExportData, tab, filteredActivity, filteredLogs]);
 
   // KPIs from live data
   const totalEvents    = filteredActivity.length + filteredLogs.length;
@@ -1327,6 +1363,11 @@ export default function AuditTrailPage() {
 
   const content = (
     <div className="space-y-5">
+      <ExportBar reportTitle={tab === "activity" ? "User Activity" : "System Logs"} onRefresh={handleRefresh} />
+      <FilterBar
+        categories={["Login", "Failed Login", "Create", "Edit", "Delete", "Approve", "Reject", "Invite", "Security", "Authentication", "Data", "System", "Configuration"]}
+        statuses={["Success", "Failed", "Warning", "Info", "Error", "Critical"]}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

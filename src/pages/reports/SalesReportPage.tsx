@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -12,7 +13,7 @@ import { getOrders } from "@/lib/salesOrderStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getQuotes } from "@/lib/quoteStore";
 import { getClients } from "@/lib/clientStore";
-import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
+import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
   BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
@@ -23,11 +24,12 @@ const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 export default function SalesReportPage() {
   usePageMeta({ title: "Sales Reports" });
   const liveRevision = useLiveReportRevision();
+  const filters = useReportFilters();
 
-  const orders = useMemo(() => getOrders(), [liveRevision]);
-  const invoices = useMemo(() => getInvoices(), [liveRevision]);
-  const quotes = useMemo(() => getQuotes(), [liveRevision]);
-  const clients = useMemo(() => getClients(), [liveRevision]);
+  const orders = useMemo(() => applyReportFilters(getOrders(), filters), [liveRevision, filters]);
+  const invoices = useMemo(() => applyReportFilters(getInvoices(), filters), [liveRevision, filters]);
+  const quotes = useMemo(() => applyReportFilters(getQuotes(), filters), [liveRevision, filters]);
+  const clients = useMemo(() => applyReportFilters(getClients(), filters), [liveRevision, filters]);
 
   const totalRevenue = useMemo(() =>
     invoices.filter(i => i.status === "Paid").reduce((s, i) => s + (i.grandTotal ?? 0), 0), [invoices]);

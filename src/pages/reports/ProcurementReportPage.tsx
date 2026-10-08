@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -10,7 +11,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
 import { getVendors } from "@/lib/vendorDataStore";
-import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
+import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -22,9 +23,10 @@ const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 export default function ProcurementReportPage() {
   usePageMeta({ title: "Procurement Reports" });
   const liveRevision = useLiveReportRevision();
+  const filters = useReportFilters();
 
-  const pos = useMemo(() => getAllPOs(), [liveRevision]);
-  const vendors = useMemo(() => getVendors(), [liveRevision]);
+  const pos = useMemo(() => applyReportFilters(getAllPOs(), filters), [liveRevision, filters]);
+  const vendors = useMemo(() => applyReportFilters(getVendors(), filters), [liveRevision, filters]);
 
   const totalSpend = useMemo(() => pos.reduce((s, p) => s + (p.grandTotal ?? 0), 0), [pos]);
   const confirmedPOs = pos.filter(p => p.status === "Confirmed" || p.status === "Delivered");

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { usePageMeta } from "@/contexts/PageMetaContext";
 import { useLiveReportRevision } from "@/hooks/useLiveReportRevision";
+import { useReportFilters } from "@/contexts/ReportControlsContext";
 import ReportShell from "@/components/reports/ReportShell";
 import KpiCard from "@/components/reports/KpiCard";
 import ChartCard from "@/components/reports/ChartCard";
@@ -10,7 +11,7 @@ import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getAllPOs } from "@/lib/purchaseOrderStore";
-import { getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
+import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -21,8 +22,9 @@ const PIE_COLORS = ["#2563EB","#10B981","#F59E0B","#EF4444","#8B5CF6"];
 export default function TaxReportPage() {
   usePageMeta({ title: "Tax Reports" });
   const liveRevision = useLiveReportRevision();
-  const invoices = useMemo(() => getInvoices(), [liveRevision]);
-  const pos = useMemo(() => getAllPOs(), [liveRevision]);
+  const filters = useReportFilters();
+  const invoices = useMemo(() => applyReportFilters(getInvoices(), filters), [liveRevision, filters]);
+  const pos = useMemo(() => applyReportFilters(getAllPOs(), filters), [liveRevision, filters]);
 
   // Tax collected (sales side)
   const taxCollected = invoices.reduce((s, i) => s + (i.totalTax ?? 0), 0);
