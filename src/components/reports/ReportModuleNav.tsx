@@ -1,6 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
   TrendingUp,
   ShoppingCart,
   Building2,
@@ -13,14 +12,18 @@ import {
   Receipt,
   FileSearch,
   Wrench,
+  ShieldCheck,
 } from "lucide-react";
 
 export type ReportModuleId =
-  | "executive"
   | "sales"
   | "procurement"
   | "vendors"
   | "clients"
+  | "catalog-products"
+  | "internal-stakeholders"
+  | "external-stakeholders"
+  | "risk-compliance"
   | "inventory"
   | "finance"
   | "support"
@@ -40,16 +43,6 @@ export const REPORT_MODULES: {
   ring: string;
   activeText: string;
 }[] = [
-  {
-    id: "executive",
-    label: "Executive Dashboard",
-    description: "Revenue, profit, KPIs & growth",
-    path: "/reports/executive",
-    icon: <LayoutDashboard className="w-5 h-5" />,
-    color: "bg-blue-50 text-blue-600",
-    ring: "ring-blue-400",
-    activeText: "text-blue-700",
-  },
   {
     id: "sales",
     label: "Sales Reports",
@@ -86,6 +79,36 @@ export const REPORT_MODULES: {
     description: "Revenue, contracts & activity",
     path: "/reports/clients",
     icon: <Users className="w-5 h-5" />,
+    color: "bg-teal-50 text-teal-600",
+    ring: "ring-teal-400",
+    activeText: "text-teal-700",
+  },
+  {
+    id: "catalog-products",
+    label: "Catalog & Product",
+    description: "Catalog, SKU, MPC, pricing & inventory",
+    path: "/reports/domain/catalog-products",
+    icon: <Package className="w-5 h-5" />,
+    color: "bg-orange-50 text-orange-600",
+    ring: "ring-orange-400",
+    activeText: "text-orange-700",
+  },
+  {
+    id: "internal-stakeholders",
+    label: "Internal Stakeholders",
+    description: "Employees, teams, roles & workload",
+    path: "/reports/domain/internal-stakeholders",
+    icon: <Users className="w-5 h-5" />,
+    color: "bg-blue-50 text-blue-600",
+    ring: "ring-blue-400",
+    activeText: "text-blue-700",
+  },
+  {
+    id: "external-stakeholders",
+    label: "External Stakeholders",
+    description: "Clients, vendors, partners & third parties",
+    path: "/reports/domain/external-stakeholders",
+    icon: <Building2 className="w-5 h-5" />,
     color: "bg-teal-50 text-teal-600",
     ring: "ring-teal-400",
     activeText: "text-teal-700",
@@ -129,6 +152,16 @@ export const REPORT_MODULES: {
     color: "bg-cyan-50 text-cyan-600",
     ring: "ring-cyan-400",
     activeText: "text-cyan-700",
+  },
+  {
+    id: "risk-compliance",
+    label: "Risk & Compliance",
+    description: "Compliance, risk & regulatory records",
+    path: "/reports/domain/risk-compliance",
+    icon: <ShieldCheck className="w-5 h-5" />,
+    color: "bg-red-50 text-red-600",
+    ring: "ring-red-400",
+    activeText: "text-red-700",
   },
   {
     id: "approvals",
@@ -198,7 +231,7 @@ export default function ReportModuleNav({
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
         {REPORT_MODULES.map((module) => {
           const isActive = onSelect
             ? activeModule === module.id

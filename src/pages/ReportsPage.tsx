@@ -8,7 +8,6 @@ import FilterBar from "@/components/reports/FilterBar";
 import ExportBar from "@/components/reports/ExportBar";
 
 // Lazy-loaded BI report pages (rendered inline when a tile is active)
-const ExecutiveDashboardPage  = lazy(() => import("@/pages/reports/ExecutiveDashboardPage"));
 const SalesReportPage         = lazy(() => import("@/pages/reports/SalesReportPage"));
 const ProcurementReportPage   = lazy(() => import("@/pages/reports/ProcurementReportPage"));
 const VendorPerformancePage   = lazy(() => import("@/pages/reports/VendorPerformancePage"));
@@ -20,6 +19,7 @@ const SlaReportPage           = lazy(() => import("@/pages/reports/SlaReportPage
 const ApprovalReportPage      = lazy(() => import("@/pages/reports/ApprovalReportPage"));
 const TaxReportPage           = lazy(() => import("@/pages/reports/TaxReportPage"));
 const AuditTrailPage          = lazy(() => import("@/pages/AuditTrailPage"));
+const StakeholderReportsPage  = lazy(() => import("@/pages/reports/StakeholderReportsPage"));
 import {
   getCustomReports,
   deleteCustomReport,
@@ -43,7 +43,6 @@ import { getSupportTickets } from "@/lib/supportTicketStore";
 import { getServiceRequests } from "@/lib/serviceRequestsStore";
 import { Button } from "@/components/ui/button";
 import {
-  LayoutDashboard,
   TrendingUp,
   Users,
   Building2,
@@ -76,6 +75,7 @@ import {
   Plus,
   ArrowRight,
   Wrench,
+  ShieldCheck,
   Trash2,
   X,
   Mail,
@@ -1046,11 +1046,14 @@ export default function ReportsPage() {
   }, [activeModule, filteredReports, setExportData]);
 
   const BI_MODULES = [
-    { id: "executive",   label: "Executive Dashboard",  desc: "Revenue, profit, KPIs & growth",        icon: <LayoutDashboard className="w-5 h-5" />, color: "bg-blue-50 text-blue-600",    ring: "ring-blue-400",    activeText: "text-blue-700"    },
+    { id: "risk-compliance", label: "Risk & Compliance", desc: "Compliance, risk & regulatory records", icon: <ShieldCheck className="w-5 h-5" />, color: "bg-red-50 text-red-600", ring: "ring-red-400", activeText: "text-red-700" },
     { id: "sales",       label: "Sales Reports",         desc: "Quotes, orders, invoices & revenue",    icon: <TrendingUp className="w-5 h-5" />,      color: "bg-emerald-50 text-emerald-600", ring: "ring-emerald-400", activeText: "text-emerald-700" },
     { id: "procurement", label: "Procurement",            desc: "POs, spend & approval cycles",          icon: <ShoppingCart className="w-5 h-5" />,    color: "bg-purple-50 text-purple-600",  ring: "ring-purple-400",  activeText: "text-purple-700"  },
     { id: "vendors",     label: "Vendor Performance",    desc: "Ratings, spend & delivery metrics",     icon: <Building2 className="w-5 h-5" />,       color: "bg-indigo-50 text-indigo-600",  ring: "ring-indigo-400",  activeText: "text-indigo-700"  },
     { id: "clients",     label: "Client Reports",        desc: "Revenue, contracts & activity",         icon: <Users className="w-5 h-5" />,           color: "bg-teal-50 text-teal-600",      ring: "ring-teal-400",    activeText: "text-teal-700"    },
+    { id: "catalog-products", label: "Catalog & Product", desc: "Catalog, SKU, MPC, prices & stock",    icon: <Package className="w-5 h-5" />,         color: "bg-orange-50 text-orange-600", ring: "ring-orange-400", activeText: "text-orange-700" },
+    { id: "internal-stakeholders", label: "Internal Stakeholders", desc: "Employees, teams, roles & workload", icon: <UserCog className="w-5 h-5" />, color: "bg-blue-50 text-blue-600", ring: "ring-blue-400", activeText: "text-blue-700" },
+    { id: "external-stakeholders", label: "External Stakeholders", desc: "Clients, vendors, partners & third parties", icon: <Building2 className="w-5 h-5" />, color: "bg-teal-50 text-teal-600", ring: "ring-teal-400", activeText: "text-teal-700" },
     { id: "inventory",   label: "Inventory Reports",     desc: "Stock levels, movements & alerts",      icon: <Package className="w-5 h-5" />,         color: "bg-orange-50 text-orange-600",  ring: "ring-orange-400",  activeText: "text-orange-700"  },
     { id: "finance",     label: "Finance Reports",       desc: "P&L, cash flow & receivables",          icon: <DollarSign className="w-5 h-5" />,      color: "bg-green-50 text-green-600",    ring: "ring-green-400",   activeText: "text-green-700"   },
     { id: "support",     label: "Support Reports",       desc: "Tickets, resolution & SLA",             icon: <HeadphonesIcon className="w-5 h-5" />,  color: "bg-rose-50 text-rose-600",      ring: "ring-rose-400",    activeText: "text-rose-700"    },
@@ -1101,7 +1104,7 @@ export default function ReportsPage() {
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 p-4">
           {BI_MODULES.map((m) => {
             const isActive = activeModule === m.id;
             return (
@@ -1140,7 +1143,6 @@ export default function ReportsPage() {
               <span className="animate-spin">⟳</span> Loading report…
             </div>
           }>
-            {activeModule === "executive"   && <ExecutiveDashboardPage />}
             {activeModule === "sales"       && <SalesReportPage />}
             {activeModule === "procurement" && <ProcurementReportPage />}
             {activeModule === "vendors"     && <VendorPerformancePage />}
@@ -1152,6 +1154,10 @@ export default function ReportsPage() {
             {activeModule === "approvals"   && <ApprovalReportPage />}
             {activeModule === "tax"         && <TaxReportPage />}
             {activeModule === "audit"       && <AuditTrailPage />}
+            {activeModule === "catalog-products" && <StakeholderReportsPage reportKind="catalog-products" />}
+            {activeModule === "internal-stakeholders" && <StakeholderReportsPage reportKind="internal-stakeholders" />}
+            {activeModule === "external-stakeholders" && <StakeholderReportsPage reportKind="external-stakeholders" />}
+            {activeModule === "risk-compliance" && <StakeholderReportsPage reportKind="risk-compliance" />}
           </Suspense>
         </ReportShellContext.Provider>
       )}
