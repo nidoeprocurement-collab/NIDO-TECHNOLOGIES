@@ -13,6 +13,7 @@ import { getOrders } from "@/lib/salesOrderStore";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getQuotes } from "@/lib/quoteStore";
 import { getClients } from "@/lib/clientStore";
+import { formatCurrency } from "@/lib/formatters";
 import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -107,9 +108,9 @@ export default function SalesReportPage() {
     date: o.orderDate,
     client: o.clientName,
     items: o.lineItems?.length ?? 0,
-    subtotal: `₹${(o.subtotal ?? 0).toLocaleString()}`,
-    tax: `₹${(o.totalTax ?? 0).toLocaleString()}`,
-    total: `₹${(o.grandTotal ?? 0).toLocaleString()}`,
+     subtotal: formatCurrency(o.subtotal ?? 0),
+     tax: formatCurrency(o.totalTax ?? 0),
+     total: formatCurrency(o.grandTotal ?? 0),
     status: o.status,
   }));
 
@@ -120,7 +121,7 @@ export default function SalesReportPage() {
         <FilterBar clients={clients.map((client) => client.name)} statuses={["Draft","Confirmed","Processing","Completed","Cancelled"]} statusLabel="Order Status" />
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <KpiCard title="Total Revenue" value={`₹${totalRevenue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+          <KpiCard title="Total Revenue" value={formatCurrency(totalRevenue, undefined, { decimals: 0 })}
             icon={<DollarSign className="w-4 h-4 text-blue-600" />} iconBg="bg-blue-50" />
           <KpiCard title="Sales Orders" value={orders.length}
             icon={<ShoppingBag className="w-4 h-4 text-indigo-600" />} iconBg="bg-indigo-50" />
@@ -128,7 +129,7 @@ export default function SalesReportPage() {
             icon={<FileText className="w-4 h-4 text-amber-600" />} iconBg="bg-amber-50" />
           <KpiCard title="Quote Conversion" value={`${conversionRate}%`}
             icon={<TrendingUp className="w-4 h-4 text-emerald-600" />} iconBg="bg-emerald-50" />
-          <KpiCard title="Avg Order Value" value={`₹${avgOrderValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+          <KpiCard title="Avg Order Value" value={formatCurrency(avgOrderValue, undefined, { decimals: 0 })}
             icon={<Receipt className="w-4 h-4 text-purple-600" />} iconBg="bg-purple-50" />
           <KpiCard title="Active Clients" value={selectedClients.length}
             icon={<Users className="w-4 h-4 text-teal-600" />} iconBg="bg-teal-50" />
@@ -146,8 +147,8 @@ export default function SalesReportPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v/1000}K`} />
-                <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, "Revenue"]} />
+                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(Number(v), undefined, { compact: true, decimals: 0 })} />
+                <Tooltip formatter={(v: number) => [formatCurrency(v, undefined, { decimals: 0 }), "Revenue"]} />
                 <Area type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={2} fill="url(#salesRev)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -175,9 +176,9 @@ export default function SalesReportPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={topClients} layout="vertical" margin={{ left: 4, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v/1000}K`} />
+                  <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(Number(v), undefined, { compact: true, decimals: 0 })} />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={90} />
-                  <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, "Revenue"]} />
+                  <Tooltip formatter={(v: number) => [formatCurrency(v, undefined, { decimals: 0 }), "Revenue"]} />
                   <Bar dataKey="revenue" fill="#10B981" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -204,9 +205,9 @@ export default function SalesReportPage() {
         </div>
 
         <AiInsightsPanel insights={[
-          { type: "positive", text: `${paidInvoices.length} paid invoices generated ₹${totalRevenue.toLocaleString("en-IN")} in revenue for the selected filters.` },
+          { type: "positive", text: `${paidInvoices.length} paid invoices generated ${formatCurrency(totalRevenue, undefined, { decimals: 0 })} in revenue for the selected filters.` },
           { type: "info", text: sentQuotes.length > 0 ? `${acceptedQuotes} of ${sentQuotes.length} sent quotes were accepted (${conversionRate}% conversion).` : "No sent quotes match the selected filters." },
-          { type: "positive", text: topClients.length > 0 ? `${topClients[0].name} is the top revenue client, contributing ₹${topClients[0].revenue.toLocaleString()}.` : "Create invoices to see client revenue rankings." },
+          { type: "positive", text: topClients.length > 0 ? `${topClients[0].name} is the top revenue client, contributing ${formatCurrency(topClients[0].revenue, undefined, { decimals: 0 })}.` : "Create invoices to see client revenue rankings." },
           { type: "warning", text: `${invoices.filter(i => i.status === "Overdue").length} invoices are overdue for the selected filters.` },
         ]} />
 

@@ -31,10 +31,65 @@ function csvValue(value: unknown): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export function reportDataToCsv(columns: ReportExportColumn[], rows: ReportExportData["rows"]): string {
   const header = columns.map((column) => csvValue(column.label)).join(",");
   const body = rows.map((row) => columns.map((column) => csvValue(row[column.key])).join(","));
   return [header, ...body].join("\r\n");
+}
+
+export function createReportExportAttachment(
+  format: ReportFileFormat,
+  title: string,
+  columns: ReportExportColumn[],
+  rows: ReportExportData["rows"],
+): { filename: string; content: string } {
+  const name = safeFileName(title);
+  const date = new Date().toISOString().slice(0, 10);
+
+  if (format === "CSV") {
+    const content = bytesToBase64(new TextEncoder().encode(`\uFEFF${reportDataToCsv(columns, rows)}`));
+    return { filename: `${name}-${date}.csv`, content };
+  }
+
+  if (format === "Excel") {
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      columns.map((column) => column.label),
+      ...rows.map((row) => columns.map((column) => cellText(row[column.key]))),
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
+    return {
+      filename: `${name}-${date}.xlsx`,
+      content: XLSX.write(workbook, { type: "base64", bookType: "xlsx" }),
+    };
+  }
+
+  const pdf = new jsPDF({ orientation: columns.length > 6 ? "landscape" : "portrait" });
+  pdf.setFontSize(14);
+  pdf.text(title, 14, 16);
+  pdf.setFontSize(9);
+  pdf.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
+  autoTable(pdf, {
+    startY: 28,
+    head: [columns.map((column) => column.label)],
+    body: rows.map((row) => columns.map((column) => cellText(row[column.key]))),
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [37, 99, 235] },
+    margin: { left: 14, right: 14 },
+  });
+  return {
+    filename: `${name}-${date}.pdf`,
+    content: bytesToBase64(new Uint8Array(pdf.output("arraybuffer"))),
+  };
 }
 
 export function downloadReportExport(
