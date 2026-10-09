@@ -355,16 +355,6 @@ function CreateReportView({
           <div className="rc-module-pills">{modules.map((module) => <button key={module} type="button" className={`rc-chip ${effectiveModule === module ? "active" : ""}`} onClick={() => updateDraft({ module, selectedColumns: [] })}>{module}</button>)}</div>
         </section>
       </div>
-      <div className="rc-sticky-preview">
-        <div className="rc-preview-meta">
-          <button type="button" className="rc-button" onClick={showPreview}><Eye />{previewVisible ? "Preview" : "Show preview"}</button>
-          <span>{previewCount ?? previewRecords.length} records · {fieldCount} columns{moneyColumns ? ` · ${previewCurrency}` : ""}</span>
-        </div>
-        <div className="rc-action-group">
-          <button type="button" className="rc-button primary" onClick={submitDownload}><Download />Download Report</button>
-          <button type="button" className="rc-button" onClick={() => { updateDraft({ delivery: "email" }); submitEmail(); }}><Mail />Send Email</button>
-        </div>
-      </div>
       <section className="rc-card rc-section">
         <div className="rc-section-title">4. Choose columns</div>
         <div className="rc-columns-head">
