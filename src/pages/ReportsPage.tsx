@@ -57,6 +57,7 @@ const LIVE_DATA_EVENTS = [
   "priceEngineSettingsUpdated",
   "slaEngineUpdated",
   "nidoClientsUpdated",
+  "nidoClientDataUpdated",
   "serviceRequestsUpdated",
   "nidoInvoicesUpdated",
   "nidoSalesOrdersUpdated",
@@ -73,6 +74,9 @@ const LIVE_DATA_EVENTS = [
   "poCancelled",
   "poActivityUpdated",
   "orderSubItemsUpdated",
+  "nidoMyOrdersUpdated",
+  "orderFulfillmentStatusUpdated",
+  "approvalStoreUpdated",
 ];
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -269,7 +273,7 @@ export default function ReportsPage() {
         if (active) setSourceLoading(false);
       });
     return () => { active = false; };
-  }, [draft.module, reloadToken]);
+  }, [draft.module, draft.entityType, reloadToken]);
 
   const filteredRecords = useMemo(
     () => filterReportCenterRecords(sourceRecords, draft, entitiesByType),

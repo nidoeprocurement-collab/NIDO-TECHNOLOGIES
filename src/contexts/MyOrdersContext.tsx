@@ -239,6 +239,7 @@ export function MyOrdersProvider({ children }: { children: ReactNode }) {
   // Persist every change to localStorage so orders survive page refresh
   useEffect(() => {
     localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+    window.dispatchEvent(new Event("nidoMyOrdersUpdated"));
   }, [orders]);
 
   // Cross-tab / cross-session sync: if another tab (e.g. the owner platform or

@@ -2,6 +2,7 @@ import type { ReportColumnGroup, ReportEntityType } from "@/components/reports/r
 import { getClients } from "@/lib/clientStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
 import { getClientCatalog } from "@/lib/clientCatalogStore";
+import { getClientOrders, getClientServices } from "@/lib/clientDataStore";
 import { getReportRecords, getReportFieldValue, type ReportRecord } from "@/lib/reportData";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getOrders } from "@/lib/salesOrderStore";
@@ -149,6 +150,39 @@ function mapClientCatalogRecords(): ReportRecord[] {
   });
 }
 
+function mapClientOrderRecords(): ReportRecord[] {
+  const clients = getClients();
+  const clientsById = new Map(clients.map((client) => [String(client.id), String(client.name ?? client.id)]));
+  return clients.flatMap((client) => {
+    const clientId = String(client.id);
+    const clientName = clientsById.get(clientId) ?? clientId;
+    return getClientOrders(clientId, clientName).map((order) => ({
+      ...(order as unknown as ReportRecord),
+      clientId,
+      clientName: order.client && order.client !== clientId ? order.client : clientName,
+      orderDate: order.date,
+      amount: order.amountNum,
+      totalAmount: order.amountNum,
+    }));
+  });
+}
+
+function mapClientServiceRecords(): ReportRecord[] {
+  const clients = getClients();
+  return clients.flatMap((client) => {
+    const clientId = String(client.id);
+    const clientName = String(client.name ?? clientId);
+    return getClientServices(clientId).map((service) => ({
+      ...(service as unknown as ReportRecord),
+      clientId,
+      clientName,
+      serviceName: service.name,
+      requestDate: service.startDate,
+      assignedTo: service.provider,
+    }));
+  });
+}
+
 function getVendorStakeholderType(vendor: ReportRecord): "Vendor" | "Partner" | "Third Party" {
   const declared = String(
     vendor.stakeholderType ?? vendor.relationshipType ?? vendor.partnerType ?? "",
@@ -226,6 +260,7 @@ export function getReportCenterRecords(module: string, entityType?: ReportEntity
     case "RFQs":
       throw new Error("RFQ records cannot be loaded because this installation has no RFQ request data source.");
     case "Client Orders":
+      return mapClientOrderRecords();
     case "Orders":
       return toRecords(getOrders());
     case "Catalog":
@@ -233,12 +268,21 @@ export function getReportCenterRecords(module: string, entityType?: ReportEntity
       if (module === "Inventory") return toRecords(getStockHistory());
       return entityType === "client" ? mapClientCatalogRecords() : toRecords(getCatalogProducts());
     case "Services":
+      if (entityType === "client") return mapClientServiceRecords();
       return toRecords(getServiceRequests());
     case "Support":
       return toRecords(getSupportTickets());
     case "Invoices / Bills":
+      if (entityType === "client") {
+        return toRecords(getInvoices()).map((record) => ({ ...record, documentType: "Invoice" }));
+      }
+      if (entityType === "vendor") return getBills();
       return [...toRecords(getInvoices()).map((record) => ({ ...record, documentType: "Invoice" })), ...getBills()];
     case "Payments":
+      if (entityType === "client") {
+        return toRecords(getReceipts()).map((record) => ({ ...record, paymentType: "Client receipt" }));
+      }
+      if (entityType === "vendor") return getPaymentsMade();
       return [...toRecords(getReceipts()).map((record) => ({ ...record, paymentType: "Client receipt" })), ...getPaymentsMade()];
     case "Vendor Credits":
       return getVendorCredits();
@@ -282,6 +326,18 @@ export function getReportCenterRecords(module: string, entityType?: ReportEntity
         })),
         ...toRecords(getOrders()),
         ...toRecords(getServiceRequests()),
+        ...mapClientOrderRecords().map((record) => ({
+          ...record,
+          documentType: "Client order",
+          documentNumber: record.orderNumber ?? record.orderId ?? record.id,
+          date: record.orderDate ?? record.date,
+        })),
+        ...mapClientServiceRecords().map((record) => ({
+          ...record,
+          documentType: "Service",
+          documentNumber: record.id,
+          date: record.startDate,
+        })),
       ];
     case "External Stakeholders":
       return [
@@ -308,7 +364,7 @@ export function getReportCenterRecords(module: string, entityType?: ReportEntity
 }
 
 export async function loadReportCenterRecords(module: string, entityType?: ReportEntityType): Promise<ReportRecord[]> {
-  if (module !== "Approvals") return getReportCenterRecords(module);
+  if (module !== "Approvals") return getReportCenterRecords(module, entityType);
   try {
     const bootstrap = await loadApprovalBootstrap();
     return [
@@ -442,10 +498,10 @@ export function filterReportCenterRecords(
 
   if (!draft.dateFrom && !draft.dateTo) return filtered;
   const dateKeys: Record<string, string[]> = {
-    "Created date": ["createdAt", "createdOn", "createdDate", "date", "timestamp"],
+    "Created date": ["createdAt", "createdOn", "createdDate", "orderDate", "requestDate", "startDate", "date", "timestamp"],
     "Updated date": ["updatedAt", "modifiedAt", "lastUpdatedAt"],
-    "Order date": ["orderDate", "invoiceDate", "billDate", "date", "createdAt"],
-    "Delivery date": ["deliveryDate", "expectedDeliveryDate", "dueDate"],
+    "Order date": ["orderDate", "invoiceDate", "billDate", "requestDate", "startDate", "date", "createdAt"],
+    "Delivery date": ["deliveryDate", "expectedDeliveryDate", "dueDate", "endDate"],
   };
   const keys = dateKeys[draft.dateBasis] ?? dateKeys["Created date"];
   return filtered.filter((record) => {
