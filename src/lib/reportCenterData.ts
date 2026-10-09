@@ -59,7 +59,6 @@ export const REPORT_CENTER_MODULES: Record<ReportEntityType, string[]> = {
     "Client Reports",
     "Internal Stakeholders",
     "External Stakeholders",
-    "Executive Dashboard",
     "Custom Reports",
   ],
 };
@@ -93,7 +92,6 @@ export const REPORT_CENTER_COLUMNS: Record<string, ReportColumnGroup[]> = {
   "Client Reports": [group("CLIENT REPORTS", "Client Name", "Document Type", "Document Number", "Date", "Status", "Amount")],
   "Internal Stakeholders": [group("INTERNAL STAKEHOLDERS", "Name", "Email", "Department", "Role", "Status")],
   "External Stakeholders": [group("EXTERNAL STAKEHOLDERS", "Name", "Entity Type", "Email", "Status", "Created date")],
-  "Executive Dashboard": [group("PLATFORM SUMMARY", "Module", "Record Type", "Name", "Status", "Date", "Amount")],
   "Custom Reports": [group("SAVED REPORTS", "Name", "Report Type", "Module", "Frequency", "Last Run Status", "Created date")],
 };
 
@@ -238,13 +236,39 @@ export function getReportCenterRecords(module: string): ReportRecord[] {
         ...toRecords(getQuotes()).map((record) => ({ ...record, documentType: "Quote" })),
       ];
     case "Vendor Performance":
-      return [...toRecords(getVendors()), ...toRecords(getAllPOs())];
+      return [
+        ...toRecords(getVendors()).map((record) => ({
+          ...record,
+          vendorId: record.vendorId ?? record.id,
+          vendorName: record.vendorName ?? record.name,
+        })),
+        ...toRecords(getAllPOs()),
+      ];
     case "Client Reports":
-      return [...toRecords(getClients()), ...toRecords(getOrders()), ...toRecords(getServiceRequests())];
+      return [
+        ...toRecords(getClients()).map((record) => ({
+          ...record,
+          clientId: record.clientId ?? record.id,
+          clientName: record.clientName ?? record.name,
+          documentType: "Client",
+        })),
+        ...toRecords(getOrders()),
+        ...toRecords(getServiceRequests()),
+      ];
     case "External Stakeholders":
       return [
-        ...toRecords(getClients()).map((record) => ({ ...record, entityType: "Client" })),
-        ...toRecords(getVendors()).map((record) => ({ ...record, entityType: "Vendor" })),
+        ...toRecords(getClients()).map((record) => ({
+          ...record,
+          clientId: record.clientId ?? record.id,
+          clientName: record.clientName ?? record.name,
+          entityType: "Client",
+        })),
+        ...toRecords(getVendors()).map((record) => ({
+          ...record,
+          vendorId: record.vendorId ?? record.id,
+          vendorName: record.vendorName ?? record.name,
+          entityType: "Vendor",
+        })),
       ];
     case "Executive Dashboard":
       return getReportRecords("All Modules");

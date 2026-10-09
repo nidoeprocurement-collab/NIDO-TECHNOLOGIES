@@ -83,15 +83,15 @@ const REPORT_ROUTES: Record<string, string> = {
   Payments: "/reports/finance",
   Support: "/reports/support",
   "Client Reports": "/reports/clients",
-  "External Stakeholders": "/reports/domain/external",
-  "Products / Catalog": "/reports/vendors",
+  "External Stakeholders": "/reports/domain/external-stakeholders",
+  "Products / Catalog": "/reports/domain/catalog-products",
   "Vendor Orders": "/reports/vendors",
   "Purchase Orders": "/reports/procurement",
   RFQs: "/reports/procurement",
   "Vendor Credits": "/reports/finance",
   SLA: "/reports/sla",
-  Users: "/reports/domain/internal",
-  Departments: "/reports/domain/internal",
+  Users: "/reports/domain/internal-stakeholders",
+  Departments: "/reports/domain/internal-stakeholders",
   Orders: "/reports/sales",
   Approvals: "/reports/approvals",
   Finance: "/reports/finance",
@@ -101,7 +101,7 @@ const REPORT_ROUTES: Record<string, string> = {
   "Sales Reports": "/reports/sales",
   "Procurement Reports": "/reports/procurement",
   "Vendor Performance": "/reports/vendors",
-  "Internal Stakeholders": "/reports/domain/internal",
+  "Internal Stakeholders": "/reports/domain/internal-stakeholders",
   "Executive Dashboard": "/reports/executive",
   "Custom Reports": "/reports/create",
 };
@@ -544,7 +544,7 @@ export default function ReportsPage() {
     navigate(REPORT_ROUTES[record.module ?? ""] ?? "/reports");
   };
 
-  const onDownloadHistoryRecord = (record: ReportHistoryRecord) => {
+  const onDownloadHistoryRecord = async (record: ReportHistoryRecord) => {
     const saved = getReportCenterHistory().find((item) => item.id === record.id);
     if (!saved) {
       toast({ title: "Report snapshot not found", description: "Refresh history and try again." });
@@ -554,8 +554,9 @@ export default function ReportsPage() {
       const columns = saved.columns;
       let rows = saved.rows;
       if (!rows.length && saved.rowCount > 0 && saved.draft) {
+        const currentModuleRecords = await loadReportCenterRecords(saved.draft.module);
         const current = filterReportCenterRecords(
-          sourceRecords,
+          currentModuleRecords,
           saved.draft,
           entitiesByType,
         );

@@ -9,19 +9,30 @@ import FilterBar from "@/components/reports/FilterBar";
 import AiInsightsPanel from "@/components/reports/AiInsightsPanel";
 import ExportBar from "@/components/reports/ExportBar";
 import ReportDataTable from "@/components/reports/ReportDataTable";
-import { getOrders } from "@/lib/salesOrderStore";
+import { getActiveOrders } from "@/lib/salesOrderStore";
 import { getInvoices } from "@/lib/invoiceStore";
-import { getQuotes } from "@/lib/quoteStore";
+import { getActiveQuotes } from "@/lib/quoteStore";
 import { getClients } from "@/lib/clientStore";
 import { formatCurrency } from "@/lib/formatters";
 import { applyReportFilters, getRecentReportMonths, getReportMonthKey } from "@/lib/reportData";
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid,
-  BarChart, Bar, PieChart, Pie, Cell, Legend, AreaChart, Area,
+  ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar, PieChart, Pie, Cell, Legend, ComposedChart, Area, Line,
 } from "recharts";
 import { DollarSign, FileText, TrendingUp, Users, Receipt, ShoppingBag } from "lucide-react";
 
 const PIE_COLORS = ["#2563EB", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+type SalesOrderTableRow = {
+  orderNumber: string;
+  date: string;
+  client: string;
+  items: number;
+  subtotal: string;
+  tax: string;
+  total: string;
+  status: string;
+};
+
 export default function SalesReportPage() {
   usePageMeta({ title: "Sales Reports" });
   const liveRevision = useLiveReportRevision();
@@ -41,7 +52,7 @@ export default function SalesReportPage() {
   }), [filters]);
   const orders = useMemo(
     () => applyReportFilters(
-      getOrders().map((order) => ({ ...order, createdAt: order.orderDate ?? order.createdAt })),
+      getActiveOrders().map((order) => ({ ...order, createdAt: order.orderDate ?? order.createdAt })),
       { ...sharedFilters, status: filters.status },
     ),
     [liveRevision, sharedFilters, filters.status],
@@ -55,7 +66,7 @@ export default function SalesReportPage() {
   );
   const quotes = useMemo(
     () => applyReportFilters(
-      getQuotes().map((quote) => ({ ...quote, createdAt: quote.quoteDate ?? quote.createdAt })),
+      getActiveQuotes().map((quote) => ({ ...quote, createdAt: quote.quoteDate ?? quote.createdAt })),
       sharedFilters,
     ),
     [liveRevision, sharedFilters],
@@ -83,6 +94,9 @@ export default function SalesReportPage() {
     revenue: paidInvoices
       .filter((invoice) => getReportMonthKey(invoice.invoiceDate ?? invoice.createdAt) === key)
       .reduce((sum, invoice) => sum + (invoice.grandTotal ?? 0), 0),
+    orders: validOrders.filter((order) =>
+      getReportMonthKey(order.orderDate ?? order.createdAt) === key,
+    ).length,
   }));
 
   // Revenue means cash collected, so exclude unpaid and cancelled invoices.
@@ -103,15 +117,15 @@ export default function SalesReportPage() {
   quotes.forEach(q => { quoteStatusMap[q.status] = (quoteStatusMap[q.status] ?? 0) + 1; });
   const quoteStatusData = Object.entries(quoteStatusMap).map(([name, value]) => ({ name, value }));
 
-  const tableData = orders.slice(0, 50).map(o => ({
-    orderNumber: o.orderNumber,
-    date: o.orderDate,
-    client: o.clientName,
+  const tableData = orders.map(o => ({
+    orderNumber: String(o.orderNumber ?? ""),
+    date: String(o.orderDate ?? ""),
+    client: String(o.clientName ?? ""),
     items: o.lineItems?.length ?? 0,
      subtotal: formatCurrency(o.subtotal ?? 0),
      tax: formatCurrency(o.totalTax ?? 0),
      total: formatCurrency(o.grandTotal ?? 0),
-    status: o.status,
+    status: String(o.status ?? ""),
   }));
 
   return (
@@ -136,9 +150,9 @@ export default function SalesReportPage() {
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <ChartCard title="Revenue Trend" subtitle="Monthly" className="col-span-2">
+          <ChartCard title="Revenue & Orders Trend" subtitle="Monthly" className="col-span-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <ComposedChart data={revenueTrend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="salesRev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563EB" stopOpacity={0.15} />
@@ -147,10 +161,14 @@ export default function SalesReportPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(Number(v), undefined, { compact: true, decimals: 0 })} />
-                <Tooltip formatter={(v: number) => [formatCurrency(v, undefined, { decimals: 0 }), "Revenue"]} />
-                <Area type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={2} fill="url(#salesRev)" />
-              </AreaChart>
+                <YAxis yAxisId="revenue" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(Number(v), undefined, { compact: true, decimals: 0 })} />
+                <YAxis yAxisId="orders" orientation="right" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip formatter={(value: number, name: string) => name === "Revenue"
+                  ? [formatCurrency(value, undefined, { decimals: 0 }), name]
+                  : [value, "Orders"]} />
+                <Area yAxisId="revenue" type="monotone" dataKey="revenue" name="Revenue" stroke="#2563EB" strokeWidth={2} fill="url(#salesRev)" />
+                <Line yAxisId="orders" type="monotone" dataKey="orders" name="Orders" stroke="#10B981" strokeWidth={2} dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           </ChartCard>
           <ChartCard title="Invoice Status">
@@ -213,7 +231,8 @@ export default function SalesReportPage() {
 
         <ReportDataTable
           title="Sales Orders"
-          data={tableData as any[]}
+          data={tableData}
+          applyGlobalFilters={false}
           columns={[
             { key: "orderNumber", label: "Order #", sortable: true },
             { key: "date", label: "Date", sortable: true },
@@ -222,7 +241,7 @@ export default function SalesReportPage() {
             { key: "subtotal", label: "Subtotal", align: "right" },
             { key: "tax", label: "Tax", align: "right" },
             { key: "total", label: "Total", align: "right" },
-            { key: "status", label: "Status", render: (r: any) => (
+            { key: "status", label: "Status", render: (r: SalesOrderTableRow) => (
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                 r.status === "Completed" ? "bg-emerald-100 text-emerald-700" :
                 r.status === "Cancelled" ? "bg-red-100 text-red-600" :
