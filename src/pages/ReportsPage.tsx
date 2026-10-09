@@ -75,37 +75,6 @@ const LIVE_DATA_EVENTS = [
   "orderSubItemsUpdated",
 ];
 
-const REPORT_ROUTES: Record<string, string> = {
-  "Client Orders": "/reports/sales",
-  Catalog: "/reports/inventory",
-  Services: "/reports/clients",
-  "Invoices / Bills": "/reports/finance",
-  Payments: "/reports/finance",
-  Support: "/reports/support",
-  "Client Reports": "/reports/clients",
-  "External Stakeholders": "/reports/domain/external-stakeholders",
-  "Products / Catalog": "/reports/domain/catalog-products",
-  "Vendor Orders": "/reports/vendors",
-  "Purchase Orders": "/reports/procurement",
-  RFQs: "/reports/procurement",
-  "Vendor Credits": "/reports/finance",
-  SLA: "/reports/sla",
-  Users: "/reports/domain/internal-stakeholders",
-  Departments: "/reports/domain/internal-stakeholders",
-  Orders: "/reports/sales",
-  Approvals: "/reports/approvals",
-  Finance: "/reports/finance",
-  "Audit Trail": "/reports/audit",
-  Inventory: "/reports/inventory",
-  Tax: "/reports/tax",
-  "Sales Reports": "/reports/sales",
-  "Procurement Reports": "/reports/procurement",
-  "Vendor Performance": "/reports/vendors",
-  "Internal Stakeholders": "/reports/domain/internal-stakeholders",
-  "Executive Dashboard": "/reports/executive",
-  "Custom Reports": "/reports/create",
-};
-
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const IST_OFFSET_MS = 330 * 60 * 1000;
 
@@ -540,10 +509,6 @@ export default function ReportsPage() {
     }
   };
 
-  const onViewHistoryRecord = (record: ReportHistoryRecord) => {
-    navigate(REPORT_ROUTES[record.module ?? ""] ?? "/reports");
-  };
-
   const onDownloadHistoryRecord = async (record: ReportHistoryRecord) => {
     const saved = getReportCenterHistory().find((item) => item.id === record.id);
     if (!saved) {
@@ -626,7 +591,6 @@ export default function ReportsPage() {
         setStoredHistory(getReportCenterHistory());
         setStoredSchedules(getReportCenterSchedules());
       }}
-      onViewHistoryRecord={onViewHistoryRecord}
       onDownloadHistoryRecord={onDownloadHistoryRecord}
     />
   );

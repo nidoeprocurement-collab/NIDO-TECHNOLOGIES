@@ -148,7 +148,6 @@ export interface ReportsCenterUIProps {
 
   historyRecords?: ReportHistoryRecord[];
   onRefreshHistory?: () => void;
-  onViewHistoryRecord?: (record: ReportHistoryRecord) => void;
   onDownloadHistoryRecord?: (record: ReportHistoryRecord) => void;
 }
 
@@ -594,10 +593,9 @@ function ScheduledReportsView({
   </>;
 }
 
-function HistoryView({ records, onRefreshHistory, onViewRecord, onDownloadRecord, notify }: {
+function HistoryView({ records, onRefreshHistory, onDownloadRecord, notify }: {
   records: ReportHistoryRecord[];
   onRefreshHistory?: () => void;
-  onViewRecord?: (record: ReportHistoryRecord) => void;
   onDownloadRecord?: (record: ReportHistoryRecord) => void;
   notify: (message: string) => void;
 }) {
@@ -641,7 +639,7 @@ function HistoryView({ records, onRefreshHistory, onViewRecord, onDownloadRecord
     </div>
     <div className="rc-card rc-table"><table><thead><tr>{["Report & scope", "Generated on (IST)", "Report period", "Source", "Delivery", "Status", "Actions"].map((heading) => <th key={heading}>{heading}</th>)}</tr></thead>
       <tbody>{paged.length ? paged.map((record) => <tr key={record.id}>
-         <td><div className="rc-row-title">{record.name}</div><div className="rc-row-sub">{record.scopeDetail || record.scope}</div></td><td>{record.generatedAt}</td><td>{record.period || "—"}</td><td>{record.source}</td><td>{record.delivery}</td><td><span className={`rc-status ${record.status === "failed" ? "failed" : record.status === "running" ? "paused" : ""}`}>{record.status[0].toUpperCase() + record.status.slice(1)}</span></td><td><div className="rc-row-actions"><IconButton label="View report" onClick={() => { onViewRecord?.(record); notify(onViewRecord ? `Opening ${record.name}.` : "Report view requested."); }}><Eye /></IconButton><IconButton label="Download report" onClick={() => { onDownloadRecord?.(record); notify(onDownloadRecord ? `Download requested: ${record.name}.` : "Report download requested."); }}><Download /></IconButton></div></td>
+         <td><div className="rc-row-title">{record.name}</div><div className="rc-row-sub">{record.scopeDetail || record.scope}</div></td><td>{record.generatedAt}</td><td>{record.period || "—"}</td><td>{record.source}</td><td>{record.delivery}</td><td><span className={`rc-status ${record.status === "failed" ? "failed" : record.status === "running" ? "paused" : ""}`}>{record.status[0].toUpperCase() + record.status.slice(1)}</span></td><td><div className="rc-row-actions"><IconButton label="Download report" onClick={() => { onDownloadRecord?.(record); notify(onDownloadRecord ? `Download requested: ${record.name}.` : "Report download requested."); }}><Download /></IconButton></div></td>
       </tr>) : <tr><td colSpan={7} className="rc-table-empty">{records.length ? "No report history matches. Adjust the filters and try again." : "No report history matches. Generate a report to see it here."}</td></tr>}</tbody>
     </table></div>
     <div className="rc-pager"><span>Showing {filtered.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, filtered.length)} of {filtered.length}</span><div className="rc-pager-actions">
@@ -711,7 +709,6 @@ export default function ReportsCenterUI(props: ReportsCenterUIProps) {
       {activeTab === "history" && <HistoryView
         records={props.historyRecords ?? []}
         onRefreshHistory={props.onRefreshHistory}
-        onViewRecord={props.onViewHistoryRecord}
         onDownloadRecord={props.onDownloadHistoryRecord}
         notify={notify}
       />}
