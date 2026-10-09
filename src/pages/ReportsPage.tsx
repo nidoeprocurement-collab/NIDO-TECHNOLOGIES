@@ -255,7 +255,7 @@ export default function ReportsPage() {
     let active = true;
     setSourceLoading(true);
     setSourceError("");
-    loadReportCenterRecords(draft.module)
+    loadReportCenterRecords(draft.module, draft.entityType)
       .then((records) => {
         if (active) setSourceRecords(records);
       })
@@ -353,7 +353,7 @@ export default function ReportsPage() {
         throw new Error("Choose at least one report column.");
       }
       const entities = getReportCenterEntities();
-      const records = await loadReportCenterRecords(reportDraft.module);
+      const records = await loadReportCenterRecords(reportDraft.module, reportDraft.entityType);
       const selectedRecords = filterReportCenterRecords(records, reportDraft, entities);
       columns = getReportCenterExportData(selectedRecords, reportDraft.selectedColumns);
       rows = getReportCenterRows(selectedRecords, reportDraft.selectedColumns);
@@ -519,7 +519,7 @@ export default function ReportsPage() {
       const columns = saved.columns;
       let rows = saved.rows;
       if (!rows.length && saved.rowCount > 0 && saved.draft) {
-        const currentModuleRecords = await loadReportCenterRecords(saved.draft.module);
+        const currentModuleRecords = await loadReportCenterRecords(saved.draft.module, saved.draft.entityType);
         const current = filterReportCenterRecords(
           currentModuleRecords,
           saved.draft,

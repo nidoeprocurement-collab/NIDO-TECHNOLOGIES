@@ -1,6 +1,7 @@
 import type { ReportColumnGroup, ReportEntityType } from "@/components/reports/report-center/ReportsCenterUI";
 import { getClients } from "@/lib/clientStore";
 import { getCatalogProducts } from "@/lib/catalogStore";
+import { getClientCatalog } from "@/lib/clientCatalogStore";
 import { getReportRecords, getReportFieldValue, type ReportRecord } from "@/lib/reportData";
 import { getInvoices } from "@/lib/invoiceStore";
 import { getOrders } from "@/lib/salesOrderStore";
@@ -131,6 +132,33 @@ function mapVendorProducts(): ReportRecord[] {
   );
 }
 
+function mapClientCatalogRecords(): ReportRecord[] {
+  return getClients().flatMap((client) => {
+    const clientId = String(client.id);
+    const clientName = String(client.name ?? clientId);
+    return getClientCatalog(clientId).map((product, index) => ({
+      ...(product as unknown as ReportRecord),
+      id: `${clientId}:${product.productCode || product.sku || index}`,
+      clientId,
+      clientName,
+      productName: product.name,
+      price: product.priceNum ?? product.price,
+      stock: product.availability,
+      status: product.availability,
+    }));
+  });
+}
+
+function getVendorStakeholderType(vendor: ReportRecord): "Vendor" | "Partner" | "Third Party" {
+  const declared = String(
+    vendor.stakeholderType ?? vendor.relationshipType ?? vendor.partnerType ?? "",
+  ).toLowerCase();
+  const category = String(vendor.category ?? "").toLowerCase();
+  if (declared.includes("partner") || category.includes("partner")) return "Partner";
+  if (declared.includes("third") || category.includes("third")) return "Third Party";
+  return "Vendor";
+}
+
 function mapDepartments(): ReportRecord[] {
   const users = toRecords(getUsers());
   const counts = new Map<string, number>();
@@ -187,7 +215,7 @@ function getAllFinanceRecords(): ReportRecord[] {
   ];
 }
 
-export function getReportCenterRecords(module: string): ReportRecord[] {
+export function getReportCenterRecords(module: string, entityType?: ReportEntityType): ReportRecord[] {
   switch (module) {
     case "Products / Catalog":
       return mapVendorProducts();
@@ -196,14 +224,14 @@ export function getReportCenterRecords(module: string): ReportRecord[] {
     case "Procurement Reports":
       return toRecords(getAllPOs());
     case "RFQs":
-      // This installation has no separate RFQ record store yet.
-      return [];
+      throw new Error("RFQ records cannot be loaded because this installation has no RFQ request data source.");
     case "Client Orders":
     case "Orders":
       return toRecords(getOrders());
     case "Catalog":
     case "Inventory":
-      return module === "Inventory" ? toRecords(getStockHistory()) : toRecords(getCatalogProducts());
+      if (module === "Inventory") return toRecords(getStockHistory());
+      return entityType === "client" ? mapClientCatalogRecords() : toRecords(getCatalogProducts());
     case "Services":
       return toRecords(getServiceRequests());
     case "Support":
@@ -267,7 +295,7 @@ export function getReportCenterRecords(module: string): ReportRecord[] {
           ...record,
           vendorId: record.vendorId ?? record.id,
           vendorName: record.vendorName ?? record.name,
-          entityType: "Vendor",
+          entityType: getVendorStakeholderType(record),
         })),
       ];
     case "Executive Dashboard":
@@ -275,11 +303,11 @@ export function getReportCenterRecords(module: string): ReportRecord[] {
     case "Custom Reports":
       return toRecords(getCustomReports());
     default:
-      return [];
+      throw new Error(`Report data source is not configured for "${module}".`);
   }
 }
 
-export async function loadReportCenterRecords(module: string): Promise<ReportRecord[]> {
+export async function loadReportCenterRecords(module: string, entityType?: ReportEntityType): Promise<ReportRecord[]> {
   if (module !== "Approvals") return getReportCenterRecords(module);
   try {
     const bootstrap = await loadApprovalBootstrap();
