@@ -668,13 +668,12 @@ export default function ReportsCenterUI(props: ReportsCenterUIProps) {
   };
   const setTab = (tab: ReportsCenterTab) => { setLocalActiveTab(tab); props.onTabChange?.(tab); };
   const intro = activeTab === "create"
-    ? { crumb: "Reports", subtitle: "Choose your data, columns and delivery options." }
+    ? { subtitle: "Choose your data, columns and delivery options." }
     : activeTab === "scheduled"
-      ? { crumb: "Schedules", subtitle: "Create and manage automatic report delivery." }
-      : { crumb: "History", subtitle: "Track generated reports, downloads and email deliveries." };
+      ? { subtitle: "Create and manage automatic report delivery." }
+      : { subtitle: "Track generated reports, downloads and email deliveries." };
   return <main className="rc-root">
     <div className="rc-workspace">
-      <div className="rc-crumbs"><span aria-hidden="true">⌂</span><ChevronRight style={{ width: 11, height: 11 }} /><span className={activeTab === "create" ? "rc-crumb-pill" : ""}>Reports</span>{activeTab !== "create" && <><ChevronRight style={{ width: 11, height: 11 }} /><span className="rc-crumb-pill">{intro.crumb}</span></>}</div>
       <header className="rc-heading"><h1>Reports</h1><p>{intro.subtitle}</p></header>
       <ReportsTabs active={activeTab} onChange={setTab} />
       {activeTab === "create" && <CreateReportView
